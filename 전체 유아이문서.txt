@@ -1,0 +1,323 @@
+📘 디어쌤 Multi-Tenant SaaS UI/UX Technical Architecture v6.0
+
+Enterprise Edition — Zero-Trust · Schema-Driven · Multi-Tenant · Backoffice-Ready · Performance-Gated · Version-Safe
+
+0. 문서 목적 (Purpose)
+
+本 문서는 디어쌤 SaaS 플랫폼을 다음 목표 수준으로 안정적으로 운영하기 위한 최종 UI/UX 기술 아키텍처 규약이다:
+
+✔ 업종 10 → 100 확장
+✔ 테넌트 5,000 → 30,000 확장
+✔ 고객용 + Backoffice UI를 통합적으로 운영
+✔ 고성능(Initial Load ≤ 500KB) 유지
+✔ 접근성 WCAG 2.1 AAA 목표
+✔ Zero-Trust 기반 보안 모델
+✔ SDUI 스키마 기반 자동 UI 생성
+✔ 스키마 버전관리 + 안전한 업그레이드
+✔ 모듈·앱·위젯 간 강력한 Isolation
+1. Enterprise Architecture Principles (EA-Principles)
+🎯 1.1 Zero-Trust UI Layer (강화됨)
+
+UI는 테넌트/업종에 대한 신뢰를 갖지 않는다.
+
+Zero-Trust 원칙:
+
+UI는 절대로 테넌트 ID를 생성하거나 수정하지 않는다.
+
+업종(Industry Context)도 UI가 직접 결정하지 않는다.
+
+모든 데이터 요청은 /api-sdk를 통해서만 발생한다.
+
+api-sdk는 항상 아래 3개를 포함하여 요청한다:
+
+tenant_id
+
+industry_type
+
+auth token
+
+➡ UI는 권한을 추론하지 않고, SDK는 권한을 생성하지 않는다.
+➡ 권한 결정은 전부 Supabase RLS가 맡는다.
+
+🎯 1.2 Boundary & Isolation (강화됨)
+UI Architecture Boundary
+schema-engine  →  ui-core  →  design-system  →  theme-engine
+        ↓
+(custom widget sandbox)
+
+
+각 모듈은 다음을 침범할 수 없다:
+
+모듈	금지사항
+schema-engine	Tailwind 클래스 직접 사용 금지
+ui-core	스키마 구조 해석 금지
+widgets	api-sdk, 다른 업종 schema import 금지
+apps	api-sdk 우회 금지 (직접 fetch 금지)
+🎯 1.3 Schema-Driven Everything
+
+UI = 스키마
+Form = 스키마
+Table = 스키마
+Validation = 스키마
+Field 조건부 로직 = 스키마
+레이아웃(columns/gap) = 스키마 → Props 형태로 전달
+
+절대 Tailwind 클래스 문자열을 스키마에서 사용하지 않는다.
+
+🎯 1.4 Performance Budget Enforcement = Hard Gate
+
+성능 목표는 “권장”이 아니라 “필수(Gate)”이다.
+
+Metric	목표	Gate 동작
+Initial Load Bundle	≤ 500KB	초과 시 빌드 실패
+FCP	≤ 1.5s	초과 시 경고
+TTI	≤ 800ms	초과 시 빌드 실패
+Interaction Delay	≤ 100ms	초과 시 경고
+
+CI에 아래 도구를 통합한다:
+
+Webpack/Next.js Bundle Analyzer
+
+LightHouse CI
+
+Custom JS Bundle Budget Script
+
+🎯 1.5 Version-Safe SDUI
+
+스키마 버전, 테마 버전, 업종 버전 모두 version-safe 구조다.
+
+스키마 충돌 발생 시:
+
+Migration Script 실행
+
+Legacy Renderer와의 병행 운영 금지
+(→ 엔터프라이즈는 번들 절감을 위해 병행 운영을 최대한 피해야 한다)
+
+2. Module-Level Architecture (완전 정리)
+2.1 Monorepo 구조
+/packages
+  /ui-core            # 공통 UI 컴포넌트
+  /design-system      # Tokens, Theme Engine
+  /schema-engine      # Renderer + Meta-Schema + Versioning + Custom Widget Registry
+  /api-sdk            # Zero-Trust 권한 주입
+  /utils
+  /widgets            # 샌드박스 위젯 (격리)
+
+/admin-ui-kit         # Backoffice 전용 UI Kit
+
+/apps
+  /academy-app
+  /nail-app
+  /estate-app
+  /fitness-app
+  /admin-app          # Backoffice
+
+2.2 api-sdk (실제 Zero-Trust 실행부)
+
+UI는 다음을 직접 호출할 수 없다:
+
+fetch
+
+axios
+
+supabase client
+
+모든 요청은 api-sdk에서만 수행한다.
+
+SDK는 자동으로 다음을 요청에 삽입한다:
+
+{
+  tenant: <tenant_id>,
+  industry: <industry_type>,
+  authorization: <jwt_token>
+}
+
+
+➡ UI는 “무슨 테넌트인지” 또는 “어떤 업종인지” 이해하지 않아도 된다.
+➡ UI가 접근할 수 있는 데이터 범위는 RLS가 책임진다.
+
+2.3 schema-engine ↔ ui-core 통신 방식 (강력한 정교화)
+❌ 스키마에서 Tailwind 문자열 사용 금지
+✔ props 기반 layout 전달
+
+예:
+
+{
+  "form": {
+    "layout": {
+      "columns": 2,
+      "columnGap": "md"
+    }
+  }
+}
+
+
+ui-core는 이를 내부적으로 Tailwind token class로 변환한다.
+
+→ 스키마는 논리적 구조만, 스타일은 ui-core만 담당한다.
+
+3. Schema-Driven UI (SDUI) — Enterprise 버전
+3.1 Meta-Schema Validation
+
+스키마 구조는 다음 단계에서 검증된다:
+
+개발(local dev)
+
+CI 빌드 단계
+
+테넌트 배포 시
+
+Schema Registry에 등록 시점
+
+오류가 발견되면 UI는 뜨기 전에 Error Boundary로 안전 중단.
+
+3.2 Schema Versioning (완벽 정리)
+
+각 스키마는 다음 형태:
+
+{
+  "version": "2.0.1",
+  "minSupportedClient": "1.12.0",
+  "entity": "student",
+  ...
+}
+
+버전 충돌 처리:
+종류	처리
+Schema > Client 지원 버전	Client 업데이트 유도
+Client > Schema 버전	Migration Script 자동 실행
+Major upgrade	Legacy renderer 삭제 + 사전 Migration
+3.3 Schema Migration Script (실전 원칙)
+
+Migration Script는 런타임이 아니라 빌드 타임 또는 백엔드 시점에서 실행해야 한다.
+
+이유:
+
+클라이언트가 두 버전 렌더러를 포함하면 번들 크기 폭증
+
+엔터프라이즈에서는 “런타임 마이그레이션”을 허용하지 않는다
+
+때문에:
+
+빌드 타임 변환 (권장)
+
+새로운 버전이 Schema Registry에 등록될 때 변환
+
+백엔드에서 스키마 업그레이드를 atomic 작업으로 수행
+
+4. Multi-Tenant Theme Engine
+4.1 Theme Merge Priority
+
+system default tokens
+
+industry tokens
+
+tenant theme override
+
+dark mode
+
+high contrast (forced-colors)
+
+→ UI는 위 레이어에서 순차적으로 override되어 최종 Token Set을 사용한다.
+
+5. UI Kit Strategy — Customer vs Backoffice
+5.1 Customer-Facing UI (ui-core)
+
+반응형 최적화
+
+모바일 중심
+
+시각적 완성도 우선
+
+애니메이션·인터랙션 풍부
+
+5.2 Backoffice (admin-ui-kit)
+
+데이터 밀도 높음
+
+고급 테이블 기능(그룹핑, pivot, 가상화)
+
+단축키 지원
+
+operator-first 설계
+
+UI 효율성 우선
+
+공통 요소:
+
+동일 SDUI 엔진 사용
+
+동일 Token Engine 사용
+
+동일 Versioning 전략 적용
+
+6. Responsive UX — Enterprise Version
+Mobile
+
+Bottom Action Bar (표준 명칭으로 통일)
+
+Fullscreen Drawer
+
+Card-first Layout
+
+Tablet
+
+2-column + Drawer Overlay
+
+Desktop
+
+Multi-panel
+
+High-density table
+
+Persistent Sidebar
+
+7. 성능 최적화 — Enterprise Version
+7.1 Performance Gates (CI/CD)
+
+Bundle Analyzer 자동 실행
+
+Lighthouse CI 자동 실행
+
+예산 초과 시 빌드 실패
+
+7.2 Runtime 최적화
+
+SDUI memoization
+
+Table virtualization
+
+Suspense + concurrent features
+
+React Query TTL/SWR
+
+tenant 변경 시 invalidateQueries() 자동 발생
+
+8. Error Handling & Debugging
+Error Boundary Layer
+
+Schema Validation Failure
+
+Widget Rendering Failure
+
+Data Fetch Error
+
+Version Mismatch Error
+
+각 카테고리마다 다른 UI/메시지·로그가 필요하다.
+
+9. Testing Requirements — Hard Gate
+종류	커버리지 요구	실패 시
+Unit Test	80% 이상	빌드 실패
+SDUI Rendering E2E	업종별 핵심 화면 100%	빌드 실패
+A11Y (Axe-Core)	Critical = 0	빌드 실패
+Visual Regression	주요 화면 100%	경고
+10. Enterprise-Grade 장점 정리
+항목	효과
+Zero-Trust API SDK	보안 문제 원천 봉쇄
+Meta-Schema Validation	UI 고장 방지
+SDUI Versioning	수천 테넌트 안전 업그레이드
+Custom Widget Sandbox	업종 확장 비용 최소화
+Performance Gates	항상 빠른 SaaS 유지
+Backoffice 분리	운영 효율 극대화
+Multi-Tenant Theme Engine	브랜드 커스터마이징 비용 최소
