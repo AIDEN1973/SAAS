@@ -2,7 +2,6 @@
   "buildCommand": "cd ../.. && npm run build --filter=@app/public-gateway",
   "outputDirectory": "dist",
   "installCommand": "npm install",
-  "framework": "vite",
-  "rootDirectory": "apps/public-gateway"
+  "framework": "vite"
 }
 
