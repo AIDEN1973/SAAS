@@ -146,7 +146,21 @@ export class TagsService {
       throw new Error(`Failed to fetch entity tags: ${error.message}`);
     }
 
-    return (data || []).map((item: any) => item.tags).filter(Boolean) as Tag[];
+    // Supabase join 결과 타입 안전하게 처리
+    type TagAssignmentWithTag = {
+      tag_id: string;
+      tags: Tag | Tag[] | null;
+    };
+    return (data || [])
+      .map((item: any) => {
+        const tags = item.tags;
+        // Supabase는 join 결과를 배열로 반환할 수 있음
+        if (Array.isArray(tags)) {
+          return tags[0] || null;
+        }
+        return tags;
+      })
+      .filter((tag): tag is Tag => tag !== null);
   }
 
   /**

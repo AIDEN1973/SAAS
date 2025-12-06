@@ -2,7 +2,6 @@
  * useStudent Hook
  */
 
-export * from './useStudent';
 export {
   useStudents,
   useStudent,
@@ -14,5 +13,3 @@ export {
   useStudentTagsByStudent,
   useConsultations,
 } from './useStudent';
-export type { UseStudentOptions } from './useStudent';
-

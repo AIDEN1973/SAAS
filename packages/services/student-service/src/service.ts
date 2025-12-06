@@ -1,13 +1,11 @@
 /**
  * Student Service
  * 
- * [불변 규칙] 모든 쿼리는 withTenant()를 사용하여 tenant_id 필터를 강제한다.
- * [불변 규칙] INSERT 시에는 row object 안에 tenant_id 필드를 직접 포함한다.
+ * [불변 규칙] Service Layer는 Industry Layer를 사용하여 업종별 비즈니스 로직을 호출한다.
+ * [불변 규칙] Service Layer는 Core Layer를 직접 사용하지 않고, Industry Layer를 통해 접근한다.
  */
 
-import { createServerClient } from '@lib/supabase-client/server';
-import { withTenant } from '@lib/supabase-client/db';
-import { tagsService } from '@core/tags';
+import { academyService } from '@industry/academy/service';
 import type {
   Student,
   Guardian,
@@ -15,11 +13,16 @@ import type {
   CreateStudentInput,
   UpdateStudentInput,
   StudentFilter,
-} from './types';
+} from '@industry/academy/types';
 import type { Tag } from '@core/tags';
 
+/**
+ * Student Service (Industry Layer 래퍼)
+ * 
+ * Service Layer는 Industry Layer의 academyService를 래핑하여 제공합니다.
+ * 향후 다른 업종(체육관 등)이 추가되면 industry-gym의 gymService를 사용하는 별도 Service를 생성합니다.
+ */
 export class StudentService {
-  private supabase = createServerClient();
 
   /**
    * 학생 목록 조회 (필터링 지원)
@@ -28,73 +31,14 @@ export class StudentService {
     tenantId: string,
     filter?: StudentFilter
   ): Promise<Student[]> {
-    let query = withTenant(
-      this.supabase.from('students').select('*'),
-      tenantId
-    );
-
-    // 상태 필터
-    if (filter?.status) {
-      if (Array.isArray(filter.status)) {
-        query = query.in('status', filter.status);
-      } else {
-        query = query.eq('status', filter.status);
-      }
-    }
-
-    // 학년 필터
-    if (filter?.grade) {
-      query = query.eq('grade', filter.grade);
-    }
-
-    // 이름 검색
-    if (filter?.search) {
-      query = query.ilike('name', `%${filter.search}%`);
-    }
-
-    // 정렬: 최신순
-    query = query.order('created_at', { ascending: false });
-
-    const { data, error } = await query;
-
-    if (error) {
-      throw new Error(`Failed to fetch students: ${error.message}`);
-    }
-
-    // 태그 필터 (클라이언트 측에서 처리 또는 서브쿼리)
-    if (filter?.tag_ids && filter.tag_ids.length > 0) {
-      // TODO: 태그 필터링 로직 추가
-    }
-
-    // 반 필터 (클라이언트 측에서 처리 또는 서브쿼리)
-    if (filter?.class_id) {
-      // TODO: 반 필터링 로직 추가
-    }
-
-    return (data || []) as Student[];
+    return academyService.getStudents(tenantId, filter);
   }
 
   /**
    * 학생 상세 조회
    */
   async getStudent(tenantId: string, studentId: string): Promise<Student | null> {
-    const { data, error } = await withTenant(
-      this.supabase
-        .from('students')
-        .select('*')
-        .eq('id', studentId)
-        .single(),
-      tenantId
-    );
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // Not found
-      }
-      throw new Error(`Failed to fetch student: ${error.message}`);
-    }
-
-    return data as Student;
+    return academyService.getStudent(tenantId, studentId);
   }
 
   /**
@@ -106,43 +50,7 @@ export class StudentService {
     input: CreateStudentInput,
     userId?: string
   ): Promise<Student> {
-    // 학생 생성
-    const { data: student, error: studentError } = await this.supabase
-      .from('students')
-      .insert({
-        tenant_id: tenantId,
-        industry_type: industryType,
-        name: input.name,
-        birth_date: input.birth_date,
-        gender: input.gender,
-        phone: input.phone,
-        email: input.email,
-        address: input.address,
-        school_name: input.school_name,
-        grade: input.grade,
-        status: input.status || 'active',
-        notes: input.notes,
-        profile_image_url: input.profile_image_url,
-        created_by: userId,
-      })
-      .select()
-      .single();
-
-    if (studentError) {
-      throw new Error(`Failed to create student: ${studentError.message}`);
-    }
-
-    // 학부모 정보 생성
-    if (input.guardians && input.guardians.length > 0) {
-      await this.createGuardians(tenantId, student.id, input.guardians);
-    }
-
-    // 태그 연결 (core-tags 활용)
-    if (input.tag_ids && input.tag_ids.length > 0) {
-      await tagsService.assignTags(tenantId, student.id, 'student', input.tag_ids);
-    }
-
-    return student as Student;
+    return academyService.createStudent(tenantId, industryType, input, userId);
   }
 
   /**
@@ -154,24 +62,7 @@ export class StudentService {
     input: UpdateStudentInput,
     userId?: string
   ): Promise<Student> {
-    const { data, error } = await withTenant(
-      this.supabase
-        .from('students')
-        .update({
-          ...input,
-          updated_by: userId,
-        })
-        .eq('id', studentId)
-        .select()
-        .single(),
-      tenantId
-    );
-
-    if (error) {
-      throw new Error(`Failed to update student: ${error.message}`);
-    }
-
-    return data as Student;
+    return academyService.updateStudent(tenantId, studentId, input, userId);
   }
 
   /**
@@ -182,29 +73,14 @@ export class StudentService {
     studentId: string,
     userId?: string
   ): Promise<void> {
-    // Soft delete: status를 'withdrawn'으로 변경
-    await this.updateStudent(tenantId, studentId, { status: 'withdrawn' }, userId);
+    return academyService.deleteStudent(tenantId, studentId, userId);
   }
 
   /**
    * 학부모 목록 조회
    */
   async getGuardians(tenantId: string, studentId: string): Promise<Guardian[]> {
-    const { data, error } = await withTenant(
-      this.supabase
-        .from('guardians')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('is_primary', { ascending: false })
-        .order('created_at', { ascending: true }),
-      tenantId
-    );
-
-    if (error) {
-      throw new Error(`Failed to fetch guardians: ${error.message}`);
-    }
-
-    return (data || []) as Guardian[];
+    return academyService.getGuardians(tenantId, studentId);
   }
 
   /**
@@ -215,36 +91,21 @@ export class StudentService {
     studentId: string,
     guardians: Omit<Guardian, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>[]
   ): Promise<Guardian[]> {
-    const guardiansToInsert = guardians.map((guardian) => ({
-      tenant_id: tenantId,
-      student_id: studentId,
-      ...guardian,
-    }));
-
-    const { data, error } = await this.supabase
-      .from('guardians')
-      .insert(guardiansToInsert)
-      .select();
-
-    if (error) {
-      throw new Error(`Failed to create guardians: ${error.message}`);
-    }
-
-    return (data || []) as Guardian[];
+    return academyService.createGuardians(tenantId, studentId, guardians);
   }
 
   /**
    * 학생 태그 목록 조회 (core-tags 활용)
    */
   async getTags(tenantId: string): Promise<Tag[]> {
-    return tagsService.getTags(tenantId, { entity_type: 'student' });
+    return academyService.getTags(tenantId);
   }
 
   /**
    * 학생의 태그 조회 (core-tags 활용)
    */
   async getStudentTags(tenantId: string, studentId: string): Promise<Tag[]> {
-    return tagsService.getEntityTags(tenantId, studentId, 'student');
+    return academyService.getStudentTags(tenantId, studentId);
   }
 
   /**
@@ -254,20 +115,7 @@ export class StudentService {
     tenantId: string,
     studentId: string
   ): Promise<StudentConsultation[]> {
-    const { data, error } = await withTenant(
-      this.supabase
-        .from('student_consultations')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('consultation_date', { ascending: false }),
-      tenantId
-    );
-
-    if (error) {
-      throw new Error(`Failed to fetch consultations: ${error.message}`);
-    }
-
-    return (data || []) as StudentConsultation[];
+    return academyService.getConsultations(tenantId, studentId);
   }
 
   /**
@@ -279,25 +127,7 @@ export class StudentService {
     consultation: Omit<StudentConsultation, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>,
     userId: string
   ): Promise<StudentConsultation> {
-    const { data, error } = await this.supabase
-      .from('student_consultations')
-      .insert({
-        tenant_id: tenantId,
-        student_id: studentId,
-        consultation_date: consultation.consultation_date,
-        consultation_type: consultation.consultation_type,
-        content: consultation.content,
-        ai_summary: consultation.ai_summary,
-        created_by: userId,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`Failed to create consultation: ${error.message}`);
-    }
-
-    return data as StudentConsultation;
+    return academyService.createConsultation(tenantId, studentId, consultation, userId);
   }
 }
 

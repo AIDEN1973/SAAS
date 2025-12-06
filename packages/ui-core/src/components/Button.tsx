@@ -40,13 +40,13 @@ export const Button: React.FC<ButtonProps> = ({
   // 토큰 기반 클래스 생성 (Tailwind는 내부적으로만 사용)
   const baseClasses = 'font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2';
   
-  const variantClasses = {
+  const variantClasses: Record<'solid' | 'outline' | 'ghost', string> = {
     solid: `bg-${color}-500 text-white hover:bg-${color}-600 focus:ring-${color}-500`,
     outline: `border-2 border-${color}-500 text-${color}-500 hover:bg-${color}-50 focus:ring-${color}-500`,
     ghost: `text-${color}-500 hover:bg-${color}-50 focus:ring-${color}-500`,
   };
   
-  const sizeClasses = {
+  const sizeClasses: Record<SizeToken, string> = {
     xs: 'px-2 py-1 text-xs',
     sm: 'px-3 py-1.5 text-sm',
     md: 'px-4 py-2 text-base',

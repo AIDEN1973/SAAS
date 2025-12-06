@@ -25,7 +25,7 @@ export const Container: React.FC<ContainerProps> = ({
   padding = 'md',
   className,
 }) => {
-  const maxWidthClasses = {
+  const maxWidthClasses: Record<'sm' | 'md' | 'lg' | 'xl' | 'full', string> = {
     sm: 'max-w-screen-sm',
     md: 'max-w-screen-md',
     lg: 'max-w-screen-lg',
@@ -33,7 +33,7 @@ export const Container: React.FC<ContainerProps> = ({
     full: 'max-w-full',
   };
 
-  const paddingClasses = {
+  const paddingClasses: Record<SpacingToken, string> = {
     xs: 'px-1',
     sm: 'px-2',
     md: 'px-4',
@@ -62,6 +62,7 @@ export interface GridProps {
   columns?: 1 | 2 | 3 | 4;
   gap?: SpacingToken;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export const Grid: React.FC<GridProps> = ({
@@ -69,20 +70,21 @@ export const Grid: React.FC<GridProps> = ({
   columns = 1,
   gap = 'md',
   className,
+  style,
 }) => {
   const mode = useResponsiveMode();
   
   // 반응형 컬럼 수 조정
   const responsiveColumns = mode === 'mobile' ? 1 : mode === 'tablet' ? 2 : columns;
   
-  const columnClasses = {
+  const columnClasses: Record<1 | 2 | 3 | 4, string> = {
     1: 'grid-cols-1',
     2: 'grid-cols-1 md:grid-cols-2',
     3: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
     4: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
   };
 
-  const gapClasses = {
+  const gapClasses: Record<SpacingToken, string> = {
     xs: 'gap-1',
     sm: 'gap-2',
     md: 'gap-4',
@@ -100,6 +102,7 @@ export const Grid: React.FC<GridProps> = ({
         gapClasses[gap],
         className
       )}
+      style={style}
     >
       {children}
     </div>

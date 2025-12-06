@@ -5,17 +5,16 @@
  * - 서버/Edge: import { envServer } from '@env-registry/core/server'
  * - 클라이언트: import { envClient } from '@env-registry/core/client'
  * - 공통: import { envCommon } from '@env-registry/core/common'
+ * 
+ * ⚠️ 주의: 이 index.ts에서는 서버 전용 코드를 export하지 않습니다.
+ * 클라이언트에서 '@env-registry/core'를 import해도 서버 코드가 번들에 포함되지 않습니다.
  */
-
-// 서버 전용 (Service Role Key 등 비밀 값 포함)
-export { envServer } from './server';
-export type { EnvServer } from './schema';
 
 // 클라이언트 전용 (NEXT_PUBLIC_* 값만)
 export { envClient } from './client';
 export type { EnvClient } from './schema';
 
-// 서버/Edge 전용 공개 값
-export { envCommon, getEnvCommon } from './common';
-export type { EnvCommon } from './schema';
+// 서버 전용 코드는 직접 경로로만 import하세요:
+// import { envServer } from '@env-registry/core/server'
+// import { envCommon } from '@env-registry/core/common'
 

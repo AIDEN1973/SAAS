@@ -1,0 +1,457 @@
+📘 디어쌤 Multi-Tenant SaaS UI/UX Technical Architecture v6.0
+
+Enterprise Edition — Zero-Trust · Schema-Driven · Multi-Tenant · Backoffice-Ready · Performance-Gated · Version-Safe
+
+0. 문서 목적 (Purpose)
+
+本 문서는 디어쌤 SaaS 플랫폼을 다음 목표 수준으로 안정적으로 운영하기 위한 최종 UI/UX 기술 아키텍처 규약이다:
+
+✔ 업종 10 → 100 확장
+✔ 테넌트 5,000 → 30,000 확장
+✔ 고객용 + Backoffice UI를 통합적으로 운영
+✔ 고성능(Initial Load ≤ 500KB) 유지
+✔ 접근성 WCAG 2.1 AAA 목표
+✔ Zero-Trust 기반 보안 모델
+✔ SDUI 스키마 기반 자동 UI 생성
+✔ 스키마 버전관리 + 안전한 업그레이드
+✔ 모듈·앱·위젯 간 강력한 Isolation
+1. Enterprise Architecture Principles (EA-Principles)
+🎯 1.1 Zero-Trust UI Layer (강화됨)
+
+UI는 테넌트/업종에 대한 신뢰를 갖지 않는다.
+
+Zero-Trust 원칙:
+
+UI는 절대로 테넌트 ID를 생성하거나 수정하지 않는다.
+
+업종(Industry Context)도 UI가 직접 결정하지 않는다.
+
+모든 데이터 요청은 @api-sdk/core를 통해서만 발생한다.
+
+@api-sdk/core는 항상 아래 3개를 포함하여 요청한다:
+
+tenant_id
+
+industry_type
+
+auth token
+
+➡ UI는 권한을 추론하지 않고, SDK는 권한을 생성하지 않는다.
+➡ 권한 결정은 전부 Supabase RLS가 맡는다.
+
+🎯 1.2 Boundary & Isolation (강화됨)
+UI Architecture Boundary
+schema-engine  →  core-ui  →  design-system  →  theme-engine
+        ↓
+(custom widget sandbox)
+
+
+각 모듈은 다음을 침범할 수 없다:
+
+모듈	금지사항
+schema-engine	Tailwind 클래스 직접 사용 금지
+core-ui	스키마 구조 해석 금지
+widgets	@api-sdk/core, 다른 업종 schema import 금지
+apps	@api-sdk/core 우회 금지 (직접 fetch 금지)
+🎯 1.3 Schema-Driven Everything
+
+UI = 스키마
+Form = 스키마
+Table = 스키마
+Validation = 스키마
+Field 조건부 로직 = 스키마
+레이아웃(columns/gap) = 스키마 → Props 형태로 전달
+
+절대 Tailwind 클래스 문자열을 스키마에서 사용하지 않는다.
+
+🎯 1.4 Performance Budget Enforcement = Hard Gate
+
+성능 목표는 “권장”이 아니라 “필수(Gate)”이다.
+
+Metric	목표	Gate 동작
+Initial Load Bundle	≤ 500KB	초과 시 빌드 실패
+FCP	≤ 1.5s	초과 시 경고
+TTI	≤ 800ms	초과 시 빌드 실패
+Interaction Delay	≤ 100ms	초과 시 경고
+
+CI에 아래 도구를 통합한다:
+
+Webpack/Next.js Bundle Analyzer
+
+LightHouse CI
+
+Custom JS Bundle Budget Script
+
+🎯 1.5 Version-Safe SDUI
+
+스키마 버전, 테마 버전, 업종 버전 모두 version-safe 구조다.
+
+스키마 충돌 발생 시:
+
+Migration Script 실행
+
+Legacy Renderer와의 병행 운영 금지
+(→ 엔터프라이즈는 번들 절감을 위해 병행 운영을 최대한 피해야 한다)
+
+2. Module-Level Architecture (완전 정리)
+2.1 Monorepo 구조
+/packages
+  /core/              # 업종 공통 Core Platform Layer
+    /core-ui/         # 디자인 시스템 + 반응형 + 다크모드 + 확대보기
+    /core-tags/       # 공통 태깅 시스템
+    /core-auth/       # 인증
+    /core-tenancy/    # 테넌시
+    /core-billing/    # 과금
+    /core-party/      # 회원/고객 공통 모델
+    /core-calendar/   # 일정/예약/수업 스케줄
+    /core-community/  # 게시판/댓글/공지
+    /core-storage/    # 파일 업로드/권한
+    /core-search/     # Full Text Search
+    /core-analytics/  # 통계 파이프라인
+    /core-activity/   # Activity Feed / 타임라인 이벤트 기록
+    /core-consultation/ # 상담/기록 관리
+    /core-reviews/    # 리뷰/평가 시스템
+    /core-coupons/    # 쿠폰/할인 관리
+    /core-tenancy-referral/ # B2B 추천인 코드
+    /core-events/     # 이벤트/프로모션
+    /...              # 기타 Core 모듈
+  /design-system      # Tokens, Theme Engine
+  /schema-engine      # Renderer + Meta-Schema + Versioning + Custom Widget Registry
+  /api-sdk            # Zero-Trust 권한 주입 (@api-sdk/core)
+  /services/          # DB 접근 Service Layer
+  /hooks/             # React Query 기반 Hooks
+  /lib/               # 공통 유틸
+  /industry/          # 업종별 모듈 (학원/미용/네일/부동산/체육관/비영리)
+  /widgets            # 샌드박스 위젯 (격리)
+
+/admin-ui-kit         # Backoffice 전용 UI Kit (Phase 2+)
+
+/apps
+  /academy-admin      # 학원 관리자/선생님용
+  /academy-parent     # 학부모용
+  /super-admin        # SaaS 본사 플랫폼 콘솔
+  /public-gateway     # 로그인 없이 접근하는 결제/키오스크/공개 페이지
+
+2.2 @api-sdk/core (실제 Zero-Trust 실행부)
+
+UI는 다음을 직접 호출할 수 없다:
+
+fetch
+
+axios
+
+supabase client
+
+모든 요청은 @api-sdk/core에서만 수행한다.
+
+SDK는 자동으로 다음을 요청에 삽입한다:
+
+{
+  tenant_id: <tenant_id>,
+  industry_type: <industry_type>,
+  authorization: <jwt_token>
+}
+
+
+➡ UI는 “무슨 테넌트인지” 또는 “어떤 업종인지” 이해하지 않아도 된다.
+➡ UI가 접근할 수 있는 데이터 범위는 RLS가 책임진다.
+
+2.3 schema-engine ↔ core-ui 통신 방식 (강력한 정교화)
+❌ 스키마에서 Tailwind 문자열 사용 금지
+✔ props 기반 layout 전달
+
+예:
+
+{
+  "form": {
+    "layout": {
+      "columns": 2,
+      "columnGap": "md"
+    }
+  }
+}
+
+
+core-ui는 이를 내부적으로 Tailwind token class로 변환한다.
+
+→ 스키마는 논리적 구조만, 스타일은 core-ui만 담당한다.
+
+3. Schema-Driven UI (SDUI) — Enterprise 버전
+3.1 Meta-Schema Validation
+
+스키마 구조는 다음 단계에서 검증된다:
+
+개발(local dev)
+
+CI 빌드 단계
+
+테넌트 배포 시
+
+Schema Registry에 등록 시점
+
+오류가 발견되면 UI는 뜨기 전에 Error Boundary로 안전 중단.
+
+3.2 Schema Versioning (완벽 정리)
+
+각 스키마는 다음 형태:
+
+{
+  "version": "2.0.1",
+  "minSupportedClient": "1.12.0",
+  "entity": "student",
+  ...
+}
+
+버전 충돌 처리:
+종류	처리
+Schema > Client 지원 버전	Client 업데이트 유도
+Client > Schema 버전	Migration Script 자동 실행
+Major upgrade	Legacy renderer 삭제 + 사전 Migration
+3.3 Schema Migration Script (실전 원칙)
+
+Migration Script는 런타임이 아니라 빌드 타임 또는 백엔드 시점에서 실행해야 한다.
+
+이유:
+
+클라이언트가 두 버전 렌더러를 포함하면 번들 크기 폭증
+
+엔터프라이즈에서는 “런타임 마이그레이션”을 허용하지 않는다
+
+때문에:
+
+빌드 타임 변환 (권장)
+
+새로운 버전이 Schema Registry에 등록될 때 변환
+
+백엔드에서 스키마 업그레이드를 atomic 작업으로 수행
+
+4. Multi-Tenant Theme Engine
+4.1 Theme Merge Priority
+
+system default tokens
+
+industry tokens
+
+tenant theme override
+
+dark mode
+
+high contrast (forced-colors)
+
+→ UI는 위 레이어에서 순차적으로 override되어 최종 Token Set을 사용한다.
+
+5. UI Kit Strategy — Customer vs Backoffice
+5.1 Customer-Facing UI (core-ui)
+
+반응형 최적화
+
+모바일 중심
+
+시각적 완성도 우선
+
+애니메이션·인터랙션 풍부
+
+5.2 Backoffice (admin-ui-kit)
+
+데이터 밀도 높음
+
+고급 테이블 기능(그룹핑, pivot, 가상화)
+
+단축키 지원
+
+operator-first 설계
+
+UI 효율성 우선
+
+공통 요소:
+
+동일 SDUI 엔진 사용
+
+동일 Token Engine 사용
+
+동일 Versioning 전략 적용
+
+6. Responsive UX — Enterprise Version
+
+6-0. 반응형 브레이크포인트 표준 (Critical)
+
+⚠️ 중요: 모든 반응형 구현은 다음 Tailwind 표준 브레이크포인트를 사용합니다.
+
+브레이크포인트 수치 (고정 값):
+
+| 브레이크포인트 | 최소 너비 | 용도 |
+|--------------|----------|------|
+| xs (기본) | 0px | 모바일 (기본) |
+| sm | 640px | 큰 모바일 / 작은 태블릿 |
+| md | 768px | 태블릿 |
+| lg | 1024px | 작은 데스크톱 |
+| xl | 1280px | 큰 데스크톱 |
+
+useResponsiveMode() 훅 사용:
+
+```typescript
+// packages/core-ui/hooks/useResponsiveMode.ts
+export function useResponsiveMode() {
+  const [mode, setMode] = useState<'xs' | 'sm' | 'md' | 'lg' | 'xl'>('xs');
+
+  useEffect(() => {
+    const updateMode = () => {
+      const width = window.innerWidth;
+      if (width >= 1280) setMode('xl');
+      else if (width >= 1024) setMode('lg');
+      else if (width >= 768) setMode('md');
+      else if (width >= 640) setMode('sm');
+      else setMode('xs');
+    };
+
+    updateMode();
+    window.addEventListener('resize', updateMode);
+    return () => window.removeEventListener('resize', updateMode);
+  }, []);
+
+  return mode;
+}
+```
+
+→ 이 브레이크포인트 수치는 디자인팀/프론트엔드팀/백엔드팀 간 일관성을 보장하기 위한 표준입니다.
+
+6-1. 기기별 UX 패턴
+
+Mobile (xs, sm)
+
+Bottom Action Bar (표준 명칭으로 통일)
+
+Fullscreen Drawer
+
+Card-first Layout
+
+Tablet (md)
+
+2-column + Drawer Overlay
+
+Desktop (lg, xl)
+
+Multi-panel
+
+High-density table
+
+Persistent Sidebar
+
+7. 성능 최적화 — Enterprise Version
+7.1 Performance Gates (CI/CD)
+
+Bundle Analyzer 자동 실행
+
+Lighthouse CI 자동 실행
+
+예산 초과 시 빌드 실패
+
+7.2 Runtime 최적화
+
+SDUI memoization
+
+Table virtualization
+
+Suspense + concurrent features
+
+React Query TTL/SWR
+
+tenant 변경 시 invalidateQueries() 자동 발생
+
+8. Error Handling & Debugging
+Error Boundary Layer
+
+Schema Validation Failure
+
+Widget Rendering Failure
+
+Data Fetch Error
+
+Version Mismatch Error
+
+각 카테고리마다 다른 UI/메시지·로그가 필요하다.
+
+9. Testing Requirements — Hard Gate
+종류	커버리지 요구	실패 시
+Unit Test	80% 이상	빌드 실패
+SDUI Rendering E2E	업종별 핵심 화면 100%	빌드 실패
+A11Y (Axe-Core)	Critical = 0	빌드 실패
+Visual Regression	주요 화면 100%	경고
+
+9-1. Public Gateway 보안 규약 (Critical)
+
+⚠️ 중요: Public Gateway는 로그인 없이 접근 가능한 공개 페이지이므로, Front-end 레이어에서도 보안 규칙을 따라야 합니다.
+
+기술문서의 보안 규약과 동일한 출처를 따르며, UI 레이어에서 구현해야 하는 보안 규칙은 다음과 같습니다:
+
+1. CSRF 방어
+   - POST 요청 시 CSRF 토큰 필수
+   - 토큰은 Public Gateway 토큰 검증 API에서 발급
+   - 토큰 만료 시 자동 갱신 또는 재발급 UX 제공
+
+2. X-Frame-Options / Clickjacking 방지
+   - iframe 임베딩 방지 (X-Frame-Options: DENY)
+   - iframe 필요 시 Content-Security-Policy: frame-ancestors 'self' 적용
+   - UI에서 iframe 감지 시 경고 메시지 표시
+
+3. 토큰 검증 UX
+   - Public Gateway 토큰 유효성 검사 실패 시 명확한 에러 메시지
+   - 토큰 만료 시 자동 갱신 또는 재발급 안내
+   - 토큰이 없는 경우 접근 거부 메시지
+
+4. Referrer 최소화
+   - Referrer-Policy: no-referrer 적용
+   - 외부 링크 클릭 시 referrer 정보 노출 방지
+
+5. 세션/토큰 수명 관리
+   - 토큰 수명 짧게 유지 (기술문서 규칙 준수)
+   - 토큰 만료 전 자동 갱신 또는 경고 표시
+
+6. 키오스크 모드 (해당 시)
+   - 일정 시간 무입력 시 자동 잠금 (예: 10분, KST 기준)
+   - 잠금 해제 시 PIN/관리자 인증 UX 제공
+   - 잠금 상태 시 명확한 안내 메시지
+
+구현 예시:
+
+```typescript
+// apps/public-gateway/components/SecurePublicPage.tsx
+export function SecurePublicPage({ token }: { token: string }) {
+  // 1. 토큰 유효성 검사
+  const { data: isValid, error } = usePublicGatewayToken(token);
+  
+  if (error || !isValid) {
+    return <TokenExpiredMessage onRefresh={() => refreshToken()} />;
+  }
+
+  // 2. CSRF 토큰 발급
+  const { csrfToken } = useCSRFToken(token);
+
+  // 3. iframe 감지 및 경고
+  useEffect(() => {
+    if (window.self !== window.top) {
+      // iframe 내부에서 실행 중
+      showWarning('이 페이지는 iframe에서 실행할 수 없습니다.');
+    }
+  }, []);
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="hidden" name="csrf_token" value={csrfToken} />
+      {/* ... */}
+    </form>
+  );
+}
+```
+
+→ Public Gateway 보안 규약의 상세 내용은 기술문서의 "19-8. Public Gateway/키오스크 보안" 섹션을 참조하세요.
+
+10. Enterprise-Grade 장점 정리
+항목	효과
+Zero-Trust @api-sdk/core	보안 문제 원천 봉쇄
+Meta-Schema Validation	UI 고장 방지
+SDUI Versioning	수천 테넌트 안전 업그레이드
+Custom Widget Sandbox	업종 확장 비용 최소화
+Performance Gates	항상 빠른 SaaS 유지
+Backoffice 분리	운영 효율 극대화
+Multi-Tenant Theme Engine	브랜드 커스터마이징 비용 최소

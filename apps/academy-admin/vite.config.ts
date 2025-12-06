@@ -1,30 +1,89 @@
-import { defineConfig } from 'vite';
+import { defineConfig, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 
+// 서버 전용 코드를 클라이언트 번들에서 제외하는 플러그인
+function excludeServerCode(): Plugin {
+  return {
+    name: 'exclude-server-code',
+    resolveId(id) {
+      // 서버 전용 모듈을 빈 모듈로 대체
+      if (
+        id.includes('/server') ||
+        id === '@env-registry/core/server' ||
+        id === '@lib/supabase-client/server' ||
+        id.includes('student-service/src/service') ||
+        id.includes('core-tags/src/service')
+      ) {
+        // 클라이언트 빌드에서는 빈 모듈 반환
+        if (process.env.NODE_ENV !== 'production' || !id.includes('node_modules')) {
+          return { id: 'data:text/javascript,export default {}', external: true };
+        }
+      }
+      return null;
+    },
+    load(id) {
+      // 서버 전용 파일을 빈 모듈로 대체
+      if (
+        id.includes('/server.ts') ||
+        id.includes('/server.js') ||
+        (id.includes('student-service') && id.includes('/service'))
+      ) {
+        return 'export default {};';
+      }
+      return null;
+    },
+  };
+}
+
 export default defineConfig({
+  // 프로젝트 루트의 .env.local 파일을 로드
+  envDir: path.resolve(__dirname, '../..'),
   plugins: [
     react(),
+    excludeServerCode(),
     // Bundle analyzer (개발 시에만)
-    process.env.ANALYZE && visualizer({
+    ...(process.env.ANALYZE ? [visualizer({
       open: true,
       filename: 'dist/stats.html',
       gzipSize: true,
       brotliSize: true,
-    }),
-  ].filter(Boolean),
+    })] : []),
+  ],
+  optimizeDeps: {
+    exclude: [
+      // 서버 전용 코드는 클라이언트 번들에서 제외
+      '@lib/supabase-client/server',
+      '@env-registry/core/server',
+    ],
+  },
   resolve: {
-    alias: {
-      '@env-registry': path.resolve(__dirname, '../../packages/env-registry/src'),
-      '@lib': path.resolve(__dirname, '../../packages/lib'),
-      '@design-system': path.resolve(__dirname, '../../packages/design-system/src'),
-      '@ui-core': path.resolve(__dirname, '../../packages/ui-core/src'),
-      '@schema-engine': path.resolve(__dirname, '../../packages/schema-engine/src'),
-      '@api-sdk': path.resolve(__dirname, '../../packages/api-sdk/src'),
-      '@services': path.resolve(__dirname, '../../packages/services'),
-      '@hooks': path.resolve(__dirname, '../../packages/hooks'),
-    },
+    alias: [
+      // 더 구체적인 패턴을 먼저 매칭 (순서 중요!)
+      { find: '@ui-core/react/styles', replacement: path.resolve(__dirname, '../../packages/ui-core/src/styles.css') },
+      { find: '@ui-core/react', replacement: path.resolve(__dirname, '../../packages/ui-core/src') },
+      { find: '@lib/supabase-client/server', replacement: path.resolve(__dirname, '../../packages/lib/supabase-client/src/server.ts') },
+      { find: '@lib/supabase-client/db', replacement: path.resolve(__dirname, '../../packages/lib/supabase-client/src/db.ts') },
+      { find: '@lib/supabase-client', replacement: path.resolve(__dirname, '../../packages/lib/supabase-client/src') },
+      { find: '@env-registry/core/server', replacement: path.resolve(__dirname, '../../packages/env-registry/src/server.ts') },
+      { find: '@env-registry/core', replacement: path.resolve(__dirname, '../../packages/env-registry/src') },
+      { find: '@core/tags', replacement: path.resolve(__dirname, '../../packages/core/core-tags/src') },
+      { find: '@env-registry', replacement: path.resolve(__dirname, '../../packages/env-registry/src') },
+      { find: '@lib', replacement: path.resolve(__dirname, '../../packages/lib') },
+      { find: '@design-system/core', replacement: path.resolve(__dirname, '../../packages/design-system/src') },
+      { find: '@design-system', replacement: path.resolve(__dirname, '../../packages/design-system/src') },
+      { find: '@ui-core', replacement: path.resolve(__dirname, '../../packages/ui-core/src') },
+      { find: '@schema-engine', replacement: path.resolve(__dirname, '../../packages/schema-engine/src') },
+      { find: '@api-sdk/core', replacement: path.resolve(__dirname, '../../packages/api-sdk/src') },
+      { find: '@api-sdk', replacement: path.resolve(__dirname, '../../packages/api-sdk/src') },
+      { find: '@industry/academy/service', replacement: path.resolve(__dirname, '../../packages/industry/industry-academy/src/service.ts') },
+      { find: '@industry/academy', replacement: path.resolve(__dirname, '../../packages/industry/industry-academy/src') },
+      { find: '@industry', replacement: path.resolve(__dirname, '../../packages/industry') },
+      { find: '@services', replacement: path.resolve(__dirname, '../../packages/services') },
+      { find: '@hooks', replacement: path.resolve(__dirname, '../../packages/hooks') },
+      { find: '@core', replacement: path.resolve(__dirname, '../../packages/core') },
+    ],
   },
   server: {
     port: 3000,
@@ -32,6 +91,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
+      // 서버 전용 코드를 external로 처리하여 클라이언트 번들에서 제외
+      external: [
+        '@env-registry/core/server',
+        '@lib/supabase-client/server',
+        '@services/student-service',
+        '@industry/academy/service',
+        '@core/tags',
+      ],
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom'],

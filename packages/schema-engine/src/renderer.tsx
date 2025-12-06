@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { Button, Input, Card, Grid } from '@ui-core/react';
+import { Button, Input, Card, Grid, Container } from '@ui-core/react';
 import { FormSchema, TableSchema, UISchema } from './types';
 import { validateSchema } from './validator';
 
@@ -43,7 +43,7 @@ export function renderForm(schema: FormSchema): React.ReactElement {
           ))}
         </Grid>
         {form.submit && (
-          <div className="mt-4">
+          <div style={{ marginTop: 'var(--spacing-md)' }}>
             <Button
               type="submit"
               variant={form.submit.variant}
@@ -71,28 +71,43 @@ export function renderTable(schema: TableSchema): React.ReactElement {
 
   const { table } = schema;
 
+  // TODO: Table 컴포넌트를 ui-core에 추가하여 Tailwind 직접 사용 제거
+  // 현재는 기본 HTML table 사용 (향후 ui-core/Table 컴포넌트로 교체 예정)
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            {table.columns.map((column) => (
-              <th
-                key={column.key}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                style={{ width: column.width }}
-              >
-                {column.label}
-                {column.sortable && <span className="ml-1">⇅</span>}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {/* 데이터는 외부에서 주입 */}
-        </tbody>
-      </table>
-    </div>
+    <Container maxWidth="full" padding="xs">
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ 
+          minWidth: '100%',
+          borderCollapse: 'collapse',
+        }}>
+          <thead style={{ backgroundColor: 'var(--color-gray-50)' }}>
+            <tr>
+              {table.columns.map((column) => (
+                <th
+                  key={column.key}
+                  style={{
+                    padding: 'var(--spacing-sm) var(--spacing-md)',
+                    textAlign: 'left',
+                    fontSize: 'var(--font-size-xs)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    color: 'var(--color-text-secondary)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    width: column.width,
+                  }}
+                >
+                  {column.label}
+                  {column.sortable && <span style={{ marginLeft: 'var(--spacing-xs)' }}>⇅</span>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody style={{ backgroundColor: 'var(--color-white)' }}>
+            {/* 데이터는 외부에서 주입 */}
+          </tbody>
+        </table>
+      </div>
+    </Container>
   );
 }
 
@@ -114,7 +129,7 @@ export function renderSchema(schema: UISchema): React.ReactElement {
  */
 export interface SchemaRendererProps {
   schema: UISchema;
-  data?: any;
+  data?: unknown;
 }
 
 export const SchemaRenderer: React.FC<SchemaRendererProps> = ({ schema, data }) => {
@@ -122,9 +137,18 @@ export const SchemaRenderer: React.FC<SchemaRendererProps> = ({ schema, data }) 
     return renderSchema(schema);
   } catch (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <p className="text-red-800">Schema 렌더링 오류: {error instanceof Error ? error.message : 'Unknown error'}</p>
-      </div>
+      <Card 
+        padding="md" 
+        variant="outlined"
+        style={{
+          backgroundColor: 'var(--color-red-50)',
+          borderColor: 'var(--color-red-200)',
+        }}
+      >
+        <p style={{ color: 'var(--color-red-800)' }}>
+          Schema 렌더링 오류: {error instanceof Error ? error.message : 'Unknown error'}
+        </p>
+      </Card>
     );
   }
 };

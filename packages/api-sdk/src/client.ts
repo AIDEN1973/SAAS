@@ -8,7 +8,7 @@
 
 import { createClient } from '@lib/supabase-client';
 import { getApiContext } from './context';
-import type { ApiRequest, ApiResponse, ApiClientConfig } from './types';
+import type { ApiResponse, ApiClientConfig } from './types';
 
 /**
  * API Client
@@ -34,18 +34,30 @@ export class ApiClient {
     }
   ): Promise<ApiResponse<T[]>> {
     try {
-      const context = getApiContext();
-      
       // RLS가 자동으로 tenant_id 필터링을 처리
       // SDK는 단순히 Supabase 클라이언트를 사용
+      // Context는 RLS 정책에서 JWT claim을 통해 자동으로 읽힘
       let query = this.supabase.from(table).select(options?.select || '*');
-
-      // 필터 적용
+      
+      // 이름 검색 필터 처리 (ilike 패턴)
       if (options?.filters) {
-        Object.entries(options.filters).forEach(([key, value]) => {
-          query = query.eq(key, value);
+        const searchFilters = { ...options.filters };
+        // name 필터가 ilike 패턴인 경우 별도 처리
+        if (searchFilters.name && typeof searchFilters.name === 'string' && searchFilters.name.startsWith('ilike.')) {
+          const pattern = searchFilters.name.replace('ilike.', '');
+          query = query.ilike('name', pattern);
+          delete searchFilters.name;
+        }
+        // 나머지 필터 적용
+        Object.entries(searchFilters).forEach(([key, value]) => {
+          if (Array.isArray(value)) {
+            query = query.in(key, value);
+          } else {
+            query = query.eq(key, value);
+          }
         });
       }
+
 
       // 정렬
       if (options?.orderBy) {
@@ -88,13 +100,22 @@ export class ApiClient {
     data: Record<string, any>
   ): Promise<ApiResponse<T>> {
     try {
+      // [불변 규칙] SDK는 자동으로 tenant_id, industry_type을 삽입한다
+      // Context에서 tenant_id와 industry_type을 가져와서 data에 포함
       const context = getApiContext();
+      const insertData = { ...data };
       
-      // tenant_id는 RLS 정책이나 withTenant()를 통해 처리
-      // SDK는 단순히 데이터를 전달
+      if (context.tenantId && !insertData.tenant_id) {
+        insertData.tenant_id = context.tenantId;
+      }
+      
+      if (context.industryType && !insertData.industry_type) {
+        insertData.industry_type = context.industryType;
+      }
+      
       const { data: result, error } = await this.supabase
         .from(table)
-        .insert(data)
+        .insert(insertData)
         .select()
         .single();
 
@@ -185,6 +206,36 @@ export class ApiClient {
       };
     }
   }
+
+  /**
+   * RPC 함수 호출
+   * PostgREST가 View를 인식하지 못하는 경우 사용
+   */
+  async rpc<T = any>(
+    functionName: string,
+    params?: Record<string, any>
+  ): Promise<ApiResponse<T[]>> {
+    try {
+      const { data, error } = await this.supabase.rpc(functionName, params || {});
+
+      if (error) {
+        return {
+          error: {
+            message: error.message,
+            code: error.code,
+          },
+        };
+      }
+
+      return { data: (data || []) as T[] };
+    } catch (error) {
+      return {
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  }
 }
 
 /**
@@ -194,8 +245,10 @@ export const apiClient = new ApiClient();
 
 /**
  * API Client 생성 (필요시)
+ * 
+ * @param config - 현재는 사용하지 않음 (Context에서 자동으로 가져옴)
  */
-export function createApiClient(config?: ApiClientConfig): ApiClient {
+export function createApiClient(_config?: ApiClientConfig): ApiClient {
   return new ApiClient();
 }
 

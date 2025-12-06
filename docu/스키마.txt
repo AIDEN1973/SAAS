@@ -1,0 +1,730 @@
+[
+  {
+    "table_schema": "public",
+    "table_name": "academy_students",
+    "column_name": "person_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "academy_students",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "academy_students",
+    "column_name": "birth_date",
+    "data_type": "date",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "academy_students",
+    "column_name": "gender",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "academy_students",
+    "column_name": "school_name",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "academy_students",
+    "column_name": "grade",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "academy_students",
+    "column_name": "class_name",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "academy_students",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'active'::text"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "academy_students",
+    "column_name": "notes",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "academy_students",
+    "column_name": "profile_image_url",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "academy_students",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "academy_students",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "academy_students",
+    "column_name": "created_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "academy_students",
+    "column_name": "updated_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "guardians",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "guardians",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "guardians",
+    "column_name": "student_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "guardians",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "guardians",
+    "column_name": "relationship",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "guardians",
+    "column_name": "phone",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "guardians",
+    "column_name": "email",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "guardians",
+    "column_name": "is_primary",
+    "data_type": "boolean",
+    "is_nullable": "NO",
+    "column_default": "false"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "guardians",
+    "column_name": "notes",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "guardians",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "guardians",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "persons",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "persons",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "persons",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "persons",
+    "column_name": "email",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "persons",
+    "column_name": "phone",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "persons",
+    "column_name": "address",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "persons",
+    "column_name": "person_type",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "persons",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "persons",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_classes",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_classes",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_classes",
+    "column_name": "student_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_classes",
+    "column_name": "class_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_classes",
+    "column_name": "enrolled_at",
+    "data_type": "date",
+    "is_nullable": "NO",
+    "column_default": "CURRENT_DATE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_classes",
+    "column_name": "left_at",
+    "data_type": "date",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_classes",
+    "column_name": "is_active",
+    "data_type": "boolean",
+    "is_nullable": "NO",
+    "column_default": "true"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_classes",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_consultations",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_consultations",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_consultations",
+    "column_name": "student_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_consultations",
+    "column_name": "consultation_date",
+    "data_type": "date",
+    "is_nullable": "NO",
+    "column_default": "CURRENT_DATE"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_consultations",
+    "column_name": "consultation_type",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_consultations",
+    "column_name": "content",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_consultations",
+    "column_name": "ai_summary",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_consultations",
+    "column_name": "created_by",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_consultations",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_consultations",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tag_assignments",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tag_assignments",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tag_assignments",
+    "column_name": "entity_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tag_assignments",
+    "column_name": "entity_type",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tag_assignments",
+    "column_name": "tag_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tag_assignments",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tags",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tags",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tags",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tags",
+    "column_name": "color",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'#3b82f6'::text"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tags",
+    "column_name": "description",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tags",
+    "column_name": "entity_type",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tags",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_features",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_features",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_features",
+    "column_name": "feature_key",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_features",
+    "column_name": "enabled",
+    "data_type": "boolean",
+    "is_nullable": "NO",
+    "column_default": "false"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_features",
+    "column_name": "quota",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_features",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_features",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_settings",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_settings",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_settings",
+    "column_name": "key",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_settings",
+    "column_name": "value",
+    "data_type": "jsonb",
+    "is_nullable": "NO",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_settings",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_settings",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenants",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenants",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenants",
+    "column_name": "industry_type",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenants",
+    "column_name": "plan",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'basic'::text"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenants",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'active'::text"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenants",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenants",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "user_tenant_roles",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "user_tenant_roles",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "user_tenant_roles",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "user_tenant_roles",
+    "column_name": "role",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "user_tenant_roles",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "user_tenant_roles",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  }
+]

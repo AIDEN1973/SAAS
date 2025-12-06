@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./components": "./src/components/index.ts",
-    "./hooks": "./src/hooks/index.ts"
+    "./hooks": "./src/hooks/index.ts",
+    "./styles": "./src/styles.css"
   },
   "scripts": {
     "type-check": "tsc --noEmit"
@@ -15,7 +16,7 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@design-system/core": "*",
+    "@design-system/core": "file:../../packages/design-system",
     "clsx": "^2.0.0"
   },
   "devDependencies": {

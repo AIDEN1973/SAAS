@@ -12,6 +12,7 @@ export interface CardProps {
   children: React.ReactNode;
   padding?: SpacingToken;
   className?: string;
+  style?: React.CSSProperties;
   onClick?: () => void;
   variant?: 'default' | 'elevated' | 'outlined';
 }
@@ -20,10 +21,11 @@ export const Card: React.FC<CardProps> = ({
   children,
   padding = 'md',
   className,
+  style,
   onClick,
   variant = 'default',
 }) => {
-  const paddingClasses = {
+  const paddingClasses: Record<SpacingToken, string> = {
     xs: 'p-1',
     sm: 'p-2',
     md: 'p-4',
@@ -48,6 +50,7 @@ export const Card: React.FC<CardProps> = ({
         onClick && 'cursor-pointer hover:shadow-lg transition-shadow',
         className
       )}
+      style={style}
       onClick={onClick}
     >
       {children}
