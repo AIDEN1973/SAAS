@@ -6,6 +6,7 @@
   "workspaces": [
     "apps/*",
     "packages/*",
+    "packages/lib/*",
     "packages/design-system",
     "packages/ui-core",
     "packages/schema-engine",
