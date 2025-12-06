@@ -10,6 +10,7 @@
     "./db": "./src/db.ts"
   },
   "scripts": {
+    "build": "tsc",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
