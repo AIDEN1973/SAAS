@@ -5,7 +5,12 @@
   "description": "디어쌤 Multi-Tenant 학원관리 SaaS 플랫폼",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "packages/design-system",
+    "packages/ui-core",
+    "packages/schema-engine",
+    "packages/api-sdk",
+    "packages/widgets"
   ],
   "scripts": {
     "dev": "turbo run dev",

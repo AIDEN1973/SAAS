@@ -18,7 +18,11 @@
     "paths": {
       "@env-registry/*": ["./packages/env-registry/src/*"],
       "@core/*": ["./packages/core/*/src"],
-      "@core-ui/*": ["./packages/core/core-ui/src/*"],
+      "@core-ui/*": ["./packages/ui-core/src/*"],
+      "@ui-core/*": ["./packages/ui-core/src/*"],
+      "@design-system/*": ["./packages/design-system/src/*"],
+      "@schema-engine/*": ["./packages/schema-engine/src/*"],
+      "@api-sdk/*": ["./packages/api-sdk/src/*"],
       "@services/*": ["./packages/services/*/src"],
       "@hooks/*": ["./packages/hooks/*/src"],
       "@lib/*": ["./packages/lib/*/src"],

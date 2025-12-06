@@ -1,0 +1,20 @@
+{
+  "name": "@services/student-service",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lib/supabase-client": "file:../../lib/supabase-client",
+    "@api-sdk/core": "file:../../api-sdk",
+    "@core/tags": "file:../../core/core-tags"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  }
+}
+

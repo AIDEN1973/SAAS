@@ -41,7 +41,7 @@ auth token
 
 🎯 1.2 Boundary & Isolation (강화됨)
 UI Architecture Boundary
-schema-engine  →  ui-core  →  design-system  →  theme-engine
+schema-engine  →  core-ui  →  design-system  →  theme-engine
         ↓
 (custom widget sandbox)
 
@@ -50,7 +50,7 @@ schema-engine  →  ui-core  →  design-system  →  theme-engine
 
 모듈	금지사항
 schema-engine	Tailwind 클래스 직접 사용 금지
-ui-core	스키마 구조 해석 금지
+core-ui	스키마 구조 해석 금지
 widgets	api-sdk, 다른 업종 schema import 금지
 apps	api-sdk 우회 금지 (직접 fetch 금지)
 🎯 1.3 Schema-Driven Everything
@@ -96,21 +96,32 @@ Legacy Renderer와의 병행 운영 금지
 2. Module-Level Architecture (완전 정리)
 2.1 Monorepo 구조
 /packages
-  /ui-core            # 공통 UI 컴포넌트
+  /core/              # 업종 공통 Core Platform Layer
+    /core-ui/         # 디자인 시스템 + 반응형 + 다크모드 + 확대보기
+    /core-tags/       # 공통 태깅 시스템
+    /core-auth/       # 인증
+    /core-tenancy/    # 테넌시
+    /core-billing/    # 과금
+    /core-calendar/   # 일정/예약/수업 스케줄
+    /core-search/     # Full Text Search
+    /core-analytics/  # 통계 파이프라인
+    /...              # 기타 Core 모듈
   /design-system      # Tokens, Theme Engine
   /schema-engine      # Renderer + Meta-Schema + Versioning + Custom Widget Registry
   /api-sdk            # Zero-Trust 권한 주입
-  /utils
+  /services/          # DB 접근 Service Layer
+  /hooks/             # React Query 기반 Hooks
+  /lib/               # 공통 유틸
+  /industry/          # 업종별 모듈 (학원/미용/네일/부동산/체육관/비영리)
   /widgets            # 샌드박스 위젯 (격리)
 
-/admin-ui-kit         # Backoffice 전용 UI Kit
+/admin-ui-kit         # Backoffice 전용 UI Kit (Phase 2+)
 
 /apps
-  /academy-app
-  /nail-app
-  /estate-app
-  /fitness-app
-  /admin-app          # Backoffice
+  /academy-admin      # 학원 관리자/선생님용
+  /academy-parent     # 학부모용
+  /super-admin        # SaaS 본사 플랫폼 콘솔
+  /public-gateway     # 로그인 없이 접근하는 결제/키오스크/공개 페이지
 
 2.2 api-sdk (실제 Zero-Trust 실행부)
 
@@ -136,7 +147,7 @@ SDK는 자동으로 다음을 요청에 삽입한다:
 ➡ UI는 “무슨 테넌트인지” 또는 “어떤 업종인지” 이해하지 않아도 된다.
 ➡ UI가 접근할 수 있는 데이터 범위는 RLS가 책임진다.
 
-2.3 schema-engine ↔ ui-core 통신 방식 (강력한 정교화)
+2.3 schema-engine ↔ core-ui 통신 방식 (강력한 정교화)
 ❌ 스키마에서 Tailwind 문자열 사용 금지
 ✔ props 기반 layout 전달
 
@@ -152,9 +163,9 @@ SDK는 자동으로 다음을 요청에 삽입한다:
 }
 
 
-ui-core는 이를 내부적으로 Tailwind token class로 변환한다.
+core-ui는 이를 내부적으로 Tailwind token class로 변환한다.
 
-→ 스키마는 논리적 구조만, 스타일은 ui-core만 담당한다.
+→ 스키마는 논리적 구조만, 스타일은 core-ui만 담당한다.
 
 3. Schema-Driven UI (SDUI) — Enterprise 버전
 3.1 Meta-Schema Validation
@@ -221,7 +232,7 @@ high contrast (forced-colors)
 → UI는 위 레이어에서 순차적으로 override되어 최종 Token Set을 사용한다.
 
 5. UI Kit Strategy — Customer vs Backoffice
-5.1 Customer-Facing UI (ui-core)
+5.1 Customer-Facing UI (core-ui)
 
 반응형 최적화
 

@@ -1,0 +1,8 @@
+{
+  "buildCommand": "cd ../.. && npm run build --filter=@app/super-admin",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "framework": "vite",
+  "rootDirectory": "apps/super-admin"
+}
+
