@@ -818,7 +818,7 @@ function ConsultationsTab({
 
 // 태그 탭 컴포넌트
 interface TagsTabProps {
-  studentTags: Tag[];
+  studentTags: Array<{ id: string; name: string; color: string }>;
   isLoading: boolean;
   studentId: string;
   onUpdateTags: (tagIds: string[]) => Promise<void>;

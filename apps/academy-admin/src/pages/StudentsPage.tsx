@@ -296,7 +296,7 @@ export function StudentsPage() {
 
 interface StudentCardProps {
   student: Student;
-  tags: Tag[];
+  tags: Array<{ id: string; name: string; color: string }>;
   onDetailClick: () => void;
 }
 

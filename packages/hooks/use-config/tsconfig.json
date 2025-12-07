@@ -1,7 +1,12 @@
 {
   "extends": "../../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@core/*": ["../../core/*/src"],
+      "@api-sdk/core": ["../../api-sdk/src"]
+    }
   },
   "include": ["src/**/*"]
 }
