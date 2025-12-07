@@ -9,7 +9,7 @@
 
 import { Card } from '@ui-core/react';
 import type { SchemaRegistryEntry } from '@hooks/use-schema-registry';
-import type { FormSchema, FormFieldSchema } from '@schema-engine/types';
+import type { FormSchema, FormFieldSchema } from '@schema-engine';
 
 export interface SemanticDiffViewerProps {
   oldSchema: SchemaRegistryEntry;

@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { Card, Input, Checkbox } from '@ui-core/react';
-import type { FormFieldSchema } from '@schema-engine/types';
+import type { FormFieldSchema } from '@schema-engine';
 
 export interface ValidationEditorProps {
   field: FormFieldSchema;

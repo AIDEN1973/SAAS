@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { Card, Input, Select, Button, Checkbox } from '@ui-core/react';
-import type { FormFieldSchema, ConditionRule, MultiConditionRule } from '@schema-engine/types';
+import type { FormFieldSchema, ConditionRule, MultiConditionRule } from '@schema-engine';
 
 export interface ConditionEditorProps {
   field: FormFieldSchema;

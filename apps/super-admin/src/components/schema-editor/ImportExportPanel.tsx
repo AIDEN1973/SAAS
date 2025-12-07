@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { Card, Button, useModal } from '@ui-core/react';
-import type { UISchema } from '@schema-engine/types';
+import type { UISchema } from '@schema-engine';
 import { validateSchema } from '@schema-engine/validator';
 
 export interface ImportExportPanelProps {

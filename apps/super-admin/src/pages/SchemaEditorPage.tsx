@@ -11,7 +11,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ErrorBoundary, Container, Card, Button, useModal } from '@ui-core/react';
 import { useIsSuperAdmin, useSchemaList, useActivateSchema, useDeleteSchema, type SchemaRegistryEntry } from '@hooks/use-schema-registry';
-import type { FormSchema, UISchema } from '@schema-engine/types';
+import type { FormSchema, UISchema } from '@schema-engine';
 import { SchemaEditorForm } from '../components/schema-editor/SchemaEditorForm';
 import { SchemaFieldEditor } from '../components/schema-editor/SchemaFieldEditor';
 import { ValidationEditor } from '../components/schema-editor/ValidationEditor';

@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { Card, Input, Select, Button, useModal } from '@ui-core/react';
-import type { FormSchema, UISchema } from '@schema-engine/types';
+import type { FormSchema, UISchema } from '@schema-engine';
 import type { SchemaRegistryEntry, CreateSchemaInput } from '@hooks/use-schema-registry';
 import { useCreateSchema, useUpdateSchema } from '@hooks/use-schema-registry';
 import { validateSchema } from '@schema-engine/validator';

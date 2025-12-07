@@ -5,7 +5,7 @@
  * [불변 규칙] Tailwind 클래스 직접 사용 금지, props 기반 전달
  */
 
-import type { FormSchema } from '@schema-engine/types';
+import type { FormSchema } from '@schema-engine';
 
 export const loginFormSchema: FormSchema = {
   version: '1.0.0',

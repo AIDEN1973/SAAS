@@ -11,7 +11,7 @@
 import { useMemo } from 'react';
 import { Card } from '@ui-core/react';
 import { SchemaForm, validateSchema } from '@schema-engine';
-import type { FormSchema } from '@schema-engine/types';
+import type { FormSchema } from '@schema-engine';
 
 export interface SchemaPreviewProps {
   schema: FormSchema;

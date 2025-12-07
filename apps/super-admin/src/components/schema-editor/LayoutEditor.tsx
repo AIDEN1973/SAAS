@@ -8,7 +8,7 @@
  */
 
 import { Card, Input, Select } from '@ui-core/react';
-import type { LayoutSchema } from '@schema-engine/types';
+import type { LayoutSchema } from '@schema-engine';
 
 export interface LayoutEditorProps {
   layout: LayoutSchema | undefined;
