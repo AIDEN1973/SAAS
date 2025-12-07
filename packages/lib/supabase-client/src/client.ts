@@ -25,7 +25,7 @@ export function createClient(): SupabaseClient {
   }
 
   // 개발 환경에서 URL 확인 로그 출력
-  if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+  if (typeof window !== 'undefined' && (import.meta as any).env?.DEV) {
     const correctUrl = 'https://xawypsrotrfoyozhrsbb.supabase.co';
     const isCorrect = supabaseUrl === correctUrl;
     
