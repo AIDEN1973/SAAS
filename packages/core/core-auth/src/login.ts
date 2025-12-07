@@ -8,7 +8,7 @@
  * 이 서비스는 로그인 관련 유틸리티와 헬퍼 함수를 제공합니다.
  */
 
-import { createClient } from '@lib/supabase-client/client';
+import { createClient } from '@lib/supabase-client';
 import { createServerClient } from '@lib/supabase-client/server';
 import type { LoginInput, OAuthLoginInput, OTPLoginInput, LoginResult, TenantSelectionResult } from './types';
 

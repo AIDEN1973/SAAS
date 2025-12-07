@@ -4,7 +4,12 @@
     "outDir": "./dist",
     "composite": true,
     "declaration": true,
-    "declarationMap": true
+    "declarationMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@core/*": ["../../core/*/src"],
+      "@lib/*": ["../../lib/*/src"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

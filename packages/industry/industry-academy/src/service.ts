@@ -21,6 +21,7 @@ import type {
   CreateStudentInput,
   UpdateStudentInput,
   StudentFilter,
+  StudentClass,
   Class,
   CreateClassInput,
   UpdateClassInput,
@@ -28,6 +29,9 @@ import type {
   Teacher,
   CreateTeacherInput,
   UpdateTeacherInput,
+  AttendanceLog,
+  CreateAttendanceLogInput,
+  AttendanceFilter,
   TeacherFilter,
   ClassTeacher,
   AssignTeacherInput,
@@ -516,7 +520,7 @@ export class AcademyService {
         })
         .eq('id', consultationId)
         .select()
-        .single(),
+        .single() as any,
       tenantId
     );
 
@@ -593,7 +597,7 @@ export class AcademyService {
         .from('student_consultations')
         .select('*')
         .eq('id', consultationId)
-        .single(),
+        .single() as any,
       tenantId
     );
 
@@ -621,7 +625,7 @@ export class AcademyService {
         .update(guardian)
         .eq('id', guardianId)
         .select()
-        .single(),
+        .single() as any,
       tenantId
     );
 
@@ -842,7 +846,7 @@ export class AcademyService {
         .update(updateData)
         .eq('id', classId)
         .select()
-        .single(),
+        .single() as any,
       tenantId
     );
 
@@ -1353,7 +1357,7 @@ export class AcademyService {
         .eq('class_id', classId)
         .eq('is_active', true)
         .limit(1)
-        .single(),
+        .single() as any,
       tenantId
     );
 

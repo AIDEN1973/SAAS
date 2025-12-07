@@ -5,7 +5,7 @@
  * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
  */
 
-export type PersonType = 'student' | 'customer' | 'member' | 'resident' | 'donor';
+export type PersonType = 'student' | 'customer' | 'member' | 'resident' | 'donor' | 'teacher';
 
 export interface Person {
   id: string;
