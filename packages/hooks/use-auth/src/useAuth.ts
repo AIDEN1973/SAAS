@@ -7,7 +7,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiClient, getApiContext } from '@api-sdk/core';
+import { apiClient } from '@api-sdk/core';
 import type {
   LoginInput,
   OAuthLoginInput,
@@ -15,22 +15,24 @@ import type {
   LoginResult,
   TenantSelectionResult,
   SignupInput,
+} from '@core/auth';
+import type {
   CreateTenantInput,
   TenantOnboardingResult,
-} from '@services/auth-service';
+} from '@core/tenancy';
 
 /**
  * 현재 세션 조회 Hook
  */
 export function useSession() {
-  return useQuery({
+  return useQuery<any>({
     queryKey: ['auth', 'session'],
     queryFn: async () => {
-      const response = await apiClient.get<{ session: any }>('auth/session');
+      const response = await apiClient.get<{ session: any }[]>('auth/session');
       if (response.error) {
         throw new Error(response.error.message);
       }
-      return response.data?.session;
+      return response.data?.[0]?.session;
     },
     staleTime: 5 * 60 * 1000, // 5분
   });
@@ -199,7 +201,10 @@ export function useCreateTenant() {
   return useMutation({
     mutationFn: async (input: CreateTenantInput): Promise<TenantOnboardingResult> => {
       const response = await apiClient.post<TenantOnboardingResult>('tenants', input);
-      return response;
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+      return response.data!;
     },
     onSuccess: () => {
       // 테넌트 목록 캐시 무효화
@@ -212,20 +217,16 @@ export function useCreateTenant() {
  * 사용자 테넌트 목록 조회 Hook
  */
 export function useUserTenants() {
-  return useQuery<Array<{
+  type Tenant = {
     id: string;
     name: string;
     industry_type: string;
     role: string;
-  }>>({
+  };
+  return useQuery<Tenant[]>({
     queryKey: ['auth', 'tenants'],
-    queryFn: async () => {
-      const response = await apiClient.get<Array<{
-        id: string;
-        name: string;
-        industry_type: string;
-        role: string;
-      }>>('auth/tenants');
+    queryFn: async (): Promise<Tenant[]> => {
+      const response = await apiClient.get<Tenant>('auth/tenants');
       if (response.error) {
         throw new Error(response.error.message);
       }

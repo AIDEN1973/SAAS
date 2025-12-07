@@ -18,6 +18,7 @@ export interface ContainerProps {
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   padding?: SpacingToken;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export const Container: React.FC<ContainerProps> = ({
@@ -25,6 +26,7 @@ export const Container: React.FC<ContainerProps> = ({
   maxWidth = 'xl',
   padding = 'md',
   className,
+  style,
 }) => {
   const maxWidthMap: Record<'sm' | 'md' | 'lg' | 'xl' | 'full', string> = {
     sm: '640px',
@@ -53,6 +55,7 @@ export const Container: React.FC<ContainerProps> = ({
         maxWidth: maxWidthMap[maxWidth],
         paddingLeft: paddingMap[padding],
         paddingRight: paddingMap[padding],
+        ...style,
       }}
     >
       {children}

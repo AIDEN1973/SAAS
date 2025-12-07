@@ -25,7 +25,17 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const [sessionLoading, setSessionLoading] = useState(true);
   const [autoSelecting, setAutoSelecting] = useState(false);
   const { data: tenants, isLoading: tenantsLoading } = useUserTenants();
-  const tenantsArray = tenants || [];
+  const tenantsArray: Array<{
+    id: string;
+    name: string;
+    industry_type: string;
+    role: string;
+  }> = (tenants as Array<{
+    id: string;
+    name: string;
+    industry_type: string;
+    role: string;
+  }>) || [];
   const selectTenant = useSelectTenant();
   const context = getApiContext();
 

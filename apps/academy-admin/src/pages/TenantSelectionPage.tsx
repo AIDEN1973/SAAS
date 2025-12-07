@@ -53,7 +53,7 @@ export function TenantSelectionPage() {
       const result = await selectTenant.mutateAsync(tenantId);
 
       // API Context 설정
-      const tenant = tenants.find((t) => t.id === tenantId);
+      const tenant = tenants?.find((t: { id: string; name: string; industry_type: string; role: string }) => t.id === tenantId);
       if (tenant) {
         setApiContext({
           tenantId: tenant.id,
@@ -134,7 +134,7 @@ export function TenantSelectionPage() {
             marginBottom: 'var(--spacing-lg)',
           }}
         >
-          {tenants.map((tenant) => (
+          {tenants?.map((tenant: { id: string; name: string; industry_type: string; role: string }) => (
             <Card
               key={tenant.id}
               padding="lg"
