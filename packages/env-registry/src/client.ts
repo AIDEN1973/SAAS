@@ -5,11 +5,14 @@ function validateEnvClient(): EnvClient {
   
   // Vite 환경 감지 (import.meta.env 사용)
   // Vite에서는 import.meta.env를 통해 환경변수에 접근
-  // @ts-ignore - import.meta는 Vite에서만 존재하며, Node.js에서는 SyntaxError 발생
+  // 프로덕션 빌드에서는 빌드 타임에 주입되므로 항상 접근 가능해야 함
+  let isVite = false;
   try {
-    // @ts-ignore
-    const viteEnv = import.meta.env;
-    if (viteEnv) {
+    // @ts-ignore - import.meta는 Vite에서만 존재
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      isVite = true;
+      const viteEnv = import.meta.env;
+      
       // Vite: VITE_* 접두사 사용
       // VITE_ 접두사를 NEXT_PUBLIC_로 매핑 (스키마 호환성)
       if (viteEnv.VITE_SUPABASE_URL) {
@@ -24,9 +27,10 @@ function validateEnvClient(): EnvClient {
     }
   } catch (e) {
     // import.meta가 없는 환경 (Node.js 등) - 정상적인 동작
+    isVite = false;
   }
   
-  // Next.js 환경 또는 일반 Node.js 환경
+  // Next.js 환경 또는 일반 Node.js 환경 (또는 Vite 프로덕션에서 process.env도 체크)
   if (typeof process !== 'undefined' && process.env) {
     // Next.js: NEXT_PUBLIC_* 접두사
     for (const key in process.env) {
@@ -36,6 +40,7 @@ function validateEnvClient(): EnvClient {
     }
     
     // Vite 환경변수를 NEXT_PUBLIC_로 매핑 (VITE_*가 있는 경우)
+    // 프로덕션 빌드에서 import.meta.env가 작동하지 않는 경우를 대비
     if (process.env.VITE_SUPABASE_URL && !rawEnv.NEXT_PUBLIC_SUPABASE_URL) {
       rawEnv.NEXT_PUBLIC_SUPABASE_URL = process.env.VITE_SUPABASE_URL;
     }
@@ -58,22 +63,38 @@ function validateEnvClient(): EnvClient {
       .map(e => e.path.join('.'))
       .join(', ');
     
-    // Vite 환경인지 확인
-    let isVite = false;
-    try {
-      // @ts-ignore
-      isVite = !!import.meta.env;
-    } catch (e) {
-      // import.meta가 없는 환경
-    }
+    // Vite 환경인지 확인 (위에서 이미 확인함)
     const envPrefix = isVite ? 'VITE_' : 'NEXT_PUBLIC_';
+    
+    // 디버깅 정보 수집
+    const debugInfo: string[] = [];
+    if (typeof import.meta !== 'undefined') {
+      try {
+        // @ts-ignore
+        const viteEnv = import.meta.env;
+        debugInfo.push(`import.meta.env.VITE_SUPABASE_URL: ${viteEnv?.VITE_SUPABASE_URL ? '설정됨' : '미설정'}`);
+        debugInfo.push(`import.meta.env.VITE_SUPABASE_ANON_KEY: ${viteEnv?.VITE_SUPABASE_ANON_KEY ? '설정됨' : '미설정'}`);
+      } catch (e) {
+        debugInfo.push('import.meta.env 접근 불가');
+      }
+    }
+    if (typeof process !== 'undefined' && process.env) {
+      debugInfo.push(`process.env.VITE_SUPABASE_URL: ${process.env.VITE_SUPABASE_URL ? '설정됨' : '미설정'}`);
+      debugInfo.push(`process.env.VITE_SUPABASE_ANON_KEY: ${process.env.VITE_SUPABASE_ANON_KEY ? '설정됨' : '미설정'}`);
+      debugInfo.push(`process.env.NEXT_PUBLIC_SUPABASE_URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? '설정됨' : '미설정'}`);
+      debugInfo.push(`process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY: ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '설정됨' : '미설정'}`);
+    }
     
     throw new Error(
       `클라이언트 환경변수 검증 실패:\n${errors}\n\n` +
       (missingVars ? `누락된 필수 환경변수: ${missingVars}\n\n` : '') +
-      `필수 클라이언트 환경변수가 누락되었습니다.\n` +
-      `프로젝트 루트 디렉토리의 .env.local 파일에 ${envPrefix}SUPABASE_URL과 ${envPrefix}SUPABASE_ANON_KEY를 설정하세요.\n` +
-      `(Vite 프로젝트는 VITE_ 접두사, Next.js 프로젝트는 NEXT_PUBLIC_ 접두사 사용)`
+      `필수 클라이언트 환경변수가 누락되었습니다.\n\n` +
+      `환경변수 설정 방법:\n` +
+      `1. 로컬 개발: 프로젝트 루트 디렉토리의 .env.local 파일에 ${envPrefix}SUPABASE_URL과 ${envPrefix}SUPABASE_ANON_KEY를 설정하세요.\n` +
+      `2. Vercel 배포: Vercel 대시보드 > 프로젝트 설정 > Environment Variables에서 ${envPrefix}SUPABASE_URL과 ${envPrefix}SUPABASE_ANON_KEY를 설정하세요.\n` +
+      `   (Vite 프로젝트는 VITE_ 접두사, Next.js 프로젝트는 NEXT_PUBLIC_ 접두사 사용)\n\n` +
+      (debugInfo.length > 0 ? `디버깅 정보:\n${debugInfo.join('\n')}\n\n` : '') +
+      `참고: Vite 프로덕션 빌드에서는 빌드 타임에 환경변수가 주입되어야 합니다.`
     );
   }
   
