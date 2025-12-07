@@ -2,7 +2,7 @@
   "name": "dearsaam-monorepo",
   "version": "1.0.0",
   "private": true,
-  "description": "?�어??Multi-Tenant ?�원관�?SaaS ?�랫??,
+  "description": "디어쌤 Multi-Tenant 학원관리 SaaS 플랫폼",
   "workspaces": [
     "apps/*",
     "packages/*",
