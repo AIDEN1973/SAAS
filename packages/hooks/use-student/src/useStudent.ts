@@ -560,9 +560,9 @@ export function useStudentTags() {
   const context = getApiContext();
   const tenantId = context.tenantId;
 
-  return useQuery({
+  return useQuery<Array<{ id: string; name: string; color: string }>>({
     queryKey: ['tags', tenantId, 'student'],
-    queryFn: async () => {
+    queryFn: async (): Promise<Array<{ id: string; name: string; color: string }>> => {
       // TODO: API SDK를 통해 태그 조회
       // 현재는 빈 배열 반환
       return [];
@@ -580,9 +580,9 @@ export function useStudentTagsByStudent(studentId: string | null) {
   const context = getApiContext();
   const tenantId = context.tenantId;
 
-  return useQuery({
+  return useQuery<Array<{ id: string; name: string; color: string }>>({
     queryKey: ['tags', tenantId, 'student', studentId],
-    queryFn: async () => {
+    queryFn: async (): Promise<Array<{ id: string; name: string; color: string }>> => {
       if (!studentId) return [];
       // TODO: API SDK를 통해 태그 조회
       // 현재는 빈 배열 반환

@@ -10,7 +10,9 @@
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",
     "@services/auth-service": "file:../../services/auth-service",
-    "@api-sdk/core": "file:../../api-sdk"
+    "@api-sdk/core": "file:../../api-sdk",
+    "@core/auth": "file:../../core/core-auth",
+    "@core/tenancy": "file:../../core/core-tenancy"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

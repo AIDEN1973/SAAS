@@ -1415,7 +1415,7 @@ export function AttendancePage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {classes.map(cls => (
+                            {(classes || []).map(cls => (
                               <tr key={cls.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                                 <td
                                   style={{

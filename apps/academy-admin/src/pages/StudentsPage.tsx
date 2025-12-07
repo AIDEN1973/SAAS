@@ -237,7 +237,7 @@ export function StudentsPage() {
           {/* 태그 필터 */}
           {tags && tags.length > 0 && (
             <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap', marginBottom: 'var(--spacing-md)' }}>
-              {tags.map((tag) => (
+              {tags.map((tag: { id: string; name: string; color: string }) => (
                 <Button
                   key={tag.id}
                   variant={filter.tag_ids?.includes(tag.id) ? 'solid' : 'outline'}

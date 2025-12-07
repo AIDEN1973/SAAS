@@ -29,9 +29,9 @@ export function useClasses(filter?: ClassFilter) {
   const context = getApiContext();
   const tenantId = context.tenantId;
 
-  return useQuery({
+  return useQuery<Class[]>({
     queryKey: ['classes', tenantId, filter],
-    queryFn: async () => {
+    queryFn: async (): Promise<Class[]> => {
       if (!tenantId) return [];
 
       const response = await apiClient.get<Class>('academy_classes', {
