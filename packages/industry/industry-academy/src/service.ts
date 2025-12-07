@@ -1518,12 +1518,25 @@ export class AcademyService {
               : input.attendance_type === 'late' ? '지각'
               : '출결';
             
-            const status: AttendanceStatus = input.status;
-            const statusText = status === 'present' ? '출석'
-              : status === 'late' ? '지각'
-              : status === 'absent' ? '결석'
-              : status === 'excused' ? '사유'
-              : '미정';
+            // 타입 단언: if 조건에서 'absent'가 제외되었지만, switch에서는 모든 케이스를 처리해야 함
+            const status = input.status as AttendanceStatus;
+            let statusText: string;
+            switch (status) {
+              case 'present':
+                statusText = '출석';
+                break;
+              case 'late':
+                statusText = '지각';
+                break;
+              case 'absent':
+                statusText = '결석';
+                break;
+              case 'excused':
+                statusText = '사유';
+                break;
+              default:
+                statusText = '미정';
+            }
 
             // [문서 요구사항] KST 기준 날짜 처리
             const occurredAtKST = new Date(input.occurred_at).toLocaleString('ko-KR', {
