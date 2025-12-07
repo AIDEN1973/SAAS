@@ -345,9 +345,9 @@ function StudentCard({ student, tags, onDetailClick }: StudentCardProps) {
         </p>
       )}
 
-      {studentTags.length > 0 && (
+      {(studentTags || []).length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xs)', marginBottom: 'var(--spacing-sm)' }}>
-          {studentTags.map((tag) => (
+          {(studentTags || []).map((tag: { id: string; name: string; color: string }) => (
             <span
               key={tag.id}
               style={{
