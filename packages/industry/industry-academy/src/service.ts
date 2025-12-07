@@ -1099,7 +1099,11 @@ export class AcademyService {
 
     if (error) {
       // 롤백: persons 삭제
-      await this.supabase.from('persons').delete().eq('id', person.id);
+      // [불변 규칙] DELETE 쿼리는 반드시 withTenant()를 사용해야 함
+      await withTenant(
+        this.supabase.from('persons').delete().eq('id', person.id),
+        tenantId
+      );
       throw new Error(`Failed to create teacher: ${error.message}`);
     }
 

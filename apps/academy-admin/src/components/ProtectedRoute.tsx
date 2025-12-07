@@ -40,6 +40,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const context = getApiContext();
 
   // Supabase Auth 세션 확인
+  // [예외] 인증 세션 확인은 Supabase Auth API를 직접 사용하는 것이 허용됨
+  // (기술문서: "UI는 fetch, axios, supabase client를 직접 호출할 수 없다"는 원칙의 예외)
+  // 인증 관련 세션 확인은 보안상 직접 확인이 필요하므로 예외 처리
   useEffect(() => {
     const checkSession = async () => {
       try {
