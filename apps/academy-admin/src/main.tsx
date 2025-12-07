@@ -6,6 +6,14 @@ import { ModalProvider } from '@ui-core/react';
 import App from './App';
 // 전역 스타일은 @ui-core/react에서 중앙 관리
 import '@ui-core/react/styles';
+import { checkSupabaseUrl, checkEnvVariables } from './utils/checkSupabaseUrl';
+
+// 개발 환경에서 Supabase URL 확인
+if (import.meta.env.DEV) {
+  console.log('🔍 Supabase URL 확인 시작...');
+  checkEnvVariables();
+  checkSupabaseUrl();
+}
 
 /**
  * [불변 규칙] Zero-Trust: Context는 미들웨어나 인증 시스템에서 설정되어야 함

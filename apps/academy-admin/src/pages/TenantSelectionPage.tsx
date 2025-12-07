@@ -12,192 +12,92 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Container, Card, Button, useModal, useResponsiveMode } from '@ui-core/react';
-import { useSelectTenant, useUserTenants } from '@hooks/use-auth';
-import { setApiContext } from '@api-sdk/core';
+import { useUserTenants, useSelectTenant } from '@hooks/use-auth';
 
 export function TenantSelectionPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
   const { showAlert } = useModal();
 
-  const [loading, setLoading] = useState(false);
+  const { data: tenants, isLoading: tenantsLoading } = useUserTenants();
+  const selectTenant = useSelectTenant();
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
 
-  // location.state에서 tenants 가져오기 (로그인 후 리다이렉트된 경우)
-  const tenantsFromState = (location.state as any)?.tenants;
-  const { data: tenantsData } = useUserTenants();
-  const tenants = tenantsFromState || tenantsData || [];
-
-  const selectTenant = useSelectTenant();
-
+  // 테넌트가 하나면 자동 선택
   useEffect(() => {
-    // 테넌트가 없는 경우 회원가입 페이지로 이동
-    if (tenants.length === 0) {
-      navigate('/auth/signup');
-    }
-    // 테넌트가 1개인 경우 자동 선택
-    else if (tenants.length === 1) {
+    if (tenants && tenants.length === 1) {
       handleSelectTenant(tenants[0].id);
     }
   }, [tenants]);
 
   const handleSelectTenant = async (tenantId: string) => {
-    setSelectedTenantId(tenantId);
-    setLoading(true);
-
     try {
-      const result = await selectTenant.mutateAsync(tenantId);
-
-      // API Context 설정
-      const tenant = tenants?.find((t: { id: string; name: string; industry_type: string; role: string }) => t.id === tenantId);
-      if (tenant) {
-        setApiContext({
-          tenantId: tenant.id,
-          industryType: tenant.industry_type,
-          authToken: result.access_token,
-        });
-      }
-
-      // 메인 페이지로 이동
+      setSelectedTenantId(tenantId);
+      await selectTenant.mutateAsync(tenantId);
       navigate('/');
     } catch (error) {
-      showAlert(
-        error instanceof Error ? error.message : '테넌트 선택에 실패했습니다.',
-        '테넌트 선택 실패',
-        'error'
-      );
+      const message = error instanceof Error ? error.message : '테넌트 선택에 실패했습니다.';
+      showAlert('오류', message);
       setSelectedTenantId(null);
-    } finally {
-      setLoading(false);
     }
   };
 
-  if (tenants.length === 0) {
-    return null; // useEffect에서 리다이렉트 처리
+  if (tenantsLoading) {
+    return (
+      <Container maxWidth="md" className="flex items-center justify-center min-h-screen">
+        <Card className="w-full p-6">
+          <p className="text-center">테넌트 목록을 불러오는 중...</p>
+        </Card>
+      </Container>
+    );
   }
 
-  if (tenants.length === 1) {
-    return null; // useEffect에서 자동 선택 처리
+  if (!tenants || tenants.length === 0) {
+    return (
+      <Container maxWidth="md" className="flex items-center justify-center min-h-screen">
+        <Card className="w-full p-6">
+          <h1 className="text-2xl font-bold mb-4">테넌트 없음</h1>
+          <p className="text-gray-500 mb-4">소속된 테넌트가 없습니다.</p>
+          <Button onClick={() => navigate('/auth/signup')} variant="solid">
+            회원가입
+          </Button>
+        </Card>
+      </Container>
+    );
   }
 
   return (
-    <Container
-      maxWidth="md"
-      padding="lg"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-      }}
-    >
-      <Card
-        padding="xl"
-        variant="elevated"
-        style={{
-          width: '100%',
-          maxWidth: isMobile ? '100%' : '600px',
-        }}
-      >
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <h1
-            style={{
-              fontSize: 'var(--font-size-2xl)',
-              fontWeight: 'var(--font-weight-bold)',
-              marginBottom: 'var(--spacing-xs)',
-              color: 'var(--color-text)',
-              textAlign: 'center',
-            }}
-          >
-            테넌트 선택
-          </h1>
-          <p
-            style={{
-              fontSize: 'var(--font-size-sm)',
-              color: 'var(--color-text-secondary)',
-              textAlign: 'center',
-            }}
-          >
-            접근할 테넌트를 선택해주세요
-          </p>
-        </div>
+    <Container maxWidth="md" className="flex items-center justify-center min-h-screen py-8">
+      <Card className="w-full p-6 md:p-8">
+        <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">테넌트 선택</h1>
+        <p className="text-gray-600 mb-6 text-center">접속할 테넌트를 선택해주세요.</p>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
-            gap: 'var(--spacing-md)',
-            marginBottom: 'var(--spacing-lg)',
-          }}
-        >
-          {tenants?.map((tenant: { id: string; name: string; industry_type: string; role: string }) => (
-            <Card
+        <div className="space-y-3">
+          {tenants.map((tenant) => (
+            <Button
               key={tenant.id}
-              padding="lg"
-              variant="outlined"
+              variant={selectedTenantId === tenant.id ? 'solid' : 'outline'}
               onClick={() => handleSelectTenant(tenant.id)}
-              style={{
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading && selectedTenantId !== tenant.id ? 0.5 : 1,
-                border: selectedTenantId === tenant.id ? '2px solid var(--color-primary)' : undefined,
-                transition: 'all 0.2s',
-              }}
+              disabled={selectTenant.isPending}
+              className="w-full justify-start p-4 h-auto"
             >
-              <div>
-                <h3
-                  style={{
-                    fontSize: 'var(--font-size-lg)',
-                    fontWeight: 'var(--font-weight-semibold)',
-                    marginBottom: 'var(--spacing-xs)',
-                    color: 'var(--color-text)',
-                  }}
-                >
-                  {tenant.name}
-                </h3>
-                <p
-                  style={{
-                    fontSize: 'var(--font-size-sm)',
-                    color: 'var(--color-text-secondary)',
-                    marginBottom: 'var(--spacing-xs)',
-                  }}
-                >
-                  업종: {tenant.industry_type === 'academy' ? '학원' : tenant.industry_type}
-                </p>
-                <p
-                  style={{
-                    fontSize: 'var(--font-size-xs)',
-                    color: 'var(--color-text-secondary)',
-                  }}
-                >
-                  권한: {tenant.role}
-                </p>
+              <div className="text-left">
+                <div className="font-semibold">{tenant.name}</div>
+                <div className="text-sm text-gray-500">
+                  {tenant.industry_type} · {tenant.role}
+                </div>
               </div>
-            </Card>
+            </Button>
           ))}
         </div>
 
-        <div style={{ textAlign: 'center' }}>
-          <button
-            type="button"
-            onClick={() => navigate('/auth/logout')}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--color-text-secondary)',
-              fontSize: 'var(--font-size-sm)',
-              cursor: 'pointer',
-              textDecoration: 'underline',
-            }}
-          >
-            다른 계정으로 로그인
-          </button>
-        </div>
+        {selectTenant.isPending && (
+          <p className="mt-4 text-center text-gray-500">테넌트를 선택하는 중...</p>
+        )}
       </Card>
     </Container>
   );
 }
-

@@ -2,10 +2,12 @@
   "extends": "../../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
     "baseUrl": ".",
     "paths": {
-      "@lib/*": ["../../lib/*/src"]
+      "@lib/*": ["../../lib/*/src"],
+      "@core/tenancy": ["../core-tenancy/src/index.ts"],
+      "@core/tenancy/types": ["../core-tenancy/src/types.ts"],
+      "@core/pii-utils": ["../pii-utils/src/index.ts"]
     }
   },
   "include": ["src/**/*"],

@@ -13,11 +13,17 @@
  * - 접근성 WCAG 2.1 AAA 목표
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Card, Button, Input, useModal, useResponsiveMode } from '@ui-core/react';
-import { useLoginWithEmail, useLoginWithOAuth, useLoginWithOTP, useSelectTenant } from '@hooks/use-auth';
-import { setApiContext } from '@api-sdk/core';
+import {
+  useLoginWithEmail,
+  useLoginWithOAuth,
+  useLoginWithOTP,
+  useSendOTP,
+  useUserTenants,
+  useSelectTenant,
+} from '@hooks/use-auth';
 
 type LoginMethod = 'email' | 'oauth' | 'otp';
 
@@ -33,415 +39,272 @@ export function LoginPage() {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   const loginWithEmail = useLoginWithEmail();
   const loginWithOAuth = useLoginWithOAuth();
+  const sendOTP = useSendOTP();
   const loginWithOTP = useLoginWithOTP();
+  const { data: tenants } = useUserTenants();
   const selectTenant = useSelectTenant();
 
-  // 이메일/비밀번호 로그인
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
-      showAlert('이메일과 비밀번호를 입력해주세요.', '입력 오류', 'warning');
-      return;
-    }
-
-    setLoading(true);
     try {
-      const result = await loginWithEmail.mutateAsync({
-        email,
-        password,
-      });
-
-      // 테넌트가 1개인 경우 자동 선택
-      if (result.tenants.length === 1) {
-        // 테넌트 자동 선택
-        const tenant = result.tenants[0];
-        const selectResult = await selectTenant.mutateAsync(tenant.id);
-        setApiContext({ 
-          tenantId: tenant.id, 
-          industryType: tenant.industry_type as any,
-          authToken: selectResult.access_token,
-        });
-        navigate('/');
-      } else if (result.tenants.length > 1) {
-        // 여러 테넌트가 있는 경우 테넌트 선택 페이지로 이동
-        navigate('/auth/select-tenant', { state: { tenants: result.tenants } });
-      } else {
-        // 테넌트가 없는 경우 (신규 사용자)
+      const result = await loginWithEmail.mutateAsync({ email, password });
+      
+      if (result.tenants.length === 0) {
+        // 개발 환경에서 상세 정보 표시
+        if (import.meta.env?.DEV) {
+          console.warn('⚠️ 테넌트가 없습니다:', {
+            userId: result.user.id,
+            email: result.user.email,
+          });
+          console.log('💡 가능한 원인:');
+          console.log('   1. 회원가입 시 테넌트가 생성되지 않았을 수 있음');
+          console.log('   2. user_tenant_roles에 레코드가 없을 수 있음');
+          console.log('   3. RLS 정책 때문에 조회가 안 될 수 있음');
+          console.log('   → Supabase Dashboard에서 확인:');
+          console.log('      - Authentication > Users: 사용자 확인');
+          console.log('      - Table Editor > user_tenant_roles: 테넌트 관계 확인');
+          console.log('      - Table Editor > tenants: 테넌트 확인');
+        }
+        
+        showAlert(
+          '알림',
+          '소속된 테넌트가 없습니다.\n\n' +
+          '회원가입을 진행하시거나, 관리자에게 문의해주세요.\n\n' +
+          (import.meta.env?.DEV
+            ? '⚠️ 개발 환경: 브라우저 콘솔에서 상세 정보를 확인하세요.'
+            : '')
+        );
         navigate('/auth/signup');
+        return;
+      }
+
+      if (result.tenants.length === 1) {
+        // 테넌트가 하나면 자동 선택
+        await selectTenant.mutateAsync(result.tenants[0].id);
+        navigate('/');
+      } else {
+        // 여러 테넌트면 선택 페이지로 이동
+        navigate('/auth/tenant-selection');
       }
     } catch (error) {
-      showAlert(
-        error instanceof Error ? error.message : '로그인에 실패했습니다.',
-        '로그인 실패',
-        'error'
-      );
-    } finally {
-      setLoading(false);
+      const message = error instanceof Error ? error.message : '로그인에 실패했습니다.';
+      showAlert('오류', message);
     }
   };
 
-  // 소셜 로그인
   const handleOAuthLogin = async (provider: 'google' | 'kakao') => {
-    setLoading(true);
     try {
-      const result = await loginWithOAuth.mutateAsync({
-        provider,
-        redirectTo: `${window.location.origin}/auth/callback`,
-      });
-      
-      // OAuth 리다이렉트
-      window.location.href = result.url;
+      const { url } = await loginWithOAuth.mutateAsync({ provider });
+      window.location.href = url;
     } catch (error) {
-      setLoading(false);
-      showAlert(
-        error instanceof Error ? error.message : '소셜 로그인에 실패했습니다.',
-        '로그인 실패',
-        'error'
-      );
+      const message = error instanceof Error ? error.message : '소셜 로그인에 실패했습니다.';
+      showAlert('오류', message);
     }
   };
 
-  // OTP 전송 (TODO: 실제 OTP 전송 API 구현 필요)
   const handleSendOTP = async () => {
-    if (!phone) {
-      showAlert('전화번호를 입력해주세요.', '입력 오류', 'warning');
-      return;
+    try {
+      await sendOTP.mutateAsync(phone);
+      setOtpSent(true);
+      showAlert('알림', 'OTP가 전송되었습니다.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'OTP 전송에 실패했습니다.';
+      showAlert('오류', message);
     }
-
-    // TODO: OTP 전송 API 호출
-    setOtpSent(true);
-    showAlert('OTP가 전송되었습니다.', 'OTP 전송', 'success');
   };
 
-  // OTP 로그인
   const handleOTPLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!phone || !otp) {
-      showAlert('전화번호와 OTP를 입력해주세요.', '입력 오류', 'warning');
-      return;
-    }
-
-    setLoading(true);
     try {
-      const result = await loginWithOTP.mutateAsync({
-        phone,
-        otp,
-      });
-
-      // 테넌트가 1개인 경우 자동 선택
-      if (result.tenants.length === 1) {
-        const tenant = result.tenants[0];
-        const selectResult = await selectTenant.mutateAsync(tenant.id);
-        setApiContext({ 
-          tenantId: tenant.id, 
-          industryType: tenant.industry_type as any,
-          authToken: selectResult.access_token,
-        });
-        navigate('/');
-      } else if (result.tenants.length > 1) {
-        navigate('/auth/select-tenant', { state: { tenants: result.tenants } });
-      } else {
+      const result = await loginWithOTP.mutateAsync({ phone, otp });
+      
+      if (result.tenants.length === 0) {
+        // 개발 환경에서 상세 정보 표시
+        if (import.meta.env?.DEV) {
+          console.warn('⚠️ 테넌트가 없습니다:', {
+            userId: result.user.id,
+            phone: result.user.phone,
+          });
+          console.log('💡 가능한 원인:');
+          console.log('   1. 회원가입 시 테넌트가 생성되지 않았을 수 있음');
+          console.log('   2. user_tenant_roles에 레코드가 없을 수 있음');
+          console.log('   3. RLS 정책 때문에 조회가 안 될 수 있음');
+          console.log('   → Supabase Dashboard에서 확인:');
+          console.log('      - Authentication > Users: 사용자 확인');
+          console.log('      - Table Editor > user_tenant_roles: 테넌트 관계 확인');
+          console.log('      - Table Editor > tenants: 테넌트 확인');
+        }
+        
+        showAlert(
+          '알림',
+          '소속된 테넌트가 없습니다.\n\n' +
+          '회원가입을 진행하시거나, 관리자에게 문의해주세요.\n\n' +
+          (import.meta.env?.DEV
+            ? '⚠️ 개발 환경: 브라우저 콘솔에서 상세 정보를 확인하세요.'
+            : '')
+        );
         navigate('/auth/signup');
+        return;
+      }
+
+      if (result.tenants.length === 1) {
+        await selectTenant.mutateAsync(result.tenants[0].id);
+        navigate('/');
+      } else {
+        navigate('/auth/tenant-selection');
       }
     } catch (error) {
-      showAlert(
-        error instanceof Error ? error.message : 'OTP 인증에 실패했습니다.',
-        '로그인 실패',
-        'error'
-      );
-    } finally {
-      setLoading(false);
+      const message = error instanceof Error ? error.message : 'OTP 로그인에 실패했습니다.';
+      showAlert('오류', message);
     }
   };
 
+  const loading = loginWithEmail.isPending || loginWithOAuth.isPending || loginWithOTP.isPending || sendOTP.isPending;
+
   return (
-    <Container
-      maxWidth="sm"
-      padding="lg"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-      }}
-    >
-      <Card
-        padding="xl"
-        variant="elevated"
-        style={{
-          width: '100%',
-          maxWidth: isMobile ? '100%' : '400px',
-        }}
-      >
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <h1
-            style={{
-              fontSize: 'var(--font-size-2xl)',
-              fontWeight: 'var(--font-weight-bold)',
-              marginBottom: 'var(--spacing-xs)',
-              color: 'var(--color-text)',
-              textAlign: 'center',
-            }}
-          >
-            디어쌤 로그인
-          </h1>
-          <p
-            style={{
-              fontSize: 'var(--font-size-sm)',
-              color: 'var(--color-text-secondary)',
-              textAlign: 'center',
-            }}
-          >
-            학원 관리 시스템에 로그인하세요
-          </p>
-        </div>
+    <Container maxWidth="sm" className="flex items-center justify-center min-h-screen py-8">
+      <Card className="w-full p-6 md:p-8">
+        <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">로그인</h1>
 
         {/* 로그인 방법 선택 */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 'var(--spacing-xs)',
-            marginBottom: 'var(--spacing-lg)',
-            borderBottom: '1px solid var(--color-border)',
-          }}
-        >
-          <button
-            type="button"
+        <div className="flex gap-2 mb-6">
+          <Button
+            variant={loginMethod === 'email' ? 'solid' : 'outline'}
             onClick={() => setLoginMethod('email')}
-            style={{
-              flex: 1,
-              padding: 'var(--spacing-sm)',
-              border: 'none',
-              borderBottom: loginMethod === 'email' ? '2px solid var(--color-primary)' : '2px solid transparent',
-              background: 'transparent',
-              color: loginMethod === 'email' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              fontSize: 'var(--font-size-sm)',
-              fontWeight: loginMethod === 'email' ? 'var(--font-weight-medium)' : 'var(--font-weight-normal)',
-              cursor: 'pointer',
-            }}
+            className="flex-1"
           >
             이메일
-          </button>
-          <button
-            type="button"
-            onClick={() => setLoginMethod('oauth')}
-            style={{
-              flex: 1,
-              padding: 'var(--spacing-sm)',
-              border: 'none',
-              borderBottom: loginMethod === 'oauth' ? '2px solid var(--color-primary)' : '2px solid transparent',
-              background: 'transparent',
-              color: loginMethod === 'oauth' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              fontSize: 'var(--font-size-sm)',
-              fontWeight: loginMethod === 'oauth' ? 'var(--font-weight-medium)' : 'var(--font-weight-normal)',
-              cursor: 'pointer',
-            }}
-          >
-            소셜
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant={loginMethod === 'otp' ? 'solid' : 'outline'}
             onClick={() => setLoginMethod('otp')}
-            style={{
-              flex: 1,
-              padding: 'var(--spacing-sm)',
-              border: 'none',
-              borderBottom: loginMethod === 'otp' ? '2px solid var(--color-primary)' : '2px solid transparent',
-              background: 'transparent',
-              color: loginMethod === 'otp' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              fontSize: 'var(--font-size-sm)',
-              fontWeight: loginMethod === 'otp' ? 'var(--font-weight-medium)' : 'var(--font-weight-normal)',
-              cursor: 'pointer',
-            }}
+            className="flex-1"
           >
-            OTP
-          </button>
+            전화번호
+          </Button>
         </div>
 
         {/* 이메일/비밀번호 로그인 */}
         {loginMethod === 'email' && (
-          <form onSubmit={handleEmailLogin}>
-            <div style={{ marginBottom: 'var(--spacing-md)' }}>
-              <Input
-                type="email"
-                label="이메일"
-                placeholder="이메일을 입력하세요"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                fullWidth
-                autoComplete="email"
-              />
-            </div>
-            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-              <Input
-                type="password"
-                label="비밀번호"
-                placeholder="비밀번호를 입력하세요"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                fullWidth
-                autoComplete="current-password"
-              />
-            </div>
+          <form onSubmit={handleEmailLogin} className="space-y-4">
+            <Input
+              type="email"
+              label="이메일"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={loading}
+              autoComplete="email"
+            />
+            <Input
+              type="password"
+              label="비밀번호"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={loading}
+              autoComplete="current-password"
+            />
             <Button
               type="submit"
               variant="solid"
-              color="primary"
-              size="lg"
-              fullWidth
+              className="w-full"
               disabled={loading}
             >
               {loading ? '로그인 중...' : '로그인'}
             </Button>
-            <div style={{ marginTop: 'var(--spacing-md)', textAlign: 'center' }}>
-              <button
-                type="button"
-                onClick={() => navigate('/auth/forgot-password')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--color-primary)',
-                  fontSize: 'var(--font-size-sm)',
-                  cursor: 'pointer',
-                  textDecoration: 'underline',
-                }}
-              >
-                비밀번호를 잊으셨나요?
-              </button>
-            </div>
           </form>
-        )}
-
-        {/* 소셜 로그인 */}
-        {loginMethod === 'oauth' && (
-          <div>
-            <div style={{ marginBottom: 'var(--spacing-md)' }}>
-              <Button
-                type="button"
-                variant="outline"
-                color="primary"
-                size="lg"
-                fullWidth
-                onClick={() => handleOAuthLogin('google')}
-                disabled={loading}
-                style={{
-                  marginBottom: 'var(--spacing-sm)',
-                }}
-              >
-                Google로 로그인
-              </Button>
-            </div>
-            <div>
-              <Button
-                type="button"
-                variant="outline"
-                color="primary"
-                size="lg"
-                fullWidth
-                onClick={() => handleOAuthLogin('kakao')}
-                disabled={loading}
-              >
-                Kakao로 로그인
-              </Button>
-            </div>
-          </div>
         )}
 
         {/* OTP 로그인 */}
         {loginMethod === 'otp' && (
-          <form onSubmit={handleOTPLogin}>
-            <div style={{ marginBottom: 'var(--spacing-md)' }}>
+          <form onSubmit={handleOTPLogin} className="space-y-4">
+            <div className="flex gap-2">
               <Input
                 type="tel"
                 label="전화번호"
-                placeholder="전화번호를 입력하세요"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
-                fullWidth
-                autoComplete="tel"
-                disabled={otpSent}
+                disabled={loading || otpSent}
+                placeholder="010-1234-5678"
+                className="flex-1"
               />
-            </div>
-            {otpSent && (
-              <div style={{ marginBottom: 'var(--spacing-md)' }}>
-                <Input
-                  type="text"
-                  label="OTP 코드"
-                  placeholder="OTP 코드를 입력하세요"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  required
-                  fullWidth
-                  maxLength={6}
-                />
-              </div>
-            )}
-            {!otpSent ? (
               <Button
                 type="button"
-                variant="solid"
-                color="primary"
-                size="lg"
-                fullWidth
+                variant="outline"
                 onClick={handleSendOTP}
-                disabled={loading}
+                disabled={loading || !phone || otpSent}
+                className="mt-6"
               >
-                OTP 전송
+                {otpSent ? '전송됨' : '전송'}
               </Button>
-            ) : (
-              <Button
-                type="submit"
-                variant="solid"
-                color="primary"
-                size="lg"
-                fullWidth
+            </div>
+            {otpSent && (
+              <Input
+                type="text"
+                label="OTP 코드"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                required
                 disabled={loading}
-              >
-                {loading ? '인증 중...' : '로그인'}
-              </Button>
+                placeholder="6자리 코드"
+                maxLength={6}
+              />
             )}
+            <Button
+              type="submit"
+              variant="solid"
+              className="w-full"
+              disabled={loading || !otpSent}
+            >
+              {loading ? '인증 중...' : '로그인'}
+            </Button>
           </form>
         )}
 
+        {/* 소셜 로그인 */}
+        <div className="mt-6">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">또는</span>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              onClick={() => handleOAuthLogin('google')}
+              disabled={loading}
+              className="w-full"
+            >
+              Google
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleOAuthLogin('kakao')}
+              disabled={loading}
+              className="w-full"
+            >
+              Kakao
+            </Button>
+          </div>
+        </div>
+
         {/* 회원가입 링크 */}
-        <div
-          style={{
-            marginTop: 'var(--spacing-xl)',
-            paddingTop: 'var(--spacing-lg)',
-            borderTop: '1px solid var(--color-border)',
-            textAlign: 'center',
-          }}
-        >
-          <p
-            style={{
-              fontSize: 'var(--font-size-sm)',
-              color: 'var(--color-text-secondary)',
-              marginBottom: 'var(--spacing-sm)',
-            }}
-          >
-            계정이 없으신가요?
-          </p>
+        <div className="mt-6 text-center">
+          <span className="text-gray-600">계정이 없으신가요? </span>
           <button
-            type="button"
             onClick={() => navigate('/auth/signup')}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--color-primary)',
-              fontSize: 'var(--font-size-sm)',
-              fontWeight: 'var(--font-weight-medium)',
-              cursor: 'pointer',
-              textDecoration: 'underline',
-            }}
+            className="text-primary hover:underline"
           >
             회원가입
           </button>
@@ -450,4 +313,3 @@ export function LoginPage() {
     </Container>
   );
 }
-
