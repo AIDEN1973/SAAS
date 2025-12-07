@@ -10,6 +10,7 @@
 
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { Card } from './Card';
+import { Button } from './Button';
 
 export interface ErrorBoundaryProps {
   children: ReactNode;
@@ -74,31 +75,68 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       }
 
       return (
-        <Card variant="outlined" className="border-red-500">
-          <div className="p-4">
-            <h3 className="text-lg font-semibold text-red-800 mb-2">
+        <Card
+          variant="outlined"
+          style={{
+            borderColor: 'var(--color-red-500)',
+          }}
+        >
+          <div style={{ padding: 'var(--spacing-md)' }}>
+            <h3
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 'var(--font-weight-semibold)',
+                color: 'var(--color-red-800)',
+                marginBottom: 'var(--spacing-sm)',
+                margin: 0,
+              }}
+            >
               {this.getErrorTitle()}
             </h3>
-            <p className="text-sm text-red-600 mb-4">
+            <p
+              style={{
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-red-600)',
+                marginBottom: 'var(--spacing-md)',
+                marginTop: 'var(--spacing-sm)',
+              }}
+            >
               {this.getErrorMessage()}
             </p>
             {this.state.error && (
-              <details className="mt-4">
-                <summary className="text-sm text-gray-600 cursor-pointer">
+              <details style={{ marginTop: 'var(--spacing-md)' }}>
+                <summary
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--color-text-secondary)',
+                    cursor: 'pointer',
+                  }}
+                >
                   기술적 세부사항
                 </summary>
-                <pre className="mt-2 text-xs text-gray-500 overflow-auto">
+                <pre
+                  style={{
+                    marginTop: 'var(--spacing-sm)',
+                    fontSize: 'var(--font-size-xs)',
+                    color: 'var(--color-text-secondary)',
+                    overflow: 'auto',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
                   {this.state.error.toString()}
                   {this.state.errorInfo?.componentStack}
                 </pre>
               </details>
             )}
-            <button
-              onClick={() => this.setState({ hasError: false, error: undefined, errorInfo: undefined })}
-              className="mt-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-            >
-              다시 시도
-            </button>
+            <div style={{ marginTop: 'var(--spacing-md)' }}>
+              <Button
+                variant="solid"
+                color="error"
+                onClick={() => this.setState({ hasError: false, error: undefined, errorInfo: undefined })}
+              >
+                다시 시도
+              </Button>
+            </div>
           </div>
         </Card>
       );
@@ -137,4 +175,3 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     }
   }
 }
-

@@ -8,13 +8,36 @@ function excludeServerCode(): Plugin {
   return {
     name: 'exclude-server-code',
     resolveId(id) {
+      // auth-service의 service.ts만 서버 전용으로 처리
+      if (id.includes('auth-service') && (id.includes('/service.ts') || id.includes('/service.js'))) {
+        // 클라이언트 빌드에서는 빈 모듈 반환
+        if (process.env.NODE_ENV !== 'production' || !id.includes('node_modules')) {
+          return { id: 'data:text/javascript,export default {}', external: true };
+        }
+      }
+      
+      // auth-service의 types와 index는 클라이언트에서 사용 가능
+      if (id.includes('auth-service')) {
+        return null; // auth-service의 types/index는 허용
+      }
+      
       // 서버 전용 모듈을 빈 모듈로 대체
       if (
         id.includes('/server') ||
         id === '@env-registry/core/server' ||
         id === '@lib/supabase-client/server' ||
-        id.includes('student-service/src/service') ||
-        id.includes('core-tags/src/service')
+        id.includes('/service.ts') ||
+        id.includes('/service.js') ||
+        id.includes('student-service') ||
+        id.includes('attendance-service') ||
+        id.includes('class-service') ||
+        id.includes('core-tags/src/service') ||
+        id.includes('core-party/src/service') ||
+        id.includes('industry-academy/src/service') ||
+        id === '@core/tags/service' ||
+        id === '@core/party/service' ||
+        id === '@industry/academy/service' ||
+        id.startsWith('@services/')
       ) {
         // 클라이언트 빌드에서는 빈 모듈 반환
         if (process.env.NODE_ENV !== 'production' || !id.includes('node_modules')) {
@@ -24,11 +47,37 @@ function excludeServerCode(): Plugin {
       return null;
     },
     load(id) {
+      // auth-service의 service.ts만 서버 전용으로 처리
+      if (id.includes('auth-service') && (id.includes('/service.ts') || id.includes('/service.js'))) {
+        return 'export default {};';
+      }
+      
+      // auth-service의 index.ts는 타입만 export하도록 수정
+      if (id.includes('auth-service') && (id.includes('/index.ts') || id.includes('/index.js'))) {
+        // service.ts를 빈 모듈로 대체하고 types만 export
+        return `
+          export * from './types';
+          // service.ts는 서버 전용이므로 클라이언트에서는 제외
+        `;
+      }
+      
+      // auth-service의 types는 클라이언트에서 사용 가능
+      if (id.includes('auth-service') && id.includes('/types')) {
+        return null; // auth-service의 types는 허용
+      }
+      
       // 서버 전용 파일을 빈 모듈로 대체
       if (
         id.includes('/server.ts') ||
         id.includes('/server.js') ||
-        (id.includes('student-service') && id.includes('/service'))
+        id.includes('/service.ts') ||
+        id.includes('/service.js') ||
+        id.includes('student-service') ||
+        id.includes('attendance-service') ||
+        id.includes('class-service') ||
+        (id.includes('core-tags') && id.includes('/service')) ||
+        (id.includes('core-party') && id.includes('/service')) ||
+        (id.includes('industry-academy') && id.includes('/service'))
       ) {
         return 'export default {};';
       }
@@ -57,6 +106,12 @@ export default defineConfig({
       '@lib/supabase-client/server',
       '@env-registry/core/server',
     ],
+    include: [
+      // xlsx 패키지를 명시적으로 포함
+      'xlsx',
+    ],
+    // 강제 재최적화 (캐시 문제 해결)
+    force: true,
   },
   resolve: {
     alias: [
@@ -68,7 +123,10 @@ export default defineConfig({
       { find: '@lib/supabase-client', replacement: path.resolve(__dirname, '../../packages/lib/supabase-client/src') },
       { find: '@env-registry/core/server', replacement: path.resolve(__dirname, '../../packages/env-registry/src/server.ts') },
       { find: '@env-registry/core', replacement: path.resolve(__dirname, '../../packages/env-registry/src') },
+      { find: '@core/tags/service', replacement: path.resolve(__dirname, '../../packages/core/core-tags/src/service.ts') },
       { find: '@core/tags', replacement: path.resolve(__dirname, '../../packages/core/core-tags/src') },
+      { find: '@core/party/service', replacement: path.resolve(__dirname, '../../packages/core/core-party/src/service.ts') },
+      { find: '@core/party', replacement: path.resolve(__dirname, '../../packages/core/core-party/src') },
       { find: '@env-registry', replacement: path.resolve(__dirname, '../../packages/env-registry/src') },
       { find: '@lib', replacement: path.resolve(__dirname, '../../packages/lib') },
       { find: '@design-system/core', replacement: path.resolve(__dirname, '../../packages/design-system/src') },

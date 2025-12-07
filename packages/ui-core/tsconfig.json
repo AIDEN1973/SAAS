@@ -8,7 +8,11 @@
     "declarationMap": true,
     "emitDeclarationOnly": true,
     "noEmit": false,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "skipLibCheck": true,
+    "paths": {
+      "@design-system/core": ["../design-system/src/index.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

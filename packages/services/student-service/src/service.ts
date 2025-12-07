@@ -129,6 +129,114 @@ export class StudentService {
   ): Promise<StudentConsultation> {
     return academyService.createConsultation(tenantId, studentId, consultation, userId);
   }
+
+  /**
+   * 상담일지 수정
+   */
+  async updateConsultation(
+    tenantId: string,
+    consultationId: string,
+    consultation: Partial<Omit<StudentConsultation, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at' | 'created_by'>>,
+    userId?: string
+  ): Promise<StudentConsultation> {
+    return academyService.updateConsultation(tenantId, consultationId, consultation, userId);
+  }
+
+  /**
+   * 상담일지 삭제
+   */
+  async deleteConsultation(
+    tenantId: string,
+    consultationId: string
+  ): Promise<void> {
+    return academyService.deleteConsultation(tenantId, consultationId);
+  }
+
+  /**
+   * 학부모 수정
+   */
+  async updateGuardian(
+    tenantId: string,
+    guardianId: string,
+    guardian: Partial<Omit<Guardian, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>>
+  ): Promise<Guardian> {
+    return academyService.updateGuardian(tenantId, guardianId, guardian);
+  }
+
+  /**
+   * 학부모 삭제
+   */
+  async deleteGuardian(
+    tenantId: string,
+    guardianId: string
+  ): Promise<void> {
+    return academyService.deleteGuardian(tenantId, guardianId);
+  }
+
+  /**
+   * 학생 태그 업데이트
+   */
+  async updateStudentTags(
+    tenantId: string,
+    studentId: string,
+    tagIds: string[]
+  ): Promise<void> {
+    return academyService.updateStudentTags(tenantId, studentId, tagIds);
+  }
+
+  /**
+   * 학생 반 배정
+   */
+  async enrollStudentToClass(
+    tenantId: string,
+    studentId: string,
+    classId: string,
+    enrolledAt?: string
+  ) {
+    return academyService.enrollStudentToClass(tenantId, studentId, classId, enrolledAt);
+  }
+
+  /**
+   * 학생 반 해제
+   */
+  async unenrollStudentFromClass(
+    tenantId: string,
+    studentId: string,
+    classId: string,
+    leftAt?: string
+  ): Promise<void> {
+    return academyService.unenrollStudentFromClass(tenantId, studentId, classId, leftAt);
+  }
+
+  /**
+   * 학생의 반 목록 조회
+   */
+  async getStudentClasses(tenantId: string, studentId: string) {
+    return academyService.getStudentClasses(tenantId, studentId);
+  }
+
+  /**
+   * 상담일지 AI 요약 생성
+   */
+  async generateConsultationAISummary(
+    tenantId: string,
+    consultationId: string
+  ): Promise<string> {
+    return academyService.generateConsultationAISummary(tenantId, consultationId);
+  }
+
+  /**
+   * 학생 일괄 등록 (엑셀)
+   * [요구사항] 학생 일괄 등록(엑셀)
+   */
+  async bulkCreateStudents(
+    tenantId: string,
+    industryType: string,
+    students: CreateStudentInput[],
+    userId?: string
+  ): Promise<Student[]> {
+    return academyService.bulkCreateStudents(tenantId, industryType, students, userId);
+  }
 }
 
 /**

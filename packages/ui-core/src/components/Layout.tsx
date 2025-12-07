@@ -5,6 +5,7 @@
  * Mobile: Card-first
  * Tablet: 2-column + Drawer Overlay
  * Desktop: Multi-panel + Persistent Sidebar
+ * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
  */
 
 import React from 'react';
@@ -25,32 +26,34 @@ export const Container: React.FC<ContainerProps> = ({
   padding = 'md',
   className,
 }) => {
-  const maxWidthClasses: Record<'sm' | 'md' | 'lg' | 'xl' | 'full', string> = {
-    sm: 'max-w-screen-sm',
-    md: 'max-w-screen-md',
-    lg: 'max-w-screen-lg',
-    xl: 'max-w-screen-xl',
-    full: 'max-w-full',
+  const maxWidthMap: Record<'sm' | 'md' | 'lg' | 'xl' | 'full', string> = {
+    sm: '640px',
+    md: '768px',
+    lg: '1024px',
+    xl: '1280px',
+    full: '100%',
   };
 
-  const paddingClasses: Record<SpacingToken, string> = {
-    xs: 'px-1',
-    sm: 'px-2',
-    md: 'px-4',
-    lg: 'px-6',
-    xl: 'px-8',
-    '2xl': 'px-12',
-    '3xl': 'px-16',
+  const paddingMap: Record<SpacingToken, string> = {
+    xs: 'var(--spacing-xs)',
+    sm: 'var(--spacing-sm)',
+    md: 'var(--spacing-md)',
+    lg: 'var(--spacing-lg)',
+    xl: 'var(--spacing-xl)',
+    '2xl': 'var(--spacing-2xl)',
+    '3xl': 'var(--spacing-3xl)',
   };
 
   return (
     <div
-      className={clsx(
-        'mx-auto w-full',
-        maxWidthClasses[maxWidth],
-        paddingClasses[padding],
-        className
-      )}
+      className={clsx(className)}
+      style={{
+        margin: '0 auto',
+        width: '100%',
+        maxWidth: maxWidthMap[maxWidth],
+        paddingLeft: paddingMap[padding],
+        paddingRight: paddingMap[padding],
+      }}
     >
       {children}
     </div>
@@ -75,34 +78,27 @@ export const Grid: React.FC<GridProps> = ({
   const mode = useResponsiveMode();
   
   // 반응형 컬럼 수 조정
-  const responsiveColumns = mode === 'mobile' ? 1 : mode === 'tablet' ? 2 : columns;
-  
-  const columnClasses: Record<1 | 2 | 3 | 4, string> = {
-    1: 'grid-cols-1',
-    2: 'grid-cols-1 md:grid-cols-2',
-    3: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
-    4: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
-  };
+  const responsiveColumns = (mode === 'xs' || mode === 'sm') ? 1 : mode === 'md' ? 2 : columns;
 
-  const gapClasses: Record<SpacingToken, string> = {
-    xs: 'gap-1',
-    sm: 'gap-2',
-    md: 'gap-4',
-    lg: 'gap-6',
-    xl: 'gap-8',
-    '2xl': 'gap-12',
-    '3xl': 'gap-16',
+  const gapMap: Record<SpacingToken, string> = {
+    xs: 'var(--spacing-xs)',
+    sm: 'var(--spacing-sm)',
+    md: 'var(--spacing-md)',
+    lg: 'var(--spacing-lg)',
+    xl: 'var(--spacing-xl)',
+    '2xl': 'var(--spacing-2xl)',
+    '3xl': 'var(--spacing-3xl)',
   };
 
   return (
     <div
-      className={clsx(
-        'grid',
-        columnClasses[responsiveColumns as keyof typeof columnClasses],
-        gapClasses[gap],
-        className
-      )}
-      style={style}
+      className={clsx(className)}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${responsiveColumns}, 1fr)`,
+        gap: gapMap[gap],
+        ...style,
+      }}
     >
       {children}
     </div>
@@ -128,27 +124,48 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
   className,
 }) => {
   const mode = useResponsiveMode();
-  const isMobile = mode === 'mobile';
+  const isMobile = mode === 'xs' || mode === 'sm';
 
   if (isMobile) {
     // Mobile: Sidebar는 Drawer로 처리 (별도 컴포넌트 필요)
     return (
-      <div className={clsx('flex flex-col', className)}>
-        <main className="flex-1">{main}</main>
+      <div
+        className={clsx(className)}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <main style={{ flex: 1 }}>{main}</main>
       </div>
     );
   }
 
   return (
-    <div className={clsx('flex', className)}>
+    <div
+      className={clsx(className)}
+      style={{
+        display: 'flex',
+      }}
+    >
       <aside
-        className="hidden md:block border-r border-gray-200"
-        style={{ width: sidebarWidth, minWidth: sidebarWidth }}
+        style={{
+          display: 'block',
+          width: sidebarWidth,
+          minWidth: sidebarWidth,
+          borderRight: '1px solid var(--color-gray-200)',
+        }}
       >
         {sidebar}
       </aside>
-      <main className="flex-1 overflow-auto">{main}</main>
+      <main
+        style={{
+          flex: 1,
+          overflow: 'auto',
+        }}
+      >
+        {main}
+      </main>
     </div>
   );
 };
-

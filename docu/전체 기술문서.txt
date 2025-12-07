@@ -2577,13 +2577,32 @@ Core Platform / Industry 모듈 / Services / Hooks / core-ui / 반응형 / 모�
 Core Layer는 전 업종 공통 기능을 제공하며, 모든 Industry 모듈의 기반이 된다.
 
 6-1. core-auth / core-tenancy (인증·테넌시)
+
 1) 인증 (Supabase Auth)
 
-이메일/비밀번호
+[불변 규칙] 인증 로직은 core-auth 모듈에서 공통으로 관리합니다.
 
-소셜 로그인(Optional)
+패키지 구조:
+- packages/core/core-auth/src/login.ts: 로그인 서비스 (이메일/소셜/OTP)
+- packages/core/core-auth/src/signup.ts: 회원가입 서비스 (사용자 계정 생성)
+- packages/core/core-auth/src/service.ts: 기본 인증 서비스 (사용자 조회 등)
 
-전화번호·OTP 로그인(업종에 따라 활성화)
+지원 인증 방식:
+- 이메일/비밀번호 로그인 (loginWithEmail)
+- 소셜 로그인 (Google, Kakao 등) (loginWithOAuth)
+- 전화번호·OTP 로그인 (업종에 따라 활성화) (loginWithOTP)
+
+로그인 플로우:
+1. 사용자 인증 (Supabase Auth)
+2. 사용자의 테넌트 목록 조회 (user_tenant_roles)
+3. 테넌트 선택 (JWT claim에 tenant_id 포함)
+4. 세션 새로고침 (업데이트된 JWT 받기)
+
+회원가입 플로우:
+1. 사용자 계정 생성 (Supabase Auth) - core-auth/signup.ts
+2. 이메일 인증 (선택적)
+3. 테넌트 생성 및 온보딩 - core-tenancy/onboarding.ts
+4. 업종별 초기 데이터 시드 - Industry Layer
 
 2) 테넌트 조인 모델
 
@@ -2593,9 +2612,24 @@ Core Layer는 전 업종 공통 기능을 제공하며, 모든 Industry 모듈�
 user_tenant_roles
 - user_id
 - tenant_id
-- role (owner, manager, staff, teacher, parent ...)
+- role (owner, admin, sub_admin, manager, staff, teacher, assistant, counselor, parent, super_admin)
 
-3) RLS 보안 규칙
+3) 테넌트 온보딩 (core-tenancy/onboarding.ts)
+
+[불변 규칙] 테넌트 생성 및 초기화는 core-tenancy/onboarding.ts에서 공통으로 관리합니다.
+
+테넌트 생성 플로우:
+1. tenants 테이블에 row 생성
+2. tenant_settings에 업종별 기본값 저장 (timezone, locale, industry_type)
+3. tenant_features에 플랜/기능 ON/OFF 설정
+4. owner 유저를 user_tenant_roles에 연결
+5. 추천인 코드 처리 (선택적, core-tenancy-referral 연동)
+6. 업종별 seed 실행 (Industry Layer에서 별도 처리)
+
+⚠️ 중요: 업종별 초기 데이터 시드(예: 학원 기본 반, 미용실 기본 서비스)는 Industry Layer에서 처리합니다.
+core-tenancy/onboarding.ts는 테넌트 생성, 기본 설정, 역할 할당만 담당합니다.
+
+4) RLS 보안 규칙
 
 유저가 소속된 테넌트만 접근 가능
 
@@ -2624,6 +2658,24 @@ WITH CHECK (
 );
 
 → 모든 RLS 정책은 위 옵션 중 하나를 선택하여 사용해야 합니다. Transaction Pooling을 사용하는 경우 반드시 옵션 1을 사용해야 합니다.
+
+5) Service Layer 및 Hooks
+
+[불변 규칙] Service Layer는 Core Layer를 래핑하여 제공합니다.
+
+패키지 구조:
+- packages/services/auth-service: Auth Service (Core Layer 래퍼)
+- packages/hooks/use-auth: React Query 기반 인증 관리 Hook
+
+주요 Hook:
+- useLoginWithEmail: 이메일/비밀번호 로그인
+- useLoginWithOAuth: 소셜 로그인
+- useLoginWithOTP: OTP 로그인
+- useSelectTenant: 테넌트 선택
+- useLogout: 로그아웃
+- useSignupWithEmail: 회원가입
+- useCreateTenant: 테넌트 생성 및 온보딩
+- useUserTenants: 사용자 테넌트 목록 조회
 
 6-2. core-billing / core-metering (과금·사용량 추적)
 Billing 공통 규칙
@@ -6158,23 +6210,58 @@ analytics.mv_tenant_dashboard (머뷰, 일정 주기 리프레시)
 16. 테넌트 프로비저닝 & SaaS 생성
 16-1. 새 테넌트 생성 플로우
 
-Super Admin 콘솔 혹은 Public Sign-up 폼에서 신청
+[불변 규칙] 테넌트 생성 및 온보딩은 core-tenancy/onboarding.ts에서 공통으로 관리합니다.
 
-tenants에 row 생성
+플로우:
 
-tenant_settings에 업종별 기본값 저장
+1. 사용자 회원가입 (core-auth/signup.ts)
+   - Super Admin 콘솔 혹은 Public Sign-up 폼에서 신청
+   - Supabase Auth를 통한 사용자 계정 생성
+   - 이메일 인증 (선택적)
 
-tenant_features에 플랜/기능 ON/OFF 설정
+2. 테넌트 생성 및 초기화 (core-tenancy/onboarding.ts)
+   - tenants에 row 생성
+   - tenant_settings에 업종별 기본값 저장 (timezone: Asia/Seoul, locale: ko-KR 등)
+   - tenant_features에 플랜/기능 ON/OFF 설정
+   - owner 유저를 user_tenant_roles에 연결 (role: 'owner')
+   - 추천인 코드 처리 (선택적, core-tenancy-referral 연동)
 
-owner 유저를 user_tenant_roles에 연결
+3. 업종별 초기 데이터 시드 (Industry Layer)
+   - 업종별 seed 실행 (예: 학원 기본 반, 미용실 기본 서비스, 요금 항목)
+   - Industry Layer의 각 모듈에서 별도로 처리
+   - 예: industry-academy에서 기본 반, 기본 강사 등 생성
 
-업종별 seed 실행 (예: 기본 반, 메뉴, 요금 항목)
-
-시간 처리
+시간 처리:
 
 테넌트 생성 시간 created_at은 timestamptz로 UTC 저장
 
 UI/Super Admin 화면에는 항상 KST로 변환하여 표기
+
+구현 예시:
+
+```typescript
+// 1. 사용자 회원가입
+import { signupService } from '@core/auth/signup';
+const { user } = await signupService.signupWithEmail({
+  email: 'owner@example.com',
+  password: 'password123',
+  name: '홍길동',
+});
+
+// 2. 테넌트 생성 및 온보딩
+import { tenantOnboardingService } from '@core/tenancy/onboarding';
+const { tenant, user_tenant_role } = await tenantOnboardingService.createTenant({
+  name: '우리 학원',
+  industry_type: 'academy',
+  owner_user_id: user.id,
+  plan: 'basic',
+  referral_code: 'REF123', // 선택적
+});
+
+// 3. 업종별 초기 데이터 시드 (Industry Layer)
+import { academyService } from '@industry/academy/service';
+await academyService.initializeTenantData(tenant.id);
+```
 
 16-2. 새로운 업종 SaaS 추가 과정
 

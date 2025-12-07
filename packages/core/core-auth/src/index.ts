@@ -14,4 +14,5 @@ export * from './types';
 
 // 서버 전용 코드는 이 index.ts에서 export하지 않습니다.
 // 서버에서는 직접 import: import { authService } from '@core/auth/service'
+// 클라이언트에서는 직접 import: import { loginService, signupService } from '@core/auth/login' 또는 '@core/auth/signup'
 

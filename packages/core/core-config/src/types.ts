@@ -9,6 +9,8 @@ export interface TenantConfig {
   attendance?: {
     late_after?: number;  // 지각 기준 (분)
     absent_after?: number;  // 결석 기준 (분)
+    auto_notification?: boolean;  // 자동 출결 알림 발송
+    notification_channel?: 'sms' | 'kakao';  // 기본 알림 채널
   };
   billing?: {
     cycle?: 'monthly' | 'quarterly' | 'yearly';
@@ -24,6 +26,8 @@ export interface UpdateConfigInput {
   attendance?: {
     late_after?: number;
     absent_after?: number;
+    auto_notification?: boolean;
+    notification_channel?: 'sms' | 'kakao';
   };
   billing?: {
     cycle?: 'monthly' | 'quarterly' | 'yearly';

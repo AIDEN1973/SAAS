@@ -12,7 +12,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@lib/supabase-client": "file:../../lib/supabase-client"
+    "@lib/supabase-client": "file:../../lib/supabase-client",
+    "@core/tenancy-referral": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

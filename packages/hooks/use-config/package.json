@@ -1,0 +1,20 @@
+{
+  "name": "@hooks/use-config",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.17.0",
+    "@core/config": "file:../../core/core-config",
+    "@api-sdk/core": "file:../../api-sdk"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
+

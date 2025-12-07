@@ -106,6 +106,10 @@ Supabase SQL Editor에서 다음 순서로 실행:
 9. `012_create_academy_related_rls.sql`
 10. `014_finalize_students_view.sql` ✅ **기존 코드 호환성을 위해 필수** (기술문서 정책 준수, 권장)
    또는 `013_create_students_view.sql` (간단한 버전)
+11. `017_create_academy_classes_tables.sql` ✅ **반/강사 관리 테이블 생성** (요구사항 3.2)
+12. `018_create_academy_classes_rls.sql` ✅ **반/강사 관리 RLS 정책**
+13. `019_auto_update_class_current_count.sql` ✅ **current_count 자동 업데이트 트리거** (데이터 일관성 보장)
+14. `015_dev_rls_bypass.sql` ⚠️ **개발 환경 전용** (프로덕션 배포 전 제거 필수)
 
 ---
 

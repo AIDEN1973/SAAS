@@ -1,7 +1,8 @@
 /**
  * Card Component
  * 
- * Mobile-first Card 레이아웃
+ * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
+ * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
  */
 
 import React from 'react';
@@ -25,36 +26,60 @@ export const Card: React.FC<CardProps> = ({
   onClick,
   variant = 'default',
 }) => {
-  const paddingClasses: Record<SpacingToken, string> = {
-    xs: 'p-1',
-    sm: 'p-2',
-    md: 'p-4',
-    lg: 'p-6',
-    xl: 'p-8',
-    '2xl': 'p-12',
-    '3xl': 'p-16',
+  const paddingMap: Record<SpacingToken, string> = {
+    xs: 'var(--spacing-xs)',
+    sm: 'var(--spacing-sm)',
+    md: 'var(--spacing-md)',
+    lg: 'var(--spacing-lg)',
+    xl: 'var(--spacing-xl)',
+    '2xl': 'var(--spacing-2xl)',
+    '3xl': 'var(--spacing-3xl)',
   };
 
-  const variantClasses = {
-    default: 'bg-white border border-gray-200',
-    elevated: 'bg-white shadow-md',
-    outlined: 'border-2 border-gray-300',
+  const variantStyles: Record<'default' | 'elevated' | 'outlined', React.CSSProperties> = {
+    default: {
+      backgroundColor: 'var(--color-white)',
+      border: '1px solid var(--color-gray-200)',
+      boxShadow: 'var(--shadow-sm)',
+    },
+    elevated: {
+      backgroundColor: 'var(--color-white)',
+      border: 'none',
+      boxShadow: 'var(--shadow-lg)',
+    },
+    outlined: {
+      backgroundColor: 'var(--color-white)',
+      border: '1px solid var(--color-gray-200)',
+      boxShadow: 'none',
+    },
+  };
+
+  const cardStyle: React.CSSProperties = {
+    borderRadius: 'var(--border-radius-xl)',
+    padding: paddingMap[padding],
+    ...variantStyles[variant],
+    ...(onClick && {
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+    }),
+    ...style,
   };
 
   return (
     <div
-      className={clsx(
-        'rounded-lg',
-        paddingClasses[padding],
-        variantClasses[variant],
-        onClick && 'cursor-pointer hover:shadow-lg transition-shadow',
-        className
-      )}
-      style={style}
+      className={clsx(className)}
+      style={cardStyle}
       onClick={onClick}
+      onMouseEnter={onClick ? (e) => {
+        e.currentTarget.style.boxShadow = 'var(--shadow-xl)';
+        e.currentTarget.style.transform = 'translateY(-2px)';
+      } : undefined}
+      onMouseLeave={onClick ? (e) => {
+        e.currentTarget.style.boxShadow = variant === 'elevated' ? 'var(--shadow-lg)' : 'var(--shadow-sm)';
+        e.currentTarget.style.transform = 'translateY(0)';
+      } : undefined}
     >
       {children}
     </div>
   );
 };
-

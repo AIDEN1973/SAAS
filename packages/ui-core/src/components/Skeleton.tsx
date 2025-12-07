@@ -1,0 +1,60 @@
+/**
+ * Skeleton Component
+ * 
+ * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
+ * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
+ */
+
+import React from 'react';
+import { clsx } from 'clsx';
+
+export interface SkeletonProps {
+  width?: string | number;
+  height?: string | number;
+  variant?: 'text' | 'circular' | 'rectangular';
+  className?: string;
+  style?: React.CSSProperties;
+}
+
+/**
+ * Skeleton 컴포넌트
+ * 
+ * 로딩 스켈레톤
+ */
+export const Skeleton: React.FC<SkeletonProps> = ({
+  width,
+  height,
+  variant = 'rectangular',
+  className,
+  style,
+}) => {
+  const baseStyle: React.CSSProperties = {
+    backgroundColor: 'var(--color-gray-200)',
+    borderRadius: variant === 'circular' ? '50%' : variant === 'text' ? '4px' : 'var(--border-radius-md)',
+    animation: 'pulse 1.5s ease-in-out infinite',
+    ...(width && { width: typeof width === 'number' ? `${width}px` : width }),
+    ...(height && { height: typeof height === 'number' ? `${height}px` : height }),
+    ...style,
+  };
+
+  if (variant === 'text') {
+    return (
+      <div
+        className={clsx(className)}
+        style={{
+          ...baseStyle,
+          height: height || '1em',
+          width: width || '100%',
+        }}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={clsx(className)}
+      style={baseStyle}
+    />
+  );
+};
+

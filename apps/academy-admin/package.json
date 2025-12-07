@@ -12,13 +12,21 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@api-sdk/core": "file:../../packages/api-sdk",
+    "@core/tags": "file:../../packages/core/core-tags",
+    "@env-registry/core": "file:../../packages/env-registry",
+    "@hooks/use-class": "file:../../packages/hooks/use-class",
+    "@hooks/use-student": "file:../../packages/hooks/use-student",
+    "@lib/supabase-client": "file:../../packages/lib/supabase-client",
+    "@services/attendance-service": "file:../../packages/services/attendance-service",
+    "@services/class-service": "file:../../packages/services/class-service",
+    "@services/student-service": "file:../../packages/services/student-service",
+    "@tanstack/react-query": "^5.17.0",
+    "@ui-core/react": "file:../../packages/ui-core",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@lib/supabase-client": "file:../../packages/lib/supabase-client",
-    "@env-registry/core": "file:../../packages/env-registry",
-    "@ui-core/react": "file:../../packages/ui-core",
-    "@hooks/use-student": "file:../../packages/hooks/use-student",
-    "@tanstack/react-query": "^5.17.0"
+    "react-router-dom": "^6.21.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
@@ -34,4 +42,3 @@
     "vite": "^5.0.8"
   }
 }
-

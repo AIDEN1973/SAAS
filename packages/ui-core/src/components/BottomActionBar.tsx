@@ -3,6 +3,7 @@
  * 
  * Mobile 표준: Bottom Action Bar
  * [불변 규칙] Mobile에서는 Bottom Action Bar를 표준으로 사용
+ * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
  */
 
 import React from 'react';
@@ -23,12 +24,21 @@ export const BottomActionBar: React.FC<BottomActionBarProps> = ({
   className,
 }) => {
   const mode = useResponsiveMode();
-  const isMobile = mode === 'mobile';
+  const isMobile = mode === 'xs' || mode === 'sm';
 
   if (!isMobile) {
     // Desktop: 상단 액션 바로 변환
     return (
-      <div className={clsx('flex items-center gap-2 p-4 border-b', className)}>
+      <div
+        className={clsx(className)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--spacing-sm)',
+          padding: 'var(--spacing-md)',
+          borderBottom: '1px solid var(--color-gray-200)',
+        }}
+      >
         {children}
       </div>
     );
@@ -36,17 +46,24 @@ export const BottomActionBar: React.FC<BottomActionBarProps> = ({
 
   return (
     <div
-      className={clsx(
-        'fixed bottom-0 left-0 right-0',
-        'bg-white border-t border-gray-200',
-        'p-4 shadow-lg',
-        'flex items-center justify-between gap-2',
-        'z-50',
-        className
-      )}
+      className={clsx(className)}
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'var(--color-white)',
+        borderTop: '1px solid var(--color-gray-200)',
+        padding: 'var(--spacing-md)',
+        boxShadow: 'var(--shadow-lg)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 'var(--spacing-sm)',
+        zIndex: 50,
+      }}
     >
       {children}
     </div>
   );
 };
-
