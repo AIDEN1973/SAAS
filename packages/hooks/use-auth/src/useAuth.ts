@@ -27,7 +27,10 @@ export function useSession() {
     queryKey: ['auth', 'session'],
     queryFn: async () => {
       const response = await apiClient.get<{ session: any }>('auth/session');
-      return response.session;
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+      return response.data?.session;
     },
     staleTime: 5 * 60 * 1000, // 5분
   });
@@ -60,7 +63,10 @@ export function useLoginWithOAuth() {
   return useMutation({
     mutationFn: async (input: OAuthLoginInput): Promise<{ url: string }> => {
       const response = await apiClient.post<{ url: string }>('auth/oauth', input);
-      return response;
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+      return response.data!;
     },
   });
 }
@@ -206,7 +212,12 @@ export function useCreateTenant() {
  * 사용자 테넌트 목록 조회 Hook
  */
 export function useUserTenants() {
-  return useQuery({
+  return useQuery<Array<{
+    id: string;
+    name: string;
+    industry_type: string;
+    role: string;
+  }>>({
     queryKey: ['auth', 'tenants'],
     queryFn: async () => {
       const response = await apiClient.get<Array<{

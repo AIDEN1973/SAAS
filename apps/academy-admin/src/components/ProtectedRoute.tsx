@@ -13,7 +13,7 @@ import { useEffect, useState, ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useUserTenants, useSelectTenant } from '@hooks/use-auth';
 import { getApiContext, setApiContext } from '@api-sdk/core';
-import { createClient } from '@lib/supabase-client/client';
+import { createClient } from '@lib/supabase-client';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -25,12 +25,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const [sessionLoading, setSessionLoading] = useState(true);
   const [autoSelecting, setAutoSelecting] = useState(false);
   const { data: tenants, isLoading: tenantsLoading } = useUserTenants();
-  const tenantsArray: Array<{
-    id: string;
-    name: string;
-    industry_type: string;
-    role: string;
-  }> = tenants || [];
+  const tenantsArray = tenants || [];
   const selectTenant = useSelectTenant();
   const context = getApiContext();
 

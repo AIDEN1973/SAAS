@@ -6,7 +6,10 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./service": "./src/service.ts"
+    "./login": "./src/login.ts",
+    "./signup": "./src/signup.ts",
+    "./service": "./src/service.ts",
+    "./types": "./src/types.ts"
   },
   "scripts": {
     "type-check": "tsc --noEmit"
