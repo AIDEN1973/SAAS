@@ -47,7 +47,10 @@ export function useLoginWithEmail() {
   return useMutation({
     mutationFn: async (input: LoginInput): Promise<LoginResult> => {
       const response = await apiClient.post<LoginResult>('auth/login', input);
-      return response;
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+      return response.data!;
     },
     onSuccess: (data) => {
       // 세션 캐시 업데이트
@@ -82,7 +85,10 @@ export function useLoginWithOTP() {
   return useMutation({
     mutationFn: async (input: OTPLoginInput): Promise<LoginResult> => {
       const response = await apiClient.post<LoginResult>('auth/otp', input);
-      return response;
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+      return response.data!;
     },
     onSuccess: (data) => {
       queryClient.setQueryData(['auth', 'session'], data.session);
@@ -103,7 +109,10 @@ export function useSelectTenant() {
         'auth/select-tenant',
         { tenant_id: tenantId }
       );
-      return response;
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+      return response.data!;
     },
     onSuccess: (data) => {
       // 세션 캐시 업데이트

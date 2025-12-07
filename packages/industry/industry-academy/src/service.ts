@@ -32,6 +32,7 @@ import type {
   AttendanceLog,
   CreateAttendanceLogInput,
   AttendanceFilter,
+  AttendanceStatus,
   TeacherFilter,
   ClassTeacher,
   AssignTeacherInput,
@@ -1517,10 +1518,11 @@ export class AcademyService {
               : input.attendance_type === 'late' ? '지각'
               : '출결';
             
-            const statusText = input.status === 'present' ? '출석'
-              : input.status === 'late' ? '지각'
-              : input.status === 'absent' ? '결석'
-              : input.status === 'excused' ? '사유'
+            const status: AttendanceStatus = input.status;
+            const statusText = status === 'present' ? '출석'
+              : status === 'late' ? '지각'
+              : status === 'absent' ? '결석'
+              : status === 'excused' ? '사유'
               : '미정';
 
             // [문서 요구사항] KST 기준 날짜 처리
