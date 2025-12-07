@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@lib/supabase-client": "file:../../lib/supabase-client",
-    "@schema/engine/core": "file:../../schema-engine"
+    "@schema/engine": "file:../../packages/schema-engine"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
