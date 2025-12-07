@@ -1520,7 +1520,8 @@ export class AcademyService {
             const statusText = input.status === 'present' ? '출석'
               : input.status === 'late' ? '지각'
               : input.status === 'absent' ? '결석'
-              : '사유';
+              : input.status === 'excused' ? '사유'
+              : '미정';
 
             // [문서 요구사항] KST 기준 날짜 처리
             const occurredAtKST = new Date(input.occurred_at).toLocaleString('ko-KR', {

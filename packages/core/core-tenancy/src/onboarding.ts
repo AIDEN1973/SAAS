@@ -9,7 +9,7 @@
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
-import { tenancyReferralService } from '@core/tenancy-referral/service';
+// import { tenancyReferralService } from '@core/tenancy-referral/service'; // TODO: 추천인 기능 구현 시 활성화
 import type {
   CreateTenantInput,
   TenantOnboardingResult,
@@ -216,7 +216,8 @@ export class TenantOnboardingService {
       }
 
       // 추천인 코드 사용 기록
-      await tenancyReferralService.useReferralCode(referralCodes.id, newTenantId);
+      // TODO: 추천인 기능 구현 시 활성화
+      // await tenancyReferralService.useReferralCode(referralCodes.id, newTenantId);
     } catch (error) {
       // 추천인 코드 처리 실패는 전체 온보딩을 중단하지 않음
       console.warn('추천인 코드 처리 실패:', error);
