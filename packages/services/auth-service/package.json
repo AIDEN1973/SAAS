@@ -8,8 +8,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@core/auth": "workspace:*",
-    "@core/tenancy": "workspace:*"
+    "@core/auth": "file:../../core/core-auth",
+    "@core/tenancy": "file:../../core/core-tenancy"
   },
   "devDependencies": {
     "typescript": "^5.0.0"

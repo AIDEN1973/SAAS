@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",
-    "@api-sdk/core": "workspace:*",
-    "@services/class-service": "workspace:*"
+    "@api-sdk/core": "file:../../api-sdk",
+    "@services/class-service": "file:../../services/class-service"
   },
   "devDependencies": {
     "@types/react": "^18.0.0",

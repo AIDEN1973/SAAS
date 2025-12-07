@@ -9,8 +9,8 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",
-    "@services/auth-service": "workspace:*",
-    "@api-sdk/core": "workspace:*"
+    "@services/auth-service": "file:../../services/auth-service",
+    "@api-sdk/core": "file:../../api-sdk"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

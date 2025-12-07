@@ -20,8 +20,8 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@industry/academy": "workspace:*",
-    "@core/tags": "workspace:*"
+    "@industry/academy": "file:../../industry/industry-academy",
+    "@core/tags": "file:../../core/core-tags"
   },
   "devDependencies": {
     "typescript": "^5.0.0"

@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@lib/supabase-client": "file:../../lib/supabase-client",
-    "@core/tenancy-referral": "workspace:*"
+    "@core/tenancy-referral": "file:../core-tenancy-referral"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
