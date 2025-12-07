@@ -11,9 +11,8 @@
 
 import { useEffect, useState, ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useUserTenants, useSelectTenant } from '@hooks/use-auth';
 import { getApiContext, setApiContext } from '@api-sdk/core';
-import { createClient } from '@lib/supabase-client';
+import { useSession, useUserTenants, useSelectTenant } from '@hooks/use-auth';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -21,47 +20,37 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
-  const [session, setSession] = useState<any>(null);
-  const [sessionLoading, setSessionLoading] = useState(true);
-  const [autoSelecting, setAutoSelecting] = useState(false);
+  const { data: session, isLoading: sessionLoading } = useSession();
   const { data: tenants, isLoading: tenantsLoading } = useUserTenants();
-  const tenantsArray: Array<{
-    id: string;
-    name: string;
-    industry_type: string;
-    role: string;
-  }> = (tenants as Array<{
-    id: string;
-    name: string;
-    industry_type: string;
-    role: string;
-  }>) || [];
   const selectTenant = useSelectTenant();
+  const [tenantSelected, setTenantSelected] = useState(false);
+
   const context = getApiContext();
+  const hasTenantId = !!context?.tenantId;
 
-  // Supabase Auth 세션 확인
-  // [예외] 인증 세션 확인은 Supabase Auth API를 직접 사용하는 것이 허용됨
-  // (기술문서: "UI는 fetch, axios, supabase client를 직접 호출할 수 없다"는 원칙의 예외)
-  // 인증 관련 세션 확인은 보안상 직접 확인이 필요하므로 예외 처리
+  // [중요] React Hooks 규칙: 모든 Hook은 조건부 return 이전에 호출되어야 함
+  // 테넌트가 하나이고 아직 선택되지 않은 경우 자동 선택
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-      } catch (error) {
-        console.error('세션 확인 실패:', error);
-        setSession(null);
-      } finally {
-        setSessionLoading(false);
-      }
-    };
-
-    checkSession();
-  }, []);
+    if (tenants && tenants.length === 1 && !hasTenantId && !tenantSelected) {
+      const autoSelectTenant = async () => {
+        try {
+          await selectTenant.mutateAsync(tenants[0].id);
+          setApiContext({
+            tenantId: tenants[0].id,
+            industryType: tenants[0].industry_type as 'academy' | 'salon' | 'realestate' | 'gym' | 'ngo',
+          });
+          setTenantSelected(true);
+        } catch (error) {
+          console.error('테넌트 자동 선택 실패:', error);
+          // 자동 선택 실패 시 테넌트 선택 페이지로 이동
+        }
+      };
+      autoSelectTenant();
+    }
+  }, [tenants, hasTenantId, tenantSelected, selectTenant]);
 
   // 세션 로딩 중
-  if (sessionLoading || tenantsLoading) {
+  if (sessionLoading) {
     return (
       <div
         style={{
@@ -83,41 +72,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
   }
 
-  // 테넌트가 없는 경우 회원가입 페이지로 리다이렉트
-  if (!tenantsArray || tenantsArray.length === 0) {
-    return <Navigate to="/auth/signup" replace />;
-  }
-
-  // 테넌트가 여러 개인데 선택되지 않은 경우 테넌트 선택 페이지로 리다이렉트
-  if (tenantsArray.length > 1 && !context.tenantId) {
-    return <Navigate to="/auth/select-tenant" replace />;
-  }
-
-  // 테넌트가 1개인데 선택되지 않은 경우 자동 선택
-  useEffect(() => {
-    if (tenantsArray && tenantsArray.length === 1 && !context.tenantId && !autoSelecting && session) {
-      const autoSelect = async () => {
-        setAutoSelecting(true);
-        try {
-          const tenant = tenantsArray[0];
-          const result = await selectTenant.mutateAsync(tenant.id);
-          setApiContext({
-            tenantId: tenant.id,
-            industryType: tenant.industry_type as any,
-            authToken: result.access_token,
-          });
-        } catch (error) {
-          console.error('테넌트 자동 선택 실패:', error);
-        } finally {
-          setAutoSelecting(false);
-        }
-      };
-      autoSelect();
-    }
-  }, [tenants, context.tenantId, autoSelecting, session, selectTenant]);
-
-  // 테넌트가 1개인데 선택되지 않은 경우 로딩 표시
-  if (tenantsArray && tenantsArray.length === 1 && !context.tenantId && (autoSelecting || !session)) {
+  // 테넌트 목록 로딩 중
+  if (tenantsLoading) {
     return (
       <div
         style={{
@@ -128,7 +84,35 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         }}
       >
         <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
-          로딩 중...
+          테넌트 정보를 불러오는 중...
+        </p>
+      </div>
+    );
+  }
+
+  // 테넌트가 없는 경우 회원가입 페이지로 리다이렉트
+  if (!tenants || tenants.length === 0) {
+    return <Navigate to="/auth/signup" replace />;
+  }
+
+  // 테넌트가 여러 개이고 선택되지 않은 경우 테넌트 선택 페이지로 리다이렉트
+  if (tenants.length > 1 && !hasTenantId && !tenantSelected) {
+    return <Navigate to="/auth/tenant-selection" replace />;
+  }
+
+  // 테넌트가 하나이고 선택 중인 경우 로딩 표시
+  if (tenants.length === 1 && !hasTenantId && tenantSelected && selectTenant.isPending) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+        }}
+      >
+        <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
+          테넌트를 선택하는 중...
         </p>
       </div>
     );
@@ -137,4 +121,3 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // 모든 조건을 만족한 경우 자식 컴포넌트 렌더링
   return <>{children}</>;
 }
-

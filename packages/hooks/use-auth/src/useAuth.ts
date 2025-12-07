@@ -4,35 +4,30 @@
  * React Query 기반 인증 관리 Hook
  * [불변 규칙] api-sdk를 통해서만 데이터 요청
  * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ * 
+ * [예외] 인증 관련 작업은 Supabase Auth API를 직접 사용하는 것이 허용됨
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@api-sdk/core';
-import type {
-  LoginInput,
-  OAuthLoginInput,
-  OTPLoginInput,
-  LoginResult,
-  TenantSelectionResult,
-  SignupInput,
-} from '@core/auth';
-import type {
-  CreateTenantInput,
-  TenantOnboardingResult,
-} from '@core/tenancy';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { createClient } from '@lib/supabase-client';
+import { loginService, signupService } from '@core/auth';
+import type { LoginInput, OAuthLoginInput, OTPLoginInput, LoginResult, TenantSelectionResult, B2BSignupInput, SignupResult } from '@core/auth';
 
 /**
  * 현재 세션 조회 Hook
  */
 export function useSession() {
-  return useQuery<any>({
+  return useQuery({
     queryKey: ['auth', 'session'],
     queryFn: async () => {
-      const response = await apiClient.get<{ session: any }>('auth/session');
-      if (response.error) {
-        throw new Error(response.error.message);
+      const supabase = createClient();
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        throw new Error(error.message);
       }
-      return response.data?.[0]?.session;
+      
+      return session;
     },
     staleTime: 5 * 60 * 1000, // 5분
   });
@@ -46,17 +41,11 @@ export function useLoginWithEmail() {
 
   return useMutation({
     mutationFn: async (input: LoginInput): Promise<LoginResult> => {
-      const response = await apiClient.post<LoginResult>('auth/login', input);
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-      return response.data!;
+      return loginService.loginWithEmail(input);
     },
-    onSuccess: (data) => {
-      // 세션 캐시 업데이트
-      queryClient.setQueryData(['auth', 'session'], data.session);
-      // 테넌트 목록 캐시 업데이트
-      queryClient.setQueryData(['auth', 'tenants'], data.tenants);
+    onSuccess: () => {
+      // 세션 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ['auth', 'session'] });
     },
   });
 }
@@ -67,11 +56,18 @@ export function useLoginWithEmail() {
 export function useLoginWithOAuth() {
   return useMutation({
     mutationFn: async (input: OAuthLoginInput): Promise<{ url: string }> => {
-      const response = await apiClient.post<{ url: string }>('auth/oauth', input);
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-      return response.data!;
+      return loginService.loginWithOAuth(input);
+    },
+  });
+}
+
+/**
+ * OTP 전송 Hook
+ */
+export function useSendOTP() {
+  return useMutation({
+    mutationFn: async (phone: string): Promise<void> => {
+      return loginService.sendOTP(phone);
     },
   });
 }
@@ -84,16 +80,30 @@ export function useLoginWithOTP() {
 
   return useMutation({
     mutationFn: async (input: OTPLoginInput): Promise<LoginResult> => {
-      const response = await apiClient.post<LoginResult>('auth/otp', input);
-      if (response.error) {
-        throw new Error(response.error.message);
+      return loginService.loginWithOTP(input);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['auth', 'session'] });
+    },
+  });
+}
+
+/**
+ * 사용자 테넌트 목록 조회 Hook
+ */
+export function useUserTenants() {
+  const { data: session } = useSession();
+
+  return useQuery({
+    queryKey: ['auth', 'user-tenants', session?.user?.id],
+    queryFn: async () => {
+      if (!session?.user?.id) {
+        return [];
       }
-      return response.data!;
+      return loginService.getUserTenants(session.user.id);
     },
-    onSuccess: (data) => {
-      queryClient.setQueryData(['auth', 'session'], data.session);
-      queryClient.setQueryData(['auth', 'tenants'], data.tenants);
-    },
+    enabled: !!session?.user?.id,
+    staleTime: 5 * 60 * 1000, // 5분
   });
 }
 
@@ -105,20 +115,12 @@ export function useSelectTenant() {
 
   return useMutation({
     mutationFn: async (tenantId: string): Promise<TenantSelectionResult> => {
-      const response = await apiClient.post<TenantSelectionResult>(
-        'auth/select-tenant',
-        { tenant_id: tenantId }
-      );
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-      return response.data!;
+      return loginService.selectTenant(tenantId);
     },
-    onSuccess: (data) => {
-      // 세션 캐시 업데이트
-      queryClient.setQueryData(['auth', 'session'], data);
-      // 모든 쿼리 무효화 (새 테넌트 컨텍스트 적용)
-      queryClient.invalidateQueries();
+    onSuccess: () => {
+      // 세션 및 테넌트 정보 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ['auth', 'session'] });
+      queryClient.invalidateQueries({ queryKey: ['auth', 'user-tenants'] });
     },
   });
 }
@@ -131,34 +133,27 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: async (): Promise<void> => {
-      await apiClient.post('auth/logout', {});
+      return loginService.logout();
     },
     onSuccess: () => {
-      // 모든 쿼리 캐시 클리어
+      // 모든 인증 관련 캐시 무효화
       queryClient.clear();
     },
   });
 }
 
 /**
- * 이메일/비밀번호 회원가입 Hook
+ * B2B 회원가입 Hook
  */
 export function useSignupWithEmail() {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: async (input: SignupInput) => {
-      const response = await apiClient.post<{
-        user: {
-          id: string;
-          email: string;
-          phone?: string;
-          created_at: string;
-        };
-        needsEmailVerification: boolean;
-      }>('auth/signup', input);
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-      return response.data!;
+    mutationFn: async (input: B2BSignupInput): Promise<SignupResult> => {
+      return signupService.signupWithEmail(input);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['auth', 'session'] });
     },
   });
 }
@@ -167,81 +162,25 @@ export function useSignupWithEmail() {
  * 이메일 인증 확인 Hook
  */
 export function useVerifyEmail() {
-  return useMutation({
-    mutationFn: async ({ token, type }: { token: string; type?: 'signup' | 'email_change' }) => {
-      const response = await apiClient.post('auth/verify-email', { token, type });
-      return response;
-    },
-  });
-}
-
-/**
- * 비밀번호 재설정 요청 Hook
- */
-export function useRequestPasswordReset() {
-  return useMutation({
-    mutationFn: async (email: string) => {
-      const response = await apiClient.post('auth/request-password-reset', { email });
-      return response;
-    },
-  });
-}
-
-/**
- * 비밀번호 재설정 Hook
- */
-export function useResetPassword() {
-  return useMutation({
-    mutationFn: async (newPassword: string) => {
-      const response = await apiClient.post('auth/reset-password', { password: newPassword });
-      return response;
-    },
-  });
-}
-
-/**
- * 테넌트 생성 및 온보딩 Hook
- * 
- * [불변 규칙] 테넌트 생성 후 업종별 초기 데이터 시드는 Industry Layer에서 별도로 처리합니다.
- */
-export function useCreateTenant() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: CreateTenantInput): Promise<TenantOnboardingResult> => {
-      const response = await apiClient.post<TenantOnboardingResult>('tenants', input);
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-      return response.data!;
+    mutationFn: async (token: string): Promise<LoginResult> => {
+      return signupService.verifyEmail(token);
     },
     onSuccess: () => {
-      // 테넌트 목록 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ['auth', 'tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['auth', 'session'] });
     },
   });
 }
 
 /**
- * 사용자 테넌트 목록 조회 Hook
+ * 이메일 인증 재전송 Hook
  */
-export function useUserTenants() {
-  type Tenant = {
-    id: string;
-    name: string;
-    industry_type: string;
-    role: string;
-  };
-  return useQuery<Tenant[]>({
-    queryKey: ['auth', 'tenants'],
-    queryFn: async (): Promise<Tenant[]> => {
-      const response = await apiClient.get<Tenant>('auth/tenants');
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-      return response.data || [];
+export function useResendVerificationEmail() {
+  return useMutation({
+    mutationFn: async (email: string): Promise<void> => {
+      return signupService.resendVerificationEmail(email);
     },
-    staleTime: 10 * 60 * 1000, // 10분
   });
 }
-

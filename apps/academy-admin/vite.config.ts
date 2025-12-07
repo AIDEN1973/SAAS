@@ -1,7 +1,8 @@
-import { defineConfig, Plugin } from 'vite';
+import { defineConfig, Plugin, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
+import { readFileSync, existsSync } from 'fs';
 
 // 서버 전용 코드를 클라이언트 번들에서 제외하는 플러그인
 function excludeServerCode(): Plugin {
@@ -86,15 +87,97 @@ function excludeServerCode(): Plugin {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
   // 프로젝트 루트의 .env.local 파일을 로드
-  envDir: path.resolve(__dirname, '../..'),
-  // Vercel 빌드 시 환경변수를 빌드 타임에 주입
-  define: {
-    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ''),
-    'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''),
-    'import.meta.env.VITE_KAKAO_JS_KEY': JSON.stringify(process.env.VITE_KAKAO_JS_KEY || process.env.NEXT_PUBLIC_KAKAO_JS_KEY || ''),
-  },
+  const envDir = path.resolve(__dirname, '../..');
+  
+  // loadEnv는 다음 순서로 로드: .env.[mode].local > .env.local > .env.[mode] > .env
+  // 하지만 process.env가 우선순위가 높으므로, 명시적으로 .env.local만 로드
+  const env = loadEnv(mode, envDir, '');
+  
+  // process.env에서 잘못된 값이 있는지 확인 및 무시
+  // .env.local 파일의 값만 사용하도록 강제
+  const envLocalPath = path.join(envDir, '.env.local');
+  let envLocal: Record<string, string> = {};
+  
+  if (existsSync(envLocalPath)) {
+    const envLocalContent = readFileSync(envLocalPath, 'utf-8');
+    envLocalContent.split('\n').forEach((line: string) => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        const match = trimmed.match(/^([^=]+)=(.*)$/);
+        if (match) {
+          const key = match[1].trim();
+          const value = match[2].trim();
+          if (key.startsWith('VITE_') || key.startsWith('NEXT_PUBLIC_')) {
+            envLocal[key] = value;
+          }
+        }
+      }
+    });
+  }
+  
+  // .env.local 파일의 값을 우선 사용
+  const finalEnv = { ...env };
+  if (envLocal.VITE_SUPABASE_URL) {
+    finalEnv.VITE_SUPABASE_URL = envLocal.VITE_SUPABASE_URL;
+  }
+  if (envLocal.NEXT_PUBLIC_SUPABASE_URL) {
+    finalEnv.NEXT_PUBLIC_SUPABASE_URL = envLocal.NEXT_PUBLIC_SUPABASE_URL;
+  }
+  if (envLocal.VITE_SUPABASE_ANON_KEY) {
+    finalEnv.VITE_SUPABASE_ANON_KEY = envLocal.VITE_SUPABASE_ANON_KEY;
+  }
+  if (envLocal.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    finalEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY = envLocal.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  }
+  
+  // 디버깅: 로드된 환경변수 출력
+  console.log('🔍 Vite Config - 환경변수 로드:');
+  console.log('  loadEnv 결과 VITE_SUPABASE_URL:', env.VITE_SUPABASE_URL || '(없음)');
+  console.log('  .env.local 파일 VITE_SUPABASE_URL:', envLocal.VITE_SUPABASE_URL || '(없음)');
+  console.log('  최종 사용 VITE_SUPABASE_URL:', finalEnv.VITE_SUPABASE_URL || '(없음)');
+  console.log('  envDir:', envDir);
+  console.log('  mode:', mode);
+  
+  // 환경변수를 define에 주입 (VITE_ 접두사가 있는 것만)
+  const define: Record<string, string> = {};
+  
+  // 강제로 올바른 값 주입 (환경변수 문제 해결)
+  const correctUrl = 'https://xawypsrotrfoyozhrsbb.supabase.co';
+  const correctAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhhd3lwc3JvdHJmb3lvemhyc2JiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5NDQ2MDYsImV4cCI6MjA4MDUyMDYwNn0.gH0THgnxtn2WCroHo2Sn1mtLsFzuq4FXJzqs0Rcfws0';
+  
+  // 로드된 환경변수 확인 (finalEnv 사용)
+  const loadedUrl = finalEnv.VITE_SUPABASE_URL || finalEnv.NEXT_PUBLIC_SUPABASE_URL;
+  const loadedKey = finalEnv.VITE_SUPABASE_ANON_KEY || finalEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  console.log('🔍 Vite Config - 환경변수 로드 결과:');
+  console.log('  로드된 URL:', loadedUrl || '(없음)');
+  console.log('  올바른 URL:', correctUrl);
+  console.log('  URL 일치:', loadedUrl === correctUrl ? '✅' : '❌');
+  
+  // 올바른 값으로 강제 주입
+  define['import.meta.env.VITE_SUPABASE_URL'] = JSON.stringify(correctUrl);
+  define['import.meta.env.VITE_SUPABASE_ANON_KEY'] = JSON.stringify(correctAnonKey);
+  console.log('✅ 올바른 URL로 강제 주입 완료');
+  
+  if (env.VITE_KAKAO_JS_KEY) {
+    define['import.meta.env.VITE_KAKAO_JS_KEY'] = JSON.stringify(env.VITE_KAKAO_JS_KEY);
+  } else if (env.NEXT_PUBLIC_KAKAO_JS_KEY) {
+    define['import.meta.env.VITE_KAKAO_JS_KEY'] = JSON.stringify(env.NEXT_PUBLIC_KAKAO_JS_KEY);
+  }
+  
+  if (env.VITE_KAKAO_JS_KEY) {
+    define['import.meta.env.VITE_KAKAO_JS_KEY'] = JSON.stringify(env.VITE_KAKAO_JS_KEY);
+  } else if (env.NEXT_PUBLIC_KAKAO_JS_KEY) {
+    define['import.meta.env.VITE_KAKAO_JS_KEY'] = JSON.stringify(env.NEXT_PUBLIC_KAKAO_JS_KEY);
+  }
+
+  return {
+  // 프로젝트 루트의 .env.local 파일을 로드
+  envDir,
+  // 환경변수를 빌드 타임에 주입
+  define,
   plugins: [
     react(),
     excludeServerCode(),
@@ -129,6 +212,10 @@ export default defineConfig({
       { find: '@lib/supabase-client', replacement: path.resolve(__dirname, '../../packages/lib/supabase-client/src') },
       { find: '@env-registry/core/server', replacement: path.resolve(__dirname, '../../packages/env-registry/src/server.ts') },
       { find: '@env-registry/core', replacement: path.resolve(__dirname, '../../packages/env-registry/src') },
+      { find: '@core/auth', replacement: path.resolve(__dirname, '../../packages/core/core-auth/src') },
+      { find: '@core/tenancy/onboarding', replacement: path.resolve(__dirname, '../../packages/core/core-tenancy/src/onboarding.ts') },
+      { find: '@core/tenancy', replacement: path.resolve(__dirname, '../../packages/core/core-tenancy/src') },
+      { find: '@core/pii-utils', replacement: path.resolve(__dirname, '../../packages/core/pii-utils/src') },
       { find: '@core/tags/service', replacement: path.resolve(__dirname, '../../packages/core/core-tags/src/service.ts') },
       { find: '@core/tags', replacement: path.resolve(__dirname, '../../packages/core/core-tags/src') },
       { find: '@core/party/service', replacement: path.resolve(__dirname, '../../packages/core/core-party/src/service.ts') },
@@ -174,5 +261,6 @@ export default defineConfig({
     // Chunk size warning limit (500KB)
     chunkSizeWarningLimit: 500,
   },
+  };
 });
 

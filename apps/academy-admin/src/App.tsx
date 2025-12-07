@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import { AppLayout, Button } from '@ui-core/react';
+import { AppLayout, Button, useModal } from '@ui-core/react';
 import type { SidebarItem } from '@ui-core/react';
 import { StudentsPage } from './pages/StudentsPage';
 import { StudentDetailPage } from './pages/StudentDetailPage';
@@ -15,6 +15,7 @@ import { useLogout } from '@hooks/use-auth';
 function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { showAlert } = useModal();
   const logout = useLogout();
 
   const sidebarItems: SidebarItem[] = [
@@ -71,7 +72,8 @@ function AppContent() {
       await logout.mutateAsync();
       navigate('/auth/login');
     } catch (error) {
-      console.error('로그아웃 실패:', error);
+      const message = error instanceof Error ? error.message : '로그아웃에 실패했습니다.';
+      showAlert('오류', message);
     }
   };
 
@@ -87,9 +89,9 @@ function AppContent() {
         path="/*"
         element={
           <ProtectedRoute>
-    <AppLayout
-      header={{
-        title: '디어쌤 학원관리',
+            <AppLayout
+              header={{
+                title: '디어쌤 학원관리',
                 rightContent: (
                   <Button
                     variant="outline"
@@ -99,22 +101,22 @@ function AppContent() {
                     로그아웃
                   </Button>
                 ),
-      }}
-      sidebar={{
-        items: sidebarItems,
-        currentPath: location.pathname,
-        onItemClick: handleSidebarItemClick,
-      }}
-    >
-      <Routes>
-        <Route path="/students" element={<StudentsPage />} />
-        <Route path="/students/:id" element={<StudentDetailPage />} />
-        <Route path="/classes" element={<ClassesPage />} />
-        <Route path="/teachers" element={<TeachersPage />} />
-        <Route path="/attendance" element={<AttendancePage />} />
-        <Route path="/" element={<StudentsPage />} />
-      </Routes>
-    </AppLayout>
+              }}
+              sidebar={{
+                items: sidebarItems,
+                currentPath: location.pathname,
+                onItemClick: handleSidebarItemClick,
+              }}
+            >
+              <Routes>
+                <Route path="/students" element={<StudentsPage />} />
+                <Route path="/students/:id" element={<StudentDetailPage />} />
+                <Route path="/classes" element={<ClassesPage />} />
+                <Route path="/teachers" element={<TeachersPage />} />
+                <Route path="/attendance" element={<AttendancePage />} />
+                <Route path="/" element={<StudentsPage />} />
+              </Routes>
+            </AppLayout>
           </ProtectedRoute>
         }
       />
@@ -136,4 +138,3 @@ function App() {
 }
 
 export default App;
-
