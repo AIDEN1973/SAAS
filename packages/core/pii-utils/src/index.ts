@@ -1,83 +1,83 @@
 /**
- * PII (Personally Identifiable Information) 마스킹 유틸리티
+ * PII (Personally Identifiable Information) 마스???�틸리티
  * 
- * [불변 규칙] PII 마스킹 유틸리티는 packages/core/pii-utils에 정의하며,
- * 모든 애플리케이션에서 일관되게 사용합니다.
+ * [불�? 규칙] PII 마스???�틸리티??packages/core/pii-utils???�의?�며,
+ * 모든 ?�플리�??�션?�서 ?��??�게 ?�용?�니??
  * 
- * [불변 규칙] 로그, audit.events.meta 등에 직접 이름/전화번호/이메일을 남기지 않습니다.
+ * [불�? 규칙] 로그, audit.events.meta ?�에 직접 ?�름/?�화번호/?�메?�을 ?�기지 ?�습?�다.
  * 
  * [기술문서 참조]
- * - rules.md 6-2. PII 마스킹 헬퍼 사용 (Critical)
- * - 전체 기술문서.txt 19-6-1. PII 마스킹 유틸리티 (Critical)
+ * - rules.md 6-2. PII 마스???�퍼 ?�용 (Critical)
+ * - ?�체 기술문서.txt 19-6-1. PII 마스???�틸리티 (Critical)
  */
 
 /**
- * 전화번호 마스킹
+ * ?�화번호 마스??
  * 
- * 예시: 010-1234-5678 → 010-****-5678
+ * ?�시: 010-1234-5678 ??010-****-5678
  */
 export function maskPhone(phone: string | null | undefined): string {
   if (!phone) return '';
-  // 010-1234-5678 → 010-****-5678
+  // 010-1234-5678 ??010-****-5678
   return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
 }
 
 /**
- * 이메일 마스킹
+ * ?�메??마스??
  * 
- * 예시: user@example.com → u***@example.com
+ * ?�시: user@example.com ??u***@example.com
  */
 export function maskEmail(email: string | null | undefined): string {
   if (!email) return '';
-  // user@example.com → u***@example.com
+  // user@example.com ??u***@example.com
   return email.replace(/(^.).*(@.*$)/, '$1***$2');
 }
 
 /**
- * 이름 마스킹
+ * ?�름 마스??
  * 
- * 예시: 홍길동 → 홍*동
+ * ?�시: ?�길????????
  */
 export function maskName(name: string | null | undefined): string {
   if (!name) return '';
-  // 홍길동 → 홍*동
+  // ?�길????????
   if (name.length <= 2) return name.charAt(0) + '*';
   return name.charAt(0) + '*'.repeat(name.length - 2) + name.charAt(name.length - 1);
 }
 
 /**
- * 객체 전체 PII 마스킹
+ * 객체 ?�체 PII 마스??
  * 
- * 객체 내의 email, phone, name 필드를 자동으로 마스킹합니다.
+ * 객체 ?�의 email, phone, name ?�드�??�동?�로 마스?�합?�다.
  */
 export function maskPII(data: any): any {
   if (data === null || data === undefined) {
     return data;
   }
 
-  // 문자열인 경우 이메일/전화번호 패턴 확인
+  // 문자?�인 경우 ?�메???�화번호 ?�턴 ?�인
   if (typeof data === 'string') {
-    // 이메일 마스킹
+    // ?�메??마스??
     if (data.includes('@')) {
       return maskEmail(data);
     }
-    // 전화번호 마스킹 (숫자와 하이픈 포함)
+    // ?�화번호 마스??(?�자?� ?�이???�함)
     if (/[\d-]/.test(data) && data.replace(/[\d-]/g, '').length === 0) {
       return maskPhone(data);
     }
     return data;
   }
 
-  // 배열인 경우 각 요소 마스킹
+  // 배열??경우 �??�소 마스??
   if (Array.isArray(data)) {
     return data.map(item => maskPII(item));
   }
 
-  // 객체인 경우 각 필드 마스킹
+  // 객체??경우 �??�드 마스??
   if (typeof data === 'object') {
     const masked: any = {};
     for (const [key, value] of Object.entries(data)) {
-      // PII 필드 직접 마스킹
+      // PII ?�드 직접 마스??
       if (key === 'email' || key === 'user_email' || key === 'owner_email') {
         masked[key] = maskEmail(value as string);
       } else if (key === 'phone' || key === 'user_phone' || key === 'owner_phone') {
@@ -85,7 +85,7 @@ export function maskPII(data: any): any {
       } else if (key === 'name' || key === 'user_name' || key === 'owner_name') {
         masked[key] = maskName(value as string);
       } else {
-        // 중첩 객체/배열 재귀 처리
+        // 중첩 객체/배열 ?��? 처리
         masked[key] = maskPII(value);
       }
     }

@@ -1,11 +1,11 @@
 /**
  * Core Analytics Service
  * 
- * 통계 파이프라인 서비스
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * ?�계 ?�이?�라???�비??
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  * 
- * ⚠️ 중요: Analytics는 replica 기반 heavy query 실행
- * 원시 이벤트 테이블 → 외부 런타임 집계 → daily_metrics / monthly_revenue
+ * ?�️ 중요: Analytics??replica 기반 heavy query ?�행
+ * ?�시 ?�벤???�이�????��? ?��???집계 ??daily_metrics / monthly_revenue
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -21,18 +21,18 @@ export class AnalyticsService {
   private supabase = createServerClient();
 
   /**
-   * 이벤트 기록
+   * ?�벤??기록
    */
   async recordEvent(
     tenantId: string,
     input: RecordEventInput
   ): Promise<AnalyticsEvent> {
-    // KST 기준 일자 계산 (UTC → KST)
+    // KST 기�? ?�자 계산 (UTC ??KST)
     const occurredAt = input.occurred_at 
       ? new Date(input.occurred_at)
       : new Date();
     
-    // KST = UTC + 9시간
+    // KST = UTC + 9?�간
     const kstDate = new Date(occurredAt.getTime() + 9 * 60 * 60 * 1000);
     const eventDateKst = kstDate.toISOString().split('T')[0];
 
@@ -60,7 +60,7 @@ export class AnalyticsService {
   }
 
   /**
-   * 일별 메트릭 조회
+   * ?�별 메트�?조회
    */
   async getDailyMetrics(
     tenantId: string,
@@ -85,7 +85,7 @@ export class AnalyticsService {
   }
 
   /**
-   * 월별 매출 조회
+   * ?�별 매출 조회
    */
   async getMonthlyRevenue(
     tenantId: string,

@@ -1,15 +1,15 @@
 /**
  * useModal Hook
  * 
- * 전역 모달 컨텍스트 기반 Alert/Confirm 모달 관리 Hook
- * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
+ * ?�역 모달 컨텍?�트 기반 Alert/Confirm 모달 관�?Hook
+ * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
  */
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { Modal } from '../components/Modal';
 import { Button } from '../components/Button';
 
-// Alert Modal 타입
+// Alert Modal ?�??
 interface AlertModal {
   isOpen: boolean;
   title: string;
@@ -17,7 +17,7 @@ interface AlertModal {
   type?: 'info' | 'success' | 'warning' | 'error';
 }
 
-// Confirm Modal 타입
+// Confirm Modal ?�??
 interface ConfirmModal {
   isOpen: boolean;
   title: string;
@@ -26,7 +26,7 @@ interface ConfirmModal {
   onCancel?: () => void;
 }
 
-// Context 타입
+// Context ?�??
 interface ModalContextType {
   showAlert: (message: string, title?: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   showConfirm: (message: string, title?: string) => Promise<boolean>;
@@ -35,9 +35,9 @@ interface ModalContextType {
 const ModalContext = createContext<ModalContextType | undefined>(undefined);
 
 /**
- * Modal Provider 컴포넌트
+ * Modal Provider 컴포?�트
  * 
- * 앱 최상위에 배치하여 전역 모달 관리
+ * ??최상?�에 배치?�여 ?�역 모달 관�?
  */
 export function ModalProvider({ children }: { children: ReactNode }) {
   const [alertModal, setAlertModal] = useState<AlertModal>({
@@ -55,7 +55,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
 
   const showAlert = useCallback((
     message: string,
-    title: string = '알림',
+    title: string = '?�림',
     type: 'info' | 'success' | 'warning' | 'error' = 'info'
   ) => {
     setAlertModal({
@@ -68,7 +68,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
 
   const showConfirm = useCallback((
     message: string,
-    title: string = '확인'
+    title: string = '?�인'
   ): Promise<boolean> => {
     return new Promise((resolve) => {
       setConfirmModal({
@@ -113,7 +113,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
             onClick={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
             fullWidth
           >
-            확인
+            ?�인
           </Button>
         }
       >
@@ -151,7 +151,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
               onClick={confirmModal.onConfirm || (() => setConfirmModal((prev) => ({ ...prev, isOpen: false })))}
               style={{ flex: 1 }}
             >
-              확인
+              ?�인
             </Button>
           </div>
         }
@@ -174,7 +174,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
 /**
  * useModal Hook
  * 
- * 전역 모달 컨텍스트에서 showAlert, showConfirm 함수를 가져옴
+ * ?�역 모달 컨텍?�트?�서 showAlert, showConfirm ?�수�?가?�옴
  */
 export function useModal() {
   const context = useContext(ModalContext);

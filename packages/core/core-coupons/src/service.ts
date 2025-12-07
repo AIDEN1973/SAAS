@@ -1,8 +1,8 @@
 /**
  * Core Coupons Service
  * 
- * 쿠폰/할인 관리 서비스
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * 쿠폰/?�인 관�??�비??
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -50,7 +50,7 @@ export class CouponsService {
   }
 
   /**
-   * 쿠폰 상세 조회
+   * 쿠폰 ?�세 조회
    */
   async getCoupon(tenantId: string, couponId: string): Promise<Coupon | null> {
     const { data, error } = await withTenant(
@@ -72,7 +72,7 @@ export class CouponsService {
   }
 
   /**
-   * 쿠폰 코드로 조회
+   * 쿠폰 코드�?조회
    */
   async getCouponByCode(
     tenantId: string,
@@ -97,7 +97,7 @@ export class CouponsService {
   }
 
   /**
-   * 쿠폰 생성
+   * 쿠폰 ?�성
    */
   async createCoupon(
     tenantId: string,
@@ -130,7 +130,7 @@ export class CouponsService {
   }
 
   /**
-   * 쿠폰 수정
+   * 쿠폰 ?�정
    */
   async updateCoupon(
     tenantId: string,
@@ -154,7 +154,7 @@ export class CouponsService {
   }
 
   /**
-   * 쿠폰 삭제
+   * 쿠폰 ??��
    */
   async deleteCoupon(tenantId: string, couponId: string): Promise<void> {
     const { error } = await withTenant(
@@ -171,7 +171,7 @@ export class CouponsService {
   }
 
   /**
-   * 쿠폰 사용
+   * 쿠폰 ?�용
    */
   async useCoupon(
     tenantId: string,
@@ -179,7 +179,7 @@ export class CouponsService {
     personId?: string,
     invoiceId?: string
   ): Promise<CouponUsage> {
-    // 쿠폰 유효성 검증
+    // 쿠폰 ?�효??검�?
     const coupon = await this.getCoupon(tenantId, couponId);
     if (!coupon) {
       throw new Error('Coupon not found');
@@ -198,7 +198,7 @@ export class CouponsService {
       throw new Error('Coupon usage limit exceeded');
     }
 
-    // 사용 기록 생성
+    // ?�용 기록 ?�성
     const { data: usage, error: usageError } = await this.supabase
       .from('coupon_usages')
       .insert({
@@ -214,7 +214,7 @@ export class CouponsService {
       throw new Error(`Failed to record coupon usage: ${usageError.message}`);
     }
 
-    // 사용 횟수 증가
+    // ?�용 ?�수 증�?
     await withTenant(
       this.supabase
         .from('coupons')
@@ -227,7 +227,7 @@ export class CouponsService {
   }
 
   /**
-   * 쿠폰 사용 내역 조회
+   * 쿠폰 ?�용 ?�역 조회
    */
   async getCouponUsages(
     tenantId: string,

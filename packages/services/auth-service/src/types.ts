@@ -1,7 +1,7 @@
 /**
  * Auth Service Types
  * 
- * [불변 규칙] Service Layer는 Industry Layer를 사용하여 업종별 비즈니스 로직을 호출한다.
+ * [불�? 규칙] Service Layer??Industry Layer�??�용?�여 ?�종�?비즈?�스 로직???�출?�다.
  */
 
 export * from '@core/auth';

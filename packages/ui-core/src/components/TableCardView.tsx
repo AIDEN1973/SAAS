@@ -1,9 +1,9 @@
 /**
  * TableCardView Component
  * 
- * [불변 규칙] 모바일 환경에서 테이블을 카드형 UI로 자동 전환
- * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
- * [불변 규칙] 휴대폰 (xs, sm)에서 사용
+ * [불�? 규칙] 모바???�경?�서 ?�이블을 카드??UI�??�동 ?�환
+ * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
+ * [불�? 규칙] ?��???(xs, sm)?�서 ?�용
  */
 
 import React from 'react';
@@ -28,22 +28,22 @@ export interface TableCardViewProps<T = any> {
 }
 
 /**
- * TableCardView 컴포넌트
+ * TableCardView 컴포?�트
  * 
- * 모바일 환경에서 테이블 데이터를 카드 형태로 표시
+ * 모바???�경?�서 ?�이�??�이?��? 카드 ?�태�??�시
  */
 export function TableCardView<T = any>({
   data,
   columns,
   keyExtractor,
   onRowClick,
-  emptyMessage = '데이터가 없습니다.',
+  emptyMessage = '?�이?��? ?�습?�다.',
   className,
 }: TableCardViewProps<T>) {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
 
-  // 모바일이 아니면 null 반환 (DataTable 사용)
+  // 모바?�이 ?�니�?null 반환 (DataTable ?�용)
   if (!isMobile) {
     return null;
   }

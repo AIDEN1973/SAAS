@@ -1,11 +1,11 @@
 /**
  * Login Form Schema
  * 
- * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
- * [불변 규칙] Tailwind 클래스 직접 사용 금지, props 기반 전달
+ * [불�? 규칙] ?�키�??�진 기반 FormSchema ?�의
+ * [불�? 규칙] Tailwind ?�래??직접 ?�용 금�?, props 기반 ?�달
  */
 
-import type { FormSchema } from '@schema-engine';
+import type { FormSchema } from '@schema/engine';
 
 export const loginFormSchema: FormSchema = {
   version: '1.0.0',
@@ -18,10 +18,10 @@ export const loginFormSchema: FormSchema = {
         name: 'email',
         kind: 'email',
         ui: {
-          label: '이메일',
+          label: '?�메??,
         },
         validation: {
-          required: '이메일을 입력해주세요.',
+          required: '?�메?�을 ?�력?�주?�요.',
         },
         defaultValue: '',
       },
@@ -29,16 +29,16 @@ export const loginFormSchema: FormSchema = {
         name: 'password',
         kind: 'password',
         ui: {
-          label: '비밀번호',
+          label: '비�?번호',
         },
         validation: {
-          required: '비밀번호를 입력해주세요.',
+          required: '비�?번호�??�력?�주?�요.',
         },
         defaultValue: '',
       },
     ],
     submit: {
-      label: '로그인',
+      label: '로그??,
       variant: 'solid',
       color: 'primary',
       size: 'md',
@@ -58,10 +58,10 @@ export const otpLoginFormSchema: FormSchema = {
         kind: 'text',
         ui: {
           label: 'OTP 코드',
-          placeholder: '6자리 코드',
+          placeholder: '6?�리 코드',
         },
         validation: {
-          required: 'OTP 코드를 입력해주세요.',
+          required: 'OTP 코드�??�력?�주?�요.',
           minLength: 6,
           maxLength: 6,
         },
@@ -69,7 +69,7 @@ export const otpLoginFormSchema: FormSchema = {
       },
     ],
     submit: {
-      label: '로그인',
+      label: '로그??,
       variant: 'solid',
       color: 'primary',
       size: 'md',

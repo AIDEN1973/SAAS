@@ -1,8 +1,8 @@
 /**
  * Student Service
  * 
- * [불변 규칙] Service Layer는 Industry Layer를 사용하여 업종별 비즈니스 로직을 호출한다.
- * [불변 규칙] Service Layer는 Core Layer를 직접 사용하지 않고, Industry Layer를 통해 접근한다.
+ * [불�? 규칙] Service Layer??Industry Layer�??�용?�여 ?�종�?비즈?�스 로직???�출?�다.
+ * [불�? 규칙] Service Layer??Core Layer�?직접 ?�용?��? ?�고, Industry Layer�??�해 ?�근?�다.
  */
 
 import { academyService } from '@industry/academy/service';
@@ -17,15 +17,15 @@ import type {
 import type { Tag } from '@core/tags';
 
 /**
- * Student Service (Industry Layer 래퍼)
+ * Student Service (Industry Layer ?�퍼)
  * 
- * Service Layer는 Industry Layer의 academyService를 래핑하여 제공합니다.
- * 향후 다른 업종(체육관 등)이 추가되면 industry-gym의 gymService를 사용하는 별도 Service를 생성합니다.
+ * Service Layer??Industry Layer??academyService�??�핑?�여 ?�공?�니??
+ * ?�후 ?�른 ?�종(체육관 ????추�??�면 industry-gym??gymService�??�용?�는 별도 Service�??�성?�니??
  */
 export class StudentService {
 
   /**
-   * 학생 목록 조회 (필터링 지원)
+   * ?�생 목록 조회 (?�터�?지??
    */
   async getStudents(
     tenantId: string,
@@ -35,14 +35,14 @@ export class StudentService {
   }
 
   /**
-   * 학생 상세 조회
+   * ?�생 ?�세 조회
    */
   async getStudent(tenantId: string, studentId: string): Promise<Student | null> {
     return academyService.getStudent(tenantId, studentId);
   }
 
   /**
-   * 학생 생성
+   * ?�생 ?�성
    */
   async createStudent(
     tenantId: string,
@@ -54,7 +54,7 @@ export class StudentService {
   }
 
   /**
-   * 학생 수정
+   * ?�생 ?�정
    */
   async updateStudent(
     tenantId: string,
@@ -66,7 +66,7 @@ export class StudentService {
   }
 
   /**
-   * 학생 삭제 (Soft delete: status를 'withdrawn'으로 변경)
+   * ?�생 ??�� (Soft delete: status�?'withdrawn'?�로 변�?
    */
   async deleteStudent(
     tenantId: string,
@@ -77,14 +77,14 @@ export class StudentService {
   }
 
   /**
-   * 학부모 목록 조회
+   * ?��?�?목록 조회
    */
   async getGuardians(tenantId: string, studentId: string): Promise<Guardian[]> {
     return academyService.getGuardians(tenantId, studentId);
   }
 
   /**
-   * 학부모 생성
+   * ?��?�??�성
    */
   async createGuardians(
     tenantId: string,
@@ -95,21 +95,21 @@ export class StudentService {
   }
 
   /**
-   * 학생 태그 목록 조회 (core-tags 활용)
+   * ?�생 ?�그 목록 조회 (core-tags ?�용)
    */
   async getTags(tenantId: string): Promise<Tag[]> {
     return academyService.getTags(tenantId);
   }
 
   /**
-   * 학생의 태그 조회 (core-tags 활용)
+   * ?�생???�그 조회 (core-tags ?�용)
    */
   async getStudentTags(tenantId: string, studentId: string): Promise<Tag[]> {
     return academyService.getStudentTags(tenantId, studentId);
   }
 
   /**
-   * 상담일지 목록 조회
+   * ?�담?��? 목록 조회
    */
   async getConsultations(
     tenantId: string,
@@ -119,7 +119,7 @@ export class StudentService {
   }
 
   /**
-   * 상담일지 생성
+   * ?�담?��? ?�성
    */
   async createConsultation(
     tenantId: string,
@@ -131,7 +131,7 @@ export class StudentService {
   }
 
   /**
-   * 상담일지 수정
+   * ?�담?��? ?�정
    */
   async updateConsultation(
     tenantId: string,
@@ -143,7 +143,7 @@ export class StudentService {
   }
 
   /**
-   * 상담일지 삭제
+   * ?�담?��? ??��
    */
   async deleteConsultation(
     tenantId: string,
@@ -153,7 +153,7 @@ export class StudentService {
   }
 
   /**
-   * 학부모 수정
+   * ?��?�??�정
    */
   async updateGuardian(
     tenantId: string,
@@ -164,7 +164,7 @@ export class StudentService {
   }
 
   /**
-   * 학부모 삭제
+   * ?��?�???��
    */
   async deleteGuardian(
     tenantId: string,
@@ -174,7 +174,7 @@ export class StudentService {
   }
 
   /**
-   * 학생 태그 업데이트
+   * ?�생 ?�그 ?�데?�트
    */
   async updateStudentTags(
     tenantId: string,
@@ -185,7 +185,7 @@ export class StudentService {
   }
 
   /**
-   * 학생 반 배정
+   * ?�생 �?배정
    */
   async enrollStudentToClass(
     tenantId: string,
@@ -197,7 +197,7 @@ export class StudentService {
   }
 
   /**
-   * 학생 반 해제
+   * ?�생 �??�제
    */
   async unenrollStudentFromClass(
     tenantId: string,
@@ -209,14 +209,14 @@ export class StudentService {
   }
 
   /**
-   * 학생의 반 목록 조회
+   * ?�생??�?목록 조회
    */
   async getStudentClasses(tenantId: string, studentId: string) {
     return academyService.getStudentClasses(tenantId, studentId);
   }
 
   /**
-   * 상담일지 AI 요약 생성
+   * ?�담?��? AI ?�약 ?�성
    */
   async generateConsultationAISummary(
     tenantId: string,
@@ -226,8 +226,8 @@ export class StudentService {
   }
 
   /**
-   * 학생 일괄 등록 (엑셀)
-   * [요구사항] 학생 일괄 등록(엑셀)
+   * ?�생 ?�괄 ?�록 (?��?)
+   * [?�구?�항] ?�생 ?�괄 ?�록(?��?)
    */
   async bulkCreateStudents(
     tenantId: string,

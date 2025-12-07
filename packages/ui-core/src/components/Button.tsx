@@ -1,8 +1,8 @@
 /**
  * Button Component
  * 
- * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
- * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
+ * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
+ * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
  */
 
 import React from 'react';
@@ -18,9 +18,9 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 /**
- * Button 컴포넌트
+ * Button 컴포?�트
  * 
- * 스키마에서 사용 예:
+ * ?�키마에???�용 ??
  * {
  *   "type": "button",
  *   "variant": "solid",
@@ -37,7 +37,7 @@ export const Button: React.FC<ButtonProps> = ({
   children,
   ...props
 }) => {
-  // Color token을 CSS Variable로 매핑
+  // Color token??CSS Variable�?매핑
   const colorMap: Record<ColorToken, {
     main: string;
     light: string;
@@ -84,7 +84,7 @@ export const Button: React.FC<ButtonProps> = ({
 
   const colorVars = colorMap[color];
   
-  // Size를 CSS Variables로 매핑
+  // Size�?CSS Variables�?매핑
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
       padding: 'var(--spacing-xs) var(--spacing-sm)',

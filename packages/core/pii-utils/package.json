@@ -1,7 +1,7 @@
 {
   "name": "@core/pii-utils",
   "version": "0.1.0",
-  "description": "PII (Personally Identifiable Information) 마스킹 유틸리티",
+  "description": "PII (Personally Identifiable Information) 마스???�틸리티",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {

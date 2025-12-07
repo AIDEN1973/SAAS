@@ -1,26 +1,26 @@
 /**
  * SchemaPreview Component
  * 
- * [불변 규칙] 실시간 미리보기 렌더링
- * [불변 규칙] Mock Data 자동 생성
- * [불변 규칙] Condition Rule 적용
+ * [불�? 규칙] ?�시�?미리보기 ?�더�?
+ * [불�? 규칙] Mock Data ?�동 ?�성
+ * [불�? 규칙] Condition Rule ?�용
  * 
- * 기술문서: docu/스키마에디터.txt 11. Preview Renderer
+ * 기술문서: docu/?�키마에?�터.txt 11. Preview Renderer
  */
 
 import { useMemo } from 'react';
 import { Card } from '@ui-core/react';
-import { SchemaForm, validateSchema } from '@schema-engine';
-import type { FormSchema } from '@schema-engine';
+import { SchemaForm, validateSchema } from '@schema/engine';
+import type { FormSchema } from '@schema/engine';
 
 export interface SchemaPreviewProps {
   schema: FormSchema;
 }
 
 /**
- * Mock Data 생성
+ * Mock Data ?�성
  * 
- * 기술문서: docu/스키마에디터.txt 11. Preview Renderer
+ * 기술문서: docu/?�키마에?�터.txt 11. Preview Renderer
  */
 function generateMockData(schema: FormSchema): Record<string, any> {
   const mockData: Record<string, any> = {};
@@ -30,7 +30,7 @@ function generateMockData(schema: FormSchema): Record<string, any> {
       case 'text':
       case 'email':
       case 'phone':
-        mockData[field.name] = field.defaultValue || '예시 텍스트';
+        mockData[field.name] = field.defaultValue || '?�시 ?�스??;
         break;
       case 'number':
         mockData[field.name] = field.defaultValue || 0;
@@ -52,7 +52,7 @@ function generateMockData(schema: FormSchema): Record<string, any> {
         mockData[field.name] = field.defaultValue || false;
         break;
       case 'textarea':
-        mockData[field.name] = field.defaultValue || '예시 텍스트 영역';
+        mockData[field.name] = field.defaultValue || '?�시 ?�스???�역';
         break;
       default:
         mockData[field.name] = field.defaultValue || '';
@@ -66,14 +66,14 @@ export function SchemaPreview({ schema }: SchemaPreviewProps) {
   // Client-Side Validation
   const validation = useMemo(() => validateSchema(schema), [schema]);
 
-  // Mock Data 생성
+  // Mock Data ?�성
   const mockData = useMemo(() => generateMockData(schema), [schema]);
 
   if (!validation.valid) {
     return (
       <Card padding="md" variant="outlined">
         <div style={{ color: 'var(--color-error)' }}>
-          <h4 style={{ marginBottom: 'var(--spacing-sm)' }}>미리보기 오류</h4>
+          <h4 style={{ marginBottom: 'var(--spacing-sm)' }}>미리보기 ?�류</h4>
           <p style={{ fontSize: 'var(--font-size-sm)' }}>{validation.errors?.message}</p>
         </div>
       </Card>

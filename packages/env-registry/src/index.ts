@@ -1,20 +1,20 @@
 /**
- * 중앙 환경변수 관리 시스템
+ * 중앙 ?�경변??관�??�스??
  * 
- * 사용법:
- * - 서버/Edge: import { envServer } from '@env-registry/core/server'
- * - 클라이언트: import { envClient } from '@env-registry/core/client'
+ * ?�용�?
+ * - ?�버/Edge: import { envServer } from '@env-registry/core/server'
+ * - ?�라?�언?? import { envClient } from '@env-registry/core/client'
  * - 공통: import { envCommon } from '@env-registry/core/common'
  * 
- * ⚠️ 주의: 이 index.ts에서는 서버 전용 코드를 export하지 않습니다.
- * 클라이언트에서 '@env-registry/core'를 import해도 서버 코드가 번들에 포함되지 않습니다.
+ * ?�️ 주의: ??index.ts?�서???�버 ?�용 코드�?export?��? ?�습?�다.
+ * ?�라?�언?�에??'@env-registry/core'�?import?�도 ?�버 코드가 번들???�함?��? ?�습?�다.
  */
 
-// 클라이언트 전용 (NEXT_PUBLIC_* 값만)
+// ?�라?�언???�용 (NEXT_PUBLIC_* 값만)
 export { envClient } from './client';
 export type { EnvClient } from './schema';
 
-// 서버 전용 코드는 직접 경로로만 import하세요:
+// ?�버 ?�용 코드??직접 경로로만 import?�세??
 // import { envServer } from '@env-registry/core/server'
 // import { envCommon } from '@env-registry/core/common'
 

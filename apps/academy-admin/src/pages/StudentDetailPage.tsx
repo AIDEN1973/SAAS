@@ -1,15 +1,15 @@
 /**
- * 학생 상세 페이지
+ * ?�생 ?�세 ?�이지
  * 
- * [불변 규칙] api-sdk를 통해서만 데이터 요청
- * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
+ * [불�? 규칙] api-sdk�??�해?�만 ?�이???�청
+ * [불�? 규칙] Zero-Trust: UI??tenantId�?직접 ?�달?��? ?�음, Context?�서 ?�동 가?�옴
  */
 
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '@ui-core/react';
 import { Container, Card, Button, Input, Select, Textarea } from '@ui-core/react';
-import { SchemaForm } from '@schema-engine';
+import { SchemaForm } from '@schema/engine';
 import { studentFormSchema } from '../schemas/student.schema';
 import {
   useStudent,
@@ -66,7 +66,7 @@ export function StudentDetailPage() {
   if (studentLoading) {
     return (
       <Container maxWidth="xl" padding="lg">
-        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>
+        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 �?..</div>
       </Container>
     );
   }
@@ -76,9 +76,9 @@ export function StudentDetailPage() {
       <Container maxWidth="xl" padding="lg">
         <Card padding="md" variant="outlined">
           <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
-            <p>학생을 찾을 수 없습니다.</p>
+            <p>?�생??찾을 ???�습?�다.</p>
             <Button variant="outline" onClick={() => navigate('/students')} style={{ marginTop: 'var(--spacing-md)' }}>
-              목록으로 돌아가기
+              목록?�로 ?�아가�?
             </Button>
           </div>
         </Card>
@@ -92,60 +92,60 @@ export function StudentDetailPage() {
         <div style={{ marginBottom: 'var(--spacing-xl)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
             <h1 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
-              {student.name} 학생 상세
+              {student.name} ?�생 ?�세
             </h1>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
               <Button variant="outline" onClick={() => navigate('/students')}>
-                목록으로
+                목록?�로
               </Button>
               {!isEditing && (
                 <Button variant="solid" onClick={() => setIsEditing(true)}>
-                  수정
+                  ?�정
                 </Button>
               )}
             </div>
           </div>
 
-          {/* 탭 메뉴 */}
+          {/* ??메뉴 */}
           <div style={{ display: 'flex', gap: 'var(--spacing-xs)', marginBottom: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)' }}>
             <Button
               variant={activeTab === 'info' ? 'solid' : 'ghost'}
               size="sm"
               onClick={() => setActiveTab('info')}
             >
-              기본 정보
+              기본 ?�보
             </Button>
             <Button
               variant={activeTab === 'guardians' ? 'solid' : 'ghost'}
               size="sm"
               onClick={() => setActiveTab('guardians')}
             >
-              학부모 ({guardians?.length || 0})
+              ?��?�?({guardians?.length || 0})
             </Button>
             <Button
               variant={activeTab === 'consultations' ? 'solid' : 'ghost'}
               size="sm"
               onClick={() => setActiveTab('consultations')}
             >
-              상담일지 ({consultations?.length || 0})
+              ?�담?��? ({consultations?.length || 0})
             </Button>
             <Button
               variant={activeTab === 'tags' ? 'solid' : 'ghost'}
               size="sm"
               onClick={() => setActiveTab('tags')}
             >
-              태그
+              ?�그
             </Button>
             <Button
               variant={activeTab === 'classes' ? 'solid' : 'ghost'}
               size="sm"
               onClick={() => setActiveTab('classes')}
             >
-              반 배정 ({studentClasses?.filter((sc) => sc.is_active).length || 0})
+              �?배정 ({studentClasses?.filter((sc) => sc.is_active).length || 0})
             </Button>
           </div>
 
-          {/* 기본 정보 탭 */}
+          {/* 기본 ?�보 ??*/}
           {activeTab === 'info' && (
             <StudentInfoTab
               student={student}
@@ -158,7 +158,7 @@ export function StudentDetailPage() {
             />
           )}
 
-          {/* 학부모 탭 */}
+          {/* ?��?�???*/}
           {activeTab === 'guardians' && (
             <GuardiansTab
               guardians={guardians || []}
@@ -184,14 +184,14 @@ export function StudentDetailPage() {
                 setEditingGuardianId(null);
               }}
               onDelete={async (guardianId) => {
-                if (confirm('정말 삭제하시겠습니까?')) {
+                if (confirm('?�말 ??��?�시겠습?�까?')) {
                   await deleteGuardian.mutateAsync({ guardianId, studentId: student.id });
                 }
               }}
             />
           )}
 
-          {/* 상담일지 탭 */}
+          {/* ?�담?��? ??*/}
           {activeTab === 'consultations' && (
             <ConsultationsTab
               consultations={consultations || []}
@@ -208,7 +208,7 @@ export function StudentDetailPage() {
                 setShowConsultationForm(true);
               }}
               onCreate={async (data) => {
-                // TODO: userId 가져오기
+                // TODO: userId 가?�오�?
                 await createConsultation.mutateAsync({ studentId: student.id, consultation: data, userId: 'current-user-id' });
                 setShowConsultationForm(false);
               }}
@@ -218,7 +218,7 @@ export function StudentDetailPage() {
                 setEditingConsultationId(null);
               }}
               onDelete={async (consultationId) => {
-                if (confirm('정말 삭제하시겠습니까?')) {
+                if (confirm('?�말 ??��?�시겠습?�까?')) {
                   await deleteConsultation.mutateAsync({ consultationId, studentId: student.id });
                 }
               }}
@@ -226,14 +226,14 @@ export function StudentDetailPage() {
                 try {
                   await generateAISummary.mutateAsync({ consultationId, studentId: student.id });
                 } catch (error) {
-                  console.error('AI 요약 생성 실패:', error);
-                  alert('AI 요약 생성에 실패했습니다.');
+                  console.error('AI ?�약 ?�성 ?�패:', error);
+                  alert('AI ?�약 ?�성???�패?�습?�다.');
                 }
               }}
             />
           )}
 
-          {/* 태그 탭 */}
+          {/* ?�그 ??*/}
           {activeTab === 'tags' && (
             <TagsTab
               studentTags={studentTags || []}
@@ -273,7 +273,7 @@ export function StudentDetailPage() {
   );
 }
 
-// 기본 정보 탭 컴포넌트
+// 기본 ?�보 ??컴포?�트
 interface StudentInfoTabProps {
   student: any;
   isEditing: boolean;
@@ -287,23 +287,23 @@ function StudentInfoTab({ student, isEditing, onCancel, onSave }: StudentInfoTab
       <Card padding="md" variant="default">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-md)' }}>
           <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>이름</label>
+            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>?�름</label>
             <p style={{ fontSize: 'var(--font-size-base)' }}>{student.name}</p>
           </div>
           <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>생년월일</label>
+            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>?�년?�일</label>
             <p style={{ fontSize: 'var(--font-size-base)' }}>{student.birth_date || '-'}</p>
           </div>
           <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>성별</label>
-            <p style={{ fontSize: 'var(--font-size-base)' }}>{student.gender === 'male' ? '남' : student.gender === 'female' ? '여' : '-'}</p>
+            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>?�별</label>
+            <p style={{ fontSize: 'var(--font-size-base)' }}>{student.gender === 'male' ? '?? : student.gender === 'female' ? '?? : '-'}</p>
           </div>
           <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>전화번호</label>
+            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>?�화번호</label>
             <p style={{ fontSize: 'var(--font-size-base)' }}>{student.phone || '-'}</p>
           </div>
           <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>이메일</label>
+            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>?�메??/label>
             <p style={{ fontSize: 'var(--font-size-base)' }}>{student.email || '-'}</p>
           </div>
           <div>
@@ -311,17 +311,17 @@ function StudentInfoTab({ student, isEditing, onCancel, onSave }: StudentInfoTab
             <p style={{ fontSize: 'var(--font-size-base)' }}>{student.address || '-'}</p>
           </div>
           <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>학교</label>
+            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>?�교</label>
             <p style={{ fontSize: 'var(--font-size-base)' }}>{student.school_name || '-'}</p>
           </div>
           <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>학년</label>
+            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>?�년</label>
             <p style={{ fontSize: 'var(--font-size-base)' }}>{student.grade || '-'}</p>
           </div>
           <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>상태</label>
+            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>?�태</label>
             <p style={{ fontSize: 'var(--font-size-base)' }}>
-              {student.status === 'active' ? '재원' : student.status === 'on_leave' ? '휴원' : student.status === 'withdrawn' ? '퇴원' : '졸업'}
+              {student.status === 'active' ? '?�원' : student.status === 'on_leave' ? '?�원' : student.status === 'withdrawn' ? '?�원' : '졸업'}
             </p>
           </div>
           {student.notes && (
@@ -335,9 +335,9 @@ function StudentInfoTab({ student, isEditing, onCancel, onSave }: StudentInfoTab
     );
   }
 
-  // 수정 모드: SchemaForm 사용
+  // ?�정 모드: SchemaForm ?�용
   const handleSubmit = async (data: any) => {
-    // 스키마에서 받은 데이터를 UpdateStudentInput 형식으로 변환
+    // ?�키마에??받�? ?�이?��? UpdateStudentInput ?�식?�로 변??
     const updateData = {
       name: data.name || student.name,
       birth_date: data.birth_date || undefined,
@@ -353,13 +353,13 @@ function StudentInfoTab({ student, isEditing, onCancel, onSave }: StudentInfoTab
     await onSave(updateData);
   };
 
-  // 수정 모드를 위한 스키마 (submit 버튼 커스터마이징)
+  // ?�정 모드�??�한 ?�키�?(submit 버튼 커스?�마?�징)
   const editSchema = {
     ...studentFormSchema,
     form: {
       ...studentFormSchema.form,
       submit: {
-        label: '저장',
+        label: '?�??,
         variant: 'solid' as const,
         color: 'primary' as const,
         size: 'md' as const,
@@ -370,7 +370,7 @@ function StudentInfoTab({ student, isEditing, onCancel, onSave }: StudentInfoTab
   return (
     <Card padding="md" variant="default">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>학생 정보 수정</h3>
+        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>?�생 ?�보 ?�정</h3>
         <Button variant="ghost" size="sm" onClick={onCancel}>
           취소
         </Button>
@@ -395,7 +395,7 @@ function StudentInfoTab({ student, isEditing, onCancel, onSave }: StudentInfoTab
   );
 }
 
-// 학부모 탭 컴포넌트
+// ?��?�???컴포?�트
 interface GuardiansTabProps {
   guardians: any[];
   isLoading: boolean;
@@ -449,7 +449,7 @@ function GuardiansTab({
   };
 
   if (isLoading) {
-    return <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>;
+    return <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 �?..</div>;
   }
 
   return (
@@ -457,18 +457,18 @@ function GuardiansTab({
       {!showForm && (
         <div style={{ marginBottom: 'var(--spacing-md)' }}>
           <Button variant="solid" onClick={onShowForm}>
-            학부모 추가
+            ?��?�?추�?
           </Button>
         </div>
       )}
 
       {showForm && (
         <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-          <h3 style={{ marginBottom: 'var(--spacing-md)' }}>{editingGuardianId ? '학부모 수정' : '학부모 추가'}</h3>
+          <h3 style={{ marginBottom: 'var(--spacing-md)' }}>{editingGuardianId ? '?��?�??�정' : '?��?�?추�?'}</h3>
           <form onSubmit={handleSubmit}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
               <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>이름 *</label>
+                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>?�름 *</label>
                 <Input
                   value={formData.name}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
@@ -477,20 +477,20 @@ function GuardiansTab({
                 />
               </div>
               <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>관계 *</label>
+                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>관�?*</label>
                 <Select
                   value={formData.relationship}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, relationship: e.target.value as GuardianRelationship })}
                   fullWidth
                   required
                 >
-                  <option value="parent">부모</option>
-                  <option value="guardian">보호자</option>
-                  <option value="other">기타</option>
+                  <option value="parent">부�?/option>
+                  <option value="guardian">보호??/option>
+                  <option value="other">기�?</option>
                 </Select>
               </div>
               <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>전화번호 *</label>
+                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>?�화번호 *</label>
                 <Input
                   value={formData.phone}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, phone: e.target.value })}
@@ -499,7 +499,7 @@ function GuardiansTab({
                 />
               </div>
               <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>이메일</label>
+                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>?�메??/label>
                 <Input
                   type="email"
                   value={formData.email}
@@ -514,7 +514,7 @@ function GuardiansTab({
                     checked={formData.is_primary}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, is_primary: e.target.checked })}
                   />
-                  주 보호자
+                  �?보호??
                 </label>
               </div>
               <div>
@@ -531,7 +531,7 @@ function GuardiansTab({
                   취소
                 </Button>
                 <Button type="submit" variant="solid">
-                  {editingGuardianId ? '수정' : '추가'}
+                  {editingGuardianId ? '?�정' : '추�?'}
                 </Button>
               </div>
             </div>
@@ -548,12 +548,12 @@ function GuardiansTab({
                   <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)' }}>{guardian.name}</h4>
                   {guardian.is_primary && (
                     <span style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', backgroundColor: 'var(--color-blue-100)', color: 'var(--color-blue-800)', borderRadius: '4px' }}>
-                      주 보호자
+                      �?보호??
                     </span>
                   )}
                 </div>
                 <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                  {guardian.relationship === 'parent' ? '부모' : guardian.relationship === 'guardian' ? '보호자' : '기타'}
+                  {guardian.relationship === 'parent' ? '부�? : guardian.relationship === 'guardian' ? '보호?? : '기�?'}
                 </p>
                 <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>{guardian.phone}</p>
                 {guardian.email && (
@@ -565,10 +565,10 @@ function GuardiansTab({
               </div>
               <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
                 <Button variant="ghost" size="sm" onClick={() => onEdit(guardian.id)}>
-                  수정
+                  ?�정
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => onDelete(guardian.id)}>
-                  삭제
+                  ??��
                 </Button>
               </div>
             </div>
@@ -576,7 +576,7 @@ function GuardiansTab({
         ))}
         {guardians.length === 0 && !showForm && (
           <Card padding="md" variant="outlined">
-            <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>등록된 학부모가 없습니다.</p>
+            <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>?�록???��?모�? ?�습?�다.</p>
           </Card>
         )}
       </div>
@@ -584,7 +584,7 @@ function GuardiansTab({
   );
 }
 
-// 상담일지 탭 컴포넌트
+// ?�담?��? ??컴포?�트
 interface ConsultationsTabProps {
   consultations: any[];
   isLoading: boolean;
@@ -634,7 +634,7 @@ function ConsultationsTab({
   };
 
   if (isLoading) {
-    return <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>;
+    return <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 �?..</div>;
   }
 
   return (
@@ -642,18 +642,18 @@ function ConsultationsTab({
       {!showForm && (
         <div style={{ marginBottom: 'var(--spacing-md)' }}>
           <Button variant="solid" onClick={onShowForm}>
-            상담일지 추가
+            ?�담?��? 추�?
           </Button>
         </div>
       )}
 
       {showForm && (
         <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-          <h3 style={{ marginBottom: 'var(--spacing-md)' }}>{editingConsultationId ? '상담일지 수정' : '상담일지 추가'}</h3>
+          <h3 style={{ marginBottom: 'var(--spacing-md)' }}>{editingConsultationId ? '?�담?��? ?�정' : '?�담?��? 추�?'}</h3>
           <form onSubmit={handleSubmit}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
               <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>상담일자 *</label>
+                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>?�담?�자 *</label>
                 <Input
                   type="date"
                   value={formData.consultation_date}
@@ -663,21 +663,21 @@ function ConsultationsTab({
                 />
               </div>
               <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>상담 유형 *</label>
+                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>?�담 ?�형 *</label>
                 <Select
                   value={formData.consultation_type}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, consultation_type: e.target.value as ConsultationType })}
                   fullWidth
                   required
                 >
-                  <option value="counseling">상담</option>
-                  <option value="learning">학습</option>
-                  <option value="behavior">행동</option>
-                  <option value="other">기타</option>
+                  <option value="counseling">?�담</option>
+                  <option value="learning">?�습</option>
+                  <option value="behavior">?�동</option>
+                  <option value="other">기�?</option>
                 </Select>
               </div>
               <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>상담 내용 *</label>
+                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>?�담 ?�용 *</label>
                 <Textarea
                   value={formData.content}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, content: e.target.value })}
@@ -691,7 +691,7 @@ function ConsultationsTab({
                   취소
                 </Button>
                 <Button type="submit" variant="solid">
-                  {editingConsultationId ? '수정' : '추가'}
+                  {editingConsultationId ? '?�정' : '추�?'}
                 </Button>
               </div>
             </div>
@@ -709,7 +709,7 @@ function ConsultationsTab({
                     {consultation.consultation_date}
                   </h4>
                   <span style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', backgroundColor: 'var(--color-gray-100)', color: 'var(--color-gray-800)', borderRadius: '4px' }}>
-                    {consultation.consultation_type === 'counseling' ? '상담' : consultation.consultation_type === 'learning' ? '학습' : consultation.consultation_type === 'behavior' ? '행동' : '기타'}
+                    {consultation.consultation_type === 'counseling' ? '?�담' : consultation.consultation_type === 'learning' ? '?�습' : consultation.consultation_type === 'behavior' ? '?�동' : '기�?'}
                   </span>
                 </div>
                 <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap' }}>
@@ -717,7 +717,7 @@ function ConsultationsTab({
                 </p>
                 {consultation.ai_summary && (
                   <div style={{ marginTop: 'var(--spacing-sm)', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-blue-50)', borderRadius: '4px' }}>
-                    <p style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>AI 요약</p>
+                    <p style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>AI ?�약</p>
                     <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>{consultation.ai_summary}</p>
                   </div>
                 )}
@@ -729,17 +729,17 @@ function ConsultationsTab({
                       onClick={() => onGenerateAISummary(consultation.id)}
                       style={{ fontSize: 'var(--font-size-xs)' }}
                     >
-                      🤖 AI 요약 생성
+                      ?�� AI ?�약 ?�성
                     </Button>
                   </div>
                 )}
               </div>
               <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
                 <Button variant="ghost" size="sm" onClick={() => onEdit(consultation.id)}>
-                  수정
+                  ?�정
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => onDelete(consultation.id)}>
-                  삭제
+                  ??��
                 </Button>
               </div>
             </div>
@@ -747,7 +747,7 @@ function ConsultationsTab({
         ))}
         {consultations.length === 0 && !showForm && (
           <Card padding="md" variant="outlined">
-            <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>등록된 상담일지가 없습니다.</p>
+            <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>?�록???�담?��?가 ?�습?�다.</p>
           </Card>
         )}
       </div>
@@ -755,7 +755,7 @@ function ConsultationsTab({
   );
 }
 
-// 태그 탭 컴포넌트
+// ?�그 ??컴포?�트
 interface TagsTabProps {
   studentTags: Array<{ id: string; name: string; color: string }>;
   isLoading: boolean;
@@ -764,16 +764,16 @@ interface TagsTabProps {
 }
 
 function TagsTab({ studentTags, isLoading, studentId, onUpdateTags }: TagsTabProps) {
-  // TODO: 전체 태그 목록 조회 및 태그 선택 UI 구현
-  // 현재는 간단히 표시만 함
+  // TODO: ?�체 ?�그 목록 조회 �??�그 ?�택 UI 구현
+  // ?�재??간단???�시�???
   if (isLoading) {
-    return <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>;
+    return <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 �?..</div>;
   }
 
   return (
     <Card padding="md" variant="default">
       <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
-        태그 관리 기능은 추후 구현 예정입니다.
+        ?�그 관�?기능?� 추후 구현 ?�정?�니??
       </p>
       {studentTags.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xs)' }}>
@@ -797,7 +797,7 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags }: TagsTabPro
   );
 }
 
-// 반 배정 탭 컴포넌트
+// �?배정 ??컴포?�트
 interface ClassesTabProps {
   studentId: string;
   studentClasses: Array<{
@@ -826,24 +826,24 @@ function ClassesTab({
   const [selectedClassId, setSelectedClassId] = useState('');
   const [enrolledAt, setEnrolledAt] = useState(new Date().toISOString().split('T')[0]);
 
-  // 이미 배정된 반 ID 목록
+  // ?��? 배정??�?ID 목록
   const assignedClassIds = studentClasses
     .filter((sc) => sc.is_active)
     .map((sc) => sc.class_id);
 
-  // 배정 가능한 반 목록 (활성 상태이고 아직 배정되지 않은 반)
+  // 배정 가?�한 �?목록 (?�성 ?�태?�고 ?�직 배정?��? ?��? �?
   const availableClasses = allClasses.filter(
     (c) => c.status === 'active' && !assignedClassIds.includes(c.id)
   );
 
   const DAYS_OF_WEEK: { value: string; label: string }[] = [
-    { value: 'monday', label: '월요일' },
-    { value: 'tuesday', label: '화요일' },
-    { value: 'wednesday', label: '수요일' },
-    { value: 'thursday', label: '목요일' },
-    { value: 'friday', label: '금요일' },
-    { value: 'saturday', label: '토요일' },
-    { value: 'sunday', label: '일요일' },
+    { value: 'monday', label: '?�요?? },
+    { value: 'tuesday', label: '?�요?? },
+    { value: 'wednesday', label: '?�요?? },
+    { value: 'thursday', label: '목요?? },
+    { value: 'friday', label: '금요?? },
+    { value: 'saturday', label: '?�요?? },
+    { value: 'sunday', label: '?�요?? },
   ];
 
   const handleAssign = async (e: React.FormEvent) => {
@@ -857,23 +857,23 @@ function ClassesTab({
       setEnrolledAt(new Date().toISOString().split('T')[0]);
     } catch (error) {
       console.error('Failed to assign class:', error);
-      alert('반 배정에 실패했습니다.');
+      alert('�?배정???�패?�습?�다.');
     }
   };
 
   const handleUnassign = async (classId: string) => {
-    if (!confirm('정말 이 반에서 제외하시겠습니까?')) return;
+    if (!confirm('?�말 ??반에???�외?�시겠습?�까?')) return;
 
     try {
       await onUnassign(classId, new Date().toISOString().split('T')[0]);
     } catch (error) {
       console.error('Failed to unassign class:', error);
-      alert('반 제외에 실패했습니다.');
+      alert('�??�외???�패?�습?�다.');
     }
   };
 
   if (isLoading) {
-    return <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>;
+    return <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 �?..</div>;
   }
 
   return (
@@ -884,28 +884,28 @@ function ClassesTab({
           onClick={() => setShowAssignForm(!showAssignForm)}
           disabled={availableClasses.length === 0}
         >
-          반 배정
+          �?배정
         </Button>
         {availableClasses.length === 0 && (
           <span style={{ marginLeft: 'var(--spacing-sm)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-            배정 가능한 반이 없습니다.
+            배정 가?�한 반이 ?�습?�다.
           </span>
         )}
       </div>
 
       {showAssignForm && (
         <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-          <h3 style={{ marginBottom: 'var(--spacing-md)' }}>반 배정</h3>
+          <h3 style={{ marginBottom: 'var(--spacing-md)' }}>�?배정</h3>
           <form onSubmit={handleAssign}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
               <Select
-                label="반 선택"
+                label="�??�택"
                 value={selectedClassId}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedClassId(e.target.value)}
                 required
                 fullWidth
               >
-                <option value="">반을 선택하세요</option>
+                <option value="">반을 ?�택?�세??/option>
                 {availableClasses.map((classItem) => {
                   const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
                   return (
@@ -917,7 +917,7 @@ function ClassesTab({
               </Select>
 
               <Input
-                label="배정일"
+                label="배정??
                 type="date"
                 value={enrolledAt}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnrolledAt(e.target.value)}
@@ -954,11 +954,11 @@ function ClassesTab({
                     </h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
                       {classItem.subject && <div>과목: {classItem.subject}</div>}
-                      {classItem.grade && <div>대상: {classItem.grade}</div>}
-                      <div>요일: {dayLabel}</div>
-                      <div>시간: {classItem.start_time} ~ {classItem.end_time}</div>
-                      {classItem.room && <div>강의실: {classItem.room}</div>}
-                      <div>배정일: {studentClass.enrolled_at}</div>
+                      {classItem.grade && <div>?�?? {classItem.grade}</div>}
+                      <div>?�일: {dayLabel}</div>
+                      <div>?�간: {classItem.start_time} ~ {classItem.end_time}</div>
+                      {classItem.room && <div>강의?? {classItem.room}</div>}
+                      <div>배정?? {studentClass.enrolled_at}</div>
                     </div>
                   </div>
                   <Button
@@ -966,7 +966,7 @@ function ClassesTab({
                     size="sm"
                     onClick={() => handleUnassign(classItem.id)}
                   >
-                    제외
+                    ?�외
                   </Button>
                 </div>
               </Card>
@@ -975,7 +975,7 @@ function ClassesTab({
         {studentClasses.filter((sc) => sc.is_active && sc.class).length === 0 && (
           <Card padding="md" variant="outlined">
             <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-              배정된 반이 없습니다.
+              배정??반이 ?�습?�다.
             </p>
           </Card>
         )}

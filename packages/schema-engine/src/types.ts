@@ -1,9 +1,8 @@
 /**
  * Schema Types
  * 
- * [불변 규칙] 스키마는 논리적 구조만 포함, Tailwind 클래스 문자열 사용 금지
- * [불변 규칙] SDUI v1.1 엔터프라이즈 확장판 규격 준수
- * 
+ * [불�? 규칙] ?�키마는 ?�리??구조�??�함, Tailwind ?�래??문자???�용 금�?
+ * [불�? 규칙] SDUI v1.1 ?�터?�라?�즈 ?�장??규격 준?? * 
  * 기술문서: SDUI 기술문서 v1.1
  */
 
@@ -12,8 +11,7 @@ import { SpacingToken, ColorToken, SizeToken } from '@design-system/core';
 /**
  * Schema Type
  * 
- * SDUI에서 지원하는 스키마 타입
- */
+ * SDUI?�서 지?�하???�키�??�?? */
 export type SchemaType = 'form' | 'table' | 'detail' | 'filter' | 'widget';
 
 /**
@@ -21,61 +19,59 @@ export type SchemaType = 'form' | 'table' | 'detail' | 'filter' | 'widget';
  */
 export interface SchemaVersion {
   version: string;
-  minClient?: string;  // SDUI v1.1: minClient가 우선
-  minSupportedClient?: string;  // 하위 호환성: minClient가 없으면 사용
+  minClient?: string;  // SDUI v1.1: minClient가 ?�선
+  minSupportedClient?: string;  // ?�위 ?�환?? minClient가 ?�으�??�용
   entity: string;
 }
 
 /**
  * Base Schema
  * 
- * 모든 스키마의 기본 구조
- * SDUI v1.1 엔터프라이즈 확장판 규격
+ * 모든 ?�키마의 기본 구조
+ * SDUI v1.1 ?�터?�라?�즈 ?�장??규격
  */
 export interface BaseSchema extends SchemaVersion {
   type: SchemaType;
-  tenantScoped?: boolean;  // 기본 true, false인 경우 system-global
-  layout?: any;            // 타입별 레이아웃 정의
-  fields?: any[];          // form/detail/filter에서 사용
-  columns?: any[];         // table에서 사용
-  actions?: ActionDefinition[];  // 액션 정의
-  conditions?: any[];      // 글로벌 조건 규칙(생략 가능)
-  meta?: Record<string, any>;  // 메타데이터
-}
+  tenantScoped?: boolean;  // 기본 true, false??경우 system-global
+  layout?: any;            // ?�?�별 ?�이?�웃 ?�의
+  fields?: any[];          // form/detail/filter?�서 ?�용
+  columns?: any[];         // table?�서 ?�용
+  actions?: ActionDefinition[];  // ?�션 ?�의
+  conditions?: any[];      // 글로벌 조건 규칙(?�략 가??
+  meta?: Record<string, any>;  // 메�??�이??}
 
 /**
  * Layout Type
  * 
- * SDUI v1.1: 레이아웃 타입 확장
+ * SDUI v1.1: ?�이?�웃 ?�???�장
  */
 export type LayoutType = 'grid' | 'section' | 'tabs' | 'stepper' | 'drawer' | 'modal' | 'responsive';
 
 /**
  * Layout Schema
  * 
- * SDUI v1.1: 다양한 레이아웃 타입 지원
- * [불변 규칙] Tailwind 클래스 문자열 사용 금지, props 기반 전달
+ * SDUI v1.1: ?�양???�이?�웃 ?�??지?? * [불�? 규칙] Tailwind ?�래??문자???�용 금�?, props 기반 ?�달
  */
 export interface LayoutSchema {
-  type?: LayoutType;  // 기본값: 'grid'
-  columns?: number;  // grid: 1-12 (기존 1-4에서 확장)
+  type?: LayoutType;  // 기본�? 'grid'
+  columns?: number;  // grid: 1-12 (기존 1-4?�서 ?�장)
   columnGap?: SpacingToken;
   rowGap?: SpacingToken;
-  // tabs 레이아웃
+  // tabs ?�이?�웃
   tabs?: Array<{
     key: string;
     labelKey?: string;
     label?: string;
-    fields?: string[];  // 해당 탭에 표시할 필드명 배열
+    fields?: string[];  // ?�당 ??�� ?�시???�드�?배열
   }>;
-  // stepper 레이아웃
+  // stepper ?�이?�웃
   steps?: Array<{
     key: string;
     labelKey?: string;
     label?: string;
     fields?: string[];
   }>;
-  // responsive 레이아웃
+  // responsive ?�이?�웃
   responsive?: {
     mobile?: Partial<LayoutSchema>;
     tablet?: Partial<LayoutSchema>;
@@ -86,88 +82,83 @@ export interface LayoutSchema {
 /**
  * Condition Operator
  * 
- * SDUI v1.1: 연산자 확장
+ * SDUI v1.1: ?�산???�장
  */
 export type ConditionOperator = 
-  | '==' | '!=' | 'eq' | 'ne'  // 동등 비교 (eq/ne는 하위 호환성)
-  | '>' | '>=' | '<' | '<=' | 'gt' | 'gte' | 'lt' | 'lte'  // 숫자 비교
-  | 'in' | 'not_in'  // 포함 여부
-  | 'exists' | 'not_exists';  // 존재 여부
+  | '==' | '!=' | 'eq' | 'ne'  // ?�등 비교 (eq/ne???�위 ?�환??
+  | '>' | '>=' | '<' | '<=' | 'gt' | 'gte' | 'lt' | 'lte'  // ?�자 비교
+  | 'in' | 'not_in'  // ?�함 ?��?
+  | 'exists' | 'not_exists';  // 존재 ?��?
 
 /**
  * Condition Actions
  * 
- * SDUI v1.1: then/else 구조 지원
- */
+ * SDUI v1.1: then/else 구조 지?? */
 export interface ConditionActions {
   hide?: boolean;
   disable?: boolean;
   require?: boolean;
-  setValue?: any;  // 필드 값 설정
-  setOptions?: {  // 동적 옵션 설정
+  setValue?: any;  // ?�드 �??�정
+  setOptions?: {  // ?�적 ?�션 ?�정
     type: 'static' | 'api';
     options?: Array<{ value: string; labelKey?: string; label?: string }>;
     endpoint?: string;
   };
-  switchComponent?: {  // 컴포넌트 전환
-    to: string;  // 'CreditCardInput', 'BankTransferInput' 등
-  };
+  switchComponent?: {  // 컴포?�트 ?�환
+    to: string;  // 'CreditCardInput', 'BankTransferInput' ??  };
 }
 
 /**
- * Condition Rule (단일 조건)
+ * Condition Rule (?�일 조건)
  * 
- * SDUI v1.1: then/else 구조 지원
- */
+ * SDUI v1.1: then/else 구조 지?? */
 export interface ConditionRule {
-  field: string;  // 참조할 필드명
-  op: ConditionOperator;
-  value?: any;  // 비교 값 (exists/not_exists일 경우 불필요)
-  // ⚠️ 중요: SDUI v1.1에서 in/not_in 연산자는 value로 스칼라 또는 배열 모두 허용
-  // 배열인 경우: fieldValue와 expected 배열 간 교집합/차집합 판단
-  // 스칼라인 경우: 기존 동작 유지
-  // (향후 intersects/not_intersects 연산자로 더 명확하게 분리 가능하나, 현재는 배열 허용)
+  field: string;  // 참조???�드�?  op: ConditionOperator;
+  value?: any;  // 비교 �?(exists/not_exists??경우 불필??
+  // ?�️ 중요: SDUI v1.1?�서 in/not_in ?�산?�는 value�??�칼???�는 배열 모두 ?�용
+  // 배열??경우: fieldValue?� expected 배열 �?교집??차집???�단
+  // ?�칼?�인 경우: 기존 ?�작 ?��?
+  // (?�후 intersects/not_intersects ?�산?�로 ??명확?�게 분리 가?�하?? ?�재??배열 ?�용)
   
-  // SDUI v1.1: then/else 구조 (기존 action은 하위 호환성)
+  // SDUI v1.1: then/else 구조 (기존 action?� ?�위 ?�환??
   then?: ConditionActions;
   else?: ConditionActions;
   
-  // 하위 호환성: 기존 action 필드
+  // ?�위 ?�환?? 기존 action ?�드
   action?: 'show' | 'hide' | 'enable' | 'disable' | 'require';
 }
 
 /**
- * 복수 Condition Rule (AND/OR 지원)
+ * 복수 Condition Rule (AND/OR 지??
  * 
- * 여러 조건을 조합하여 평가할 수 있습니다.
- * - conditions: 평가할 조건들의 배열
- * - logic: 'and' | 'or' - 조건들을 AND 또는 OR로 결합
- * - action: 모든 조건이 충족되었을 때 수행할 액션 (하위 호환성)
- * - then/else: SDUI v1.1 구조 (action보다 우선)
+ * ?�러 조건??조합?�여 ?��??????�습?�다.
+ * - conditions: ?��???조건?�의 배열
+ * - logic: 'and' | 'or' - 조건?�을 AND ?�는 OR�?결합
+ * - action: 모든 조건??충족?�었?????�행???�션 (?�위 ?�환??
+ * - then/else: SDUI v1.1 구조 (action보다 ?�선)
  */
 export interface MultiConditionRule {
   conditions: ConditionRule[];  // 복수 조건 배열
   logic: 'and' | 'or';  // 조건 결합 방식
-  // SDUI v1.1: then/else 구조 (action보다 우선)
+  // SDUI v1.1: then/else 구조 (action보다 ?�선)
   then?: ConditionActions;
   else?: ConditionActions;
-  // 하위 호환성: 기존 action 필드
+  // ?�위 ?�환?? 기존 action ?�드
   action?: 'show' | 'hide' | 'enable' | 'disable' | 'require';
 }
 
 /**
  * Form Field Schema
  * 
- * SDUI v1.1: i18n 키 지원, Custom Widget 지원
- * [불변 규칙] 스키마는 논리적 구조만 정의하고, 스타일은 core-ui가 담당합니다.
+ * SDUI v1.1: i18n ??지?? Custom Widget 지?? * [불�? 규칙] ?�키마는 ?�리??구조�??�의?�고, ?��??��? core-ui가 ?�당?�니??
  */
 export interface FormFieldSchema {
   name: string;
   kind: 'text' | 'email' | 'phone' | 'number' | 'password' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'datetime' | 'custom';
   ui?: {
-    // SDUI v1.1: i18n 키 지원 (label/placeholder/description은 하위 호환성)
-    labelKey?: string;  // i18n 키 (우선순위)
-    label?: string;     // 직접 문자열 (하위 호환성)
+    // SDUI v1.1: i18n ??지??(label/placeholder/description?� ?�위 ?�환??
+    labelKey?: string;  // i18n ??(?�선?�위)
+    label?: string;     // 직접 문자??(?�위 ?�환??
     placeholderKey?: string;
     placeholder?: string;
     descriptionKey?: string;
@@ -176,44 +167,37 @@ export interface FormFieldSchema {
     tooltip?: string;
     colSpan?: number;  // Grid column span (1-12)
   };
-  // SDUI v1.1: options도 i18n 키 지원
-  options?: Array<{ 
+  // SDUI v1.1: options??i18n ??지??  options?: Array<{ 
     value: string; 
-    labelKey?: string;  // i18n 키 (우선순위)
-    label?: string;     // 직접 문자열 (하위 호환성)
+    labelKey?: string;  // i18n ??(?�선?�위)
+    label?: string;     // 직접 문자??(?�위 ?�환??
   }>;
   defaultValue?: any;
-  condition?: ConditionRule;  // 단일 조건부 렌더링 규칙 (하위 호환성)
-  conditions?: MultiConditionRule;  // 복수 조건부 렌더링 규칙 (AND/OR 지원) - condition보다 우선
-  // ⚠️ 중요: condition과 conditions는 동시에 사용할 수 없습니다.
-  // conditions가 있으면 condition은 자동으로 무시됩니다.
+  condition?: ConditionRule;  // ?�일 조건부 ?�더�?규칙 (?�위 ?�환??
+  conditions?: MultiConditionRule;  // 복수 조건부 ?�더�?규칙 (AND/OR 지?? - condition보다 ?�선
+  // ?�️ 중요: condition�?conditions???�시???�용?????�습?�다.
+  // conditions가 ?�으�?condition?� ?�동?�로 무시?�니??
   
-  // SDUI v1.1: Custom Widget 지원
-  customComponentType?: string;  // 'CreditCardInput' 등
-  
+  // SDUI v1.1: Custom Widget 지??  customComponentType?: string;  // 'CreditCardInput' ??  
   validation?: {
-    required?: boolean | string | { messageKey?: string; message?: string };  // SDUI v1.1: messageKey 지원
-    min?: number;
+    required?: boolean | string | { messageKey?: string; message?: string };  // SDUI v1.1: messageKey 지??    min?: number;
     max?: number;
     minLength?: number;
     maxLength?: number;
     pattern?: {
-      value: string;  // JSON serializable 패턴 문자열 (예: "^010[0-9]{8}$")
-      messageKey?: string;  // SDUI v1.1: i18n 키 지원
-      message?: string;      // 하위 호환성
-    };
+      value: string;  // JSON serializable ?�턴 문자??(?? "^010[0-9]{8}$")
+      messageKey?: string;  // SDUI v1.1: i18n ??지??      message?: string;      // ?�위 ?�환??    };
     validate?: (value: any) => boolean | string;
-    // ⚠️ 중요: validate 함수는 Schema Registry(JSONB)에 저장될 수 없으므로,
-    // Registry 기반 운영 시 validate는 사용할 수 없고 pattern 또는 min/max 등 정형 Validation만 허용됩니다.
-    // validate 함수는 fallbackSchema(로컬 스키마) 전용입니다.
+    // ?�️ 중요: validate ?�수??Schema Registry(JSONB)???�?�될 ???�으므�?
+    // Registry 기반 ?�영 ??validate???�용?????�고 pattern ?�는 min/max ???�형 Validation�??�용?�니??
+    // validate ?�수??fallbackSchema(로컬 ?�키�? ?�용?�니??
   };
 }
 
 /**
  * Action Definition
  * 
- * SDUI v1.1: Action Engine 지원
- */
+ * SDUI v1.1: Action Engine 지?? */
 export type ActionType = 
   | 'api.call'
   | 'navigate'
@@ -227,8 +211,7 @@ export type ActionType =
   | 'sequence';
 
 export interface ActionDefinition {
-  event: string;  // 'onSubmit', 'onSubmitSuccess', 'onRowClick' 등
-  type: ActionType;
+  event: string;  // 'onSubmit', 'onSubmitSuccess', 'onRowClick' ??  type: ActionType;
   // api.call
   endpoint?: string;
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -236,8 +219,7 @@ export interface ActionDefinition {
   // navigate
   to?: string;
   // openDrawer / openModal
-  schemaKey?: string;  // 열 스키마 키
-  // setValue
+  schemaKey?: string;  // ???�키�???  // setValue
   field?: string;
   value?: any;
   // toast
@@ -247,8 +229,8 @@ export interface ActionDefinition {
   // confirm
   titleKey?: string;
   title?: string;
-  confirmMessageKey?: string;  // SDUI v1.1: i18n 키 (messageKey와 구분)
-  confirmMessage?: string;     // 하위 호환성 (message와 구분)
+  confirmMessageKey?: string;  // SDUI v1.1: i18n ??(messageKey?� 구분)
+  confirmMessage?: string;     // ?�위 ?�환??(message?� 구분)
   // sequence
   actions?: ActionDefinition[];
 }
@@ -256,8 +238,7 @@ export interface ActionDefinition {
 /**
  * Form Schema
  * 
- * SDUI v1.1: i18n 키 지원, Action Engine 지원
- * [불변 규칙] React Hook Form과 통합하여 사용합니다.
+ * SDUI v1.1: i18n ??지?? Action Engine 지?? * [불�? 규칙] React Hook Form�??�합?�여 ?�용?�니??
  */
 export interface FormSchema extends BaseSchema {
   type: 'form';
@@ -265,54 +246,41 @@ export interface FormSchema extends BaseSchema {
     layout?: LayoutSchema;
     fields: FormFieldSchema[];
     submit?: {
-      labelKey?: string;  // SDUI v1.1: i18n 키 지원
-      label?: string;     // 하위 호환성
-      variant?: 'solid' | 'outline' | 'ghost';
+      labelKey?: string;  // SDUI v1.1: i18n ??지??      label?: string;     // ?�위 ?�환??      variant?: 'solid' | 'outline' | 'ghost';
       color?: ColorToken;
       size?: SizeToken;
     };
-    actions?: ActionDefinition[];  // SDUI v1.1: Form 전용 액션 (schema.actions보다 우선)
+    actions?: ActionDefinition[];  // SDUI v1.1: Form ?�용 ?�션 (schema.actions보다 ?�선)
   };
 }
 
 /**
  * Table Column Schema
  * 
- * SDUI v1.1: i18n 키 지원, 필터링 지원
- */
+ * SDUI v1.1: i18n ??지?? ?�터�?지?? */
 export interface TableColumnSchema {
   key: string;
-  labelKey?: string;  // SDUI v1.1: i18n 키 지원
-  label?: string;      // 하위 호환성
-  width?: number;      // string에서 number로 변경
-  sortable?: boolean;
-  filterable?: boolean;  // SDUI v1.1: 필터링 지원
-  type?: 'text' | 'number' | 'date' | 'tag' | 'badge' | 'custom';
-  render?: 'text' | 'date' | 'number' | 'currency' | 'custom';  // 하위 호환성
-}
+  labelKey?: string;  // SDUI v1.1: i18n ??지??  label?: string;      // ?�위 ?�환??  width?: number;      // string?�서 number�?변�?  sortable?: boolean;
+  filterable?: boolean;  // SDUI v1.1: ?�터�?지??  type?: 'text' | 'number' | 'date' | 'tag' | 'badge' | 'custom';
+  render?: 'text' | 'date' | 'number' | 'currency' | 'custom';  // ?�위 ?�환??}
 
 /**
  * Table Schema
  * 
- * SDUI v1.1: dataSource, rowActions, bulkActions 지원
- */
+ * SDUI v1.1: dataSource, rowActions, bulkActions 지?? */
 export interface TableSchema extends BaseSchema {
   type: 'table';
   table: {
-    dataSource: {  // SDUI v1.1: API 기반 데이터 소스
+    dataSource: {  // SDUI v1.1: API 기반 ?�이???�스
       type: 'api';
       endpoint: string;
       method?: 'GET' | 'POST';
     };
     columns: TableColumnSchema[];
-    rowActions?: string[];  // 'edit', 'delete', 'view' 등
-    bulkActions?: string[];  // 'delete', 'export' 등
-    pagination?: {
-      pageSizeOptions?: number[];  // SDUI v1.1: 페이지 크기 옵션
-      defaultPageSize?: number;     // pageSize에서 변경
-      pageSize?: number;            // 하위 호환성
-    };
-    selection?: 'none' | 'single' | 'multiple';  // SDUI v1.1: 행 선택
+    rowActions?: string[];  // 'edit', 'delete', 'view' ??    bulkActions?: string[];  // 'delete', 'export' ??    pagination?: {
+      pageSizeOptions?: number[];  // SDUI v1.1: ?�이지 ?�기 ?�션
+      defaultPageSize?: number;     // pageSize?�서 변�?      pageSize?: number;            // ?�위 ?�환??    };
+    selection?: 'none' | 'single' | 'multiple';  // SDUI v1.1: ???�택
     virtualization?: boolean;
   };
 }
@@ -320,52 +288,49 @@ export interface TableSchema extends BaseSchema {
 /**
  * Detail Schema
  * 
- * SDUI v1.1: 읽기 전용 정보 화면
+ * SDUI v1.1: ?�기 ?�용 ?�보 ?�면
  */
 export interface DetailSchema extends BaseSchema {
   type: 'detail';
   detail: {
     layout?: LayoutSchema;
-    fields: FormFieldSchema[];  // FormFieldSchema 재사용 (읽기 전용)
+    fields: FormFieldSchema[];  // FormFieldSchema ?�사??(?�기 ?�용)
   };
 }
 
 /**
  * Filter Schema
  * 
- * SDUI v1.1: Table 상단 검색 조건 영역
+ * SDUI v1.1: Table ?�단 검??조건 ?�역
  */
 export interface FilterSchema extends BaseSchema {
   type: 'filter';
   filter: {
     layout?: LayoutSchema;
-    fields: FormFieldSchema[];  // FormFieldSchema 재사용
-    // submit이 아닌 "필터 변경 이벤트" 발생
+    fields: FormFieldSchema[];  // FormFieldSchema ?�사??    // submit???�닌 "?�터 변�??�벤?? 발생
   };
 }
 
 /**
  * Widget Schema
  * 
- * SDUI v1.1: 대시보드용 카드/차트/지표
- */
+ * SDUI v1.1: ?�?�보?�용 카드/차트/지?? */
 export interface WidgetSchema extends BaseSchema {
   type: 'widget';
   widget: {
-    componentType: string;  // 'chart', 'metric', 'card' 등
-    dataSource?: {
+    componentType: string;  // 'chart', 'metric', 'card' ??    dataSource?: {
       type: 'api';
       endpoint: string;
       method?: 'GET' | 'POST';
     };
-    config?: Record<string, any>;  // 위젯별 설정
+    config?: Record<string, any>;  // ?�젯�??�정
   };
 }
 
 /**
- * UI Schema (통합)
+ * UI Schema (?�합)
  * 
- * SDUI v1.1: 모든 스키마 타입 포함
+ * SDUI v1.1: 모든 ?�키�??�???�함
  */
 export type UISchema = FormSchema | TableSchema | DetailSchema | FilterSchema | WidgetSchema;
 

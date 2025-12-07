@@ -1,8 +1,8 @@
 /**
  * Core Activity Types
  * 
- * Activity Feed / 타임라인 이벤트 기록
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * Activity Feed / ?�?�라???�벤??기록
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  */
 
 export type ActivityType = 
@@ -20,7 +20,7 @@ export interface Activity {
   id: string;
   tenant_id: string;
   activity_type: ActivityType;
-  entity_type: string;  // 'person', 'consultation', 'invoice' 등
+  entity_type: string;  // 'person', 'consultation', 'invoice' ??
   entity_id: string;
   user_id?: string;
   description: string;

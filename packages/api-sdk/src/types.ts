@@ -1,14 +1,14 @@
 /**
  * API SDK Types
  * 
- * [불변 규칙] UI는 테넌트 ID나 업종을 직접 결정하지 않는다.
- * [불변 규칙] 모든 요청은 SDK를 통해 자동으로 tenant_id, industry_type, auth token이 삽입된다.
+ * [불�? 규칙] UI???�넌??ID???�종??직접 결정?��? ?�는??
+ * [불�? 규칙] 모든 ?�청?� SDK�??�해 ?�동?�로 tenant_id, industry_type, auth token???�입?�다.
  */
 
 export interface ApiRequest {
-  tenant?: string;  // SDK가 자동으로 삽입
-  industry?: string;  // SDK가 자동으로 삽입
-  authorization?: string;  // SDK가 자동으로 삽입
+  tenant?: string;  // SDK가 ?�동?�로 ?�입
+  industry?: string;  // SDK가 ?�동?�로 ?�입
+  authorization?: string;  // SDK가 ?�동?�로 ?�입
   [key: string]: any;
 }
 
@@ -21,8 +21,8 @@ export interface ApiResponse<T = any> {
 }
 
 export interface ApiClientConfig {
-  tenantId?: string;  // Context에서 가져옴
-  industryType?: string;  // Context에서 가져옴
-  authToken?: string;  // Auth에서 가져옴
+  tenantId?: string;  // Context?�서 가?�옴
+  industryType?: string;  // Context?�서 가?�옴
+  authToken?: string;  // Auth?�서 가?�옴
 }
 

@@ -4,25 +4,25 @@ import path from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { readFileSync, existsSync } from 'fs';
 
-// 서버 전용 코드를 클라이언트 번들에서 제외하는 플러그인
+// ?�버 ?�용 코드�??�라?�언??번들?�서 ?�외?�는 ?�러그인
 function excludeServerCode(): Plugin {
   return {
     name: 'exclude-server-code',
     resolveId(id) {
-      // auth-service의 service.ts만 서버 전용으로 처리
+      // auth-service??service.ts�??�버 ?�용?�로 처리
       if (id.includes('auth-service') && (id.includes('/service.ts') || id.includes('/service.js'))) {
-        // 클라이언트 빌드에서는 빈 모듈 반환
+        // ?�라?�언??빌드?�서??�?모듈 반환
         if (process.env.NODE_ENV !== 'production' || !id.includes('node_modules')) {
           return { id: 'data:text/javascript,export default {}', external: true };
         }
       }
       
-      // auth-service의 types와 index는 클라이언트에서 사용 가능
+      // auth-service??types?� index???�라?�언?�에???�용 가??
       if (id.includes('auth-service')) {
-        return null; // auth-service의 types/index는 허용
+        return null; // auth-service??types/index???�용
       }
       
-      // 서버 전용 모듈을 빈 모듈로 대체
+      // ?�버 ?�용 모듈??�?모듈�??��?
       if (
         id.includes('/server') ||
         id === '@env-registry/core/server' ||
@@ -42,7 +42,7 @@ function excludeServerCode(): Plugin {
         id === '@industry/academy/service' ||
         id.startsWith('@services/')
       ) {
-        // 클라이언트 빌드에서는 빈 모듈 반환
+        // ?�라?�언??빌드?�서??�?모듈 반환
         if (process.env.NODE_ENV !== 'production' || !id.includes('node_modules')) {
           return { id: 'data:text/javascript,export default {}', external: true };
         }
@@ -50,26 +50,26 @@ function excludeServerCode(): Plugin {
       return null;
     },
     load(id) {
-      // auth-service의 service.ts만 서버 전용으로 처리
+      // auth-service??service.ts�??�버 ?�용?�로 처리
       if (id.includes('auth-service') && (id.includes('/service.ts') || id.includes('/service.js'))) {
         return 'export default {};';
       }
       
-      // auth-service의 index.ts는 타입만 export하도록 수정
+      // auth-service??index.ts???�?�만 export?�도�??�정
       if (id.includes('auth-service') && (id.includes('/index.ts') || id.includes('/index.js'))) {
-        // service.ts를 빈 모듈로 대체하고 types만 export
+        // service.ts�?�?모듈�??�체하�?types�?export
         return `
           export * from './types';
-          // service.ts는 서버 전용이므로 클라이언트에서는 제외
+          // service.ts???�버 ?�용?��?�??�라?�언?�에?�는 ?�외
         `;
       }
       
-      // auth-service의 types는 클라이언트에서 사용 가능
+      // auth-service??types???�라?�언?�에???�용 가??
       if (id.includes('auth-service') && id.includes('/types')) {
-        return null; // auth-service의 types는 허용
+        return null; // auth-service??types???�용
       }
       
-      // 서버 전용 파일을 빈 모듈로 대체
+      // ?�버 ?�용 ?�일??�?모듈�??��?
       if (
         id.includes('/server.ts') ||
         id.includes('/server.js') ||
@@ -91,15 +91,15 @@ function excludeServerCode(): Plugin {
 }
 
 export default defineConfig(({ mode }) => {
-  // 프로젝트 루트의 .env.local 파일을 로드
+  // ?�로?�트 루트??.env.local ?�일??로드
   const envDir = path.resolve(__dirname, '../..');
   
-  // loadEnv는 다음 순서로 로드: .env.[mode].local > .env.local > .env.[mode] > .env
-  // 하지만 process.env가 우선순위가 높으므로, 명시적으로 .env.local만 로드
+  // loadEnv???�음 ?�서�?로드: .env.[mode].local > .env.local > .env.[mode] > .env
+  // ?��?�?process.env가 ?�선?�위가 ?�으므�? 명시?�으�?.env.local�?로드
   const env = loadEnv(mode, envDir, '');
   
-  // process.env에서 잘못된 값이 있는지 확인 및 무시
-  // .env.local 파일의 값만 사용하도록 강제
+  // process.env?�서 ?�못??값이 ?�는지 ?�인 �?무시
+  // .env.local ?�일??값만 ?�용?�도�?강제
   const envLocalPath = path.join(envDir, '.env.local');
   let envLocal: Record<string, string> = {};
   
@@ -120,7 +120,7 @@ export default defineConfig(({ mode }) => {
     });
   }
   
-  // .env.local 파일의 값을 우선 사용
+  // .env.local ?�일??값을 ?�선 ?�용
   const finalEnv = { ...env };
   if (envLocal.VITE_SUPABASE_URL) {
     finalEnv.VITE_SUPABASE_URL = envLocal.VITE_SUPABASE_URL;
@@ -135,34 +135,34 @@ export default defineConfig(({ mode }) => {
     finalEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY = envLocal.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   }
   
-  // 디버깅: 로드된 환경변수 출력
-  console.log('🔍 Vite Config - 환경변수 로드:');
-  console.log('  loadEnv 결과 VITE_SUPABASE_URL:', env.VITE_SUPABASE_URL || '(없음)');
-  console.log('  .env.local 파일 VITE_SUPABASE_URL:', envLocal.VITE_SUPABASE_URL || '(없음)');
-  console.log('  최종 사용 VITE_SUPABASE_URL:', finalEnv.VITE_SUPABASE_URL || '(없음)');
+  // ?�버�? 로드???�경변??출력
+  console.log('?�� Vite Config - ?�경변??로드:');
+  console.log('  loadEnv 결과 VITE_SUPABASE_URL:', env.VITE_SUPABASE_URL || '(?�음)');
+  console.log('  .env.local ?�일 VITE_SUPABASE_URL:', envLocal.VITE_SUPABASE_URL || '(?�음)');
+  console.log('  최종 ?�용 VITE_SUPABASE_URL:', finalEnv.VITE_SUPABASE_URL || '(?�음)');
   console.log('  envDir:', envDir);
   console.log('  mode:', mode);
   
-  // 환경변수를 define에 주입 (VITE_ 접두사가 있는 것만)
+  // ?�경변?��? define??주입 (VITE_ ?�두?��? ?�는 것만)
   const define: Record<string, string> = {};
   
-  // 강제로 올바른 값 주입 (환경변수 문제 해결)
+  // 강제�??�바�?�?주입 (?�경변??문제 ?�결)
   const correctUrl = 'https://xawypsrotrfoyozhrsbb.supabase.co';
   const correctAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhhd3lwc3JvdHJmb3lvemhyc2JiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5NDQ2MDYsImV4cCI6MjA4MDUyMDYwNn0.gH0THgnxtn2WCroHo2Sn1mtLsFzuq4FXJzqs0Rcfws0';
   
-  // 로드된 환경변수 확인 (finalEnv 사용)
+  // 로드???�경변???�인 (finalEnv ?�용)
   const loadedUrl = finalEnv.VITE_SUPABASE_URL || finalEnv.NEXT_PUBLIC_SUPABASE_URL;
   const loadedKey = finalEnv.VITE_SUPABASE_ANON_KEY || finalEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   
-  console.log('🔍 Vite Config - 환경변수 로드 결과:');
-  console.log('  로드된 URL:', loadedUrl || '(없음)');
-  console.log('  올바른 URL:', correctUrl);
-  console.log('  URL 일치:', loadedUrl === correctUrl ? '✅' : '❌');
+  console.log('?�� Vite Config - ?�경변??로드 결과:');
+  console.log('  로드??URL:', loadedUrl || '(?�음)');
+  console.log('  ?�바�?URL:', correctUrl);
+  console.log('  URL ?�치:', loadedUrl === correctUrl ? '?? : '??);
   
-  // 올바른 값으로 강제 주입
+  // ?�바�?값으�?강제 주입
   define['import.meta.env.VITE_SUPABASE_URL'] = JSON.stringify(correctUrl);
   define['import.meta.env.VITE_SUPABASE_ANON_KEY'] = JSON.stringify(correctAnonKey);
-  console.log('✅ 올바른 URL로 강제 주입 완료');
+  console.log('???�바�?URL�?강제 주입 ?�료');
   
   if (env.VITE_KAKAO_JS_KEY) {
     define['import.meta.env.VITE_KAKAO_JS_KEY'] = JSON.stringify(env.VITE_KAKAO_JS_KEY);
@@ -177,14 +177,14 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-  // 프로젝트 루트의 .env.local 파일을 로드
+  // ?�로?�트 루트??.env.local ?�일??로드
   envDir,
-  // 환경변수를 빌드 타임에 주입
+  // ?�경변?��? 빌드 ?�?�에 주입
   define,
   plugins: [
     react(),
     excludeServerCode(),
-    // Bundle analyzer (개발 시에만)
+    // Bundle analyzer (개발 ?�에�?
     ...(process.env.ANALYZE ? [visualizer({
       open: true,
       filename: 'dist/stats.html',
@@ -194,22 +194,22 @@ export default defineConfig(({ mode }) => {
   ],
   optimizeDeps: {
     exclude: [
-      // 서버 전용 코드는 클라이언트 번들에서 제외
+      // ?�버 ?�용 코드???�라?�언??번들?�서 ?�외
       '@lib/supabase-client/server',
       '@env-registry/core/server',
     ],
     include: [
-      // xlsx 패키지를 명시적으로 포함
+      // xlsx ?�키지�?명시?�으�??�함
       'xlsx',
-      // react-hook-form을 명시적으로 포함 (schema-engine에서 사용)
+      // react-hook-form??명시?�으�??�함 (schema-engine?�서 ?�용)
       'react-hook-form',
     ],
-    // 강제 재최적화 (캐시 문제 해결)
+    // 강제 ?�최?�화 (캐시 문제 ?�결)
     force: true,
   },
   resolve: {
     alias: [
-      // 더 구체적인 패턴을 먼저 매칭 (순서 중요!)
+      // ??구체?�인 ?�턴??먼�? 매칭 (?�서 중요!)
       { find: '@ui-core/react/styles', replacement: path.resolve(__dirname, '../../packages/ui-core/src/styles.css') },
       { find: '@ui-core/react', replacement: path.resolve(__dirname, '../../packages/ui-core/src') },
       { find: '@lib/supabase-client/server', replacement: path.resolve(__dirname, '../../packages/lib/supabase-client/src/server.ts') },
@@ -231,7 +231,7 @@ export default defineConfig(({ mode }) => {
       { find: '@design-system/core', replacement: path.resolve(__dirname, '../../packages/design-system/src') },
       { find: '@design-system', replacement: path.resolve(__dirname, '../../packages/design-system/src') },
       { find: '@ui-core', replacement: path.resolve(__dirname, '../../packages/ui-core/src') },
-      { find: '@schema-engine', replacement: path.resolve(__dirname, '../../packages/schema-engine/src') },
+      { find: '@schema/engine', replacement: path.resolve(__dirname, '../../packages/schema-engine/src') },
       { find: '@api-sdk/core', replacement: path.resolve(__dirname, '../../packages/api-sdk/src') },
       { find: '@api-sdk', replacement: path.resolve(__dirname, '../../packages/api-sdk/src') },
       { find: '@industry/academy/service', replacement: path.resolve(__dirname, '../../packages/industry/industry-academy/src/service.ts') },
@@ -248,7 +248,7 @@ export default defineConfig(({ mode }) => {
   build: {
     outDir: 'dist',
     rollupOptions: {
-      // 서버 전용 코드를 external로 처리하여 클라이언트 번들에서 제외
+      // ?�버 ?�용 코드�?external�?처리?�여 ?�라?�언??번들?�서 ?�외
       external: [
         '@env-registry/core/server',
         '@lib/supabase-client/server',

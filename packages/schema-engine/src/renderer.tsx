@@ -1,8 +1,7 @@
 /**
  * SDUI Renderer
  * 
- * [불변 규칙] 스키마를 UI 컴포넌트로 렌더링
- * [불변 규칙] Tailwind 클래스는 ui-core에서만 사용
+ * [불�? 규칙] ?�키마�? UI 컴포?�트�??�더�? * [불�? 규칙] Tailwind ?�래?�는 ui-core?�서�??�용
  */
 
 import React from 'react';
@@ -14,7 +13,7 @@ import { SchemaForm } from './react/SchemaForm';
 /**
  * Form Renderer (Deprecated)
  * 
- * ⚠️ 이 함수는 레거시입니다. SchemaForm 컴포넌트를 사용하세요.
+ * ?�️ ???�수???�거?�입?�다. SchemaForm 컴포?�트�??�용?�세??
  * 
  * @deprecated Use SchemaForm component instead
  */
@@ -26,8 +25,7 @@ export function renderForm(schema: FormSchema): React.ReactElement {
     throw new Error(`Invalid form schema: ${validation.errors?.message}`);
   }
 
-  // SchemaForm 컴포넌트를 사용하도록 변경
-  // 이 함수는 하위 호환성을 위해 유지되지만, 내부적으로 SchemaForm을 사용합니다.
+  // SchemaForm 컴포?�트�??�용?�도�?변�?  // ???�수???�위 ?�환?�을 ?�해 ?��??��?�? ?��??�으�?SchemaForm???�용?�니??
   return React.createElement(SchemaForm, { schema });
 }
 
@@ -43,8 +41,8 @@ export function renderTable(schema: TableSchema): React.ReactElement {
 
   const { table } = schema;
 
-  // TODO: Table 컴포넌트를 ui-core에 추가하여 Tailwind 직접 사용 제거
-  // 현재는 기본 HTML table 사용 (향후 ui-core/Table 컴포넌트로 교체 예정)
+  // TODO: Table 컴포?�트�?ui-core??추�??�여 Tailwind 직접 ?�용 ?�거
+  // ?�재??기본 HTML table ?�용 (?�후 ui-core/Table 컴포?�트�?교체 ?�정)
   return (
     <Container maxWidth="full" padding="xs">
       <div style={{ overflowX: 'auto' }}>
@@ -69,13 +67,13 @@ export function renderTable(schema: TableSchema): React.ReactElement {
                   }}
                 >
                   {column.label}
-                  {column.sortable && <span style={{ marginLeft: 'var(--spacing-xs)' }}>⇅</span>}
+                  {column.sortable && <span style={{ marginLeft: 'var(--spacing-xs)' }}>??/span>}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody style={{ backgroundColor: 'var(--color-white)' }}>
-            {/* 데이터는 외부에서 주입 */}
+            {/* ?�이?�는 ?��??�서 주입 */}
           </tbody>
         </table>
       </div>
@@ -118,7 +116,7 @@ export const SchemaRenderer: React.FC<SchemaRendererProps> = ({ schema, data }) 
         }}
       >
         <p style={{ color: 'var(--color-red-800)' }}>
-          Schema 렌더링 오류: {error instanceof Error ? error.message : 'Unknown error'}
+          Schema ?�더�??�류: {error instanceof Error ? error.message : 'Unknown error'}
         </p>
       </Card>
     );

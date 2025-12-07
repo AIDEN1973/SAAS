@@ -1,8 +1,8 @@
 /**
  * Core Analytics Types
  * 
- * 통계 파이프라인 (이벤트 기반 집계)
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * ?�계 ?�이?�라??(?�벤??기반 집계)
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  */
 
 export interface AnalyticsEvent {
@@ -15,12 +15,12 @@ export interface AnalyticsEvent {
   store_id?: string;
   region_id?: string;
   industry_type?: string;
-  event_date_kst?: string;  // date (KST 기준)
+  event_date_kst?: string;  // date (KST 기�?)
 }
 
 export interface DailyMetrics {
   tenant_id: string;
-  date: string;  // date (KST 기준)
+  date: string;  // date (KST 기�?)
   total_revenue?: number;
   total_attendance?: number;
   no_show_count?: number;
@@ -30,7 +30,7 @@ export interface DailyMetrics {
 export interface MonthlyRevenue {
   tenant_id: string;
   year: number;
-  month: number;  // KST 기준 월
+  month: number;  // KST 기�? ??
   revenue: number;
 }
 

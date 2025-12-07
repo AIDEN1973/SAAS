@@ -3,27 +3,25 @@ import { defineConfig, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
-// 서버 전용 코드를 클라이언트 번들에서 제외하는 플러그인
+// ?�버 ?�용 코드�??�라?�언??번들?�서 ?�외?�는 ?�러그인
 function excludeServerCode(): Plugin {
   return {
     name: 'exclude-server-code',
     resolveId(id) {
-      // 서버 전용 모듈을 빈 모듈로 대체
-      if (
+      // ?�버 ?�용 모듈??�?모듈�??��?      if (
         id.includes('/server') ||
         id === '@env-registry/core/server' ||
         id === '@lib/supabase-client/server' ||
         id === '@core/schema-registry' ||
         id.includes('core-schema-registry')
       ) {
-        // 클라이언트 빌드에서는 빈 모듈 반환
+        // ?�라?�언??빌드?�서??�?모듈 반환
         return { id: 'data:text/javascript,export default {}', external: true };
       }
       return null;
     },
     load(id) {
-      // 서버 전용 파일을 빈 모듈로 대체
-      if (
+      // ?�버 ?�용 ?�일??�?모듈�??��?      if (
         id.includes('/server.ts') ||
         id.includes('/server.js') ||
         id.includes('core-schema-registry')
@@ -36,11 +34,11 @@ function excludeServerCode(): Plugin {
 }
 
 export default defineConfig({
-  // 프로젝트 루트의 .env.local 파일을 로드
+  // ?�로?�트 루트??.env.local ?�일??로드
   envDir: path.resolve(__dirname, '../..'),
-  // Vercel 빌드 시 환경변수를 빌드 타임에 주입
+  // Vercel 빌드 ???�경변?��? 빌드 ?�?�에 주입
   define: {
-    // 환경변수가 없으면 개발용 기본값 사용 (프로덕션에서는 반드시 환경변수 설정 필요)
+    // ?�경변?��? ?�으�?개발??기본�??�용 (?�로?�션?�서??반드???�경변???�정 ?�요)
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(
       process.env.VITE_SUPABASE_URL || 
       process.env.NEXT_PUBLIC_SUPABASE_URL || 
@@ -73,7 +71,7 @@ export default defineConfig({
       { find: '@design-system/core', replacement: path.resolve(__dirname, '../../packages/design-system/src') },
       { find: '@design-system', replacement: path.resolve(__dirname, '../../packages/design-system/src') },
       { find: '@ui-core', replacement: path.resolve(__dirname, '../../packages/ui-core/src') },
-      { find: '@schema-engine', replacement: path.resolve(__dirname, '../../packages/schema-engine/src') },
+      { find: '@schema/engine', replacement: path.resolve(__dirname, '../../packages/schema-engine/src') },
       { find: '@industry/academy/service', replacement: path.resolve(__dirname, '../../packages/industry/industry-academy/src/service.ts') },
       { find: '@industry/academy', replacement: path.resolve(__dirname, '../../packages/industry/industry-academy/src') },
       { find: '@industry', replacement: path.resolve(__dirname, '../../packages/industry') },
@@ -86,7 +84,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: [
-      // 서버 전용 코드는 클라이언트 번들에서 제외
+      // ?�버 ?�용 코드???�라?�언??번들?�서 ?�외
       '@lib/supabase-client/server',
       '@env-registry/core/server',
       '@core/schema-registry',

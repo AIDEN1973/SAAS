@@ -1,11 +1,11 @@
 /**
  * Student Service Types
  * 
- * [불변 규칙] Service Layer는 Industry Layer의 타입을 재export합니다.
- * 실제 타입 정의는 @industry/academy/types에 있습니다.
+ * [불�? 규칙] Service Layer??Industry Layer???�?�을 ?�export?�니??
+ * ?�제 ?�???�의??@industry/academy/types???�습?�다.
  */
 
-// Industry Layer의 타입을 재export
+// Industry Layer???�?�을 ?�export
 export type {
   Student,
   Guardian,

@@ -1,9 +1,9 @@
 /**
  * Checkbox Component
  * 
- * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
- * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
- * [불변 규칙] 터치 타겟 최소 44px 보장
+ * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
+ * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
+ * [불�? 규칙] ?�치 ?��?최소 44px 보장
  */
 
 import React from 'react';
@@ -17,7 +17,7 @@ export interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputE
 }
 
 /**
- * Checkbox 컴포넌트
+ * Checkbox 컴포?�트
  */
 export const Checkbox: React.FC<CheckboxProps> = ({
   label,

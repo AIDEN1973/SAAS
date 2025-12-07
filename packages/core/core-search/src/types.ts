@@ -1,10 +1,10 @@
 /**
  * Core Search Types
  * 
- * Full Text Search 공통 레이어
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * Full Text Search 공통 ?�이??
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  * 
- * ⚠️ 중요: Phase 1은 PostgreSQL Full Text Search, Phase 2+에서 외부 검색 엔진 검토
+ * ?�️ 중요: Phase 1?� PostgreSQL Full Text Search, Phase 2+?�서 ?��? 검???�진 검??
  */
 
 export type SearchEntityType = 'person' | 'consultation' | 'post' | 'review' | 'event';

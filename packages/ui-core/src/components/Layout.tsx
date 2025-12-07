@@ -1,11 +1,11 @@
 /**
  * Layout Components
  * 
- * 반응형 레이아웃 컴포넌트
+ * 반응???�이?�웃 컴포?�트
  * Mobile: Card-first
  * Tablet: 2-column + Drawer Overlay
  * Desktop: Multi-panel + Persistent Sidebar
- * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
+ * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
  */
 
 import React from 'react';
@@ -80,7 +80,7 @@ export const Grid: React.FC<GridProps> = ({
 }) => {
   const mode = useResponsiveMode();
   
-  // 반응형 컬럼 수 조정
+  // 반응??컬럼 ??조정
   const responsiveColumns = (mode === 'xs' || mode === 'sm') ? 1 : mode === 'md' ? 2 : columns;
 
   const gapMap: Record<SpacingToken, string> = {
@@ -117,7 +117,7 @@ export interface SidebarLayoutProps {
 
 /**
  * Sidebar Layout
- * Mobile: Sidebar 숨김 (Drawer로 전환)
+ * Mobile: Sidebar ?��? (Drawer�??�환)
  * Desktop: Persistent Sidebar
  */
 export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
@@ -130,7 +130,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
   const isMobile = mode === 'xs' || mode === 'sm';
 
   if (isMobile) {
-    // Mobile: Sidebar는 Drawer로 처리 (별도 컴포넌트 필요)
+    // Mobile: Sidebar??Drawer�?처리 (별도 컴포?�트 ?�요)
     return (
       <div
         className={clsx(className)}

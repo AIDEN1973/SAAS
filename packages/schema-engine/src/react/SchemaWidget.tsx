@@ -1,7 +1,7 @@
 /**
  * SchemaWidget Component
  * 
- * SDUI v1.1: Widget Schema 렌더러 (대시보드용 카드/차트/지표)
+ * SDUI v1.1: Widget Schema ?�더??(?�?�보?�용 카드/차트/지??
  * 
  * 기술문서: SDUI 기술문서 v1.1 - 15. Widget Engine
  */
@@ -15,24 +15,24 @@ export interface SchemaWidgetProps {
 }
 
 /**
- * SchemaWidget 컴포넌트
+ * SchemaWidget 컴포?�트
  * 
- * WidgetSchema를 렌더링합니다.
- * 대시보드용 카드, 차트, 지표 등을 표시합니다.
+ * WidgetSchema�??�더링합?�다.
+ * ?�?�보?�용 카드, 차트, 지???�을 ?�시?�니??
  */
 export const SchemaWidget: React.FC<SchemaWidgetProps> = ({
   schema,
   className,
 }) => {
-  // TODO: componentType에 따라 적절한 위젯 렌더링
-  // 예: 'chart', 'metric', 'card' 등
-  // TODO: API 데이터 소스 로드
+  // TODO: componentType???�라 ?�절???�젯 ?�더�?
+  // ?? 'chart', 'metric', 'card' ??
+  // TODO: API ?�이???�스 로드
   
   const { componentType, dataSource, config } = schema.widget;
   
   return (
     <div className={className}>
-      <p>Widget Schema 렌더링: {schema.entity}</p>
+      <p>Widget Schema ?�더�? {schema.entity}</p>
       <p>Component Type: {componentType}</p>
       {/* 
       switch (componentType) {

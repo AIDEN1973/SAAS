@@ -1,12 +1,12 @@
 /**
- * 인증 보호 라우트 컴포넌트
+ * ?�증 보호 ?�우??컴포?�트
  * 
- * [기술문서 요구사항]
- * - 인증되지 않은 사용자는 로그인 페이지로 리다이렉트
- * - 테넌트가 선택되지 않은 경우 테넌트 선택 페이지로 리다이렉트
+ * [기술문서 ?�구?�항]
+ * - ?�증?��? ?��? ?�용?�는 로그???�이지�?리다?�렉??
+ * - ?�넌?��? ?�택?��? ?��? 경우 ?�넌???�택 ?�이지�?리다?�렉??
  * 
- * [UI 문서 요구사항]
- * - Zero-Trust 원칙 준수
+ * [UI 문서 ?�구?�항]
+ * - Zero-Trust ?�칙 준??
  */
 
 import { useEffect, useState, ReactNode } from 'react';
@@ -28,8 +28,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const context = getApiContext();
   const hasTenantId = !!context?.tenantId;
 
-  // [중요] React Hooks 규칙: 모든 Hook은 조건부 return 이전에 호출되어야 함
-  // 테넌트가 하나이고 아직 선택되지 않은 경우 자동 선택
+  // [중요] React Hooks 규칙: 모든 Hook?� 조건부 return ?�전???�출?�어????
+  // ?�넌?��? ?�나?�고 ?�직 ?�택?��? ?��? 경우 ?�동 ?�택
   useEffect(() => {
     if (tenants && tenants.length === 1 && !hasTenantId && !tenantSelected) {
       const autoSelectTenant = async () => {
@@ -41,15 +41,15 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           });
           setTenantSelected(true);
         } catch (error) {
-          console.error('테넌트 자동 선택 실패:', error);
-          // 자동 선택 실패 시 테넌트 선택 페이지로 이동
+          console.error('?�넌???�동 ?�택 ?�패:', error);
+          // ?�동 ?�택 ?�패 ???�넌???�택 ?�이지�??�동
         }
       };
       autoSelectTenant();
     }
   }, [tenants, hasTenantId, tenantSelected, selectTenant]);
 
-  // 세션 로딩 중
+  // ?�션 로딩 �?
   if (sessionLoading) {
     return (
       <div
@@ -61,18 +61,18 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         }}
       >
         <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
-          로딩 중...
+          로딩 �?..
         </p>
       </div>
     );
   }
 
-  // 세션이 없는 경우 로그인 페이지로 리다이렉트
+  // ?�션???�는 경우 로그???�이지�?리다?�렉??
   if (!session) {
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
   }
 
-  // 테넌트 목록 로딩 중
+  // ?�넌??목록 로딩 �?
   if (tenantsLoading) {
     return (
       <div
@@ -84,23 +84,23 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         }}
       >
         <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
-          테넌트 정보를 불러오는 중...
+          ?�넌???�보�?불러?�는 �?..
         </p>
       </div>
     );
   }
 
-  // 테넌트가 없는 경우 회원가입 페이지로 리다이렉트
+  // ?�넌?��? ?�는 경우 ?�원가???�이지�?리다?�렉??
   if (!tenants || tenants.length === 0) {
     return <Navigate to="/auth/signup" replace />;
   }
 
-  // 테넌트가 여러 개이고 선택되지 않은 경우 테넌트 선택 페이지로 리다이렉트
+  // ?�넌?��? ?�러 개이�??�택?��? ?��? 경우 ?�넌???�택 ?�이지�?리다?�렉??
   if (tenants.length > 1 && !hasTenantId && !tenantSelected) {
     return <Navigate to="/auth/tenant-selection" replace />;
   }
 
-  // 테넌트가 하나이고 선택 중인 경우 로딩 표시
+  // ?�넌?��? ?�나?�고 ?�택 중인 경우 로딩 ?�시
   if (tenants.length === 1 && !hasTenantId && tenantSelected && selectTenant.isPending) {
     return (
       <div
@@ -112,12 +112,12 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         }}
       >
         <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
-          테넌트를 선택하는 중...
+          ?�넌?��? ?�택?�는 �?..
         </p>
       </div>
     );
   }
 
-  // 모든 조건을 만족한 경우 자식 컴포넌트 렌더링
+  // 모든 조건??만족??경우 ?�식 컴포?�트 ?�더�?
   return <>{children}</>;
 }

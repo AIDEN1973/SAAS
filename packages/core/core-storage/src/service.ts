@@ -1,11 +1,11 @@
 /**
  * Core Storage Service
  * 
- * 파일 업로드/권한 서비스 (Supabase Storage 래핑)
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * ?�일 ?�로??권한 ?�비??(Supabase Storage ?�핑)
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  * 
- * ⚠️ 주의: 테넌트별 폴더 구조: `{tenant_id}/{module}/{file_id}`
- * RLS 기반 권한 관리
+ * ?�️ 주의: ?�넌?�별 ?�더 구조: `{tenant_id}/{module}/{file_id}`
+ * RLS 기반 권한 관�?
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -20,7 +20,7 @@ export class StorageService {
   private supabase = createServerClient();
 
   /**
-   * 파일 업로드
+   * ?�일 ?�로??
    */
   async uploadFile(
     tenantId: string,
@@ -42,7 +42,7 @@ export class StorageService {
       throw new Error(`Failed to upload file: ${error.message}`);
     }
 
-    // 파일 메타데이터 저장
+    // ?�일 메�??�이???�??
     const { data: metadata, error: metadataError } = await this.supabase
       .from('file_metadata')
       .insert({
@@ -53,7 +53,7 @@ export class StorageService {
         mime_type: input.file.type || 'application/octet-stream',
         module: input.module,
         entity_id: input.entity_id,
-        created_by: null, // TODO: auth.uid()에서 가져오기
+        created_by: null, // TODO: auth.uid()?�서 가?�오�?
       })
       .select()
       .single();
@@ -66,7 +66,7 @@ export class StorageService {
   }
 
   /**
-   * 파일 다운로드 URL 생성
+   * ?�일 ?�운로드 URL ?�성
    */
   async getFileUrl(
     tenantId: string,
@@ -97,7 +97,7 @@ export class StorageService {
   }
 
   /**
-   * 파일 목록 조회
+   * ?�일 목록 조회
    */
   async getFiles(
     tenantId: string,
@@ -130,7 +130,7 @@ export class StorageService {
   }
 
   /**
-   * 파일 삭제
+   * ?�일 ??��
    */
   async deleteFile(tenantId: string, fileId: string): Promise<void> {
     const { data: metadata } = await withTenant(
@@ -145,7 +145,7 @@ export class StorageService {
       throw new Error('File not found');
     }
 
-    // Storage에서 파일 삭제
+    // Storage?�서 ?�일 ??��
     const { error: storageError } = await this.supabase.storage
       .from('files')
       .remove([metadata.file_path]);
@@ -154,7 +154,7 @@ export class StorageService {
       throw new Error(`Failed to delete file from storage: ${storageError.message}`);
     }
 
-    // 메타데이터 삭제
+    // 메�??�이????��
     const { error: metadataError } = await withTenant(
       this.supabase
         .from('file_metadata')

@@ -1,8 +1,8 @@
 /**
  * SearchBar Component
  * 
- * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
- * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
+ * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
+ * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
  */
 
 import React, { useState } from 'react';
@@ -21,12 +21,12 @@ export interface SearchBarProps {
 }
 
 /**
- * SearchBar 컴포넌트
+ * SearchBar 컴포?�트
  * 
- * 검색 기능을 제공하는 입력 바
+ * 검??기능???�공?�는 ?�력 �?
  */
 export const SearchBar: React.FC<SearchBarProps> = ({
-  placeholder = '검색...',
+  placeholder = '검??..',
   value: controlledValue,
   onChange,
   onSearch,
@@ -94,7 +94,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             minHeight: '44px',
           }}
         >
-          ✕
+          ??
         </Button>
       )}
       <Button
@@ -107,7 +107,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           minHeight: '44px',
         }}
       >
-        검색
+        검??
       </Button>
     </div>
   );

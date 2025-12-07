@@ -1,11 +1,11 @@
 /**
  * Core Auth Login Service
  * 
- * 로그인 서비스 (Supabase Auth 래핑)
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * 로그???�비??(Supabase Auth ?�핑)
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  * 
- * ⚠️ 주의: 실제 인증 로직은 Supabase Auth를 직접 사용합니다.
- * 이 서비스는 로그인 관련 유틸리티와 헬퍼 함수를 제공합니다.
+ * ?�️ 주의: ?�제 ?�증 로직?� Supabase Auth�?직접 ?�용?�니??
+ * ???�비?�는 로그??관???�틸리티?� ?�퍼 ?�수�??�공?�니??
  */
 
 import { createClient } from '@lib/supabase-client';
@@ -16,26 +16,26 @@ export class LoginService {
   private supabase = createClient();
 
   /**
-   * 이메일/비밀번호 로그인
+   * ?�메??비�?번호 로그??
    * 
-   * [기술문서 요구사항]
-   * - 이메일/비밀번호 로그인 (loginWithEmail)
-   * - 로그인 플로우: 사용자 인증 → 테넌트 목록 조회 → 테넌트 선택
+   * [기술문서 ?�구?�항]
+   * - ?�메??비�?번호 로그??(loginWithEmail)
+   * - 로그???�로?? ?�용???�증 ???�넌??목록 조회 ???�넌???�택
    */
   async loginWithEmail(input: LoginInput): Promise<LoginResult> {
-    // 입력값 검증
+    // ?�력�?검�?
     if (!input.email || !input.email.trim()) {
-      throw new Error('이메일을 입력해주세요.');
+      throw new Error('?�메?�을 ?�력?�주?�요.');
     }
 
     if (!input.password || !input.password.trim()) {
-      throw new Error('비밀번호를 입력해주세요.');
+      throw new Error('비�?번호�??�력?�주?�요.');
     }
 
-    // 이메일 형식 검증 (간단한 검증)
+    // ?�메???�식 검�?(간단??검�?
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(input.email.trim())) {
-      throw new Error('올바른 이메일 형식이 아닙니다.');
+      throw new Error('?�바�??�메???�식???�닙?�다.');
     }
 
     const { data, error } = await this.supabase.auth.signInWithPassword({
@@ -44,48 +44,48 @@ export class LoginService {
     });
 
     if (error) {
-      // Supabase Auth 에러 코드별 상세 메시지
-      // [기술문서 요구사항] 에러 메시지에 민감 정보 노출 금지, 사용자 친화적 메시지 제공
-      let errorMessage = '로그인에 실패했습니다.';
+      // Supabase Auth ?�러 코드�??�세 메시지
+      // [기술문서 ?�구?�항] ?�러 메시지??민감 ?�보 ?�출 금�?, ?�용??친화??메시지 ?�공
+      let errorMessage = '로그?�에 ?�패?�습?�다.';
       
-      // 에러 코드 기반 처리 (Supabase Auth 표준 에러 코드)
+      // ?�러 코드 기반 처리 (Supabase Auth ?��? ?�러 코드)
       const errorCode = error.code || '';
       const errorMsg = error.message || '';
       
-      // 이메일 인증 필요
+      // ?�메???�증 ?�요
       if (errorCode === 'email_not_confirmed' || errorMsg.includes('Email not confirmed') || errorMsg.includes('email_not_confirmed')) {
-        errorMessage = '이메일 인증이 필요합니다. 이메일을 확인해주세요.';
+        errorMessage = '?�메???�증???�요?�니?? ?�메?�을 ?�인?�주?�요.';
       }
-      // 잘못된 자격증명 (가장 흔한 경우)
+      // ?�못???�격증명 (가???�한 경우)
       else if (errorCode === 'invalid_credentials' || errorMsg.includes('Invalid login credentials') || errorMsg.includes('invalid_credentials')) {
-        errorMessage = '이메일 또는 비밀번호가 올바르지 않습니다. 회원가입이 필요하시면 회원가입 페이지로 이동해주세요.';
+        errorMessage = '?�메???�는 비�?번호가 ?�바르�? ?�습?�다. ?�원가?�이 ?�요?�시�??�원가???�이지�??�동?�주?�요.';
       }
-      // 계정 잠금 또는 Rate Limit
+      // 계정 ?�금 ?�는 Rate Limit
       else if (errorCode === 'too_many_requests' || errorMsg.includes('too many requests') || errorMsg.includes('rate_limit')) {
-        errorMessage = '너무 많은 로그인 시도가 있었습니다. 잠시 후 다시 시도해주세요.';
+        errorMessage = '?�무 많�? 로그???�도가 ?�었?�니?? ?�시 ???�시 ?�도?�주?�요.';
       }
-      // 사용자 없음
+      // ?�용???�음
       else if (errorCode === 'user_not_found' || errorMsg.includes('User not found')) {
-        errorMessage = '등록되지 않은 이메일입니다. 회원가입을 진행해주세요.';
+        errorMessage = '?�록?��? ?��? ?�메?�입?�다. ?�원가?�을 진행?�주?�요.';
       }
-      // 비밀번호 재설정 필요
+      // 비�?번호 ?�설???�요
       else if (errorCode === 'email_rate_limit_exceeded' || errorMsg.includes('email rate limit')) {
-        errorMessage = '이메일 전송 한도를 초과했습니다. 잠시 후 다시 시도해주세요.';
+        errorMessage = '?�메???�송 ?�도�?초과?�습?�다. ?�시 ???�시 ?�도?�주?�요.';
       }
-      // 기타 에러 (민감 정보 제거)
+      // 기�? ?�러 (민감 ?�보 ?�거)
       else {
-        // 개발 환경에서만 상세 에러 표시
+        // 개발 ?�경?�서�??�세 ?�러 ?�시
         if (typeof window !== 'undefined' && import.meta.env?.DEV) {
-          errorMessage = `로그인 실패: ${errorMsg}`;
+          errorMessage = `로그???�패: ${errorMsg}`;
         } else {
-          errorMessage = '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.';
+          errorMessage = '로그?�에 ?�패?�습?�다. ?�메?�과 비�?번호�??�인?�주?�요.';
         }
       }
 
-      // 개발 환경에서 상세 에러 로그 (PII 마스킹 적용)
-      // [기술문서 규칙] 로그에 PII 직접 노출 금지, maskPII() 사용 필수
+      // 개발 ?�경?�서 ?�세 ?�러 로그 (PII 마스???�용)
+      // [기술문서 규칙] 로그??PII 직접 ?�출 금�?, maskPII() ?�용 ?�수
       if (typeof window !== 'undefined' && import.meta.env?.DEV) {
-        console.error('로그인 에러 상세:', maskPII({
+        console.error('로그???�러 ?�세:', maskPII({
           message: error.message,
           status: error.status,
           code: error.code,
@@ -96,10 +96,10 @@ export class LoginService {
     }
 
     if (!data.user || !data.session) {
-      throw new Error('로그인 정보가 올바르지 않습니다.');
+      throw new Error('로그???�보가 ?�바르�? ?�습?�다.');
     }
 
-    // 사용자의 테넌트 목록 조회
+    // ?�용?�의 ?�넌??목록 조회
     const tenants = await this.getUserTenants(data.user.id);
 
     return {
@@ -119,17 +119,17 @@ export class LoginService {
   }
 
   /**
-   * 소셜 로그인 (OAuth)
+   * ?�셜 로그??(OAuth)
    * 
-   * ⚠️ 주의: OAuth는 리다이렉트 방식이므로 이 메서드는 URL만 반환합니다.
-   * 실제 인증은 브라우저에서 처리됩니다.
+   * ?�️ 주의: OAuth??리다?�렉??방식?��?�???메서?�는 URL�?반환?�니??
+   * ?�제 ?�증?� 브라?��??�서 처리?�니??
    * 
-   * [불변 규칙] 클라이언트 전용 코드이므로 window 객체 사용 가능
+   * [불�? 규칙] ?�라?�언???�용 코드?��?�?window 객체 ?�용 가??
    */
   async loginWithOAuth(input: OAuthLoginInput): Promise<{ url: string }> {
-    // 클라이언트 환경 확인
+    // ?�라?�언???�경 ?�인
     if (typeof window === 'undefined') {
-      throw new Error('소셜 로그인은 클라이언트 환경에서만 사용할 수 있습니다.');
+      throw new Error('?�셜 로그?��? ?�라?�언???�경?�서�??�용?????�습?�다.');
     }
     
     const redirectTo = input.redirectTo || `${window.location.origin}/auth/callback`;
@@ -142,21 +142,21 @@ export class LoginService {
     });
 
     if (error) {
-      throw new Error(`소셜 로그인 실패: ${error.message}`);
+      throw new Error(`?�셜 로그???�패: ${error.message}`);
     }
 
     if (!data.url) {
-      throw new Error('소셜 로그인 URL을 생성할 수 없습니다.');
+      throw new Error('?�셜 로그??URL???�성?????�습?�다.');
     }
 
     return { url: data.url };
   }
 
   /**
-   * OTP 로그인 (전화번호 인증)
+   * OTP 로그??(?�화번호 ?�증)
    * 
-   * 1단계: 전화번호로 OTP 전송
-   * 2단계: OTP 코드로 인증
+   * 1?�계: ?�화번호�?OTP ?�송
+   * 2?�계: OTP 코드�??�증
    */
   async sendOTP(phone: string): Promise<void> {
     const { error } = await this.supabase.auth.signInWithOtp({
@@ -164,7 +164,7 @@ export class LoginService {
     });
 
     if (error) {
-      throw new Error(`OTP 전송 실패: ${error.message}`);
+      throw new Error(`OTP ?�송 ?�패: ${error.message}`);
     }
   }
 
@@ -176,14 +176,14 @@ export class LoginService {
     });
 
     if (error) {
-      throw new Error(`OTP 인증 실패: ${error.message}`);
+      throw new Error(`OTP ?�증 ?�패: ${error.message}`);
     }
 
     if (!data.user || !data.session) {
-      throw new Error('OTP 인증 정보가 올바르지 않습니다.');
+      throw new Error('OTP ?�증 ?�보가 ?�바르�? ?�습?�다.');
     }
 
-    // 사용자의 테넌트 목록 조회
+    // ?�용?�의 ?�넌??목록 조회
     const tenants = await this.getUserTenants(data.user.id);
 
     return {
@@ -203,21 +203,21 @@ export class LoginService {
   }
 
   /**
-   * 사용자의 테넌트 목록 조회
+   * ?�용?�의 ?�넌??목록 조회
    * 
-   * ⚠️ 주의: 이 함수는 RLS 정책의 영향을 받습니다.
-   * user_tenant_roles 테이블의 RLS 정책: user_id = auth.uid()
-   * tenants 테이블의 RLS 정책: user_tenant_roles를 통한 간접 참조
+   * ?�️ 주의: ???�수??RLS ?�책???�향??받습?�다.
+   * user_tenant_roles ?�이블의 RLS ?�책: user_id = auth.uid()
+   * tenants ?�이블의 RLS ?�책: user_tenant_roles�??�한 간접 참조
    */
   async getUserTenants(userId: string): Promise<TenantInfo[]> {
     const isDev = typeof window !== 'undefined' && (typeof import.meta !== 'undefined' && (import.meta as any).env?.DEV);
     
-    // 현재 세션의 user_id 확인
+    // ?�재 ?�션??user_id ?�인
     const { data: { session } } = await this.supabase.auth.getSession();
     const currentUserId = session?.user?.id;
     
     if (isDev) {
-      console.log('🔍 getUserTenants 호출:', {
+      console.log('?�� getUserTenants ?�출:', {
         requestedUserId: userId,
         currentSessionUserId: currentUserId,
         userIdMatch: userId === currentUserId,
@@ -225,20 +225,20 @@ export class LoginService {
       });
     }
 
-    // RLS 정책 때문에 userId와 현재 세션의 user_id가 일치해야 함
+    // RLS ?�책 ?�문??userId?� ?�재 ?�션??user_id가 ?�치?�야 ??
     if (userId !== currentUserId) {
       if (isDev) {
-        console.warn('⚠️ 경고: 요청한 userId와 현재 세션의 user_id가 일치하지 않습니다.', {
+        console.warn('?�️ 경고: ?�청??userId?� ?�재 ?�션??user_id가 ?�치?��? ?�습?�다.', {
           requestedUserId: userId,
           currentSessionUserId: currentUserId,
         });
-        console.warn('   RLS 정책 때문에 조회가 실패할 수 있습니다.');
+        console.warn('   RLS ?�책 ?�문??조회가 ?�패?????�습?�다.');
       }
     }
 
-    // ⚠️ 중요: tenants 테이블 조인 시 RLS 순환 참조 문제 발생 가능
-    // tenants RLS 정책이 user_tenant_roles를 참조하므로, 조인 대신 별도 조회
-    // 1단계: user_tenant_roles 조회
+    // ?�️ 중요: tenants ?�이�?조인 ??RLS ?�환 참조 문제 발생 가??
+    // tenants RLS ?�책??user_tenant_roles�?참조?��?�? 조인 ?�??별도 조회
+    // 1?�계: user_tenant_roles 조회
     const { data: rolesData, error: rolesError } = await this.supabase
       .from('user_tenant_roles')
       .select('tenant_id, role')
@@ -246,7 +246,7 @@ export class LoginService {
 
     if (rolesError) {
       if (isDev) {
-        console.error('❌ user_tenant_roles 조회 에러 상세:', {
+        console.error('??user_tenant_roles 조회 ?�러 ?�세:', {
           message: rolesError.message,
           code: rolesError.code,
           details: rolesError.details,
@@ -256,24 +256,24 @@ export class LoginService {
         });
       }
       
-      // 404 에러는 새 사용자로 간주 (테넌트 없음)
+      // 404 ?�러?????�용?�로 간주 (?�넌???�음)
       if (rolesError.code === 'PGRST116' || rolesError.message.includes('Could not find the table')) {
         if (isDev) {
-          console.warn('⚠️ 테이블을 찾을 수 없습니다. 빈 배열 반환.');
+          console.warn('?�️ ?�이블을 찾을 ???�습?�다. �?배열 반환.');
         }
         return [];
       }
-      throw new Error(`테넌트 목록 조회 실패: ${rolesError.message}`);
+      throw new Error(`?�넌??목록 조회 ?�패: ${rolesError.message}`);
     }
 
     if (!rolesData || rolesData.length === 0) {
       if (isDev) {
-        console.warn('⚠️ user_tenant_roles 데이터가 없습니다:', {
+        console.warn('?�️ user_tenant_roles ?�이?��? ?�습?�다:', {
           userId,
           currentSessionUserId: currentUserId,
           possibleReasons: [
-            'user_tenant_roles에 레코드가 없음',
-            'RLS 정책 때문에 조회가 차단됨 (user_id = auth.uid() 불일치)',
+            'user_tenant_roles???�코?��? ?�음',
+            'RLS ?�책 ?�문??조회가 차단??(user_id = auth.uid() 불일�?',
           ],
         });
       }
@@ -281,20 +281,20 @@ export class LoginService {
     }
 
     if (isDev) {
-      console.log('✅ user_tenant_roles 조회 성공:', {
+      console.log('??user_tenant_roles 조회 ?�공:', {
         count: rolesData.length,
         roles: rolesData.map(r => ({ tenant_id: r.tenant_id, role: r.role })),
       });
     }
 
-    // 2단계: 각 tenant_id로 tenants 테이블 조회 (RLS 정책 적용)
-    // ⚠️ 주의: tenants 테이블의 RLS 정책은 user_tenant_roles를 참조합니다.
-    // RLS 정책: id IN (SELECT tenant_id FROM user_tenant_roles WHERE user_id = auth.uid())
-    // 이 정책이 제대로 작동하려면 user_tenant_roles가 먼저 조회 가능해야 합니다.
+    // 2?�계: �?tenant_id�?tenants ?�이�?조회 (RLS ?�책 ?�용)
+    // ?�️ 주의: tenants ?�이블의 RLS ?�책?� user_tenant_roles�?참조?�니??
+    // RLS ?�책: id IN (SELECT tenant_id FROM user_tenant_roles WHERE user_id = auth.uid())
+    // ???�책???��?�??�동?�려�?user_tenant_roles가 먼�? 조회 가?�해???�니??
     const tenantIds = rolesData.map(r => r.tenant_id);
     
     if (isDev) {
-      console.log('🔍 tenants 조회 시도:', {
+      console.log('?�� tenants 조회 ?�도:', {
         tenantIds,
         tenantIdsCount: tenantIds.length,
         currentSessionUserId: currentUserId,
@@ -308,7 +308,7 @@ export class LoginService {
 
     if (tenantsError) {
       if (isDev) {
-        console.error('❌ tenants 조회 에러 상세:', {
+        console.error('??tenants 조회 ?�러 ?�세:', {
           message: tenantsError.message,
           code: tenantsError.code,
           details: tenantsError.details,
@@ -317,17 +317,17 @@ export class LoginService {
           currentSessionUserId: currentUserId,
         });
       }
-      // tenants 조회 실패 시 role 정보만 반환
+      // tenants 조회 ?�패 ??role ?�보�?반환
       return rolesData.map(r => ({
         id: r.tenant_id,
-        name: '알 수 없음',
+        name: '?????�음',
         industry_type: 'unknown' as const,
         role: r.role,
       }));
     }
 
     if (isDev) {
-      console.log('✅ tenants 조회 성공:', {
+      console.log('??tenants 조회 ?�공:', {
         count: tenantsData?.length || 0,
         tenants: tenantsData,
         requestedTenantIds: tenantIds,
@@ -335,25 +335,25 @@ export class LoginService {
         missingTenantIds: tenantIds.filter(id => !tenantsData?.some(t => t.id === id)),
       });
       
-      // tenants가 조회되지 않은 경우 원인 분석
+      // tenants가 조회?��? ?��? 경우 ?�인 분석
       if ((tenantsData?.length || 0) === 0 && tenantIds.length > 0) {
-        console.error('❌ tenants 조회 실패 원인 분석:', {
+        console.error('??tenants 조회 ?�패 ?�인 분석:', {
           tenantIds,
           currentSessionUserId: currentUserId,
           possibleReasons: [
-            'RLS 정책이 user_tenant_roles를 참조하는데, 서브쿼리 실행 시 문제 발생',
-            'tenants 테이블에 실제로 레코드가 없음',
-            'RLS 정책이 제대로 적용되지 않음',
-            '세션의 auth.uid()와 user_tenant_roles의 user_id가 불일치',
+            'RLS ?�책??user_tenant_roles�?참조?�는?? ?�브쿼리 ?�행 ??문제 발생',
+            'tenants ?�이블에 ?�제�??�코?��? ?�음',
+            'RLS ?�책???��?�??�용?��? ?�음',
+            '?�션??auth.uid()?� user_tenant_roles??user_id가 불일�?,
           ],
-          suggestion: 'Supabase Dashboard > SQL Editor에서 직접 조회하여 확인:',
+          suggestion: 'Supabase Dashboard > SQL Editor?�서 직접 조회?�여 ?�인:',
           sqlQuery: `SELECT * FROM public.tenants WHERE id = '${tenantIds[0]}';`,
           rlsCheckQuery: `SELECT id FROM public.tenants WHERE id IN (SELECT tenant_id FROM public.user_tenant_roles WHERE user_id = '${currentUserId}');`,
         });
       }
     }
 
-    // 3단계: 결과 병합
+    // 3?�계: 결과 병합
     const tenantMap = new Map(
       (tenantsData || []).map(t => [t.id, { id: t.id, name: t.name, industry_type: t.industry_type }])
     );
@@ -363,16 +363,16 @@ export class LoginService {
         const tenant = tenantMap.get(role.tenant_id);
         if (!tenant) {
           if (isDev) {
-            console.warn('⚠️ tenant 정보를 찾을 수 없습니다:', {
+            console.warn('?�️ tenant ?�보�?찾을 ???�습?�다:', {
               tenant_id: role.tenant_id,
               role: role.role,
             });
           }
-          // tenant 정보가 없어도 role 정보는 반환
+          // tenant ?�보가 ?�어??role ?�보??반환
           return {
             id: role.tenant_id,
-            name: '알 수 없음',
-            industry_type: 'academy' as const, // 기본값
+            name: '?????�음',
+            industry_type: 'academy' as const, // 기본�?
             role: role.role,
           };
         }
@@ -388,30 +388,30 @@ export class LoginService {
   }
 
   /**
-   * 테넌트 선택
+   * ?�넌???�택
    * 
-   * 선택한 테넌트의 tenant_id를 JWT claim에 포함하여 새 세션 생성
+   * ?�택???�넌?�의 tenant_id�?JWT claim???�함?�여 ???�션 ?�성
    * 
-   * [기술문서 요구사항]
-   * - 로그인 플로우 3단계: 테넌트 선택 (JWT claim에 tenant_id 포함)
-   * - 로그인 플로우 4단계: 세션 새로고침 (업데이트된 JWT 받기)
+   * [기술문서 ?�구?�항]
+   * - 로그???�로??3?�계: ?�넌???�택 (JWT claim??tenant_id ?�함)
+   * - 로그???�로??4?�계: ?�션 ?�로고침 (?�데?�트??JWT 받기)
    * 
-   * ⚠️ 중요: JWT claim 업데이트는 Supabase Database Trigger 또는 Edge Function에서 처리됩니다.
-   * - Database Trigger: user_tenant_roles 변경 시 자동으로 JWT claim 업데이트
-   * - 또는 Edge Function: selectTenant 호출 시 tenant_id를 JWT claim에 포함하여 새 토큰 발급
+   * ?�️ 중요: JWT claim ?�데?�트??Supabase Database Trigger ?�는 Edge Function?�서 처리?�니??
+   * - Database Trigger: user_tenant_roles 변�????�동?�로 JWT claim ?�데?�트
+   * - ?�는 Edge Function: selectTenant ?�출 ??tenant_id�?JWT claim???�함?�여 ???�큰 발급
    * 
-   * 현재 구현은 세션을 새로고침하여 최신 JWT를 받아옵니다.
-   * 실제 JWT claim에 tenant_id가 포함되려면 Supabase 인프라 설정이 필요합니다.
+   * ?�재 구현?� ?�션???�로고침?�여 최신 JWT�?받아?�니??
+   * ?�제 JWT claim??tenant_id가 ?�함?�려�?Supabase ?�프???�정???�요?�니??
    */
   async selectTenant(tenantId: string): Promise<TenantSelectionResult> {
-    // 현재 세션 확인
+    // ?�재 ?�션 ?�인
     const { data: { session }, error: sessionError } = await this.supabase.auth.getSession();
     
     if (sessionError || !session) {
-      throw new Error('세션이 없습니다. 다시 로그인해주세요.');
+      throw new Error('?�션???�습?�다. ?�시 로그?�해주세??');
     }
 
-    // 사용자가 해당 테넌트에 접근 권한이 있는지 확인
+    // ?�용?��? ?�당 ?�넌?�에 ?�근 권한???�는지 ?�인
     const { data: roleData, error: roleError } = await this.supabase
       .from('user_tenant_roles')
       .select('role')
@@ -420,14 +420,14 @@ export class LoginService {
       .single();
 
     if (roleError || !roleData) {
-      throw new Error('해당 테넌트에 접근 권한이 없습니다.');
+      throw new Error('?�당 ?�넌?�에 ?�근 권한???�습?�다.');
     }
 
-    // 세션 새로고침 (JWT claim 업데이트는 Edge Function에서 처리)
+    // ?�션 ?�로고침 (JWT claim ?�데?�트??Edge Function?�서 처리)
     const { data: refreshData, error: refreshError } = await this.supabase.auth.refreshSession(session);
 
     if (refreshError || !refreshData.session) {
-      throw new Error(`세션 새로고침 실패: ${refreshError?.message || '알 수 없는 오류'}`);
+      throw new Error(`?�션 ?�로고침 ?�패: ${refreshError?.message || '?????�는 ?�류'}`);
     }
 
     return {
@@ -438,24 +438,24 @@ export class LoginService {
   }
 
   /**
-   * 로그아웃
+   * 로그?�웃
    */
   async logout(): Promise<void> {
     const { error } = await this.supabase.auth.signOut();
 
     if (error) {
-      throw new Error(`로그아웃 실패: ${error.message}`);
+      throw new Error(`로그?�웃 ?�패: ${error.message}`);
     }
   }
 
   /**
-   * 현재 세션 조회
+   * ?�재 ?�션 조회
    */
   async getCurrentSession() {
     const { data: { session }, error } = await this.supabase.auth.getSession();
 
     if (error) {
-      throw new Error(`세션 조회 실패: ${error.message}`);
+      throw new Error(`?�션 조회 ?�패: ${error.message}`);
     }
 
     return session;
@@ -465,7 +465,7 @@ export class LoginService {
 /**
  * Default Service Instance
  * 
- * [불변 규칙] 클라이언트 코드에서 사용하는 인증 서비스 인스턴스
+ * [불�? 규칙] ?�라?�언??코드?�서 ?�용?�는 ?�증 ?�비???�스?�스
  */
 export const loginService = new LoginService();
 

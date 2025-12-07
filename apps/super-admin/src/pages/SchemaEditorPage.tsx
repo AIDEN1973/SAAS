@@ -1,17 +1,17 @@
 /**
  * Schema Editor Page
  * 
- * [불변 규칙] Super Admin 전용 No-Code UI Builder
- * [불변 규칙] Zero-Trust: 모든 권한 검증은 RLS에서 처리
- * [불변 규칙] Dual Validation: Client-Side + Server-Side
+ * [불�? 규칙] Super Admin ?�용 No-Code UI Builder
+ * [불�? 규칙] Zero-Trust: 모든 권한 검증�? RLS?�서 처리
+ * [불�? 규칙] Dual Validation: Client-Side + Server-Side
  * 
- * 기술문서: docu/스키마에디터.txt
+ * 기술문서: docu/?�키마에?�터.txt
  */
 
 import { useState, useMemo, useEffect } from 'react';
 import { ErrorBoundary, Container, Card, Button, useModal } from '@ui-core/react';
 import { useIsSuperAdmin, useSchemaList, useActivateSchema, useDeleteSchema, type SchemaRegistryEntry } from '@hooks/use-schema-registry';
-import type { FormSchema, UISchema } from '@schema-engine';
+import type { FormSchema, UISchema } from '@schema/engine';
 import { SchemaEditorForm } from '../components/schema-editor/SchemaEditorForm';
 import { SchemaFieldEditor } from '../components/schema-editor/SchemaFieldEditor';
 import { ValidationEditor } from '../components/schema-editor/ValidationEditor';
@@ -33,7 +33,7 @@ export function SchemaEditorPage() {
   const [editingFieldIndex, setEditingFieldIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'fields' | 'preview' | 'import'>('fields');
 
-  // 현재 편집 중인 스키마 (FormSchema로 변환)
+  // ?�재 ?�집 중인 ?�키�?(FormSchema�?변??
   const editingFormSchema = useMemo<FormSchema | null>(() => {
     if (localFormSchema) return localFormSchema;
     if (selectedSchema && selectedSchema.schema_json.type === 'form') {
@@ -54,7 +54,7 @@ export function SchemaEditorPage() {
     return null;
   }, [selectedSchema, isCreating, localFormSchema]);
 
-  // selectedSchema 변경 시 localFormSchema 초기화
+  // selectedSchema 변�???localFormSchema 초기??
   useEffect(() => {
     if (selectedSchema) {
       setLocalFormSchema(null);
@@ -66,7 +66,7 @@ export function SchemaEditorPage() {
     return (
       <Container maxWidth="xl" padding="lg">
         <Card padding="md">
-          <p>권한 확인 중...</p>
+          <p>권한 ?�인 �?..</p>
         </Card>
       </Container>
     );
@@ -77,10 +77,10 @@ export function SchemaEditorPage() {
       <Container maxWidth="xl" padding="lg">
         <Card padding="md" variant="outlined">
           <h2 style={{ color: 'var(--color-error)', marginBottom: 'var(--spacing-md)' }}>
-            접근 권한 없음
+            ?�근 권한 ?�음
           </h2>
           <p style={{ color: 'var(--color-text-secondary)' }}>
-            이 페이지는 Super Admin만 접근할 수 있습니다.
+            ???�이지??Super Admin�??�근?????�습?�다.
           </p>
         </Card>
       </Container>
@@ -97,8 +97,8 @@ export function SchemaEditorPage() {
   const handleSelectSchema = (schema: SchemaRegistryEntry) => {
     if (schema.status !== 'draft') {
       showAlert(
-        '알림',
-        'draft 상태의 스키마만 편집할 수 있습니다. 수정하려면 새 버전을 생성하세요.',
+        '?�림',
+        'draft ?�태???�키마만 ?�집?????�습?�다. ?�정?�려�???버전???�성?�세??',
         'info'
       );
       return;
@@ -112,7 +112,7 @@ export function SchemaEditorPage() {
   const handleSaveSchema = (savedSchema: SchemaRegistryEntry) => {
     setSelectedSchema(savedSchema);
     setIsCreating(false);
-    setLocalFormSchema(null); // 저장 후 로컬 상태 초기화
+    setLocalFormSchema(null); // ?�????로컬 ?�태 초기??
   };
 
   const handleFieldsChange = (fields: FormSchema['form']['fields']) => {
@@ -175,19 +175,19 @@ export function SchemaEditorPage() {
     if (!selectedSchema) return;
     
     const confirmed = await showConfirm(
-      '스키마 활성화',
-      `이 스키마를 활성화하면 기존 active 스키마는 deprecated로 변경됩니다. 계속하시겠습니까?`
+      '?�키�??�성??,
+      `???�키마�? ?�성?�하�?기존 active ?�키마는 deprecated�?변경됩?�다. 계속?�시겠습?�까?`
     );
     
     if (!confirmed) return;
     
     try {
       await activateSchema.mutateAsync(selectedSchema.id);
-      showAlert('성공', '스키마가 활성화되었습니다.');
-      // 목록 새로고침
+      showAlert('?�공', '?�키마�? ?�성?�되?�습?�다.');
+      // 목록 ?�로고침
       window.location.reload();
     } catch (error) {
-      showAlert('오류', error instanceof Error ? error.message : '스키마 활성화에 실패했습니다.');
+      showAlert('?�류', error instanceof Error ? error.message : '?�키�??�성?�에 ?�패?�습?�다.');
     }
   };
 
@@ -195,20 +195,20 @@ export function SchemaEditorPage() {
     if (!selectedSchema) return;
     
     const confirmed = await showConfirm(
-      '스키마 삭제',
-      '이 스키마를 삭제하시겠습니까? (draft만 삭제 가능)'
+      '?�키�???��',
+      '???�키마�? ??��?�시겠습?�까? (draft�???�� 가??'
     );
     
     if (!confirmed) return;
     
     try {
       await deleteSchema.mutateAsync(selectedSchema.id);
-      showAlert('성공', '스키마가 삭제되었습니다.');
+      showAlert('?�공', '?�키마�? ??��?�었?�니??');
       setSelectedSchema(null);
-      // 목록 새로고침
+      // 목록 ?�로고침
       window.location.reload();
     } catch (error) {
-      showAlert('오류', error instanceof Error ? error.message : '스키마 삭제에 실패했습니다.');
+      showAlert('?�류', error instanceof Error ? error.message : '?�키�???��???�패?�습?�다.');
     }
   };
 
@@ -216,12 +216,12 @@ export function SchemaEditorPage() {
     <ErrorBoundary>
       <Container maxWidth="full" padding="lg">
         <div style={{ display: 'flex', gap: 'var(--spacing-md)', height: 'calc(100vh - 120px)' }}>
-          {/* 좌측: 스키마 목록 */}
+          {/* 좌측: ?�키�?목록 */}
           <div style={{ width: '300px', flexShrink: 0 }}>
             <Card padding="md" variant="default">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
                 <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
-                  스키마 목록
+                  ?�키�?목록
                 </h2>
                 <Button
                   variant="solid"
@@ -229,12 +229,12 @@ export function SchemaEditorPage() {
                   size="sm"
                   onClick={handleCreateNew}
                 >
-                  새로 만들기
+                  ?�로 만들�?
                 </Button>
               </div>
 
               {isLoadingSchemas ? (
-                <p style={{ color: 'var(--color-text-secondary)' }}>로딩 중...</p>
+                <p style={{ color: 'var(--color-text-secondary)' }}>로딩 �?..</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
                   {schemas?.map((schema) => (
@@ -261,11 +261,11 @@ export function SchemaEditorPage() {
             </Card>
           </div>
 
-          {/* 우측: 스키마 편집 영역 */}
+          {/* ?�측: ?�키�??�집 ?�역 */}
           <div style={{ flex: 1, overflow: 'auto' }}>
             {isCreating || selectedSchema ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-                {/* 기본 정보 */}
+                {/* 기본 ?�보 */}
                 <SchemaEditorForm
                   schema={selectedSchema || null}
                   currentFormSchema={editingFormSchema}
@@ -282,7 +282,7 @@ export function SchemaEditorPage() {
                   }}
                 />
 
-                {/* 액션 버튼 */}
+                {/* ?�션 버튼 */}
                 {selectedSchema && (
                   <Card padding="md" variant="default">
                     <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
@@ -292,7 +292,7 @@ export function SchemaEditorPage() {
                         onClick={handleActivate}
                         disabled={activateSchema.isPending || selectedSchema.status !== 'draft'}
                       >
-                        활성화
+                        ?�성??
                       </Button>
                       <Button
                         variant="outline"
@@ -300,13 +300,13 @@ export function SchemaEditorPage() {
                         onClick={handleDelete}
                         disabled={deleteSchema.isPending || selectedSchema.status !== 'draft'}
                       >
-                        삭제
+                        ??��
                       </Button>
                     </div>
                   </Card>
                 )}
 
-                {/* 탭: 필드 편집 / 미리보기 / Import */}
+                {/* ?? ?�드 ?�집 / 미리보기 / Import */}
                 {editingFormSchema && (
                   <Card padding="md" variant="default">
                     <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
@@ -315,7 +315,7 @@ export function SchemaEditorPage() {
                         size="sm"
                         onClick={() => setActiveTab('fields')}
                       >
-                        필드 편집
+                        ?�드 ?�집
                       </Button>
                       <Button
                         variant={activeTab === 'preview' ? 'solid' : 'outline'}
@@ -354,7 +354,7 @@ export function SchemaEditorPage() {
                               field={editingFormSchema.form.fields[editingFieldIndex]}
                               allFields={editingFormSchema.form.fields}
                               onChange={(condition, conditions) => {
-                                // condition이 MultiConditionRule인 경우는 무시 (conditions로 처리)
+                                // condition??MultiConditionRule??경우??무시 (conditions�?처리)
                                 const singleCondition = condition && 'field' in condition ? condition : undefined;
                                 handleFieldConditionChange(editingFieldIndex, singleCondition, conditions);
                               }}
@@ -380,7 +380,7 @@ export function SchemaEditorPage() {
             ) : (
               <Card padding="md" variant="outlined">
                 <p style={{ color: 'var(--color-text-secondary)', textAlign: 'center' }}>
-                  스키마를 선택하거나 새로 만드세요.
+                  ?�키마�? ?�택?�거???�로 만드?�요.
                 </p>
               </Card>
             )}

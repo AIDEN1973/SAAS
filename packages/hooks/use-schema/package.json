@@ -10,7 +10,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",
     "@api-sdk/core": "file:../../api-sdk",
-    "@schema-engine": "file:../../packages/schema-engine"
+    "@schema/engine": "file:../../packages/schema-engine"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

@@ -23,7 +23,7 @@
     "@services/student-service": "file:../../packages/services/student-service",
     "@tanstack/react-query": "^5.17.0",
     "@ui-core/react": "file:../../packages/ui-core",
-    "@schema-engine": "file:../../packages/schema-engine",
+    "@schema/engine": "file:../../packages/schema-engine",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.49.0",

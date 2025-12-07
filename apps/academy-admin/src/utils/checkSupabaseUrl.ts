@@ -1,12 +1,12 @@
 /**
- * Supabase URL 확인 유틸리티
- * 개발 환경에서 실제 사용되는 URL을 확인하기 위한 헬퍼
+ * Supabase URL ?�인 ?�틸리티
+ * 개발 ?�경?�서 ?�제 ?�용?�는 URL???�인?�기 ?�한 ?�퍼
  */
 
 import { createClient } from '@lib/supabase-client';
 
 /**
- * 현재 사용 중인 Supabase URL 확인
+ * ?�재 ?�용 중인 Supabase URL ?�인
  */
 export function checkSupabaseUrl(): {
   url: string;
@@ -15,27 +15,27 @@ export function checkSupabaseUrl(): {
 } {
   const supabase = createClient();
   
-  // Supabase 클라이언트의 내부 URL 추출
-  // @ts-ignore - 내부 속성 접근
+  // Supabase ?�라?�언?�의 ?��? URL 추출
+  // @ts-ignore - ?��? ?�성 ?�근
   const url = supabase.supabaseUrl || '';
-  // @ts-ignore - 내부 속성 접근
+  // @ts-ignore - ?��? ?�성 ?�근
   const anonKey = supabase.supabaseKey || '';
   
   const correctUrl = 'https://xawypsrotrfoyozhrsbb.supabase.co';
   const isCorrect = url === correctUrl;
   
-  console.log('🔍 Supabase URL 확인:', {
-    현재_URL: url,
-    올바른_URL: correctUrl,
-    일치: isCorrect ? '✅' : '❌',
-    Anon_Key_설정됨: anonKey ? '✅' : '❌',
+  console.log('?�� Supabase URL ?�인:', {
+    ?�재_URL: url,
+    ?�바�?URL: correctUrl,
+    ?�치: isCorrect ? '?? : '??,
+    Anon_Key_?�정?? anonKey ? '?? : '??,
   });
   
   if (!isCorrect) {
-    console.error('❌ 잘못된 Supabase URL이 사용되고 있습니다!');
-    console.error('   현재:', url);
-    console.error('   올바른 값:', correctUrl);
-    console.error('   .env.local 파일을 확인하고 개발 서버를 재시작하세요.');
+    console.error('???�못??Supabase URL???�용?�고 ?�습?�다!');
+    console.error('   ?�재:', url);
+    console.error('   ?�바�?�?', correctUrl);
+    console.error('   .env.local ?�일???�인?�고 개발 ?�버�??�시?�하?�요.');
   }
   
   return {
@@ -46,22 +46,22 @@ export function checkSupabaseUrl(): {
 }
 
 /**
- * 환경변수에서 직접 URL 확인
+ * ?�경변?�에??직접 URL ?�인
  */
 export function checkEnvVariables(): void {
   // @ts-ignore
   const viteUrl = import.meta.env?.VITE_SUPABASE_URL;
   
-  console.log('🔍 환경변수 확인:', {
-    'import.meta.env.VITE_SUPABASE_URL': viteUrl || '미설정',
-    'import.meta.env.MODE': import.meta.env?.MODE || '미설정',
-    'import.meta.env.DEV': import.meta.env?.DEV || '미설정',
+  console.log('?�� ?�경변???�인:', {
+    'import.meta.env.VITE_SUPABASE_URL': viteUrl || '미설??,
+    'import.meta.env.MODE': import.meta.env?.MODE || '미설??,
+    'import.meta.env.DEV': import.meta.env?.DEV || '미설??,
   });
   
   if (viteUrl && viteUrl.includes('npferbxuxocbfnfbpcnz')) {
-    console.error('❌ 잘못된 URL이 환경변수에 설정되어 있습니다!');
-    console.error('   .env.local 파일을 확인하고 개발 서버를 재시작하세요.');
-    console.error('   Vite 캐시를 삭제: rm -rf node_modules/.vite');
+    console.error('???�못??URL???�경변?�에 ?�정?�어 ?�습?�다!');
+    console.error('   .env.local ?�일???�인?�고 개발 ?�버�??�시?�하?�요.');
+    console.error('   Vite 캐시�???��: rm -rf node_modules/.vite');
   }
 }
 

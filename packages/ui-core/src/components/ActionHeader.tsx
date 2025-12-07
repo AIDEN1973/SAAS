@@ -1,8 +1,8 @@
 /**
  * ActionHeader Component
  * 
- * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
- * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
+ * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
+ * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
  */
 
 import React from 'react';
@@ -16,9 +16,9 @@ export interface ActionHeaderProps {
 }
 
 /**
- * ActionHeader 컴포넌트
+ * ActionHeader 컴포?�트
  * 
- * 액션 버튼이 있는 헤더
+ * ?�션 버튼???�는 ?�더
  */
 export const ActionHeader: React.FC<ActionHeaderProps> = ({
   title,

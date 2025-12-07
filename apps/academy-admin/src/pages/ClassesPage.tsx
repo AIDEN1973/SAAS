@@ -1,16 +1,16 @@
 /**
- * 반 관리 페이지
+ * �?관�??�이지
  * 
- * [불변 규칙] api-sdk를 통해서만 데이터 요청
- * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
- * [요구사항] 반 리스트 + 캘린더 뷰, 반 편성표(Calendar-like) 제공
+ * [불�? 규칙] api-sdk�??�해?�만 ?�이???�청
+ * [불�? 규칙] Zero-Trust: UI??tenantId�?직접 ?�달?��? ?�음, Context?�서 ?�동 가?�옴
+ * [?�구?�항] �?리스??+ 캘린??�? �??�성??Calendar-like) ?�공
  */
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '@ui-core/react';
 import { Container, Card, Button, Input } from '@ui-core/react';
-import { SchemaForm } from '@schema-engine';
+import { SchemaForm } from '@schema/engine';
 import {
   useClasses,
   useCreateClass,
@@ -23,13 +23,13 @@ import type { Class, CreateClassInput, ClassFilter, ClassStatus, DayOfWeek } fro
 import { classFormSchema } from '../schemas/class.schema';
 
 const DAYS_OF_WEEK: { value: DayOfWeek; label: string }[] = [
-  { value: 'monday', label: '월요일' },
-  { value: 'tuesday', label: '화요일' },
-  { value: 'wednesday', label: '수요일' },
-  { value: 'thursday', label: '목요일' },
-  { value: 'friday', label: '금요일' },
-  { value: 'saturday', label: '토요일' },
-  { value: 'sunday', label: '일요일' },
+  { value: 'monday', label: '?�요?? },
+  { value: 'tuesday', label: '?�요?? },
+  { value: 'wednesday', label: '?�요?? },
+  { value: 'thursday', label: '목요?? },
+  { value: 'friday', label: '금요?? },
+  { value: 'saturday', label: '?�요?? },
+  { value: 'sunday', label: '?�요?? },
 ];
 
 export function ClassesPage() {
@@ -41,7 +41,7 @@ export function ClassesPage() {
 
   const { data: classes, isLoading, error } = useClasses({
     ...filter,
-    search: searchQuery.trim() || undefined, // 빈 문자열은 undefined로 변환
+    search: searchQuery.trim() || undefined, // �?문자?��? undefined�?변??
   });
   const { data: teachers } = useTeachers();
   const createClass = useCreateClass();
@@ -81,7 +81,7 @@ export function ClassesPage() {
               fontWeight: 'var(--font-weight-bold)',
               color: 'var(--color-text)'
             }}>
-              반 관리
+              �?관�?
             </h1>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
               <Button
@@ -89,31 +89,31 @@ export function ClassesPage() {
                 size="sm"
                 onClick={() => setViewMode('list')}
               >
-                리스트
+                리스??
               </Button>
               <Button
                 variant={viewMode === 'calendar' ? 'solid' : 'outline'}
                 size="sm"
                 onClick={() => setViewMode('calendar')}
               >
-                캘린더
+                캘린??
               </Button>
               <Button
                 variant="solid"
                 size="sm"
                 onClick={() => setShowCreateForm(!showCreateForm)}
               >
-                반 생성
+                �??�성
               </Button>
             </div>
           </div>
 
-          {/* 검색 및 필터 패널 */}
+          {/* 검??�??�터 ?�널 */}
           <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
               <div style={{ flex: 1 }}>
                 <Input
-                  placeholder="반 이름 검색..."
+                  placeholder="�??�름 검??.."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   fullWidth
@@ -126,21 +126,21 @@ export function ClassesPage() {
                   size="sm"
                   onClick={() => handleStatusFilter('all')}
                 >
-                  전체
+                  ?�체
                 </Button>
                 <Button
                   variant={filter.status === 'active' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleStatusFilter('active')}
                 >
-                  운영중
+                  ?�영�?
                 </Button>
                 <Button
                   variant={filter.status === 'inactive' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleStatusFilter('inactive')}
                 >
-                  비활성
+                  비활??
                 </Button>
               </div>
 
@@ -150,7 +150,7 @@ export function ClassesPage() {
                   size="sm"
                   onClick={() => handleDayFilter('all')}
                 >
-                  전체 요일
+                  ?�체 ?�일
                 </Button>
                 {DAYS_OF_WEEK.map((day) => (
                   <Button
@@ -166,7 +166,7 @@ export function ClassesPage() {
             </div>
           </Card>
 
-          {/* 반 생성 폼 */}
+          {/* �??�성 ??*/}
           {showCreateForm && (
             <CreateClassForm
               teachers={teachers || []}
@@ -175,17 +175,17 @@ export function ClassesPage() {
             />
           )}
 
-          {/* 반 목록 또는 캘린더 뷰 */}
+          {/* �?목록 ?�는 캘린??�?*/}
           {isLoading ? (
-            <div>로딩 중...</div>
+            <div>로딩 �?..</div>
           ) : error ? (
-            <div>오류: {error.message}</div>
+            <div>?�류: {error.message}</div>
           ) : viewMode === 'list' ? (
             <ClassListView
               classes={classes || []}
               onEdit={(classId) => navigate(`/classes/${classId}`)}
               onDelete={async (classId) => {
-                if (confirm('정말 이 반을 삭제하시겠습니까?')) {
+                if (confirm('?�말 ??반을 ??��?�시겠습?�까?')) {
                   await deleteClass.mutateAsync(classId);
                 }
               }}
@@ -200,7 +200,7 @@ export function ClassesPage() {
 }
 
 /**
- * 반 생성 폼
+ * �??�성 ??
  */
 function CreateClassForm({
   teachers,
@@ -212,7 +212,7 @@ function CreateClassForm({
   onCancel: () => void;
 }) {
   const handleSubmit = async (data: any) => {
-    // 스키마에서 받은 데이터를 CreateClassInput 형식으로 변환
+    // ?�키마에??받�? ?�이?��? CreateClassInput ?�식?�로 변??
     const input: CreateClassInput = {
       name: data.name || '',
       subject: data.subject || undefined,
@@ -231,7 +231,7 @@ function CreateClassForm({
   return (
     <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>반 생성</h3>
+        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>�??�성</h3>
         <Button variant="ghost" size="sm" onClick={onCancel}>
           취소
         </Button>
@@ -252,7 +252,7 @@ function CreateClassForm({
 }
 
 /**
- * 반 리스트 뷰
+ * �?리스??�?
  */
 function ClassListView({
   classes,
@@ -271,7 +271,7 @@ function ClassListView({
       {classes.length === 0 && (
         <Card padding="lg" variant="default">
           <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-            등록된 반이 없습니다.
+            ?�록??반이 ?�습?�다.
           </div>
         </Card>
       )}
@@ -280,7 +280,7 @@ function ClassListView({
 }
 
 /**
- * 반 카드
+ * �?카드
  */
 function ClassCard({
   classItem,
@@ -308,24 +308,24 @@ function ClassCard({
         </h3>
         <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
           <Button size="xs" variant="ghost" onClick={() => onEdit(classItem.id)}>
-            수정
+            ?�정
           </Button>
           <Button size="xs" variant="ghost" onClick={() => onDelete(classItem.id)}>
-            삭제
+            ??��
           </Button>
         </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
         {classItem.subject && <div>과목: {classItem.subject}</div>}
-        {classItem.grade && <div>대상: {classItem.grade}</div>}
-        <div>요일: {dayLabel}</div>
-        <div>시간: {classItem.start_time} ~ {classItem.end_time}</div>
-        <div>정원: {classItem.current_count} / {classItem.capacity}</div>
+        {classItem.grade && <div>?�?? {classItem.grade}</div>}
+        <div>?�일: {dayLabel}</div>
+        <div>?�간: {classItem.start_time} ~ {classItem.end_time}</div>
+        <div>?�원: {classItem.current_count} / {classItem.capacity}</div>
         {statistics && (
           <>
-            <div>정원률: {statistics.capacity_rate.toFixed(1)}%</div>
-            <div>출결률: {statistics.attendance_rate.toFixed(1)}%</div>
+            <div>?�원�? {statistics.capacity_rate.toFixed(1)}%</div>
+            <div>출결�? {statistics.attendance_rate.toFixed(1)}%</div>
             <div>지각률: {statistics.late_rate.toFixed(1)}%</div>
           </>
         )}
@@ -335,11 +335,11 @@ function ClassCard({
 }
 
 /**
- * 반 캘린더 뷰 (편성표)
- * [요구사항] 반 편성표(Calendar-like) 제공
+ * �?캘린??�?(?�성??
+ * [?�구?�항] �??�성??Calendar-like) ?�공
  */
 function ClassCalendarView({ classes }: { classes: Class[] }) {
-  // 요일별로 반 그룹화
+  // ?�일별로 �?그룹??
   const classesByDay = DAYS_OF_WEEK.map((day) => ({
     day,
     classes: classes.filter((c) => c.day_of_week === day.value),
@@ -354,7 +354,7 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
           </h3>
           {dayClasses.length === 0 ? (
             <div style={{ color: 'var(--color-text-secondary)', textAlign: 'center', padding: 'var(--spacing-lg)' }}>
-              등록된 반이 없습니다.
+              ?�록??반이 ?�습?�다.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
@@ -374,7 +374,7 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
                       <div>
                         <div style={{ fontWeight: 'var(--font-weight-semibold)' }}>{classItem.name}</div>
                         <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                          {classItem.start_time} ~ {classItem.end_time} | {classItem.current_count} / {classItem.capacity}명
+                          {classItem.start_time} ~ {classItem.end_time} | {classItem.current_count} / {classItem.capacity}�?
                         </div>
                       </div>
                       {classItem.room && (

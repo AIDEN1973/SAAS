@@ -1,8 +1,8 @@
 /**
  * Tooltip Component
  * 
- * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
- * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
+ * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
+ * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -17,9 +17,9 @@ export interface TooltipProps {
 }
 
 /**
- * Tooltip 컴포넌트
+ * Tooltip 컴포?�트
  * 
- * 호버 시 도움말을 표시하는 툴팁
+ * ?�버 ???��?말을 ?�시?�는 ?�팁
  */
 export const Tooltip: React.FC<TooltipProps> = ({
   children,

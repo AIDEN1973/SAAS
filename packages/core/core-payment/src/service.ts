@@ -1,11 +1,11 @@
 /**
  * Core Payment Service
  * 
- * 결제 서비스 (공통 스키마/비즈니스 규칙)
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * 결제 ?�비??(공통 ?�키�?비즈?�스 규칙)
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  * 
- * ⚠️ 주의: 실제 결제 API 연동은 /packages/payments/* Provider 모듈에서 구현합니다.
- * 이 서비스는 결제 도메인 공통 스키마와 비즈니스 규칙을 제공합니다.
+ * ?�️ 주의: ?�제 결제 API ?�동?� /packages/payments/* Provider 모듈?�서 구현?�니??
+ * ???�비?�는 결제 ?�메??공통 ?�키마�? 비즈?�스 규칙???�공?�니??
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -21,7 +21,7 @@ export class PaymentService {
   private supabase = createServerClient();
 
   /**
-   * 결제 생성
+   * 결제 ?�성
    */
   async createPayment(
     tenantId: string,
@@ -83,7 +83,7 @@ export class PaymentService {
   }
 
   /**
-   * 결제 상세 조회
+   * 결제 ?�세 조회
    */
   async getPayment(tenantId: string, paymentId: string): Promise<Payment | null> {
     const { data, error } = await withTenant(
@@ -105,7 +105,7 @@ export class PaymentService {
   }
 
   /**
-   * 결제 상태 업데이트 (웹훅에서 호출)
+   * 결제 ?�태 ?�데?�트 (?�훅?�서 ?�출)
    */
   async updatePayment(
     tenantId: string,

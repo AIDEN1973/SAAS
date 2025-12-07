@@ -19,9 +19,9 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@schema-engine": ["../../packages/schema-engine/src"],
-      "@schema-engine/types": ["../../packages/schema-engine/src/types"],
-      "@schema-engine/validator": ["../../packages/schema-engine/src/validator"],
+      "@schema/engine": ["../../packages/schema-engine/src"],
+      "@schema/engine/types": ["../../packages/schema-engine/src/types"],
+      "@schema/engine/validator": ["../../packages/schema-engine/src/validator"],
       "@hooks/*": ["../../packages/hooks/*/src"],
       "@core/schema-registry": ["../../packages/core/core-schema-registry/src"]
     }

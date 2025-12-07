@@ -1,8 +1,8 @@
 /**
  * Pagination Component
  * 
- * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
- * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
+ * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
+ * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
  */
 
 import React from 'react';
@@ -19,9 +19,9 @@ export interface PaginationProps {
 }
 
 /**
- * Pagination 컴포넌트
+ * Pagination 컴포?�트
  * 
- * 페이지네이션 컨트롤
+ * ?�이지?�이??컨트�?
  */
 export const Pagination: React.FC<PaginationProps> = ({
   currentPage,
@@ -88,7 +88,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           minHeight: '44px',
         }}
       >
-        ‹
+        ??
       </Button>
       
       {visiblePages.map((page) => (
@@ -117,7 +117,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           minHeight: '44px',
         }}
       >
-        ›
+        ??
       </Button>
       {showFirstLast && (
         <Button

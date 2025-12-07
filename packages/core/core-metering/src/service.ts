@@ -1,11 +1,11 @@
 /**
  * Core Metering Service
  * 
- * 사용량 계측 서비스
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * ?�용??계측 ?�비??
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  * 
- * ⚠️ 주의: Edge Function에서 수집하여 billing engine이 인보이스 자동 생성.
- * 배치 실행 시각은 매일 04:00 KST 고정.
+ * ?�️ 주의: Edge Function?�서 ?�집?�여 billing engine???�보?�스 ?�동 ?�성.
+ * 배치 ?�행 ?�각?� 매일 04:00 KST 고정.
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -21,7 +21,7 @@ export class MeteringService {
   private supabase = createServerClient();
 
   /**
-   * 사용량 기록
+   * ?�용??기록
    */
   async recordUsage(
     tenantId: string,
@@ -46,7 +46,7 @@ export class MeteringService {
   }
 
   /**
-   * 사용량 목록 조회
+   * ?�용??목록 조회
    */
   async getUsageMetrics(
     tenantId: string,
@@ -81,7 +81,7 @@ export class MeteringService {
   }
 
   /**
-   * 특정 기간의 사용량 합계 조회
+   * ?�정 기간???�용???�계 조회
    */
   async getUsageSum(
     tenantId: string,

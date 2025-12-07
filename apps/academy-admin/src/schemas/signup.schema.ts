@@ -1,11 +1,11 @@
 /**
  * Signup Form Schema
  * 
- * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
- * [불변 규칙] Tailwind 클래스 직접 사용 금지, props 기반 전달
+ * [불�? 규칙] ?�키�??�진 기반 FormSchema ?�의
+ * [불�? 규칙] Tailwind ?�래??직접 ?�용 금�?, props 기반 ?�달
  */
 
-import type { FormSchema } from '@schema-engine';
+import type { FormSchema } from '@schema/engine';
 import type { IndustryType } from '@core/tenancy';
 
 export const signupFormSchema: FormSchema = {
@@ -20,15 +20,15 @@ export const signupFormSchema: FormSchema = {
       rowGap: 'md',
     },
     fields: [
-      // 사용자 정보 섹션
+      // ?�용???�보 ?�션
       {
         name: 'name',
         kind: 'text',
         ui: {
-          label: '이름',
+          label: '?�름',
         },
         validation: {
-          required: '이름을 입력해주세요.',
+          required: '?�름???�력?�주?�요.',
         },
         defaultValue: '',
       },
@@ -36,10 +36,10 @@ export const signupFormSchema: FormSchema = {
         name: 'email',
         kind: 'email',
         ui: {
-          label: '이메일',
+          label: '?�메??,
         },
         validation: {
-          required: '이메일을 입력해주세요.',
+          required: '?�메?�을 ?�력?�주?�요.',
         },
         defaultValue: '',
       },
@@ -47,7 +47,7 @@ export const signupFormSchema: FormSchema = {
         name: 'phone',
         kind: 'phone',
         ui: {
-          label: '전화번호 (선택)',
+          label: '?�화번호 (?�택)',
           placeholder: '010-1234-5678',
         },
         defaultValue: '',
@@ -56,10 +56,10 @@ export const signupFormSchema: FormSchema = {
         name: 'password',
         kind: 'password',
         ui: {
-          label: '비밀번호',
+          label: '비�?번호',
         },
         validation: {
-          required: '비밀번호를 입력해주세요.',
+          required: '비�?번호�??�력?�주?�요.',
           minLength: 8,
         },
         defaultValue: '',
@@ -68,26 +68,26 @@ export const signupFormSchema: FormSchema = {
         name: 'passwordConfirm',
         kind: 'password',
         ui: {
-          label: '비밀번호 확인',
+          label: '비�?번호 ?�인',
         },
         validation: {
-          required: '비밀번호 확인을 입력해주세요.',
-          // ⚠️ 참고: validate 함수는 Schema Registry(JSONB)에 저장될 수 없고,
-          // formValues를 받을 수 없으므로, 비밀번호 확인은 클라이언트 측에서 별도로 처리해야 합니다.
-          // validate: (value: any) => boolean | string;  // 단일 value만 받을 수 있음
+          required: '비�?번호 ?�인???�력?�주?�요.',
+          // ?�️ 참고: validate ?�수??Schema Registry(JSONB)???�?�될 ???�고,
+          // formValues�?받을 ???�으므�? 비�?번호 ?�인?� ?�라?�언??측에??별도�?처리?�야 ?�니??
+          // validate: (value: any) => boolean | string;  // ?�일 value�?받을 ???�음
         },
         defaultValue: '',
       },
-      // 테넌트 정보 섹션
+      // ?�넌???�보 ?�션
       {
         name: 'tenantName',
         kind: 'text',
         ui: {
-          label: '테넌트 이름',
-          placeholder: '예: 서울 학원',
+          label: '?�넌???�름',
+          placeholder: '?? ?�울 ?�원',
         },
         validation: {
-          required: '테넌트 이름을 입력해주세요.',
+          required: '?�넌???�름???�력?�주?�요.',
         },
         defaultValue: '',
       },
@@ -95,23 +95,23 @@ export const signupFormSchema: FormSchema = {
         name: 'industryType',
         kind: 'select',
         ui: {
-          label: '업종',
+          label: '?�종',
         },
         options: [
-          { label: '학원', value: 'academy' },
-          { label: '미용실', value: 'salon' },
-          { label: '부동산', value: 'realestate' },
-          { label: '헬스장', value: 'gym' },
-          { label: '비영리단체', value: 'ngo' },
+          { label: '?�원', value: 'academy' },
+          { label: '미용??, value: 'salon' },
+          { label: '부?�산', value: 'realestate' },
+          { label: '?�스??, value: 'gym' },
+          { label: '비영리단�?, value: 'ngo' },
         ],
         validation: {
-          required: '업종을 선택해주세요.',
+          required: '?�종???�택?�주?�요.',
         },
         defaultValue: 'academy',
       },
     ],
     submit: {
-      label: '회원가입',
+      label: '?�원가??,
       variant: 'solid',
       color: 'primary',
       size: 'md',

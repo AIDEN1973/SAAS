@@ -1,8 +1,8 @@
 /**
  * Accordion Component
  * 
- * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
- * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
+ * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
+ * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
  */
 
 import React, { useState } from 'react';
@@ -24,9 +24,9 @@ export interface AccordionProps {
 }
 
 /**
- * Accordion 컴포넌트
+ * Accordion 컴포?�트
  * 
- * 아코디언 컴포넌트
+ * ?�코?�언 컴포?�트
  */
 export const Accordion: React.FC<AccordionProps> = ({
   items,
@@ -103,7 +103,7 @@ export const Accordion: React.FC<AccordionProps> = ({
                   transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                 }}
               >
-                ▼
+                ??
               </span>
             </button>
             {isOpen && (

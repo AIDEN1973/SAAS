@@ -1,8 +1,8 @@
 /**
  * Core Storage Types
  * 
- * 파일 업로드/권한/폴더 구조 공통화 (Supabase Storage 래핑)
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * ?�일 ?�로??권한/?�더 구조 공통??(Supabase Storage ?�핑)
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  */
 
 export interface FileMetadata {
@@ -12,8 +12,8 @@ export interface FileMetadata {
   file_name: string;
   file_size: number;
   mime_type: string;
-  module?: string;  // 'consultation', 'review', 'post' 등
-  entity_id?: string;  // 관련 엔티티 ID
+  module?: string;  // 'consultation', 'review', 'post' ??
+  entity_id?: string;  // 관???�티??ID
   created_by?: string;
   created_at: string;
 }

@@ -1,11 +1,11 @@
 /**
  * Core Notification Service
  * 
- * 메시징/알림 서비스
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * 메시�??�림 ?�비??
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  * 
- * ⚠️ 주의: 실제 발송은 Edge Function (fns-notification-dispatch)에서 처리합니다.
- * 이 서비스는 알림 큐 관리 및 로그 저장을 담당합니다.
+ * ?�️ 주의: ?�제 발송?� Edge Function (fns-notification-dispatch)?�서 처리?�니??
+ * ???�비?�는 ?�림 ??관�?�?로그 ?�?�을 ?�당?�니??
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -21,7 +21,7 @@ export class NotificationService {
   private supabase = createServerClient();
 
   /**
-   * 알림 생성 (큐에 추가)
+   * ?�림 ?�성 (?�에 추�?)
    */
   async createNotification(
     tenantId: string,
@@ -48,7 +48,7 @@ export class NotificationService {
   }
 
   /**
-   * 알림 목록 조회
+   * ?�림 목록 조회
    */
   async getNotifications(
     tenantId: string,
@@ -87,7 +87,7 @@ export class NotificationService {
   }
 
   /**
-   * 알림 상태 업데이트 (Edge Function에서 호출)
+   * ?�림 ?�태 ?�데?�트 (Edge Function?�서 ?�출)
    */
   async updateNotificationStatus(
     tenantId: string,

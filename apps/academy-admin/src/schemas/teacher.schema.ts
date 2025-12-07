@@ -1,10 +1,10 @@
 /**
  * Teacher Form Schema
  * 
- * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
+ * [불�? 규칙] ?�키�??�진 기반 FormSchema ?�의
  */
 
-import type { FormSchema } from '@schema-engine';
+import type { FormSchema } from '@schema/engine';
 
 export const teacherFormSchema: FormSchema = {
   version: '1.0.0',
@@ -22,7 +22,7 @@ export const teacherFormSchema: FormSchema = {
         name: 'name',
         kind: 'text',
         ui: {
-          label: '이름',
+          label: '?�름',
           colSpan: 1,
         },
         validation: {
@@ -33,7 +33,7 @@ export const teacherFormSchema: FormSchema = {
         name: 'email',
         kind: 'email',
         ui: {
-          label: '이메일',
+          label: '?�메??,
           colSpan: 1,
         },
       },
@@ -41,7 +41,7 @@ export const teacherFormSchema: FormSchema = {
         name: 'phone',
         kind: 'phone',
         ui: {
-          label: '전화번호',
+          label: '?�화번호',
           colSpan: 1,
         },
       },
@@ -57,7 +57,7 @@ export const teacherFormSchema: FormSchema = {
         name: 'employee_id',
         kind: 'text',
         ui: {
-          label: '사원번호',
+          label: '?�원번호',
           colSpan: 1,
         },
       },
@@ -65,7 +65,7 @@ export const teacherFormSchema: FormSchema = {
         name: 'specialization',
         kind: 'text',
         ui: {
-          label: '전문 분야',
+          label: '?�문 분야',
           colSpan: 1,
         },
       },
@@ -73,7 +73,7 @@ export const teacherFormSchema: FormSchema = {
         name: 'hire_date',
         kind: 'date',
         ui: {
-          label: '입사일',
+          label: '?�사??,
           colSpan: 1,
         },
       },
@@ -81,7 +81,7 @@ export const teacherFormSchema: FormSchema = {
         name: 'bio',
         kind: 'textarea',
         ui: {
-          label: '강사 소개',
+          label: '강사 ?�개',
           colSpan: 2,
         },
       },
@@ -95,7 +95,7 @@ export const teacherFormSchema: FormSchema = {
       },
     ],
     submit: {
-      label: '등록',
+      label: '?�록',
       variant: 'solid',
       color: 'primary',
       size: 'md',

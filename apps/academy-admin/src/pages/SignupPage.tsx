@@ -1,21 +1,21 @@
 /**
- * 회원가입 페이지 (B2B)
+ * ?�원가???�이지 (B2B)
  * 
- * [기술문서 요구사항]
- * - 회원가입 플로우: 사용자 계정 생성 → 이메일 인증(선택) → 테넌트 생성 및 온보딩 → 업종별 초기 데이터 시드
- * - [불변 규칙] 사용자 계정만 생성하며, 테넌트 생성은 core-tenancy/onboarding에서 처리
+ * [기술문서 ?�구?�항]
+ * - ?�원가???�로?? ?�용??계정 ?�성 ???�메???�증(?�택) ???�넌???�성 �??�보?????�종�?초기 ?�이???�드
+ * - [불�? 규칙] ?�용??계정�??�성?�며, ?�넌???�성?� core-tenancy/onboarding?�서 처리
  * 
- * [UI 문서 요구사항]
- * - Zero-Trust 원칙 준수
- * - 반응형 지원 (xs, sm, md, lg, xl)
- * - Design System 토큰 사용
- * - 접근성 WCAG 2.1 AAA 목표
+ * [UI 문서 ?�구?�항]
+ * - Zero-Trust ?�칙 준??
+ * - 반응??지??(xs, sm, md, lg, xl)
+ * - Design System ?�큰 ?�용
+ * - ?�근??WCAG 2.1 AAA 목표
  */
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Card, useModal, useResponsiveMode } from '@ui-core/react';
-import { SchemaForm } from '@schema-engine';
+import { SchemaForm } from '@schema/engine';
 import { useSignupWithEmail } from '@hooks/use-auth';
 import { signupFormSchema } from '../schemas/signup.schema';
 import type { IndustryType } from '@core/tenancy';
@@ -39,17 +39,17 @@ export function SignupPage() {
         industry_type: data.industryType as IndustryType,
       });
 
-      // 회원가입 성공
-      showAlert('성공', '회원가입이 완료되었습니다.');
+      // ?�원가???�공
+      showAlert('?�공', '?�원가?�이 ?�료?�었?�니??');
       
-      // 테넌트 선택 (자동으로 하나의 테넌트가 생성됨)
+      // ?�넌???�택 (?�동?�로 ?�나???�넌?��? ?�성??
       navigate('/');
     } catch (error) {
-      const message = error instanceof Error ? error.message : '회원가입에 실패했습니다.';
+      const message = error instanceof Error ? error.message : '?�원가?�에 ?�패?�습?�다.';
       
-      // 개발 환경에서 상세 에러 로그
+      // 개발 ?�경?�서 ?�세 ?�러 로그
       if (import.meta.env?.DEV) {
-        console.error('❌ 회원가입 실패 상세:', {
+        console.error('???�원가???�패 ?�세:', {
           error,
           message,
           email: data.email,
@@ -57,17 +57,17 @@ export function SignupPage() {
         });
       }
 
-      // 이메일 인증 필요 오류 처리
-      if (error instanceof Error && message.includes('이메일 인증')) {
+      // ?�메???�증 ?�요 ?�류 처리
+      if (error instanceof Error && message.includes('?�메???�증')) {
         showAlert(
-          '알림',
-          '이메일 인증이 필요합니다. 이메일을 확인해주세요.\n\n' +
-          '⚠️ 개발 환경에서는 Supabase Dashboard > Authentication > Settings > Email Auth에서\n' +
-          '"Enable email confirmations"를 비활성화하거나 "Auto Confirm"을 활성화하세요.'
+          '?�림',
+          '?�메???�증???�요?�니?? ?�메?�을 ?�인?�주?�요.\n\n' +
+          '?�️ 개발 ?�경?�서??Supabase Dashboard > Authentication > Settings > Email Auth?�서\n' +
+          '"Enable email confirmations"�?비활?�화?�거??"Auto Confirm"???�성?�하?�요.'
         );
         navigate('/auth/login');
       } else {
-        showAlert('오류', message);
+        showAlert('?�류', message);
       }
     }
   };
@@ -77,7 +77,7 @@ export function SignupPage() {
   return (
     <Container maxWidth="sm" className="flex items-center justify-center min-h-screen py-8">
       <Card className="w-full p-6 md:p-8">
-        <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">B2B 회원가입</h1>
+        <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">B2B ?�원가??/h1>
 
         <SchemaForm
           schema={signupFormSchema}
@@ -87,14 +87,14 @@ export function SignupPage() {
           }}
         />
 
-        {/* 로그인 링크 */}
+        {/* 로그??링크 */}
         <div className="mt-6 text-center">
-          <span className="text-gray-600">이미 계정이 있으신가요? </span>
+          <span className="text-gray-600">?��? 계정???�으?��??? </span>
           <button
             onClick={() => navigate('/auth/login')}
             className="text-primary hover:underline"
           >
-            로그인
+            로그??
           </button>
         </div>
       </Card>

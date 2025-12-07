@@ -18,7 +18,7 @@
     "@lib/supabase-client": "file:../../packages/lib/supabase-client",
     "@env-registry/core": "file:../../packages/env-registry",
     "@ui-core/react": "file:../../packages/ui-core",
-    "@schema-engine": "file:../../packages/schema-engine",
+    "@schema/engine": "file:../../packages/schema-engine",
     "@hooks/use-schema-registry": "file:../../packages/hooks/use-schema-registry",
     "@hooks/use-auth": "file:../../packages/hooks/use-auth"
   },

@@ -1,15 +1,15 @@
 /**
- * Super Admin 로그인 페이지
+ * Super Admin 로그???�이지
  * 
- * [불변 규칙] 스키마 엔진 기반 로그인 폼
- * [불변 규칙] Zero-Trust: 인증 로직은 core-auth 모듈에서 공통 관리
- * [불변 규칙] academy-admin 앱과 동일한 인증 로직 사용
+ * [불�? 규칙] ?�키�??�진 기반 로그????
+ * [불�? 규칙] Zero-Trust: ?�증 로직?� core-auth 모듈?�서 공통 관�?
+ * [불�? 규칙] academy-admin ?�과 ?�일???�증 로직 ?�용
  */
 
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Container, Card, useModal, useResponsiveMode } from '@ui-core/react';
-import { SchemaForm } from '@schema-engine';
+import { SchemaForm } from '@schema/engine';
 import {
   useLoginWithEmail,
   useLoginWithOAuth,
@@ -46,18 +46,18 @@ export function LoginPage() {
       
       if (result.tenants.length === 0) {
         showAlert(
-          '알림',
-          '소속된 테넌트가 없습니다.\n\n' +
-          '회원가입을 진행하시거나, 관리자에게 문의해주세요.'
+          '?�림',
+          '?�속???�넌?��? ?�습?�다.\n\n' +
+          '?�원가?�을 진행?�시거나, 관리자?�게 문의?�주?�요.'
         );
         return;
       }
 
       if (result.tenants.length === 1) {
-        // 테넌트가 하나면 자동 선택
+        // ?�넌?��? ?�나�??�동 ?�택
         await selectTenant.mutateAsync(result.tenants[0].id);
         
-        // returnTo 파라미터 확인
+        // returnTo ?�라미터 ?�인
         const returnTo = searchParams.get('returnTo');
         if (returnTo) {
           window.location.href = decodeURIComponent(returnTo);
@@ -65,12 +65,12 @@ export function LoginPage() {
           navigate('/');
         }
       } else {
-        // 여러 테넌트면 선택 페이지로 이동
+        // ?�러 ?�넌?�면 ?�택 ?�이지�??�동
         navigate('/auth/tenant-selection');
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : '로그인에 실패했습니다.';
-      showAlert('오류', message);
+      const message = error instanceof Error ? error.message : '로그?�에 ?�패?�습?�다.';
+      showAlert('?�류', message);
     }
   };
 
@@ -78,8 +78,8 @@ export function LoginPage() {
     try {
       await loginWithOAuth.mutateAsync({ provider });
     } catch (error) {
-      const message = error instanceof Error ? error.message : '소셜 로그인에 실패했습니다.';
-      showAlert('오류', message);
+      const message = error instanceof Error ? error.message : '?�셜 로그?�에 ?�패?�습?�다.';
+      showAlert('?�류', message);
     }
   };
 
@@ -87,10 +87,10 @@ export function LoginPage() {
     try {
       await sendOTP.mutateAsync(phone);
       setOtpSent(true);
-      showAlert('성공', '인증번호가 전송되었습니다.');
+      showAlert('?�공', '?�증번호가 ?�송?�었?�니??');
     } catch (error) {
-      const message = error instanceof Error ? error.message : '인증번호 전송에 실패했습니다.';
-      showAlert('오류', message);
+      const message = error instanceof Error ? error.message : '?�증번호 ?�송???�패?�습?�다.';
+      showAlert('?�류', message);
     }
   };
 
@@ -100,9 +100,9 @@ export function LoginPage() {
       
       if (result.tenants.length === 0) {
         showAlert(
-          '알림',
-          '소속된 테넌트가 없습니다.\n\n' +
-          '회원가입을 진행하시거나, 관리자에게 문의해주세요.'
+          '?�림',
+          '?�속???�넌?��? ?�습?�다.\n\n' +
+          '?�원가?�을 진행?�시거나, 관리자?�게 문의?�주?�요.'
         );
         return;
       }
@@ -120,17 +120,17 @@ export function LoginPage() {
         navigate('/auth/tenant-selection');
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : '로그인에 실패했습니다.';
-      showAlert('오류', message);
+      const message = error instanceof Error ? error.message : '로그?�에 ?�패?�습?�다.';
+      showAlert('?�류', message);
     }
   };
 
   return (
     <Container maxWidth="sm" className="flex items-center justify-center min-h-screen py-8">
       <Card className="w-full p-6 md:p-8">
-        <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">Super Admin 로그인</h1>
+        <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">Super Admin 로그??/h1>
 
-        {/* 로그인 방법 선택 */}
+        {/* 로그??방법 ?�택 */}
         <div className="mb-6 flex gap-2 border-b">
           <button
             onClick={() => {
@@ -143,7 +143,7 @@ export function LoginPage() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            이메일
+            ?�메??
           </button>
           <button
             onClick={() => {
@@ -156,7 +156,7 @@ export function LoginPage() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            소셜 로그인
+            ?�셜 로그??
           </button>
           <button
             onClick={() => {
@@ -169,11 +169,11 @@ export function LoginPage() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            전화번호
+            ?�화번호
           </button>
         </div>
 
-        {/* 이메일 로그인 */}
+        {/* ?�메??로그??*/}
         {loginMethod === 'email' && (
           <SchemaForm
             schema={loginFormSchema}
@@ -185,7 +185,7 @@ export function LoginPage() {
           />
         )}
 
-        {/* 소셜 로그인 */}
+        {/* ?�셜 로그??*/}
         {loginMethod === 'oauth' && (
           <div className="space-y-3">
             <button
@@ -211,26 +211,26 @@ export function LoginPage() {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              <span>Google로 로그인</span>
+              <span>Google�?로그??/span>
             </button>
             <button
               onClick={() => handleOAuthLogin('kakao')}
               className="w-full py-3 px-4 border border-yellow-300 bg-yellow-400 rounded-lg hover:bg-yellow-500 transition-colors flex items-center justify-center gap-3"
               disabled={loginWithOAuth.isPending}
             >
-              <span className="text-gray-900 font-medium">카카오로 로그인</span>
+              <span className="text-gray-900 font-medium">카카?�로 로그??/span>
             </button>
           </div>
         )}
 
-        {/* 전화번호/OTP 로그인 */}
+        {/* ?�화번호/OTP 로그??*/}
         {loginMethod === 'otp' && (
           <div className="space-y-4">
             {!otpSent ? (
               <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    전화번호
+                    ?�화번호
                   </label>
                   <input
                     type="tel"
@@ -245,7 +245,7 @@ export function LoginPage() {
                   disabled={!phone || sendOTP.isPending}
                   className="w-full py-3 px-4 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {sendOTP.isPending ? '전송 중...' : '인증번호 전송'}
+                  {sendOTP.isPending ? '?�송 �?..' : '?�증번호 ?�송'}
                 </button>
               </>
             ) : (

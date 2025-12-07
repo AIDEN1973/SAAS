@@ -1,11 +1,11 @@
 /**
  * Attendance Form Schema
  * 
- * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
- * [동적 옵션] 학생 및 반 목록은 동적으로 채워집니다.
+ * [불�? 규칙] ?�키�??�진 기반 FormSchema ?�의
+ * [?�적 ?�션] ?�생 �?�?목록?� ?�적?�로 채워집니??
  */
 
-import type { FormSchema } from '@schema-engine';
+import type { FormSchema } from '@schema/engine';
 import type { Student } from '@services/student-service';
 import type { Class } from '@services/class-service';
 
@@ -29,11 +29,11 @@ export function createAttendanceFormSchema(
           name: 'student_id',
           kind: 'select',
           ui: {
-            label: '학생',
+            label: '?�생',
             colSpan: 1,
           },
           options: [
-            { label: '선택', value: '' },
+            { label: '?�택', value: '' },
             ...(students?.map((s) => ({ label: s.name, value: s.id })) || []),
           ],
           validation: {
@@ -44,11 +44,11 @@ export function createAttendanceFormSchema(
           name: 'class_id',
           kind: 'select',
           ui: {
-            label: '반 (선택)',
+            label: '�?(?�택)',
             colSpan: 1,
           },
           options: [
-            { label: '선택 안함', value: '' },
+            { label: '?�택 ?�함', value: '' },
             ...(classes?.map((c) => ({ label: c.name, value: c.id })) || []),
           ],
         },
@@ -56,7 +56,7 @@ export function createAttendanceFormSchema(
           name: 'occurred_at',
           kind: 'datetime',
           ui: {
-            label: '출결 시간',
+            label: '출결 ?�간',
             colSpan: 1,
           },
           validation: {
@@ -67,13 +67,13 @@ export function createAttendanceFormSchema(
           name: 'attendance_type',
           kind: 'select',
           ui: {
-            label: '출결 유형',
+            label: '출결 ?�형',
             colSpan: 1,
           },
           options: [
-            { label: '등원', value: 'check_in' },
-            { label: '하원', value: 'check_out' },
-            { label: '지각', value: 'late' },
+            { label: '?�원', value: 'check_in' },
+            { label: '?�원', value: 'check_out' },
+            { label: '지�?, value: 'late' },
             { label: '결석', value: 'absent' },
           ],
           defaultValue: 'check_in',
@@ -85,14 +85,14 @@ export function createAttendanceFormSchema(
           name: 'status',
           kind: 'select',
           ui: {
-            label: '상태',
+            label: '?�태',
             colSpan: 1,
           },
           options: [
             { label: '출석', value: 'present' },
-            { label: '지각', value: 'late' },
+            { label: '지�?, value: 'late' },
             { label: '결석', value: 'absent' },
-            { label: '사유', value: 'excused' },
+            { label: '?�유', value: 'excused' },
           ],
           defaultValue: 'present',
           validation: {
@@ -109,7 +109,7 @@ export function createAttendanceFormSchema(
         },
       ],
       submit: {
-        label: '저장',
+        label: '?�??,
         variant: 'solid',
         color: 'primary',
         size: 'md',

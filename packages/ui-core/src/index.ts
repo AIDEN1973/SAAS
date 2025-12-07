@@ -1,14 +1,14 @@
 /**
  * UI Core
  * 
- * 공통 UI 컴포넌트 및 훅
+ * 공통 UI 컴포?�트 �???
  * 
- * [불변 규칙] 전역 스타일은 이 패키지에서 중앙 관리
- * [불변 규칙] 모든 앱은 이 패키지의 스타일을 import하여 사용
+ * [불�? 규칙] ?�역 ?��??��? ???�키지?�서 중앙 관�?
+ * [불�? 규칙] 모든 ?��? ???�키지???��??�을 import?�여 ?�용
  * 
- * 사용법:
- * - 컴포넌트: import { Button, Card } from '@ui-core/react'
- * - 전역 스타일: import '@ui-core/react/styles'
+ * ?�용�?
+ * - 컴포?�트: import { Button, Card } from '@ui-core/react'
+ * - ?�역 ?��??? import '@ui-core/react/styles'
  */
 
 export * from './components';

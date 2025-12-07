@@ -1,8 +1,8 @@
 /**
  * Core Tenancy Service
  * 
- * 테넌시 서비스 (user_tenant_roles 기반)
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * ?�넌???�비??(user_tenant_roles 기반)
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -18,7 +18,7 @@ export class TenancyService {
   private supabase = createServerClient();
 
   /**
-   * 사용자의 테넌트 목록 조회
+   * ?�용?�의 ?�넌??목록 조회
    */
   async getUserTenants(userId: string): Promise<Tenant[]> {
     const { data, error } = await this.supabase
@@ -39,7 +39,7 @@ export class TenancyService {
       throw new Error(`Failed to fetch user tenants: ${error.message}`);
     }
 
-    // Supabase join 결과 타입 안전하게 처리
+    // Supabase join 결과 ?�???�전?�게 처리
     type UserTenantRoleWithTenant = {
       tenant_id: string;
       tenants: Tenant | Tenant[] | null;
@@ -48,7 +48,7 @@ export class TenancyService {
     return (data || [])
       .map((item: any) => {
         const tenants = item.tenants;
-        // Supabase는 join 결과를 배열로 반환할 수 있음
+        // Supabase??join 결과�?배열�?반환?????�음
         if (Array.isArray(tenants)) {
           return tenants[0] || null;
         }
@@ -58,7 +58,7 @@ export class TenancyService {
   }
 
   /**
-   * 테넌트의 사용자 역할 목록 조회
+   * ?�넌?�의 ?�용????�� 목록 조회
    */
   async getTenantUsers(tenantId: string): Promise<UserTenantRole[]> {
     const { data, error } = await withTenant(
@@ -76,7 +76,7 @@ export class TenancyService {
   }
 
   /**
-   * 사용자 역할 할당
+   * ?�용????�� ?�당
    */
   async assignRole(
     input: CreateUserTenantRoleInput
@@ -99,7 +99,7 @@ export class TenancyService {
   }
 
   /**
-   * 사용자 역할 변경
+   * ?�용????�� 변�?
    */
   async updateRole(
     userId: string,
@@ -123,7 +123,7 @@ export class TenancyService {
   }
 
   /**
-   * 사용자 역할 제거
+   * ?�용????�� ?�거
    */
   async removeRole(userId: string, tenantId: string): Promise<void> {
     const { error } = await withTenant(
@@ -140,7 +140,7 @@ export class TenancyService {
   }
 
   /**
-   * 테넌트 조회
+   * ?�넌??조회
    */
   async getTenant(tenantId: string): Promise<Tenant | null> {
     const { data, error } = await this.supabase

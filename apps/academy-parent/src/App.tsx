@@ -11,13 +11,13 @@ function App() {
             marginBottom: 'var(--spacing-md)',
             color: 'var(--color-text)'
           }}>
-            디어쌤 - 학부모
+            ?�어??- ?��?�?
           </h1>
           <p style={{ 
             color: 'var(--color-text-secondary)',
             margin: 0
           }}>
-            환경설정이 완료되었습니다.
+            ?�경?�정???�료?�었?�니??
           </p>
         </Card>
       </Container>

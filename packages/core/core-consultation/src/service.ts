@@ -1,8 +1,8 @@
 /**
  * Core Consultation Service
  * 
- * 상담/기록 관리 서비스
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * ?�담/기록 관�??�비??
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -18,7 +18,7 @@ export class ConsultationService {
   private supabase = createServerClient();
 
   /**
-   * 상담 목록 조회
+   * ?�담 목록 조회
    */
   async getConsultations(
     tenantId: string,
@@ -57,7 +57,7 @@ export class ConsultationService {
   }
 
   /**
-   * 상담 상세 조회
+   * ?�담 ?�세 조회
    */
   async getConsultation(
     tenantId: string,
@@ -82,7 +82,7 @@ export class ConsultationService {
   }
 
   /**
-   * 상담 생성
+   * ?�담 ?�성
    */
   async createConsultation(
     tenantId: string,
@@ -97,7 +97,7 @@ export class ConsultationService {
         title: input.title,
         content: input.content,
         consultation_date: input.consultation_date,
-        created_by: null, // TODO: auth.uid()에서 가져오기
+        created_by: null, // TODO: auth.uid()?�서 가?�오�?
       })
       .select()
       .single();
@@ -110,7 +110,7 @@ export class ConsultationService {
   }
 
   /**
-   * 상담 수정
+   * ?�담 ?�정
    */
   async updateConsultation(
     tenantId: string,
@@ -134,7 +134,7 @@ export class ConsultationService {
   }
 
   /**
-   * 상담 삭제
+   * ?�담 ??��
    */
   async deleteConsultation(
     tenantId: string,

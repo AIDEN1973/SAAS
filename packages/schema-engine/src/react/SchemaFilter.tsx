@@ -1,7 +1,7 @@
 /**
  * SchemaFilter Component
  * 
- * SDUI v1.1: Filter Schema 렌더러 (Table 상단 검색 조건)
+ * SDUI v1.1: Filter Schema ?�더??(Table ?�단 검??조건)
  * 
  * 기술문서: SDUI 기술문서 v1.1 - 15. Filter Engine
  */
@@ -20,10 +20,10 @@ export interface SchemaFilterProps {
 }
 
 /**
- * SchemaFilter 컴포넌트
+ * SchemaFilter 컴포?�트
  * 
- * FilterSchema를 렌더링합니다.
- * FormFieldSchema를 재사용하되, submit이 아닌 "필터 변경 이벤트"를 발생시킵니다.
+ * FilterSchema�??�더링합?�다.
+ * FormFieldSchema�??�사?�하?? submit???�닌 "?�터 변�??�벤??�?발생?�킵?�다.
  */
 export const SchemaFilter: React.FC<SchemaFilterProps> = ({
   schema,
@@ -37,7 +37,7 @@ export const SchemaFilter: React.FC<SchemaFilterProps> = ({
 
   const { register, control, watch, formState: { errors } } = form;
   
-  // 필터 값 변경 감시
+  // ?�터 �?변�?감시
   const watchedValues = watch();
   
   React.useEffect(() => {

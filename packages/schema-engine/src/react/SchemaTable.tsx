@@ -1,8 +1,7 @@
 /**
  * SchemaTable Component
  * 
- * SDUI v1.1: Table Schema 렌더러
- * 
+ * SDUI v1.1: Table Schema ?�더?? * 
  * 기술문서: SDUI 기술문서 v1.1 - 14. Table Engine
  */
 
@@ -15,19 +14,19 @@ import { executeActionsForEvent, type ActionContext } from '../core/actionEngine
 export interface SchemaTableProps {
   schema: TableSchema;
   className?: string;
-  // SDUI v1.1: Action Engine 컨텍스트 (선택적)
+  // SDUI v1.1: Action Engine 컨텍?�트 (?�택??
   actionContext?: Partial<ActionContext>;
-  // SDUI v1.1: i18n 번역 (선택적)
+  // SDUI v1.1: i18n 번역 (?�택??
   translations?: Record<string, string>;
-  // API 호출 함수 (선택적, 없으면 @api-sdk/core의 apiClient 사용)
+  // API ?�출 ?�수 (?�택?? ?�으�?@api-sdk/core??apiClient ?�용)
   apiCall?: (endpoint: string, method: string, body?: any) => Promise<any>;
 }
 
 /**
- * SchemaTable 컴포넌트
+ * SchemaTable 컴포?�트
  * 
- * TableSchema를 렌더링합니다.
- * API 기반 데이터 소스, 행 액션, 벌크 액션 등을 지원합니다.
+ * TableSchema�??�더링합?�다.
+ * API 기반 ?�이???�스, ???�션, 벌크 ?�션 ?�을 지?�합?�다.
  */
 export const SchemaTable: React.FC<SchemaTableProps> = ({
   schema,
@@ -38,7 +37,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
 }) => {
   const { dataSource, columns, rowActions, bulkActions, pagination, selection, virtualization } = schema.table;
 
-  // SDUI v1.1: API 데이터 소스 로드
+  // SDUI v1.1: API ?�이???�스 로드
   const { data, isLoading, error } = useQuery({
     queryKey: ['schema-table', schema.entity, dataSource.endpoint],
     queryFn: async () => {
@@ -46,13 +45,13 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
         throw new Error('Only API data source is supported');
       }
 
-      // ⚠️ 중요: Zero-Trust 원칙 - apiCall prop이 필수입니다.
-      // apiCall이 없으면 @api-sdk/core의 apiClient를 사용해야 합니다.
+      // ?�️ 중요: Zero-Trust ?�칙 - apiCall prop???�수?�니??
+      // apiCall???�으�?@api-sdk/core??apiClient�??�용?�야 ?�니??
       if (!apiCall) {
-        // apiCall이 없으면 apiClient를 사용
+        // apiCall???�으�?apiClient�??�용
         const { apiClient } = await import('@api-sdk/core');
-        // ⚠️ 참고: apiClient.get()은 method 옵션을 지원하지 않으므로, GET만 사용
-        // POST가 필요한 경우 apiCall prop을 사용해야 합니다.
+        // ?�️ 참고: apiClient.get()?� method ?�션??지?�하지 ?�으므�? GET�??�용
+        // POST가 ?�요??경우 apiCall prop???�용?�야 ?�니??
         const res = await apiClient.get(dataSource.endpoint);
         const data = (res as any).data ?? res;
         return data;
@@ -63,8 +62,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
     enabled: !!dataSource.endpoint,
   });
 
-  // SDUI v1.1: DataTable 컬럼 변환
-  const dataTableColumns: DataTableColumn[] = React.useMemo(() => {
+  // SDUI v1.1: DataTable 컬럼 변??  const dataTableColumns: DataTableColumn[] = React.useMemo(() => {
     return columns.map((col) => ({
       key: col.key,
       label: col.labelKey
@@ -73,15 +71,14 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
       width: col.width !== undefined ? (typeof col.width === 'number' ? String(col.width) : col.width) : undefined,
       align: col.type === 'number' ? 'right' : 'left',
       render: (value: any, row: any) => {
-        // 타입별 렌더링
-        switch (col.type) {
+        // ?�?�별 ?�더�?        switch (col.type) {
           case 'date':
             return value ? new Date(value).toLocaleDateString() : '-';
           case 'number':
             return typeof value === 'number' ? value.toLocaleString() : value;
           case 'tag':
           case 'badge':
-            return <span>{value}</span>; // TODO: Tag/Badge 컴포넌트 사용
+            return <span>{value}</span>; // TODO: Tag/Badge 컴포?�트 ?�용
           default:
             return value ?? '-';
         }
@@ -89,8 +86,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
     }));
   }, [columns, translations]);
 
-  // SDUI v1.1: 행 클릭 핸들러
-  const handleRowClick = React.useCallback(async (row: any) => {
+  // SDUI v1.1: ???�릭 ?�들??  const handleRowClick = React.useCallback(async (row: any) => {
     if (schema.actions && schema.actions.length > 0) {
       const fullContext: ActionContext = {
         selectedRows: [row],
@@ -102,11 +98,11 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   }, [schema.actions, actionContext, translations]);
 
   if (isLoading) {
-    return <div className={className}>로딩 중...</div>;
+    return <div className={className}>로딩 �?..</div>;
   }
 
   if (error) {
-    return <div className={className}>에러: {error instanceof Error ? error.message : String(error)}</div>;
+    return <div className={className}>?�러: {error instanceof Error ? error.message : String(error)}</div>;
   }
 
   return (
@@ -116,9 +112,9 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
         columns={dataTableColumns}
         keyExtractor={(row: any) => row.id || row[columns[0]?.key]}
         onRowClick={rowActions && rowActions.length > 0 ? handleRowClick : undefined}
-        emptyMessage="데이터가 없습니다."
+        emptyMessage="?�이?��? ?�습?�다."
       />
-      {/* TODO: pagination, selection, bulkActions, virtualization 지원 */}
+      {/* TODO: pagination, selection, bulkActions, virtualization 지??*/}
     </div>
   );
 };

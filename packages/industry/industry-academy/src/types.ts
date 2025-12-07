@@ -1,8 +1,8 @@
 /**
  * Industry Academy Types
  * 
- * 학원 업종 전용 타입 정의
- * [불변 규칙] Industry Layer는 Core Layer를 import할 수 있지만, Core는 Industry를 import할 수 없음
+ * ?�원 ?�종 ?�용 ?�???�의
+ * [불�? 규칙] Industry Layer??Core Layer�?import?????��?�? Core??Industry�?import?????�음
  */
 
 export type StudentStatus = 'active' | 'on_leave' | 'graduated' | 'withdrawn';
@@ -104,10 +104,10 @@ export interface StudentFilter {
   grade?: string;
   class_id?: string;
   tag_ids?: string[];
-  search?: string;  // 이름 검색
+  search?: string;  // ?�름 검??
 }
 
-// 반(Class) 관련 타입
+// �?Class) 관???�??
 export type ClassStatus = 'active' | 'inactive' | 'archived';
 export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 
@@ -118,11 +118,11 @@ export interface Class {
   subject?: string;
   grade?: string;
   day_of_week: DayOfWeek;
-  start_time: string;  // time 형식 (예: "14:00:00")
-  end_time: string;  // time 형식 (예: "15:30:00")
+  start_time: string;  // time ?�식 (?? "14:00:00")
+  end_time: string;  // time ?�식 (?? "15:30:00")
   capacity: number;
   current_count: number;
-  color: string;  // 반 자동 색상 태깅
+  color: string;  // �??�동 ?�상 ?�깅
   room?: string;
   notes?: string;
   status: ClassStatus;
@@ -140,7 +140,7 @@ export interface CreateClassInput {
   start_time: string;
   end_time: string;
   capacity: number;
-  color?: string;  // 지정하지 않으면 자동 생성
+  color?: string;  // 지?�하지 ?�으�??�동 ?�성
   room?: string;
   notes?: string;
   status?: ClassStatus;
@@ -167,12 +167,12 @@ export interface ClassFilter {
   subject?: string;
   grade?: string;
   teacher_id?: string;
-  search?: string;  // 반 이름 검색
+  search?: string;  // �??�름 검??
 }
 
-// 강사(Teacher) 관련 타입
+// 강사(Teacher) 관???�??
 export type TeacherStatus = 'active' | 'on_leave' | 'resigned';
-export type TeacherRole = 'teacher' | 'assistant';  // 담임/부담임
+export type TeacherRole = 'teacher' | 'assistant';  // ?�임/부?�임
 
 export interface Teacher {
   id: string;  // person_id
@@ -225,10 +225,10 @@ export interface UpdateTeacherInput {
 export interface TeacherFilter {
   status?: TeacherStatus | TeacherStatus[];
   specialization?: string;
-  search?: string;  // 이름 검색
+  search?: string;  // ?�름 검??
 }
 
-// 반-강사 연결 타입
+// �?강사 ?�결 ?�??
 export interface ClassTeacher {
   id: string;
   tenant_id: string;
@@ -245,10 +245,10 @@ export interface AssignTeacherInput {
   class_id: string;
   teacher_id: string;
   role: TeacherRole;
-  assigned_at?: string;  // 기본값: 오늘
+  assigned_at?: string;  // 기본�? ?�늘
 }
 
-// 출결 관리 타입
+// 출결 관�??�??
 export type AttendanceType = 'check_in' | 'check_out' | 'absent' | 'late';
 export type AttendanceStatus = 'present' | 'late' | 'absent' | 'excused';
 

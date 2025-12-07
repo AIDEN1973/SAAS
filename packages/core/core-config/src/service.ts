@@ -1,8 +1,8 @@
 /**
  * Core Config Service
  * 
- * 환경설정 서비스 (tenant_settings 테이블 기반)
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * ?�경?�정 ?�비??(tenant_settings ?�이�?기반)
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -13,7 +13,7 @@ export class ConfigService {
   private supabase = createServerClient();
 
   /**
-   * 테넌트 설정 조회
+   * ?�넌???�정 조회
    */
   async getConfig(tenantId: string): Promise<TenantConfig | null> {
     const { data, error } = await withTenant(
@@ -34,13 +34,13 @@ export class ConfigService {
   }
 
   /**
-   * 테넌트 설정 업데이트
+   * ?�넌???�정 ?�데?�트
    */
   async updateConfig(
     tenantId: string,
     input: UpdateConfigInput
   ): Promise<TenantConfig> {
-    // 기존 설정 조회
+    // 기존 ?�정 조회
     const existing = await this.getConfig(tenantId);
     const merged = { ...existing, ...input };
 
@@ -62,7 +62,7 @@ export class ConfigService {
   }
 
   /**
-   * 특정 설정 키 조회
+   * ?�정 ?�정 ??조회
    */
   async getConfigValue<T = any>(
     tenantId: string,
@@ -84,7 +84,7 @@ export class ConfigService {
   }
 
   /**
-   * 특정 설정 키 업데이트
+   * ?�정 ?�정 ???�데?�트
    */
   async setConfigValue(
     tenantId: string,

@@ -1,32 +1,28 @@
 /**
  * Condition Rule Evaluator
  * 
- * [불변 규칙] Condition Rule 평가 함수는 schema-engine/core에 위치합니다.
- * [불변 규칙] 단일 조건 및 복수 조건(AND/OR) 모두 지원
- * [불변 규칙] SDUI v1.1: then/else 구조, 새로운 연산자 지원
- * 
+ * [불�? 규칙] Condition Rule ?��? ?�수??schema-engine/core???�치?�니??
+ * [불�? 규칙] ?�일 조건 �?복수 조건(AND/OR) 모두 지?? * [불�? 규칙] SDUI v1.1: then/else 구조, ?�로???�산??지?? * 
  * 기술문서: 
- * - docu/스키마엔진.txt 7.2, 7.3
+ * - docu/?�키마엔�?txt 7.2, 7.3
  * - SDUI 기술문서 v1.1 - 12. Condition Engine
  */
 
 import type { ConditionRule, MultiConditionRule, FormFieldSchema, ConditionActions } from '../types';
 
 /**
- * 단일 Condition Rule 평가 함수
+ * ?�일 Condition Rule ?��? ?�수
  * 
- * @param rule - 평가할 Condition Rule
- * @param fieldValue - 참조 필드의 현재 값
- * @returns 조건 충족 여부 (boolean)
+ * @param rule - ?��???Condition Rule
+ * @param fieldValue - 참조 ?�드???�재 �? * @returns 조건 충족 ?��? (boolean)
  */
 /**
- * 단일 Condition Rule 평가 함수
+ * ?�일 Condition Rule ?��? ?�수
  * 
- * SDUI v1.1: 새로운 연산자 지원 (==, !=, not_exists)
+ * SDUI v1.1: ?�로???�산??지??(==, !=, not_exists)
  * 
- * @param rule - 평가할 Condition Rule
- * @param fieldValue - 참조 필드의 현재 값
- * @returns 조건 충족 여부 (boolean)
+ * @param rule - ?��???Condition Rule
+ * @param fieldValue - 참조 ?�드???�재 �? * @returns 조건 충족 ?��? (boolean)
  */
 export function evaluateConditionRule(
   rule: ConditionRule,
@@ -34,7 +30,7 @@ export function evaluateConditionRule(
 ): boolean {
   const { op, value } = rule;
 
-  // exists / not_exists 연산자 처리
+  // exists / not_exists ?�산??처리
   if (op === 'exists' || op === 'not_exists') {
     const exists = Array.isArray(fieldValue) 
       ? fieldValue.length > 0
@@ -46,76 +42,70 @@ export function evaluateConditionRule(
 
   switch (op) {
     case '==':
-    case 'eq':  // 하위 호환성
-      // undefined 안전 처리: value가 undefined인 경우 false 반환
+    case 'eq':  // ?�위 ?�환??      // undefined ?�전 처리: value가 undefined??경우 false 반환
       if (expected === undefined) return false;
       return fieldValue === expected;
     case '!=':
-    case 'ne':  // 하위 호환성
-      return fieldValue !== expected;
+    case 'ne':  // ?�위 ?�환??      return fieldValue !== expected;
     case 'in':
-      // SDUI v1.1: value는 스칼라 또는 배열 모두 허용
-      // 배열인 경우: fieldValue와 expected 배열 간 교집합 판단
+      // SDUI v1.1: value???�칼???�는 배열 모두 ?�용
+      // 배열??경우: fieldValue?� expected 배열 �?교집???�단
       if (Array.isArray(expected)) {
-        // expected가 배열인 경우
+        // expected가 배열??경우
         if (Array.isArray(fieldValue)) {
-          // fieldValue도 배열: 교집합 확인 (하나라도 포함되면 true)
+          // fieldValue??배열: 교집???�인 (?�나?�도 ?�함?�면 true)
           return expected.some(val => fieldValue.includes(val));
         }
-        // fieldValue가 스칼라: expected 배열에 포함되는지 확인
+        // fieldValue가 ?�칼?? expected 배열???�함?�는지 ?�인
         return expected.includes(fieldValue);
       }
-      // expected가 스칼라인 경우
+      // expected가 ?�칼?�인 경우
       if (Array.isArray(fieldValue)) {
-        // fieldValue가 배열: 배열에 expected가 포함되는지 확인
+        // fieldValue가 배열: 배열??expected가 ?�함?�는지 ?�인
         return fieldValue.includes(expected);
       }
-      // 둘 다 스칼라: 단순 비교
+      // ?????�칼?? ?�순 비교
       return fieldValue === expected;
     case 'not_in':
-      // SDUI v1.1: value는 스칼라 또는 배열 모두 허용
-      // 배열인 경우: fieldValue와 expected 배열 간 차집합 판단
+      // SDUI v1.1: value???�칼???�는 배열 모두 ?�용
+      // 배열??경우: fieldValue?� expected 배열 �?차집???�단
       if (Array.isArray(expected)) {
-        // expected가 배열인 경우
+        // expected가 배열??경우
         if (Array.isArray(fieldValue)) {
-          // fieldValue도 배열: 교집합이 없으면 true
+          // fieldValue??배열: 교집?�이 ?�으�?true
           return !expected.some(val => fieldValue.includes(val));
         }
-        // fieldValue가 스칼라: expected 배열에 포함되지 않으면 true
+        // fieldValue가 ?�칼?? expected 배열???�함?��? ?�으�?true
         return !expected.includes(fieldValue);
       }
-      // expected가 스칼라인 경우
+      // expected가 ?�칼?�인 경우
       if (Array.isArray(fieldValue)) {
-        // fieldValue가 배열: 배열에 expected가 포함되지 않으면 true
+        // fieldValue가 배열: 배열??expected가 ?�함?��? ?�으�?true
         return !fieldValue.includes(expected);
       }
-      // 둘 다 스칼라: 단순 비교
+      // ?????�칼?? ?�순 비교
       return fieldValue !== expected;
     case '>':
-    case 'gt':  // 하위 호환성
-      return typeof fieldValue === 'number' && typeof expected === 'number' && fieldValue > expected;
+    case 'gt':  // ?�위 ?�환??      return typeof fieldValue === 'number' && typeof expected === 'number' && fieldValue > expected;
     case '>=':
-    case 'gte':  // 하위 호환성
-      return typeof fieldValue === 'number' && typeof expected === 'number' && fieldValue >= expected;
+    case 'gte':  // ?�위 ?�환??      return typeof fieldValue === 'number' && typeof expected === 'number' && fieldValue >= expected;
     case '<':
-    case 'lt':  // 하위 호환성
-      return typeof fieldValue === 'number' && typeof expected === 'number' && fieldValue < expected;
+    case 'lt':  // ?�위 ?�환??      return typeof fieldValue === 'number' && typeof expected === 'number' && fieldValue < expected;
     case '<=':
-    case 'lte':  // 하위 호환성
-      return typeof fieldValue === 'number' && typeof expected === 'number' && fieldValue <= expected;
+    case 'lte':  // ?�위 ?�환??      return typeof fieldValue === 'number' && typeof expected === 'number' && fieldValue <= expected;
     default:
       return false;
   }
 }
 
 /**
- * 복수 Condition Rule 평가 함수
+ * 복수 Condition Rule ?��? ?�수
  * 
- * 여러 조건을 AND/OR로 결합하여 평가합니다.
+ * ?�러 조건??AND/OR�?결합?�여 ?��??�니??
  * 
  * @param multiRule - MultiConditionRule
- * @param watchedValues - useWatch로 관찰한 필드 값들
- * @returns 조건 충족 여부 (boolean)
+ * @param watchedValues - useWatch�?관찰한 ?�드 값들
+ * @returns 조건 충족 ?��? (boolean)
  */
 export function evaluateMultiConditionRule(
   multiRule: MultiConditionRule,
@@ -139,13 +129,13 @@ export function evaluateMultiConditionRule(
 }
 
 /**
- * Condition Actions 적용
+ * Condition Actions ?�용
  * 
- * SDUI v1.1: then/else 구조의 ConditionActions를 적용합니다.
+ * SDUI v1.1: then/else 구조??ConditionActions�??�용?�니??
  * 
- * @param actions - 적용할 ConditionActions
- * @param currentState - 현재 상태
- * @returns 업데이트된 상태
+ * @param actions - ?�용??ConditionActions
+ * @param currentState - ?�재 ?�태
+ * @returns ?�데?�트???�태
  */
 function applyConditionActions(
   actions: ConditionActions | undefined,
@@ -165,20 +155,20 @@ function applyConditionActions(
     newState.isRequired = actions.require;
   }
 
-  // setValue, setOptions, switchComponent는 SchemaField에서 별도 처리
-  // (이 함수는 상태만 반환)
+  // setValue, setOptions, switchComponent??SchemaField?�서 별도 처리
+  // (???�수???�태�?반환)
 
   return newState;
 }
 
 /**
- * Condition Rule 집계 함수
+ * Condition Rule 집계 ?�수
  * 
- * 필드의 Condition Rule(단일 또는 복수)을 평가하여 hidden/disabled/required 상태를 결정합니다.
- * SDUI v1.1: then/else 구조 지원, 동적 액션(setValue, setOptions, switchComponent) 반환
+ * ?�드??Condition Rule(?�일 ?�는 복수)???��??�여 hidden/disabled/required ?�태�?결정?�니??
+ * SDUI v1.1: then/else 구조 지?? ?�적 ?�션(setValue, setOptions, switchComponent) 반환
  * 
  * @param field - FormFieldSchema
- * @param watchedValues - useWatch로 관찰한 필드 값들 (Record<string, any>)
+ * @param watchedValues - useWatch�?관찰한 ?�드 값들 (Record<string, any>)
  * @returns { isHidden, isDisabled, isRequired, actions }
  */
 export function getConditionalActions(
@@ -209,11 +199,11 @@ export function getConditionalActions(
     switchComponent?: { to: string };
   } | undefined;
 
-  // 복수 조건 우선 처리 (conditions가 있으면 condition보다 우선)
+  // 복수 조건 ?�선 처리 (conditions가 ?�으�?condition보다 ?�선)
   if (field.conditions) {
     const conditionMet = evaluateMultiConditionRule(field.conditions, watchedValues);
     
-    // SDUI v1.1: then/else 구조 우선 처리 (action보다 우선)
+    // SDUI v1.1: then/else 구조 ?�선 처리 (action보다 ?�선)
     if (conditionMet && field.conditions.then) {
       const thenActions = field.conditions.then;
       if (thenActions.hide !== undefined) isHidden = thenActions.hide;
@@ -231,7 +221,7 @@ export function getConditionalActions(
       if (elseActions.setOptions) dynamicActions = { ...dynamicActions, setOptions: elseActions.setOptions };
       if (elseActions.switchComponent) dynamicActions = { ...dynamicActions, switchComponent: elseActions.switchComponent };
     } else {
-      // 하위 호환성: 기존 action 필드 처리 (then/else가 없을 때만)
+      // ?�위 ?�환?? 기존 action ?�드 처리 (then/else가 ?�을 ?�만)
       const { action } = field.conditions;
       if (action === 'hide' && conditionMet) isHidden = true;
       else if (action === 'show' && !conditionMet) isHidden = true;
@@ -243,14 +233,14 @@ export function getConditionalActions(
     return { isHidden, isDisabled, isRequired, actions: dynamicActions };
   }
 
-  // 단일 조건 처리 (하위 호환성)
+  // ?�일 조건 처리 (?�위 ?�환??
   const rule = field.condition;
   if (!rule) return { isHidden, isDisabled, isRequired, actions: dynamicActions };
 
   const refValue = watchedValues[rule.field];
   const conditionMet = evaluateConditionRule(rule, refValue);
 
-  // SDUI v1.1: then/else 구조 우선 처리 (action보다 우선)
+  // SDUI v1.1: then/else 구조 ?�선 처리 (action보다 ?�선)
   if (conditionMet && rule.then) {
     const thenActions = rule.then;
     if (thenActions.hide !== undefined) isHidden = thenActions.hide;
@@ -268,7 +258,7 @@ export function getConditionalActions(
     if (elseActions.setOptions) dynamicActions = { ...dynamicActions, setOptions: elseActions.setOptions };
     if (elseActions.switchComponent) dynamicActions = { ...dynamicActions, switchComponent: elseActions.switchComponent };
   } else {
-    // 하위 호환성: 기존 action 필드 처리 (then/else가 없을 때만)
+    // ?�위 ?�환?? 기존 action ?�드 처리 (then/else가 ?�을 ?�만)
     if (rule.action === 'hide' && conditionMet) isHidden = true;
     else if (rule.action === 'show' && !conditionMet) isHidden = true;
     if (rule.action === 'disable' && conditionMet) isDisabled = true;

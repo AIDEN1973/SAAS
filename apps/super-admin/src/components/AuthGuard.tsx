@@ -1,9 +1,7 @@
 /**
  * Auth Guard Component
  * 
- * [불변 규칙] Super Admin 앱에서 인증 상태 확인 및 로그인 페이지로 리다이렉트
- * [불변 규칙] academy-admin 앱과 동일한 Supabase 인스턴스를 사용하므로 세션 공유 가능
- */
+ * [불�? 규칙] Super Admin ?�에???�증 ?�태 ?�인 �?로그???�이지�?리다?�렉?? * [불�? 규칙] academy-admin ?�과 ?�일??Supabase ?�스?�스�??�용?��?�??�션 공유 가?? */
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -24,37 +22,35 @@ export function AuthGuard({ children }: AuthGuardProps) {
       try {
         const supabase = createClient();
         
-        // 다른 포트(localhost:3000)에서 세션 공유 시도
-        // Supabase는 localStorage에 세션을 저장하므로, 다른 origin에서는 공유되지 않습니다.
-        // 따라서 academy-admin 앱의 localStorage에서 세션을 읽어와야 합니다.
-        // 하지만 브라우저 보안 정책상 다른 origin의 localStorage에 접근할 수 없으므로,
-        // 사용자가 academy-admin 앱에서 로그인한 후 super-admin 앱으로 돌아와야 합니다.
+        // ?�른 ?�트(localhost:3000)?�서 ?�션 공유 ?�도
+        // Supabase??localStorage???�션???�?�하므�? ?�른 origin?�서??공유?��? ?�습?�다.
+        // ?�라??academy-admin ?�의 localStorage?�서 ?�션???�어?�???�니??
+        // ?��?�?브라?��? 보안 ?�책???�른 origin??localStorage???�근?????�으므�?
+        // ?�용?��? academy-admin ?�에??로그?�한 ??super-admin ?�으�??�아?�???�니??
         
-        // 현재 세션 확인
+        // ?�재 ?�션 ?�인
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('[Auth Guard] 세션 확인 실패:', error);
+          console.error('[Auth Guard] ?�션 ?�인 ?�패:', error);
           setIsAuthenticated(false);
           setIsLoading(false);
-          // 오류 발생 시에도 로그인 페이지로 리다이렉트
-          navigate('/auth/login');
+          // ?�류 발생 ?�에??로그???�이지�?리다?�렉??          navigate('/auth/login');
           return;
         }
 
         if (session) {
-          console.log('[Auth Guard] 인증된 사용자:', session.user.email);
+          console.log('[Auth Guard] ?�증???�용??', session.user.email);
           setIsAuthenticated(true);
         } else {
-          console.warn('[Auth Guard] 세션이 없습니다. 로그인 페이지로 이동합니다.');
+          console.warn('[Auth Guard] ?�션???�습?�다. 로그???�이지�??�동?�니??');
           setIsAuthenticated(false);
-          // super-admin 앱의 로그인 페이지로 자동 리다이렉트
-          navigate('/auth/login');
+          // super-admin ?�의 로그???�이지�??�동 리다?�렉??          navigate('/auth/login');
         }
         
         setIsLoading(false);
       } catch (error) {
-        console.error('[Auth Guard] 인증 확인 중 오류:', error);
+        console.error('[Auth Guard] ?�증 ?�인 �??�류:', error);
         setIsAuthenticated(false);
         setIsLoading(false);
       }
@@ -62,10 +58,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     checkAuth();
 
-    // 인증 상태 변경 감지
+    // ?�증 ?�태 변�?감�?
     const supabase = createClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[Auth Guard] 인증 상태 변경:', event, session?.user?.email);
+      console.log('[Auth Guard] ?�증 ?�태 변�?', event, session?.user?.email);
       setIsAuthenticated(!!session);
       
       if (event === 'SIGNED_OUT') {
@@ -82,7 +78,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return (
       <Container maxWidth="xl" padding="lg">
         <Card padding="md">
-          <p>인증 확인 중...</p>
+          <p>?�증 ?�인 �?..</p>
         </Card>
       </Container>
     );
@@ -92,14 +88,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return (
       <Container maxWidth="sm" padding="lg" className="flex items-center justify-center min-h-screen">
         <Card padding="lg">
-          <h2 className="text-xl font-bold mb-4">로그인이 필요합니다</h2>
+          <h2 className="text-xl font-bold mb-4">로그?�이 ?�요?�니??/h2>
           <p className="mb-6 text-gray-600">
-            Super Admin 기능을 사용하려면 로그인이 필요합니다.
+            Super Admin 기능???�용?�려�?로그?�이 ?�요?�니??
             <br />
             <br />
-            <strong>중요:</strong> 다른 포트(localhost:3000)에서 로그인한 경우,
+            <strong>중요:</strong> ?�른 ?�트(localhost:3000)?�서 로그?�한 경우,
             <br />
-            이 페이지를 새로고침하거나 아래 버튼을 클릭하세요.
+            ???�이지�??�로고침?�거???�래 버튼???�릭?�세??
           </p>
           <div className="space-y-2">
             <Button
@@ -107,52 +103,51 @@ export function AuthGuard({ children }: AuthGuardProps) {
               color="primary"
               fullWidth
               onClick={() => {
-                // super-admin 앱의 로그인 페이지로 이동
+                // super-admin ?�의 로그???�이지�??�동
                 const returnTo = encodeURIComponent(window.location.href);
                 navigate(`/auth/login?returnTo=${returnTo}`);
               }}
             >
-              로그인 페이지로 이동
+              로그???�이지�??�동
             </Button>
             <Button
               variant="outline"
               fullWidth
               onClick={async () => {
-                // 현재 페이지 새로고침
-                // academy-admin 앱에서 로그인한 경우, 세션이 공유되지 않을 수 있으므로
-                // 수동으로 세션을 확인하거나 새로고침
+                // ?�재 ?�이지 ?�로고침
+                // academy-admin ?�에??로그?�한 경우, ?�션??공유?��? ?�을 ???�으므�?                // ?�동?�로 ?�션???�인?�거???�로고침
                 const supabase = createClient();
                 
-                // 세션 확인 전에 잠시 대기 (세션이 복원될 시간 제공)
+                // ?�션 ?�인 ?�에 ?�시 ?��?(?�션??복원???�간 ?�공)
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 const { data: { session } } = await supabase.auth.getSession();
                 
                 if (session) {
-                  console.log('[Auth Guard] 세션 발견! 새로고침합니다.');
+                  console.log('[Auth Guard] ?�션 발견! ?�로고침?�니??');
                   window.location.reload();
                 } else {
-                  console.warn('[Auth Guard] 세션이 여전히 없습니다.');
-                  console.warn('[Auth Guard] 참고: localhost:3000과 localhost:3002는 다른 origin이므로');
-                  console.warn('[Auth Guard] 세션이 자동으로 공유되지 않습니다.');
-                  console.warn('[Auth Guard] 해결 방법:');
-                  console.warn('[Auth Guard]   1. academy-admin 앱(http://localhost:3000)에서 로그인');
-                  console.warn('[Auth Guard]   2. 로그인 후 이 페이지로 돌아와서 "로그인 페이지로 이동" 버튼 클릭');
-                  console.warn('[Auth Guard]   3. 또는 같은 포트에서 서브패스로 라우팅 (권장)');
+                  console.warn('[Auth Guard] ?�션???�전???�습?�다.');
+                  console.warn('[Auth Guard] 참고: localhost:3000�?localhost:3002???�른 origin?��?�?);
+                  console.warn('[Auth Guard] ?�션???�동?�로 공유?��? ?�습?�다.');
+                  console.warn('[Auth Guard] ?�결 방법:');
+                  console.warn('[Auth Guard]   1. academy-admin ??http://localhost:3000)?�서 로그??);
+                  console.warn('[Auth Guard]   2. 로그???????�이지�??�아?�??"로그???�이지�??�동" 버튼 ?�릭');
+                  console.warn('[Auth Guard]   3. ?�는 같�? ?�트?�서 ?�브?�스�??�우??(권장)');
                   
                   alert(
-                    '세션이 없습니다.\n\n' +
-                    'localhost:3000과 localhost:3002는 다른 origin이므로\n' +
-                    '세션이 자동으로 공유되지 않습니다.\n\n' +
-                    '해결 방법:\n' +
-                    '1. academy-admin 앱(http://localhost:3000)에서 로그인\n' +
-                    '2. 로그인 후 이 페이지로 돌아와서 "로그인 페이지로 이동" 버튼 클릭\n' +
-                    '3. 또는 같은 포트에서 서브패스로 라우팅 (권장)'
+                    '?�션???�습?�다.\n\n' +
+                    'localhost:3000�?localhost:3002???�른 origin?��?�?n' +
+                    '?�션???�동?�로 공유?��? ?�습?�다.\n\n' +
+                    '?�결 방법:\n' +
+                    '1. academy-admin ??http://localhost:3000)?�서 로그??n' +
+                    '2. 로그???????�이지�??�아?�??"로그???�이지�??�동" 버튼 ?�릭\n' +
+                    '3. ?�는 같�? ?�트?�서 ?�브?�스�??�우??(권장)'
                   );
                 }
               }}
             >
-              세션 확인 및 새로고침
+              ?�션 ?�인 �??�로고침
             </Button>
           </div>
         </Card>

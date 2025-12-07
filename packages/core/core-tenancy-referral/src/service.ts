@@ -1,8 +1,8 @@
 /**
  * Core Tenancy Referral Service
  * 
- * B2B 추천인 코드 제도 서비스
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * B2B 추천??코드 ?�도 ?�비??
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -18,7 +18,7 @@ export class TenancyReferralService {
   private supabase = createServerClient();
 
   /**
-   * 추천인 코드 목록 조회 (추천인 테넌트 기준)
+   * 추천??코드 목록 조회 (추천???�넌??기�?)
    */
   async getReferralCodes(
     referrerTenantId: string
@@ -37,8 +37,8 @@ export class TenancyReferralService {
   }
 
   /**
-   * 추천인 코드 상세 조회
-   * ⚠️ 주의: referral_codes는 referrer_tenant_id를 사용하므로 직접 필터링
+   * 추천??코드 ?�세 조회
+   * ?�️ 주의: referral_codes??referrer_tenant_id�??�용?��?�?직접 ?�터�?
    */
   async getReferralCode(
     referrerTenantId: string,
@@ -62,8 +62,8 @@ export class TenancyReferralService {
   }
 
   /**
-   * 추천인 코드로 조회 (테넌트 필터링 포함)
-   * ⚠️ 주의: referral_codes는 referrer_tenant_id를 사용하므로 직접 필터링
+   * 추천??코드�?조회 (?�넌???�터�??�함)
+   * ?�️ 주의: referral_codes??referrer_tenant_id�??�용?��?�?직접 ?�터�?
    */
   async getReferralCodeByCode(
     referrerTenantId: string,
@@ -87,8 +87,8 @@ export class TenancyReferralService {
   }
 
   /**
-   * 추천인 코드 상세 조회 (테넌트 필터링 없음 - useReferralCode에서 사용)
-   * ⚠️ 주의: 신규 테넌트 가입 시 referrerTenantId를 알 수 없으므로 이 메서드 사용
+   * 추천??코드 ?�세 조회 (?�넌???�터�??�음 - useReferralCode?�서 ?�용)
+   * ?�️ 주의: ?�규 ?�넌??가????referrerTenantId�??????�으므�???메서???�용
    */
   private async getReferralCodeWithoutTenant(
     referralCodeId: string
@@ -110,7 +110,7 @@ export class TenancyReferralService {
   }
 
   /**
-   * 추천인 코드 생성
+   * 추천??코드 ?�성
    */
   async createReferralCode(
     referrerTenantId: string,
@@ -137,8 +137,8 @@ export class TenancyReferralService {
   }
 
   /**
-   * 추천인 코드 수정
-   * ⚠️ 주의: referral_codes는 referrer_tenant_id를 사용하므로 직접 필터링
+   * 추천??코드 ?�정
+   * ?�️ 주의: referral_codes??referrer_tenant_id�??�용?��?�?직접 ?�터�?
    */
   async updateReferralCode(
     referrerTenantId: string,
@@ -161,14 +161,14 @@ export class TenancyReferralService {
   }
 
   /**
-   * 추천인 코드 사용
+   * 추천??코드 ?�용
    */
   async useReferralCode(
     referralCodeId: string,
     newTenantId: string
   ): Promise<ReferralUsage> {
-    // 추천인 코드 유효성 검증
-    // 참고: useReferralCode는 신규 테넌트 가입 시 호출되므로 referrerTenantId를 알 수 없음
+    // 추천??코드 ?�효??검�?
+    // 참고: useReferralCode???�규 ?�넌??가?????�출?��?�?referrerTenantId�??????�음
     const referralCode = await this.getReferralCodeWithoutTenant(referralCodeId);
     if (!referralCode) {
       throw new Error('Referral code not found');
@@ -182,7 +182,7 @@ export class TenancyReferralService {
       throw new Error('Referral code has expired');
     }
 
-    // 사용 기록 생성
+    // ?�용 기록 ?�성
     const { data, error } = await this.supabase
       .from('referral_usages')
       .insert({
@@ -201,8 +201,8 @@ export class TenancyReferralService {
   }
 
   /**
-   * 추천인 코드 사용 내역 조회
-   * ⚠️ 주의: referral_usages는 new_tenant_id를 사용하므로 직접 필터링
+   * 추천??코드 ?�용 ?�역 조회
+   * ?�️ 주의: referral_usages??new_tenant_id�??�용?��?�?직접 ?�터�?
    */
   async getReferralUsages(
     tenantId: string,
@@ -229,8 +229,8 @@ export class TenancyReferralService {
   }
 
   /**
-   * 보상 적용
-   * ⚠️ 주의: referral_usages는 new_tenant_id를 사용하므로 직접 필터링
+   * 보상 ?�용
+   * ?�️ 주의: referral_usages??new_tenant_id�??�용?��?�?직접 ?�터�?
    */
   async applyReward(
     newTenantId: string,

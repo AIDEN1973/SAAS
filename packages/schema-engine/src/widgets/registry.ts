@@ -1,9 +1,8 @@
 /**
  * Custom Widget Registry
  * 
- * SDUI v1.1: Custom Widget 컴포넌트를 등록하고 로드하는 레지스트리
- * 
- * 기술문서: SDUI 기술문서 v1.1 - 22. 확장 전략
+ * SDUI v1.1: Custom Widget 컴포?�트�??�록?�고 로드?�는 ?��??�트�? * 
+ * 기술문서: SDUI 기술문서 v1.1 - 22. ?�장 ?�략
  */
 
 import React from 'react';
@@ -17,15 +16,14 @@ export interface WidgetRegistry {
 /**
  * Global Widget Registry
  * 
- * 앱에서 Custom Widget을 등록할 수 있는 전역 레지스트리
- */
+ * ?�에??Custom Widget???�록?????�는 ?�역 ?��??�트�? */
 const globalWidgetRegistry: WidgetRegistry = {};
 
 /**
- * Widget Registry에 Custom Widget 등록
+ * Widget Registry??Custom Widget ?�록
  * 
- * @param componentType - 컴포넌트 타입 (예: 'CreditCardInput')
- * @param loader - 동적 로더 함수
+ * @param componentType - 컴포?�트 ?�??(?? 'CreditCardInput')
+ * @param loader - ?�적 로더 ?�수
  */
 export function registerWidget(
   componentType: string,
@@ -35,18 +33,16 @@ export function registerWidget(
 }
 
 /**
- * Widget Registry에서 Custom Widget 로드
+ * Widget Registry?�서 Custom Widget 로드
  * 
- * @param componentType - 컴포넌트 타입
- * @returns 로드된 컴포넌트
+ * @param componentType - 컴포?�트 ?�?? * @returns 로드??컴포?�트
  */
 /**
- * Widget Registry에서 Custom Widget 로드
+ * Widget Registry?�서 Custom Widget 로드
  * 
  * SDUI v1.1: Widget Not Found 처리 강화
  * 
- * @param componentType - 컴포넌트 타입
- * @returns 로드된 컴포넌트 (실패 시 null)
+ * @param componentType - 컴포?�트 ?�?? * @returns 로드??컴포?�트 (?�패 ??null)
  */
 export async function loadWidget(
   componentType: string
@@ -65,7 +61,7 @@ export async function loadWidget(
 
   try {
     const module = await loader();
-    // default export 또는 named export 처리
+    // default export ?�는 named export 처리
     const Component = (module as any).default || module;
     
     if (!Component) {
@@ -81,12 +77,10 @@ export async function loadWidget(
 }
 
 /**
- * Widget Registry 초기화
+ * Widget Registry 초기?? * 
+ * ?�종�??�젯???�록?�니??
  * 
- * 업종별 위젯을 등록합니다.
- * 
- * @param widgets - 위젯 맵
- */
+ * @param widgets - ?�젯 �? */
 export function initializeWidgetRegistry(widgets: WidgetRegistry): void {
   Object.keys(widgets).forEach((componentType) => {
     registerWidget(componentType, widgets[componentType]);
@@ -94,7 +88,7 @@ export function initializeWidgetRegistry(widgets: WidgetRegistry): void {
 }
 
 /**
- * 등록된 Widget 목록 조회
+ * ?�록??Widget 목록 조회
  */
 export function getRegisteredWidgets(): string[] {
   return Object.keys(globalWidgetRegistry);

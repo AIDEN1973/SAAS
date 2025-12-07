@@ -1,8 +1,8 @@
 /**
  * Class Service
  * 
- * [불변 규칙] Service Layer는 Industry Layer를 사용하여 업종별 비즈니스 로직을 호출한다.
- * [불변 규칙] Service Layer는 Core Layer를 직접 사용하지 않고, Industry Layer를 통해 접근한다.
+ * [불�? 규칙] Service Layer??Industry Layer�??�용?�여 ?�종�?비즈?�스 로직???�출?�다.
+ * [불�? 규칙] Service Layer??Core Layer�?직접 ?�용?��? ?�고, Industry Layer�??�해 ?�근?�다.
  */
 
 import { academyService } from '@industry/academy/service';
@@ -20,15 +20,15 @@ import type {
 } from '@industry/academy/types';
 
 /**
- * Class Service (Industry Layer 래퍼)
+ * Class Service (Industry Layer ?�퍼)
  * 
- * Service Layer는 Industry Layer의 academyService를 래핑하여 제공합니다.
+ * Service Layer??Industry Layer??academyService�??�핑?�여 ?�공?�니??
  */
 export class ClassService {
-  // ==================== 반(Class) 관리 ====================
+  // ==================== �?Class) 관�?====================
 
   /**
-   * 반 목록 조회 (필터링 지원)
+   * �?목록 조회 (?�터�?지??
    */
   async getClasses(
     tenantId: string,
@@ -38,14 +38,14 @@ export class ClassService {
   }
 
   /**
-   * 반 상세 조회
+   * �??�세 조회
    */
   async getClass(tenantId: string, classId: string): Promise<Class | null> {
     return academyService.getClass(tenantId, classId);
   }
 
   /**
-   * 반 생성
+   * �??�성
    */
   async createClass(
     tenantId: string,
@@ -55,7 +55,7 @@ export class ClassService {
   }
 
   /**
-   * 반 수정
+   * �??�정
    */
   async updateClass(
     tenantId: string,
@@ -66,14 +66,14 @@ export class ClassService {
   }
 
   /**
-   * 반 삭제
+   * �???��
    */
   async deleteClass(tenantId: string, classId: string): Promise<void> {
     return academyService.deleteClass(tenantId, classId);
   }
 
   /**
-   * 반별 통계 조회
+   * 반별 ?�계 조회
    */
   async getClassStatistics(
     tenantId: string,
@@ -86,10 +86,10 @@ export class ClassService {
     return academyService.getClassStatistics(tenantId, classId);
   }
 
-  // ==================== 강사(Teacher) 관리 ====================
+  // ==================== 강사(Teacher) 관�?====================
 
   /**
-   * 강사 목록 조회 (필터링 지원)
+   * 강사 목록 조회 (?�터�?지??
    */
   async getTeachers(
     tenantId: string,
@@ -99,14 +99,14 @@ export class ClassService {
   }
 
   /**
-   * 강사 상세 조회
+   * 강사 ?�세 조회
    */
   async getTeacher(tenantId: string, teacherId: string): Promise<Teacher | null> {
     return academyService.getTeacher(tenantId, teacherId);
   }
 
   /**
-   * 강사 생성
+   * 강사 ?�성
    */
   async createTeacher(
     tenantId: string,
@@ -116,7 +116,7 @@ export class ClassService {
   }
 
   /**
-   * 강사 수정
+   * 강사 ?�정
    */
   async updateTeacher(
     tenantId: string,
@@ -127,13 +127,13 @@ export class ClassService {
   }
 
   /**
-   * 강사 삭제
+   * 강사 ??��
    */
   async deleteTeacher(tenantId: string, teacherId: string): Promise<void> {
     return academyService.deleteTeacher(tenantId, teacherId);
   }
 
-  // ==================== 반-강사 연결 관리 ====================
+  // ==================== �?강사 ?�결 관�?====================
 
   /**
    * 강사 배정
@@ -146,7 +146,7 @@ export class ClassService {
   }
 
   /**
-   * 강사 배정 해제
+   * 강사 배정 ?�제
    */
   async unassignTeacher(
     tenantId: string,

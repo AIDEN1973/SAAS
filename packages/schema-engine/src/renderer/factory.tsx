@@ -1,8 +1,7 @@
 /**
  * Renderer Factory
  * 
- * SDUI v1.1: 스키마 타입에 따라 적절한 렌더러를 선택하는 팩토리
- * 
+ * SDUI v1.1: ?�키�??�?�에 ?�라 ?�절???�더?��? ?�택?�는 ?�토�? * 
  * 기술문서: SDUI 기술문서 v1.1 - 8. Renderer Factory
  */
 
@@ -20,21 +19,21 @@ export interface SchemaRendererProps {
   onSubmit?: (data: any) => void | Promise<void>;
   defaultValues?: Record<string, any>;
   className?: string;
-  // SDUI v1.1: Action Engine 컨텍스트 (선택적)
+  // SDUI v1.1: Action Engine 컨텍?�트 (?�택??
   actionContext?: Partial<ActionContext>;
-  // SDUI v1.1: i18n 번역 (선택적)
+  // SDUI v1.1: i18n 번역 (?�택??
   translations?: Record<string, string>;
-  // SDUI v1.1: API 호출 함수 (Table용, 선택적)
+  // SDUI v1.1: API ?�출 ?�수 (Table?? ?�택??
   apiCall?: (endpoint: string, method: string, body?: any) => Promise<any>;
 }
 
 /**
  * Renderer Factory
  * 
- * 스키마의 type에 따라 적절한 렌더러를 선택하여 렌더링합니다.
+ * ?�키마의 type???�라 ?�절???�더?��? ?�택?�여 ?�더링합?�다.
  * 
- * @param props - 렌더러 props
- * @returns 렌더링된 컴포넌트
+ * @param props - ?�더??props
+ * @returns ?�더링된 컴포?�트
  */
 export function SchemaRenderer({ schema, ...props }: SchemaRendererProps): React.ReactElement | null {
   switch (schema.type) {
@@ -87,11 +86,11 @@ export function SchemaRenderer({ schema, ...props }: SchemaRendererProps): React
       );
     
     default:
-      // 타입이 없거나 알 수 없는 경우
+      // ?�?�이 ?�거???????�는 경우
       console.error(`Unknown schema type: ${(schema as any).type}`);
       return (
         <div>
-          <p>알 수 없는 스키마 타입입니다.</p>
+          <p>?????�는 ?�키�??�?�입?�다.</p>
         </div>
       );
   }

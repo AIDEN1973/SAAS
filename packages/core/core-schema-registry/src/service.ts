@@ -1,16 +1,16 @@
 /**
  * Schema Registry Service
  * 
- * [불변 규칙] 기술문서 PART 1의 5. Schema Registry 운영 문서를 준수합니다.
- * [불변 규칙] meta.schema_registry는 공통 스키마 저장소이므로 tenant_id 컬럼이 없습니다.
- * [불변 규칙] SELECT 쿼리는 withTenant를 사용하지 않습니다 (공통 스키마이므로).
+ * [불�? 규칙] 기술문서 PART 1??5. Schema Registry ?�영 문서�?준?�합?�다.
+ * [불�? 규칙] meta.schema_registry??공통 ?�키�??�?�소?��?�?tenant_id 컬럼???�습?�다.
+ * [불�? 규칙] SELECT 쿼리??withTenant�??�용?��? ?�습?�다 (공통 ?�키마이므�?.
  * 
- * 기술문서: docu/스키마엔진.txt 4. Schema Registry (DB + RLS)
+ * 기술문서: docu/?�키마엔�?txt 4. Schema Registry (DB + RLS)
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
-import type { FormSchema, TableSchema, UISchema } from '@schema-engine/types';
-import { SchemaRegistryClient, type SchemaRegistryEntry } from '@schema-engine/registry/client';
+import type { FormSchema, TableSchema, UISchema } from '@schema/engine/types';
+import { SchemaRegistryClient, type SchemaRegistryEntry } from '@schema/engine/registry/client';
 
 export interface RegisterSchemaInput {
   entity: string;
@@ -39,16 +39,16 @@ export interface PinSchemaVersionInput {
 /**
  * Schema Registry Service
  * 
- * 스키마 등록, 조회, 활성화, Version Pinning을 담당합니다.
+ * ?�키�??�록, 조회, ?�성?? Version Pinning???�당?�니??
  */
 export class SchemaRegistryService {
   private supabase = createServerClient();
 
   /**
-   * 스키마 등록
+   * ?�키�??�록
    * 
-   * [불변 규칙] status는 기본적으로 'draft'로 설정됩니다.
-   * [불변 규칙] Super Admin만 등록 가능 (RLS 정책)
+   * [불�? 규칙] status??기본?�으�?'draft'�??�정?�니??
+   * [불�? 규칙] Super Admin�??�록 가??(RLS ?�책)
    */
   async registerSchema(input: RegisterSchemaInput): Promise<SchemaRegistryEntry> {
     const { data, error } = await this.supabase
@@ -57,7 +57,7 @@ export class SchemaRegistryService {
         entity: input.entity,
         industry_type: input.industry_type || null,
         version: input.version,
-        min_supported_client: input.minSupportedClient,  // camelCase → snake_case 변환
+        min_supported_client: input.minSupportedClient,  // camelCase ??snake_case 변??
         schema_json: input.schema_json,
         migration_script: input.migration_script || null,
         status: input.status || 'draft',
@@ -74,9 +74,9 @@ export class SchemaRegistryService {
   }
 
   /**
-   * 스키마 조회 (우선순위 적용)
+   * ?�키�?조회 (?�선?�위 ?�용)
    * 
-   * SchemaRegistryClient의 resolveSchema 로직을 사용합니다.
+   * SchemaRegistryClient??resolveSchema 로직???�용?�니??
    */
   async getSchema(
     entity: string,
@@ -89,7 +89,7 @@ export class SchemaRegistryService {
   ): Promise<UISchema | null> {
     const client = new SchemaRegistryClient(options);
 
-    // 1. 테넌트별 Version Pinning 조회
+    // 1. ?�넌?�별 Version Pinning 조회
     let pinnedVersion: string | null = null;
     if (options.tenantId) {
       const pin = await this.getPinnedVersion(
@@ -100,13 +100,13 @@ export class SchemaRegistryService {
       pinnedVersion = pin?.pinned_version || null;
     }
 
-    // 2. 모든 활성 스키마 조회 (getActiveSchemas는 이미 status='active'로 필터링)
+    // 2. 모든 ?�성 ?�키�?조회 (getActiveSchemas???��? status='active'�??�터�?
     const entries = await this.getActiveSchemas(entity, options.industryType || null);
 
-    // 3. 우선순위에 따라 스키마 결정
-    // pinnedVersion이 있으면 해당 버전만 필터링
-    // ⚠️ 중요: resolveSchema는 이미 필터링된 entries를 받아서 우선순위에 따라 선택합니다.
-    // getActiveSchemas는 이미 status='active'로 필터링하므로, 여기서는 version만 필터링합니다.
+    // 3. ?�선?�위???�라 ?�키�?결정
+    // pinnedVersion???�으�??�당 버전�??�터�?
+    // ?�️ 중요: resolveSchema???��? ?�터링된 entries�?받아???�선?�위???�라 ?�택?�니??
+    // getActiveSchemas???��? status='active'�??�터링하므�? ?�기?�는 version�??�터링합?�다.
     const filteredEntries = pinnedVersion
       ? entries.filter((e) => e.version === pinnedVersion)
       : entries;
@@ -115,7 +115,7 @@ export class SchemaRegistryService {
   }
 
   /**
-   * 활성 스키마 목록 조회
+   * ?�성 ?�키�?목록 조회
    */
   private async getActiveSchemas(
     entity: string,
@@ -127,7 +127,7 @@ export class SchemaRegistryService {
       .eq('entity', entity)
       .eq('status', 'active');
 
-    // industry_type 필터
+    // industry_type ?�터
     if (industryType !== null) {
       query = query.or(`industry_type.eq.${industryType},industry_type.is.null`);
     } else {
@@ -144,9 +144,9 @@ export class SchemaRegistryService {
   }
 
   /**
-   * 스키마 활성화
+   * ?�키�??�성??
    * 
-   * [불변 규칙] Super Admin만 활성화 가능 (RLS 정책)
+   * [불�? 규칙] Super Admin�??�성??가??(RLS ?�책)
    */
   async activateSchema(input: ActivateSchemaInput): Promise<SchemaRegistryEntry> {
     const { data, error } = await this.supabase
@@ -169,9 +169,9 @@ export class SchemaRegistryService {
   }
 
   /**
-   * 스키마 비활성화 (Deprecated)
+   * ?�키�?비활?�화 (Deprecated)
    * 
-   * [불변 규칙] Super Admin만 비활성화 가능 (RLS 정책)
+   * [불�? 규칙] Super Admin�?비활?�화 가??(RLS ?�책)
    */
   async deprecateSchema(input: ActivateSchemaInput): Promise<SchemaRegistryEntry> {
     const { data, error } = await this.supabase
@@ -220,9 +220,9 @@ export class SchemaRegistryService {
   }
 
   /**
-   * Version Pinning 설정
+   * Version Pinning ?�정
    * 
-   * [불변 규칙] Super Admin만 설정 가능 (RLS 정책)
+   * [불�? 규칙] Super Admin�??�정 가??(RLS ?�책)
    */
   async pinSchemaVersion(input: PinSchemaVersionInput): Promise<void> {
     const { data, error } = await this.supabase
@@ -244,9 +244,9 @@ export class SchemaRegistryService {
   }
 
   /**
-   * Version Pinning 해제
+   * Version Pinning ?�제
    * 
-   * [불변 규칙] Super Admin만 해제 가능 (RLS 정책)
+   * [불�? 규칙] Super Admin�??�제 가??(RLS ?�책)
    */
   async unpinSchemaVersion(
     tenantId: string,
@@ -266,9 +266,9 @@ export class SchemaRegistryService {
   }
 
   /**
-   * DB row를 SchemaRegistryEntry로 변환
+   * DB row�?SchemaRegistryEntry�?변??
    * 
-   * min_supported_client (snake_case) → minSupportedClient (camelCase) 변환
+   * min_supported_client (snake_case) ??minSupportedClient (camelCase) 변??
    */
   private mapToEntry(row: any): SchemaRegistryEntry {
     return {

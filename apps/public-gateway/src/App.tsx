@@ -11,13 +11,13 @@ function App() {
             marginBottom: 'var(--spacing-md)',
             color: 'var(--color-text)'
           }}>
-            디어쌤 - 공개 게이트웨이
+            ?�어??- 공개 게이?�웨??
           </h1>
           <p style={{ 
             color: 'var(--color-text-secondary)',
             margin: 0
           }}>
-            환경설정이 완료되었습니다.
+            ?�경?�정???�료?�었?�니??
           </p>
         </Card>
       </Container>

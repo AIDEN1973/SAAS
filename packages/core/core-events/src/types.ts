@@ -1,8 +1,8 @@
 /**
  * Core Events Types
  * 
- * 이벤트/프로모션 관리
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * ?�벤???�로모션 관�?
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  */
 
 export interface Event {

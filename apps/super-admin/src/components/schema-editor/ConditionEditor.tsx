@@ -1,15 +1,15 @@
 /**
  * ConditionEditor Component
  * 
- * [불변 규칙] Condition Rule 설정 UI
- * [불변 규칙] condition과 conditions는 동시에 사용 불가
+ * [불�? 규칙] Condition Rule ?�정 UI
+ * [불�? 규칙] condition�?conditions???�시???�용 불�?
  * 
- * 기술문서: docu/스키마에디터.txt 8. Condition Rule Engine
+ * 기술문서: docu/?�키마에?�터.txt 8. Condition Rule Engine
  */
 
 import { useState } from 'react';
 import { Card, Input, Select, Button, Checkbox } from '@ui-core/react';
-import type { FormFieldSchema, ConditionRule, MultiConditionRule } from '@schema-engine';
+import type { FormFieldSchema, ConditionRule, MultiConditionRule } from '@schema/engine';
 
 export interface ConditionEditorProps {
   field: FormFieldSchema;
@@ -31,15 +31,15 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
 
   const operators: Array<{ value: ConditionRule['op']; label: string }> = [
     { value: 'eq', label: '같음 (==)' },
-    { value: 'ne', label: '다름 (!=)' },
-    { value: 'gt', label: '큼 (>)' },
-    { value: 'gte', label: '크거나 같음 (>=)' },
-    { value: 'lt', label: '작음 (<)' },
-    { value: 'lte', label: '작거나 같음 (<=)' },
-    { value: 'in', label: '포함 (in)' },
-    { value: 'not_in', label: '미포함 (not_in)' },
+    { value: 'ne', label: '?�름 (!=)' },
+    { value: 'gt', label: '??(>)' },
+    { value: 'gte', label: '?�거??같음 (>=)' },
+    { value: 'lt', label: '?�음 (<)' },
+    { value: 'lte', label: '?�거??같음 (<=)' },
+    { value: 'in', label: '?�함 (in)' },
+    { value: 'not_in', label: '미포??(not_in)' },
     { value: 'exists', label: '존재 (exists)' },
-    { value: 'not_exists', label: '미존재 (not_exists)' },
+    { value: 'not_exists', label: '미존??(not_exists)' },
   ];
 
   const handleSingleConditionChange = (key: keyof ConditionRule, value: any) => {
@@ -91,13 +91,13 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
               }
             }}
           />
-          <label style={{ fontSize: 'var(--font-size-sm)' }}>복수 조건 사용 (AND/OR)</label>
+          <label style={{ fontSize: 'var(--font-size-sm)' }}>복수 조건 ?�용 (AND/OR)</label>
         </div>
 
         {!useMultiCondition ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
             <Select
-              label="참조 필드"
+              label="참조 ?�드"
               value={condition.field}
               onChange={(e) => handleSingleConditionChange('field', e.target.value)}
             >
@@ -110,7 +110,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
                 ))}
             </Select>
             <Select
-              label="연산자"
+              label="?�산??
               value={condition.op}
               onChange={(e) => handleSingleConditionChange('op', e.target.value)}
             >
@@ -122,7 +122,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
             </Select>
             {!['exists', 'not_exists'].includes(condition.op) && (
               <Input
-                label="비교 값"
+                label="비교 �?
                 value={condition.value || ''}
                 onChange={(e) => handleSingleConditionChange('value', e.target.value)}
               />
@@ -131,12 +131,12 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
             <Select
-              label="연산자 (AND/OR)"
+              label="?�산??(AND/OR)"
               value={multiCondition.logic || 'and'}
               onChange={(e) => handleMultiConditionChange({ logic: e.target.value as 'and' | 'or' })}
             >
               <option value="and">AND (모두 만족)</option>
-              <option value="or">OR (하나라도 만족)</option>
+              <option value="or">OR (?�나?�도 만족)</option>
             </Select>
 
             {multiCondition.conditions.map((cond, index) => (
@@ -147,11 +147,11 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
                       조건 {index + 1}
                     </span>
                     <Button variant="ghost" size="sm" onClick={() => handleRemoveCondition(index)}>
-                      삭제
+                      ??��
                     </Button>
                   </div>
                   <Select
-                    label="참조 필드"
+                    label="참조 ?�드"
                     value={cond.field}
                     onChange={(e) => handleConditionItemChange(index, 'field', e.target.value)}
                   >
@@ -164,7 +164,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
                       ))}
                   </Select>
                   <Select
-                    label="연산자"
+                    label="?�산??
                     value={cond.op}
                     onChange={(e) => handleConditionItemChange(index, 'op', e.target.value)}
                   >
@@ -176,7 +176,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
                   </Select>
                   {!['exists', 'not_exists'].includes(cond.op) && (
                     <Input
-                      label="비교 값"
+                      label="비교 �?
                       value={cond.value || ''}
                       onChange={(e) => handleConditionItemChange(index, 'value', e.target.value)}
                     />
@@ -186,7 +186,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
             ))}
 
             <Button variant="outline" size="sm" onClick={handleAddCondition}>
-              + 조건 추가
+              + 조건 추�?
             </Button>
           </div>
         )}

@@ -1,16 +1,16 @@
 /**
  * ImportExportPanel Component
  * 
- * [불변 규칙] JSON/YAML Import/Export
- * [불변 규칙] Import 시 검증 필수
+ * [불�? 규칙] JSON/YAML Import/Export
+ * [불�? 규칙] Import ??검�??�수
  * 
- * 기술문서: docu/스키마에디터.txt 14. Schema Editor 기능
+ * 기술문서: docu/?�키마에?�터.txt 14. Schema Editor 기능
  */
 
 import { useState } from 'react';
 import { Card, Button, useModal } from '@ui-core/react';
-import type { UISchema } from '@schema-engine';
-import { validateSchema } from '@schema-engine/validator';
+import type { UISchema } from '@schema/engine';
+import { validateSchema } from '@schema/engine/validator';
 
 export interface ImportExportPanelProps {
   schema: UISchema;
@@ -41,15 +41,15 @@ export function ImportExportPanel({ schema, onImport }: ImportExportPanelProps) 
       // Client-Side Validation
       const validation = validateSchema(imported);
       if (!validation.valid) {
-        showAlert('Import 실패', validation.errors?.message || '스키마 검증에 실패했습니다.');
+        showAlert('Import ?�패', validation.errors?.message || '?�키�?검증에 ?�패?�습?�다.');
         return;
       }
 
       onImport(imported);
       setImportText('');
-      showAlert('성공', '스키마가 Import되었습니다.');
+      showAlert('?�공', '?�키마�? Import?�었?�니??');
     } catch (error) {
-      showAlert('Import 실패', error instanceof Error ? error.message : 'JSON 파싱에 실패했습니다.');
+      showAlert('Import ?�패', error instanceof Error ? error.message : 'JSON ?�싱???�패?�습?�다.');
     }
   };
 
@@ -73,7 +73,7 @@ export function ImportExportPanel({ schema, onImport }: ImportExportPanelProps) 
           <textarea
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
-            placeholder="JSON 스키마를 붙여넣으세요..."
+            placeholder="JSON ?�키마�? 붙여?�으?�요..."
             style={{
               width: '100%',
               minHeight: '200px',

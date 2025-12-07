@@ -1,11 +1,11 @@
 /**
  * Industry Academy Service
  * 
- * 학원 업종 전용 비즈니스 로직
- * [불변 규칙] Industry Layer는 Core Layer를 import할 수 있음
- * [불변 규칙] 모든 쿼리는 withTenant()를 사용하여 tenant_id 필터를 강제한다.
- * [불변 규칙] INSERT 시에는 row object 안에 tenant_id 필드를 직접 포함한다.
- * [불변 규칙] persons 테이블은 core-party 모듈에서 관리되며, academy_students는 이를 확장하여 사용합니다.
+ * ?�원 ?�종 ?�용 비즈?�스 로직
+ * [불�? 규칙] Industry Layer??Core Layer�?import?????�음
+ * [불�? 규칙] 모든 쿼리??withTenant()�??�용?�여 tenant_id ?�터�?강제?�다.
+ * [불�? 규칙] INSERT ?�에??row object ?�에 tenant_id ?�드�?직접 ?�함?�다.
+ * [불�? 규칙] persons ?�이블�? core-party 모듈?�서 관리되�? academy_students???��? ?�장?�여 ?�용?�니??
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -44,15 +44,15 @@ export class AcademyService {
   private supabase = createServerClient();
 
   /**
-   * 학생 목록 조회 (필터링 지원)
-   * [불변 규칙] persons + academy_students 조인하여 조회
-   * [불변 규칙] 기술문서 정책: "Core Party 테이블 + 업종별 확장 테이블" 패턴 사용
+   * ?�생 목록 조회 (?�터�?지??
+   * [불�? 규칙] persons + academy_students 조인?�여 조회
+   * [불�? 규칙] 기술문서 ?�책: "Core Party ?�이�?+ ?�종�??�장 ?�이�? ?�턴 ?�용
    */
   async getStudents(
     tenantId: string,
     filter?: StudentFilter
   ): Promise<Student[]> {
-    // persons와 academy_students를 조인하여 조회
+    // persons?� academy_students�?조인?�여 조회
     let query = withTenant(
       this.supabase
         .from('persons')
@@ -77,13 +77,11 @@ export class AcademyService {
       tenantId
     );
 
-    // 이름 검색
-    if (filter?.search) {
+    // ?�름 검??    if (filter?.search) {
       query = query.ilike('name', `%${filter.search}%`);
     }
 
-    // 정렬: 최신순
-    query = query.order('created_at', { ascending: false });
+    // ?�렬: 최신??    query = query.order('created_at', { ascending: false });
 
     const { data, error } = await query;
 
@@ -91,14 +89,13 @@ export class AcademyService {
       throw new Error(`Failed to fetch students: ${error.message}`);
     }
 
-    // 데이터 변환: persons + academy_students → Student
+    // ?�이??변?? persons + academy_students ??Student
     let students = (data || []).map((person: any) => {
       const academyData = person.academy_students?.[0] || {};
       return {
         id: person.id,
         tenant_id: person.tenant_id,
-        industry_type: 'academy', // 고정값
-        name: person.name,
+        industry_type: 'academy', // 고정�?        name: person.name,
         birth_date: academyData.birth_date,
         gender: academyData.gender,
         phone: person.phone,
@@ -116,34 +113,34 @@ export class AcademyService {
       } as Student;
     });
 
-    // 상태 필터
+    // ?�태 ?�터
     if (filter?.status) {
       const statusArray = Array.isArray(filter.status) ? filter.status : [filter.status];
       students = students.filter((s) => statusArray.includes(s.status));
     }
 
-    // 학년 필터
+    // ?�년 ?�터
     if (filter?.grade) {
       students = students.filter((s) => s.grade === filter.grade);
     }
 
-    // 태그 필터 (클라이언트 측에서 처리 또는 서브쿼리)
+    // ?�그 ?�터 (?�라?�언??측에??처리 ?�는 ?�브쿼리)
     if (filter?.tag_ids && filter.tag_ids.length > 0) {
-      // TODO: 태그 필터링 로직 추가
+      // TODO: ?�그 ?�터�?로직 추�?
     }
 
-    // 반 필터 (클라이언트 측에서 처리 또는 서브쿼리)
+    // �??�터 (?�라?�언??측에??처리 ?�는 ?�브쿼리)
     if (filter?.class_id) {
-      // TODO: 반 필터링 로직 추가
+      // TODO: �??�터�?로직 추�?
     }
 
     return students;
   }
 
   /**
-   * 학생 상세 조회
-   * [불변 규칙] persons + academy_students 조인하여 조회
-   * [불변 규칙] 기술문서 정책: "Core Party 테이블 + 업종별 확장 테이블" 패턴 사용
+   * ?�생 ?�세 조회
+   * [불�? 규칙] persons + academy_students 조인?�여 조회
+   * [불�? 규칙] 기술문서 ?�책: "Core Party ?�이�?+ ?�종�??�장 ?�이�? ?�턴 ?�용
    */
   async getStudent(tenantId: string, studentId: string): Promise<Student | null> {
     const { data, error } = await withTenant(
@@ -178,7 +175,7 @@ export class AcademyService {
       throw new Error(`Failed to fetch student: ${error.message}`);
     }
 
-    // 데이터 변환: persons + academy_students → Student
+    // ?�이??변?? persons + academy_students ??Student
     const academyData = data.academy_students?.[0] || {};
     return {
       id: data.id,
@@ -203,16 +200,15 @@ export class AcademyService {
   }
 
   /**
-   * 학생 생성
-   * [불변 규칙] persons 테이블에 먼저 생성 후 academy_students 테이블에 확장 정보 저장
-   */
+   * ?�생 ?�성
+   * [불�? 규칙] persons ?�이블에 먼�? ?�성 ??academy_students ?�이블에 ?�장 ?�보 ?�??   */
   async createStudent(
     tenantId: string,
     industryType: string,
     input: CreateStudentInput,
     userId?: string
   ): Promise<Student> {
-    // 1. persons 테이블에 생성 (core-party 사용)
+    // 1. persons ?�이블에 ?�성 (core-party ?�용)
     const person = await partyService.createPerson(tenantId, {
       name: input.name,
       email: input.email,
@@ -221,8 +217,7 @@ export class AcademyService {
       person_type: 'student',
     });
 
-    // 2. academy_students 테이블에 확장 정보 저장
-    const { data: academyData, error: academyError } = await this.supabase
+    // 2. academy_students ?�이블에 ?�장 ?�보 ?�??    const { data: academyData, error: academyError } = await this.supabase
       .from('academy_students')
       .insert({
         person_id: person.id,
@@ -242,17 +237,17 @@ export class AcademyService {
       .single();
 
     if (academyError) {
-      // 롤백: persons 삭제
+      // 롤백: persons ??��
       await partyService.deletePerson(tenantId, person.id);
       throw new Error(`Failed to create academy student: ${academyError.message}`);
     }
 
-    // 3. 학부모 정보 생성
+    // 3. ?��?�??�보 ?�성
     if (input.guardians && input.guardians.length > 0) {
       await this.createGuardians(tenantId, person.id, input.guardians);
     }
 
-    // 5. 태그 연결 (core-tags 활용)
+    // 5. ?�그 ?�결 (core-tags ?�용)
     if (input.tag_ids && input.tag_ids.length > 0) {
       await tagsService.assignTags(tenantId, person.id, 'student', input.tag_ids);
     }
@@ -281,14 +276,13 @@ export class AcademyService {
   }
 
   /**
-   * 학생 일괄 등록 (엑셀)
-   * [요구사항] 학생 일괄 등록(엑셀)
+   * ?�생 ?�괄 ?�록 (?��?)
+   * [?�구?�항] ?�생 ?�괄 ?�록(?��?)
    * 
-   * @param tenantId - 테넌트 ID
-   * @param industryType - 업종 타입
-   * @param students - 학생 데이터 배열
-   * @param userId - 생성자 ID
-   * @returns 생성된 학생 목록
+   * @param tenantId - ?�넌??ID
+   * @param industryType - ?�종 ?�??   * @param students - ?�생 ?�이??배열
+   * @param userId - ?�성??ID
+   * @returns ?�성???�생 목록
    */
   async bulkCreateStudents(
     tenantId: string,
@@ -299,7 +293,7 @@ export class AcademyService {
     const results: Student[] = [];
     const errors: Array<{ index: number; error: string }> = [];
 
-    // 순차적으로 생성 (트랜잭션은 PostgreSQL 레벨에서 처리)
+    // ?�차?�으�??�성 (?�랜??��?� PostgreSQL ?�벨?�서 처리)
     for (let i = 0; i < students.length; i++) {
       try {
         const student = await this.createStudent(tenantId, industryType, students[i], userId);
@@ -313,16 +307,16 @@ export class AcademyService {
     }
 
     if (errors.length > 0) {
-      // 일부 실패한 경우 경고와 함께 성공한 결과 반환
-      console.warn('일부 학생 등록 실패:', errors);
+      // ?��? ?�패??경우 경고?� ?�께 ?�공??결과 반환
+      console.warn('?��? ?�생 ?�록 ?�패:', errors);
     }
 
     return results;
   }
 
   /**
-   * 학생 수정
-   * [불변 규칙] persons와 academy_students를 각각 업데이트
+   * ?�생 ?�정
+   * [불�? 규칙] persons?� academy_students�?각각 ?�데?�트
    */
   async updateStudent(
     tenantId: string,
@@ -330,7 +324,7 @@ export class AcademyService {
     input: UpdateStudentInput,
     userId?: string
   ): Promise<Student> {
-    // 1. persons 테이블 업데이트 (공통 필드)
+    // 1. persons ?�이�??�데?�트 (공통 ?�드)
     const personUpdate: any = {};
     if (input.name !== undefined) personUpdate.name = input.name;
     if (input.email !== undefined) personUpdate.email = input.email;
@@ -341,7 +335,7 @@ export class AcademyService {
       await partyService.updatePerson(tenantId, studentId, personUpdate);
     }
 
-    // 2. academy_students 테이블 업데이트 (업종 특화 필드)
+    // 2. academy_students ?�이�??�데?�트 (?�종 ?�화 ?�드)
     const academyUpdate: any = {};
     if (input.birth_date !== undefined) academyUpdate.birth_date = input.birth_date;
     if (input.gender !== undefined) academyUpdate.gender = input.gender;
@@ -366,7 +360,7 @@ export class AcademyService {
       }
     }
 
-    // 3. 업데이트된 데이터 조회하여 반환
+    // 3. ?�데?�트???�이??조회?�여 반환
     const updated = await this.getStudent(tenantId, studentId);
     if (!updated) {
       throw new Error(`Student not found: ${studentId}`);
@@ -375,27 +369,26 @@ export class AcademyService {
   }
 
   /**
-   * 학생 삭제 (Soft delete: status를 'withdrawn'으로 변경)
+   * ?�생 ??�� (Soft delete: status�?'withdrawn'?�로 변�?
    */
   async deleteStudent(
     tenantId: string,
     studentId: string,
     userId?: string
   ): Promise<void> {
-    // Soft delete: status를 'withdrawn'으로 변경
-    await this.updateStudent(tenantId, studentId, { status: 'withdrawn' }, userId);
+    // Soft delete: status�?'withdrawn'?�로 변�?    await this.updateStudent(tenantId, studentId, { status: 'withdrawn' }, userId);
   }
 
   /**
-   * 학부모 목록 조회
-   * [불변 규칙] student_id는 person_id를 참조 (persons.id)
+   * ?��?�?목록 조회
+   * [불�? 규칙] student_id??person_id�?참조 (persons.id)
    */
   async getGuardians(tenantId: string, studentId: string): Promise<Guardian[]> {
     const { data, error } = await withTenant(
       this.supabase
         .from('guardians')
         .select('*')
-        .eq('student_id', studentId)  // student_id는 person_id를 참조
+        .eq('student_id', studentId)  // student_id??person_id�?참조
         .order('is_primary', { ascending: false })
         .order('created_at', { ascending: true }),
       tenantId
@@ -409,7 +402,7 @@ export class AcademyService {
   }
 
   /**
-   * 학부모 생성
+   * ?��?�??�성
    */
   async createGuardians(
     tenantId: string,
@@ -435,22 +428,22 @@ export class AcademyService {
   }
 
   /**
-   * 학생 태그 목록 조회 (core-tags 활용)
+   * ?�생 ?�그 목록 조회 (core-tags ?�용)
    */
   async getTags(tenantId: string): Promise<Tag[]> {
     return tagsService.getTags(tenantId, { entity_type: 'student' });
   }
 
   /**
-   * 학생의 태그 조회 (core-tags 활용)
+   * ?�생???�그 조회 (core-tags ?�용)
    */
   async getStudentTags(tenantId: string, studentId: string): Promise<Tag[]> {
     return tagsService.getEntityTags(tenantId, studentId, 'student');
   }
 
   /**
-   * 상담일지 목록 조회
-   * [불변 규칙] student_id는 person_id를 참조 (persons.id)
+   * ?�담?��? 목록 조회
+   * [불�? 규칙] student_id??person_id�?참조 (persons.id)
    */
   async getConsultations(
     tenantId: string,
@@ -460,7 +453,7 @@ export class AcademyService {
       this.supabase
         .from('student_consultations')
         .select('*')
-        .eq('student_id', studentId)  // student_id는 person_id를 참조
+        .eq('student_id', studentId)  // student_id??person_id�?참조
         .order('consultation_date', { ascending: false }),
       tenantId
     );
@@ -473,8 +466,8 @@ export class AcademyService {
   }
 
   /**
-   * 상담일지 생성
-   * [불변 규칙] student_id는 person_id를 참조 (persons.id)
+   * ?�담?��? ?�성
+   * [불�? 규칙] student_id??person_id�?참조 (persons.id)
    */
   async createConsultation(
     tenantId: string,
@@ -486,7 +479,7 @@ export class AcademyService {
       .from('student_consultations')
       .insert({
         tenant_id: tenantId,
-        student_id: studentId,  // student_id는 person_id를 참조
+        student_id: studentId,  // student_id??person_id�?참조
         consultation_date: consultation.consultation_date,
         consultation_type: consultation.consultation_type,
         content: consultation.content,
@@ -504,7 +497,7 @@ export class AcademyService {
   }
 
   /**
-   * 상담일지 수정
+   * ?�담?��? ?�정
    */
   async updateConsultation(
     tenantId: string,
@@ -533,7 +526,7 @@ export class AcademyService {
   }
 
   /**
-   * 상담일지 삭제
+   * ?�담?��? ??��
    */
   async deleteConsultation(
     tenantId: string,
@@ -553,31 +546,30 @@ export class AcademyService {
   }
 
   /**
-   * 상담일지 AI 요약 생성
+   * ?�담?��? AI ?�약 ?�성
    * 
-   * [불변 규칙] Phase 1에서는 플레이스홀더로 구현
-   * 실제 AI 연동은 Edge Function 또는 외부 AI 서비스를 통해 구현
+   * [불�? 규칙] Phase 1?�서???�레?�스?�?�로 구현
+   * ?�제 AI ?�동?� Edge Function ?�는 ?��? AI ?�비?��? ?�해 구현
    * 
-   * TODO: 실제 AI 서비스 연동 (OpenAI, Claude 등)
+   * TODO: ?�제 AI ?�비???�동 (OpenAI, Claude ??
    */
   async generateConsultationAISummary(
     tenantId: string,
     consultationId: string
   ): Promise<string> {
-    // 1. 상담일지 조회
+    // 1. ?�담?��? 조회
     const consultation = await this.getConsultation(tenantId, consultationId);
     if (!consultation) {
-      throw new Error('상담일지를 찾을 수 없습니다.');
+      throw new Error('?�담?��?�?찾을 ???�습?�다.');
     }
 
-    // 2. AI 요약 생성 (Phase 1: 플레이스홀더)
-    // TODO: 실제 AI 서비스 연동
-    // - Edge Function 호출: fns-ai-summarize-consultation
-    // - 또는 외부 AI API 직접 호출
-    const aiSummary = `[AI 요약] ${consultation.content.substring(0, 100)}... (요약 기능은 곧 제공될 예정입니다.)`;
+    // 2. AI ?�약 ?�성 (Phase 1: ?�레?�스?�??
+    // TODO: ?�제 AI ?�비???�동
+    // - Edge Function ?�출: fns-ai-summarize-consultation
+    // - ?�는 ?��? AI API 직접 ?�출
+    const aiSummary = `[AI ?�약] ${consultation.content.substring(0, 100)}... (?�약 기능?� �??�공???�정?�니??)`;
 
-    // 3. 상담일지에 AI 요약 저장
-    await this.updateConsultation(
+    // 3. ?�담?��???AI ?�약 ?�??    await this.updateConsultation(
       tenantId,
       consultationId,
       { ai_summary: aiSummary }
@@ -587,7 +579,7 @@ export class AcademyService {
   }
 
   /**
-   * 상담일지 단건 조회 (내부용)
+   * ?�담?��? ?�건 조회 (?��???
    */
   private async getConsultation(
     tenantId: string,
@@ -613,7 +605,7 @@ export class AcademyService {
   }
 
   /**
-   * 학부모 수정
+   * ?��?�??�정
    */
   async updateGuardian(
     tenantId: string,
@@ -638,7 +630,7 @@ export class AcademyService {
   }
 
   /**
-   * 학부모 삭제
+   * ?��?�???��
    */
   async deleteGuardian(
     tenantId: string,
@@ -658,14 +650,14 @@ export class AcademyService {
   }
 
   /**
-   * 학생 태그 업데이트 (기존 태그 제거 후 새 태그 할당)
+   * ?�생 ?�그 ?�데?�트 (기존 ?�그 ?�거 ?????�그 ?�당)
    */
   async updateStudentTags(
     tenantId: string,
     studentId: string,
     tagIds: string[]
   ): Promise<void> {
-    // 기존 태그 할당 제거
+    // 기존 ?�그 ?�당 ?�거
     const { error: deleteError } = await withTenant(
       this.supabase
         .from('tag_assignments')
@@ -679,17 +671,17 @@ export class AcademyService {
       throw new Error(`Failed to remove existing tags: ${deleteError.message}`);
     }
 
-    // 새 태그 할당
+    // ???�그 ?�당
     if (tagIds.length > 0) {
       await tagsService.assignTags(tenantId, studentId, 'student', tagIds);
     }
   }
 
-  // ==================== 반(Class) 관리 ====================
+  // ==================== �?Class) 관�?====================
 
   /**
-   * 반 목록 조회 (필터링 지원)
-   * [불변 규칙] withTenant() 사용하여 tenant_id 필터 강제
+   * �?목록 조회 (?�터�?지??
+   * [불�? 규칙] withTenant() ?�용?�여 tenant_id ?�터 강제
    */
   async getClasses(
     tenantId: string,
@@ -702,7 +694,7 @@ export class AcademyService {
       tenantId
     );
 
-    // 상태 필터
+    // ?�태 ?�터
     if (filter?.status) {
       if (Array.isArray(filter.status)) {
         query = query.in('status', filter.status);
@@ -711,28 +703,26 @@ export class AcademyService {
       }
     }
 
-    // 요일 필터
+    // ?�일 ?�터
     if (filter?.day_of_week) {
       query = query.eq('day_of_week', filter.day_of_week);
     }
 
-    // 과목 필터
+    // 과목 ?�터
     if (filter?.subject) {
       query = query.eq('subject', filter.subject);
     }
 
-    // 학년 필터
+    // ?�년 ?�터
     if (filter?.grade) {
       query = query.eq('grade', filter.grade);
     }
 
-    // 이름 검색
-    if (filter?.search) {
+    // ?�름 검??    if (filter?.search) {
       query = query.ilike('name', `%${filter.search}%`);
     }
 
-    // 정렬: 요일, 시작 시간 순
-    query = query.order('day_of_week', { ascending: true })
+    // ?�렬: ?�일, ?�작 ?�간 ??    query = query.order('day_of_week', { ascending: true })
       .order('start_time', { ascending: true });
 
     const { data, error } = await query;
@@ -745,7 +735,7 @@ export class AcademyService {
   }
 
   /**
-   * 반 상세 조회
+   * �??�세 조회
    */
   async getClass(tenantId: string, classId: string): Promise<Class | null> {
     const { data, error } = await withTenant(
@@ -767,18 +757,18 @@ export class AcademyService {
   }
 
   /**
-   * 반 생성
-   * [불변 규칙] INSERT 시 tenant_id 직접 포함
-   * [불변 규칙] 반 자동 색상 태깅 (지정하지 않으면 자동 생성)
+   * �??�성
+   * [불�? 규칙] INSERT ??tenant_id 직접 ?�함
+   * [불�? 규칙] �??�동 ?�상 ?�깅 (지?�하지 ?�으�??�동 ?�성)
    */
   async createClass(
     tenantId: string,
     input: CreateClassInput
   ): Promise<Class> {
-    // 색상 자동 생성 (지정하지 않은 경우)
+    // ?�상 ?�동 ?�성 (지?�하지 ?��? 경우)
     const color = input.color || this.generateClassColor();
 
-    // 반 생성
+    // �??�성
     const { data, error } = await this.supabase
       .from('academy_classes')
       .insert({
@@ -811,7 +801,7 @@ export class AcademyService {
         await this.assignTeacher(tenantId, {
           class_id: newClass.id,
           teacher_id: teacherId,
-          role: 'teacher', // 기본값: 담임
+          role: 'teacher', // 기본�? ?�임
         });
       }
     }
@@ -820,7 +810,7 @@ export class AcademyService {
   }
 
   /**
-   * 반 수정
+   * �??�정
    */
   async updateClass(
     tenantId: string,
@@ -859,7 +849,7 @@ export class AcademyService {
   }
 
   /**
-   * 반 삭제 (소프트 삭제: status를 'archived'로 변경)
+   * �???�� (?�프????��: status�?'archived'�?변�?
    */
   async deleteClass(tenantId: string, classId: string): Promise<void> {
     const { error } = await withTenant(
@@ -876,59 +866,50 @@ export class AcademyService {
   }
 
   /**
-   * 반 자동 색상 생성
-   * [불변 규칙] 반 자동 색상 태깅
+   * �??�동 ?�상 ?�성
+   * [불�? 규칙] �??�동 ?�상 ?�깅
    */
   private generateClassColor(): string {
-    // 기본 색상 팔레트 (16진수 색상 코드)
+    // 기본 ?�상 ?�레??(16진수 ?�상 코드)
     const colors = [
-      '#3b82f6', // 파란색
-      '#ef4444', // 빨간색
-      '#10b981', // 초록색
-      '#f59e0b', // 주황색
-      '#8b5cf6', // 보라색
-      '#ec4899', // 분홍색
-      '#06b6d4', // 청록색
-      '#f97316', // 주황색
-      '#84cc16', // 연두색
-      '#6366f1', // 남색
+      '#3b82f6', // ?��???      '#ef4444', // 빨간??      '#10b981', // 초록??      '#f59e0b', // 주황??      '#8b5cf6', // 보라??      '#ec4899', // 분홍??      '#06b6d4', // �?��??      '#f97316', // 주황??      '#84cc16', // ?�두??      '#6366f1', // ?�색
     ];
 
-    // 랜덤 색상 반환 (실제로는 기존 반 색상과 중복되지 않도록 개선 가능)
+    // ?�덤 ?�상 반환 (?�제로는 기존 �??�상�?중복?��? ?�도�?개선 가??
     return colors[Math.floor(Math.random() * colors.length)];
   }
 
   /**
-   * 반별 출결률/정원률/지각률 조회
-   * [요구사항] 반별 출결률/정원률/지각률 표시
-   * TODO: 출결 데이터가 구현되면 실제 통계 계산
+   * 반별 출결�??�원�?지각률 조회
+   * [?�구?�항] 반별 출결�??�원�?지각률 ?�시
+   * TODO: 출결 ?�이?��? 구현?�면 ?�제 ?�계 계산
    */
   async getClassStatistics(
     tenantId: string,
     classId: string
   ): Promise<{
-    attendance_rate: number;  // 출결률 (%)
-    capacity_rate: number;    // 정원률 (%)
+    attendance_rate: number;  // 출결�?(%)
+    capacity_rate: number;    // ?�원�?(%)
     late_rate: number;        // 지각률 (%)
   }> {
-    // 현재는 기본값 반환 (출결 데이터 구현 후 실제 계산)
+    // ?�재??기본�?반환 (출결 ?�이??구현 ???�제 계산)
     const classData = await this.getClass(tenantId, classId);
     if (!classData) {
       throw new Error('Class not found');
     }
 
     return {
-      attendance_rate: 0,  // TODO: 출결 데이터 기반 계산
+      attendance_rate: 0,  // TODO: 출결 ?�이??기반 계산
       capacity_rate: (classData.current_count / classData.capacity) * 100,
-      late_rate: 0,  // TODO: 출결 데이터 기반 계산
+      late_rate: 0,  // TODO: 출결 ?�이??기반 계산
     };
   }
 
-  // ==================== 강사(Teacher) 관리 ====================
+  // ==================== 강사(Teacher) 관�?====================
 
   /**
-   * 강사 목록 조회 (필터링 지원)
-   * [불변 규칙] persons + academy_teachers 조인하여 조회
+   * 강사 목록 조회 (?�터�?지??
+   * [불�? 규칙] persons + academy_teachers 조인?�여 조회
    */
   async getTeachers(
     tenantId: string,
@@ -957,23 +938,20 @@ export class AcademyService {
       tenantId
     );
 
-    // 상태 필터
+    // ?�태 ?�터
     if (filter?.status) {
       if (Array.isArray(filter.status)) {
-        // academy_teachers.status 필터링은 조인 후 처리 필요
-        // 현재는 간단히 구현
+        // academy_teachers.status ?�터링�? 조인 ??처리 ?�요
+        // ?�재??간단??구현
       } else {
-        // 조인 후 필터링은 복잡하므로, 일단 전체 조회 후 필터링
-      }
+        // 조인 ???�터링�? 복잡?��?�? ?�단 ?�체 조회 ???�터�?      }
     }
 
-    // 이름 검색
-    if (filter?.search) {
+    // ?�름 검??    if (filter?.search) {
       query = query.ilike('name', `%${filter.search}%`);
     }
 
-    // 정렬: 최신순
-    query = query.order('created_at', { ascending: false });
+    // ?�렬: 최신??    query = query.order('created_at', { ascending: false });
 
     const { data, error } = await query;
 
@@ -981,7 +959,7 @@ export class AcademyService {
       throw new Error(`Failed to fetch teachers: ${error.message}`);
     }
 
-    // 데이터 변환: persons + academy_teachers → Teacher
+    // ?�이??변?? persons + academy_teachers ??Teacher
     return (data || []).map((person: any) => {
       const teacherData = person.academy_teachers?.[0] || {};
       return {
@@ -1007,7 +985,7 @@ export class AcademyService {
   }
 
   /**
-   * 강사 상세 조회
+   * 강사 ?�세 조회
    */
   async getTeacher(tenantId: string, teacherId: string): Promise<Teacher | null> {
     const { data, error } = await withTenant(
@@ -1064,14 +1042,13 @@ export class AcademyService {
   }
 
   /**
-   * 강사 생성
-   * [불변 규칙] persons 테이블에 먼저 생성 후 academy_teachers 테이블에 확장 정보 저장
-   */
+   * 강사 ?�성
+   * [불�? 규칙] persons ?�이블에 먼�? ?�성 ??academy_teachers ?�이블에 ?�장 ?�보 ?�??   */
   async createTeacher(
     tenantId: string,
     input: CreateTeacherInput
   ): Promise<Teacher> {
-    // 1. persons 테이블에 생성
+    // 1. persons ?�이블에 ?�성
     const person = await partyService.createPerson(tenantId, {
       name: input.name,
       email: input.email,
@@ -1080,8 +1057,7 @@ export class AcademyService {
       person_type: 'teacher',
     });
 
-    // 2. academy_teachers 테이블에 확장 정보 저장
-    const { data, error } = await this.supabase
+    // 2. academy_teachers ?�이블에 ?�장 ?�보 ?�??    const { data, error } = await this.supabase
       .from('academy_teachers')
       .insert({
         person_id: person.id,
@@ -1098,9 +1074,8 @@ export class AcademyService {
       .single();
 
     if (error) {
-      // 롤백: persons 삭제
-      // [불변 규칙] DELETE 쿼리는 반드시 withTenant()를 사용해야 함
-      await withTenant(
+      // 롤백: persons ??��
+      // [불�? 규칙] DELETE 쿼리??반드??withTenant()�??�용?�야 ??      await withTenant(
         this.supabase.from('persons').delete().eq('id', person.id),
         tenantId
       );
@@ -1129,14 +1104,14 @@ export class AcademyService {
   }
 
   /**
-   * 강사 수정
+   * 강사 ?�정
    */
   async updateTeacher(
     tenantId: string,
     teacherId: string,
     input: UpdateTeacherInput
   ): Promise<Teacher> {
-    // 1. persons 테이블 업데이트
+    // 1. persons ?�이�??�데?�트
     const personUpdate: any = {};
     if (input.name !== undefined) personUpdate.name = input.name;
     if (input.email !== undefined) personUpdate.email = input.email;
@@ -1157,7 +1132,7 @@ export class AcademyService {
       }
     }
 
-    // 2. academy_teachers 테이블 업데이트
+    // 2. academy_teachers ?�이�??�데?�트
     const teacherUpdate: any = {};
     if (input.employee_id !== undefined) teacherUpdate.employee_id = input.employee_id;
     if (input.specialization !== undefined) teacherUpdate.specialization = input.specialization;
@@ -1181,12 +1156,12 @@ export class AcademyService {
       }
     }
 
-    // 3. 업데이트된 데이터 조회하여 반환
+    // 3. ?�데?�트???�이??조회?�여 반환
     return await this.getTeacher(tenantId, teacherId) as Teacher;
   }
 
   /**
-   * 강사 삭제 (소프트 삭제: status를 'resigned'로 변경)
+   * 강사 ??�� (?�프????��: status�?'resigned'�?변�?
    */
   async deleteTeacher(tenantId: string, teacherId: string): Promise<void> {
     const { error } = await withTenant(
@@ -1202,11 +1177,11 @@ export class AcademyService {
     }
   }
 
-  // ==================== 반-강사 연결 관리 ====================
+  // ==================== �?강사 ?�결 관�?====================
 
   /**
    * 강사 배정
-   * [요구사항] 강사 배정/부담임 설정
+   * [?�구?�항] 강사 배정/부?�임 ?�정
    */
   async assignTeacher(
     tenantId: string,
@@ -1233,7 +1208,7 @@ export class AcademyService {
   }
 
   /**
-   * 강사 배정 해제
+   * 강사 배정 ?�제
    */
   async unassignTeacher(
     tenantId: string,
@@ -1282,12 +1257,12 @@ export class AcademyService {
     return (data || []) as ClassTeacher[];
   }
 
-  // ==================== 학생 반 배정 관리 ====================
+  // ==================== ?�생 �?배정 관�?====================
 
   /**
-   * 학생 반 배정
-   * [불변 규칙] student_classes INSERT + academy_classes.current_count 업데이트
-   * [불변 규칙] INSERT 시 tenant_id 직접 포함
+   * ?�생 �?배정
+   * [불�? 규칙] student_classes INSERT + academy_classes.current_count ?�데?�트
+   * [불�? 규칙] INSERT ??tenant_id 직접 ?�함
    */
   async enrollStudentToClass(
     tenantId: string,
@@ -1295,7 +1270,7 @@ export class AcademyService {
     classId: string,
     enrolledAt?: string
   ): Promise<StudentClass> {
-    // 1. student_classes에 배정
+    // 1. student_classes??배정
     const { data: studentClass, error: insertError } = await this.supabase
       .from('student_classes')
       .insert({
@@ -1312,8 +1287,8 @@ export class AcademyService {
       throw new Error(`Failed to enroll student to class: ${insertError.message}`);
     }
 
-    // 2. academy_classes.current_count 업데이트
-    // 현재 활성 학생 수 계산
+    // 2. academy_classes.current_count ?�데?�트
+    // ?�재 ?�성 ?�생 ??계산
     const { count, error: countError } = await withTenant(
       this.supabase
         .from('student_classes')
@@ -1327,7 +1302,7 @@ export class AcademyService {
       throw new Error(`Failed to count students: ${countError.message}`);
     }
 
-    // current_count 업데이트
+    // current_count ?�데?�트
     const { error: updateError } = await withTenant(
       this.supabase
         .from('academy_classes')
@@ -1344,8 +1319,8 @@ export class AcademyService {
   }
 
   /**
-   * 학생 반 해제
-   * [불변 규칙] student_classes UPDATE + academy_classes.current_count 업데이트
+   * ?�생 �??�제
+   * [불�? 규칙] student_classes UPDATE + academy_classes.current_count ?�데?�트
    */
   async unenrollStudentFromClass(
     tenantId: string,
@@ -1353,7 +1328,7 @@ export class AcademyService {
     classId: string,
     leftAt?: string
   ): Promise<void> {
-    // 1. student_classes에서 해제
+    // 1. student_classes?�서 ?�제
     const { data: assignment, error: findError } = await withTenant(
       this.supabase
         .from('student_classes')
@@ -1385,7 +1360,7 @@ export class AcademyService {
       throw new Error(`Failed to unenroll student: ${updateError.message}`);
     }
 
-    // 2. academy_classes.current_count 업데이트
+    // 2. academy_classes.current_count ?�데?�트
     const { count, error: countError } = await withTenant(
       this.supabase
         .from('student_classes')
@@ -1413,8 +1388,8 @@ export class AcademyService {
   }
 
   /**
-   * 학생의 반 목록 조회
-   * [불변 규칙] student_classes + academy_classes 조인하여 조회
+   * ?�생??�?목록 조회
+   * [불�? 규칙] student_classes + academy_classes 조인?�여 조회
    */
   async getStudentClasses(
     tenantId: string,
@@ -1455,34 +1430,34 @@ export class AcademyService {
       throw new Error(`Failed to fetch classes: ${classesError.message}`);
     }
 
-    // 4. class_id로 맵 생성
+    // 4. class_id�?�??�성
     const classMap = new Map((classes || []).map((c) => [c.id, c as Class]));
 
-    // 5. 조합하여 반환
+    // 5. 조합?�여 반환
     return studentClasses.map((sc) => ({
       ...sc,
       class: classMap.get(sc.class_id) || null,
     })) as Array<StudentClass & { class: Class | null }>;
   }
 
-  // ==================== 출결 관리 ====================
+  // ==================== 출결 관�?====================
 
   /**
-   * 출결 로그 생성
-   * [불변 규칙] INSERT 시 tenant_id 직접 포함
+   * 출결 로그 ?�성
+   * [불�? 규칙] INSERT ??tenant_id 직접 ?�함
    */
   async createAttendanceLog(
     tenantId: string,
     input: CreateAttendanceLogInput,
     userId?: string
   ): Promise<AttendanceLog> {
-    // [문서 요구사항] 출결 Hook 흐름: 출석 체크 → 출결 이벤트 발생 → core-notification → 학부모 알림 → core-metering → 사용량 기록 → core-billing → 월말 자동청구
+    // [문서 ?�구?�항] 출결 Hook ?�름: 출석 체크 ??출결 ?�벤??발생 ??core-notification ???��?�??�림 ??core-metering ???�용??기록 ??core-billing ???�말 ?�동�?��
     
-    // 1. 출결 로그 생성
+    // 1. 출결 로그 ?�성
     const { data, error } = await this.supabase
       .from('attendance_logs')
       .insert({
-        tenant_id: tenantId,  // [불변 규칙] INSERT 시 tenant_id 직접 포함
+        tenant_id: tenantId,  // [불�? 규칙] INSERT ??tenant_id 직접 ?�함
         student_id: input.student_id,
         class_id: input.class_id,
         occurred_at: input.occurred_at,
@@ -1500,49 +1475,48 @@ export class AcademyService {
 
     const attendanceLog = data as AttendanceLog;
 
-    // 2. core-notification → 학부모 알림 (문서 요구사항: 출결 Hook 흐름)
+    // 2. core-notification ???��?�??�림 (문서 ?�구?�항: 출결 Hook ?�름)
     try {
       const config = await configService.getConfig(tenantId);
       const autoNotification = config?.attendance?.auto_notification ?? false;
       const notificationChannel = config?.attendance?.notification_channel ?? 'sms';
 
-      // 자동 알림이 활성화되어 있고, 결석이 아닌 경우에만 알림 발송
+      // ?�동 ?�림???�성?�되???�고, 결석???�닌 경우?�만 ?�림 발송
       if (autoNotification && input.status !== 'absent') {
-        // 학생 정보 조회
+        // ?�생 ?�보 조회
         const student = await this.getStudent(tenantId, input.student_id);
         if (student) {
-          // 학부모 정보 조회 (주 보호자 우선)
+          // ?��?�??�보 조회 (�?보호???�선)
           const guardians = await this.getGuardians(tenantId, input.student_id);
           const primaryGuardian = guardians.find(g => g.is_primary) || guardians[0];
 
           if (primaryGuardian?.phone) {
-            // 알림 메시지 생성
-            const attendanceTypeText = input.attendance_type === 'check_in' ? '등원' 
-              : input.attendance_type === 'check_out' ? '하원'
-              : input.attendance_type === 'late' ? '지각'
+            // ?�림 메시지 ?�성
+            const attendanceTypeText = input.attendance_type === 'check_in' ? '?�원' 
+              : input.attendance_type === 'check_out' ? '?�원'
+              : input.attendance_type === 'late' ? '지�?
               : '출결';
             
-            // 타입 단언: if 조건에서 'absent'가 제외되었지만, switch에서는 모든 케이스를 처리해야 함
-            const status = input.status as AttendanceStatus;
+            // ?�???�언: if 조건?�서 'absent'가 ?�외?�었지�? switch?�서??모든 케?�스�?처리?�야 ??            const status = input.status as AttendanceStatus;
             let statusText: string;
             switch (status) {
               case 'present':
                 statusText = '출석';
                 break;
               case 'late':
-                statusText = '지각';
+                statusText = '지�?;
                 break;
               case 'absent':
                 statusText = '결석';
                 break;
               case 'excused':
-                statusText = '사유';
+                statusText = '?�유';
                 break;
               default:
                 statusText = '미정';
             }
 
-            // [문서 요구사항] KST 기준 날짜 처리
+            // [문서 ?�구?�항] KST 기�? ?�짜 처리
             const occurredAtKST = new Date(input.occurred_at).toLocaleString('ko-KR', {
               timeZone: 'Asia/Seoul',
               year: 'numeric',
@@ -1552,9 +1526,9 @@ export class AcademyService {
               minute: '2-digit',
             });
 
-            const message = `[디어쌤] ${student.name} 학생이 ${attendanceTypeText}했습니다.\n시간: ${occurredAtKST}\n상태: ${statusText}`;
+            const message = `[?�어?? ${student.name} ?�생??${attendanceTypeText}?�습?�다.\n?�간: ${occurredAtKST}\n?�태: ${statusText}`;
 
-            // 알림 발송
+            // ?�림 발송
             await notificationService.createNotification(tenantId, {
               channel: notificationChannel === 'kakao' ? 'kakao' : 'sms',
               recipient: primaryGuardian.phone,
@@ -1564,23 +1538,23 @@ export class AcademyService {
         }
       }
     } catch (error) {
-      // 알림 발송 실패해도 출결 기록은 저장됨
+      // ?�림 발송 ?�패?�도 출결 기록?� ?�?�됨
       console.error('Failed to send notification:', error);
     }
 
-    // 3. analytics.events에 이벤트 기록 (문서 15-8: attendance.check_in, attendance.check_out)
+    // 3. analytics.events???�벤??기록 (문서 15-8: attendance.check_in, attendance.check_out)
     try {
       const { analyticsService } = await import('@core/analytics/service');
       const { meteringService } = await import('@core/metering/service');
       
-      // 테넌트 정보 조회 (store_id, region_id, industry_type)
+      // ?�넌???�보 조회 (store_id, region_id, industry_type)
       const tenant = await this.supabase
         .from('tenants')
         .select('industry_type')
         .eq('id', tenantId)
         .single();
       
-      // 기본 매장 조회 (Phase 1: 단일 매장 가정)
+      // 기본 매장 조회 (Phase 1: ?�일 매장 가??
       const store = await withTenant(
         this.supabase
           .from('core_stores')
@@ -1594,14 +1568,14 @@ export class AcademyService {
       const regionId = store.data?.[0]?.region_id;
       const industryType = tenant.data?.industry_type || store.data?.[0]?.industry_type || 'academy';
 
-      // 이벤트 타입 결정 (attendance.check_in 또는 attendance.check_out)
+      // ?�벤???�??결정 (attendance.check_in ?�는 attendance.check_out)
       const eventType = input.attendance_type === 'check_in' 
         ? 'attendance.check_in' 
         : input.attendance_type === 'check_out'
         ? 'attendance.check_out'
         : `attendance.${input.attendance_type}`;
 
-      // analytics.events에 기록 (event_date_kst는 서비스 내부에서 자동 계산됨)
+      // analytics.events??기록 (event_date_kst???�비???��??�서 ?�동 계산??
       await analyticsService.recordEvent(tenantId, {
         event_type: eventType,
         user_id: userId,
@@ -1617,14 +1591,14 @@ export class AcademyService {
         industry_type: industryType,
       });
 
-      // 4. core-metering 사용량 기록 (attendance_count)
+      // 4. core-metering ?�용??기록 (attendance_count)
       await meteringService.recordUsage(tenantId, {
         metric_type: 'attendance_count',
         value: 1,
         recorded_at: input.occurred_at,
       });
     } catch (error) {
-      // analytics/metering 기록 실패해도 출결 기록은 저장됨
+      // analytics/metering 기록 ?�패?�도 출결 기록?� ?�?�됨
       console.error('Failed to record analytics/metering:', error);
     }
 
@@ -1633,7 +1607,7 @@ export class AcademyService {
 
   /**
    * 출결 로그 조회
-   * [불변 규칙] SELECT 시 withTenant 사용
+   * [불�? 규칙] SELECT ??withTenant ?�용
    */
   async getAttendanceLogs(
     tenantId: string,
@@ -1644,7 +1618,7 @@ export class AcademyService {
       .select('*')
       .order('occurred_at', { ascending: false });
 
-    // 필터 적용
+    // ?�터 ?�용
     if (filter?.student_id) {
       query = query.eq('student_id', filter.student_id);
     }
@@ -1674,7 +1648,7 @@ export class AcademyService {
   }
 
   /**
-   * 학생별 출결 로그 조회
+   * ?�생�?출결 로그 조회
    */
   async getAttendanceLogsByStudent(
     tenantId: string,
@@ -1696,8 +1670,8 @@ export class AcademyService {
   }
 
   /**
-   * 출결 로그 삭제
-   * [불변 규칙] DELETE 시 withTenant 사용
+   * 출결 로그 ??��
+   * [불�? 규칙] DELETE ??withTenant ?�용
    */
   async deleteAttendanceLog(
     tenantId: string,

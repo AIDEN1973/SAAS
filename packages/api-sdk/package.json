@@ -15,7 +15,7 @@
   "dependencies": {
     "@lib/supabase-client": "file:../../packages/lib/supabase-client",
     "@env-registry/core": "file:../../packages/env-registry",
-    "@schema-engine": "file:../../packages/schema-engine"
+    "@schema/engine": "file:../../packages/schema-engine"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

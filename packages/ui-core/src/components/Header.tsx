@@ -1,8 +1,8 @@
 /**
  * Header Component
  * 
- * 상단 헤더 메뉴
- * [불변 규칙] 반응형: Mobile에서는 햄버거 메뉴, Desktop에서는 전체 메뉴 표시
+ * ?�단 ?�더 메뉴
+ * [불�? 규칙] 반응?? Mobile?�서???�버�?메뉴, Desktop?�서???�체 메뉴 ?�시
  */
 
 import React from 'react';
@@ -19,7 +19,7 @@ export interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  title = '디어쌤',
+  title = '?�어??,
   logo,
   onMenuClick,
   rightContent,

@@ -1,8 +1,8 @@
 /**
  * Core Tenancy Referral Types
  * 
- * B2B 추천인 코드 제도 (SaaS 사용자 간 추천 시스템)
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * B2B 추천??코드 ?�도 (SaaS ?�용??�?추천 ?�스??
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  */
 
 export type RewardType = 'discount' | 'credit' | 'free_trial';

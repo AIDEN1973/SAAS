@@ -1,10 +1,10 @@
 /**
  * SplitTableLayout Component
  * 
- * [불변 규칙] 태블릿 환경에서 사용하는 좌측 목록 + 우측 상세 패널 레이아웃
- * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
- * [불변 규칙] 태블릿 (md)에서 사용
- * [불변 규칙] 우측 상세 패널 최소 폭 ≥ 360px
+ * [불�? 규칙] ?�블�??�경?�서 ?�용?�는 좌측 목록 + ?�측 ?�세 ?�널 ?�이?�웃
+ * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
+ * [불�? 규칙] ?�블�?(md)?�서 ?�용
+ * [불�? 규칙] ?�측 ?�세 ?�널 최소 ????360px
  */
 
 import React from 'react';
@@ -22,9 +22,9 @@ export interface SplitTableLayoutProps {
 }
 
 /**
- * SplitTableLayout 컴포넌트
+ * SplitTableLayout 컴포?�트
  * 
- * 태블릿 환경에서 좌측 목록과 우측 상세 패널을 동시에 표시
+ * ?�블�??�경?�서 좌측 목록�??�측 ?�세 ?�널???�시???�시
  */
 export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
   list,
@@ -37,7 +37,7 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
   const mode = useResponsiveMode();
   const isTablet = mode === 'md';
 
-  // 태블릿이 아니면 목록만 표시
+  // ?�블릿이 ?�니�?목록�??�시
   if (!isTablet) {
     return <div className={clsx(className)}>{list}</div>;
   }
@@ -96,7 +96,7 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
                 minHeight: '44px',
               }}
             >
-              ✕
+              ??
             </button>
           </div>
         )}

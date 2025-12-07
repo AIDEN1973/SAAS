@@ -4,7 +4,7 @@
     "baseUrl": ".",
     "paths": {
       "@core/*": ["../*"],
-      "@schema-engine/*": ["../../schema-engine/src"],
+      "@schema/engine/*": ["../../schema-engine/src"],
       "@lib/*": ["../../lib/*"]
     }
   },

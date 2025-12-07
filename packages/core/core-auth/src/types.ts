@@ -1,8 +1,8 @@
 /**
  * Core Auth Types
  * 
- * 인증 (Supabase Auth 기반)
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * ?�증 (Supabase Auth 기반)
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  */
 
 export interface User {
@@ -19,7 +19,7 @@ export interface AuthSession {
 }
 
 /**
- * 로그인 입력
+ * 로그???�력
  */
 export interface LoginInput {
   email: string;
@@ -27,7 +27,7 @@ export interface LoginInput {
 }
 
 /**
- * 소셜 로그인 입력
+ * ?�셜 로그???�력
  */
 export interface OAuthLoginInput {
   provider: 'google' | 'kakao';
@@ -35,7 +35,7 @@ export interface OAuthLoginInput {
 }
 
 /**
- * OTP 로그인 입력
+ * OTP 로그???�력
  */
 export interface OTPLoginInput {
   phone: string;
@@ -43,7 +43,7 @@ export interface OTPLoginInput {
 }
 
 /**
- * 회원가입 입력
+ * ?�원가???�력
  */
 export interface SignupInput {
   email: string;
@@ -53,7 +53,7 @@ export interface SignupInput {
 }
 
 /**
- * 테넌트 정보 (로그인 결과에 포함)
+ * ?�넌???�보 (로그??결과???�함)
  */
 export interface TenantInfo {
   id: string;
@@ -63,7 +63,7 @@ export interface TenantInfo {
 }
 
 /**
- * 로그인 결과
+ * 로그??결과
  */
 export interface LoginResult {
   user: User;
@@ -72,7 +72,7 @@ export interface LoginResult {
 }
 
 /**
- * 테넌트 선택 결과
+ * ?�넌???�택 결과
  */
 export interface TenantSelectionResult {
   access_token: string;

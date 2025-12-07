@@ -1,8 +1,8 @@
 /**
  * Core Calendar Types
  * 
- * 일정/예약/수업 스케줄 공통 도메인
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * ?�정/?�약/?�업 ?��?�?공통 ?�메??
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  */
 
 export type RepeatPattern = 'daily' | 'weekly' | 'monthly' | 'none';

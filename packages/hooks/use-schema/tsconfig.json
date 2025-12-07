@@ -6,7 +6,7 @@
     "baseUrl": ".",
     "paths": {
       "@api-sdk/core": ["../../api-sdk/src"],
-      "@schema-engine": ["../../packages/schema-engine/src"]
+      "@schema/engine": ["../../packages/schema-engine/src"]
     }
   },
   "include": ["src/**/*"]

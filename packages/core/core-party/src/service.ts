@@ -1,10 +1,10 @@
 /**
  * Core Party Service
  * 
- * 회원/고객 공통 모델 서비스
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
- * [불변 규칙] 모든 쿼리는 withTenant()를 사용하여 tenant_id 필터를 강제한다.
- * [불변 규칙] INSERT 시에는 row object 안에 tenant_id 필드를 직접 포함한다.
+ * ?�원/고객 공통 모델 ?�비??
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
+ * [불�? 규칙] 모든 쿼리??withTenant()�??�용?�여 tenant_id ?�터�?강제?�다.
+ * [불�? 규칙] INSERT ?�에??row object ?�에 tenant_id ?�드�?직접 ?�함?�다.
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -20,7 +20,7 @@ export class PartyService {
   private supabase = createServerClient();
 
   /**
-   * 회원 목록 조회 (필터링 지원)
+   * ?�원 목록 조회 (?�터�?지??
    */
   async getPersons(
     tenantId: string,
@@ -31,7 +31,7 @@ export class PartyService {
       tenantId
     );
 
-    // person_type 필터
+    // person_type ?�터
     if (filter?.person_type) {
       if (Array.isArray(filter.person_type)) {
         query = query.in('person_type', filter.person_type);
@@ -40,12 +40,12 @@ export class PartyService {
       }
     }
 
-    // 이름 검색
+    // ?�름 검??
     if (filter?.search) {
       query = query.ilike('name', `%${filter.search}%`);
     }
 
-    // 정렬: 최신순
+    // ?�렬: 최신??
     query = query.order('created_at', { ascending: false });
 
     const { data, error } = await query;
@@ -58,7 +58,7 @@ export class PartyService {
   }
 
   /**
-   * 회원 상세 조회
+   * ?�원 ?�세 조회
    */
   async getPerson(tenantId: string, personId: string): Promise<Person | null> {
     const { data, error } = await withTenant(
@@ -80,7 +80,7 @@ export class PartyService {
   }
 
   /**
-   * 회원 생성
+   * ?�원 ?�성
    */
   async createPerson(
     tenantId: string,
@@ -107,7 +107,7 @@ export class PartyService {
   }
 
   /**
-   * 회원 수정
+   * ?�원 ?�정
    */
   async updatePerson(
     tenantId: string,
@@ -131,7 +131,7 @@ export class PartyService {
   }
 
   /**
-   * 회원 삭제
+   * ?�원 ??��
    */
   async deletePerson(tenantId: string, personId: string): Promise<void> {
     const { error } = await withTenant(

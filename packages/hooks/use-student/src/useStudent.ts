@@ -1,9 +1,9 @@
 /**
  * useStudent Hook
  * 
- * React Query 기반 학생 관리 Hook
- * [불변 규칙] tenant 변경 시 invalidateQueries() 자동 발생
- * [불변 규칙] api-sdk를 통해서만 데이터 요청
+ * React Query 기반 ?�생 관�?Hook
+ * [불�? 규칙] tenant 변�???invalidateQueries() ?�동 발생
+ * [불�? 규칙] api-sdk�??�해?�만 ?�이???�청
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -18,8 +18,8 @@ import type {
 import type { Class } from '@services/class-service';
 
 /**
- * 학생 목록 조회 Hook
- * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ * ?�생 목록 조회 Hook
+ * [불�? 규칙] Zero-Trust: tenantId??Context?�서 ?�동?�로 가?�옴
  */
 export function useStudents(filter?: StudentFilter) {
   const context = getApiContext();
@@ -28,9 +28,9 @@ export function useStudents(filter?: StudentFilter) {
   return useQuery({
     queryKey: ['students', tenantId, filter],
     queryFn: async () => {
-      // [불변 규칙] 기술문서 정책: "Core Party 테이블 + 업종별 확장 테이블" 패턴 사용
-      // persons + academy_students를 직접 조인하여 조회 (View 대신)
-      // PostgREST가 View를 인식하지 못하는 문제를 우회하기 위해 직접 조인 사용
+      // [불�? 규칙] 기술문서 ?�책: "Core Party ?�이�?+ ?�종�??�장 ?�이�? ?�턴 ?�용
+      // persons + academy_students�?직접 조인?�여 조회 (View ?�??
+      // PostgREST가 View�??�식?��? 못하??문제�??�회?�기 ?�해 직접 조인 ?�용
       const response = await apiClient.get<any>('persons', {
         select: `
           *,
@@ -60,7 +60,7 @@ export function useStudents(filter?: StudentFilter) {
 
       const personsData = response.data || [];
 
-      // 데이터 변환: persons + academy_students → Student
+      // ?�이??변?? persons + academy_students ??Student
       let students: Student[] = personsData.map((person: any) => {
         const academyData = person.academy_students?.[0] || {};
         return {
@@ -85,7 +85,7 @@ export function useStudents(filter?: StudentFilter) {
         } as Student;
       });
 
-      // 클라이언트 측 필터링
+      // ?�라?�언??�??�터�?
       if (filter?.status) {
         const statusArray = Array.isArray(filter.status) ? filter.status : [filter.status];
         students = students.filter((s) => statusArray.includes(s.status));
@@ -109,8 +109,8 @@ export function useStudents(filter?: StudentFilter) {
 }
 
 /**
- * 학생 상세 조회 Hook
- * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ * ?�생 ?�세 조회 Hook
+ * [불�? 규칙] Zero-Trust: tenantId??Context?�서 ?�동?�로 가?�옴
  */
 export function useStudent(studentId: string | null) {
   const context = getApiContext();
@@ -121,7 +121,7 @@ export function useStudent(studentId: string | null) {
     queryFn: async () => {
       if (!studentId) return null;
       
-      // students View를 사용하여 조회 (persons + academy_students 조인)
+      // students View�??�용?�여 조회 (persons + academy_students 조인)
       const response = await apiClient.get<any>('persons', {
         select: `
           *,
@@ -151,7 +151,7 @@ export function useStudent(studentId: string | null) {
       const person = response.data?.[0];
       if (!person) return null;
       
-      // 데이터 변환: persons + academy_students → Student
+      // ?�이??변?? persons + academy_students ??Student
       const academyData = person.academy_students?.[0] || {};
       return {
         id: person.id,
@@ -179,9 +179,9 @@ export function useStudent(studentId: string | null) {
 }
 
 /**
- * 학생 생성 Hook
- * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
- * [불변 규칙] students는 View이므로 persons + academy_students를 각각 생성해야 함
+ * ?�생 ?�성 Hook
+ * [불�? 규칙] Zero-Trust: tenantId??Context?�서 ?�동?�로 가?�옴
+ * [불�? 규칙] students??View?��?�?persons + academy_students�?각각 ?�성?�야 ??
  */
 export function useCreateStudent() {
   const queryClient = useQueryClient();
@@ -191,7 +191,7 @@ export function useCreateStudent() {
 
   return useMutation({
     mutationFn: async (input: CreateStudentInput) => {
-      // 1. persons 테이블에 생성 (공통 필드)
+      // 1. persons ?�이블에 ?�성 (공통 ?�드)
       const personResponse = await apiClient.post<any>('persons', {
         name: input.name,
         email: input.email,
@@ -206,7 +206,7 @@ export function useCreateStudent() {
       
       const person = personResponse.data!;
       
-      // 2. academy_students 테이블에 확장 정보 저장
+      // 2. academy_students ?�이블에 ?�장 ?�보 ?�??
       const academyResponse = await apiClient.post<any>('academy_students', {
         person_id: person.id,
         birth_date: input.birth_date,
@@ -219,12 +219,12 @@ export function useCreateStudent() {
       });
       
       if (academyResponse.error) {
-        // 롤백: persons 삭제
+        // 롤백: persons ??��
         await apiClient.delete('persons', person.id);
         throw new Error(academyResponse.error.message);
       }
       
-      // 3. 학부모 정보 생성
+      // 3. ?��?�??�보 ?�성
       if (input.guardians && input.guardians.length > 0) {
         for (const guardian of input.guardians) {
           await apiClient.post('guardians', {
@@ -234,7 +234,7 @@ export function useCreateStudent() {
         }
       }
       
-      // 4. 태그 연결
+      // 4. ?�그 ?�결
       if (input.tag_ids && input.tag_ids.length > 0) {
         for (const tagId of input.tag_ids) {
           await apiClient.post('tag_assignments', {
@@ -268,15 +268,15 @@ export function useCreateStudent() {
       } as Student;
     },
     onSuccess: () => {
-      // 학생 목록 쿼리 무효화
+      // ?�생 목록 쿼리 무효??
       queryClient.invalidateQueries({ queryKey: ['students', tenantId] });
     },
   });
 }
 
 /**
- * 학생 일괄 등록 Hook (엑셀)
- * [요구사항] 학생 일괄 등록(엑셀)
+ * ?�생 ?�괄 ?�록 Hook (?��?)
+ * [?�구?�항] ?�생 ?�괄 ?�록(?��?)
  */
 export function useBulkCreateStudents() {
   const queryClient = useQueryClient();
@@ -286,14 +286,14 @@ export function useBulkCreateStudents() {
 
   return useMutation({
     mutationFn: async (students: CreateStudentInput[]) => {
-      // [불변 규칙] api-sdk를 통해서만 데이터 요청
-      // 일괄 등록은 여러 개의 POST 요청으로 처리
+      // [불�? 규칙] api-sdk�??�해?�만 ?�이???�청
+      // ?�괄 ?�록?� ?�러 개의 POST ?�청?�로 처리
       const results: Student[] = [];
       const errors: Array<{ index: number; error: string }> = [];
 
       for (let i = 0; i < students.length; i++) {
         try {
-          // 1. persons 테이블에 생성
+          // 1. persons ?�이블에 ?�성
           const personResponse = await apiClient.post<any>('persons', {
             name: students[i].name,
             email: students[i].email,
@@ -308,7 +308,7 @@ export function useBulkCreateStudents() {
           
           const person = personResponse.data!;
           
-          // 2. academy_students 테이블에 확장 정보 저장
+          // 2. academy_students ?�이블에 ?�장 ?�보 ?�??
           const academyResponse = await apiClient.post<any>('academy_students', {
             person_id: person.id,
             birth_date: students[i].birth_date,
@@ -321,7 +321,7 @@ export function useBulkCreateStudents() {
           });
           
           if (academyResponse.error) {
-            // 롤백: persons 삭제
+            // 롤백: persons ??��
             await apiClient.delete('persons', person.id);
             throw new Error(academyResponse.error.message);
           }
@@ -356,22 +356,22 @@ export function useBulkCreateStudents() {
       }
 
       if (errors.length > 0) {
-        console.warn('일부 학생 등록 실패:', errors);
+        console.warn('?��? ?�생 ?�록 ?�패:', errors);
       }
 
       return { results, errors };
     },
     onSuccess: () => {
-      // 학생 목록 쿼리 무효화
+      // ?�생 목록 쿼리 무효??
       queryClient.invalidateQueries({ queryKey: ['students', tenantId] });
     },
   });
 }
 
 /**
- * 학생 수정 Hook
- * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
- * [불변 규칙] students는 View이므로 persons와 academy_students를 각각 업데이트해야 함
+ * ?�생 ?�정 Hook
+ * [불�? 규칙] Zero-Trust: tenantId??Context?�서 ?�동?�로 가?�옴
+ * [불�? 규칙] students??View?��?�?persons?� academy_students�?각각 ?�데?�트?�야 ??
  */
 export function useUpdateStudent() {
   const queryClient = useQueryClient();
@@ -386,7 +386,7 @@ export function useUpdateStudent() {
       studentId: string;
       input: UpdateStudentInput;
     }) => {
-      // 1. persons 테이블 업데이트 (공통 필드)
+      // 1. persons ?�이�??�데?�트 (공통 ?�드)
       const personUpdate: any = {};
       if (input.name !== undefined) personUpdate.name = input.name;
       if (input.email !== undefined) personUpdate.email = input.email;
@@ -400,7 +400,7 @@ export function useUpdateStudent() {
         }
       }
 
-      // 2. academy_students 테이블 업데이트 (업종 특화 필드)
+      // 2. academy_students ?�이�??�데?�트 (?�종 ?�화 ?�드)
       const academyUpdate: any = {};
       if (input.birth_date !== undefined) academyUpdate.birth_date = input.birth_date;
       if (input.gender !== undefined) academyUpdate.gender = input.gender;
@@ -411,7 +411,7 @@ export function useUpdateStudent() {
       if (input.profile_image_url !== undefined) academyUpdate.profile_image_url = input.profile_image_url;
 
       if (Object.keys(academyUpdate).length > 0) {
-        // academy_students는 person_id를 PK로 사용하므로 person_id로 조회 후 업데이트
+        // academy_students??person_id�?PK�??�용?��?�?person_id�?조회 ???�데?�트
         const academyResponse = await apiClient.get('academy_students', {
           filters: { person_id: studentId },
           limit: 1,
@@ -430,7 +430,7 @@ export function useUpdateStudent() {
         }
       }
 
-      // 3. 업데이트된 데이터 조회하여 반환
+      // 3. ?�데?�트???�이??조회?�여 반환
       const studentResponse = await apiClient.get<any>('persons', {
         select: `
           *,
@@ -485,7 +485,7 @@ export function useUpdateStudent() {
       } as Student;
     },
     onSuccess: (data) => {
-      // 학생 목록 및 상세 쿼리 무효화
+      // ?�생 목록 �??�세 쿼리 무효??
       queryClient.invalidateQueries({ queryKey: ['students', tenantId] });
       queryClient.invalidateQueries({
         queryKey: ['student', tenantId, data.id],
@@ -495,8 +495,8 @@ export function useUpdateStudent() {
 }
 
 /**
- * 학생 삭제 Hook (Soft delete: status를 'withdrawn'으로 변경)
- * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ * ?�생 ??�� Hook (Soft delete: status�?'withdrawn'?�로 변�?
+ * [불�? 규칙] Zero-Trust: tenantId??Context?�서 ?�동?�로 가?�옴
  */
 export function useDeleteStudent() {
   const queryClient = useQueryClient();
@@ -505,7 +505,7 @@ export function useDeleteStudent() {
 
   return useMutation({
     mutationFn: async (studentId: string) => {
-      // Soft delete: status를 'withdrawn'으로 변경
+      // Soft delete: status�?'withdrawn'?�로 변�?
       const response = await apiClient.patch<Student>('students', studentId, {
         status: 'withdrawn',
       });
@@ -517,15 +517,15 @@ export function useDeleteStudent() {
       return response.data!;
     },
     onSuccess: () => {
-      // 학생 목록 쿼리 무효화
+      // ?�생 목록 쿼리 무효??
       queryClient.invalidateQueries({ queryKey: ['students', tenantId] });
     },
   });
 }
 
 /**
- * 학부모 목록 조회 Hook
- * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ * ?��?�?목록 조회 Hook
+ * [불�? 규칙] Zero-Trust: tenantId??Context?�서 ?�동?�로 가?�옴
  */
 export function useGuardians(studentId: string | null) {
   const context = getApiContext();
@@ -552,9 +552,9 @@ export function useGuardians(studentId: string | null) {
 }
 
 /**
- * 학생 태그 목록 조회 Hook (core-tags 활용)
- * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
- * TODO: API SDK를 통해 태그 조회 구현 필요
+ * ?�생 ?�그 목록 조회 Hook (core-tags ?�용)
+ * [불�? 규칙] Zero-Trust: tenantId??Context?�서 ?�동?�로 가?�옴
+ * TODO: API SDK�??�해 ?�그 조회 구현 ?�요
  */
 export function useStudentTags() {
   const context = getApiContext();
@@ -563,8 +563,8 @@ export function useStudentTags() {
   return useQuery<Array<{ id: string; name: string; color: string }>>({
     queryKey: ['tags', tenantId, 'student'],
     queryFn: async (): Promise<Array<{ id: string; name: string; color: string }>> => {
-      // TODO: API SDK를 통해 태그 조회
-      // 현재는 빈 배열 반환
+      // TODO: API SDK�??�해 ?�그 조회
+      // ?�재??�?배열 반환
       return [];
     },
     enabled: !!tenantId,
@@ -572,9 +572,9 @@ export function useStudentTags() {
 }
 
 /**
- * 학생의 태그 조회 Hook (core-tags 활용)
- * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
- * TODO: API SDK를 통해 태그 조회 구현 필요
+ * ?�생???�그 조회 Hook (core-tags ?�용)
+ * [불�? 규칙] Zero-Trust: tenantId??Context?�서 ?�동?�로 가?�옴
+ * TODO: API SDK�??�해 ?�그 조회 구현 ?�요
  */
 export function useStudentTagsByStudent(studentId: string | null) {
   const context = getApiContext();
@@ -584,8 +584,8 @@ export function useStudentTagsByStudent(studentId: string | null) {
     queryKey: ['tags', tenantId, 'student', studentId],
     queryFn: async (): Promise<Array<{ id: string; name: string; color: string }>> => {
       if (!studentId) return [];
-      // TODO: API SDK를 통해 태그 조회
-      // 현재는 빈 배열 반환
+      // TODO: API SDK�??�해 ?�그 조회
+      // ?�재??�?배열 반환
       return [];
     },
     enabled: !!tenantId && !!studentId,
@@ -593,8 +593,8 @@ export function useStudentTagsByStudent(studentId: string | null) {
 }
 
 /**
- * 상담일지 목록 조회 Hook
- * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ * ?�담?��? 목록 조회 Hook
+ * [불�? 규칙] Zero-Trust: tenantId??Context?�서 ?�동?�로 가?�옴
  */
 export function useConsultations(studentId: string | null) {
   const context = getApiContext();
@@ -621,7 +621,7 @@ export function useConsultations(studentId: string | null) {
 }
 
 /**
- * 상담일지 생성 Hook
+ * ?�담?��? ?�성 Hook
  */
 export function useCreateConsultation() {
   const queryClient = useQueryClient();
@@ -657,7 +657,7 @@ export function useCreateConsultation() {
 }
 
 /**
- * 상담일지 수정 Hook
+ * ?�담?��? ?�정 Hook
  */
 export function useUpdateConsultation() {
   const queryClient = useQueryClient();
@@ -689,7 +689,7 @@ export function useUpdateConsultation() {
 }
 
 /**
- * 상담일지 삭제 Hook
+ * ?�담?��? ??�� Hook
  */
 export function useDeleteConsultation() {
   const queryClient = useQueryClient();
@@ -717,11 +717,11 @@ export function useDeleteConsultation() {
 }
 
 /**
- * 상담일지 AI 요약 생성 Hook
- * [요구사항] 상담일지 AI 요약 버튼 삽입
+ * ?�담?��? AI ?�약 ?�성 Hook
+ * [?�구?�항] ?�담?��? AI ?�약 버튼 ?�입
  * 
- * [불변 규칙] Phase 1에서는 플레이스홀더로 구현
- * 실제 AI 연동은 Edge Function 또는 외부 AI 서비스를 통해 구현 예정
+ * [불�? 규칙] Phase 1?�서???�레?�스?�?�로 구현
+ * ?�제 AI ?�동?� Edge Function ?�는 ?��? AI ?�비?��? ?�해 구현 ?�정
  */
 export function useGenerateConsultationAISummary() {
   const queryClient = useQueryClient();
@@ -736,24 +736,24 @@ export function useGenerateConsultationAISummary() {
       consultationId: string;
       studentId: string;
     }) => {
-      // [불변 규칙] api-sdk를 통해서만 데이터 요청
-      // 1. 상담일지 조회
+      // [불�? 규칙] api-sdk�??�해?�만 ?�이???�청
+      // 1. ?�담?��? 조회
       const consultationResponse = await apiClient.get<any>('student_consultations', {
         filters: { id: consultationId },
         limit: 1,
       });
       
       if (consultationResponse.error || !consultationResponse.data || consultationResponse.data.length === 0) {
-        throw new Error('상담일지를 찾을 수 없습니다.');
+        throw new Error('?�담?��?�?찾을 ???�습?�다.');
       }
       
       const consultation = consultationResponse.data[0];
       
-      // 2. AI 요약 생성 (Phase 1: 플레이스홀더)
-      // TODO: 실제 AI 서비스 연동 (Edge Function 또는 외부 AI API)
-      const placeholderSummary = `[AI 요약] ${consultation.content.substring(0, 100)}... (요약 기능은 곧 제공될 예정입니다.)`;
+      // 2. AI ?�약 ?�성 (Phase 1: ?�레?�스?�??
+      // TODO: ?�제 AI ?�비???�동 (Edge Function ?�는 ?��? AI API)
+      const placeholderSummary = `[AI ?�약] ${consultation.content.substring(0, 100)}... (?�약 기능?� �??�공???�정?�니??)`;
       
-      // 3. ai_summary 업데이트
+      // 3. ai_summary ?�데?�트
       const updateResponse = await apiClient.patch('student_consultations', consultationId, {
         ai_summary: placeholderSummary,
       });
@@ -765,14 +765,14 @@ export function useGenerateConsultationAISummary() {
       return placeholderSummary;
     },
     onSuccess: (_, variables) => {
-      // 상담일지 목록 쿼리 무효화하여 AI 요약 반영
+      // ?�담?��? 목록 쿼리 무효?�하??AI ?�약 반영
       queryClient.invalidateQueries({ queryKey: ['consultations', tenantId, variables.studentId] });
     },
   });
 }
 
 /**
- * 학부모 생성 Hook
+ * ?��?�??�성 Hook
  */
 export function useCreateGuardian() {
   const queryClient = useQueryClient();
@@ -805,7 +805,7 @@ export function useCreateGuardian() {
 }
 
 /**
- * 학부모 수정 Hook
+ * ?��?�??�정 Hook
  */
 export function useUpdateGuardian() {
   const queryClient = useQueryClient();
@@ -837,7 +837,7 @@ export function useUpdateGuardian() {
 }
 
 /**
- * 학부모 삭제 Hook
+ * ?��?�???�� Hook
  */
 export function useDeleteGuardian() {
   const queryClient = useQueryClient();
@@ -865,7 +865,7 @@ export function useDeleteGuardian() {
 }
 
 /**
- * 학생 태그 업데이트 Hook
+ * ?�생 ?�그 ?�데?�트 Hook
  */
 export function useUpdateStudentTags() {
   const queryClient = useQueryClient();
@@ -880,7 +880,7 @@ export function useUpdateStudentTags() {
       studentId: string;
       tagIds: string[];
     }) => {
-      // 기존 태그 할당 제거
+      // 기존 ?�그 ?�당 ?�거
       const existingTags = await apiClient.get('tag_assignments', {
         filters: { entity_id: studentId, entity_type: 'student' },
       });
@@ -891,7 +891,7 @@ export function useUpdateStudentTags() {
         }
       }
       
-      // 새 태그 할당
+      // ???�그 ?�당
       if (tagIds.length > 0) {
         for (const tagId of tagIds) {
           await apiClient.post('tag_assignments', {
@@ -909,12 +909,12 @@ export function useUpdateStudentTags() {
   });
 }
 
-// ==================== 학생 반 배정 관리 ====================
+// ==================== ?�생 �?배정 관�?====================
 
 /**
- * 학생의 반 목록 조회 Hook
- * [요구사항] 다중 반 소속 지원
- * [수정] PostgREST 조인 문법 오류 수정: 두 번의 쿼리로 분리
+ * ?�생??�?목록 조회 Hook
+ * [?�구?�항] ?�중 �??�속 지??
+ * [?�정] PostgREST 조인 문법 ?�류 ?�정: ??번의 쿼리�?분리
  */
 export function useStudentClasses(studentId: string | null) {
   const context = getApiContext();
@@ -953,7 +953,7 @@ export function useStudentClasses(studentId: string | null) {
       const classes = classesResponse.data || [];
       const classMap = new Map(classes.map((c) => [c.id, c]));
 
-      // 4. 조합하여 반환
+      // 4. 조합?�여 반환
       return studentClasses.map((sc: any) => ({
         ...sc,
         class: classMap.get(sc.class_id) || null,
@@ -964,10 +964,10 @@ export function useStudentClasses(studentId: string | null) {
 }
 
 /**
- * 학생 반 배정 Hook
- * [요구사항] 반 배정, 다중 반 소속 지원
- * [수정] current_count 수동 업데이트 제거 (Service Layer에서 처리하도록 변경 필요)
- * [주의] 현재는 apiClient를 통해 직접 호출하지만, 향후 Edge Function으로 이동 권장
+ * ?�생 �?배정 Hook
+ * [?�구?�항] �?배정, ?�중 �??�속 지??
+ * [?�정] current_count ?�동 ?�데?�트 ?�거 (Service Layer?�서 처리?�도�?변�??�요)
+ * [주의] ?�재??apiClient�??�해 직접 ?�출?��?�? ?�후 Edge Function?�로 ?�동 권장
  */
 export function useAssignStudentToClass() {
   const queryClient = useQueryClient();
@@ -988,9 +988,9 @@ export function useAssignStudentToClass() {
         throw new Error('Tenant ID is required');
       }
 
-      // student_classes에 배정
-      // [주의] current_count 업데이트는 Industry Service의 enrollStudentToClass에서 처리해야 함
-      // 현재는 apiClient를 통해 직접 호출하지만, 향후 Edge Function으로 이동 권장
+      // student_classes??배정
+      // [주의] current_count ?�데?�트??Industry Service??enrollStudentToClass?�서 처리?�야 ??
+      // ?�재??apiClient�??�해 직접 ?�출?��?�? ?�후 Edge Function?�로 ?�동 권장
       const response = await apiClient.post<StudentClass>('student_classes', {
         student_id: studentId,
         class_id: classId,
@@ -1002,10 +1002,10 @@ export function useAssignStudentToClass() {
         throw new Error(response.error.message);
       }
 
-      // [수정] current_count 수동 업데이트 제거
-      // current_count는 Industry Service의 enrollStudentToClass 메서드에서 처리하거나
-      // PostgreSQL 트리거로 자동 업데이트되어야 함
-      // TODO: Edge Function을 통해 enrollStudentToClass 호출로 변경
+      // [?�정] current_count ?�동 ?�데?�트 ?�거
+      // current_count??Industry Service??enrollStudentToClass 메서?�에??처리?�거??
+      // PostgreSQL ?�리거로 ?�동 ?�데?�트?�어????
+      // TODO: Edge Function???�해 enrollStudentToClass ?�출�?변�?
 
       return response.data!;
     },
@@ -1018,10 +1018,10 @@ export function useAssignStudentToClass() {
 }
 
 /**
- * 학생 반 이동/해제 Hook
- * [요구사항] 반 이동, 다중 반 소속 지원
- * [수정] current_count 수동 업데이트 제거 (Service Layer에서 처리하도록 변경 필요)
- * [주의] 현재는 apiClient를 통해 직접 호출하지만, 향후 Edge Function으로 이동 권장
+ * ?�생 �??�동/?�제 Hook
+ * [?�구?�항] �??�동, ?�중 �??�속 지??
+ * [?�정] current_count ?�동 ?�데?�트 ?�거 (Service Layer?�서 처리?�도�?변�??�요)
+ * [주의] ?�재??apiClient�??�해 직접 ?�출?��?�? ?�후 Edge Function?�로 ?�동 권장
  */
 export function useUnassignStudentFromClass() {
   const queryClient = useQueryClient();
@@ -1042,7 +1042,7 @@ export function useUnassignStudentFromClass() {
         throw new Error('Tenant ID is required');
       }
 
-      // student_classes에서 해당 배정 찾기
+      // student_classes?�서 ?�당 배정 찾기
       const findResponse = await apiClient.get('student_classes', {
         filters: { student_id: studentId, class_id: classId, is_active: true },
         limit: 1,
@@ -1054,9 +1054,9 @@ export function useUnassignStudentFromClass() {
 
       const assignment = findResponse.data[0];
 
-      // is_active를 false로 변경하고 left_at 설정
-      // [주의] current_count 업데이트는 Industry Service의 unenrollStudentFromClass에서 처리해야 함
-      // 현재는 apiClient를 통해 직접 호출하지만, 향후 Edge Function으로 이동 권장
+      // is_active�?false�?변경하�?left_at ?�정
+      // [주의] current_count ?�데?�트??Industry Service??unenrollStudentFromClass?�서 처리?�야 ??
+      // ?�재??apiClient�??�해 직접 ?�출?��?�? ?�후 Edge Function?�로 ?�동 권장
       const response = await apiClient.patch('student_classes', assignment.id, {
         is_active: false,
         left_at: leftAt || new Date().toISOString().split('T')[0],
@@ -1066,10 +1066,10 @@ export function useUnassignStudentFromClass() {
         throw new Error(response.error.message);
       }
 
-      // [수정] current_count 수동 업데이트 제거
-      // current_count는 Industry Service의 unenrollStudentFromClass 메서드에서 처리하거나
-      // PostgreSQL 트리거로 자동 업데이트되어야 함
-      // TODO: Edge Function을 통해 unenrollStudentFromClass 호출로 변경
+      // [?�정] current_count ?�동 ?�데?�트 ?�거
+      // current_count??Industry Service??unenrollStudentFromClass 메서?�에??처리?�거??
+      // PostgreSQL ?�리거로 ?�동 ?�데?�트?�어????
+      // TODO: Edge Function???�해 unenrollStudentFromClass ?�출�?변�?
 
       return response.data!;
     },

@@ -1,8 +1,8 @@
 /**
  * App Layout Component
  * 
- * 전체 앱 레이아웃 (Header + Sidebar + Content)
- * [불변 규칙] 반응형: Mobile에서는 Drawer, Desktop에서는 Persistent Sidebar
+ * ?�체 ???�이?�웃 (Header + Sidebar + Content)
+ * [불�? 규칙] 반응?? Mobile?�서??Drawer, Desktop?�서??Persistent Sidebar
  */
 
 import React, { useState } from 'react';

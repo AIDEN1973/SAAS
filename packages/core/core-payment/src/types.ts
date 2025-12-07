@@ -1,10 +1,10 @@
 /**
  * Core Payment Types
  * 
- * 결제/알림뱅킹 Provider (공통 스키마/비즈니스 규칙)
- * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * 결제/?�림뱅킹 Provider (공통 ?�키�?비즈?�스 규칙)
+ * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
  * 
- * ⚠️ 주의: 실제 결제 API 연동 코드는 /packages/payments/* Provider 모듈에서 구현합니다.
+ * ?�️ 주의: ?�제 결제 API ?�동 코드??/packages/payments/* Provider 모듈?�서 구현?�니??
  */
 
 export type PaymentProvider = 'alimbank' | 'toss' | 'kg' | 'nice';
