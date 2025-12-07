@@ -26,13 +26,14 @@ function validateEnvClient(): EnvClient {
       
       // Vite: VITE_* 접두사 사용
       // VITE_ 접두사를 NEXT_PUBLIC_로 매핑 (스키마 호환성)
-      if (viteEnv.VITE_SUPABASE_URL) {
+      // 빈 문자열 체크 (define 옵션으로 주입된 경우 빈 문자열이 될 수 있음)
+      if (viteEnv.VITE_SUPABASE_URL && viteEnv.VITE_SUPABASE_URL.trim() !== '') {
         rawEnv.NEXT_PUBLIC_SUPABASE_URL = viteEnv.VITE_SUPABASE_URL;
       }
-      if (viteEnv.VITE_SUPABASE_ANON_KEY) {
+      if (viteEnv.VITE_SUPABASE_ANON_KEY && viteEnv.VITE_SUPABASE_ANON_KEY.trim() !== '') {
         rawEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY = viteEnv.VITE_SUPABASE_ANON_KEY;
       }
-      if (viteEnv.VITE_KAKAO_JS_KEY) {
+      if (viteEnv.VITE_KAKAO_JS_KEY && viteEnv.VITE_KAKAO_JS_KEY.trim() !== '') {
         rawEnv.NEXT_PUBLIC_KAKAO_JS_KEY = viteEnv.VITE_KAKAO_JS_KEY;
       }
     }
