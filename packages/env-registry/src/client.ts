@@ -1,5 +1,20 @@
 import { envClientSchema, type EnvClient } from './schema';
 
+// Vite 환경변수 타입 정의 (Vite가 없는 환경에서도 타입 체크 통과)
+interface ImportMetaEnv {
+  VITE_SUPABASE_URL?: string;
+  VITE_SUPABASE_ANON_KEY?: string;
+  VITE_KAKAO_JS_KEY?: string;
+  [key: string]: any;
+}
+
+// import.meta에 대한 타입 확장
+declare global {
+  interface ImportMeta {
+    env: ImportMetaEnv;
+  }
+}
+
 function validateEnvClient(): EnvClient {
   const rawEnv: Record<string, string | undefined> = {};
   
@@ -8,10 +23,13 @@ function validateEnvClient(): EnvClient {
   // 프로덕션 빌드에서는 빌드 타임에 주입되므로 항상 접근 가능해야 함
   let isVite = false;
   try {
-    // @ts-ignore - import.meta는 Vite에서만 존재
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
+    // @ts-ignore - import.meta는 Vite에서만 존재하며, 타입 정의가 완벽하지 않을 수 있음
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    const metaEnv = import.meta.env;
+    if (metaEnv) {
       isVite = true;
-      const viteEnv = import.meta.env;
+      const viteEnv = metaEnv as ImportMetaEnv;
       
       // Vite: VITE_* 접두사 사용
       // VITE_ 접두사를 NEXT_PUBLIC_로 매핑 (스키마 호환성)
@@ -68,15 +86,15 @@ function validateEnvClient(): EnvClient {
     
     // 디버깅 정보 수집
     const debugInfo: string[] = [];
-    if (typeof import.meta !== 'undefined') {
-      try {
-        // @ts-ignore
-        const viteEnv = import.meta.env;
-        debugInfo.push(`import.meta.env.VITE_SUPABASE_URL: ${viteEnv?.VITE_SUPABASE_URL ? '설정됨' : '미설정'}`);
-        debugInfo.push(`import.meta.env.VITE_SUPABASE_ANON_KEY: ${viteEnv?.VITE_SUPABASE_ANON_KEY ? '설정됨' : '미설정'}`);
-      } catch (e) {
-        debugInfo.push('import.meta.env 접근 불가');
+    try {
+      // @ts-ignore
+      const metaEnv = import.meta.env;
+      if (metaEnv) {
+        debugInfo.push(`import.meta.env.VITE_SUPABASE_URL: ${metaEnv.VITE_SUPABASE_URL ? '설정됨' : '미설정'}`);
+        debugInfo.push(`import.meta.env.VITE_SUPABASE_ANON_KEY: ${metaEnv.VITE_SUPABASE_ANON_KEY ? '설정됨' : '미설정'}`);
       }
+    } catch (e) {
+      debugInfo.push('import.meta.env 접근 불가');
     }
     if (typeof process !== 'undefined' && process.env) {
       debugInfo.push(`process.env.VITE_SUPABASE_URL: ${process.env.VITE_SUPABASE_URL ? '설정됨' : '미설정'}`);
