@@ -28,7 +28,7 @@ export function useSession() {
   return useQuery<any>({
     queryKey: ['auth', 'session'],
     queryFn: async () => {
-      const response = await apiClient.get<{ session: any }[]>('auth/session');
+      const response = await apiClient.get<{ session: any }>('auth/session');
       if (response.error) {
         throw new Error(response.error.message);
       }
