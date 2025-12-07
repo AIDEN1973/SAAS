@@ -8,13 +8,6 @@ interface ImportMetaEnv {
   [key: string]: any;
 }
 
-// import.meta에 대한 타입 확장
-declare global {
-  interface ImportMeta {
-    env: ImportMetaEnv;
-  }
-}
-
 function validateEnvClient(): EnvClient {
   const rawEnv: Record<string, string | undefined> = {};
   
