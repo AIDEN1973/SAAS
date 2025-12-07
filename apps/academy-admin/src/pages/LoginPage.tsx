@@ -16,6 +16,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Card, Button, Input, useModal, useResponsiveMode } from '@ui-core/react';
+import { SchemaForm } from '@schema-engine';
 import {
   useLoginWithEmail,
   useLoginWithOAuth,
@@ -24,6 +25,7 @@ import {
   useUserTenants,
   useSelectTenant,
 } from '@hooks/use-auth';
+import { loginFormSchema, otpLoginFormSchema } from '../schemas/login.schema';
 
 type LoginMethod = 'email' | 'oauth' | 'otp';
 
@@ -34,10 +36,7 @@ export function LoginPage() {
   const { showAlert } = useModal();
 
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('email');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
 
   const loginWithEmail = useLoginWithEmail();
@@ -47,11 +46,9 @@ export function LoginPage() {
   const { data: tenants } = useUserTenants();
   const selectTenant = useSelectTenant();
 
-  const handleEmailLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleEmailLogin = async (data: { email: string; password: string }) => {
     try {
-      const result = await loginWithEmail.mutateAsync({ email, password });
+      const result = await loginWithEmail.mutateAsync({ email: data.email, password: data.password });
       
       if (result.tenants.length === 0) {
         // 개발 환경에서 상세 정보 표시
@@ -117,11 +114,9 @@ export function LoginPage() {
     }
   };
 
-  const handleOTPLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleOTPLogin = async (data: { phone: string; otp: string }) => {
     try {
-      const result = await loginWithOTP.mutateAsync({ phone, otp });
+      const result = await loginWithOTP.mutateAsync({ phone: data.phone, otp: data.otp });
       
       if (result.tenants.length === 0) {
         // 개발 환경에서 상세 정보 표시
@@ -191,39 +186,15 @@ export function LoginPage() {
 
         {/* 이메일/비밀번호 로그인 */}
         {loginMethod === 'email' && (
-          <form onSubmit={handleEmailLogin} className="space-y-4">
-            <Input
-              type="email"
-              label="이메일"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-              autoComplete="email"
-            />
-            <Input
-              type="password"
-              label="비밀번호"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-              autoComplete="current-password"
-            />
-            <Button
-              type="submit"
-              variant="solid"
-              className="w-full"
-              disabled={loading}
-            >
-              {loading ? '로그인 중...' : '로그인'}
-            </Button>
-          </form>
+          <SchemaForm
+            schema={loginFormSchema}
+            onSubmit={handleEmailLogin}
+          />
         )}
 
         {/* OTP 로그인 */}
         {loginMethod === 'otp' && (
-          <form onSubmit={handleOTPLogin} className="space-y-4">
+          <div className="space-y-4">
             <div className="flex gap-2">
               <Input
                 type="tel"
@@ -246,26 +217,18 @@ export function LoginPage() {
               </Button>
             </div>
             {otpSent && (
-              <Input
-                type="text"
-                label="OTP 코드"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                required
-                disabled={loading}
-                placeholder="6자리 코드"
-                maxLength={6}
+              <SchemaForm
+                schema={{
+                  ...otpLoginFormSchema,
+                  form: {
+                    ...otpLoginFormSchema.form,
+                    fields: otpLoginFormSchema.form.fields.filter((f: { name: string }) => f.name === 'otp'),
+                  },
+                }}
+                onSubmit={(data: { otp: string }) => handleOTPLogin({ phone, otp: data.otp })}
               />
             )}
-            <Button
-              type="submit"
-              variant="solid"
-              className="w-full"
-              disabled={loading || !otpSent}
-            >
-              {loading ? '인증 중...' : '로그인'}
-            </Button>
-          </form>
+          </div>
         )}
 
         {/* 소셜 로그인 */}

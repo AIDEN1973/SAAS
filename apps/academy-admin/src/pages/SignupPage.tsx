@@ -14,8 +14,10 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Card, Button, Input, Select, useModal, useResponsiveMode } from '@ui-core/react';
+import { Container, Card, useModal, useResponsiveMode } from '@ui-core/react';
+import { SchemaForm } from '@schema-engine';
 import { useSignupWithEmail } from '@hooks/use-auth';
+import { signupFormSchema } from '../schemas/signup.schema';
 import type { IndustryType } from '@core/tenancy';
 
 export function SignupPage() {
@@ -24,46 +26,17 @@ export function SignupPage() {
   const isMobile = mode === 'xs' || mode === 'sm';
   const { showAlert } = useModal();
 
-  // 사용자 정보
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-
-  // 테넌트 정보
-  const [tenantName, setTenantName] = useState('');
-  const [industryType, setIndustryType] = useState<IndustryType>('academy');
-
   const signup = useSignupWithEmail();
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // 유효성 검사
-    if (password !== passwordConfirm) {
-      showAlert('오류', '비밀번호가 일치하지 않습니다.');
-      return;
-    }
-
-    if (password.length < 8) {
-      showAlert('오류', '비밀번호는 8자 이상이어야 합니다.');
-      return;
-    }
-
-    if (!tenantName.trim()) {
-      showAlert('오류', '테넌트 이름을 입력해주세요.');
-      return;
-    }
-
+  const handleSignup = async (data: any) => {
     try {
       const result = await signup.mutateAsync({
-        email,
-        password,
-        name,
-        phone: phone || undefined,
-        tenant_name: tenantName,
-        industry_type: industryType,
+        email: data.email,
+        password: data.password,
+        name: data.name,
+        phone: data.phone || undefined,
+        tenant_name: data.tenantName,
+        industry_type: data.industryType as IndustryType,
       });
 
       // 회원가입 성공
@@ -79,8 +52,8 @@ export function SignupPage() {
         console.error('❌ 회원가입 실패 상세:', {
           error,
           message,
-          email,
-          tenantName,
+          email: data.email,
+          tenantName: data.tenantName,
         });
       }
 
@@ -106,101 +79,13 @@ export function SignupPage() {
       <Card className="w-full p-6 md:p-8">
         <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">B2B 회원가입</h1>
 
-        <form onSubmit={handleSignup} className="space-y-4">
-          {/* 사용자 정보 */}
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold">사용자 정보</h2>
-            
-            <Input
-              type="text"
-              label="이름"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              disabled={loading}
-              autoComplete="name"
-            />
-
-            <Input
-              type="email"
-              label="이메일"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-              autoComplete="email"
-            />
-
-            <Input
-              type="tel"
-              label="전화번호 (선택)"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              disabled={loading}
-              placeholder="010-1234-5678"
-              autoComplete="tel"
-            />
-
-            <Input
-              type="password"
-              label="비밀번호"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-              autoComplete="new-password"
-              minLength={8}
-            />
-
-            <Input
-              type="password"
-              label="비밀번호 확인"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-              required
-              disabled={loading}
-              autoComplete="new-password"
-            />
-          </div>
-
-          {/* 테넌트 정보 */}
-          <div className="space-y-4 mt-6">
-            <h2 className="text-lg font-semibold">테넌트 정보</h2>
-
-            <Input
-              type="text"
-              label="테넌트 이름"
-              value={tenantName}
-              onChange={(e) => setTenantName(e.target.value)}
-              required
-              disabled={loading}
-              placeholder="예: 서울 학원"
-            />
-
-            <Select
-              label="업종"
-              value={industryType}
-              onChange={(e) => setIndustryType(e.target.value as IndustryType)}
-              required
-              disabled={loading}
-            >
-              <option value="academy">학원</option>
-              <option value="salon">미용실</option>
-              <option value="realestate">부동산</option>
-              <option value="gym">헬스장</option>
-              <option value="ngo">비영리단체</option>
-            </Select>
-          </div>
-
-          <Button
-            type="submit"
-            variant="solid"
-            className="w-full mt-6"
-            disabled={loading}
-          >
-            {loading ? '회원가입 중...' : '회원가입'}
-          </Button>
-        </form>
+        <SchemaForm
+          schema={signupFormSchema}
+          onSubmit={handleSignup}
+          defaultValues={{
+            industryType: 'academy',
+          }}
+        />
 
         {/* 로그인 링크 */}
         <div className="mt-6 text-center">

@@ -5,10 +5,12 @@
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  */
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '@ui-core/react';
-import { Container, Card, Button, Input, Textarea, Select } from '@ui-core/react';
+import { Container, Card, Button, Input, Select, Textarea } from '@ui-core/react';
+import { SchemaForm } from '@schema-engine';
+import { studentFormSchema } from '../schemas/student.schema';
 import {
   useStudent,
   useGuardians,
@@ -280,19 +282,6 @@ interface StudentInfoTabProps {
 }
 
 function StudentInfoTab({ student, isEditing, onCancel, onSave }: StudentInfoTabProps) {
-  const [formData, setFormData] = useState({
-    name: student.name,
-    birth_date: student.birth_date || '',
-    gender: student.gender || '',
-    phone: student.phone || '',
-    email: student.email || '',
-    address: student.address || '',
-    school_name: student.school_name || '',
-    grade: student.grade || '',
-    status: student.status,
-    notes: student.notes || '',
-  });
-
   if (!isEditing) {
     return (
       <Card padding="md" variant="default">
@@ -346,112 +335,62 @@ function StudentInfoTab({ student, isEditing, onCancel, onSave }: StudentInfoTab
     );
   }
 
+  // 수정 모드: SchemaForm 사용
+  const handleSubmit = async (data: any) => {
+    // 스키마에서 받은 데이터를 UpdateStudentInput 형식으로 변환
+    const updateData = {
+      name: data.name || student.name,
+      birth_date: data.birth_date || undefined,
+      gender: data.gender || undefined,
+      phone: data.phone || undefined,
+      email: data.email || undefined,
+      address: data.address || undefined,
+      school_name: data.school_name || undefined,
+      grade: data.grade || undefined,
+      status: data.status || student.status,
+      notes: data.notes || undefined,
+    };
+    await onSave(updateData);
+  };
+
+  // 수정 모드를 위한 스키마 (submit 버튼 커스터마이징)
+  const editSchema = {
+    ...studentFormSchema,
+    form: {
+      ...studentFormSchema.form,
+      submit: {
+        label: '저장',
+        variant: 'solid' as const,
+        color: 'primary' as const,
+        size: 'md' as const,
+      },
+    },
+  };
+
   return (
     <Card padding="md" variant="default">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-md)' }}>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>이름 *</label>
-            <Input
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              fullWidth
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>생년월일</label>
-            <Input
-              type="date"
-              value={formData.birth_date}
-              onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
-              fullWidth
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>성별</label>
-            <Select
-              value={formData.gender}
-              onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-              fullWidth
-            >
-              <option value="">선택</option>
-              <option value="male">남</option>
-              <option value="female">여</option>
-            </Select>
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>전화번호</label>
-            <Input
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              fullWidth
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>이메일</label>
-            <Input
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              fullWidth
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>주소</label>
-            <Input
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              fullWidth
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>학교</label>
-            <Input
-              value={formData.school_name}
-              onChange={(e) => setFormData({ ...formData, school_name: e.target.value })}
-              fullWidth
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>학년</label>
-            <Input
-              value={formData.grade}
-              onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
-              fullWidth
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>상태</label>
-            <Select
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as StudentStatus })}
-              fullWidth
-            >
-              <option value="active">재원</option>
-              <option value="on_leave">휴원</option>
-              <option value="withdrawn">퇴원</option>
-              <option value="graduated">졸업</option>
-            </Select>
-          </div>
-        </div>
-        <div>
-          <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>비고</label>
-          <Textarea
-            value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            fullWidth
-            rows={4}
-          />
-        </div>
-        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
-          <Button variant="outline" onClick={onCancel}>
-            취소
-          </Button>
-          <Button variant="solid" onClick={() => onSave(formData)}>
-            저장
-          </Button>
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>학생 정보 수정</h3>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          취소
+        </Button>
       </div>
+      <SchemaForm
+        schema={editSchema}
+        onSubmit={handleSubmit}
+        defaultValues={{
+          name: student.name,
+          birth_date: student.birth_date || '',
+          gender: student.gender || '',
+          phone: student.phone || '',
+          email: student.email || '',
+          address: student.address || '',
+          school_name: student.school_name || '',
+          grade: student.grade || '',
+          status: student.status,
+          notes: student.notes || '',
+        }}
+      />
     </Card>
   );
 }
@@ -532,7 +471,7 @@ function GuardiansTab({
                 <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>이름 *</label>
                 <Input
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
                   fullWidth
                   required
                 />
@@ -541,7 +480,7 @@ function GuardiansTab({
                 <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>관계 *</label>
                 <Select
                   value={formData.relationship}
-                  onChange={(e) => setFormData({ ...formData, relationship: e.target.value as GuardianRelationship })}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, relationship: e.target.value as GuardianRelationship })}
                   fullWidth
                   required
                 >
@@ -554,7 +493,7 @@ function GuardiansTab({
                 <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>전화번호 *</label>
                 <Input
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, phone: e.target.value })}
                   fullWidth
                   required
                 />
@@ -564,7 +503,7 @@ function GuardiansTab({
                 <Input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, email: e.target.value })}
                   fullWidth
                 />
               </div>
@@ -573,7 +512,7 @@ function GuardiansTab({
                   <input
                     type="checkbox"
                     checked={formData.is_primary}
-                    onChange={(e) => setFormData({ ...formData, is_primary: e.target.checked })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, is_primary: e.target.checked })}
                   />
                   주 보호자
                 </label>
@@ -582,7 +521,7 @@ function GuardiansTab({
                 <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>비고</label>
                 <Textarea
                   value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, notes: e.target.value })}
                   fullWidth
                   rows={3}
                 />
@@ -718,7 +657,7 @@ function ConsultationsTab({
                 <Input
                   type="date"
                   value={formData.consultation_date}
-                  onChange={(e) => setFormData({ ...formData, consultation_date: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, consultation_date: e.target.value })}
                   fullWidth
                   required
                 />
@@ -727,7 +666,7 @@ function ConsultationsTab({
                 <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>상담 유형 *</label>
                 <Select
                   value={formData.consultation_type}
-                  onChange={(e) => setFormData({ ...formData, consultation_type: e.target.value as ConsultationType })}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, consultation_type: e.target.value as ConsultationType })}
                   fullWidth
                   required
                 >
@@ -741,7 +680,7 @@ function ConsultationsTab({
                 <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>상담 내용 *</label>
                 <Textarea
                   value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, content: e.target.value })}
                   fullWidth
                   rows={8}
                   required
@@ -962,7 +901,7 @@ function ClassesTab({
               <Select
                 label="반 선택"
                 value={selectedClassId}
-                onChange={(e) => setSelectedClassId(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedClassId(e.target.value)}
                 required
                 fullWidth
               >
@@ -981,7 +920,7 @@ function ClassesTab({
                 label="배정일"
                 type="date"
                 value={enrolledAt}
-                onChange={(e) => setEnrolledAt(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnrolledAt(e.target.value)}
                 required
                 fullWidth
               />

@@ -9,10 +9,16 @@ import React from 'react';
 import { Button, Input, Card, Grid, Container } from '@ui-core/react';
 import { FormSchema, TableSchema, UISchema } from './types';
 import { validateSchema } from './validator';
+import { SchemaForm } from './react/SchemaForm';
 
 /**
- * Form Renderer
+ * Form Renderer (Deprecated)
+ * 
+ * ⚠️ 이 함수는 레거시입니다. SchemaForm 컴포넌트를 사용하세요.
+ * 
+ * @deprecated Use SchemaForm component instead
  */
+
 export function renderForm(schema: FormSchema): React.ReactElement {
   const validation = validateSchema(schema);
   
@@ -20,43 +26,9 @@ export function renderForm(schema: FormSchema): React.ReactElement {
     throw new Error(`Invalid form schema: ${validation.errors?.message}`);
   }
 
-  const { form } = schema;
-
-  return (
-    <Card padding={form.layout?.columnGap || 'md'}>
-      <form>
-        <Grid
-          columns={form.layout?.columns || 1}
-          gap={form.layout?.columnGap || 'md'}
-        >
-          {form.fields.map((field) => (
-            <Input
-              key={field.name}
-              type={field.type}
-              name={field.name}
-              label={field.label}
-              placeholder={field.placeholder}
-              required={field.required}
-              size={field.size}
-              fullWidth
-            />
-          ))}
-        </Grid>
-        {form.submit && (
-          <div style={{ marginTop: 'var(--spacing-md)' }}>
-            <Button
-              type="submit"
-              variant={form.submit.variant}
-              color={form.submit.color}
-              size={form.submit.size}
-            >
-              {form.submit.label}
-            </Button>
-          </div>
-        )}
-      </form>
-    </Card>
-  );
+  // SchemaForm 컴포넌트를 사용하도록 변경
+  // 이 함수는 하위 호환성을 위해 유지되지만, 내부적으로 SchemaForm을 사용합니다.
+  return React.createElement(SchemaForm, { schema });
 }
 
 /**

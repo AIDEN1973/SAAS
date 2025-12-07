@@ -17,7 +17,7 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
   fullWidth?: boolean;
 }
 
-export const Input: React.FC<InputProps> = ({
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   label,
   error,
   helperText,
@@ -25,7 +25,7 @@ export const Input: React.FC<InputProps> = ({
   fullWidth = false,
   className,
   ...props
-}) => {
+}, ref) => {
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
       padding: 'var(--spacing-xs) var(--spacing-sm)',
@@ -83,6 +83,7 @@ export const Input: React.FC<InputProps> = ({
         </label>
       )}
       <input
+        ref={ref}
         className={clsx(className)}
         style={inputStyle}
         onFocus={(e) => {
@@ -121,4 +122,4 @@ export const Input: React.FC<InputProps> = ({
       )}
     </div>
   );
-};
+});

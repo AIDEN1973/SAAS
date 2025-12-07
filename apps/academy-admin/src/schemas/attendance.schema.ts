@@ -1,0 +1,120 @@
+/**
+ * Attendance Form Schema
+ * 
+ * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
+ * [동적 옵션] 학생 및 반 목록은 동적으로 채워집니다.
+ */
+
+import type { FormSchema } from '@schema-engine';
+import type { Student } from '@services/student-service';
+import type { Class } from '@services/class-service';
+
+export function createAttendanceFormSchema(
+  students?: Student[],
+  classes?: Class[]
+): FormSchema {
+  return {
+    version: '1.0.0',
+    minSupportedClient: '1.0.0',
+    entity: 'attendance',
+    type: 'form',
+    form: {
+      layout: {
+        columns: 2,
+        columnGap: 'md',
+        rowGap: 'md',
+      },
+      fields: [
+        {
+          name: 'student_id',
+          kind: 'select',
+          ui: {
+            label: '학생',
+            colSpan: 1,
+          },
+          options: [
+            { label: '선택', value: '' },
+            ...(students?.map((s) => ({ label: s.name, value: s.id })) || []),
+          ],
+          validation: {
+            required: true,
+          },
+        },
+        {
+          name: 'class_id',
+          kind: 'select',
+          ui: {
+            label: '반 (선택)',
+            colSpan: 1,
+          },
+          options: [
+            { label: '선택 안함', value: '' },
+            ...(classes?.map((c) => ({ label: c.name, value: c.id })) || []),
+          ],
+        },
+        {
+          name: 'occurred_at',
+          kind: 'datetime',
+          ui: {
+            label: '출결 시간',
+            colSpan: 1,
+          },
+          validation: {
+            required: true,
+          },
+        },
+        {
+          name: 'attendance_type',
+          kind: 'select',
+          ui: {
+            label: '출결 유형',
+            colSpan: 1,
+          },
+          options: [
+            { label: '등원', value: 'check_in' },
+            { label: '하원', value: 'check_out' },
+            { label: '지각', value: 'late' },
+            { label: '결석', value: 'absent' },
+          ],
+          defaultValue: 'check_in',
+          validation: {
+            required: true,
+          },
+        },
+        {
+          name: 'status',
+          kind: 'select',
+          ui: {
+            label: '상태',
+            colSpan: 1,
+          },
+          options: [
+            { label: '출석', value: 'present' },
+            { label: '지각', value: 'late' },
+            { label: '결석', value: 'absent' },
+            { label: '사유', value: 'excused' },
+          ],
+          defaultValue: 'present',
+          validation: {
+            required: true,
+          },
+        },
+        {
+          name: 'notes',
+          kind: 'textarea',
+          ui: {
+            label: '비고',
+            colSpan: 2,
+          },
+        },
+      ],
+      submit: {
+        label: '저장',
+        variant: 'solid',
+        color: 'primary',
+        size: 'md',
+      },
+    },
+  };
+}
+

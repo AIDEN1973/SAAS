@@ -9,7 +9,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '@ui-core/react';
-import { Container, Card, Button, Input, Select } from '@ui-core/react';
+import { Container, Card, Button, Input } from '@ui-core/react';
+import { SchemaForm } from '@schema-engine';
 import {
   useClasses,
   useCreateClass,
@@ -19,6 +20,7 @@ import {
   useTeachers,
 } from '@hooks/use-class';
 import type { Class, CreateClassInput, ClassFilter, ClassStatus, DayOfWeek } from '@services/class-service';
+import { classFormSchema } from '../schemas/class.schema';
 
 const DAYS_OF_WEEK: { value: DayOfWeek; label: string }[] = [
   { value: 'monday', label: '월요일' },
@@ -209,110 +211,42 @@ function CreateClassForm({
   onSubmit: (input: CreateClassInput) => void;
   onCancel: () => void;
 }) {
-  const [formData, setFormData] = useState<CreateClassInput>({
-    name: '',
-    subject: '',
-    grade: '',
-    day_of_week: 'monday',
-    start_time: '14:00',
-    end_time: '15:30',
-    capacity: 20,
-    room: '',
-    notes: '',
-    status: 'active',
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(formData);
+  const handleSubmit = async (data: any) => {
+    // 스키마에서 받은 데이터를 CreateClassInput 형식으로 변환
+    const input: CreateClassInput = {
+      name: data.name || '',
+      subject: data.subject || undefined,
+      grade: data.grade || undefined,
+      day_of_week: data.day_of_week || 'monday',
+      start_time: data.start_time || '14:00',
+      end_time: data.end_time || '15:30',
+      capacity: data.capacity || 20,
+      room: data.room || undefined,
+      notes: data.notes || undefined,
+      status: data.status || 'active',
+    };
+    onSubmit(input);
   };
 
   return (
     <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
         <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>반 생성</h3>
-        
-        <Input
-          label="반 이름"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          required
-          fullWidth
-        />
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-md)' }}>
-          <Input
-            label="과목"
-            value={formData.subject || ''}
-            onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-            fullWidth
-          />
-          <Input
-            label="대상 학년"
-            value={formData.grade || ''}
-            onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
-            fullWidth
-          />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-md)' }}>
-          <Select
-            label="요일"
-            value={formData.day_of_week}
-            onChange={(e) => setFormData({ ...formData, day_of_week: e.target.value as DayOfWeek })}
-            required
-            fullWidth
-          >
-            {DAYS_OF_WEEK.map((day) => (
-              <option key={day.value} value={day.value}>
-                {day.label}
-              </option>
-            ))}
-          </Select>
-          <Input
-            label="시작 시간"
-            type="time"
-            value={formData.start_time}
-            onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-            required
-            fullWidth
-          />
-          <Input
-            label="종료 시간"
-            type="time"
-            value={formData.end_time}
-            onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-            required
-            fullWidth
-          />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-md)' }}>
-          <Input
-            label="정원"
-            type="number"
-            value={formData.capacity}
-            onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 20 })}
-            required
-            fullWidth
-          />
-          <Input
-            label="강의실"
-            value={formData.room || ''}
-            onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-            fullWidth
-          />
-        </div>
-
-        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
-          <Button type="button" variant="outline" onClick={onCancel}>
-            취소
-          </Button>
-          <Button type="submit" variant="solid">
-            생성
-          </Button>
-        </div>
-      </form>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          취소
+        </Button>
+      </div>
+      <SchemaForm
+        schema={classFormSchema}
+        onSubmit={handleSubmit}
+        defaultValues={{
+          day_of_week: 'monday',
+          start_time: '14:00',
+          end_time: '15:30',
+          capacity: 20,
+          status: 'active',
+        }}
+      />
     </Card>
   );
 }

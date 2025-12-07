@@ -11,6 +11,8 @@ import { SignupPage } from './pages/SignupPage';
 import { TenantSelectionPage } from './pages/TenantSelectionPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useLogout } from '@hooks/use-auth';
+import { SchemaEditorPage } from '../../super-admin/src/pages/SchemaEditorPage';
+import { AuthGuard } from '../../super-admin/src/components/AuthGuard';
 
 function AppContent() {
   const location = useLocation();
@@ -114,6 +116,14 @@ function AppContent() {
                 <Route path="/classes" element={<ClassesPage />} />
                 <Route path="/teachers" element={<TeachersPage />} />
                 <Route path="/attendance" element={<AttendancePage />} />
+                <Route 
+                  path="/super-admin" 
+                  element={
+                    <AuthGuard>
+                      <SchemaEditorPage />
+                    </AuthGuard>
+                  } 
+                />
                 <Route path="/" element={<StudentsPage />} />
               </Routes>
             </AppLayout>

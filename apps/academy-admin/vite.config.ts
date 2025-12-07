@@ -27,6 +27,8 @@ function excludeServerCode(): Plugin {
         id.includes('/server') ||
         id === '@env-registry/core/server' ||
         id === '@lib/supabase-client/server' ||
+        id === '@core/schema-registry' ||
+        id.includes('core-schema-registry') ||
         id.includes('/service.ts') ||
         id.includes('/service.js') ||
         id.includes('student-service') ||
@@ -71,6 +73,7 @@ function excludeServerCode(): Plugin {
       if (
         id.includes('/server.ts') ||
         id.includes('/server.js') ||
+        id.includes('core-schema-registry') ||
         id.includes('/service.ts') ||
         id.includes('/service.js') ||
         id.includes('student-service') ||
@@ -198,6 +201,8 @@ export default defineConfig(({ mode }) => {
     include: [
       // xlsx 패키지를 명시적으로 포함
       'xlsx',
+      // react-hook-form을 명시적으로 포함 (schema-engine에서 사용)
+      'react-hook-form',
     ],
     // 강제 재최적화 (캐시 문제 해결)
     force: true,
@@ -220,6 +225,7 @@ export default defineConfig(({ mode }) => {
       { find: '@core/tags', replacement: path.resolve(__dirname, '../../packages/core/core-tags/src') },
       { find: '@core/party/service', replacement: path.resolve(__dirname, '../../packages/core/core-party/src/service.ts') },
       { find: '@core/party', replacement: path.resolve(__dirname, '../../packages/core/core-party/src') },
+      { find: '@core/schema-registry', replacement: path.resolve(__dirname, '../../packages/core/core-schema-registry/src') },
       { find: '@env-registry', replacement: path.resolve(__dirname, '../../packages/env-registry/src') },
       { find: '@lib', replacement: path.resolve(__dirname, '../../packages/lib') },
       { find: '@design-system/core', replacement: path.resolve(__dirname, '../../packages/design-system/src') },

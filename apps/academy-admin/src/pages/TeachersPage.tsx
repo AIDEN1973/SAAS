@@ -9,7 +9,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '@ui-core/react';
-import { Container, Card, Button, Input, Textarea } from '@ui-core/react';
+import { Container, Card, Button, Input } from '@ui-core/react';
+import { SchemaForm } from '@schema-engine';
 import {
   useTeachers,
   useTeacher,
@@ -18,6 +19,7 @@ import {
   useDeleteTeacher,
 } from '@hooks/use-class';
 import type { Teacher, CreateTeacherInput, TeacherFilter, TeacherStatus } from '@services/class-service';
+import { teacherFormSchema } from '../schemas/teacher.schema';
 
 export function TeachersPage() {
   const navigate = useNavigate();
@@ -167,108 +169,39 @@ function CreateTeacherForm({
   onSubmit: (input: CreateTeacherInput) => void;
   onCancel: () => void;
 }) {
-  const [formData, setFormData] = useState<CreateTeacherInput>({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    employee_id: '',
-    specialization: '',
-    hire_date: '',
-    status: 'active',
-    profile_image_url: '',
-    bio: '',
-    notes: '',
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(formData);
+  const handleSubmit = async (data: any) => {
+    // 스키마에서 받은 데이터를 CreateTeacherInput 형식으로 변환
+    const input: CreateTeacherInput = {
+      name: data.name || '',
+      email: data.email || undefined,
+      phone: data.phone || undefined,
+      address: data.address || undefined,
+      employee_id: data.employee_id || undefined,
+      specialization: data.specialization || undefined,
+      hire_date: data.hire_date || undefined,
+      status: data.status || 'active',
+      profile_image_url: data.profile_image_url || undefined,
+      bio: data.bio || undefined,
+      notes: data.notes || undefined,
+    };
+    onSubmit(input);
   };
 
   return (
     <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
         <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>강사 등록</h3>
-
-        <Input
-          label="이름"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          required
-          fullWidth
-        />
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-md)' }}>
-          <Input
-            label="이메일"
-            type="email"
-            value={formData.email || ''}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            fullWidth
-          />
-          <Input
-            label="전화번호"
-            value={formData.phone || ''}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            fullWidth
-          />
-        </div>
-
-        <Input
-          label="주소"
-          value={formData.address || ''}
-          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-          fullWidth
-        />
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-md)' }}>
-          <Input
-            label="사원번호"
-            value={formData.employee_id || ''}
-            onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-            fullWidth
-          />
-          <Input
-            label="전문 분야"
-            value={formData.specialization || ''}
-            onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
-            fullWidth
-          />
-          <Input
-            label="입사일"
-            type="date"
-            value={formData.hire_date || ''}
-            onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
-            fullWidth
-          />
-        </div>
-
-        <Textarea
-          label="강사 소개"
-          value={formData.bio || ''}
-          onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-          rows={3}
-          fullWidth
-        />
-
-        <Textarea
-          label="비고"
-          value={formData.notes || ''}
-          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-          rows={2}
-          fullWidth
-        />
-
-        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
-          <Button type="button" variant="outline" onClick={onCancel}>
-            취소
-          </Button>
-          <Button type="submit" variant="solid">
-            등록
-          </Button>
-        </div>
-      </form>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          취소
+        </Button>
+      </div>
+      <SchemaForm
+        schema={teacherFormSchema}
+        onSubmit={handleSubmit}
+        defaultValues={{
+          status: 'active',
+        }}
+      />
     </Card>
   );
 }

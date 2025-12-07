@@ -1,27 +1,37 @@
-import { ErrorBoundary, Container, Card } from '@ui-core/react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ErrorBoundary } from '@ui-core/react';
+import { SchemaEditorPage } from './pages/SchemaEditorPage';
+import { LoginPage } from './pages/LoginPage';
+import { AuthGuard } from './components/AuthGuard';
 
 function App() {
   return (
-    <ErrorBoundary>
-      <Container maxWidth="xl" padding="lg">
-        <Card padding="md" variant="default">
-          <h1 style={{ 
-            fontSize: '1.5rem', 
-            fontWeight: 'var(--font-weight-bold)', 
-            marginBottom: 'var(--spacing-md)',
-            color: 'var(--color-text)'
-          }}>
-            디어쌤 - 본사 관리
-          </h1>
-          <p style={{ 
-            color: 'var(--color-text-secondary)',
-            margin: 0
-          }}>
-            환경설정이 완료되었습니다.
-          </p>
-        </Card>
-      </Container>
-    </ErrorBoundary>
+    <BrowserRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
+      <ErrorBoundary>
+        <Routes>
+          {/* 인증이 필요 없는 라우트 */}
+          <Route path="/auth/login" element={<LoginPage />} />
+
+          {/* 인증이 필요한 라우트 */}
+          <Route
+            path="/*"
+            element={
+              <AuthGuard>
+                <Routes>
+                  <Route path="/" element={<SchemaEditorPage />} />
+                  <Route path="/schemas" element={<SchemaEditorPage />} />
+                </Routes>
+              </AuthGuard>
+            }
+          />
+        </Routes>
+      </ErrorBoundary>
+    </BrowserRouter>
   );
 }
 

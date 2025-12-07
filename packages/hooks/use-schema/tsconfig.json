@@ -1,0 +1,14 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@api-sdk/core": ["../../api-sdk/src"],
+      "@schema-engine": ["../../packages/schema-engine/src"]
+    }
+  },
+  "include": ["src/**/*"]
+}
+

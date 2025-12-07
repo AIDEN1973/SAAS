@@ -7,7 +7,22 @@
   "exports": {
     ".": "./src/index.ts",
     "./renderer": "./src/renderer.tsx",
-    "./validator": "./src/validator.ts"
+    "./validator": "./src/validator.ts",
+    "./core/conditionEvaluator": "./src/core/conditionEvaluator.ts",
+    "./core/validation": "./src/core/validation.ts",
+    "./core/actionEngine": "./src/core/actionEngine.ts",
+    "./loader": "./src/loader/index.ts",
+    "./loader/migration": "./src/loader/migration.ts",
+    "./loader/i18n": "./src/loader/i18n.ts",
+    "./widgets/registry": "./src/widgets/registry.ts",
+    "./registry/client": "./src/registry/client.ts",
+    "./renderer/factory": "./src/renderer/factory.tsx",
+    "./react/SchemaField": "./src/react/SchemaField.tsx",
+    "./react/SchemaForm": "./src/react/SchemaForm.tsx",
+    "./react/SchemaTable": "./src/react/SchemaTable.tsx",
+    "./react/SchemaDetail": "./src/react/SchemaDetail.tsx",
+    "./react/SchemaFilter": "./src/react/SchemaFilter.tsx",
+    "./react/SchemaWidget": "./src/react/SchemaWidget.tsx"
   },
   "scripts": {
     "type-check": "tsc --noEmit"
@@ -15,7 +30,9 @@
   "dependencies": {
     "@ui-core/react": "file:../../packages/ui-core",
     "@design-system/core": "file:../../packages/design-system",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "react-hook-form": "^7.49.0",
+    "@tanstack/react-query": "^5.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

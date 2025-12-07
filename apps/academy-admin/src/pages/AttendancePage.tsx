@@ -12,9 +12,10 @@
  * - 출결 히스토리 조회
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ErrorBoundary } from '@ui-core/react';
-import { Container, Card, Button, Input, Select, Badge, Switch, useModal } from '@ui-core/react';
+import { Container, Card, Button, Input, Badge, Switch, Select, useModal } from '@ui-core/react';
+import { SchemaForm } from '@schema-engine';
 import { useAttendanceLogs, useCreateAttendanceLog, useDeleteAttendanceLog } from '@hooks/use-attendance';
 import { useStudents } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
@@ -22,6 +23,7 @@ import { useConfig, useUpdateConfig } from '@hooks/use-config';
 import type { AttendanceFilter, AttendanceType, AttendanceStatus } from '@services/attendance-service';
 import { useResponsiveMode } from '@ui-core/react';
 import type { ColorToken } from '@design-system/core';
+import { createAttendanceFormSchema } from '../schemas/attendance.schema';
 
 export function AttendancePage() {
   const mode = useResponsiveMode();
@@ -74,23 +76,6 @@ export function AttendancePage() {
 
   // 출결 기록 상태
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [createFormData, setCreateFormData] = useState<{
-    student_id: string;
-    class_id?: string;
-    occurred_at: string;
-    attendance_type: AttendanceType;
-    status: AttendanceStatus;
-    notes?: string;
-    send_notification?: boolean; // 알림 발송 여부
-    notification_channel?: 'sms' | 'kakao'; // 알림 채널
-  }>({
-    student_id: '',
-    occurred_at: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
-    attendance_type: 'check_in',
-    status: 'present',
-    send_notification: false,
-    notification_channel: 'sms',
-  });
 
   // 데이터 조회
   const { data: attendanceLogs, isLoading, error } = useAttendanceLogs({
@@ -188,23 +173,23 @@ export function AttendancePage() {
   };
 
   // 출결 기록 생성
-  const handleCreateAttendance = async () => {
-    if (!createFormData.student_id) {
+  const handleCreateAttendance = async (data: any) => {
+    if (!data.student_id) {
       showAlert('학생을 선택해주세요.', '입력 오류', 'warning');
       return;
     }
 
     try {
-      const occurredAt = new Date(createFormData.occurred_at);
-      const classInfo = createFormData.class_id 
-        ? classes?.find(c => c.id === createFormData.class_id)
+      const occurredAt = new Date(data.occurred_at);
+      const classInfo = data.class_id 
+        ? classes?.find(c => c.id === data.class_id)
         : undefined;
 
       // 자동 판정 (반 정보가 있고 등원인 경우)
-      let finalStatus = createFormData.status;
-      let finalType = createFormData.attendance_type;
+      let finalStatus = data.status;
+      let finalType = data.attendance_type;
       
-      if (createFormData.attendance_type === 'check_in' && classInfo) {
+      if (data.attendance_type === 'check_in' && classInfo) {
         const autoDetermined = determineAttendanceStatus(
           occurredAt,
           classInfo,
@@ -216,35 +201,33 @@ export function AttendancePage() {
       }
 
       await createAttendance.mutateAsync({
-        student_id: createFormData.student_id,
-        class_id: createFormData.class_id || undefined,
+        student_id: data.student_id,
+        class_id: data.class_id || undefined,
         occurred_at: occurredAt.toISOString(),
         attendance_type: finalType,
         status: finalStatus,
-        notes: createFormData.notes,
+        notes: data.notes || undefined,
       });
 
       // [문서 요구사항] 알림 발송은 서버에서 자동 처리됨 (core-notification → 학부모 알림)
       // 클라이언트에서는 알림 발송 로직을 제거하고, 서버에서 설정에 따라 자동 발송
 
       setShowCreateForm(false);
-      setCreateFormData({
-        student_id: '',
-        occurred_at: new Date().toISOString().slice(0, 16),
-        attendance_type: 'check_in',
-        status: 'present',
-        send_notification: false,
-        notification_channel: 'sms',
-      });
     } catch (error) {
       console.error('출결 기록 생성 실패:', error);
-        showAlert(
-          `출결 기록 생성 중 오류가 발생했습니다: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          '오류',
-          'error'
-        );
+      showAlert(
+        `출결 기록 생성 중 오류가 발생했습니다: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        '오류',
+        'error'
+      );
     }
   };
+
+  // 출결 스키마 생성 (동적 옵션)
+  const attendanceSchema = useMemo(
+    () => createAttendanceFormSchema(students, classes),
+    [students, classes]
+  );
 
   // QR 스캐너 시작
   const handleStartQRScanner = async () => {
@@ -275,7 +258,7 @@ export function AttendancePage() {
   };
 
   // QR 코드 스캔 처리 (간단한 텍스트 입력으로 대체)
-  const handleQRScan = (qrData: string) => {
+  const handleQRScan = async (qrData: string) => {
     try {
       // QR 코드 형식: student_id 또는 JSON {student_id, class_id}
       let studentId: string;
@@ -296,21 +279,18 @@ export function AttendancePage() {
         return;
       }
 
-      // 출결 기록 생성
+      // 출결 기록 생성 (QR 스캔 시 즉시 기록)
       const now = new Date();
-      setCreateFormData({
+      await handleCreateAttendance({
         student_id: studentId,
         class_id: classId,
         occurred_at: now.toISOString().slice(0, 16),
         attendance_type: 'check_in',
         status: 'present',
-        send_notification: attendanceConfig.auto_notification,
-        notification_channel: attendanceConfig.notification_channel,
       });
       
-      setShowCreateForm(true);
       handleStopQRScanner();
-        showAlert(`${student.name}님의 등원이 기록되었습니다.`, '출결 기록 완료', 'success');
+      showAlert(`${student.name}님의 등원이 기록되었습니다.`, '출결 기록 완료', 'success');
     } catch (error) {
       console.error('QR 스캔 처리 실패:', error);
       showAlert('QR 코드를 인식할 수 없습니다.', 'QR 스캔 오류', 'error');
@@ -1013,115 +993,27 @@ export function AttendancePage() {
                   닫기
                 </Button>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--spacing-xs)', color: 'var(--color-text)' }}>
-                    학생 *
-                  </label>
-                  <Select
-                    value={createFormData.student_id}
-                    onChange={(e) => setCreateFormData((prev) => ({ ...prev, student_id: e.target.value }))}
-                    fullWidth
-                  >
-                    <option value="">선택</option>
-                    {students?.map((student) => (
-                      <option key={student.id} value={student.id}>
-                        {student.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--spacing-xs)', color: 'var(--color-text)' }}>
-                    반 (선택)
-                  </label>
-                  <Select
-                    value={createFormData.class_id || ''}
-                    onChange={(e) => setCreateFormData((prev) => ({ ...prev, class_id: e.target.value || undefined }))}
-                    fullWidth
-                  >
-                    <option value="">선택 안함</option>
-                    {classes?.map((cls) => (
-                      <option key={cls.id} value={cls.id}>
-                        {cls.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--spacing-xs)', color: 'var(--color-text)' }}>
-                    일시 *
-                  </label>
-                  <Input
-                    type="datetime-local"
-                    value={createFormData.occurred_at}
-                    onChange={(e) => setCreateFormData((prev) => ({ ...prev, occurred_at: e.target.value }))}
-                    fullWidth
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--spacing-xs)', color: 'var(--color-text)' }}>
-                    타입 *
-                  </label>
-                  <Select
-                    value={createFormData.attendance_type}
-                    onChange={(e) => setCreateFormData((prev) => ({ ...prev, attendance_type: e.target.value as AttendanceType }))}
-                    fullWidth
-                  >
-                    <option value="check_in">등원</option>
-                    <option value="check_out">하원</option>
-                    <option value="late">지각</option>
-                    <option value="absent">결석</option>
-                  </Select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--spacing-xs)', color: 'var(--color-text)' }}>
-                    상태 *
-                  </label>
-                  <Select
-                    value={createFormData.status}
-                    onChange={(e) => setCreateFormData((prev) => ({ ...prev, status: e.target.value as AttendanceStatus }))}
-                    fullWidth
-                  >
-                    <option value="present">출석</option>
-                    <option value="late">지각</option>
-                    <option value="absent">결석</option>
-                    <option value="excused">사유</option>
-                  </Select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--spacing-xs)', color: 'var(--color-text)' }}>
-                    비고
-                  </label>
-                  <Input
-                    value={createFormData.notes || ''}
-                    onChange={(e) => setCreateFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                    placeholder="비고를 입력하세요"
-                    fullWidth
-                  />
-                </div>
+              {attendanceConfig.auto_notification && (
                 <div style={{ 
-                  padding: 'var(--spacing-md)', 
-                  backgroundColor: 'var(--color-background-secondary)', 
-                  borderRadius: 'var(--border-radius-md)',
-                  border: '1px solid var(--color-border)'
+                  padding: 'var(--spacing-sm)', 
+                  backgroundColor: 'var(--color-info-50)', 
+                  borderRadius: 'var(--border-radius-sm)', 
+                  fontSize: 'var(--font-size-sm)', 
+                  color: 'var(--color-text-secondary)',
+                  marginBottom: 'var(--spacing-md)'
                 }}>
-                  {/* [문서 요구사항] 알림 발송은 서버에서 자동 처리됨 (core-notification → 학부모 알림) */}
-                  {attendanceConfig.auto_notification && (
-                    <div style={{ padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-info-soft)', borderRadius: 'var(--border-radius-sm)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                      자동 알림이 활성화되어 있습니다. 출결 기록 시 학부모에게 자동으로 알림이 발송됩니다.
-                    </div>
-                  )}
+                  자동 알림이 활성화되어 있습니다. 출결 기록 시 학부모에게 자동으로 알림이 발송됩니다.
                 </div>
-                <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
-                  <Button variant="outline" onClick={() => setShowCreateForm(false)}>
-                    취소
-                  </Button>
-                  <Button variant="solid" color="primary" onClick={handleCreateAttendance} disabled={createAttendance.isPending}>
-                    {createAttendance.isPending ? '저장 중...' : '저장'}
-                  </Button>
-                </div>
-              </div>
+              )}
+              <SchemaForm
+                schema={attendanceSchema}
+                onSubmit={handleCreateAttendance}
+                defaultValues={{
+                  occurred_at: new Date().toISOString().slice(0, 16),
+                  attendance_type: 'check_in',
+                  status: 'present',
+                }}
+              />
             </Card>
           )}
 

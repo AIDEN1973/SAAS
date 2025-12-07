@@ -1,0 +1,13 @@
+{
+  "name": "@hooks/use-schema-registry",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@tanstack/react-query": "^5.0.0",
+    "@lib/supabase-client": "file:../../lib/supabase-client",
+    "@schema-engine/types": "file:../../schema-engine"
+  }
+}
+

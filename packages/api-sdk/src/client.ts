@@ -9,6 +9,8 @@
 import { createClient } from '@lib/supabase-client';
 import { getApiContext } from './context';
 import type { ApiResponse, ApiClientConfig } from './types';
+import { SchemaRegistryClient, type SchemaRegistryEntry } from '@schema-engine/registry/client';
+import type { FormSchema, UISchema } from '@schema-engine/types';
 
 /**
  * API Client
@@ -318,6 +320,137 @@ export class ApiClient {
         // void를 T로 캐스팅
         return result as ApiResponse<T>;
       }
+    } catch (error) {
+      return {
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  }
+
+  /**
+   * Schema Registry에서 스키마 조회
+   * 
+   * [불변 규칙] 기술문서 PART 1의 5. Schema Registry 운영 문서를 준수합니다.
+   * [불변 규칙] meta.schema_registry는 공통 스키마 저장소이므로 tenant_id 컬럼이 없습니다.
+   * [불변 규칙] RLS 정책에 따라 모든 인증된 사용자가 읽기 가능합니다.
+   * 
+   * 기술문서: docu/스키마엔진.txt 5.2 Schema Registry Service 사용법
+   * 
+   * @param entity - 스키마 엔티티명 (예: 'student', 'class', 'teacher')
+   * @param options - 조회 옵션
+   * @returns 스키마 데이터 또는 null
+   */
+  async getSchema(
+    entity: string,
+    options?: {
+      tenant_id?: string;
+      industry_type?: string;
+      client_version?: string;
+    }
+  ): Promise<ApiResponse<FormSchema>> {
+    try {
+      const context = getApiContext();
+      const tenantId = options?.tenant_id || context.tenantId;
+      const industryType = options?.industry_type || context.industryType;
+      const clientVersion = options?.client_version || '1.0.0';
+
+      // 1. 테넌트별 Version Pinning 조회
+      let pinnedVersion: string | null = null;
+      if (tenantId) {
+        const pinResponse = await this.get<{ pinned_version: string }>('meta.tenant_schema_pins', {
+          filters: {
+            tenant_id: tenantId,
+            entity,
+            industry_type: industryType || null,
+          },
+          limit: 1,
+        });
+
+        if (!pinResponse.error && pinResponse.data && pinResponse.data.length > 0) {
+          pinnedVersion = pinResponse.data[0].pinned_version;
+        }
+      }
+
+      // 2. 활성 스키마 조회 (status = 'active')
+      let query = this.supabase
+        .from('meta.schema_registry')
+        .select('*')
+        .eq('entity', entity)
+        .eq('status', 'active');
+
+      // Industry별 필터링
+      if (industryType) {
+        query = query.or(`industry_type.eq.${industryType},industry_type.is.null`);
+      } else {
+        query = query.is('industry_type', null);
+      }
+
+      const { data: entries, error } = await query;
+
+      if (error) {
+        return {
+          error: {
+            message: error.message,
+            code: error.code,
+          },
+        };
+      }
+
+      // 3. Version Pinning이 있으면 해당 버전만 필터링
+      // ⚠️ 중요: entries는 이미 status='active'로 필터링된 상태입니다.
+      // Version Pinning이 있으면 해당 버전만 선택하고, 없으면 모든 활성 스키마를 사용합니다.
+      const filteredEntries: SchemaRegistryEntry[] = (entries || [])
+        .filter((e: any) => {
+          if (pinnedVersion) {
+            return e.version === pinnedVersion;
+          }
+          return true;
+        })
+        .map((e: any) => ({
+          id: e.id,
+          entity: e.entity,
+          industry_type: e.industry_type,
+          version: e.version,
+          min_supported_client: e.min_supported_client,
+          schema_json: e.schema_json as UISchema,
+          status: e.status as 'draft' | 'active' | 'deprecated',
+          activated_at: e.activated_at,
+        }))
+        .sort((a, b) => {
+          // 버전 내림차순 정렬 (최신 버전 우선)
+          const aVersion = a.version.split('.').map(Number);
+          const bVersion = b.version.split('.').map(Number);
+          for (let i = 0; i < 3; i++) {
+            if (aVersion[i] !== bVersion[i]) {
+              return bVersion[i] - aVersion[i];
+            }
+          }
+          return 0;
+        });
+
+      // 4. SchemaRegistryClient를 사용하여 우선순위에 따라 스키마 선택
+      // ⚠️ 참고: fallbackSchema는 useSchema hook에서 처리하므로 여기서는 undefined 전달
+      const client = new SchemaRegistryClient({
+        tenantId,
+        industryType: industryType || undefined,
+        clientVersion,
+        fallbackSchema: undefined,
+      });
+
+      const resolvedSchema = client.resolveSchema(entity, filteredEntries);
+
+      if (!resolvedSchema) {
+        return {
+          error: {
+            message: `Schema not found for entity: ${entity}`,
+          },
+        };
+      }
+
+      // FormSchema로 타입 캐스팅 (UISchema는 FormSchema | TableSchema이지만, 현재는 FormSchema만 지원)
+      return { data: resolvedSchema as FormSchema };
     } catch (error) {
       return {
         error: {

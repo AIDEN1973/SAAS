@@ -9,10 +9,12 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '@ui-core/react';
-import { Container, Grid, Card, Button, Input, Textarea, Select } from '@ui-core/react';
+import { Container, Grid, Card, Button, Input } from '@ui-core/react';
+import { SchemaForm } from '@schema-engine';
 import { useStudents, useStudentTags, useStudentTagsByStudent, useCreateStudent, useBulkCreateStudents } from '@hooks/use-student';
 import type { StudentFilter, StudentStatus, Student, CreateStudentInput } from '@services/student-service';
 import type { Tag } from '@core/tags';
+import { studentFormSchema } from '../schemas/student.schema';
 // xlsx는 동적 import로 로드 (필요할 때만)
 
 export function StudentsPage() {
@@ -383,25 +385,25 @@ interface CreateStudentFormProps {
 }
 
 function CreateStudentForm({ onClose, onSubmit }: CreateStudentFormProps) {
-  const [formData, setFormData] = useState<CreateStudentInput>({
-    name: '',
-    birth_date: '',
-    gender: undefined,
-    phone: '',
-    email: '',
-    address: '',
-    school_name: '',
-    grade: '',
-    status: 'active',
-    notes: '',
-  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (data: any) => {
     setIsSubmitting(true);
     try {
-      await onSubmit(formData);
+      // 스키마에서 받은 데이터를 CreateStudentInput 형식으로 변환
+      const input: CreateStudentInput = {
+        name: data.name || '',
+        birth_date: data.birth_date || undefined,
+        gender: data.gender || undefined,
+        phone: data.phone || undefined,
+        email: data.email || undefined,
+        address: data.address || undefined,
+        school_name: data.school_name || undefined,
+        grade: data.grade || undefined,
+        status: data.status || 'active',
+        notes: data.notes || undefined,
+      };
+      await onSubmit(input);
     } finally {
       setIsSubmitting(false);
     }
@@ -411,115 +413,17 @@ function CreateStudentForm({ onClose, onSubmit }: CreateStudentFormProps) {
     <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
         <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>학생 등록</h3>
-        <Button variant="ghost" size="sm" onClick={onClose}>
+        <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
           닫기
         </Button>
       </div>
-      <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-md)' }}>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>이름 *</label>
-            <Input
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              fullWidth
-              required
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>생년월일</label>
-            <Input
-              type="date"
-              value={formData.birth_date}
-              onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
-              fullWidth
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>성별</label>
-            <Select
-              value={formData.gender || ''}
-              onChange={(e) => setFormData({ ...formData, gender: e.target.value as any || undefined })}
-              fullWidth
-            >
-              <option value="">선택</option>
-              <option value="male">남</option>
-              <option value="female">여</option>
-            </Select>
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>전화번호</label>
-            <Input
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              fullWidth
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>이메일</label>
-            <Input
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              fullWidth
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>주소</label>
-            <Input
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              fullWidth
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>학교</label>
-            <Input
-              value={formData.school_name}
-              onChange={(e) => setFormData({ ...formData, school_name: e.target.value })}
-              fullWidth
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>학년</label>
-            <Input
-              value={formData.grade}
-              onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
-              fullWidth
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>상태</label>
-            <Select
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as StudentStatus })}
-              fullWidth
-            >
-              <option value="active">재원</option>
-              <option value="on_leave">휴원</option>
-              <option value="withdrawn">퇴원</option>
-              <option value="graduated">졸업</option>
-            </Select>
-          </div>
-        </div>
-        <div style={{ marginTop: 'var(--spacing-md)' }}>
-          <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>비고</label>
-          <Textarea
-            value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            fullWidth
-            rows={3}
-          />
-        </div>
-        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end', marginTop: 'var(--spacing-md)' }}>
-          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-            취소
-          </Button>
-          <Button type="submit" variant="solid" disabled={isSubmitting}>
-            {isSubmitting ? '등록 중...' : '등록'}
-          </Button>
-        </div>
-      </form>
+      <SchemaForm
+        schema={studentFormSchema}
+        onSubmit={handleSubmit}
+        defaultValues={{
+          status: 'active',
+        }}
+      />
     </Card>
   );
 }
