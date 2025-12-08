@@ -30,8 +30,6 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   label,
   error,
   helperText,
-  size = 'md',
-  fullWidth = false,
   value,
   onChange,
   dateTime = false,

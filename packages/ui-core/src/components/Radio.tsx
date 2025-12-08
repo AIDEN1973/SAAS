@@ -27,7 +27,6 @@ export const Radio: React.FC<RadioProps> = ({
   error,
   helperText,
   fullWidth = false,
-  className,
   checked,
   value,
   onChange,

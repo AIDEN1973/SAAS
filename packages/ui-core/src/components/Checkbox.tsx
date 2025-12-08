@@ -25,7 +25,6 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   error,
   helperText,
   fullWidth = false,
-  className,
   checked,
   onChange,
   disabled,

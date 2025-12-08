@@ -30,7 +30,6 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   disabled,
   placeholder,
   rows,
-  ...restProps
 }, ref) => {
   return (
     <div>
