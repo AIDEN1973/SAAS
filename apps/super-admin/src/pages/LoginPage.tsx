@@ -8,14 +8,13 @@
 
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Container, Card, useModal, useResponsiveMode } from '@ui-core/react';
+import { Container, Card, useModal } from '@ui-core/react';
 import { SchemaForm } from '@schema-engine';
 import {
   useLoginWithEmail,
   useLoginWithOAuth,
   useLoginWithOTP,
   useSendOTP,
-  useUserTenants,
   useSelectTenant,
 } from '@hooks/use-auth';
 import { loginFormSchema, otpLoginFormSchema } from '../schemas/login.schema';
@@ -25,8 +24,6 @@ type LoginMethod = 'email' | 'oauth' | 'otp';
 export function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
   const { showAlert } = useModal();
 
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('email');
@@ -37,7 +34,6 @@ export function LoginPage() {
   const loginWithOAuth = useLoginWithOAuth();
   const sendOTP = useSendOTP();
   const loginWithOTP = useLoginWithOTP();
-  const { data: tenants } = useUserTenants();
   const selectTenant = useSelectTenant();
 
   const handleEmailLogin = async (data: { email: string; password: string }) => {

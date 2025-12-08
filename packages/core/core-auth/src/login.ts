@@ -9,7 +9,7 @@
  */
 
 import { createClient } from '@lib/supabase-client';
-import { maskPII, maskEmail } from '@core/pii-utils';
+import { maskPII } from '@core/pii-utils';
 import type { LoginInput, OAuthLoginInput, OTPLoginInput, LoginResult, TenantSelectionResult, TenantInfo } from './types';
 
 export class LoginService {
@@ -210,10 +210,6 @@ export class LoginService {
    * tenants 테이블의 RLS 정책: user_tenant_roles를 통한 간접 참조
    */
   async getUserTenants(userId: string): Promise<TenantInfo[]> {
-    // 현재 세션의 user_id 확인
-    const { data: { session } } = await this.supabase.auth.getSession();
-    const currentUserId = session?.user?.id;
-
     // RLS 정책 때문에 userId와 현재 세션의 user_id가 일치해야 함
 
     // ⚠️ 중요: tenants 테이블 조인 시 RLS 순환 참조 문제 발생 가능

@@ -9,7 +9,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@lib/supabase-client';
-import type { FormSchema, TableSchema, DetailSchema, FilterSchema, WidgetSchema, UISchema } from '@schema-engine/types';
+import type { UISchema } from '@schema-engine/types';
 
 export interface SchemaRegistryEntry {
   id: string;

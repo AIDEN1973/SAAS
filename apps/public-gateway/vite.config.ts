@@ -4,9 +4,9 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  // ?�로?�트 루트??.env.local ?�일??로드
+  // ?�로?�트 루트??.env.local ?�일??로드
   envDir: path.resolve(__dirname, '../..'),
-  // Vercel 빌드 ???�경변?��? 빌드 ?�?�에 주입
+  // Vercel 빌드 ???�경변?��? 빌드 ?�?�에 주입
   define: {
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ''),
     'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''),
@@ -23,12 +23,14 @@ export default defineConfig({
       { find: '@env-registry/core/server', replacement: path.resolve(__dirname, '../../packages/env-registry/src/server.ts') },
       { find: '@env-registry/core', replacement: path.resolve(__dirname, '../../packages/env-registry/src') },
       { find: '@core/tags', replacement: path.resolve(__dirname, '../../packages/core/core-tags/src') },
+      { find: '@core/schema-registry', replacement: path.resolve(__dirname, '../../packages/core/core-schema-registry/src') },
       { find: '@env-registry', replacement: path.resolve(__dirname, '../../packages/env-registry/src') },
       { find: '@lib', replacement: path.resolve(__dirname, '../../packages/lib') },
       { find: '@design-system/core', replacement: path.resolve(__dirname, '../../packages/design-system/src') },
       { find: '@design-system', replacement: path.resolve(__dirname, '../../packages/design-system/src') },
       { find: '@ui-core', replacement: path.resolve(__dirname, '../../packages/ui-core/src') },
       { find: '@schema/engine', replacement: path.resolve(__dirname, '../../packages/schema-engine/src') },
+      { find: '@schema-engine', replacement: path.resolve(__dirname, '../../packages/schema-engine/src') },
       { find: '@industry/academy/service', replacement: path.resolve(__dirname, '../../packages/industry/industry-academy/src/service.ts') },
       { find: '@industry/academy', replacement: path.resolve(__dirname, '../../packages/industry/industry-academy/src') },
       { find: '@industry', replacement: path.resolve(__dirname, '../../packages/industry') },

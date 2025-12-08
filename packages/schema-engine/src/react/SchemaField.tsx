@@ -70,7 +70,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
   // labelKey가 있으면 translations에서 조회, 없으면 기존 label 사용
   const label = ui?.labelKey ? (translations[ui.labelKey] || ui.labelKey) : ui?.label;
   const placeholder = ui?.placeholderKey ? (translations[ui.placeholderKey] || ui.placeholderKey) : ui?.placeholder;
-  const description = ui?.descriptionKey ? (translations[ui.descriptionKey] || ui.descriptionKey) : ui?.description;
+  // const description = ui?.descriptionKey ? (translations[ui.descriptionKey] || ui.descriptionKey) : ui?.description; // TODO: 향후 사용 예정
   
   // 1) 조건부 필드 감시
   // 단일 조건 또는 복수 조건에서 참조하는 모든 필드를 감시
@@ -446,7 +446,7 @@ const CustomWidgetField: React.FC<{
   isDisabled: boolean;
   finalRules: any;
   translations?: Record<string, string>;
-}> = ({ componentType, field, colSpan, control, errors, isDisabled, finalRules, translations = {} }) => {
+}> = ({ componentType, field, colSpan, control, errors, isDisabled, finalRules, translations: _translations = {} }) => {
   const [CustomComponent, setCustomComponent] = React.useState<React.ComponentType<any> | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<Error | null>(null);

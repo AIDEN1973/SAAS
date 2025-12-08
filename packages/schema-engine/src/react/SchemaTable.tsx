@@ -36,7 +36,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   translations = {},
   apiCall,
 }) => {
-  const { dataSource, columns, rowActions, bulkActions, pagination, selection, virtualization } = schema.table;
+  const { dataSource, columns, rowActions } = schema.table;
 
   // SDUI v1.1: API 데이터 소스 로드
   const { data, isLoading, error } = useQuery({
@@ -72,7 +72,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
         : (col.label || col.key),
       width: col.width !== undefined ? (typeof col.width === 'number' ? String(col.width) : col.width) : undefined,
       align: col.type === 'number' ? 'right' : 'left',
-      render: (value: any, row: any) => {
+      render: (value: any, _row: any) => {
         // 타입별 렌더링
         switch (col.type) {
           case 'date':

@@ -22,7 +22,7 @@ export interface SchemaEditorFormProps {
   onCancel?: () => void;
 }
 
-export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJsonChange, onCancel }: SchemaEditorFormProps) {
+export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJsonChange: _onSchemaJsonChange, onCancel }: SchemaEditorFormProps) {
   const { showAlert } = useModal();
   const createSchema = useCreateSchema();
   const updateSchema = useUpdateSchema();

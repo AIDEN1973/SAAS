@@ -12,7 +12,7 @@
  * 기술문서: SDUI 기술문서 v1.1 - 4. Schema Loader
  */
 
-import type { BaseSchema, UISchema } from '../types';
+import type { UISchema } from '../types';
 import { validateSchema } from '../validator';
 import { migrateSchema } from './migration';
 import { bindI18n } from './i18n';

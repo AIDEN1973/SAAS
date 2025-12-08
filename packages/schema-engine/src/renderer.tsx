@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Button, Input, Card, Grid, Container } from '@ui-core/react';
+import { Card, Container } from '@ui-core/react';
 import { FormSchema, TableSchema, UISchema } from './types';
 import { validateSchema } from './validator';
 import { SchemaForm } from './react/SchemaForm';
@@ -102,7 +102,7 @@ export interface SchemaRendererProps {
   data?: unknown;
 }
 
-export const SchemaRenderer: React.FC<SchemaRendererProps> = ({ schema, data }) => {
+export const SchemaRenderer: React.FC<SchemaRendererProps> = ({ schema, data: _data }) => {
   try {
     return renderSchema(schema);
   } catch (error) {
