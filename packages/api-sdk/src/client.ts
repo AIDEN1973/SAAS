@@ -415,8 +415,8 @@ export class ApiClient {
    * @deprecated 기술문서 규칙 위반. useSchema Hook을 사용하세요.
    */
   async loadSchema(
-    entity: string,
-    type: 'form' | 'table' | 'detail' | 'filter' | 'widget' = 'form'
+    _entity: string,
+    _type: 'form' | 'table' | 'detail' | 'filter' | 'widget' = 'form'
   ): Promise<UISchema | null> {
     // ⚠️ 이 메서드는 사용되지 않습니다.
     // useSchema Hook을 사용하세요.
@@ -431,7 +431,7 @@ export class ApiClient {
  * 필요시 커스텀 설정으로 새로운 인스턴스를 생성할 수 있습니다.
  * 대부분의 경우 기본 인스턴스(apiClient)를 사용하면 됩니다.
  */
-export function createApiClient(config?: ApiClientConfig): ApiClient {
+export function createApiClient(_config?: ApiClientConfig): ApiClient {
   return new ApiClient();
 }
 

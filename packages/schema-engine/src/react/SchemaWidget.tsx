@@ -34,7 +34,7 @@ export const SchemaWidget: React.FC<SchemaWidgetProps> = ({
   const { componentType, dataSource, config, refreshInterval } = schema.widget;
 
   // SDUI v1.1: API 데이터 소스 로드
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['schema-widget', schema.entity, dataSource?.endpoint],
     queryFn: async () => {
       if (!dataSource || dataSource.type !== 'api') {
@@ -160,7 +160,7 @@ export const SchemaWidget: React.FC<SchemaWidgetProps> = ({
   };
 
   // Chart 위젯 렌더링 (차트 - 기본 구현)
-  const renderChartWidget = (widgetData: any, widgetConfig?: Record<string, any>) => {
+  const renderChartWidget = (widgetData: any, _widgetConfig?: Record<string, any>) => {
     return (
       <div style={{ padding: 'var(--spacing-md)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
         차트 위젯 (구현 예정)
