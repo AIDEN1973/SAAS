@@ -2,43 +2,45 @@ import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/
 import { envClient } from '@env-registry/core';
 
 /**
- * ?��???Supabase ?�라?�언???�스?�스
- * ?�러 ?�스?�스 ?�성 방�? (GoTrueClient 경고 ?�결)
+ * 싱글톤 Supabase 클라이언트 인스턴스
+ * 여러 인스턴스 생성 방지 (GoTrueClient 경고 해결)
  */
 let clientInstance: SupabaseClient | null = null;
 
 /**
  * Cross-Origin Session Storage Adapter
  * 
- * [불�? 규칙] 개발 ?�경?�서 localhost:3000�?localhost:3002 �??�션 공유
- * [불�? 규칙] localStorage??origin별로 분리?��?�? URL ?�라미터�??�션???�달
+ * [불변 규칙] 개발 환경에서 localhost:3000과 localhost:3002 간 세션 공유
+ * [불변 규칙] localStorage는 origin별로 분리되므로, URL 파라미터로 세션을 전달
  * 
- * Supabase??기본?�으�?localStorage�??�용?��?�? ?�트가 ?�르�? * ?�른 origin?�로 간주?�어 공유?��? ?�습?�다.
+ * Supabase는 기본적으로 localStorage를 사용하지만, 포트가 다르면
+ * 다른 origin으로 간주되어 공유되지 않습니다.
  */
 function createCrossOriginStorage() {
   return {
     getItem: (key: string): string | null => {
-      // 1. ?�재 origin??localStorage ?�인
+      // 1. 현재 origin의 localStorage 확인
       if (typeof window !== 'undefined') {
         const value = localStorage.getItem(key);
         if (value) return value;
       }
       
-      // 2. URL ?�라미터?�서 ?�션 ?�인 (로그????리다?�렉????
+      // 2. URL 파라미터에서 세션 확인 (로그인 후 리다이렉트 시)
       if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search);
         const sessionToken = urlParams.get('session_token');
         if (sessionToken && key.includes('auth-token')) {
-          // ?�션 ?�큰??localStorage???�??          try {
+          // 세션 토큰을 localStorage에 저장
+          try {
             const sessionData = JSON.parse(decodeURIComponent(sessionToken));
             localStorage.setItem(key, JSON.stringify(sessionData));
-            // URL?�서 ?�라미터 ?�거
+            // URL에서 파라미터 제거
             urlParams.delete('session_token');
             const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
             window.history.replaceState({}, '', newUrl);
             return JSON.stringify(sessionData);
           } catch (e) {
-            console.error('[Cross-Origin Storage] ?�션 ?�큰 ?�싱 ?�패:', e);
+            console.error('[Cross-Origin Storage] 세션 토큰 파싱 실패:', e);
           }
         }
       }
@@ -59,11 +61,12 @@ function createCrossOriginStorage() {
 }
 
 /**
- * ?�라?�언?�용 Supabase ?�라?�언???�성 (?��???
- * NEXT_PUBLIC_* ?�경변???�용
+ * 클라이언트용 Supabase 클라이언트 생성 (싱글톤)
+ * NEXT_PUBLIC_* 환경변수 사용
  */
 export function createClient(): SupabaseClient {
-  // ?��? ?�스?�스가 ?�으�??�사??  if (clientInstance) {
+  // 이미 인스턴스가 있으면 재사용
+  if (clientInstance) {
     return clientInstance;
   }
 
@@ -71,44 +74,47 @@ export function createClient(): SupabaseClient {
   const supabaseAnonKey = envClient.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase URL�?Anon Key가 ?�정?��? ?�았?�니??');
+    throw new Error('Supabase URL과 Anon Key가 설정되지 않았습니다.');
   }
 
-  // 개발 ?�경?�서 URL ?�인 로그 출력
+  // 개발 환경에서 URL 확인 로그 출력
   if (typeof window !== 'undefined' && (import.meta as any).env?.DEV) {
     const correctUrl = 'https://xawypsrotrfoyozhrsbb.supabase.co';
     const isCorrect = supabaseUrl === correctUrl;
     
-    console.log('?�� Supabase ?�라?�언???�성:', {
-      '?�재 URL': supabaseUrl,
-      '?�바�?URL': correctUrl,
-      '?�치': isCorrect ? '?? : '??,
-      'Anon Key ?�정??: supabaseAnonKey ? '?? : '??,
+    console.log('🔍 Supabase 클라이언트 생성:', {
+      '현재 URL': supabaseUrl,
+      '올바른 URL': correctUrl,
+      '일치': isCorrect ? '✅' : '❌',
+      'Anon Key 설정됨': supabaseAnonKey ? '✅' : '❌',
     });
     
     if (!isCorrect) {
-      console.error('???�못??Supabase URL???�용?�고 ?�습?�다!');
-      console.error('   ?�재:', supabaseUrl);
-      console.error('   ?�바�?�?', correctUrl);
-      console.error('   .env.local ?�일???�인?�고 개발 ?�버�??�시?�하?�요.');
+      console.error('❌ 잘못된 Supabase URL이 사용되고 있습니다!');
+      console.error('   현재:', supabaseUrl);
+      console.error('   올바른 값:', correctUrl);
+      console.error('   .env.local 파일을 확인하고 개발 서버를 재시작하세요.');
     }
   }
 
   // Custom Storage Adapter for Cross-Port Session Sharing
-  // [불�? 규칙] 개발 ?�경?�서 localhost:3000�?localhost:3002 �??�션 공유
-  // [불�? 규칙] localStorage??origin별로 분리?��?�? sessionStorage�??�용?�거??  //            URL ?�라미터�??�션???�달?�야 ?�니??
+  // [불변 규칙] 개발 환경에서 localhost:3000과 localhost:3002 간 세션 공유
+  // [불변 규칙] localStorage는 origin별로 분리되므로, sessionStorage를 사용하거나
+  //            URL 파라미터로 세션을 전달해야 합니다.
   // 
-  // 참고: Supabase??기본?�으�?localStorage�??�용?��?�? ?�트가 ?�르�?  //      ?�른 origin?�로 간주?�어 공유?��? ?�습?�다.
+  // 참고: Supabase는 기본적으로 localStorage를 사용하지만, 포트가 다르면
+  //      다른 origin으로 간주되어 공유되지 않습니다.
   // 
-  // ?�결 방법:
-  // 1. 같�? ?�트?�서 ?�브?�스�??�우??(권장)
-  // 2. ?�는 custom storage adapter ?�용 (복잡??
-  // 3. ?�는 URL ?�라미터�??�션 ?�달 (보안 ?�험)
+  // 해결 방법:
+  // 1. 같은 포트에서 서브패스로 라우팅 (권장)
+  // 2. 또는 custom storage adapter 사용 (복잡함)
+  // 3. 또는 URL 파라미터로 세션 전달 (보안 위험)
   //
-  // ?�재??기본 localStorage�??�용?�되, ?�용?��? academy-admin ?�에??  // 로그?�한 ??super-admin ?�으�??�아?�면 ?�동?�로 ?�션???�인?�도�??�니??
+  // 현재는 기본 localStorage를 사용하되, 사용자가 academy-admin 앱에서
+  // 로그인한 후 super-admin 앱으로 돌아오면 수동으로 세션을 확인하도록 합니다.
 
   // Custom storage adapter for cross-origin session sharing
-  // 개발 ?�경?�서�??�용 (?�로?�션?�서??같�? origin ?�용 권장)
+  // 개발 환경에서만 사용 (프로덕션에서는 같은 origin 사용 권장)
   const customStorage = typeof window !== 'undefined' && (import.meta as any).env?.DEV
     ? createCrossOriginStorage()
     : undefined;

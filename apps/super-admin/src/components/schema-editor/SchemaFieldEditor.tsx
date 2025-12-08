@@ -1,15 +1,15 @@
 /**
  * SchemaFieldEditor Component
  * 
- * [불�? 규칙] ?�드 추�?/?�정/??�� UI
- * [불�? 규칙] Anti-Pattern 강제: Tailwind class, script ?�입 금�?
+ * [불변 규칙] 필드 추가/수정/삭제 UI
+ * [불변 규칙] Anti-Pattern 강제: Tailwind class, script 삽입 금지
  * 
- * 기술문서: docu/?�키마에?�터.txt 14. Schema Editor 기능
+ * 기술문서: docu/스키마에디터.txt 14. Schema Editor 기능
  */
 
 import { useState } from 'react';
 import { Card, Input, Select, Button, useModal } from '@ui-core/react';
-import type { FormFieldSchema } from '@schema/engine';
+import type { FormFieldSchema } from '@schema-engine/types';
 
 export interface SchemaFieldEditorProps {
   fields: FormFieldSchema[];
@@ -23,19 +23,19 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
   const [editingField, setEditingField] = useState<FormFieldSchema | null>(null);
 
   const fieldKinds: Array<{ value: FormFieldSchema['kind']; label: string }> = [
-    { value: 'text', label: '?�스?? },
-    { value: 'email', label: '?�메?? },
-    { value: 'phone', label: '?�화번호' },
-    { value: 'number', label: '?�자' },
-    { value: 'password', label: '비�?번호' },
-    { value: 'textarea', label: '?�스???�역' },
-    { value: 'select', label: '?�택박스' },
-    { value: 'multiselect', label: '?�중 ?�택' },
-    { value: 'radio', label: '?�디??버튼' },
+    { value: 'text', label: '텍스트' },
+    { value: 'email', label: '이메일' },
+    { value: 'phone', label: '전화번호' },
+    { value: 'number', label: '숫자' },
+    { value: 'password', label: '비밀번호' },
+    { value: 'textarea', label: '텍스트 영역' },
+    { value: 'select', label: '선택박스' },
+    { value: 'multiselect', label: '다중 선택' },
+    { value: 'radio', label: '라디오 버튼' },
     { value: 'checkbox', label: '체크박스' },
-    { value: 'date', label: '?�짜' },
-    { value: 'datetime', label: '?�짜/?�간' },
-    { value: 'custom', label: '커스?� ?�젯' },
+    { value: 'date', label: '날짜' },
+    { value: 'datetime', label: '날짜/시간' },
+    { value: 'custom', label: '커스텀 위젯' },
   ];
 
   const handleAddField = () => {
@@ -65,34 +65,34 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
   const handleSaveField = () => {
     if (!editingField || editingIndex === null) return;
 
-    // ?�수 ?�드 검�?
+    // 필수 필드 검증
     if (!editingField.name.trim()) {
-      showAlert('?�류', '?�드 ?�름?� ?�수?�니??', 'error');
+      showAlert('오류', '필드 이름은 필수입니다.', 'error');
       return;
     }
 
-    // Anti-Pattern 검�? Tailwind class 금�?
+    // Anti-Pattern 검증: Tailwind class 금지
     const tailwindPattern = /^(p|m|w|h|text|bg|border|rounded|flex|grid|col|row|gap|space|justify|items|self|place)-/;
     if (editingField.ui?.label && tailwindPattern.test(editingField.ui.label)) {
-      showAlert('?�류', 'Tailwind ?�래?��? 직접 ?�용?????�습?�다.', 'error');
+      showAlert('오류', 'Tailwind 클래스를 직접 사용할 수 없습니다.', 'error');
       return;
     }
     if (editingField.ui?.placeholder && tailwindPattern.test(editingField.ui.placeholder)) {
-      showAlert('?�류', 'Tailwind ?�래?��? 직접 ?�용?????�습?�다.', 'error');
+      showAlert('오류', 'Tailwind 클래스를 직접 사용할 수 없습니다.', 'error');
       return;
     }
 
-    // select/multiselect/radio??options ?�수
+    // select/multiselect/radio는 options 필수
     if (['select', 'multiselect', 'radio'].includes(editingField.kind)) {
       if (!editingField.options || editingField.options.length === 0) {
-        showAlert('?�류', 'select/multiselect/radio ?�드??options가 ?�수?�니??', 'error');
+        showAlert('오류', 'select/multiselect/radio 필드는 options가 필수입니다.', 'error');
         return;
       }
     }
 
-    // custom?� customComponentType ?�수
+    // custom은 customComponentType 필수
     if (editingField.kind === 'custom' && !editingField.customComponentType) {
-      showAlert('?�류', 'custom ?�드??customComponentType???�수?�니??', 'error');
+      showAlert('오류', 'custom 필드는 customComponentType이 필수입니다.', 'error');
       return;
     }
 
@@ -117,21 +117,21 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
     return (
       <Card padding="md" variant="default">
         <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
-          {editingIndex === fields.length ? '?�드 추�?' : '?�드 ?�정'}
+          {editingIndex === fields.length ? '필드 추가' : '필드 수정'}
         </h4>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
           <Input
-            label="?�드 ?�름 (name)"
+            label="필드 이름 (name)"
             value={editingField.name}
             onChange={(e) => setEditingField({ ...editingField, name: e.target.value })}
-            helperText="?�이?�베?�스???�?�될 ?�드???�름?�니?? ?�문 ?�문?��? ?�더?�코??_)�??�용?�세?? (?? student_name, email_address)"
+            helperText="데이터베이스에 저장될 필드의 이름입니다. 영문 소문자와 언더스코어(_)만 사용하세요. (예: student_name, email_address)"
             required
           />
 
           <div>
             <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--spacing-xs)', display: 'block' }}>
-              ?�드 ?�??(kind)
+              필드 타입 (kind)
             </label>
             <Select
               value={editingField.kind}
@@ -140,7 +140,7 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
                 const updated: FormFieldSchema = {
                   ...editingField,
                   kind: newKind,
-                  // kind 변�???options 초기??(?�요??경우)
+                  // kind 변경 시 options 초기화 (필요한 경우)
                   options: ['select', 'multiselect', 'radio'].includes(newKind) ? editingField.options || [] : undefined,
                 };
                 setEditingField(updated);
@@ -154,52 +154,52 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
               ))}
             </Select>
             <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-xs)', display: 'block' }}>
-              ?�용?��? ?�력???�이?�의 종류�??�택?�세?? ?�스?? ?�자, ?�짜, ?�택박스 ???�양???�?�을 지?�합?�다.
+              사용자가 입력할 데이터의 종류를 선택하세요. 텍스트, 숫자, 날짜, 선택박스 등 다양한 타입을 지원합니다.
             </span>
           </div>
 
           <Input
-            label="?�벨 (label)"
+            label="라벨 (label)"
             value={editingField.ui?.label || ''}
             onChange={(e) => setEditingField({
               ...editingField,
               ui: { ...editingField.ui, label: e.target.value },
             })}
-            helperText="?�용?�에�?보여�??�드???�름?�니?? (?? '?�름', '?�메??주소', '?�화번호')"
+            helperText="사용자에게 보여질 필드의 이름입니다. (예: '이름', '이메일 주소', '전화번호')"
           />
 
           <Input
-            label="?�레?�스?�??(placeholder)"
+            label="플레이스홀더 (placeholder)"
             value={editingField.ui?.placeholder || ''}
             onChange={(e) => setEditingField({
               ...editingField,
               ui: { ...editingField.ui, placeholder: e.target.value },
             })}
-            helperText="?�력 ?�드 ?�에 ?�시???�내 문구?�니?? (?? '?�름???�력?�세??, '010-1234-5678')"
+            helperText="입력 필드 안에 표시될 안내 문구입니다. (예: '이름을 입력하세요', '010-1234-5678')"
           />
 
           <Input
             type="number"
-            label="???�비 (colSpan, 1-12)"
+            label="열 너비 (colSpan, 1-12)"
             value={editingField.ui?.colSpan || 1}
             onChange={(e) => setEditingField({
               ...editingField,
               ui: { ...editingField.ui, colSpan: parseInt(e.target.value) || 1 },
             })}
-            helperText="?�드가 차�????�의 ?�비?�니?? 1-12 ?�이???�자�??�력?�세?? (12 = ?�체 ?�비, 6 = ?�반 ?�비, 4 = 1/3 ?�비)"
+            helperText="필드가 차지할 열의 너비입니다. 1-12 사이의 숫자를 입력하세요. (12 = 전체 너비, 6 = 절반 너비, 4 = 1/3 너비)"
             min={1}
             max={12}
           />
 
           {editingField.kind === 'custom' && (
             <Input
-              label="커스?� 컴포?�트 ?�??
+              label="커스텀 컴포넌트 타입"
               value={editingField.customComponentType || ''}
               onChange={(e) => setEditingField({
                 ...editingField,
                 customComponentType: e.target.value,
               })}
-              helperText="?�용??커스?� ?�젯???�름???�력?�세?? (?? 'RichTextEditor', 'ImageUploader')"
+              helperText="사용할 커스텀 위젯의 이름을 입력하세요. (예: 'RichTextEditor', 'ImageUploader')"
               required
             />
           )}
@@ -207,16 +207,16 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
           {['select', 'multiselect', 'radio'].includes(editingField.kind) && (
             <div>
               <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--spacing-xs)', display: 'block' }}>
-                ?�션 (options)
+                옵션 (options)
               </label>
               <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-sm)', display: 'block' }}>
-                ?�용?��? ?�택?????�는 ?�션 목록??추�??�세?? �??�션?� "�?�?"?�벨"??가집니??
+                사용자가 선택할 수 있는 옵션 목록을 추가하세요. 각 옵션은 "값"과 "라벨"을 가집니다.
               </span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
                 {(editingField.options || []).map((opt, idx) => (
                   <div key={idx} style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
                     <Input
-                      placeholder="�?(value)"
+                      placeholder="값 (value)"
                       value={opt.value}
                       onChange={(e) => {
                         const newOptions = [...(editingField.options || [])];
@@ -225,7 +225,7 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
                       }}
                     />
                     <Input
-                      placeholder="?�벨 (label)"
+                      placeholder="라벨 (label)"
                       value={opt.label || ''}
                       onChange={(e) => {
                         const newOptions = [...(editingField.options || [])];
@@ -241,7 +241,7 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
                         setEditingField({ ...editingField, options: newOptions });
                       }}
                     >
-                      ??��
+                      삭제
                     </Button>
                   </div>
                 ))}
@@ -255,7 +255,7 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
                     });
                   }}
                 >
-                  ?�션 추�?
+                  옵션 추가
                 </Button>
               </div>
             </div>
@@ -263,7 +263,7 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
 
           <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginTop: 'var(--spacing-md)' }}>
             <Button variant="solid" color="primary" onClick={handleSaveField}>
-              ?�??
+              저장
             </Button>
             <Button variant="outline" onClick={handleCancelEdit}>
               취소
@@ -278,10 +278,10 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
     <Card padding="md" variant="default">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
         <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
-          ?�드 목록 ({fields.length})
+          필드 목록 ({fields.length})
         </h3>
         <Button variant="solid" color="primary" size="sm" onClick={handleAddField}>
-          + ?�드 추�?
+          + 필드 추가
         </Button>
       </div>
 
@@ -295,25 +295,25 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
           >
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>
-                {field.name || '(?�름 ?�음)'} ({field.kind})
+                {field.name || '(이름 없음)'} ({field.kind})
               </div>
               <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                {field.ui?.label || '(?�벨 ?�음)'} · colSpan: {field.ui?.colSpan || 1}
+                {field.ui?.label || '(라벨 없음)'} · colSpan: {field.ui?.colSpan || 1}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
               <Button variant="outline" size="sm" onClick={() => handleEditField(index)}>
-                ?�정
+                수정
               </Button>
               <Button variant="outline" size="sm" onClick={() => handleDeleteField(index)}>
-                ??��
+                삭제
               </Button>
             </div>
           </Card>
         ))}
         {fields.length === 0 && (
           <p style={{ color: 'var(--color-text-secondary)', textAlign: 'center', padding: 'var(--spacing-md)' }}>
-            ?�드가 ?�습?�다. ?�드�?추�??�세??
+            필드가 없습니다. 필드를 추가하세요.
           </p>
         )}
       </div>

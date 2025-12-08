@@ -1,11 +1,11 @@
 /**
  * Student Form Schema
  * 
- * [불�? 규칙] ?�키�??�진 기반 FormSchema ?�의
- * [불�? 규칙] Tailwind ?�래??직접 ?�용 금�?, props 기반 ?�달
+ * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
+ * [불변 규칙] Tailwind 클래스 직접 사용 금지, props 기반 전달
  */
 
-import type { FormSchema } from '@schema/engine';
+import type { FormSchema } from '@schema-engine';
 
 export const studentFormSchema: FormSchema = {
   version: '1.0.0',
@@ -23,7 +23,7 @@ export const studentFormSchema: FormSchema = {
         name: 'name',
         kind: 'text',
         ui: {
-          label: '?�름',
+          label: '이름',
           colSpan: 1,
         },
         validation: {
@@ -34,7 +34,7 @@ export const studentFormSchema: FormSchema = {
         name: 'birth_date',
         kind: 'date',
         ui: {
-          label: '?�년?�일',
+          label: '생년월일',
           colSpan: 1,
         },
       },
@@ -42,20 +42,20 @@ export const studentFormSchema: FormSchema = {
         name: 'gender',
         kind: 'select',
         ui: {
-          label: '?�별',
+          label: '성별',
           colSpan: 1,
         },
         options: [
-          { label: '?�택', value: '' },
-          { label: '??, value: 'male' },
-          { label: '??, value: 'female' },
+          { label: '선택', value: '' },
+          { label: '남', value: 'male' },
+          { label: '여', value: 'female' },
         ],
       },
       {
         name: 'phone',
         kind: 'phone',
         ui: {
-          label: '?�화번호',
+          label: '전화번호',
           colSpan: 1,
         },
       },
@@ -63,7 +63,7 @@ export const studentFormSchema: FormSchema = {
         name: 'email',
         kind: 'email',
         ui: {
-          label: '?�메??,
+          label: '이메일',
           colSpan: 1,
         },
       },
@@ -79,7 +79,7 @@ export const studentFormSchema: FormSchema = {
         name: 'school_name',
         kind: 'text',
         ui: {
-          label: '?�교',
+          label: '학교',
           colSpan: 1,
         },
       },
@@ -87,7 +87,7 @@ export const studentFormSchema: FormSchema = {
         name: 'grade',
         kind: 'text',
         ui: {
-          label: '?�년',
+          label: '학년',
           colSpan: 1,
         },
       },
@@ -95,13 +95,13 @@ export const studentFormSchema: FormSchema = {
         name: 'status',
         kind: 'select',
         ui: {
-          label: '?�태',
+          label: '상태',
           colSpan: 1,
         },
         options: [
-          { label: '?�원', value: 'active' },
-          { label: '?�원', value: 'on_leave' },
-          { label: '?�원', value: 'withdrawn' },
+          { label: '재원', value: 'active' },
+          { label: '휴원', value: 'on_leave' },
+          { label: '퇴원', value: 'withdrawn' },
           { label: '졸업', value: 'graduated' },
         ],
         defaultValue: 'active',
@@ -116,7 +116,7 @@ export const studentFormSchema: FormSchema = {
       },
     ],
     submit: {
-      label: '?�록',
+      label: '등록',
       variant: 'solid',
       color: 'primary',
       size: 'md',

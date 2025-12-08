@@ -1,7 +1,7 @@
 /**
  * Schema Registry Hooks
  * 
- * [불�? 규칙] Zero-Trust: 모든 ?�청?� Supabase RLS�??�해 권한 검�?
+ * [불변 규칙] Zero-Trust: 모든 요청은 Supabase RLS를 통해 권한 검증
  */
 
 export { useIsSuperAdmin } from './useIsSuperAdmin';

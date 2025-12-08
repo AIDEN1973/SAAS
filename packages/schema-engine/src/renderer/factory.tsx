@@ -1,7 +1,7 @@
 /**
  * Renderer Factory
  * 
- * SDUI v1.1: ?�키�??�?�에 ?�라 ?�절???�더?��? ?�택?�는 ?�토�? * 
+ * SDUI v1.1: ?�키�??�?�에 ?�라 ?�절???�더?��? ?�택?�는 ?�토�? * 
  * 기술문서: SDUI 기술문서 v1.1 - 8. Renderer Factory
  */
 
@@ -19,21 +19,21 @@ export interface SchemaRendererProps {
   onSubmit?: (data: any) => void | Promise<void>;
   defaultValues?: Record<string, any>;
   className?: string;
-  // SDUI v1.1: Action Engine 컨텍?�트 (?�택??
+  // SDUI v1.1: Action Engine 컨텍?�트 (?�택??
   actionContext?: Partial<ActionContext>;
-  // SDUI v1.1: i18n 번역 (?�택??
+  // SDUI v1.1: i18n 번역 (?�택??
   translations?: Record<string, string>;
-  // SDUI v1.1: API ?�출 ?�수 (Table?? ?�택??
+  // SDUI v1.1: API ?�출 ?�수 (Table?? ?�택??
   apiCall?: (endpoint: string, method: string, body?: any) => Promise<any>;
 }
 
 /**
  * Renderer Factory
  * 
- * ?�키마의 type???�라 ?�절???�더?��? ?�택?�여 ?�더링합?�다.
+ * ?�키마의 type???�라 ?�절???�더?��? ?�택?�여 ?�더링합?�다.
  * 
- * @param props - ?�더??props
- * @returns ?�더링된 컴포?�트
+ * @param props - ?�더??props
+ * @returns ?�더링된 컴포?�트
  */
 export function SchemaRenderer({ schema, ...props }: SchemaRendererProps): React.ReactElement | null {
   switch (schema.type) {
@@ -86,11 +86,11 @@ export function SchemaRenderer({ schema, ...props }: SchemaRendererProps): React
       );
     
     default:
-      // ?�?�이 ?�거???????�는 경우
+      // ?�?�이 ?�거???????�는 경우
       console.error(`Unknown schema type: ${(schema as any).type}`);
       return (
         <div>
-          <p>?????�는 ?�키�??�?�입?�다.</p>
+          <p>?????�는 ?�키�??�?�입?�다.</p>
         </div>
       );
   }

@@ -1,15 +1,15 @@
 /**
  * ValidationEditor Component
  * 
- * [불�? 규칙] 검�?규칙 ?�정 UI
- * [불�? 규칙] validate ?�수??Registry???�??불�? (JSONB ?�약)
+ * [불변 규칙] 검증 규칙 설정 UI
+ * [불변 규칙] validate 함수는 Registry에 저장 불가 (JSONB 제약)
  * 
- * 기술문서: docu/?�키마에?�터.txt 9. Validation Rule
+ * 기술문서: docu/스키마에디터.txt 9. Validation Rule
  */
 
 import { useState } from 'react';
 import { Card, Input, Checkbox } from '@ui-core/react';
-import type { FormFieldSchema } from '@schema/engine';
+import type { FormFieldSchema } from '@schema-engine/types';
 
 export interface ValidationEditorProps {
   field: FormFieldSchema;
@@ -29,7 +29,7 @@ export function ValidationEditor({ field, onChange }: ValidationEditorProps) {
   return (
     <Card padding="md" variant="default">
       <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
-        검�?규칙
+        검증 규칙
       </h4>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
@@ -39,9 +39,9 @@ export function ValidationEditor({ field, onChange }: ValidationEditorProps) {
             onChange={(e) => handleChange('required', e.target.checked ? true : undefined)}
           />
           <div>
-            <label style={{ fontSize: 'var(--font-size-sm)' }}>?�수 ?�력</label>
+            <label style={{ fontSize: 'var(--font-size-sm)' }}>필수 입력</label>
             <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginLeft: 'var(--spacing-xs)', display: 'block' }}>
-              체크?�면 ?�용?��? 반드???�력?�야 ?�니??
+              체크하면 사용자가 반드시 입력해야 합니다.
             </span>
           </div>
         </div>
@@ -53,23 +53,23 @@ export function ValidationEditor({ field, onChange }: ValidationEditorProps) {
               label="최소 길이 (minLength)"
               value={validation?.minLength || ''}
               onChange={(e) => handleChange('minLength', e.target.value ? parseInt(e.target.value) : undefined)}
-              helperText="?�력?�야 ?�는 최소 글???�입?�다. (?? 2 = 최소 2글???�상)"
+              helperText="입력해야 하는 최소 글자 수입니다. (예: 2 = 최소 2글자 이상)"
               min={0}
             />
             <Input
               type="number"
-              label="최�? 길이 (maxLength)"
+              label="최대 길이 (maxLength)"
               value={validation?.maxLength || ''}
               onChange={(e) => handleChange('maxLength', e.target.value ? parseInt(e.target.value) : undefined)}
-              helperText="?�력?????�는 최�? 글???�입?�다. (?? 100 = 최�? 100글?�까지)"
+              helperText="입력할 수 있는 최대 글자 수입니다. (예: 100 = 최대 100글자까지)"
               min={0}
             />
             <Input
-              label="?�규???�턴 (pattern)"
+              label="정규식 패턴 (pattern)"
               value={validation?.pattern?.value || ''}
               onChange={(e) => handleChange('pattern', e.target.value ? { value: e.target.value } : undefined)}
               placeholder="^[0-9]+$"
-              helperText="?�력 ?�식???�한?�는 ?�규???�턴?�니?? (?? ^[0-9]+$ = ?�자�??�용, ^[a-zA-Z]+$ = ?�문�??�용)"
+              helperText="입력 형식을 제한하는 정규식 패턴입니다. (예: ^[0-9]+$ = 숫자만 허용, ^[a-zA-Z]+$ = 영문만 허용)"
             />
           </>
         )}
@@ -78,23 +78,23 @@ export function ValidationEditor({ field, onChange }: ValidationEditorProps) {
           <>
             <Input
               type="number"
-              label="최소�?(min)"
+              label="최소값 (min)"
               value={validation?.min || ''}
               onChange={(e) => handleChange('min', e.target.value ? parseFloat(e.target.value) : undefined)}
-              helperText="?�력?????�는 최소 ?�자?�니?? (?? 0 = 0 ?�상???�자�??�용)"
+              helperText="입력할 수 있는 최소 숫자입니다. (예: 0 = 0 이상의 숫자만 허용)"
             />
             <Input
               type="number"
-              label="최�?�?(max)"
+              label="최대값 (max)"
               value={validation?.max || ''}
               onChange={(e) => handleChange('max', e.target.value ? parseFloat(e.target.value) : undefined)}
-              helperText="?�력?????�는 최�? ?�자?�니?? (?? 100 = 100 ?�하???�자�??�용)"
+              helperText="입력할 수 있는 최대 숫자입니다. (예: 100 = 100 이하의 숫자만 허용)"
             />
           </>
         )}
 
         <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-sm)' }}>
-          ?�️ validate ?�수??Schema Registry(JSONB)???�?�할 ???�으므�??�용?????�습?�다.
+          ⚠️ validate 함수는 Schema Registry(JSONB)에 저장할 수 없으므로 사용할 수 없습니다.
         </div>
       </div>
     </Card>

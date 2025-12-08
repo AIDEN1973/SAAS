@@ -7,7 +7,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",
     "@lib/supabase-client": "file:../../lib/supabase-client",
-    "@schema/engine": "file:../../packages/schema-engine"
+    "@schema-engine/types": "file:../../schema-engine"
   }
 }
 

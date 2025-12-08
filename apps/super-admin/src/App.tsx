@@ -14,10 +14,10 @@ function App() {
     >
       <ErrorBoundary>
         <Routes>
-          {/* ?�증???�요 ?�는 ?�우??*/}
+          {/* 인증이 필요 없는 라우트 */}
           <Route path="/auth/login" element={<LoginPage />} />
 
-          {/* ?�증???�요???�우??*/}
+          {/* 인증이 필요한 라우트 */}
           <Route
             path="/*"
             element={

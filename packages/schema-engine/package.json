@@ -1,5 +1,5 @@
 {
-  "name": "@schema/engine",
+  "name": "@schema-engine/core",
   "version": "1.0.0",
   "private": true,
   "main": "./src/index.ts",

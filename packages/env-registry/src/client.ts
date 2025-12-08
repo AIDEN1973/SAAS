@@ -1,6 +1,6 @@
 import { envClientSchema, type EnvClient } from './schema';
 
-// Vite ?�경변???�???�의 (Vite가 ?�는 ?�경?�서???�??체크 ?�과)
+// Vite 환경변수 타입 정의 (Vite가 있는 환경에서만 체크 가능)
 interface ImportMetaEnv {
   VITE_SUPABASE_URL?: string;
   VITE_SUPABASE_ANON_KEY?: string;
@@ -11,11 +11,12 @@ interface ImportMetaEnv {
 function validateEnvClient(): EnvClient {
   const rawEnv: Record<string, string | undefined> = {};
   
-  // Vite ?�경 감�? (import.meta.env ?�용)
-  // Vite?�서??import.meta.env�??�해 ?�경변?�에 ?�근
-  // ?�로?�션 빌드?�서??빌드 ?�?�에 주입?��?�???�� ?�근 가?�해????  let isVite = false;
+  // Vite 환경 감지 (import.meta.env 사용)
+  // Vite에서는 import.meta.env를 통해 환경변수에 접근
+  // 프로덕션 빌드에서는 빌드 타임에 주입되어 접근 가능합니다
+  let isVite = false;
   try {
-    // @ts-ignore - import.meta??Vite?�서�?존재?�며, ?�???�의가 ?�벽?��? ?�을 ???�음
+    // @ts-ignore - import.meta는 Vite에서만 존재하며, 타입 정의가 완벽하지 않을 수 있음
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     const metaEnv = import.meta.env;
@@ -23,9 +24,9 @@ function validateEnvClient(): EnvClient {
       isVite = true;
       const viteEnv = metaEnv as ImportMetaEnv;
       
-      // Vite: VITE_* ?�두???�용
-      // VITE_ ?�두?��? NEXT_PUBLIC_�?매핑 (?�키�??�환??
-      // �?문자??체크 (define ?�션?�로 주입??경우 �?문자?�이 ?????�음)
+      // Vite: VITE_* 접두사 사용
+      // VITE_ 접두사를 NEXT_PUBLIC_로 매핑 (키 변환)
+      // 빈 문자열 체크 (define 옵션으로 주입된 경우 빈 문자열일 수 있음)
       if (viteEnv.VITE_SUPABASE_URL && viteEnv.VITE_SUPABASE_URL.trim() !== '') {
         rawEnv.NEXT_PUBLIC_SUPABASE_URL = viteEnv.VITE_SUPABASE_URL;
       }
@@ -37,20 +38,22 @@ function validateEnvClient(): EnvClient {
       }
     }
   } catch (e) {
-    // import.meta가 ?�는 ?�경 (Node.js ?? - ?�상?�인 ?�작
+    // import.meta가 없는 환경 (Node.js 등 - 정상적인 동작)
     isVite = false;
   }
   
-  // Next.js ?�경 ?�는 ?�반 Node.js ?�경 (?�는 Vite ?�로?�션?�서 process.env??체크)
+  // Next.js 환경 또는 일반 Node.js 환경 (또는 Vite 프로덕션에서 process.env로 체크)
   if (typeof process !== 'undefined' && process.env) {
-    // Next.js: NEXT_PUBLIC_* ?�두??    for (const key in process.env) {
+    // Next.js: NEXT_PUBLIC_* 접두사
+    for (const key in process.env) {
       if (key.startsWith('NEXT_PUBLIC_')) {
         rawEnv[key] = process.env[key];
       }
     }
     
-    // Vite ?�경변?��? NEXT_PUBLIC_�?매핑 (VITE_*가 ?�는 경우)
-    // ?�로?�션 빌드?�서 import.meta.env가 ?�동?��? ?�는 경우�??��?    if (process.env.VITE_SUPABASE_URL && !rawEnv.NEXT_PUBLIC_SUPABASE_URL) {
+    // Vite 환경변수를 NEXT_PUBLIC_로 매핑 (VITE_*가 있는 경우)
+    // 프로덕션 빌드에서 import.meta.env가 동적으로 접근되지 않는 경우 대비
+    if (process.env.VITE_SUPABASE_URL && !rawEnv.NEXT_PUBLIC_SUPABASE_URL) {
       rawEnv.NEXT_PUBLIC_SUPABASE_URL = process.env.VITE_SUPABASE_URL;
     }
     if (process.env.VITE_SUPABASE_ANON_KEY && !rawEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -72,42 +75,43 @@ function validateEnvClient(): EnvClient {
       .map(e => e.path.join('.'))
       .join(', ');
     
-    // Vite ?�경?��? ?�인 (?�에???��? ?�인??
+    // Vite 환경인지 확인 (에러 메시지에 반영)
     const envPrefix = isVite ? 'VITE_' : 'NEXT_PUBLIC_';
     
-    // ?�버�??�보 ?�집
+    // 디버깅 정보 수집
     const debugInfo: string[] = [];
     try {
       // @ts-ignore
       const metaEnv = import.meta.env;
       if (metaEnv) {
-        debugInfo.push(`import.meta.env.VITE_SUPABASE_URL: ${metaEnv.VITE_SUPABASE_URL ? '?�정?? : '미설??}`);
-        debugInfo.push(`import.meta.env.VITE_SUPABASE_ANON_KEY: ${metaEnv.VITE_SUPABASE_ANON_KEY ? '?�정?? : '미설??}`);
+        debugInfo.push(`import.meta.env.VITE_SUPABASE_URL: ${metaEnv.VITE_SUPABASE_URL ? '설정됨' : '미설정'}`);
+        debugInfo.push(`import.meta.env.VITE_SUPABASE_ANON_KEY: ${metaEnv.VITE_SUPABASE_ANON_KEY ? '설정됨' : '미설정'}`);
       }
     } catch (e) {
-      debugInfo.push('import.meta.env ?�근 불�?');
+      debugInfo.push('import.meta.env 접근 불가');
     }
     if (typeof process !== 'undefined' && process.env) {
-      debugInfo.push(`process.env.VITE_SUPABASE_URL: ${process.env.VITE_SUPABASE_URL ? '?�정?? : '미설??}`);
-      debugInfo.push(`process.env.VITE_SUPABASE_ANON_KEY: ${process.env.VITE_SUPABASE_ANON_KEY ? '?�정?? : '미설??}`);
-      debugInfo.push(`process.env.NEXT_PUBLIC_SUPABASE_URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? '?�정?? : '미설??}`);
-      debugInfo.push(`process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY: ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '?�정?? : '미설??}`);
+      debugInfo.push(`process.env.VITE_SUPABASE_URL: ${process.env.VITE_SUPABASE_URL ? '설정됨' : '미설정'}`);
+      debugInfo.push(`process.env.VITE_SUPABASE_ANON_KEY: ${process.env.VITE_SUPABASE_ANON_KEY ? '설정됨' : '미설정'}`);
+      debugInfo.push(`process.env.NEXT_PUBLIC_SUPABASE_URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? '설정됨' : '미설정'}`);
+      debugInfo.push(`process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY: ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '설정됨' : '미설정'}`);
     }
     
     throw new Error(
-      `?�라?�언???�경변??검�??�패:\n${errors}\n\n` +
-      (missingVars ? `?�락???�수 ?�경변?? ${missingVars}\n\n` : '') +
-      `?�수 ?�라?�언???�경변?��? ?�락?�었?�니??\n\n` +
-      `?�경변???�정 방법:\n` +
-      `1. 로컬 개발: ?�로?�트 루트 ?�렉?�리??.env.local ?�일??${envPrefix}SUPABASE_URL�?${envPrefix}SUPABASE_ANON_KEY�??�정?�세??\n` +
-      `2. Vercel 배포: Vercel ?�?�보??> ?�로?�트 ?�정 > Environment Variables?�서 ${envPrefix}SUPABASE_URL�?${envPrefix}SUPABASE_ANON_KEY�??�정?�세??\n` +
-      `   (Vite ?�로?�트??VITE_ ?�두?? Next.js ?�로?�트??NEXT_PUBLIC_ ?�두???�용)\n\n` +
-      (debugInfo.length > 0 ? `?�버�??�보:\n${debugInfo.join('\n')}\n\n` : '') +
-      `참고: Vite ?�로?�션 빌드?�서??빌드 ?�?�에 ?�경변?��? 주입?�어???�니??`
+      `클라이언트 환경변수 검증 실패:\n${errors}\n\n` +
+      (missingVars ? `누락된 필수 환경변수: ${missingVars}\n\n` : '') +
+      `필수 클라이언트 환경변수가 누락되었습니다.\n\n` +
+      `환경변수 설정 방법:\n` +
+      `1. 로컬 개발: 프로젝트 루트 디렉토리의 .env.local 파일에 ${envPrefix}SUPABASE_URL과 ${envPrefix}SUPABASE_ANON_KEY를 설정하세요.\n` +
+      `2. Vercel 배포: Vercel 대시보드 > 프로젝트 설정 > Environment Variables에서 ${envPrefix}SUPABASE_URL과 ${envPrefix}SUPABASE_ANON_KEY를 설정하세요.\n` +
+      `   (Vite 프로젝트는 VITE_ 접두사, Next.js 프로젝트는 NEXT_PUBLIC_ 접두사 사용)\n\n` +
+      (debugInfo.length > 0 ? `디버깅 정보:\n${debugInfo.join('\n')}\n\n` : '') +
+      `참고: Vite 프로덕션 빌드에서는 빌드 타임에 환경변수가 주입되어야 합니다.`
     );
   }
   
   return parsed.data;
 }
 
-// ?�플리�??�션 ?�작 ????번만 검�?export const envClient = validateEnvClient();
+// 애플리케이션 시작 시 한 번만 검증
+export const envClient = validateEnvClient();

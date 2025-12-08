@@ -1,21 +1,21 @@
 /**
- * ?�생 관�??�이지
+ * 학생 관리 페이지
  * 
- * [불�? 규칙] api-sdk�??�해?�만 ?�이???�청
- * [불�? 규칙] SDUI ?�키�?기반 ?�면 ?�동 ?�성
- * [불�? 규칙] Zero-Trust: UI??tenantId�?직접 ?�달?��? ?�음, Context?�서 ?�동 가?�옴
+ * [불변 규칙] api-sdk를 통해서만 API 요청
+ * [불변 규칙] SDUI 스키마 기반 화면 자동 생성
+ * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  */
 
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '@ui-core/react';
 import { Container, Grid, Card, Button, Input } from '@ui-core/react';
-import { SchemaForm } from '@schema/engine';
+import { SchemaForm } from '@schema-engine';
 import { useStudents, useStudentTags, useStudentTagsByStudent, useCreateStudent, useBulkCreateStudents } from '@hooks/use-student';
 import type { StudentFilter, StudentStatus, Student, CreateStudentInput } from '@services/student-service';
 import type { Tag } from '@core/tags';
 import { studentFormSchema } from '../schemas/student.schema';
-// xlsx???�적 import�?로드 (?�요???�만)
+// xlsx 동적 import로 로드 (필요한 경우만)
 
 export function StudentsPage() {
   const navigate = useNavigate();
@@ -24,10 +24,10 @@ export function StudentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
 
-  // [불�? 규칙] Zero-Trust: tenantId??Context?�서 ?�동?�로 가?�옴
+  // [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
   const { data: students, isLoading, error } = useStudents({
     ...filter,
-    search: searchQuery.trim() || undefined, // �?문자?��? undefined�?변??
+    search: searchQuery.trim() || undefined, // 빈 문자열이면 undefined로 변환
   });
 
   const { data: tags } = useStudentTags();
@@ -72,55 +72,55 @@ export function StudentsPage() {
             marginBottom: 'var(--spacing-md)',
             color: 'var(--color-text)'
           }}>
-            ?�생 관�?
+            학생 관리
           </h1>
 
-          {/* 검??�??�터 ?�널 */}
+          {/* 검색 및 필터 패널 */}
           <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              {/* 검??*/}
+              {/* 검색 */}
               <div style={{ flex: 1 }}>
                 <Input
-                  placeholder="?�생 ?�름 검??.."
+                  placeholder="학생 이름 검색.."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   fullWidth
                 />
               </div>
 
-              {/* ?�태 ?�터 */}
+              {/* 상태 필터 */}
               <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
                 <Button
                   variant={!filter.status ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleStatusFilter('all')}
                 >
-                  ?�체
+                  전체
                 </Button>
                 <Button
                   variant={filter.status === 'active' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleStatusFilter('active')}
                 >
-                  ?�원
+                  재원
                 </Button>
                 <Button
                   variant={filter.status === 'on_leave' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleStatusFilter('on_leave')}
                 >
-                  ?�원
+                  휴원
                 </Button>
                 <Button
                   variant={filter.status === 'withdrawn' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleStatusFilter('withdrawn')}
                 >
-                  ?�원
+                  퇴원
                 </Button>
               </div>
 
-              {/* �?모드 ?�환 */}
+              {/* 보기 모드 전환 */}
               <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
                 <Button
                   variant={viewMode === 'card' ? 'solid' : 'outline'}
@@ -134,14 +134,14 @@ export function StudentsPage() {
                   size="sm"
                   onClick={() => setViewMode('table')}
                 >
-                  ?�이�?
+                  테이블
                 </Button>
               </div>
 
-              {/* ?�생 ?�록 버튼 */}
+              {/* 학생 등록 버튼 */}
               <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
                 <Button variant="solid" color="primary" onClick={() => setShowCreateForm(true)}>
-                  ?�생 ?�록
+                  학생 등록
                 </Button>
                 <Button 
                   variant="outline" 
@@ -149,7 +149,7 @@ export function StudentsPage() {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={bulkCreateStudents.isPending}
                 >
-                  {bulkCreateStudents.isPending ? '?�록 �?..' : '?�� ?��? ?�괄 ?�록'}
+                  {bulkCreateStudents.isPending ? '등록 중..' : '엑셀 파일 일괄 등록'}
                 </Button>
                 <input
                   ref={fileInputRef}
@@ -161,53 +161,53 @@ export function StudentsPage() {
                     if (!file) return;
 
                     try {
-                      // xlsx 모듈 ?�적 로드
+                      // xlsx 모듈 동적 로드
                       const XLSX = await import('xlsx');
                       
-                      // ?��? ?�일 ?�기
+                      // 엑셀 파일 읽기
                       const arrayBuffer = await file.arrayBuffer();
                       const workbook = XLSX.read(arrayBuffer, { type: 'array' });
                       const sheetName = workbook.SheetNames[0];
                       const worksheet = workbook.Sheets[sheetName];
                       
-                      // JSON?�로 변??
+                      // JSON으로 변환
                       const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
                       
-                      // CreateStudentInput ?�식?�로 변??
+                      // CreateStudentInput 형식으로 변환
                       const students: CreateStudentInput[] = jsonData.map((row: any) => ({
-                        name: row['?�름'] || row['name'] || '',
-                        birth_date: row['?�년?�일'] || row['birth_date'] || '',
-                        gender: (row['?�별'] || row['gender'] || undefined) as any,
-                        phone: row['?�화번호'] || row['phone'] || '',
-                        email: row['?�메??] || row['email'] || '',
+                        name: row['이름'] || row['name'] || '',
+                        birth_date: row['생년월일'] || row['birth_date'] || '',
+                        gender: (row['성별'] || row['gender'] || undefined) as any,
+                        phone: row['전화번호'] || row['phone'] || '',
+                        email: row['이메일'] || row['email'] || '',
                         address: row['주소'] || row['address'] || '',
-                        school_name: row['?�교'] || row['school_name'] || '',
-                        grade: row['?�년'] || row['grade'] || '',
-                        status: (row['?�태'] || row['status'] || 'active') as StudentStatus,
+                        school_name: row['학교'] || row['school_name'] || '',
+                        grade: row['학년'] || row['grade'] || '',
+                        status: (row['상태'] || row['status'] || 'active') as StudentStatus,
                         notes: row['비고'] || row['notes'] || '',
-                      })).filter((s) => s.name.trim() !== ''); // ?�름???�는 경우�?
+                      })).filter((s) => s.name.trim() !== ''); // 이름이 없는 경우 제외
 
                       if (students.length === 0) {
-                        alert('?�록???�생 ?�이?��? ?�습?�다.');
+                        alert('등록할 학생 데이터가 없습니다.');
                         return;
                       }
 
-                      // ?�괄 ?�록 ?�행
+                      // 일괄 등록 실행
                       const result = await bulkCreateStudents.mutateAsync(students);
                       
                       if (result.errors && result.errors.length > 0) {
-                        alert(`${result.results.length}�??�록 ?�료, ${result.errors.length}�??�패`);
+                        alert(`${result.results.length}개 등록 완료, ${result.errors.length}개 실패`);
                       } else {
-                        alert(`${result.results.length}�??�록 ?�료`);
+                        alert(`${result.results.length}개 등록 완료`);
                       }
 
-                      // ?�일 ?�력 초기??
+                      // 파일 입력 초기화
                       if (fileInputRef.current) {
                         fileInputRef.current.value = '';
                       }
                     } catch (error) {
-                      console.error('?��? ?�괄 ?�록 ?�패:', error);
-                      alert('?��? ?�괄 ?�록???�패?�습?�다.');
+                      console.error('엑셀 일괄 등록 실패:', error);
+                      alert('엑셀 일괄 등록에 실패했습니다.');
                     }
                   }}
                 />
@@ -215,18 +215,18 @@ export function StudentsPage() {
             </div>
           </Card>
 
-          {/* ?�년 ?�터 */}
+          {/* 학년 필터 */}
           <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap', marginBottom: 'var(--spacing-md)' }}>
             <Button
               variant={!filter.grade ? 'solid' : 'outline'}
               size="sm"
               onClick={() => handleGradeFilter('all')}
             >
-              ?�체 ?�년
+              전체 학년
             </Button>
-            {['1?�년', '2?�년', '3?�년', '�?', '�?', '�?', '�?', '�?', '�?'].map((grade) => (
+            {['1학년', '2학년', '3학년', '중1', '중2', '중3', '고1', '고2', '고3'].map((grade, index) => (
               <Button
-                key={grade}
+                key={`grade-${grade}-${index}`}
                 variant={filter.grade === grade ? 'solid' : 'outline'}
                 size="sm"
                 onClick={() => handleGradeFilter(grade)}
@@ -236,7 +236,7 @@ export function StudentsPage() {
             ))}
           </div>
 
-          {/* ?�그 ?�터 */}
+          {/* 태그 필터 */}
           {tags && tags.length > 0 && (
             <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap', marginBottom: 'var(--spacing-md)' }}>
               {tags.map((tag: { id: string; name: string; color: string }) => (
@@ -256,7 +256,7 @@ export function StudentsPage() {
             </div>
           )}
 
-          {/* ?�생 ?�록 ??*/}
+          {/* 학생 등록 폼 */}
           {showCreateForm && (
             <CreateStudentForm
               onClose={() => setShowCreateForm(false)}
@@ -267,15 +267,15 @@ export function StudentsPage() {
             />
           )}
 
-          {/* ?�생 목록 */}
+          {/* 학생 목록 */}
           {isLoading && (
             <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-              로딩 �?..
+              로딩 중..
             </div>
           )}
           {error && (
             <Card padding="md" variant="outlined">
-              <div style={{ color: '#ef4444' }}>?�류: {error.message}</div>
+              <div style={{ color: '#ef4444' }}>오류: {error.message}</div>
             </Card>
           )}
           {students && (
@@ -307,9 +307,9 @@ function StudentCard({ student, tags, onDetailClick }: StudentCardProps) {
   const displayedTags = studentTags || [];
 
   const statusConfig = {
-    active: { label: '?�원', bgColor: 'var(--color-green-100)', textColor: 'var(--color-green-800)' },
-    on_leave: { label: '?�원', bgColor: 'var(--color-yellow-100)', textColor: 'var(--color-yellow-800)' },
-    withdrawn: { label: '?�원', bgColor: 'var(--color-gray-100)', textColor: 'var(--color-gray-800)' },
+    active: { label: '재원', bgColor: 'var(--color-green-100)', textColor: 'var(--color-green-800)' },
+    on_leave: { label: '휴원', bgColor: 'var(--color-yellow-100)', textColor: 'var(--color-yellow-800)' },
+    withdrawn: { label: '퇴원', bgColor: 'var(--color-gray-100)', textColor: 'var(--color-gray-800)' },
   };
 
   const status = student.status as keyof typeof statusConfig;
@@ -343,7 +343,7 @@ function StudentCard({ student, tags, onDetailClick }: StudentCardProps) {
           color: 'var(--color-text-secondary)', 
           marginBottom: 'var(--spacing-sm)'
         }}>
-          ?�년: {student.grade}
+          학년: {student.grade}
         </p>
       )}
 
@@ -368,17 +368,17 @@ function StudentCard({ student, tags, onDetailClick }: StudentCardProps) {
 
       <Grid columns={2} gap="sm" style={{ marginTop: 'var(--spacing-md)' }}>
         <Button variant="outline" size="sm" fullWidth onClick={(e) => { e.stopPropagation(); onDetailClick(); }}>
-          ?�세
+          상세
         </Button>
         <Button variant="outline" size="sm" fullWidth onClick={(e) => { e.stopPropagation(); onDetailClick(); }}>
-          ?�정
+          수정
         </Button>
       </Grid>
     </Card>
   );
 }
 
-// ?�생 ?�록 ??컴포?�트
+// 학생 등록 폼 컴포넌트
 interface CreateStudentFormProps {
   onClose: () => void;
   onSubmit: (data: CreateStudentInput) => Promise<void>;
@@ -390,7 +390,7 @@ function CreateStudentForm({ onClose, onSubmit }: CreateStudentFormProps) {
   const handleSubmit = async (data: any) => {
     setIsSubmitting(true);
     try {
-      // ?�키마에??받�? ?�이?��? CreateStudentInput ?�식?�로 변??
+      // 스키마에서 받은 데이터를 CreateStudentInput 형식으로 변환
       const input: CreateStudentInput = {
         name: data.name || '',
         birth_date: data.birth_date || undefined,
@@ -412,9 +412,9 @@ function CreateStudentForm({ onClose, onSubmit }: CreateStudentFormProps) {
   return (
     <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>?�생 ?�록</h3>
+        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>학생 등록</h3>
         <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
-          ?�기
+          닫기
         </Button>
       </div>
       <SchemaForm
@@ -427,4 +427,3 @@ function CreateStudentForm({ onClose, onSubmit }: CreateStudentFormProps) {
     </Card>
   );
 }
-

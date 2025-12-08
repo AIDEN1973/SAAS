@@ -1,11 +1,11 @@
 /**
  * Schema Engine Core
  * 
- * SDUI ?�더??+ Meta-Schema + Versioning + Condition Rule
- * SDUI v1.1 ?�터?�라?�즈 ?�장?? * 
+ * SDUI ?�더??+ Meta-Schema + Versioning + Condition Rule
+ * SDUI v1.1 ?�터?�라?�즈 ?�장?? * 
  * 기술문서: 
- * - docu/?�키마엔�?txt (기존)
- * - SDUI 기술문서 v1.1 (?�터?�라?�즈 ?�장??
+ * - docu/?�키마엔�?txt (기존)
+ * - SDUI 기술문서 v1.1 (?�터?�라?�즈 ?�장??
  */
 
 export * from './types';
@@ -55,7 +55,7 @@ export type { SchemaFieldProps } from './react/SchemaField';
 export { SchemaForm, SchemaFormWithMethods } from './react/SchemaForm';
 export type { SchemaFormProps, SchemaFormWithMethodsProps } from './react/SchemaForm';
 
-// SDUI v1.1: 추�? ?�더?�들
+// SDUI v1.1: 추�? ?�더?�들
 export { SchemaTable } from './react/SchemaTable';
 export type { SchemaTableProps } from './react/SchemaTable';
 export { SchemaDetail } from './react/SchemaDetail';

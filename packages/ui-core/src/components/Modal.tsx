@@ -1,8 +1,8 @@
 /**
  * Modal Component
  * 
- * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
- * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
+ * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
+ * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
  */
 
 import React, { useEffect } from 'react';
@@ -24,9 +24,9 @@ export interface ModalProps {
 }
 
 /**
- * Modal 컴포?�트
+ * Modal 컴포?�트
  * 
- * ?�버?�이?� ?�께 ?�시?�는 모달 ?�이?�로�?
+ * ?�버?�이?� ?�께 ?�시?�는 모달 ?�이?�로�?
  */
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
@@ -165,8 +165,9 @@ export const Modal: React.FC<ModalProps> = ({
                 minWidth: '44px',
                 minHeight: '44px',
               }}
+              aria-label="닫기"
             >
-              ??
+              ×
             </Button>
           </div>
         )}

@@ -1,16 +1,16 @@
-/**
- * 강사 관�??�이지
+﻿/**
+ * 강사 관리 페이지
  * 
- * [불�? 규칙] api-sdk�??�해?�만 ?�이???�청
- * [불�? 규칙] Zero-Trust: UI??tenantId�?직접 ?�달?��? ?�음, Context?�서 ?�동 가?�옴
- * [?�구?�항] 강사 ?�로???�시
+ * [불변 규칙] api-sdk를 통해서만 API 요청
+ * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
+ * [요구사항] 강사 프로필 보기
  */
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '@ui-core/react';
 import { Container, Card, Button, Input } from '@ui-core/react';
-import { SchemaForm } from '@schema/engine';
+import { SchemaForm } from '@schema-engine';
 import {
   useTeachers,
   useTeacher,
@@ -29,7 +29,7 @@ export function TeachersPage() {
 
   const { data: teachers, isLoading, error } = useTeachers({
     ...filter,
-    search: searchQuery.trim() || undefined, // �?문자?��? undefined�?변??
+    search: searchQuery.trim() || undefined, // 빈 문자열이면 undefined로 변환
   });
   const createTeacher = useCreateTeacher();
   const updateTeacher = useUpdateTeacher();
@@ -61,23 +61,23 @@ export function TeachersPage() {
               fontWeight: 'var(--font-weight-bold)',
               color: 'var(--color-text)'
             }}>
-              강사 관�?
+              강사 관리
             </h1>
             <Button
               variant="solid"
               size="sm"
               onClick={() => setShowCreateForm(!showCreateForm)}
             >
-              강사 ?�록
+              강사 등록
             </Button>
           </div>
 
-          {/* 검??�??�터 ?�널 */}
+          {/* 검색 및 필터 패널 */}
           <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
               <div style={{ flex: 1 }}>
                 <Input
-                  placeholder="강사 ?�름 검??.."
+                  placeholder="강사 이름 검색.."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   fullWidth
@@ -90,34 +90,34 @@ export function TeachersPage() {
                   size="sm"
                   onClick={() => handleStatusFilter('all')}
                 >
-                  ?�체
+                  전체
                 </Button>
                 <Button
                   variant={filter.status === 'active' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleStatusFilter('active')}
                 >
-                  ?�직�?
+                  재직중
                 </Button>
                 <Button
                   variant={filter.status === 'on_leave' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleStatusFilter('on_leave')}
                 >
-                  ?�직
+                  휴직
                 </Button>
                 <Button
                   variant={filter.status === 'resigned' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleStatusFilter('resigned')}
                 >
-                  ?�직
+                  퇴직
                 </Button>
               </div>
             </div>
           </Card>
 
-          {/* 강사 ?�록 ??*/}
+          {/* 강사 등록 폼 */}
           {showCreateForm && (
             <CreateTeacherForm
               onSubmit={handleCreateTeacher}
@@ -127,9 +127,9 @@ export function TeachersPage() {
 
           {/* 강사 목록 */}
           {isLoading ? (
-            <div>로딩 �?..</div>
+            <div>로딩 중..</div>
           ) : error ? (
-            <div>?�류: {error.message}</div>
+            <div>오류: {error.message}</div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 'var(--spacing-md)' }}>
               {teachers?.map((teacher) => (
@@ -138,7 +138,7 @@ export function TeachersPage() {
                   teacher={teacher}
                   onEdit={(teacherId) => navigate(`/teachers/${teacherId}`)}
                   onDelete={async (teacherId) => {
-                    if (confirm('?�말 ??강사�???��?�시겠습?�까?')) {
+                    if (confirm('정말 이 강사를 삭제하시겠습니까?')) {
                       await deleteTeacher.mutateAsync(teacherId);
                     }
                   }}
@@ -147,7 +147,7 @@ export function TeachersPage() {
               {teachers?.length === 0 && (
                 <Card padding="lg" variant="default">
                   <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                    ?�록??강사가 ?�습?�다.
+                    등록된 강사가 없습니다.
                   </div>
                 </Card>
               )}
@@ -160,7 +160,7 @@ export function TeachersPage() {
 }
 
 /**
- * 강사 ?�록 ??
+ * 강사 등록 폼
  */
 function CreateTeacherForm({
   onSubmit,
@@ -170,7 +170,7 @@ function CreateTeacherForm({
   onCancel: () => void;
 }) {
   const handleSubmit = async (data: any) => {
-    // ?�키마에??받�? ?�이?��? CreateTeacherInput ?�식?�로 변??
+    // 스키마에서 받은 데이터를 CreateTeacherInput 형식으로 변환
     const input: CreateTeacherInput = {
       name: data.name || '',
       email: data.email || undefined,
@@ -190,7 +190,7 @@ function CreateTeacherForm({
   return (
     <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>강사 ?�록</h3>
+        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>강사 등록</h3>
         <Button variant="ghost" size="sm" onClick={onCancel}>
           취소
         </Button>
@@ -207,8 +207,8 @@ function CreateTeacherForm({
 }
 
 /**
- * 강사 카드 (?�로???�시)
- * [?�구?�항] 강사 ?�로???�시
+ * 강사 카드 (프로필 보기)
+ * [요구사항] 강사 프로필 보기
  */
 function TeacherCard({
   teacher,
@@ -220,9 +220,9 @@ function TeacherCard({
   onDelete: (teacherId: string) => Promise<void>;
 }) {
   const statusLabels: Record<TeacherStatus, string> = {
-    active: '?�직�?,
-    on_leave: '?�직',
-    resigned: '?�직',
+    active: '재직중',
+    on_leave: '휴직',
+    resigned: '퇴직',
   };
 
   const statusColors: Record<TeacherStatus, string> = {
@@ -259,16 +259,16 @@ function TeacherCard({
           </div>
           {teacher.employee_id && (
             <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-              ?�원번호: {teacher.employee_id}
+              사원번호: {teacher.employee_id}
             </div>
           )}
         </div>
         <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
           <Button size="xs" variant="ghost" onClick={() => onEdit(teacher.id)}>
-            ?�정
+            수정
           </Button>
           <Button size="xs" variant="ghost" onClick={() => onDelete(teacher.id)}>
-            ??��
+            삭제
           </Button>
         </div>
       </div>
@@ -289,10 +289,10 @@ function TeacherCard({
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-        {teacher.specialization && <div>?�문 분야: {teacher.specialization}</div>}
-        {teacher.phone && <div>?�화: {teacher.phone}</div>}
-        {teacher.email && <div>?�메?? {teacher.email}</div>}
-        {teacher.hire_date && <div>?�사?? {teacher.hire_date}</div>}
+        {teacher.specialization && <div>전문 분야: {teacher.specialization}</div>}
+        {teacher.phone && <div>전화: {teacher.phone}</div>}
+        {teacher.email && <div>이메일: {teacher.email}</div>}
+        {teacher.hire_date && <div>입사일: {teacher.hire_date}</div>}
         {teacher.bio && (
           <div style={{ marginTop: 'var(--spacing-xs)', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)' }}>
             {teacher.bio}
@@ -302,4 +302,3 @@ function TeacherCard({
     </Card>
   );
 }
-

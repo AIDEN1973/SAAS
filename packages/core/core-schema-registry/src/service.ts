@@ -1,11 +1,11 @@
 /**
  * Schema Registry Service
  * 
- * [불�? 규칙] 기술문서 PART 1??5. Schema Registry ?�영 문서�?준?�합?�다.
- * [불�? 규칙] meta.schema_registry??공통 ?�키�??�?�소?��?�?tenant_id 컬럼???�습?�다.
- * [불�? 규칙] SELECT 쿼리??withTenant�??�용?��? ?�습?�다 (공통 ?�키마이므�?.
+ * [불�? 규칙] 기술문서 PART 1??5. Schema Registry ?�영 문서�?준?�합?�다.
+ * [불�? 규칙] meta.schema_registry??공통 ?�키�??�?�소?��?�?tenant_id 컬럼???�습?�다.
+ * [불�? 규칙] SELECT 쿼리??withTenant�??�용?��? ?�습?�다 (공통 ?�키마이므�?.
  * 
- * 기술문서: docu/?�키마엔�?txt 4. Schema Registry (DB + RLS)
+ * 기술문서: docu/?�키마엔�?txt 4. Schema Registry (DB + RLS)
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -39,16 +39,16 @@ export interface PinSchemaVersionInput {
 /**
  * Schema Registry Service
  * 
- * ?�키�??�록, 조회, ?�성?? Version Pinning???�당?�니??
+ * ?�키�??�록, 조회, ?�성?? Version Pinning???�당?�니??
  */
 export class SchemaRegistryService {
   private supabase = createServerClient();
 
   /**
-   * ?�키�??�록
+   * ?�키�??�록
    * 
-   * [불�? 규칙] status??기본?�으�?'draft'�??�정?�니??
-   * [불�? 규칙] Super Admin�??�록 가??(RLS ?�책)
+   * [불�? 규칙] status??기본?�으�?'draft'�??�정?�니??
+   * [불�? 규칙] Super Admin�??�록 가??(RLS ?�책)
    */
   async registerSchema(input: RegisterSchemaInput): Promise<SchemaRegistryEntry> {
     const { data, error } = await this.supabase
@@ -57,7 +57,7 @@ export class SchemaRegistryService {
         entity: input.entity,
         industry_type: input.industry_type || null,
         version: input.version,
-        min_supported_client: input.minSupportedClient,  // camelCase ??snake_case 변??
+        min_supported_client: input.minSupportedClient,  // camelCase → snake_case 변환
         schema_json: input.schema_json,
         migration_script: input.migration_script || null,
         status: input.status || 'draft',
@@ -74,9 +74,9 @@ export class SchemaRegistryService {
   }
 
   /**
-   * ?�키�?조회 (?�선?�위 ?�용)
+   * ?�키�?조회 (?�선?�위 ?�용)
    * 
-   * SchemaRegistryClient??resolveSchema 로직???�용?�니??
+   * SchemaRegistryClient??resolveSchema 로직???�용?�니??
    */
   async getSchema(
     entity: string,
@@ -89,7 +89,7 @@ export class SchemaRegistryService {
   ): Promise<UISchema | null> {
     const client = new SchemaRegistryClient(options);
 
-    // 1. ?�넌?�별 Version Pinning 조회
+    // 1. ?�넌?�별 Version Pinning 조회
     let pinnedVersion: string | null = null;
     if (options.tenantId) {
       const pin = await this.getPinnedVersion(
@@ -100,13 +100,13 @@ export class SchemaRegistryService {
       pinnedVersion = pin?.pinned_version || null;
     }
 
-    // 2. 모든 ?�성 ?�키�?조회 (getActiveSchemas???��? status='active'�??�터�?
+    // 2. 모든 ?�성 ?�키�?조회 (getActiveSchemas???��? status='active'�??�터�?
     const entries = await this.getActiveSchemas(entity, options.industryType || null);
 
-    // 3. ?�선?�위???�라 ?�키�?결정
-    // pinnedVersion???�으�??�당 버전�??�터�?
-    // ?�️ 중요: resolveSchema???��? ?�터링된 entries�?받아???�선?�위???�라 ?�택?�니??
-    // getActiveSchemas???��? status='active'�??�터링하므�? ?�기?�는 version�??�터링합?�다.
+    // 3. ?�선?�위???�라 ?�키�?결정
+    // pinnedVersion???�으�??�당 버전�??�터�?
+    // ?�️ 중요: resolveSchema???��? ?�터링된 entries�?받아???�선?�위???�라 ?�택?�니??
+    // getActiveSchemas???��? status='active'�??�터링하므�? ?�기?�는 version�??�터링합?�다.
     const filteredEntries = pinnedVersion
       ? entries.filter((e) => e.version === pinnedVersion)
       : entries;
@@ -115,7 +115,7 @@ export class SchemaRegistryService {
   }
 
   /**
-   * ?�성 ?�키�?목록 조회
+   * ?�성 ?�키�?목록 조회
    */
   private async getActiveSchemas(
     entity: string,
@@ -127,7 +127,7 @@ export class SchemaRegistryService {
       .eq('entity', entity)
       .eq('status', 'active');
 
-    // industry_type ?�터
+    // industry_type ?�터
     if (industryType !== null) {
       query = query.or(`industry_type.eq.${industryType},industry_type.is.null`);
     } else {
@@ -144,11 +144,27 @@ export class SchemaRegistryService {
   }
 
   /**
-   * ?�키�??�성??
+   * ?�키�??�성??
    * 
-   * [불�? 규칙] Super Admin�??�성??가??(RLS ?�책)
+   * [불�? 규칙] Super Admin�??�성??가??(RLS ?�책)
    */
   async activateSchema(input: ActivateSchemaInput): Promise<SchemaRegistryEntry> {
+    // 1. 기존 active 스키마를 deprecated로 변경
+    const { error: deprecateError } = await this.supabase
+      .from('meta.schema_registry')
+      .update({
+        status: 'deprecated',
+        deprecated_at: new Date().toISOString(),
+      })
+      .eq('entity', input.entity)
+      .eq('industry_type', input.industry_type || null)
+      .eq('status', 'active');
+
+    if (deprecateError) {
+      throw new Error(`Failed to deprecate existing active schema: ${deprecateError.message}`);
+    }
+
+    // 2. 새 스키마를 active로 변경
     const { data, error } = await this.supabase
       .from('meta.schema_registry')
       .update({
@@ -169,9 +185,9 @@ export class SchemaRegistryService {
   }
 
   /**
-   * ?�키�?비활?�화 (Deprecated)
+   * ?�키�?비활?�화 (Deprecated)
    * 
-   * [불�? 규칙] Super Admin�?비활?�화 가??(RLS ?�책)
+   * [불�? 규칙] Super Admin�?비활?�화 가??(RLS ?�책)
    */
   async deprecateSchema(input: ActivateSchemaInput): Promise<SchemaRegistryEntry> {
     const { data, error } = await this.supabase
@@ -220,9 +236,9 @@ export class SchemaRegistryService {
   }
 
   /**
-   * Version Pinning ?�정
+   * Version Pinning ?�정
    * 
-   * [불�? 규칙] Super Admin�??�정 가??(RLS ?�책)
+   * [불�? 규칙] Super Admin�??�정 가??(RLS ?�책)
    */
   async pinSchemaVersion(input: PinSchemaVersionInput): Promise<void> {
     const { data, error } = await this.supabase
@@ -244,9 +260,9 @@ export class SchemaRegistryService {
   }
 
   /**
-   * Version Pinning ?�제
+   * Version Pinning ?�제
    * 
-   * [불�? 규칙] Super Admin�??�제 가??(RLS ?�책)
+   * [불�? 규칙] Super Admin�??�제 가??(RLS ?�책)
    */
   async unpinSchemaVersion(
     tenantId: string,
@@ -266,7 +282,7 @@ export class SchemaRegistryService {
   }
 
   /**
-   * DB row�?SchemaRegistryEntry�?변??
+   * DB row�?SchemaRegistryEntry�?변??
    * 
    * min_supported_client (snake_case) ??minSupportedClient (camelCase) 변??
    */

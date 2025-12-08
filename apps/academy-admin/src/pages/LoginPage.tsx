@@ -1,22 +1,22 @@
 /**
- * 로그???�이지
+ * 로그인 페이지
  * 
- * [기술문서 ?�구?�항]
- * - ?�증 로직?� core-auth 모듈?�서 공통 관�?
- * - 지???�증 방식: ?�메??비�?번호, ?�셜 로그??Google, Kakao), ?�화번호·OTP
- * - 로그???�로?? ?�용???�증 ???�넌??목록 조회 ???�넌???�택 ??JWT claim??tenant_id ?�함
+ * [기술문서 요구사항]
+ * - 인증 로직은 core-auth 모듈에서 공통 관리
+ * - 지원 인증 방식: 이메일/비밀번호, 소셜 로그인(Google, Kakao), 전화번호·OTP
+ * - 로그인 플로우: 사용자 인증 → 테넌트 목록 조회 → 테넌트 선택 → JWT claim에 tenant_id 포함
  * 
- * [UI 문서 ?�구?�항]
- * - Zero-Trust ?�칙 준??
- * - 반응??지??(xs, sm, md, lg, xl)
- * - Design System ?�큰 ?�용
- * - ?�근??WCAG 2.1 AAA 목표
+ * [UI 문서 요구사항]
+ * - Zero-Trust 원칙 준수
+ * - 반응형 지원 (xs, sm, md, lg, xl)
+ * - Design System 토큰 사용
+ * - 접근성 WCAG 2.1 AAA 목표
  */
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Card, Button, Input, useModal, useResponsiveMode } from '@ui-core/react';
-import { SchemaForm } from '@schema/engine';
+import { SchemaForm } from '@schema-engine';
 import {
   useLoginWithEmail,
   useLoginWithOAuth,
@@ -51,28 +51,28 @@ export function LoginPage() {
       const result = await loginWithEmail.mutateAsync({ email: data.email, password: data.password });
       
       if (result.tenants.length === 0) {
-        // 개발 ?�경?�서 ?�세 ?�보 ?�시
+        // 개발 환경에서 상세 정보 표시
         if (import.meta.env?.DEV) {
-          console.warn('?�️ ?�넌?��? ?�습?�다:', {
+          console.warn('⚠️ 테넌트가 없습니다:', {
             userId: result.user.id,
             email: result.user.email,
           });
-          console.log('?�� 가?�한 ?�인:');
-          console.log('   1. ?�원가?????�넌?��? ?�성?��? ?�았?????�음');
-          console.log('   2. user_tenant_roles???�코?��? ?�을 ???�음');
-          console.log('   3. RLS ?�책 ?�문??조회가 ???????�음');
-          console.log('   ??Supabase Dashboard?�서 ?�인:');
-          console.log('      - Authentication > Users: ?�용???�인');
-          console.log('      - Table Editor > user_tenant_roles: ?�넌??관�??�인');
-          console.log('      - Table Editor > tenants: ?�넌???�인');
+          console.log('💡 가능한 원인:');
+          console.log('   1. 회원가입 시 테넌트가 생성되지 않았을 수 있음');
+          console.log('   2. user_tenant_roles에 레코드가 없을 수 있음');
+          console.log('   3. RLS 정책 때문에 조회가 안 될 수 있음');
+          console.log('   → Supabase Dashboard에서 확인:');
+          console.log('      - Authentication > Users: 사용자 확인');
+          console.log('      - Table Editor > user_tenant_roles: 테넌트 관계 확인');
+          console.log('      - Table Editor > tenants: 테넌트 확인');
         }
         
         showAlert(
-          '?�림',
-          '?�속???�넌?��? ?�습?�다.\n\n' +
-          '?�원가?�을 진행?�시거나, 관리자?�게 문의?�주?�요.\n\n' +
+          '알림',
+          '소속된 테넌트가 없습니다.\n\n' +
+          '회원가입을 진행하시거나, 관리자에게 문의해주세요.\n\n' +
           (import.meta.env?.DEV
-            ? '?�️ 개발 ?�경: 브라?��? 콘솔?�서 ?�세 ?�보�??�인?�세??'
+            ? '⚠️ 개발 환경: 브라우저 콘솔에서 상세 정보를 확인하세요.'
             : '')
         );
         navigate('/auth/signup');
@@ -80,16 +80,16 @@ export function LoginPage() {
       }
 
       if (result.tenants.length === 1) {
-        // ?�넌?��? ?�나�??�동 ?�택
+        // 테넌트가 하나면 자동 선택
         await selectTenant.mutateAsync(result.tenants[0].id);
         navigate('/');
       } else {
-        // ?�러 ?�넌?�면 ?�택 ?�이지�??�동
+        // 여러 테넌트면 선택 페이지로 이동
         navigate('/auth/tenant-selection');
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : '로그?�에 ?�패?�습?�다.';
-      showAlert('?�류', message);
+      const message = error instanceof Error ? error.message : '로그인에 실패했습니다.';
+      showAlert('오류', message);
     }
   };
 
@@ -98,8 +98,8 @@ export function LoginPage() {
       const { url } = await loginWithOAuth.mutateAsync({ provider });
       window.location.href = url;
     } catch (error) {
-      const message = error instanceof Error ? error.message : '?�셜 로그?�에 ?�패?�습?�다.';
-      showAlert('?�류', message);
+      const message = error instanceof Error ? error.message : '소셜 로그인에 실패했습니다.';
+      showAlert('오류', message);
     }
   };
 
@@ -107,10 +107,10 @@ export function LoginPage() {
     try {
       await sendOTP.mutateAsync(phone);
       setOtpSent(true);
-      showAlert('?�림', 'OTP가 ?�송?�었?�니??');
+      showAlert('알림', 'OTP가 전송되었습니다.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'OTP ?�송???�패?�습?�다.';
-      showAlert('?�류', message);
+      const message = error instanceof Error ? error.message : 'OTP 전송에 실패했습니다.';
+      showAlert('오류', message);
     }
   };
 
@@ -119,28 +119,28 @@ export function LoginPage() {
       const result = await loginWithOTP.mutateAsync({ phone: data.phone, otp: data.otp });
       
       if (result.tenants.length === 0) {
-        // 개발 ?�경?�서 ?�세 ?�보 ?�시
+        // 개발 환경에서 상세 정보 표시
         if (import.meta.env?.DEV) {
-          console.warn('?�️ ?�넌?��? ?�습?�다:', {
+          console.warn('⚠️ 테넌트가 없습니다:', {
             userId: result.user.id,
             phone: result.user.phone,
           });
-          console.log('?�� 가?�한 ?�인:');
-          console.log('   1. ?�원가?????�넌?��? ?�성?��? ?�았?????�음');
-          console.log('   2. user_tenant_roles???�코?��? ?�을 ???�음');
-          console.log('   3. RLS ?�책 ?�문??조회가 ???????�음');
-          console.log('   ??Supabase Dashboard?�서 ?�인:');
-          console.log('      - Authentication > Users: ?�용???�인');
-          console.log('      - Table Editor > user_tenant_roles: ?�넌??관�??�인');
-          console.log('      - Table Editor > tenants: ?�넌???�인');
+          console.log('💡 가능한 원인:');
+          console.log('   1. 회원가입 시 테넌트가 생성되지 않았을 수 있음');
+          console.log('   2. user_tenant_roles에 레코드가 없을 수 있음');
+          console.log('   3. RLS 정책 때문에 조회가 안 될 수 있음');
+          console.log('   → Supabase Dashboard에서 확인:');
+          console.log('      - Authentication > Users: 사용자 확인');
+          console.log('      - Table Editor > user_tenant_roles: 테넌트 관계 확인');
+          console.log('      - Table Editor > tenants: 테넌트 확인');
         }
         
         showAlert(
-          '?�림',
-          '?�속???�넌?��? ?�습?�다.\n\n' +
-          '?�원가?�을 진행?�시거나, 관리자?�게 문의?�주?�요.\n\n' +
+          '알림',
+          '소속된 테넌트가 없습니다.\n\n' +
+          '회원가입을 진행하시거나, 관리자에게 문의해주세요.\n\n' +
           (import.meta.env?.DEV
-            ? '?�️ 개발 ?�경: 브라?��? 콘솔?�서 ?�세 ?�보�??�인?�세??'
+            ? '⚠️ 개발 환경: 브라우저 콘솔에서 상세 정보를 확인하세요.'
             : '')
         );
         navigate('/auth/signup');
@@ -154,8 +154,8 @@ export function LoginPage() {
         navigate('/auth/tenant-selection');
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'OTP 로그?�에 ?�패?�습?�다.';
-      showAlert('?�류', message);
+      const message = error instanceof Error ? error.message : 'OTP 로그인에 실패했습니다.';
+      showAlert('오류', message);
     }
   };
 
@@ -164,27 +164,27 @@ export function LoginPage() {
   return (
     <Container maxWidth="sm" className="flex items-center justify-center min-h-screen py-8">
       <Card className="w-full p-6 md:p-8">
-        <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">로그??/h1>
+        <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">로그인</h1>
 
-        {/* 로그??방법 ?�택 */}
+        {/* 로그인 방법 선택 */}
         <div className="flex gap-2 mb-6">
           <Button
             variant={loginMethod === 'email' ? 'solid' : 'outline'}
             onClick={() => setLoginMethod('email')}
             className="flex-1"
           >
-            ?�메??
+            이메일
           </Button>
           <Button
             variant={loginMethod === 'otp' ? 'solid' : 'outline'}
             onClick={() => setLoginMethod('otp')}
             className="flex-1"
           >
-            ?�화번호
+            전화번호
           </Button>
         </div>
 
-        {/* ?�메??비�?번호 로그??*/}
+        {/* 이메일/비밀번호 로그인 */}
         {loginMethod === 'email' && (
           <SchemaForm
             schema={loginFormSchema}
@@ -192,13 +192,13 @@ export function LoginPage() {
           />
         )}
 
-        {/* OTP 로그??*/}
+        {/* OTP 로그인 */}
         {loginMethod === 'otp' && (
           <div className="space-y-4">
             <div className="flex gap-2">
               <Input
                 type="tel"
-                label="?�화번호"
+                label="전화번호"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
@@ -213,7 +213,7 @@ export function LoginPage() {
                 disabled={loading || !phone || otpSent}
                 className="mt-6"
               >
-                {otpSent ? '?�송?? : '?�송'}
+                {otpSent ? '전송됨' : '전송'}
               </Button>
             </div>
             {otpSent && (
@@ -231,14 +231,14 @@ export function LoginPage() {
           </div>
         )}
 
-        {/* ?�셜 로그??*/}
+        {/* 소셜 로그인 */}
         <div className="mt-6">
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">?�는</span>
+              <span className="px-2 bg-white text-gray-500">또는</span>
             </div>
           </div>
 
@@ -262,14 +262,14 @@ export function LoginPage() {
           </div>
         </div>
 
-        {/* ?�원가??링크 */}
+        {/* 회원가입 링크 */}
         <div className="mt-6 text-center">
-          <span className="text-gray-600">계정???�으?��??? </span>
+          <span className="text-gray-600">계정이 없으신가요? </span>
           <button
             onClick={() => navigate('/auth/signup')}
             className="text-primary hover:underline"
           >
-            ?�원가??
+            회원가입
           </button>
         </div>
       </Card>

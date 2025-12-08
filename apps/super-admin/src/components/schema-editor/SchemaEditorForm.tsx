@@ -1,18 +1,18 @@
 /**
  * SchemaEditorForm Component
  * 
- * [불�? 규칙] ?�키�?기본 ?�보 ?�집 (entity, version, industry_type ??
- * [불�? 규칙] Zero-Trust: 모든 검증�? ?�버?�서 처리
+ * [불변 규칙] 스키마 기본 정보 편집 (entity, version, industry_type 등)
+ * [불변 규칙] Zero-Trust: 모든 검증은 서버에서 처리
  * 
- * 기술문서: docu/?�키마에?�터.txt 14. Schema Editor 기능
+ * 기술문서: docu/스키마에디터.txt 14. Schema Editor 기능
  */
 
 import { useState, useEffect } from 'react';
 import { Card, Input, Select, Button, useModal } from '@ui-core/react';
-import type { FormSchema, UISchema } from '@schema/engine';
+import type { FormSchema, UISchema } from '@schema-engine/types';
 import type { SchemaRegistryEntry, CreateSchemaInput } from '@hooks/use-schema-registry';
 import { useCreateSchema, useUpdateSchema } from '@hooks/use-schema-registry';
-import { validateSchema } from '@schema/engine/validator';
+import { validateSchema } from '@schema-engine/validator';
 
 export interface SchemaEditorFormProps {
   schema?: SchemaRegistryEntry | null;
@@ -30,7 +30,8 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
   const [formData, setFormData] = useState<CreateSchemaInput>(() => {
     const baseSchemaJson = currentFormSchema || schema?.schema_json || {
       version: '1.0.0',
-      minSupportedClient: '1.0.0',
+      minClient: '1.0.0',  // SDUI v1.1: minClient 우선
+      minSupportedClient: '1.0.0',  // 하위 호환성
       entity: '',
       type: 'form',
       form: {
@@ -47,14 +48,15 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
       entity: schema?.entity || '',
       industry_type: schema?.industry_type || null,
       version: schema?.version || '1.0.0',
-      minSupportedClient: schema?.min_supported_client || '1.0.0',
+      minClient: schema?.min_client || schema?.min_supported_client || '1.0.0',  // SDUI v1.1: minClient 우선
+      minSupportedClient: schema?.min_supported_client || '1.0.0',  // 하위 호환성
       schema_json: baseSchemaJson,
       migration_script: schema?.migration_script || null,
       status: 'draft',
     };
   });
 
-  // currentFormSchema 변�???formData ?�데?�트
+  // currentFormSchema 변경 시 formData 업데이트
   useEffect(() => {
     if (currentFormSchema && currentFormSchema.type === 'form') {
       setFormData((prev) => ({
@@ -68,25 +70,27 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // handleSchemaJsonChange??onSchemaJsonChange prop???�해 ?��??�서 ?�출??
+  // handleSchemaJsonChange는 onSchemaJsonChange prop을 통해 외부에서 호출됨
 
   const handleSave = async () => {
     try {
-      // currentFormSchema가 ?�으�??�선 ?�용 (최신 ?�집 ?�용)
+      // currentFormSchema가 있으면 우선 사용 (최신 편집 내용)
       const schemaJsonToSave = currentFormSchema || formData.schema_json;
       
-      // entity, version ??기본 ?�보 ?�데?�트
+      // entity, version 등 기본 정보 업데이트
+      // SDUI v1.1: minClient 우선, minSupportedClient는 하위 호환성
       const finalSchemaJson: UISchema = {
         ...schemaJsonToSave,
         entity: formData.entity,
         version: formData.version,
-        minSupportedClient: formData.minSupportedClient,
+        minClient: formData.minClient || formData.minSupportedClient,  // SDUI v1.1: minClient 우선
+        minSupportedClient: formData.minSupportedClient,  // 하위 호환성
       };
 
       // Client-Side Validation
       const validation = validateSchema(finalSchemaJson);
       if (!validation.valid) {
-        showAlert('검�??�패', validation.errors?.message || '?�키�?검증에 ?�패?�습?�다.', 'error');
+        showAlert('검증 실패', validation.errors?.message || '스키마 검증에 실패했습니다.', 'error');
         return;
       }
 
@@ -97,12 +101,13 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
           input: {
             schema_json: finalSchemaJson,
             migration_script: formData.migration_script,
-            minSupportedClient: formData.minSupportedClient,
+            minClient: formData.minClient || formData.minSupportedClient,  // SDUI v1.1: minClient 우선
+            minSupportedClient: formData.minSupportedClient,  // 하위 호환성
           },
           expectedUpdatedAt: schema.updated_at, // Optimistic Locking
         });
         onSave?.(result);
-        showAlert('?�공', '?�키마�? ?�?�되?�습?�다.', 'success');
+        showAlert('성공', '스키마가 저장되었습니다.', 'success');
       } else {
         // Create new schema
         const result = await createSchema.mutateAsync({
@@ -110,47 +115,47 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
           schema_json: finalSchemaJson,
         });
         onSave?.(result);
-        showAlert('?�공', '???�키마�? ?�성?�었?�니??', 'success');
+        showAlert('성공', '새 스키마가 생성되었습니다.', 'success');
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : '?�키�??�?�에 ?�패?�습?�다.';
-      showAlert('?�류', message, 'error');
+      const message = error instanceof Error ? error.message : '스키마 저장에 실패했습니다.';
+      showAlert('오류', message, 'error');
     }
   };
 
   return (
     <Card padding="md" variant="default">
       <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
-        기본 ?�보
+        기본 정보
       </h3>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
         <Input
-          label="?�티??(entity)"
+          label="엔티티 (entity)"
           value={formData.entity}
           onChange={(e) => handleFieldChange('entity', e.target.value)}
-          placeholder="student, class, teacher ??
-          helperText="???�이 관리할 ?�이?�의 종류�??��??�니?? ?? ?�생(student), �?class), 강사(teacher)"
+          placeholder="student, class, teacher 등"
+          helperText="이 폼이 관리할 데이터의 종류를 나타냅니다. 예: 학생(student), 반(class), 강사(teacher)"
           required
         />
 
         <div>
           <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--spacing-xs)', display: 'block' }}>
-            ?�종 (industry_type)
+            업종 (industry_type)
           </label>
           <Select
             value={formData.industry_type || ''}
             onChange={(e) => handleFieldChange('industry_type', e.target.value || null)}
           >
             <option value="">공통 (null)</option>
-            <option value="academy">?�원 (academy)</option>
-            <option value="salon">미용??(salon)</option>
-            <option value="realestate">부?�산 (realestate)</option>
+            <option value="academy">학원 (academy)</option>
+            <option value="salon">미용실 (salon)</option>
+            <option value="realestate">부동산 (realestate)</option>
             <option value="gym">체육관 (gym)</option>
             <option value="ngo">NGO</option>
           </Select>
           <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-xs)', display: 'block' }}>
-            ???�을 ?�용???�종???�택?�세?? "공통"???�택?�면 모든 ?�종?�서 ?�용?????�습?�다.
+            이 폼을 사용할 업종을 선택하세요. "공통"을 선택하면 모든 업종에서 사용할 수 있습니다.
           </span>
         </div>
 
@@ -159,17 +164,24 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
           value={formData.version}
           onChange={(e) => handleFieldChange('version', e.target.value)}
           placeholder="1.0.0"
-          helperText="?�키마의 버전 번호?�니?? 변경할 ?�마??버전???�려주세?? (?? 1.0.0, 1.1.0, 2.0.0)"
+          helperText="스키마의 버전 번호입니다. 변경할 때마다 버전을 올려주세요. (예: 1.0.0, 1.1.0, 2.0.0)"
           required
         />
 
         <Input
-          label="최소 지???�라?�언??버전"
+          label="최소 클라이언트 버전 (minClient)"
+          value={formData.minClient || formData.minSupportedClient || ''}
+          onChange={(e) => handleFieldChange('minClient', e.target.value || null)}
+          placeholder="1.0.0"
+          helperText="SDUI v1.1: 이 스키마를 사용하려면 클라이언트 앱이 이 버전 이상이어야 합니다. minClient가 우선 사용되며, 보통 스키마 버전과 동일하게 설정합니다."
+          required
+        />
+        <Input
+          label="최소 지원 클라이언트 버전 (minSupportedClient, 하위 호환성)"
           value={formData.minSupportedClient}
           onChange={(e) => handleFieldChange('minSupportedClient', e.target.value)}
           placeholder="1.0.0"
-          helperText="???�키마�? ?�용?�려�??�라?�언???�이 ??버전 ?�상?�어???�니?? 보통 ?�키�?버전�??�일?�게 ?�정?�니??"
-          required
+          helperText="하위 호환성: minClient가 없을 때 사용됩니다. 일반적으로 minClient와 동일한 값을 설정합니다."
         />
 
         <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginTop: 'var(--spacing-md)' }}>
@@ -179,7 +191,7 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
             onClick={handleSave}
             disabled={createSchema.isPending || updateSchema.isPending}
           >
-            {schema ? '?�?? : '?�성'}
+            {schema ? '저장' : '생성'}
           </Button>
           {onCancel && (
             <Button variant="outline" onClick={onCancel}>

@@ -23,7 +23,7 @@ function AppContent() {
   const sidebarItems: SidebarItem[] = [
     {
       id: 'students',
-      label: '?�생 관�?,
+      label: '학생 관리',
       path: '/students',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -33,7 +33,7 @@ function AppContent() {
     },
     {
       id: 'classes',
-      label: '�?관�?,
+      label: '반 관리',
       path: '/classes',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -43,7 +43,7 @@ function AppContent() {
     },
     {
       id: 'teachers',
-      label: '강사 관�?,
+      label: '강사 관리',
       path: '/teachers',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -53,7 +53,7 @@ function AppContent() {
     },
     {
       id: 'attendance',
-      label: '출결 관�?,
+      label: '출결 관리',
       path: '/attendance',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -74,33 +74,33 @@ function AppContent() {
       await logout.mutateAsync();
       navigate('/auth/login');
     } catch (error) {
-      const message = error instanceof Error ? error.message : '로그?�웃???�패?�습?�다.';
-      showAlert('?�류', message);
+      const message = error instanceof Error ? error.message : '로그아웃에 실패했습니다.';
+      showAlert('오류', message);
     }
   };
 
   return (
     <Routes>
-      {/* ?�증???�요 ?�는 ?�우??*/}
+      {/* 인증이 필요 없는 라우트 */}
       <Route path="/auth/login" element={<LoginPage />} />
       <Route path="/auth/signup" element={<SignupPage />} />
       <Route path="/auth/select-tenant" element={<TenantSelectionPage />} />
 
-      {/* ?�증???�요???�우??*/}
+      {/* 인증이 필요한 라우트 */}
       <Route
         path="/*"
         element={
           <ProtectedRoute>
             <AppLayout
               header={{
-                title: '?�어???�원관�?,
+                title: '디어쌤 학원관리',
                 rightContent: (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleLogout}
                   >
-                    로그?�웃
+                    로그아웃
                   </Button>
                 ),
               }}

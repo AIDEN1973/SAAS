@@ -1,7 +1,7 @@
 /**
  * Error Boundary
  * 
- * [불�? 규칙] �?카테고리마다 ?�른 UI/메시지·로그 ?�요:
+ * [불변 규칙] 각 카테고리마다 다른 UI/메시지·로그 요구:
  * - Schema Validation Failure
  * - Widget Rendering Failure
  * - Data Fetch Error
@@ -34,7 +34,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
-    // ?�러 ?�???�별
+    // 에러 타입 식별
     let errorType: ErrorBoundaryState['errorType'] = 'unknown';
     
     if (error.message.includes('schema') || error.message.includes('Schema')) {
@@ -64,7 +64,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       this.props.onError(error, errorInfo);
     }
 
-    // ?�러 로깅
+    // 에러 로깅
     console.error('ErrorBoundary caught an error:', error, errorInfo);
   }
 
@@ -112,7 +112,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                     cursor: 'pointer',
                   }}
                 >
-                  기술???��??�항
+                  기술적 세부사항
                 </summary>
                 <pre
                   style={{
@@ -134,7 +134,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 color="error"
                 onClick={() => this.setState({ hasError: false, error: undefined, errorInfo: undefined })}
               >
-                ?�시 ?�도
+                다시 시도
               </Button>
             </div>
           </div>
@@ -148,30 +148,30 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   private getErrorTitle(): string {
     switch (this.state.errorType) {
       case 'schema':
-        return '?�키�?검�??�패';
+        return '스키마 검증 실패';
       case 'widget':
-        return '?�젯 ?�더�??�패';
+        return '위젯 로더 실패';
       case 'data':
-        return '?�이??로드 ?�류';
+        return '데이터 로드 오류';
       case 'version':
-        return '버전 불일�?;
+        return '버전 불일치';
       default:
-        return '?�류가 발생?�습?�다';
+        return '오류가 발생했습니다';
     }
   }
 
   private getErrorMessage(): string {
     switch (this.state.errorType) {
       case 'schema':
-        return 'UI ?�키마�? ?�바르�? ?�습?�다. 관리자?�게 문의?�세??';
+        return 'UI 스키마가 올바르지 않습니다. 관리자에게 문의해주세요.';
       case 'widget':
-        return '?�젯???�더링할 ???�습?�다. ?�이지�??�로고침?�주?�요.';
+        return '위젯을 렌더링할 수 없습니다. 페이지를 새로고침해주세요.';
       case 'data':
-        return '?�이?��? 불러?�는 �??�류가 발생?�습?�다. ?�트?�크 ?�결???�인?�세??';
+        return '데이터를 불러오는 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.';
       case 'version':
-        return '?�키�?버전???�환?��? ?�습?�다. ?�이지�??�로고침?�주?�요.';
+        return '스키마 버전이 호환되지 않습니다. 페이지를 새로고침해주세요.';
       default:
-        return this.state.error?.message || '?????�는 ?�류가 발생?�습?�다.';
+        return this.state.error?.message || '알 수 없는 오류가 발생했습니다.';
     }
   }
 }

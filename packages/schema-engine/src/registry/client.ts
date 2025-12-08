@@ -1,11 +1,14 @@
 /**
  * Schema Registry Client
  * 
- * [불�? 규칙] 기술문서 PART 1??5. Schema Registry ?�영 문서�?준?�합?�다.
- * [불�? 규칙] ?�키�?조회 ?�선?�위:
- * 1. ?�넌?�별 Version Pinning
- * 2. Industry�??�성 ?�키�? * 3. 공통 ?�성 ?�키�? * 4. Fallback ?�키�? * 
- * 기술문서: docu/?�키마엔�?txt 5. Registry Client
+ * [불변 규칙] 기술문서 PART 1의 5. Schema Registry 운영 문서를 준수합니다.
+ * [불변 규칙] 스키마 조회 우선순위:
+ * 1. 테넌트별 Version Pinning
+ * 2. Industry별 스키마
+ * 3. 공통 스키마
+ * 4. Fallback 스키마
+ * 
+ * 기술문서: docu/스키마엔진.txt 5. Registry Client
  */
 
 import type { FormSchema, TableSchema, UISchema } from '../types';
@@ -14,8 +17,9 @@ import { checkSchemaVersion } from '../validator';
 export interface SchemaRegistryClientOptions {
   tenantId?: string;
   industryType?: string;
-  clientVersion: string;  // ?�라?�언??버전 (?? '1.12.0')
-  fallbackSchema?: UISchema;  // Fallback ?�키�?}
+  clientVersion: string;  // 클라이언트 버전 (예: '1.12.0')
+  fallbackSchema?: UISchema;  // Fallback 스키마
+}
 
 export interface SchemaRegistryEntry {
   id: string;
@@ -31,7 +35,7 @@ export interface SchemaRegistryEntry {
 /**
  * Schema Registry Client
  * 
- * ?�키�?조회 ?�선?�위???�라 ?�절???�키마�? 반환?�니??
+ * 스키마 조회 우선순위에 따라 적절한 스키마를 반환합니다.
  */
 export class SchemaRegistryClient {
   private options: SchemaRegistryClientOptions;
@@ -41,36 +45,37 @@ export class SchemaRegistryClient {
   }
 
   /**
-   * ?�키�?조회 (?�선?�위 ?�용)
+   * 스키마 조회 (우선순위 적용)
    * 
-   * ?�️ ??메서?�는 ?�용?��? ?�습?�다. Service Layer??getSchema�??�용?�세??
+   * ⚠️ 이 메서드는 사용되지 않습니다. Service Layer의 getSchema를 사용하세요.
    * 
    * @deprecated Use SchemaRegistryService.getSchema instead
    */
   async getSchema(entity: string): Promise<UISchema | null> {
-    // ?�제 구현?� Service Layer�??�해 DB?�서 조회
-    // ?�기?�는 ?�터?�이?�만 ?�의
+    // 실제 구현은 Service Layer에서 DB에서 조회
+    // 여기서는 인터페이스만 정의
     throw new Error('getSchema must be implemented by Service Layer. Use SchemaRegistryService.getSchema instead.');
   }
 
   /**
-   * ?�키�?조회 ?�선?�위 로직
+   * 스키마 조회 우선순위 로직
    * 
-   * ?�️ 중요: ??메서?�는 Service Layer?�서 ?��? Version Pinning???�터링한 entries�?받습?�다.
-   * ?�라??Version Pinning 조회??Service Layer?�서 ?�행?�며, ?�기?�는 ?�선?�위???�라 ?�키마�? ?�택?�니??
+   * ⚠️ 중요: 이 메서드는 Service Layer에서 이미 Version Pinning으로 필터링한 entries를 받습니다.
+   * 따라서 Version Pinning 조회는 Service Layer에서 수행하며, 여기서는 우선순위에 따라 스키마를 선택합니다.
    * 
-   * ?�선?�위:
-   * 1. Industry�??�성 ?�키�?(entries???��? ?�터링된 ?�태)
-   * 2. 공통 ?�성 ?�키�?(industry_type IS NULL)
-   * 3. Fallback ?�키�?   */
+   * 우선순위:
+   * 1. Industry별 스키마 (entries는 이미 필터링된 상태)
+   * 2. 공통 스키마 (industry_type IS NULL)
+   * 3. Fallback 스키마
+   */
   resolveSchema(
     entity: string,
     entries: SchemaRegistryEntry[]
   ): UISchema | null {
     const { industryType, clientVersion, fallbackSchema } = this.options;
 
-    // 1. Industry�??�성 ?�키�?조회
-    // ?�️ 참고: entries???��? status='active'�??�터링된 ?�태?�니??(getActiveSchemas?�서).
+    // 1. Industry별 스키마 조회
+    // ⚠️ 참고: entries는 이미 status='active'로 필터링된 상태입니다 (getActiveSchemas에서).
     if (industryType) {
       const industrySchema = entries
         .filter(
@@ -78,7 +83,7 @@ export class SchemaRegistryClient {
             e.industry_type === industryType
         )
         .sort((a, b) => {
-          // 버전 ?�림차순 ?�렬
+          // 버전 내림차순 정렬
           const aVersion = a.version.split('.').map(Number);
           const bVersion = b.version.split('.').map(Number);
           for (let i = 0; i < 3; i++) {
@@ -90,7 +95,8 @@ export class SchemaRegistryClient {
         })[0];
 
       if (industrySchema) {
-        // SDUI v1.1: min_supported_client (DB) ??minClient (코드) 변??        const versionCheck = checkSchemaVersion(
+        // SDUI v1.1: min_supported_client (DB)를 minClient (코드) 변환
+        const versionCheck = checkSchemaVersion(
           { version: industrySchema.version, minClient: industrySchema.min_supported_client, entity },
           clientVersion
         );
@@ -103,8 +109,8 @@ export class SchemaRegistryClient {
       }
     }
 
-    // 2. 공통 ?�성 ?�키�?조회 (industry_type IS NULL)
-    // ?�️ 참고: entries???��? status='active'�??�터링된 ?�태?�니??(getActiveSchemas?�서).
+    // 2. 공통 스키마 조회 (industry_type IS NULL)
+    // ⚠️ 참고: entries는 이미 status='active'로 필터링된 상태입니다 (getActiveSchemas에서).
     const commonSchema = entries
       .filter(
         (e) => e.entity === entity &&
@@ -122,7 +128,8 @@ export class SchemaRegistryClient {
       })[0];
 
     if (commonSchema) {
-      // SDUI v1.1: min_supported_client (DB) ??minClient (코드) 변??      const versionCheck = checkSchemaVersion(
+      // SDUI v1.1: min_supported_client (DB)를 minClient (코드) 변환
+      const versionCheck = checkSchemaVersion(
         { version: commonSchema.version, minClient: commonSchema.min_supported_client, entity },
         clientVersion
       );
@@ -134,7 +141,7 @@ export class SchemaRegistryClient {
       );
     }
 
-    // 3. Fallback ?�키�?반환
+    // 3. Fallback 스키마 반환
     if (fallbackSchema && fallbackSchema.entity === entity) {
       return fallbackSchema;
     }
@@ -142,4 +149,3 @@ export class SchemaRegistryClient {
     return null;
   }
 }
-

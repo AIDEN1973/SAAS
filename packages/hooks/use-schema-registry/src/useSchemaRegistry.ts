@@ -1,15 +1,15 @@
 /**
  * useSchemaRegistry Hook
  * 
- * [불�? 규칙] Zero-Trust: 모든 ?�청?� @api-sdk/core�??�해 ?�송
- * [불�? 규칙] Schema Registry CRUD ?�업
+ * [불변 규칙] Zero-Trust: 모든 요청은 @api-sdk/core를 통해 전송
+ * [불변 규칙] Schema Registry CRUD 작업
  * 
- * 기술문서: docu/?�키마에?�터.txt 17. API 명세
+ * 기술문서: docu/스키마에디터.txt 17. API 명세
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@lib/supabase-client';
-import type { FormSchema, TableSchema, DetailSchema, FilterSchema, WidgetSchema, UISchema } from '@schema/engine/types';
+import type { FormSchema, TableSchema, DetailSchema, FilterSchema, WidgetSchema, UISchema } from '@schema-engine/types';
 
 export interface SchemaRegistryEntry {
   id: string;
@@ -19,13 +19,13 @@ export interface SchemaRegistryEntry {
   status: 'draft' | 'active' | 'deprecated';
   schema_json: UISchema;
   min_supported_client: string;
-  min_client?: string | null; // SDUI v1.1: minClient 추�?
+  min_client?: string | null; // SDUI v1.1: minClient 추가
   migration_script: string | null;
-  registered_by: string | null; // RPC ?�수??registered_by ?�용
-  registered_at: string; // RPC ?�수??registered_at ?�용
+  registered_by: string | null; // RPC 함수는 registered_by 사용
+  registered_at: string; // RPC 함수는 registered_at 사용
   activated_at: string | null;
   deprecated_at: string | null;
-  // ?�위 ?�환?�을 ?�한 ?�드
+  // 하위 호환성을 위한 필드
   created_at?: string;
   updated_at?: string;
   created_by?: string | null;
@@ -37,7 +37,7 @@ export interface CreateSchemaInput {
   industry_type?: string | null;
   version: string;
   minSupportedClient: string;
-  minClient?: string | null; // SDUI v1.1: minClient 추�?
+  minClient?: string | null; // SDUI v1.1: minClient 추가
   schema_json: UISchema;
   migration_script?: string | null;
   status?: 'draft' | 'active' | 'deprecated';
@@ -47,13 +47,13 @@ export interface UpdateSchemaInput {
   schema_json: UISchema;
   migration_script?: string | null;
   minSupportedClient?: string;
-  minClient?: string | null; // SDUI v1.1: minClient 추�?
+  minClient?: string | null; // SDUI v1.1: minClient 추가
 }
 
 /**
- * ?�키�?목록 조회
+ * 스키마 목록 조회
  * 
- * [불�? 규칙] Super Admin�?조회 가??(RLS ?�책)
+ * [불변 규칙] Super Admin만 조회 가능 (RLS 정책)
  */
 export function useSchemaList(filters?: {
   entity?: string;
@@ -65,16 +65,17 @@ export function useSchemaList(filters?: {
     queryFn: async () => {
       const supabase = createClient();
       
-      // RPC ?�수 ?�용 (meta ?�키�??�근)
-      // ?�️ 중요: Supabase RPC??모든 매개변?��? 명시?�으�??�달?�야 ??      const { data, error } = await supabase.rpc('get_schema_registry_list', {
+      // RPC 함수 사용 (meta 스키마 접근)
+      // ⚠️ 중요: Supabase RPC는 모든 매개변수를 명시적으로 전달해야 함
+      const { data, error } = await supabase.rpc('get_schema_registry_list', {
         p_entity: filters?.entity ?? null,
         p_industry_type: filters?.industry_type ?? null,
         p_status: filters?.status ?? null,
       });
       
       if (error) {
-        // ?�세 ?�류 ?�보 로깅
-        console.error('[Schema Registry] RPC ?�출 ?�패:', {
+        // 상세 오류 정보 로깅
+        console.error('[Schema Registry] RPC 호출 실패:', {
           function: 'get_schema_registry_list',
           error: error,
           message: error.message,
@@ -87,11 +88,12 @@ export function useSchemaList(filters?: {
       
       return (data || []) as SchemaRegistryEntry[];
     },
-    staleTime: 30 * 1000, // 30�?  });
+    staleTime: 30 * 1000, // 30초
+  });
 }
 
 /**
- * ?�키�??�일 조회
+ * 스키마 단일 조회
  */
 export function useSchema(id: string) {
   return useQuery({
@@ -99,7 +101,7 @@ export function useSchema(id: string) {
     queryFn: async () => {
       const supabase = createClient();
       
-      // RPC ?�수 ?�용 (meta ?�키�??�근)
+      // RPC 함수 사용 (meta 스키마 접근)
       const { data, error } = await supabase.rpc('get_schema_registry', {
         p_id: id,
       });
@@ -119,10 +121,10 @@ export function useSchema(id: string) {
 }
 
 /**
- * Draft ?�키�??�성
+ * Draft 스키마 생성
  * 
- * [불�? 규칙] status??기본?�으�?'draft'�??�정
- * [불�? 규칙] Super Admin�??�성 가??(RLS ?�책)
+ * [불변 규칙] status는 기본적으로 'draft'로 설정
+ * [불변 규칙] Super Admin만 생성 가능 (RLS 정책)
  */
 export function useCreateSchema() {
   const queryClient = useQueryClient();
@@ -131,7 +133,7 @@ export function useCreateSchema() {
     mutationFn: async (input: CreateSchemaInput) => {
       const supabase = createClient();
       
-      // RPC ?�수 ?�용 (meta ?�키�??�근)
+      // RPC 함수 사용 (meta 스키마 접근)
       const { data, error } = await supabase.rpc('create_schema_registry', {
         p_entity: input.entity,
         p_industry_type: input.industry_type || null,
@@ -159,10 +161,10 @@ export function useCreateSchema() {
 }
 
 /**
- * Draft ?�키�??�정
+ * Draft 스키마 수정
  * 
- * [불�? 규칙] draft�??�정 가??(RLS ?�책)
- * [불�? 규칙] Optimistic Locking: updated_at 비교
+ * [불변 규칙] draft만 수정 가능 (RLS 정책)
+ * [불변 규칙] Optimistic Locking: updated_at 비교
  */
 export function useUpdateSchema() {
   const queryClient = useQueryClient();
@@ -171,10 +173,11 @@ export function useUpdateSchema() {
     mutationFn: async ({ id, input, expectedUpdatedAt }: {
       id: string;
       input: UpdateSchemaInput;
-      expectedUpdatedAt?: string; // Optimistic Locking??    }) => {
+      expectedUpdatedAt?: string; // Optimistic Locking용
+    }) => {
       const supabase = createClient();
       
-      // RPC ?�수 ?�용 (meta ?�키�??�근, Optimistic Locking 지??
+      // RPC 함수 사용 (meta 스키마 접근, Optimistic Locking 지원)
       const { data, error } = await supabase.rpc('update_schema_registry', {
         p_id: id,
         p_schema_json: input.schema_json,
@@ -185,9 +188,9 @@ export function useUpdateSchema() {
       });
       
       if (error) {
-        // Optimistic Locking 충돌 ?�는 기�? ?�류
+        // Optimistic Locking 충돌 또는 기타 오류
         if (error.message?.includes('modified by another user') || error.message?.includes('Schema was modified')) {
-          throw new Error('?�른 관리자가 먼�? ?�정?�습?�다. 변�??�용???�시 ?�인?�주?�요.');
+          throw new Error('다른 관리자가 먼저 수정했습니다. 변경 내용을 다시 확인해주세요.');
         }
         throw new Error(`Failed to update schema: ${error.message}`);
       }
@@ -206,10 +209,10 @@ export function useUpdateSchema() {
 }
 
 /**
- * ?�키�??�성??(Activate)
+ * 스키마 활성화 (Activate)
  * 
- * [불�? 규칙] 기존 active ??deprecated, draft ??active
- * [불�? 규칙] Super Admin�??�성??가??(RLS ?�책)
+ * [불변 규칙] 기존 active → deprecated, draft → active
+ * [불변 규칙] Super Admin만 활성화 가능 (RLS 정책)
  */
 export function useActivateSchema() {
   const queryClient = useQueryClient();
@@ -218,7 +221,7 @@ export function useActivateSchema() {
     mutationFn: async (id: string) => {
       const supabase = createClient();
       
-      // RPC ?�수 ?�용 (meta ?�키�??�근, ?�자???�랜??��)
+      // RPC 함수 사용 (meta 스키마 접근, 원자적 트랜잭션)
       const { data, error } = await supabase.rpc('activate_schema_registry', {
         p_id: id,
       });
@@ -231,7 +234,7 @@ export function useActivateSchema() {
         throw new Error('Failed to activate schema: No data returned');
       }
       
-      // RPC 결과???��? ?�드�?반환?��?�? ?�체 ?�키마�? ?�시 조회
+      // RPC 결과는 일부 필드만 반환하므로, 전체 스키마를 다시 조회
       const { data: fullSchema, error: fetchError } = await supabase.rpc('get_schema_registry', {
         p_id: id,
       });
@@ -249,9 +252,9 @@ export function useActivateSchema() {
 }
 
 /**
- * Draft ?�키�???��
+ * Draft 스키마 삭제
  * 
- * [불�? 규칙] draft�???�� 가??(RLS ?�책)
+ * [불변 규칙] draft만 삭제 가능 (RLS 정책)
  */
 export function useDeleteSchema() {
   const queryClient = useQueryClient();
@@ -260,7 +263,7 @@ export function useDeleteSchema() {
     mutationFn: async (id: string) => {
       const supabase = createClient();
       
-      // RPC ?�수 ?�용 (meta ?�키�??�근)
+      // RPC 함수 사용 (meta 스키마 접근)
       const { error } = await supabase.rpc('delete_schema_registry', {
         p_id: id,
       });

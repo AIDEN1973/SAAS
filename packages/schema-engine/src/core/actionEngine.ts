@@ -1,7 +1,7 @@
 /**
  * Action Engine
  * 
- * SDUI v1.1: ?�키마에 ?�의???�션???�행?�는 ?�진
+ * SDUI v1.1: ?�키마에 ?�의???�션???�행?�는 ?�진
  * 
  * 기술문서: SDUI 기술문서 v1.1 - 13. Action Engine
  */
@@ -26,18 +26,18 @@ export interface ActionContext {
 /**
  * Action Engine
  * 
- * ?�키마에 ?�의???�션???�행?�니??
+ * ?�키마에 ?�의???�션???�행?�니??
  * 
- * @param action - ?�행???�션 ?�의
- * @param context - ?�행 컨텍?�트
- * @returns ?�행 결과
+ * @param action - ?�행???�션 ?�의
+ * @param context - ?�행 컨텍?�트
+ * @returns ?�행 결과
  */
 export async function executeAction(
   action: ActionDefinition,
   context: ActionContext
 ): Promise<any> {
   const { type } = action;
-  const translations = context.translations || {};  // SDUI v1.1: context?�서 translations 가?�오�?
+  const translations = context.translations || {};  // SDUI v1.1: context?�서 translations 가?�오�?
   try {
     switch (type) {
       case 'api.call':
@@ -81,10 +81,10 @@ export async function executeAction(
 }
 
 /**
- * API ?�출 ?�행
+ * API ?�출 ?�행
  * 
- * SDUI v1.1: @api-sdk/core�??�한 API ?�출 (권장)
- * context.apiCall???�으�?기본 fetch ?�용
+ * SDUI v1.1: @api-sdk/core�??�한 API ?�출 (권장)
+ * context.apiCall???�으�?기본 fetch ?�용
  */
 async function executeApiCall(
   action: ActionDefinition,
@@ -104,28 +104,28 @@ async function executeApiCall(
     requestBody = context.selectedRows;
   }
 
-  // ?�️ 중요: Zero-Trust ?�칙 - context.apiCall ?�는 @api-sdk/core�??�용
-  // fetch fallback?� ?�거?�었?�니??
+  // ?�️ 중요: Zero-Trust ?�칙 - context.apiCall ?�는 @api-sdk/core�??�용
+  // fetch fallback?� ?�거?�었?�니??
   if (context.apiCall) {
     return await context.apiCall(endpoint, method, requestBody);
   }
 
-  // @api-sdk/core�??�한 API ?�출 (?�수)
-  // ?�️ 중요: apiClient.call()?� table/id/action ?�식???�드?�인?�만 지?�합?�다.
-  // ?�반 HTTP ?�드?�인?�는 context.apiCall???�용?�거?? 직접 fetch�??�용?�야 ?�니??
-  // ?��?�?Zero-Trust ?�칙???�라 context.apiCall???�선 ?�용?�니??
+  // @api-sdk/core�??�한 API ?�출 (?�수)
+  // ?�️ 중요: apiClient.call()?� table/id/action ?�식???�드?�인?�만 지?�합?�다.
+  // ?�반 HTTP ?�드?�인?�는 context.apiCall???�용?�거?? 직접 fetch�??�용?�야 ?�니??
+  // ?��?�?Zero-Trust ?�칙???�라 context.apiCall???�선 ?�용?�니??
   try {
-    // apiClient.call()?� ?�정 ?�식(table/id/action)�?지?�하므�?
-    // ?�반 HTTP ?�드?�인?�의 경우 context.apiCall???�수?�니??
-    // context.apiCall???�으�??�러�?발생?�킵?�다.
+    // apiClient.call()?� ?�정 ?�식(table/id/action)�?지?�하므�?
+    // ?�반 HTTP ?�드?�인?�의 경우 context.apiCall???�수?�니??
+    // context.apiCall???�으�??�러�?발생?�킵?�다.
     throw new Error(
       `API call requires context.apiCall for custom endpoints. ` +
       `apiClient.call() only supports table/id/action format. ` +
       `Please provide context.apiCall in ActionContext.`
     );
   } catch (importError) {
-    // ?�️ 중요: @api-sdk/core가 ?�으�?API ?�출 ?�패
-    // Zero-Trust ?�칙???�라 fetch fallback?� ?�공?��? ?�습?�다.
+    // ?�️ 중요: @api-sdk/core가 ?�으�?API ?�출 ?�패
+    // Zero-Trust ?�칙???�라 fetch fallback?� ?�공?��? ?�습?�다.
     throw new Error(
       `API call failed: @api-sdk/core is required but not available. ` +
       `Please provide context.apiCall or ensure @api-sdk/core is installed.`
@@ -134,7 +134,7 @@ async function executeApiCall(
 }
 
 /**
- * ?�비게이???�행
+ * ?�비게이???�행
  */
 function executeNavigate(
   action: ActionDefinition,
@@ -154,7 +154,7 @@ function executeNavigate(
 }
 
 /**
- * Drawer ?�기
+ * Drawer ?�기
  */
 function executeOpenDrawer(
   action: ActionDefinition,
@@ -174,7 +174,7 @@ function executeOpenDrawer(
 }
 
 /**
- * Modal ?�기
+ * Modal ?�기
  */
 function executeOpenModal(
   action: ActionDefinition,
@@ -194,7 +194,7 @@ function executeOpenModal(
 }
 
 /**
- * ?�드 �??�정
+ * ?�드 �??�정
  */
 function executeSetValue(
   action: ActionDefinition,
@@ -228,7 +228,7 @@ function executeReset(
 }
 
 /**
- * ?�키�??�로?? */
+ * ?�키�??�로?? */
 async function executeReloadSchema(
   action: ActionDefinition,
   context: ActionContext
@@ -241,7 +241,7 @@ async function executeReloadSchema(
 }
 
 /**
- * Toast 메시지 ?�시
+ * Toast 메시지 ?�시
  */
 function executeToast(
   action: ActionDefinition,
@@ -266,7 +266,7 @@ function executeToast(
 }
 
 /**
- * ?�인 ?�???�자 ?�시
+ * ?�인 ?�???�자 ?�시
  */
 async function executeConfirm(
   action: ActionDefinition,
@@ -295,7 +295,7 @@ async function executeConfirm(
 }
 
 /**
- * ?�차 ?�행
+ * ?�차 ?�행
  */
 async function executeSequence(
   action: ActionDefinition,
@@ -318,11 +318,11 @@ async function executeSequence(
 }
 
 /**
- * ?�벤?�에 ?�당?�는 ?�션?�을 ?�행
+ * ?�벤?�에 ?�당?�는 ?�션?�을 ?�행
  * 
- * @param event - ?�벤???�름 (?? 'onSubmit', 'onSubmitSuccess')
- * @param actions - ?�션 ?�의 배열
- * @param context - ?�행 컨텍?�트
+ * @param event - ?�벤???�름 (?? 'onSubmit', 'onSubmitSuccess')
+ * @param actions - ?�션 ?�의 배열
+ * @param context - ?�행 컨텍?�트
  */
 export async function executeActionsForEvent(
   event: string,
@@ -339,7 +339,7 @@ export async function executeActionsForEvent(
       results.push(result);
     } catch (error) {
       console.error(`Failed to execute action for event ${event}:`, error);
-      // ?�러가 발생?�도 ?�음 ?�션?� 계속 ?�행
+      // ?�러가 발생?�도 ?�음 ?�션?� 계속 ?�행
     }
   }
   

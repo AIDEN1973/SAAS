@@ -1,8 +1,8 @@
 /**
  * Textarea Component
  * 
- * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
- * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
+ * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않음
+ * [불변 규칙] 모든 스타일은 design-system 토큰만 사용한다.
  */
 
 import React from 'react';
@@ -17,7 +17,7 @@ export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextArea
   fullWidth?: boolean;
 }
 
-export const Textarea: React.FC<TextareaProps> = ({
+export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   label,
   error,
   helperText,
@@ -25,7 +25,7 @@ export const Textarea: React.FC<TextareaProps> = ({
   fullWidth = false,
   className,
   ...props
-}) => {
+}, ref) => {
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
       padding: 'var(--spacing-xs) var(--spacing-sm)',
@@ -83,6 +83,7 @@ export const Textarea: React.FC<TextareaProps> = ({
         </label>
       )}
       <textarea
+        ref={ref}
         className={clsx(className)}
         style={textareaStyle}
         onFocus={(e) => {
@@ -119,4 +120,6 @@ export const Textarea: React.FC<TextareaProps> = ({
       )}
     </div>
   );
-};
+});
+
+Textarea.displayName = 'Textarea';

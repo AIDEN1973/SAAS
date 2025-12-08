@@ -1,10 +1,10 @@
 /**
  * Class Form Schema
  * 
- * [불�? 규칙] ?�키�??�진 기반 FormSchema ?�의
+ * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
  */
 
-import type { FormSchema } from '@schema/engine';
+import type { FormSchema } from '@schema-engine';
 
 export const classFormSchema: FormSchema = {
   version: '1.0.0',
@@ -22,7 +22,7 @@ export const classFormSchema: FormSchema = {
         name: 'name',
         kind: 'text',
         ui: {
-          label: '�??�름',
+          label: '반 이름',
           colSpan: 2,
         },
         validation: {
@@ -41,7 +41,7 @@ export const classFormSchema: FormSchema = {
         name: 'grade',
         kind: 'text',
         ui: {
-          label: '?�???�년',
+          label: '대상 학년',
           colSpan: 1,
         },
       },
@@ -49,17 +49,17 @@ export const classFormSchema: FormSchema = {
         name: 'day_of_week',
         kind: 'select',
         ui: {
-          label: '?�일',
+          label: '요일',
           colSpan: 1,
         },
         options: [
-          { label: '?�요??, value: 'monday' },
-          { label: '?�요??, value: 'tuesday' },
-          { label: '?�요??, value: 'wednesday' },
-          { label: '목요??, value: 'thursday' },
-          { label: '금요??, value: 'friday' },
-          { label: '?�요??, value: 'saturday' },
-          { label: '?�요??, value: 'sunday' },
+          { label: '월요일', value: 'monday' },
+          { label: '화요일', value: 'tuesday' },
+          { label: '수요일', value: 'wednesday' },
+          { label: '목요일', value: 'thursday' },
+          { label: '금요일', value: 'friday' },
+          { label: '토요일', value: 'saturday' },
+          { label: '일요일', value: 'sunday' },
         ],
         defaultValue: 'monday',
         validation: {
@@ -70,7 +70,7 @@ export const classFormSchema: FormSchema = {
         name: 'start_time',
         kind: 'text',
         ui: {
-          label: '?�작 ?�간',
+          label: '시작 시간',
           placeholder: '14:00',
           colSpan: 1,
         },
@@ -78,7 +78,7 @@ export const classFormSchema: FormSchema = {
           required: true,
           pattern: {
             value: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$',
-            message: '?�간 ?�식???�바르�? ?�습?�다 (?? 14:00)',
+            message: '시간 형식이 올바르지 않습니다 (예: 14:00)',
           },
         },
       },
@@ -86,7 +86,7 @@ export const classFormSchema: FormSchema = {
         name: 'end_time',
         kind: 'text',
         ui: {
-          label: '종료 ?�간',
+          label: '종료 시간',
           placeholder: '15:30',
           colSpan: 1,
         },
@@ -94,7 +94,7 @@ export const classFormSchema: FormSchema = {
           required: true,
           pattern: {
             value: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$',
-            message: '?�간 ?�식???�바르�? ?�습?�다 (?? 15:30)',
+            message: '시간 형식이 올바르지 않습니다 (예: 15:30)',
           },
         },
       },
@@ -102,7 +102,7 @@ export const classFormSchema: FormSchema = {
         name: 'capacity',
         kind: 'number',
         ui: {
-          label: '?�원',
+          label: '정원',
           colSpan: 1,
         },
         validation: {
@@ -115,7 +115,7 @@ export const classFormSchema: FormSchema = {
         name: 'room',
         kind: 'text',
         ui: {
-          label: '강의??,
+          label: '강의실',
           colSpan: 1,
         },
       },
@@ -129,7 +129,7 @@ export const classFormSchema: FormSchema = {
       },
     ],
     submit: {
-      label: '?�성',
+      label: '생성',
       variant: 'solid',
       color: 'primary',
       size: 'md',

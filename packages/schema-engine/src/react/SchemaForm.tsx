@@ -1,11 +1,13 @@
 /**
  * SchemaForm Component
  * 
- * [불�? 규칙] React Hook Form�??�합??FormSchema Renderer
- * [불�? 규칙] SchemaField�??�용?�여 개별 ?�드 ?�더�? * [불�? 규칙] Grid ?�이?�웃 ?�용
- * [불�? 규칙] SDUI v1.1: Action Engine ?�동, i18n ??지?? * 
+ * [불변 규칙] React Hook Form과 통합된 FormSchema Renderer
+ * [불변 규칙] SchemaField를 사용하여 개별 필드 렌더링
+ * [불변 규칙] Grid 레이아웃 적용
+ * [불변 규칙] SDUI v1.1: Action Engine 연동, i18n 키 지원
+ * 
  * 기술문서: 
- * - docu/?�키마엔�?txt 8. Renderer ?�합
+ * - docu/스키마엔진.txt 8. Renderer 통합
  * - SDUI 기술문서 v1.1 - 10. Form Engine
  */
 
@@ -22,17 +24,17 @@ export interface SchemaFormProps {
   onSubmit?: (data: any) => void | Promise<void>;
   defaultValues?: Record<string, any>;
   className?: string;
-  // SDUI v1.1: Action Engine 컨텍?�트 (?�택??
+  // SDUI v1.1: Action Engine 컨텍스트 (선택적)
   actionContext?: Partial<ActionContext>;
-  // SDUI v1.1: i18n 번역 (?�택??
+  // SDUI v1.1: i18n 번역 (선택적)
   translations?: Record<string, string>;
 }
 
 /**
- * SchemaForm 컴포?�트
+ * SchemaForm 컴포넌트
  * 
- * FormSchema�?React Hook Form�??�합?�여 ?�더링합?�다.
- * SchemaField�??�용?�여 개별 ?�드�??�더링하�? Condition Rule??지?�합?�다.
+ * FormSchema를 React Hook Form과 통합하여 렌더링합니다.
+ * SchemaField를 사용하여 개별 필드를 렌더링하고, Condition Rule을 지원합니다.
  */
 export const SchemaForm: React.FC<SchemaFormProps> = ({
   schema,
@@ -48,7 +50,8 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     throw new Error(`Invalid form schema: ${validation.errors?.message}`);
   }
 
-  // 2) React Hook Form 초기??  // defaultValues???�키마의 defaultValue?� 병합
+  // 2) React Hook Form 초기화
+  // defaultValues는 스키마의 defaultValue와 병합
   const mergedDefaultValues = React.useMemo(() => {
     const schemaDefaults: Record<string, any> = {};
     schema.form.fields.forEach((field) => {
@@ -65,9 +68,9 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
 
   const { register, control, handleSubmit, formState: { errors }, reset, setValue, watch } = form;
 
-  // SDUI v1.1: Action Engine 컨텍?�트 구성
-  // ?�️ 중요: watch()??매번 ?�출?��?�?formData??최신 값을 반영?�니??
-  // actionContext???��??�서 주입?��?�??�존??배열???�함?�니??
+  // SDUI v1.1: Action Engine 컨텍스트 구성
+  // ⚠️ 중요: watch()는 매번 호출되므로 formData는 최신 값을 반영합니다.
+  // actionContext는 외부에서 주입되므로 의존성 배열에 포함합니다.
   const formData = watch();
   const fullActionContext: ActionContext = React.useMemo(() => ({
     formData,
@@ -77,10 +80,11 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     ...actionContext,
   }), [formData, setValue, reset, translations, actionContext]);
 
-  // 3) Submit ?�들??  // SDUI v1.1: Action Engine ?�동
+  // 3) Submit 핸들러
+  // SDUI v1.1: Action Engine 연동
   const onFormSubmit = async (data: any) => {
     try {
-      // ?�키마에 ?�의??onSubmit ?�션 ?�행 (form.actions ?�선, ?�으�?schema.actions)
+      // 스키마에 정의된 onSubmit 액션 실행 (form.actions 우선, 없으면 schema.actions)
       const actions = schema.form.actions || schema.actions;
       if (actions && actions.length > 0) {
         await executeActionsForEvent('onSubmit', actions, {
@@ -89,12 +93,12 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
         });
       }
 
-      // 기존 onSubmit 콜백 ?�행 (?�위 ?�환??
+      // 기존 onSubmit 콜백 실행 (하위 호환성)
       if (onSubmit) {
         await onSubmit(data);
       }
 
-      // onSubmitSuccess ?�션 ?�행
+      // onSubmitSuccess 액션 실행
       const successActions = schema.form.actions || schema.actions;
       if (successActions && successActions.length > 0) {
         await executeActionsForEvent('onSubmitSuccess', successActions, {
@@ -103,7 +107,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
         });
       }
     } catch (error) {
-      // onSubmitError ?�션 ?�행
+      // onSubmitError 액션 실행
       const errorActions = schema.form.actions || schema.actions;
       if (errorActions && errorActions.length > 0) {
         await executeActionsForEvent('onSubmitError', errorActions, {
@@ -122,8 +126,8 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     <Card padding={layout?.columnGap || 'md'} className={className}>
       <form onSubmit={handleSubmit(onFormSubmit)}>
         <Grid
-          // ?�️ 참고: Grid 컴포?�트???�재 1-4까�?�?지?�하지�? ?�키마에?�는 1-12�??�용?�니??
-          // 5 ?�상??값�? 4�??�한?�니?? ?�후 core-ui Grid 컴포?�트가 ?�장?�면 ?�거 ?�정.
+          // ⚠️ 참고: Grid 컴포넌트는 현재 1-4까지만 지원하지만, 스키마에서는 1-12를 허용합니다.
+          // 5 이상의 값은 4로 제한됩니다. 향후 core-ui Grid 컴포넌트가 확장되면 제거 예정.
           columns={Math.min((layout?.columns || 1), 4) as 1 | 2 | 3 | 4}
           gap={layout?.columnGap || 'md'}
         >
@@ -147,7 +151,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
               color={formConfig.submit.color}
               size={formConfig.submit.size}
             >
-              {/* SDUI v1.1: i18n ??지??*/}
+              {/* SDUI v1.1: i18n 키 지원 */}
               {formConfig.submit.labelKey
                 ? (translations[formConfig.submit.labelKey] || formConfig.submit.labelKey)
                 : (formConfig.submit.label || 'Submit')}
@@ -162,7 +166,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
 /**
  * SchemaForm with form methods exposed
  * 
- * useForm??메서?��? ?��??�서 ?�근?????�도�??�는 고급 컴포?�트
+ * useForm의 메서드를 외부에서 접근할 수 있도록 하는 고급 컴포넌트
  */
 export interface SchemaFormWithMethodsProps extends SchemaFormProps {
   formRef?: React.RefObject<UseFormReturn<any>>;
@@ -196,14 +200,14 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
     defaultValues: mergedDefaultValues,
   });
 
-  // formRef??form ?�스?�스 ?�당
+  // formRef에 form 인스턴스 할당
   React.useImperativeHandle(formRef, () => form, [form]);
 
   const { register, control, handleSubmit, formState: { errors }, reset, setValue, watch } = form;
 
-  // SDUI v1.1: Action Engine 컨텍?�트 구성
-  // ?�️ 중요: watch()??매번 ?�출?��?�?formData??최신 값을 반영?�니??
-  // actionContext???��??�서 주입?��?�??�존??배열???�함?�니??
+  // SDUI v1.1: Action Engine 컨텍스트 구성
+  // ⚠️ 중요: watch()는 매번 호출되므로 formData는 최신 값을 반영합니다.
+  // actionContext는 외부에서 주입되므로 의존성 배열에 포함합니다.
   const formData = watch();
   const fullActionContext: ActionContext = React.useMemo(() => ({
     formData,
@@ -213,10 +217,10 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
     ...actionContext,
   }), [formData, setValue, reset, translations, actionContext]);
 
-  // SDUI v1.1: Action Engine ?�동
+  // SDUI v1.1: Action Engine 연동
   const onFormSubmit = async (data: any) => {
     try {
-      // ?�키마에 ?�의??onSubmit ?�션 ?�행 (form.actions ?�선, ?�으�?schema.actions)
+      // 스키마에 정의된 onSubmit 액션 실행 (form.actions 우선, 없으면 schema.actions)
       const actions = schema.form.actions || schema.actions;
       if (actions && actions.length > 0) {
         await executeActionsForEvent('onSubmit', actions, {
@@ -225,12 +229,12 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
         });
       }
 
-      // 기존 onSubmit 콜백 ?�행 (?�위 ?�환??
+      // 기존 onSubmit 콜백 실행 (하위 호환성)
       if (onSubmit) {
         await onSubmit(data);
       }
 
-      // onSubmitSuccess ?�션 ?�행
+      // onSubmitSuccess 액션 실행
       const successActions = schema.form.actions || schema.actions;
       if (successActions && successActions.length > 0) {
         await executeActionsForEvent('onSubmitSuccess', successActions, {
@@ -239,7 +243,7 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
         });
       }
     } catch (error) {
-      // onSubmitError ?�션 ?�행
+      // onSubmitError 액션 실행
       const errorActions = schema.form.actions || schema.actions;
       if (errorActions && errorActions.length > 0) {
         await executeActionsForEvent('onSubmitError', errorActions, {
@@ -258,8 +262,8 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
     <Card padding={layout?.columnGap || 'md'} className={className}>
       <form onSubmit={handleSubmit(onFormSubmit)}>
         <Grid
-          // ?�️ 참고: Grid 컴포?�트???�재 1-4까�?�?지?�하지�? ?�키마에?�는 1-12�??�용?�니??
-          // 5 ?�상??값�? 4�??�한?�니?? ?�후 core-ui Grid 컴포?�트가 ?�장?�면 ?�거 ?�정.
+          // ⚠️ 참고: Grid 컴포넌트는 현재 1-4까지만 지원하지만, 스키마에서는 1-12를 허용합니다.
+          // 5 이상의 값은 4로 제한됩니다. 향후 core-ui Grid 컴포넌트가 확장되면 제거 예정.
           columns={Math.min((layout?.columns || 1), 4) as 1 | 2 | 3 | 4}
           gap={layout?.columnGap || 'md'}
         >
@@ -283,7 +287,7 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
               color={formConfig.submit.color}
               size={formConfig.submit.size}
             >
-              {/* SDUI v1.1: i18n ??지??*/}
+              {/* SDUI v1.1: i18n 키 지원 */}
               {formConfig.submit.labelKey
                 ? (translations[formConfig.submit.labelKey] || formConfig.submit.labelKey)
                 : (formConfig.submit.label || 'Submit')}

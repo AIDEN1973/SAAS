@@ -1,11 +1,11 @@
 /**
  * DatePicker Component
  * 
- * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�습?�다.
- * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�니??
+ * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않습니다.
+ * [불변 규칙] 모든 스타일은 design-system 토큰을 사용합니다.
  * 
- * Phase 1: 기본 HTML5 date input ?�용
- * Phase 2+: 고급 DatePicker ?�이브러�??�합 가??
+ * Phase 1: 기본 HTML5 date input 사용
+ * Phase 2+: 고급 DatePicker 라이브러리 통합 가능
  */
 
 import React from 'react';
@@ -20,13 +20,13 @@ export interface DatePickerProps extends Omit<React.InputHTMLAttributes<HTMLInpu
   fullWidth?: boolean;
   value?: string | Date;
   onChange?: (value: string) => void;
-  dateTime?: boolean; // datetime-local 지??
+  dateTime?: boolean; // datetime-local 지원
 }
 
 /**
- * DatePicker 컴포?�트
+ * DatePicker 컴포넌트
  * 
- * Phase 1?�서??HTML5 date input???�용?�니??
+ * Phase 1에서는 HTML5 date input을 사용합니다.
  */
 export const DatePicker: React.FC<DatePickerProps> = ({
   label,
@@ -63,7 +63,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     },
   };
 
-  // value�?string?�로 변??(Date 객체??경우)
+  // value를 string으로 변환 (Date 객체인 경우)
   const stringValue = value instanceof Date 
     ? (dateTime ? value.toISOString().slice(0, 16) : value.toISOString().split('T')[0])
     : value || '';

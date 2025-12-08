@@ -1,10 +1,11 @@
 /**
  * SchemaField Component
  * 
- * [불�? 규칙] React Hook Form�??�합??Schema Field Renderer
- * [불�? 규칙] Condition Rule 기반 ?�적 UI ?�더�? * [불�? 규칙] Tailwind ?�래?��? 직접 ?�용?��? ?�고, core-ui 컴포?�트�??�용
+ * [불변 규칙] React Hook Form과 통합된 Schema Field Renderer
+ * [불변 규칙] Condition Rule 기반 동적 UI 렌더링
+ * [불변 규칙] Tailwind 클래스를 직접 사용하지 않고, core-ui 컴포넌트만 사용
  * 
- * 기술문서: docu/?�키마엔�?txt 8. Renderer ?�합
+ * 기술문서: docu/스키마엔진.txt 8. Renderer 통합
  */
 
 import React from 'react';
@@ -31,29 +32,29 @@ import {
   Radio,
   Card,
 } from '@ui-core/react';
-// ?�️ 참고: Input 컴포?�트??TextInput????��???�행?�니??
-// 기술문서?�서??TextInput?�로 명시?�어 ?�으?? ?�제 구현?� Input 컴포?�트�??�용?�니??
+// ⚠️ 참고: Input 컴포넌트는 TextInput의 역할을 수행합니다.
+// 기술문서에서는 TextInput으로 명시되어 있으나, 실제 구현은 Input 컴포넌트를 사용합니다.
 
 export interface SchemaFieldProps {
   field: FormFieldSchema;
   register: UseFormRegister<any>;
   errors: FieldErrors<any>;
   control: Control<any>;
-  // SDUI v1.1: i18n 번역 (?�택?? Loader ?�계?�서 바인?�되지 ?��? 경우 ?�용)
+  // SDUI v1.1: i18n 번역 (선택적, Loader 단계에서 바인딩되지 않은 경우 사용)
   translations?: Record<string, string>;
-  // SDUI v1.1: ?�적 ?�드 �??�정 (setValue ?�션??
+  // SDUI v1.1: 동적 필드 값 설정 (setValue 액션용)
   setValue?: UseFormSetValue<any>;
 }
 
 /**
- * SchemaField 컴포?�트
+ * SchemaField 컴포넌트
  * 
- * FormFieldSchema�?React Hook Form�??�합?�여 ?�더링합?�다.
- * Condition Rule??지?�하???�적?�로 hidden/disabled/required ?�태�??�어?�니??
+ * FormFieldSchema를 React Hook Form과 통합하여 렌더링합니다.
+ * Condition Rule을 지원하여 동적으로 hidden/disabled/required 상태를 제어합니다.
  * 
- * ?�️ ?�능 최적?? React.memo�?감싸??불필?�한 리렌?�링??방�??�니??
- * useWatch??감시 ?�드가 변?�면 ?�당 SchemaField 컴포?�트가 리렌?�되므�?
- * ?�드가 100�??�상?�면 ?�능 문제가 발생?????�습?�다.
+ * ⚠️ 성능 최적화: React.memo로 감싸서 불필요한 리렌더링을 방지합니다.
+ * useWatch는 감시 필드가 변하면 해당 SchemaField 컴포넌트가 리렌더되므로,
+ * 필드가 100개 이상이면 성능 문제가 발생할 수 있습니다.
  */
 const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
   field,
@@ -65,14 +66,14 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
 }) => {
   const { name, kind, ui, options } = field;
   
-  // SDUI v1.1: i18n ??처리 (Loader ?�계?�서 바인?�되지 ?��? 경우)
-  // labelKey가 ?�으�?translations?�서 조회, ?�으�?기존 label ?�용
+  // SDUI v1.1: i18n 키 처리 (Loader 단계에서 바인딩되지 않은 경우)
+  // labelKey가 있으면 translations에서 조회, 없으면 기존 label 사용
   const label = ui?.labelKey ? (translations[ui.labelKey] || ui.labelKey) : ui?.label;
   const placeholder = ui?.placeholderKey ? (translations[ui.placeholderKey] || ui.placeholderKey) : ui?.placeholder;
   const description = ui?.descriptionKey ? (translations[ui.descriptionKey] || ui.descriptionKey) : ui?.description;
   
-  // 1) 조건부 ?�드 감시
-  // ?�일 조건 ?�는 복수 조건?�서 참조?�는 모든 ?�드�?감시
+  // 1) 조건부 필드 감시
+  // 단일 조건 또는 복수 조건에서 참조하는 모든 필드를 감시
   const fieldsToWatch = React.useMemo(() => {
     const fields = new Set<string>();
     if (field.condition) {
@@ -86,64 +87,67 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
     return Array.from(fields);
   }, [field.condition, field.conditions]);
 
-  // 모든 참조 ?�드 �?관�?  // ?�️ 최적?? 조건???�는 ?�드??useWatch�??�출?��? ?�음
-  // fieldsToWatch.length === 0?�면 name: []�??�달?�여 ???�체 구독 방�?
+  // 모든 참조 필드 값 관찰
+  // ⚠️ 최적화: 조건이 없는 필드는 useWatch를 호출하지 않음
+  // fieldsToWatch.length === 0이면 name: []로 전달하여 폼 전체 구독 방지
   const hasConditions = fieldsToWatch.length > 0;
   
   const watched = useWatch({
     control,
-    name: hasConditions ? fieldsToWatch : [],  // 조건???�으�?�?배열�??�달 (???�체 구독 방�?)
+    name: hasConditions ? fieldsToWatch : [],  // 조건이 없으면 빈 배열로 전달 (폼 전체 구독 방지)
   });
   
   const watchedValues = React.useMemo(() => {
     if (!hasConditions) return {} as Record<string, any>;
-    // watched가 배열??경우 ?�드명과 매핑
+    // watched가 배열인 경우 필드명과 매핑
     if (Array.isArray(watched)) {
       return fieldsToWatch.reduce((acc, key, idx) => {
         acc[key] = watched[idx];
         return acc;
       }, {} as Record<string, any>);
     }
-    // watched가 객체??경우 (?�일 ?�드)
+    // watched가 객체인 경우 (단일 필드)
     return watched as Record<string, any>;
   }, [watched, hasConditions, fieldsToWatch]);
 
-  // 2) 조건 ?��?
-  // ?�️ 중요: getConditionalActions??field.conditions�??�선 처리?�고, ?�으�?field.condition??처리?�니??
-  // ?�라????�� ?�출?�야 ?�며, field.condition�?체크?�면 ???�니??
+  // 2) 조건 평가
+  // ⚠️ 중요: getConditionalActions는 field.conditions를 우선 처리하고, 없으면 field.condition을 처리합니다.
+  // 따라서 항상 호출해야 하며, field.condition만 체크하면 안 됩니다.
   const { isHidden, isDisabled, isRequired, actions: conditionalActions } = getConditionalActions(field, watchedValues);
 
-  // SDUI v1.1: ?�적 ?�션 처리 (setOptions ?�션)
-  // ?�️ 중요: dynamicOptions??API 기반 ?�션�??�?�하�? 초기값�? undefined?�니??
-  // static ?�션?� effectiveOptions?�서 직접 ?�용?�니??
+  // SDUI v1.1: 동적 옵션 처리 (setOptions 액션)
+  // ⚠️ 중요: dynamicOptions는 API 기반 옵션만 저장하며, 초기값은 undefined입니다.
+  // static 옵션은 effectiveOptions에서 직접 사용합니다.
   const [dynamicOptions, setDynamicOptions] = React.useState<Array<{ value: string; labelKey?: string; label?: string }> | undefined>(undefined);
   
-  // effectiveOptions: conditionalActions.setOptions가 ?�으�??�선, ?�으�?field.options
+  // effectiveOptions: conditionalActions.setOptions가 있으면 우선, 없으면 field.options
   const effectiveOptions = React.useMemo(() => {
     if (conditionalActions && conditionalActions.setOptions) {
       if (conditionalActions.setOptions.type === 'static' && conditionalActions.setOptions.options) {
         return conditionalActions.setOptions.options;
       }
-      // API 기반 ?�션?� dynamicOptions ?�태�?관�?      if (conditionalActions.setOptions.type === 'api' && dynamicOptions) {
+      // API 기반 옵션은 dynamicOptions 상태로 관리
+      if (conditionalActions.setOptions.type === 'api' && dynamicOptions) {
         return dynamicOptions;
       }
     }
     return options;
   }, [conditionalActions?.setOptions, dynamicOptions, options]);
 
-  // SDUI v1.1: setOptions API ?�출 처리
-  // ?�️ 중요: ?�존??배열?� endpoint?� type�?추출?�여 ?�정?�으�?관�?  const setOptionsConfig = conditionalActions?.setOptions;
+  // SDUI v1.1: setOptions API 호출 처리
+  // ⚠️ 중요: 의존성 배열은 endpoint와 type만 추출하여 안정적으로 관리
+  const setOptionsConfig = conditionalActions?.setOptions;
   const setOptionsEndpoint = setOptionsConfig?.type === 'api' ? setOptionsConfig.endpoint : undefined;
   const setOptionsType = setOptionsConfig?.type;
   
   React.useEffect(() => {
     if (setOptionsType === 'api' && setOptionsEndpoint) {
-      const endpoint = setOptionsEndpoint; // ?�??가?? ???�점?�서 endpoint??string
+      const endpoint = setOptionsEndpoint; // 타입 가드: 이 시점에서 endpoint는 string
       let mounted = true;
       async function loadOptions() {
         try {
-          // ?�️ 중요: Zero-Trust ?�칙 - @api-sdk/core??apiClient�??�용
-          // apiClient가 ?�으�??�션 로드 ?�패 (fetch fallback ?�거)
+          // ⚠️ 중요: Zero-Trust 원칙 - @api-sdk/core의 apiClient만 사용
+          // apiClient가 없으면 옵션 로드 실패 (fetch fallback 제거)
           const { apiClient } = await import('@api-sdk/core');
           const res = await apiClient.get(endpoint);
           const data = (res as any).data ?? res;
@@ -158,9 +162,9 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
             );
           }
         } catch (error) {
-          // ?�️ 중요: apiClient가 ?�으�??�션 로드 ?�패 (Zero-Trust ?�칙)
+          // ⚠️ 중요: apiClient가 없으면 옵션 로드 실패 (Zero-Trust 원칙)
           console.error(`[Schema Engine] Failed to load options from API: ${endpoint}. apiClient not available.`, error);
-          // ?�션?� 기존 field.options ?��? (dynamicOptions??undefined�??��?)
+          // 옵션은 기존 field.options 유지 (dynamicOptions는 undefined로 유지)
         }
       }
       loadOptions();
@@ -168,11 +172,12 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         mounted = false;
       };
     } else {
-      // setOptions가 ?�거??static ?�?�이�?dynamicOptions 초기??      setDynamicOptions(undefined);
+      // setOptions가 없거나 static 타입이면 dynamicOptions 초기화
+      setDynamicOptions(undefined);
     }
   }, [setOptionsEndpoint, setOptionsType]);
 
-  // SDUI v1.1: setValue ?�션 처리
+  // SDUI v1.1: setValue 액션 처리
   React.useEffect(() => {
     if (conditionalActions?.setValue !== undefined && setFormValue) {
       setFormValue(name, conditionalActions.setValue, {
@@ -187,25 +192,25 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
 
   if (isHidden) return null;
 
-  // 3) Validation rule ?�적 ?�용
-  // ?�️ 중요: ?�적 required???�적 required보다 ?�선?�니??
-  // BaseRules???��? required ?�션???�어?? Condition Rule???�한 ?�적 required가 ??��?�니??
+  // 3) Validation rule 동적 적용
+  // ⚠️ 중요: 동적 required는 정적 required보다 우선합니다.
+  // BaseRules에 이미 required 옵션이 있어도, Condition Rule에 의한 동적 required가 덮어씁니다.
   const baseRules = buildValidationRules(field);
   const finalRules = isRequired
-    ? { ...baseRules, required: '?�수 ?�력 ??��?�니??' }
+    ? { ...baseRules, required: '필수 입력 항목입니다.' }
     : baseRules;
 
   const error = errors[name]?.message as string | undefined;
   
-  // ?�️ 중요: Tailwind ?�래?��? 직접 ?�용?��? ?�고, props 기반?�로 core-ui???�달
-  // ?�키마는 ?�리??구조�??�의?�고, ?��??��? core-ui가 ?�당?�니??
-  // 기술문서 UI 문서 2.3 "schema-engine ??core-ui ?�신 방식" 참조
-  // Renderer??layout??구조???�달�??�행?�고 ?��??�을 직접 ?�루지 ?�아???�니??
+  // ⚠️ 중요: Tailwind 클래스를 직접 사용하지 않고, props 기반으로 core-ui에 전달
+  // 스키마는 논리적 구조만 정의하고, 스타일은 core-ui가 담당합니다.
+  // 기술문서 UI 문서 2.3 "schema-engine ↔ core-ui 통신 방식" 참조
+  // Renderer는 layout의 구조적 전달만 수행하고 스타일을 직접 다루지 않아야 합니다.
   const colSpan = ui?.colSpan ?? 12;
   
-  // ?? 4) �??�드 ?�더링에 isDisabled ?�용
+  // 🍀 4) 각 필드 렌더링에 isDisabled 적용
 
-  // text/email/phone/password ??register
+  // text/email/phone/password → register
   if (['text', 'email', 'phone', 'password'].includes(kind)) {
     const inputType =
       kind === 'email'
@@ -230,7 +235,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
     );
   }
 
-  // number ??register
+  // number → register
   if (kind === 'number') {
     return (
       <FormFieldLayout colSpan={colSpan}>
@@ -247,7 +252,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
     );
   }
 
-  // textarea ??register
+  // textarea → register
   if (kind === 'textarea') {
     return (
       <FormFieldLayout colSpan={colSpan}>
@@ -263,7 +268,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
     );
   }
 
-  // select / multiselect ??Controller
+  // select / multiselect → Controller
   if (kind === 'select' || kind === 'multiselect') {
     return (
       <FormFieldLayout colSpan={colSpan}>
@@ -297,7 +302,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
     );
   }
 
-  // radio ??Controller (?�러 ?�션 �??�나 ?�택)
+  // radio → Controller (여러 옵션 중 하나 선택)
   if (kind === 'radio') {
     return (
       <FormFieldLayout colSpan={colSpan}>
@@ -408,7 +413,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
     );
   }
 
-  // SDUI v1.1: Custom Widget 지??(?�적 로딩)
+  // SDUI v1.1: Custom Widget 지원 (동적 로딩)
   if (kind === 'custom' && effectiveComponentType) {
     return (
       <CustomWidgetField
@@ -430,7 +435,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
 /**
  * Custom Widget Field Component
  * 
- * SDUI v1.1: Custom Widget???�적?�로 로드?�여 ?�더링합?�다.
+ * SDUI v1.1: Custom Widget을 동적으로 로드하여 렌더링합니다.
  */
 const CustomWidgetField: React.FC<{
   componentType: string;
@@ -459,7 +464,7 @@ const CustomWidgetField: React.FC<{
         
         if (mounted) {
           if (!Component) {
-            // Widget???��??�트리에 ?�거??로드 ?�패
+            // Widget이 레지스트리에 없거나 로드 실패
             const registeredWidgets = await import('../widgets/registry').then(m => m.getRegisteredWidgets());
             setError(new Error(
               `Widget "${componentType}" not found in registry. ` +
@@ -494,7 +499,7 @@ const CustomWidgetField: React.FC<{
   if (loading) {
     return (
       <FormFieldLayout colSpan={colSpan}>
-        <div>?�젯 로딩 �? {componentType}...</div>
+        <div>위젯 로딩 중: {componentType}...</div>
       </FormFieldLayout>
     );
   }
@@ -512,7 +517,7 @@ const CustomWidgetField: React.FC<{
         >
           <div>
             <strong style={{ color: 'var(--color-error)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>
-              ?�젯 로드 ?�패: {componentType}
+              위젯 로드 실패: {componentType}
             </strong>
             {error && (
               <div style={{ marginTop: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)', color: 'var(--color-error)' }}>
@@ -520,7 +525,7 @@ const CustomWidgetField: React.FC<{
               </div>
             )}
             <div style={{ marginTop: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-              ???�드???�더링되지 ?�습?�다. ?�키마의 customComponentType???�인?�거???�젯???�록?�주?�요.
+              이 필드는 렌더링되지 않습니다. 스키마의 customComponentType을 확인하거나 위젯을 등록해주세요.
             </div>
           </div>
         </Card>
@@ -528,7 +533,7 @@ const CustomWidgetField: React.FC<{
     );
   }
 
-  // Custom Widget???�달??props
+  // Custom Widget에 전달할 props
   const widgetProps = {
     name: field.name,
     label: field.ui?.label,
@@ -539,7 +544,9 @@ const CustomWidgetField: React.FC<{
     error: errors[field.name]?.message as string | undefined,
     control,
     rules: finalRules,
-    value: undefined, // Controller?�서 관�?    onChange: undefined, // Controller?�서 관�?    // 추�? ?�드 ?�성 ?�달
+    value: undefined, // Controller에서 관리
+    onChange: undefined, // Controller에서 관리
+    // 추가 필드 속성 전달
     defaultValue: field.defaultValue,
     options: field.options,
   };
@@ -563,6 +570,6 @@ const CustomWidgetField: React.FC<{
   );
 };
 
-// ?�️ ?�능 최적?? React.memo�?감싸??불필?�한 리렌?�링 방�?
+// ⚠️ 성능 최적화: React.memo로 감싸서 불필요한 리렌더링 방지
 export const SchemaField = React.memo(SchemaFieldComponent);
 
