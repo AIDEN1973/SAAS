@@ -1,44 +1,47 @@
 ﻿/**
  * Meta-Schema Validator
  * 
- * [불�? 규칙] ?�키�?구조???�음 ?�계?�서 검�?
+ * [불변 규칙] 스키마 구조는 다음 계층에서 검증
  * - 개발(local dev)
- * - CI 빌드 ?�계
- * - ?�넌??배포 ?? * - Schema Registry???�록 ?�점
+ * - CI 빌드 계층
+ * - 클라이언트 배포 시
+ * - Schema Registry에 등록 시점
  */
 
 import { z } from 'zod';
-import { FormSchema, TableSchema, SchemaVersion, ConditionRule, MultiConditionRule } from './types';
+import { FormSchema, SchemaVersion, ConditionRule, MultiConditionRule } from './types';
 
 /**
  * Schema Version Validator
  * 
- * SDUI v1.1: minClient ?�용 (minSupportedClient???�위 ?�환??
+ * SDUI v1.1: minClient 사용 (minSupportedClient는 하위 호환)
  */
 const schemaVersionBase = z.object({
   version: z.string().regex(/^\d+\.\d+\.\d+$/),
   minClient: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),  // SDUI v1.1
-  minSupportedClient: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),  // ?�위 ?�환??  entity: z.string().min(1),
+  minSupportedClient: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),  // 하위 호환
+  entity: z.string().min(1),
 });
 
-const schemaVersionSchema = schemaVersionBase.refine((data) => {
-  // minClient ?�는 minSupportedClient �??�나???�수
-  return !!(data.minClient || data.minSupportedClient);
-}, {
-  message: 'minClient ?�는 minSupportedClient �??�나???�수?�니??',
-});
+// schemaVersionSchema는 현재 사용되지 않지만, 향후 검증에 사용될 수 있으므로 주석 처리
+// const schemaVersionSchema = schemaVersionBase.refine((data) => {
+//   // minClient 또는 minSupportedClient 중 하나는 필수
+//   return !!(data.minClient || data.minSupportedClient);
+// }, {
+//   message: 'minClient 또는 minSupportedClient 중 하나는 필수입니다.',
+// });
 
 /**
  * Layout Schema Validator
  * 
- * SDUI v1.1: columns�?number�??�장 (1-12)
+ * SDUI v1.1: columns를 number로 확장 (1-12)
  */
 const layoutSchema = z.object({
   type: z.enum(['grid', 'section', 'tabs', 'stepper', 'drawer', 'modal', 'responsive']).optional(),  // SDUI v1.1
-  columns: z.union([z.number().min(1).max(12), z.enum(['1', '2', '3', '4'])]).optional(),  // SDUI v1.1: number ?�장
+  columns: z.union([z.number().min(1).max(12), z.enum(['1', '2', '3', '4'])]).optional(),  // SDUI v1.1: number 확장
   columnGap: z.enum(['xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl']).optional(),
   rowGap: z.enum(['xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl']).optional(),
-  // SDUI v1.1: tabs, stepper, responsive ���̾ƿ� ����
+  // SDUI v1.1: tabs, stepper, responsive 레이아웃 지원
   tabs: z.array(z.object({
     key: z.string(),
     labelKey: z.string().optional(),
@@ -59,14 +62,15 @@ const layoutSchema = z.object({
 });
 
 /**
- * Condition Rule Validator (?�일 조건)
+ * Condition Rule Validator (단일 조건)
  * 
- * SDUI v1.1: then/else 구조 지?? ?�로???�산??지?? */
+ * SDUI v1.1: then/else 구조 지원 (action보다 우선)
+ */
 const conditionRuleSchema: z.ZodType<ConditionRule> = z.object({
   field: z.string().min(1),
   op: z.enum(['==', '!=', 'eq', 'ne', 'in', 'not_in', 'exists', 'not_exists', 'gt', 'gte', 'lt', 'lte', '>', '>=', '<', '<=']),  // SDUI v1.1: 비교 연산자
   value: z.any().optional(),  // exists/not_exists의 경우 불필요
-  // SDUI v1.1: then/else 구조 구조
+  // SDUI v1.1: then/else 구조
   then: z.object({
     hide: z.boolean().optional(),
     disable: z.boolean().optional(),
@@ -95,23 +99,23 @@ const conditionRuleSchema: z.ZodType<ConditionRule> = z.object({
       to: z.string(),
     }).optional(),
   }).optional(),
-  // ?�위 ?�환?? 기존 action ?�드
+  // 하위 호환: 기존 action 필드
   action: z.enum(['show', 'hide', 'enable', 'disable', 'require']).optional(),
 }).refine((data) => {
-  // ?�️ 중요: value가 undefined??ConditionRule?� Meta-Schema ?�계?�서 거�?
-  // eq/ne/in/not_in/gt/gte/lt/lte ?�산?�는 value가 ?�수 (exists/not_exists ?�외)
+  // ⚠️ 중요: value가 undefined인 ConditionRule은 Meta-Schema 검증에서 거부
+  // eq/ne/in/not_in/gt/gte/lt/lte 연산자는 value가 필수 (exists/not_exists 제외)
   if (data.op !== 'exists' && data.op !== 'not_exists' && data.value === undefined) {
     return false;
   }
   return true;
 }, {
-  message: 'eq/ne/in/not_in/gt/gte/lt/lte ?�산?�는 value가 ?�수?�니?? exists/not_exists ?�산?�만 value가 불필?�합?�다.',
-}).refine((data) => {
-  // SDUI v1.1: in/not_in ?�산?�는 value�??�칼???�는 배열 모두 ?�용
-  // 배열??경우: fieldValue?� expected 배열 �?교집??차집???�단
-  // ?�칼?�인 경우: 기존 ?�작 ?��?
-  // (?�후 intersects/not_intersects ?�산?�로 ??명확?�게 분리 가??
-  // ?�재??배열 ?�용?�로 처리
+  message: 'eq/ne/in/not_in/gt/gte/lt/lte 연산자는 value가 필수입니다. exists/not_exists 연산자만 value가 불필요합니다.',
+}).refine((_data) => {
+  // SDUI v1.1: in/not_in 연산자는 value가 스칼라 또는 배열 모두 지원
+  // 배열인 경우: fieldValue와 expected 배열의 교집합/차집합을 판단
+  // 스칼라인 경우: 기존 동작 유지
+  // (향후 intersects/not_intersects 연산자로 더 명확하게 분리 가능)
+  // 현재는 배열 지원으로 처리
   return true;
 });
 
@@ -123,7 +127,7 @@ const conditionRuleSchema: z.ZodType<ConditionRule> = z.object({
 const multiConditionRuleSchema: z.ZodType<MultiConditionRule> = z.object({
   conditions: z.array(conditionRuleSchema).min(1),
   logic: z.enum(['and', 'or']),
-  // SDUI v1.1: then/else 구조 (action보다 ?�선)
+  // SDUI v1.1: then/else 구조 (action보다 우선)
   then: z.object({
     hide: z.boolean().optional(),
     disable: z.boolean().optional(),
@@ -152,17 +156,20 @@ const multiConditionRuleSchema: z.ZodType<MultiConditionRule> = z.object({
       to: z.string(),
     }).optional(),
   }).optional(),
-  // ?�위 ?�환?? 기존 action ?�드
+  // 하위 호환: 기존 action 필드
   action: z.enum(['show', 'hide', 'enable', 'disable', 'require']).optional(),
 });
 
 /**
  * Form Field Schema Validator
  * 
- * [불�? 규칙] Tailwind ?�래??문자???�용 금�? 검�? * [불�? 규칙] Field kind�?options 강제 검?? * [불�? 규칙] ConditionRule 구조??검�?가?? */
+ * [불변 규칙] Tailwind 클래스 문자열 사용 금지 검증
+ * [불변 규칙] Field kind와 options 강제 검증
+ * [불변 규칙] ConditionRule 구조 검증
+ */
 const formFieldSchema = z.object({
   name: z.string().min(1),
-  kind: z.enum(['text', 'email', 'phone', 'number', 'password', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'date', 'datetime', 'custom']),  // SDUI v1.1: custom 추�?
+  kind: z.enum(['text', 'email', 'phone', 'number', 'password', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'date', 'datetime', 'custom']),  // SDUI v1.1: custom 추가
   ui: z.object({
     // SDUI v1.1: i18n 지원
     labelKey: z.string().optional(),
@@ -182,7 +189,7 @@ const formFieldSchema = z.object({
     label: z.string().optional(),  // 하위 호환성
   })).optional(),
   defaultValue: z.any().optional(),
-  condition: conditionRuleSchema.optional(),  // ?�일 조건 (?�위 ?�환??
+  condition: conditionRuleSchema.optional(),  // 단일 조건 (하위 호환)
   conditions: multiConditionRuleSchema.optional(),  // 복수 조건 (AND/OR)
   // SDUI v1.1: Custom Widget 지원
   customComponentType: z.string().optional(),
@@ -201,7 +208,7 @@ const formFieldSchema = z.object({
     minLength: z.number().optional(),
     maxLength: z.number().optional(),
     pattern: z.object({
-      value: z.string(),  // JSON serializable ?�턴 문자??(?? "^010[0-9]{8}$")
+      value: z.string(),  // JSON serializable 패턴 문자열 (예: "^010[0-9]{8}$")
       messageKey: z.string().optional(),  // SDUI v1.1
       message: z.string().optional(),  // 하위 호환성
     }).optional(),
@@ -316,7 +323,7 @@ const tableColumnSchema = z.object({
 });
 export const tableSchemaValidator = schemaVersionBase.extend({
   table: z.object({
-    dataSource: z.object({  // SDUI v1.1: API 기반 ?�이???�스
+    dataSource: z.object({  // SDUI v1.1: API 기반 테이블 데이터소스
       type: z.literal('api'),
       endpoint: z.string().min(1),
       method: z.enum(['GET', 'POST']).optional(),
@@ -337,7 +344,7 @@ export const tableSchemaValidator = schemaVersionBase.extend({
 /**
  * Schema Validator
  * 
- * [불�? 규칙] ?�행 ?�드 존재??검�??�함
+ * [불변 규칙] 실행 코드 존재 여부 검증
  */
 export function validateSchema(schema: unknown): {
   valid: boolean;
@@ -457,7 +464,6 @@ export function validateSchema(schema: unknown): {
     return { valid: true };
   } catch (formError) {
     if (formError instanceof z.ZodError) {
-      // Table Schema 검�??�도
       // Table Schema 검증 시도
       try {
         tableSchemaValidator.parse(schema);
@@ -491,7 +497,6 @@ export function checkSchemaVersion(
   requiresUpdate?: boolean;
   requiresMigration?: boolean;
 } {
-  // SDUI v1.1: minClient�??�용?�여 ?�라?�언??버전�?비교
   // SDUI v1.1: minClient를 사용하여 클라이언트 버전을 비교
   const minClientVersion = schema.minClient || schema.minSupportedClient;
   if (!minClientVersion) {
@@ -502,30 +507,15 @@ export function checkSchemaVersion(
   const [minClientMajor, minClientMinor] = minClientVersion.split('.').map(Number);
   const [clientMajor, clientMinor] = clientVersion.split('.').map(Number);
 
-  // ?�라?�언??버전??minClient보다 ??���??�데?�트 ?�요
   // 클라이언트 버전이 minClient보다 낮으면 업데이트 필요
   if (clientMajor < minClientMajor || (clientMajor === minClientMajor && clientMinor < minClientMinor)) {
     return {
       compatible: false,
       requiresUpdate: true,
-      requiresMigration: false,  // minClient 체크??Migration�?무�?
+      requiresMigration: false,  // minClient 체크는 Migration과 무관
     };
   }
 
   // 호환 가능
   return { compatible: true };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
