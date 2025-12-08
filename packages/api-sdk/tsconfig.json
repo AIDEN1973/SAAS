@@ -2,18 +2,13 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": ".",
-    "composite": true,
     "declaration": true,
     "declarationMap": true,
     "emitDeclarationOnly": true,
-    "noEmit": false
+    "noEmit": false,
+    "skipLibCheck": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"],
-  "references": [
-    { "path": "../lib/supabase-client" },
-    { "path": "../env-registry" }
-  ]
+  "exclude": ["node_modules", "dist"]
 }
 
