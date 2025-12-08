@@ -25,7 +25,12 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   size = 'md',
   fullWidth = false,
   className,
-  ...props
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  rows,
+  ...restProps
 }, ref) => {
   return (
     <div>
@@ -34,6 +39,11 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
         ref={ref}
         isInvalid={!!error}
         className={className}
+        value={value as string}
+        onChange={onChange as any}
+        isDisabled={disabled}
+        placeholder={placeholder}
+        minimumRows={rows}
       />
       {error && (
         <div style={{ color: 'var(--color-error)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--spacing-xs)' }}>

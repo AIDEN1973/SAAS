@@ -36,7 +36,6 @@ export const Tabs: React.FC<TabsProps> = ({
   activeKey: controlledActiveKey,
   onChange,
   className,
-  variant = 'default',
 }) => {
   const [internalActiveKey, setInternalActiveKey] = useState(defaultActiveKey || items[0]?.key || '');
   const activeKey = controlledActiveKey !== undefined ? controlledActiveKey : internalActiveKey;

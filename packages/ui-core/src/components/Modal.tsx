@@ -8,7 +8,6 @@
 
 import React from 'react';
 import ModalDialog, { ModalTransition } from '@atlaskit/modal-dialog';
-import { Button } from './Button';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -36,7 +35,6 @@ export const Modal: React.FC<ModalProps> = ({
   size = 'md',
   closeOnOverlayClick = true,
   closeOnEscape = true,
-  className,
 }) => {
   const sizeMap: Record<'sm' | 'md' | 'lg' | 'xl' | 'full', 'small' | 'medium' | 'large' | 'x-large'> = {
     sm: 'small',

@@ -29,7 +29,6 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   checked,
   onChange,
   disabled,
-  ...props
 }) => {
   return (
     <div

@@ -27,9 +27,6 @@ export interface BadgeProps {
 export const Badge: React.FC<BadgeProps> = ({
   children,
   color = 'primary',
-  size = 'md',
-  variant = 'solid',
-  className,
 }) => {
   // Atlaskit Badge appearance 매핑
   const appearanceMap: Record<ColorToken, 'blue' | 'green' | 'red' | 'yellow' | 'purple' | 'grey'> = {

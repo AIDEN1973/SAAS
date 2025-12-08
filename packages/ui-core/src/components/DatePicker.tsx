@@ -37,7 +37,6 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   dateTime = false,
   className,
   disabled,
-  ...props
 }) => {
   // value를 Date 객체로 변환
   const dateValue = React.useMemo(() => {

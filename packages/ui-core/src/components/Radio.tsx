@@ -32,7 +32,6 @@ export const Radio: React.FC<RadioProps> = ({
   value,
   onChange,
   disabled,
-  ...props
 }) => {
   return (
     <div

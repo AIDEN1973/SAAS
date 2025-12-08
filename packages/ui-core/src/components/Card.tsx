@@ -7,7 +7,6 @@
  */
 
 import React from 'react';
-import { Box } from '@atlaskit/primitives';
 import { SpacingToken } from '@design-system/core';
 
 export interface CardProps {

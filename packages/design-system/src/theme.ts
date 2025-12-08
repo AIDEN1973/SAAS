@@ -13,7 +13,6 @@
  */
 
 import { colors, spacing, sizes, breakpoints, type SpacingToken, type ColorToken, type SizeToken } from './tokens';
-import { token } from '@atlaskit/tokens';
 
 export type ThemeMode = 'light' | 'dark' | 'auto';
 export type IndustryType = 'academy' | 'salon' | 'realestate' | 'gym' | 'ngo';
