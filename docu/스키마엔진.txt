@@ -26,11 +26,12 @@
 1. 아키텍처
 
 🔹 디자인 시스템 종속성 방향
-schema-engine  →  core-ui  →  design-system  →  theme-engine
+schema-engine  →  @atlaskit/components  →  @atlaskit/theme
 
 ⚠️ 중요: 기술문서 PART 1 및 UI 문서에 명시된 의존성 방향을 준수합니다.
-- schema-engine은 core-ui를 사용하며, Tailwind 클래스를 직접 사용하지 않습니다.
-- 스키마는 논리적 구조만 정의하고, 스타일은 core-ui가 담당합니다.
+- schema-engine은 Atlaskit 컴포넌트를 사용하며, Tailwind 클래스를 직접 사용하지 않습니다.
+- schema-engine은 Atlaskit 컴포넌트를 직접 import하지 않고, 컴포넌트 매핑 레이어를 통해 사용합니다.
+- 스키마는 논리적 구조만 정의하고, 컴포넌트 선택과 스타일은 Schema Engine이 담당합니다.
 
 🔹 Condition Rule 실행 위치 명확화
 
@@ -498,7 +499,7 @@ Version Pinning:
 - **Tailwind 클래스 문자열 사용 금지 검증** (중요)
   - 스키마에서 Tailwind 클래스를 직접 사용하면 안 됩니다.
   - 레이아웃은 props 기반으로 전달: `{ columns: 2, columnGap: "md" }`
-  - core-ui가 내부적으로 Tailwind token class로 변환합니다.
+  - Schema Engine이 내부적으로 Atlaskit 컴포넌트를 사용하여 렌더링합니다.
 - **ConditionRule 상호 충돌 검증**
   - 단일 조건(condition) + 복수 조건(conditions) 동시 존재 → 오류
 - **선행 필드 존재성 검증** (필수)
@@ -752,7 +753,7 @@ Controller 사용 필드는 rules={finalRules}로 전달
 ⚠️ 성능 최적화: SchemaField는 React.memo로 감싸는 것을 권장합니다.
 - useWatch는 감시 필드가 변하면 해당 SchemaField 컴포넌트가 리렌더됩니다.
 - 필드가 100개 이상이면 성능 문제가 발생할 수 있습니다.
-- core-ui 레벨에서 memoization 제공 가능합니다.
+- Schema Engine 레벨에서 memoization 제공 가능합니다.
 
 // packages/schema-engine/src/react/SchemaField.tsx
 
@@ -768,19 +769,17 @@ import {
 import { getConditionalActions } from '../core/conditionEvaluator';
 import { buildValidationRules } from '../core/validation';
 import type { FormFieldSchema } from '../types';
-import {
-  Input,
-  Select,
-  Checkbox,
-  DatePicker,
-  FormFieldLayout,
-  Textarea,
-  Radio,
-  Card,
-} from '@ui-core/react';
+import TextField from '@atlaskit/textfield';
+import Select from '@atlaskit/select';
+import Checkbox from '@atlaskit/checkbox';
+import DatePicker from '@atlaskit/datetime-picker';
+import TextArea from '@atlaskit/textarea';
+import RadioGroup from '@atlaskit/radio';
+import { Card } from '@atlaskit/card';
+import { Box } from '@atlaskit/primitives';
 import { loadWidget } from '../widgets/registry';
-// ⚠️ 참고: Input 컴포넌트는 TextInput의 역할을 수행합니다.
-// 기술문서에서는 TextInput으로 명시되어 있으나, 실제 구현은 Input 컴포넌트를 사용합니다.
+// ⚠️ 중요: Schema Engine은 Atlaskit 컴포넌트를 직접 import하여 사용합니다.
+// 컴포넌트 매핑은 field.kind에 따라 자동으로 수행됩니다.
 
 export interface SchemaFieldProps {
   field: FormFieldSchema;
@@ -811,8 +810,7 @@ function SchemaFieldComponent({
   const placeholder = ui?.placeholderKey ? (translations[ui.placeholderKey] || ui.placeholderKey) : ui?.placeholder;
   const description = ui?.descriptionKey ? (translations[ui.descriptionKey] || ui.descriptionKey) : ui?.description;
   const tooltip = ui?.tooltipKey ? (translations[ui.tooltipKey] || ui.tooltipKey) : ui?.tooltip;
-  // ⚠️ 참고: description/tooltip은 현재 v2.1에서는 FormFieldLayout에 전달되지 않습니다.
-  // 향후 버전에서 FormFieldLayout이 description/tooltip prop을 지원하면 추가 예정입니다.
+  // ⚠️ 참고: description/tooltip은 Atlaskit 컴포넌트의 기본 prop으로 지원됩니다.
 
   // 1) 조건부 필드 감시
   // 단일 조건 또는 복수 조건에서 참조하는 모든 필드를 감시
@@ -937,12 +935,12 @@ function SchemaFieldComponent({
 
   const error = errors[name]?.message as string | undefined;
 
-  // ⚠️ 중요: Tailwind 클래스를 직접 사용하지 않고, props 기반으로 core-ui에 전달
-  // 스키마는 논리적 구조만 정의하고, 스타일은 core-ui가 담당합니다.
-  // 기술문서 UI 문서 2.3 "schema-engine ↔ core-ui 통신 방식" 참조
+  // ⚠️ 중요: Tailwind 클래스를 직접 사용하지 않고, props 기반으로 Atlaskit 컴포넌트에 전달
+  // 스키마는 논리적 구조만 정의하고, 컴포넌트 선택과 스타일은 Schema Engine이 담당합니다.
+  // 기술문서 UI 문서 2.3 "schema-engine ↔ Atlaskit 통신 방식" 참조
   // Renderer는 layout의 구조적 전달만 수행하고 스타일을 직접 다루지 않아야 합니다.
   // ⚠️ 보완: Renderer는 스타일 로직을 가져서는 안 됩니다.
-  // → core-ui의 FormFieldLayout만 사용하도록 명시
+  // → Atlaskit의 Box 또는 Grid를 사용하여 레이아웃 구성
   const colSpan = ui?.colSpan ?? 12;
 
   // 🍀 4) 각 필드 렌더링에 isDisabled 적용
@@ -1475,7 +1473,7 @@ export function StudentsPage() {
 
 ✅ 레이아웃 props 기반
 - Tailwind 클래스 직접 사용 금지
-- core-ui의 FormFieldLayout만 사용
+- Atlaskit의 Box, Grid 등 레이아웃 컴포넌트 사용
 - Renderer는 스타일 로직을 가져서는 안 됨
 
 13. 성능 최적화 (CTO 관점)

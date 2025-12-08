@@ -1,21 +1,29 @@
 /**
  * Select Component
  *
+ * [불변 규칙] Atlaskit Select를 래핑하여 사용합니다.
  * [불변 규칙] 스키마에서는 Tailwind 클래스를 직접 사용하지 않습니다.
- * [불변 규칙] 모든 스타일은 design-system 토큰을 사용합니다.
+ * [불변 규칙] 모든 스타일은 Atlaskit 테마를 사용합니다.
  */
 
 import React from 'react';
-import { clsx } from 'clsx';
+import AKSelect from '@atlaskit/select';
 import { SizeToken } from '@design-system/core';
 
-export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
+export interface SelectProps {
   label?: string;
   error?: string;
   helperText?: string;
   size?: SizeToken;
   fullWidth?: boolean;
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  value?: string | string[];
+  onChange?: (value: string | string[]) => void;
+  onBlur?: () => void;
+  multiple?: boolean;
+  disabled?: boolean;
+  required?: boolean;
+  className?: string;
 }
 
 export const Select: React.FC<SelectProps> = ({
@@ -26,104 +34,57 @@ export const Select: React.FC<SelectProps> = ({
   fullWidth = false,
   className,
   children,
+  value,
+  onChange,
+  onBlur,
+  multiple = false,
+  disabled,
   ...props
 }) => {
-  const sizeStyles: Record<SizeToken, React.CSSProperties> = {
-    xs: {
-      padding: 'var(--spacing-xs) var(--spacing-sm)',
-      fontSize: 'var(--font-size-xs)',
-    },
-    sm: {
-      padding: 'var(--spacing-xs) var(--spacing-sm)',
-      fontSize: 'var(--font-size-sm)',
-    },
-    md: {
-      padding: 'var(--spacing-sm) var(--spacing-md)',
-      fontSize: 'var(--font-size-base)',
-    },
-    lg: {
-      padding: 'var(--spacing-md) var(--spacing-lg)',
-      fontSize: 'var(--font-size-lg)',
-    },
-    xl: {
-      padding: 'var(--spacing-lg) var(--spacing-xl)',
-      fontSize: 'var(--font-size-xl)',
-    },
-  };
+  // children을 options로 변환
+  const options = React.useMemo(() => {
+    if (!children) return [];
+    return React.Children.toArray(children)
+      .filter((child): child is React.ReactElement => React.isValidElement(child))
+      .map((child) => {
+        const childProps = child.props as { value?: string; children?: React.ReactNode };
+        return {
+          label: String(childProps.children || childProps.value || ''),
+          value: String(childProps.value || ''),
+        };
+      });
+  }, [children]);
 
-  const selectStyle: React.CSSProperties = {
-    ...sizeStyles[size],
-    border: `1px solid ${error ? 'var(--color-red-500)' : 'var(--color-gray-200)'}`,
-    borderRadius: 'var(--border-radius-lg)',
-    backgroundColor: 'var(--color-white)',
-    color: 'var(--color-text)',
-    outline: 'none',
-    width: fullWidth ? '100%' : 'auto',
-    appearance: 'none',
-    transition: 'all 0.2s ease',
-    fontFamily: 'var(--font-family)',
-    boxShadow: 'var(--shadow-sm)',
-  };
+  const selectedValue = React.useMemo(() => {
+    if (!value) return null;
+    if (multiple && Array.isArray(value)) {
+      return options.filter((opt) => value.includes(opt.value));
+    }
+    return options.find((opt) => opt.value === value) || null;
+  }, [value, options, multiple]);
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        width: fullWidth ? '100%' : 'auto',
+    <AKSelect
+      label={label}
+      isInvalid={!!error}
+      errorMessage={error}
+      helperText={helperText}
+      isDisabled={disabled}
+      isMulti={multiple}
+      options={options}
+      value={selectedValue}
+      onChange={(selected) => {
+        if (onChange) {
+          if (multiple && Array.isArray(selected)) {
+            onChange(selected.map((s: any) => s.value));
+          } else if (!multiple && selected && !Array.isArray(selected)) {
+            onChange((selected as any).value);
+          }
+        }
       }}
-    >
-      {label && (
-        <label
-          style={{
-            fontSize: 'var(--font-size-sm)',
-            fontWeight: 'var(--font-weight-medium)',
-            color: 'var(--color-text)',
-            marginBottom: 'var(--spacing-xs)',
-          }}
-        >
-          {label}
-        </label>
-      )}
-      <select
-        className={clsx(className)}
-        style={selectStyle}
-        onFocus={(e) => {
-          e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-primary)';
-          e.currentTarget.style.boxShadow = `0 0 0 3px ${error ? 'var(--color-red-50)' : 'var(--color-primary-50)'}`;
-          e.currentTarget.style.transform = 'translateY(-1px)';
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-gray-200)';
-          e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-          e.currentTarget.style.transform = 'translateY(0)';
-        }}
-        {...props}
-      >
-        {children}
-      </select>
-      {error && (
-        <span
-          style={{
-            fontSize: 'var(--font-size-sm)',
-            color: 'var(--color-red-500)',
-            marginTop: 'var(--spacing-xs)',
-          }}
-        >
-          {error}
-        </span>
-      )}
-      {helperText && !error && (
-        <span
-          style={{
-            fontSize: 'var(--font-size-sm)',
-            color: 'var(--color-text-secondary)',
-            marginTop: 'var(--spacing-xs)',
-          }}
-        >
-          {helperText}
-        </span>
-      )}
-    </div>
+      onBlur={onBlur}
+      className={className}
+      {...props}
+    />
   );
 };

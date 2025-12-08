@@ -1,6 +1,6 @@
 /**
  * UI Core Global Styles
- * 
+ *
  * [불변 규칙] 모든 앱에서 공통으로 사용하는 전역 스타일
  * [불변 규칙] design-system 토큰과 통합
  * [불변 규칙] 다크모드, 접근성(고대비) 지원
@@ -45,50 +45,50 @@
   --color-yellow-50: #fefce8;
   --color-yellow-100: #fef9c3;
   --color-yellow-800: #854d0e;
-  
+
   /* Primary Colors (for Button, etc.) - 모던 블루 */
   --color-primary: #3b82f6;
   --color-primary-light: #60a5fa;
   --color-primary-dark: #2563eb;
   --color-primary-50: #f0f7ff;
-  
+
   /* Color Tokens for Design System - 모던 톤 */
   --color-success: #10b981;
   --color-success-light: #34d399;
   --color-success-dark: #059669;
   --color-success-50: #ecfdf5;
-  
+
   --color-warning: #f59e0b;
   --color-warning-light: #fbbf24;
   --color-warning-dark: #d97706;
   --color-warning-50: #fffbeb;
-  
+
   --color-error: #ef4444;
   --color-error-light: #f87171;
   --color-error-dark: #dc2626;
   --color-error-50: #fef2f2;
-  
+
   --color-info: #06b6d4;
   --color-info-light: #22d3ee;
   --color-info-dark: #0891b2;
   --color-info-50: #ecfeff;
-  
+
   --color-secondary: #8b5cf6;
   --color-secondary-light: #a78bfa;
   --color-secondary-dark: #7c3aed;
   --color-secondary-50: #f5f3ff;
-  
+
   /* Shadow - 부드러운 모던 그림자 */
   --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px 0 rgba(0, 0, 0, 0.02);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
   --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
-  
+
   /* Overlay & Backdrop */
   --overlay-background: rgba(0, 0, 0, 0.5);
   --backdrop-blur: blur(4px);
-  
+
   /* Z-Index Layers */
   --z-base: 0;
   --z-dropdown: 1000;
@@ -116,19 +116,19 @@
   --font-size-lg: 1.125rem;   /* 18px */
   --font-size-xl: 1.25rem;    /* 20px */
   --font-size-2xl: 1.5rem;    /* 24px */
-  
+
   /* Border Radius - 더 둥근 모서리 */
   --border-radius-sm: 0.375rem;   /* 6px */
   --border-radius-md: 0.75rem;    /* 12px */
   --border-radius-lg: 1rem;      /* 16px */
   --border-radius-xl: 1.25rem;   /* 20px */
-  
+
   /* Transition */
   --transition-fast: 0.15s ease;
   --transition-base: 0.2s ease;
   --transition-slow: 0.3s ease;
   --transition-transform: transform 0.3s ease-in-out;
-  
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

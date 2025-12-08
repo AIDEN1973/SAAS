@@ -1,13 +1,14 @@
 /**
  * Checkbox Component
  *
+ * [불변 규칙] Atlaskit Checkbox를 래핑하여 사용합니다.
  * [불변 규칙] 스키마에서는 Tailwind 클래스를 직접 사용하지 않습니다.
- * [불변 규칙] 모든 스타일은 design-system 토큰을 사용합니다.
+ * [불변 규칙] 모든 스타일은 Atlaskit 테마를 사용합니다.
  * [불변 규칙] 터치 영역 최소 44px 보장
  */
 
 import React from 'react';
-import { clsx } from 'clsx';
+import AKCheckbox from '@atlaskit/checkbox';
 
 export interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'size'> {
   label?: string;
@@ -25,6 +26,9 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   helperText,
   fullWidth = false,
   className,
+  checked,
+  onChange,
+  disabled,
   ...props
 }) => {
   return (
@@ -36,39 +40,16 @@ export const Checkbox: React.FC<CheckboxProps> = ({
         width: fullWidth ? '100%' : 'auto',
       }}
     >
-      <label
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--spacing-sm)',
-          cursor: 'pointer',
-          fontSize: 'var(--font-size-base)',
-          color: 'var(--color-text)',
+      <AKCheckbox
+        label={label}
+        isChecked={checked}
+        onChange={(e) => {
+          if (onChange) {
+            onChange(e as any);
+          }
         }}
-      >
-        <input
-          type="checkbox"
-          className={clsx(className)}
-          style={{
-            width: '20px',
-            height: '20px',
-            minWidth: '20px',
-            minHeight: '20px',
-            cursor: 'pointer',
-            accentColor: 'var(--color-primary)',
-          }}
-          {...props}
-        />
-        {label && (
-          <span
-            style={{
-              userSelect: 'none',
-            }}
-          >
-            {label}
-          </span>
-        )}
-      </label>
+        isDisabled={disabled}
+      />
       {error && (
         <span
           style={{

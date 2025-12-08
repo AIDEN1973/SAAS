@@ -1,6 +1,6 @@
-📘 디어쌤 Multi-Tenant SaaS UI/UX Technical Architecture v6.0
+📘 디어쌤 Multi-Tenant SaaS UI/UX Technical Architecture v7.0
 
-Enterprise Edition — Zero-Trust · Schema-Driven · Multi-Tenant · Backoffice-Ready · Performance-Gated · Version-Safe
+Enterprise Edition — Zero-Trust · Schema-Driven · Multi-Tenant · Backoffice-Ready · Performance-Gated · Version-Safe · Atlaskit
 
 0. 문서 목적 (Purpose)
 
@@ -9,7 +9,7 @@ Enterprise Edition — Zero-Trust · Schema-Driven · Multi-Tenant · Backoffice
 ✔ 업종 10 → 100 확장
 ✔ 테넌트 5,000 → 30,000 확장
 ✔ 고객용 + Backoffice UI를 통합적으로 운영
-✔ 고성능(Initial Load ≤ 500KB) 유지
+✔ 고성능(Initial Load ≤ 600KB) 유지
 ✔ 접근성 WCAG 2.1 AAA 목표
 ✔ Zero-Trust 기반 보안 모델
 ✔ SDUI 스키마 기반 자동 UI 생성
@@ -41,7 +41,7 @@ auth token
 
 🎯 1.2 Boundary & Isolation (강화됨)
 UI Architecture Boundary
-schema-engine  →  core-ui  →  design-system  →  theme-engine
+schema-engine  →  @atlaskit/components  →  @atlaskit/theme
         ↓
 (custom widget sandbox)
 
@@ -49,10 +49,10 @@ schema-engine  →  core-ui  →  design-system  →  theme-engine
 각 모듈은 다음을 침범할 수 없다:
 
 모듈	금지사항
-schema-engine	Tailwind 클래스 직접 사용 금지
-core-ui	스키마 구조 해석 금지
+schema-engine	Tailwind 클래스 직접 사용 금지, Atlaskit 컴포넌트 직접 import 금지
+@atlaskit/components	스키마 구조 해석 금지
 widgets	@api-sdk/core, 다른 업종 schema import 금지
-apps	@api-sdk/core 우회 금지 (직접 fetch 금지)
+apps	@api-sdk/core 우회 금지 (직접 fetch 금지), Atlaskit 컴포넌트 직접 사용 금지 (schema-engine을 통해서만)
 🎯 1.3 Schema-Driven Everything
 
 UI = 스키마
@@ -69,7 +69,7 @@ Field 조건부 로직 = 스키마
 성능 목표는 “권장”이 아니라 “필수(Gate)”이다.
 
 Metric	목표	Gate 동작
-Initial Load Bundle	≤ 500KB	초과 시 빌드 실패
+Initial Load Bundle	≤ 600KB	초과 시 빌드 실패
 FCP	≤ 1.5s	초과 시 경고
 TTI	≤ 800ms	초과 시 빌드 실패
 Interaction Delay	≤ 100ms	초과 시 경고
@@ -97,7 +97,6 @@ Legacy Renderer와의 병행 운영 금지
 2.1 Monorepo 구조
 /packages
   /core/              # 업종 공통 Core Platform Layer
-    /core-ui/         # 디자인 시스템 + 반응형 + 다크모드 + 확대보기
     /core-tags/       # 공통 태깅 시스템
     /core-auth/       # 인증
     /core-tenancy/    # 테넌시
@@ -115,8 +114,7 @@ Legacy Renderer와의 병행 운영 금지
     /core-tenancy-referral/ # B2B 추천인 코드
     /core-events/     # 이벤트/프로모션
     /...              # 기타 Core 모듈
-  /design-system      # Tokens, Theme Engine
-  /schema-engine      # Renderer + Meta-Schema + Versioning + Custom Widget Registry
+  /schema-engine      # Renderer + Meta-Schema + Versioning + Custom Widget Registry (Atlaskit 컴포넌트 사용)
   /api-sdk            # Zero-Trust 권한 주입 (@api-sdk/core)
   /services/          # DB 접근 Service Layer
   /hooks/             # React Query 기반 Hooks
@@ -156,9 +154,14 @@ SDK는 자동으로 다음을 요청에 삽입한다:
 ➡ UI는 “무슨 테넌트인지” 또는 “어떤 업종인지” 이해하지 않아도 된다.
 ➡ UI가 접근할 수 있는 데이터 범위는 RLS가 책임진다.
 
-2.3 schema-engine ↔ core-ui 통신 방식 (강력한 정교화)
+2.3 schema-engine ↔ Atlaskit 통신 방식
+
+⚠️ 중요: Schema Engine은 Atlaskit 컴포넌트를 직접 import하지 않고, 컴포넌트 매핑 레이어를 통해 사용합니다.
+
 ❌ 스키마에서 Tailwind 문자열 사용 금지
+❌ 스키마에서 Atlaskit 컴포넌트 직접 참조 금지
 ✔ props 기반 layout 전달
+✔ 스키마는 논리적 구조만 정의
 
 예:
 
@@ -171,10 +174,16 @@ SDK는 자동으로 다음을 요청에 삽입한다:
   }
 }
 
+Schema Engine은 스키마의 field.kind에 따라 적절한 Atlaskit 컴포넌트를 매핑합니다:
+- text/email/phone/password → @atlaskit/textfield
+- select/multiselect → @atlaskit/select
+- checkbox → @atlaskit/checkbox
+- radio → @atlaskit/radio
+- textarea → @atlaskit/textarea
+- date → @atlaskit/datetime-picker
+- table → @atlaskit/dynamic-table
 
-core-ui는 이를 내부적으로 Tailwind token class로 변환한다.
-
-→ 스키마는 논리적 구조만, 스타일은 core-ui만 담당한다.
+→ 스키마는 논리적 구조만, 스타일과 컴포넌트 선택은 Schema Engine이 담당합니다.
 
 3. Schema-Driven UI (SDUI) — Enterprise 버전
 3.1 Meta-Schema Validation
@@ -225,50 +234,59 @@ Migration Script는 런타임이 아니라 빌드 타임 또는 백엔드 시점
 
 백엔드에서 스키마 업그레이드를 atomic 작업으로 수행
 
-4. Multi-Tenant Theme Engine
-4.1 Theme Merge Priority
+4. Atlaskit UI 라이브러리 전략
 
-system default tokens
+4.1 Atlaskit 컴포넌트 사용 규칙
 
-industry tokens
+⚠️ 중요: 모든 UI 컴포넌트는 Atlaskit을 사용합니다.
 
-tenant theme override
+[불변 규칙] Schema Engine은 Atlaskit 컴포넌트를 직접 import하지 않고, 컴포넌트 매핑 레이어를 통해 사용합니다.
+[불변 규칙] Apps 레이어에서도 Atlaskit 컴포넌트를 직접 사용하지 않고, Schema Engine을 통해서만 UI를 렌더링합니다.
+[불변 규칙] 커스텀 위젯은 Atlaskit 컴포넌트를 사용할 수 있으나, @api-sdk/core를 직접 호출할 수 없습니다.
 
-dark mode
+4.2 Atlaskit Theme 설정
 
-high contrast (forced-colors)
+기본 Atlaskit Theme을 사용하며, 다크모드는 Atlaskit의 기본 다크모드 지원을 활용합니다.
 
-→ UI는 위 레이어에서 순차적으로 override되어 최종 Token Set을 사용한다.
+테넌트별 테마 override는 지원하지 않습니다.
 
-5. UI Kit Strategy — Customer vs Backoffice
-5.1 Customer-Facing UI (core-ui)
+4.3 컴포넌트 매핑
 
-반응형 최적화
+Schema Engine은 스키마의 field.kind에 따라 다음 Atlaskit 컴포넌트를 매핑합니다:
 
-모바일 중심
+| Schema Kind | Atlaskit Component | 패키지 |
+|------------|-------------------|--------|
+| text/email/phone/password | TextField | @atlaskit/textfield |
+| number | TextField (type="number") | @atlaskit/textfield |
+| textarea | TextArea | @atlaskit/textarea |
+| select | Select | @atlaskit/select |
+| multiselect | Select (isMulti) | @atlaskit/select |
+| checkbox | Checkbox | @atlaskit/checkbox |
+| radio | RadioGroup | @atlaskit/radio |
+| date | DatePicker | @atlaskit/datetime-picker |
+| table | DynamicTable | @atlaskit/dynamic-table |
+| button | Button | @atlaskit/button |
+| card | Card | @atlaskit/card |
+| badge | Badge | @atlaskit/badge |
+| modal | ModalDialog | @atlaskit/modal-dialog |
+| tooltip | Tooltip | @atlaskit/tooltip |
+| tabs | Tabs | @atlaskit/tabs |
+| accordion | Accordion | @atlaskit/accordion |
 
-시각적 완성도 우선
+5. UI Kit Strategy — 통합 전략
 
-애니메이션·인터랙션 풍부
+5.1 Atlaskit 통합 사용
 
-5.2 Backoffice (admin-ui-kit)
+모든 앱(Customer-Facing, Backoffice)에서 동일한 Atlaskit 컴포넌트를 사용합니다.
 
-데이터 밀도 높음
+반응형 최적화: Atlaskit의 기본 반응형 지원 활용
+접근성: Atlaskit의 WCAG 2.1 AAA 지원 활용
+다크모드: Atlaskit의 기본 다크모드 지원 활용
 
-고급 테이블 기능(그룹핑, pivot, 가상화)
-
-단축키 지원
-
-operator-first 설계
-
-UI 효율성 우선
-
-공통 요소:
+5.2 공통 요소
 
 동일 SDUI 엔진 사용
-
-동일 Token Engine 사용
-
+동일 Atlaskit 컴포넌트 사용
 동일 Versioning 전략 적용
 
 6. Responsive UX — Enterprise Version
@@ -287,31 +305,10 @@ UI 효율성 우선
 | lg | 1024px | 작은 데스크톱 |
 | xl | 1280px | 큰 데스크톱 |
 
-useResponsiveMode() 훅 사용:
+반응형 구현:
 
-```typescript
-// packages/core-ui/hooks/useResponsiveMode.ts
-export function useResponsiveMode() {
-  const [mode, setMode] = useState<'xs' | 'sm' | 'md' | 'lg' | 'xl'>('xs');
-
-  useEffect(() => {
-    const updateMode = () => {
-      const width = window.innerWidth;
-      if (width >= 1280) setMode('xl');
-      else if (width >= 1024) setMode('lg');
-      else if (width >= 768) setMode('md');
-      else if (width >= 640) setMode('sm');
-      else setMode('xs');
-    };
-
-    updateMode();
-    window.addEventListener('resize', updateMode);
-    return () => window.removeEventListener('resize', updateMode);
-  }, []);
-
-  return mode;
-}
-```
+Atlaskit 컴포넌트는 기본적으로 반응형을 지원합니다.
+필요한 경우 CSS Media Query 또는 Atlaskit의 반응형 유틸리티를 사용합니다.
 
 → 이 브레이크포인트 수치는 디자인팀/프론트엔드팀/백엔드팀 간 일관성을 보장하기 위한 표준입니다.
 
@@ -378,15 +375,14 @@ Persistent Sidebar
 - window.prompt()
 
 ✅ 허용:
-- useModal().showAlert(message, title?, type?)
-- useModal().showConfirm(message, title?)
-- 커스텀 Modal 컴포넌트
+- @atlaskit/modal-dialog를 사용한 커스텀 모달
+- Schema Engine의 Action Engine을 통한 모달 표시
 
 이유:
-1. 일관된 UX: 모든 알림이 동일한 디자인 시스템 사용
-2. 접근성: 커스텀 모달은 접근성 개선 가능
-3. 모바일 최적화: 모바일에서 네이티브 alert는 부자연스러움
-4. 테마 지원: 다크모드, 테넌트 테마 적용 가능
+1. 일관된 UX: 모든 알림이 Atlaskit 디자인 시스템 사용
+2. 접근성: Atlaskit 모달은 WCAG 2.1 AAA 지원
+3. 모바일 최적화: Atlaskit 모달은 모바일 최적화됨
+4. 다크모드: Atlaskit의 기본 다크모드 지원
 5. i18n 지원: 다국어 메시지 지원
 
 → 상세 가이드라인은 `docu/UI_가이드라인_모달_페이지_선택.md` 참조
@@ -507,5 +503,4 @@ Meta-Schema Validation	UI 고장 방지
 SDUI Versioning	수천 테넌트 안전 업그레이드
 Custom Widget Sandbox	업종 확장 비용 최소화
 Performance Gates	항상 빠른 SaaS 유지
-Backoffice 분리	운영 효율 극대화
-Multi-Tenant Theme Engine	브랜드 커스터마이징 비용 최소
+Atlaskit 통합	엔터프라이즈급 컴포넌트 품질, 접근성 자동 지원

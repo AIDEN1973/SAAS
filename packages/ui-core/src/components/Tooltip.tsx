@@ -1,12 +1,13 @@
 /**
  * Tooltip Component
  *
+ * [불변 규칙] Atlaskit Tooltip을 래핑하여 사용합니다.
  * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
- * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
+ * [불변 규칙] 모든 스타일은 Atlaskit 테마를 사용합니다.
  */
 
-import React, { useState, useRef, useEffect } from 'react';
-import { clsx } from 'clsx';
+import React from 'react';
+import AKTooltip from '@atlaskit/tooltip';
 
 export interface TooltipProps {
   children: React.ReactNode;
@@ -19,7 +20,7 @@ export interface TooltipProps {
 /**
  * Tooltip 컴포넌트
  *
- * 호버 시 설명말을 표시하는 툴팁
+ * Atlaskit Tooltip을 래핑하여 사용합니다.
  */
 export const Tooltip: React.FC<TooltipProps> = ({
   children,
@@ -28,104 +29,22 @@ export const Tooltip: React.FC<TooltipProps> = ({
   delay = 200,
   className,
 }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
-  const triggerRef = useRef<HTMLDivElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>();
-
-  useEffect(() => {
-    if (isVisible && triggerRef.current && tooltipRef.current) {
-      const triggerRect = triggerRef.current.getBoundingClientRect();
-      const tooltipRect = tooltipRef.current.getBoundingClientRect();
-
-      let top = 0;
-      let left = 0;
-
-      switch (position) {
-        case 'top':
-          top = triggerRect.top - tooltipRect.height - 8;
-          left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
-          break;
-        case 'bottom':
-          top = triggerRect.bottom + 8;
-          left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
-          break;
-        case 'left':
-          top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
-          left = triggerRect.left - tooltipRect.width - 8;
-          break;
-        case 'right':
-          top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
-          left = triggerRect.right + 8;
-          break;
-      }
-
-      setTooltipStyle({
-        position: 'fixed',
-        top: `${top}px`,
-        left: `${left}px`,
-        zIndex: 'var(--z-tooltip)',
-      });
-    }
-  }, [isVisible, position]);
-
-  const handleMouseEnter = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    timeoutRef.current = setTimeout(() => {
-      setIsVisible(true);
-    }, delay);
+  const positionMap: Record<'top' | 'bottom' | 'left' | 'right', 'top' | 'bottom' | 'left' | 'right'> = {
+    top: 'top',
+    bottom: 'bottom',
+    left: 'left',
+    right: 'right',
   };
-
-  const handleMouseLeave = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    setIsVisible(false);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
 
   return (
-    <>
-      <div
-        ref={triggerRef}
-        className={clsx(className)}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        style={{
-          display: 'inline-block',
-        }}
-      >
+    <AKTooltip
+      content={content}
+      position={positionMap[position]}
+      delay={delay}
+    >
+      <div className={className}>
         {children}
       </div>
-      {isVisible && (
-        <div
-          ref={tooltipRef}
-          style={{
-            ...tooltipStyle,
-            maxWidth: '200px',
-            pointerEvents: 'none',
-            fontSize: 'var(--font-size-sm)',
-            color: 'var(--color-text)',
-            backgroundColor: 'var(--color-white)',
-            padding: 'var(--spacing-sm)',
-            borderRadius: 'var(--border-radius-md)',
-            boxShadow: 'var(--shadow-lg)',
-            border: '1px solid var(--color-gray-200)',
-          }}
-        >
-          {content}
-        </div>
-      )}
-    </>
+    </AKTooltip>
   );
 };

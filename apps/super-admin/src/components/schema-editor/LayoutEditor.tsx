@@ -1,9 +1,9 @@
 /**
  * LayoutEditor Component
- * 
+ *
  * [불변 규칙] 레이아웃 설정 UI
  * [불변 규칙] Tailwind 클래스 직접 사용 금지
- * 
+ *
  * 기술문서: docu/스키마에디터.txt 5. 스키마 구조
  */
 
@@ -40,7 +40,7 @@ export function LayoutEditor({ layout, onChange }: LayoutEditorProps) {
           </label>
           <Select
             value={currentLayout.type || 'grid'}
-            onChange={(e) => handleChange('type', e.target.value)}
+            onChange={(value) => handleChange('type', String(value))}
           >
             <option value="grid">Grid (격자형)</option>
             <option value="section">Section (섹션형)</option>
@@ -72,7 +72,7 @@ export function LayoutEditor({ layout, onChange }: LayoutEditorProps) {
               </label>
               <Select
                 value={currentLayout.columnGap || 'md'}
-                onChange={(e) => handleChange('columnGap', e.target.value)}
+                onChange={(value) => handleChange('columnGap', String(value))}
               >
                 <option value="xs">XS (매우 작음)</option>
                 <option value="sm">SM (작음)</option>
@@ -92,7 +92,7 @@ export function LayoutEditor({ layout, onChange }: LayoutEditorProps) {
               </label>
               <Select
                 value={currentLayout.rowGap || 'md'}
-                onChange={(e) => handleChange('rowGap', e.target.value)}
+                onChange={(value) => handleChange('rowGap', String(value))}
               >
                 <option value="xs">XS (매우 작음)</option>
                 <option value="sm">SM (작음)</option>

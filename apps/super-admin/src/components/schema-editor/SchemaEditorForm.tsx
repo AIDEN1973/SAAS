@@ -1,9 +1,9 @@
 /**
  * SchemaEditorForm Component
- * 
+ *
  * [불변 규칙] 스키마 기본 정보 편집 (entity, version, industry_type 등)
  * [불변 규칙] Zero-Trust: 모든 검증은 서버에서 처리
- * 
+ *
  * 기술문서: docu/스키마에디터.txt 14. Schema Editor 기능
  */
 
@@ -76,7 +76,7 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
     try {
       // currentFormSchema가 있으면 우선 사용 (최신 편집 내용)
       const schemaJsonToSave = currentFormSchema || formData.schema_json;
-      
+
       // entity, version 등 기본 정보 업데이트
       // SDUI v1.1: minClient 우선, minSupportedClient는 하위 호환성
       const finalSchemaJson: UISchema = {
@@ -145,7 +145,7 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
           </label>
           <Select
             value={formData.industry_type || ''}
-            onChange={(e) => handleFieldChange('industry_type', e.target.value || null)}
+            onChange={(value) => handleFieldChange('industry_type', String(value) || null)}
           >
             <option value="">공통 (null)</option>
             <option value="academy">학원 (academy)</option>

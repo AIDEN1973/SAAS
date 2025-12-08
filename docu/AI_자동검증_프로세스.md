@@ -42,9 +42,9 @@
 14. ✅ **에러 처리**: AppError 표준 사용, PostgREST 에러 매핑
 
 ### UI/UX & 스타일
-15. ✅ **UI/UX 규칙**: CSS 변수 사용, ui-core 컴포넌트 사용, Tailwind 직접 사용 금지
-16. ✅ **전역 스타일**: @ui-core/react/styles import, 앱별 index.css는 비어있거나 앱 전용만
-17. ✅ **모달 규칙**: window.alert/confirm 금지, useModal() 사용 필수, 모바일에서는 모달 우선
+15. ✅ **UI/UX 규칙**: Atlaskit 컴포넌트 사용, Tailwind 직접 사용 금지, Schema Engine을 통해서만 UI 렌더링
+16. ✅ **전역 스타일**: 앱별 index.css는 비어있거나 앱 전용만, Atlaskit Theme은 자동 적용
+17. ✅ **모달 규칙**: window.alert/confirm 금지, Atlaskit ModalDialog 사용 필수, 모바일에서는 모달 우선
 
 ### 데이터 처리
 17. ✅ **날짜/시간**: KST 기준 처리, CURRENT_DATE 직접 사용 금지

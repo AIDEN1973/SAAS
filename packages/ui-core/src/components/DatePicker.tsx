@@ -1,15 +1,13 @@
 /**
  * DatePicker Component
- * 
+ *
+ * [불변 규칙] Atlaskit DateTimePicker를 래핑하여 사용합니다.
  * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않습니다.
- * [불변 규칙] 모든 스타일은 design-system 토큰을 사용합니다.
- * 
- * Phase 1: 기본 HTML5 date input 사용
- * Phase 2+: 고급 DatePicker 라이브러리 통합 가능
+ * [불변 규칙] 모든 스타일은 Atlaskit 테마를 사용합니다.
  */
 
 import React from 'react';
-import { clsx } from 'clsx';
+import { DatePicker as AKDatePicker } from '@atlaskit/datetime-picker';
 import { SizeToken } from '@design-system/core';
 
 export interface DatePickerProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'size' | 'value' | 'onChange'> {
@@ -25,8 +23,8 @@ export interface DatePickerProps extends Omit<React.InputHTMLAttributes<HTMLInpu
 
 /**
  * DatePicker 컴포넌트
- * 
- * Phase 1에서는 HTML5 date input을 사용합니다.
+ *
+ * Atlaskit DateTimePicker를 래핑하여 사용합니다.
  */
 export const DatePicker: React.FC<DatePickerProps> = ({
   label,
@@ -38,112 +36,43 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   onChange,
   dateTime = false,
   className,
+  disabled,
   ...props
 }) => {
-  const sizeStyles: Record<SizeToken, React.CSSProperties> = {
-    xs: {
-      padding: 'var(--spacing-xs) var(--spacing-sm)',
-      fontSize: 'var(--font-size-xs)',
-    },
-    sm: {
-      padding: 'var(--spacing-xs) var(--spacing-sm)',
-      fontSize: 'var(--font-size-sm)',
-    },
-    md: {
-      padding: 'var(--spacing-sm) var(--spacing-md)',
-      fontSize: 'var(--font-size-base)',
-    },
-    lg: {
-      padding: 'var(--spacing-md) var(--spacing-lg)',
-      fontSize: 'var(--font-size-lg)',
-    },
-    xl: {
-      padding: 'var(--spacing-lg) var(--spacing-xl)',
-      fontSize: 'var(--font-size-xl)',
-    },
-  };
+  // value를 Date 객체로 변환
+  const dateValue = React.useMemo(() => {
+    if (!value) return undefined;
+    if (value instanceof Date) return value;
+    return new Date(value);
+  }, [value]);
 
-  // value를 string으로 변환 (Date 객체인 경우)
-  const stringValue = value instanceof Date 
-    ? (dateTime ? value.toISOString().slice(0, 16) : value.toISOString().split('T')[0])
-    : value || '';
-
-  const inputStyle: React.CSSProperties = {
-    ...sizeStyles[size],
-    border: `1px solid ${error ? 'var(--color-red-500)' : 'var(--color-gray-200)'}`,
-    borderRadius: 'var(--border-radius-lg)',
-    backgroundColor: 'var(--color-white)',
-    color: 'var(--color-text)',
-    outline: 'none',
-    width: fullWidth ? '100%' : 'auto',
-    transition: 'all 0.2s ease',
-    fontFamily: 'var(--font-family)',
-    boxShadow: 'var(--shadow-sm)',
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (value: string) => {
     if (onChange) {
-      onChange(e.target.value);
+      onChange(value);
     }
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        width: fullWidth ? '100%' : 'auto',
-      }}
-    >
-      {label && (
-        <label
-          style={{
-            fontSize: 'var(--font-size-sm)',
-            fontWeight: 'var(--font-weight-medium)',
-            color: 'var(--color-text)',
-            marginBottom: 'var(--spacing-xs)',
-          }}
-        >
-          {label}
-        </label>
-      )}
-      <input
-        type={dateTime ? 'datetime-local' : 'date'}
-        className={clsx(className)}
-        style={inputStyle}
-        value={stringValue}
-        onChange={handleChange}
-        onFocus={(e) => {
-          e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-primary)';
-          e.currentTarget.style.boxShadow = `0 0 0 3px ${error ? 'var(--color-red-50)' : 'var(--color-primary-50)'}`;
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-gray-200)';
-          e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-        }}
-        {...props}
-      />
+    <div>
+      <div className={className}>
+        <AKDatePicker
+          label={label}
+          isInvalid={!!error}
+          isDisabled={disabled}
+          value={dateValue?.toISOString()}
+          onChange={handleChange}
+          dateFormat={dateTime ? 'YYYY-MM-DD HH:mm' : 'YYYY-MM-DD'}
+        />
+      </div>
       {error && (
-        <span
-          style={{
-            fontSize: 'var(--font-size-sm)',
-            color: 'var(--color-red-500)',
-            marginTop: 'var(--spacing-xs)',
-          }}
-        >
+        <div style={{ color: 'var(--color-error)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--spacing-xs)' }}>
           {error}
-        </span>
+        </div>
       )}
       {helperText && !error && (
-        <span
-          style={{
-            fontSize: 'var(--font-size-sm)',
-            color: 'var(--color-text-secondary)',
-            marginTop: 'var(--spacing-xs)',
-          }}
-        >
+        <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--spacing-xs)' }}>
           {helperText}
-        </span>
+        </div>
       )}
     </div>
   );

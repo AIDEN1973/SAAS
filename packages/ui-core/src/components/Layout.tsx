@@ -1,6 +1,7 @@
 /**
  * Layout Components
  *
+ * [불변 규칙] Atlaskit Primitives를 기반으로 한 레이아웃 컴포넌트
  * 반응형 레이아웃 컴포넌트
  * Mobile: Card-first
  * Tablet: 2-column + Drawer Overlay
@@ -9,7 +10,7 @@
  */
 
 import React from 'react';
-import { clsx } from 'clsx';
+import { Box, Stack } from '@atlaskit/primitives';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 import { SpacingToken } from '@design-system/core';
 
@@ -46,21 +47,27 @@ export const Container: React.FC<ContainerProps> = ({
     '3xl': 'var(--spacing-3xl)',
   };
 
-  return (
-    <div
-      className={clsx(className)}
-      style={{
-        margin: '0 auto',
-        width: '100%',
-        maxWidth: maxWidthMap[maxWidth],
-        paddingLeft: paddingMap[padding],
-        paddingRight: paddingMap[padding],
-        ...style,
-      }}
-    >
+  const containerStyle: React.CSSProperties = {
+    margin: '0 auto',
+    width: '100%',
+    maxWidth: maxWidthMap[maxWidth],
+    paddingLeft: paddingMap[padding],
+    paddingRight: paddingMap[padding],
+    ...style,
+  };
+
+  const content = (
+    <Box as="div" style={containerStyle}>
       {children}
-    </div>
+    </Box>
   );
+
+  // className이 필요한 경우에만 래핑
+  if (className) {
+    return <div className={className}>{content}</div>;
+  }
+
+  return content;
 };
 
 export interface GridProps {
@@ -114,19 +121,25 @@ export const Grid: React.FC<GridProps> = ({
     gridTemplateColumns = `repeat(${responsiveColumns}, 1fr)`;
   }
 
-  return (
-    <div
-      className={clsx(className)}
-      style={{
-        display: 'grid',
-        gridTemplateColumns,
-        gap: gapMap[gap],
-        ...style,
-      }}
-    >
+  const gridStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns,
+    gap: gapMap[gap],
+    ...style,
+  };
+
+  const content = (
+    <Box as="div" style={gridStyle}>
       {children}
-    </div>
+    </Box>
   );
+
+  // className이 필요한 경우에만 래핑
+  if (className) {
+    return <div className={className}>{content}</div>;
+  }
+
+  return content;
 };
 
 export interface SidebarLayoutProps {
@@ -152,27 +165,29 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
 
   if (isMobile) {
     // Mobile: Sidebar를 Drawer로 처리 (별도 컴포넌트 필요)
-    return (
-      <div
-        className={clsx(className)}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <main style={{ flex: 1 }}>{main}</main>
-      </div>
+    const content = (
+      <Stack as="div" space="space.0">
+        <Box as="main" style={{ flex: 1 }}>
+          {main}
+        </Box>
+      </Stack>
     );
+
+    if (className) {
+      return <div className={className}>{content}</div>;
+    }
+    return content;
   }
 
-  return (
-    <div
-      className={clsx(className)}
+  const content = (
+    <Box
+      as="div"
       style={{
         display: 'flex',
       }}
     >
-      <aside
+      <Box
+        as="aside"
         style={{
           display: 'block',
           width: sidebarWidth,
@@ -181,15 +196,21 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
         }}
       >
         {sidebar}
-      </aside>
-      <main
+      </Box>
+      <Box
+        as="main"
         style={{
           flex: 1,
           overflow: 'auto',
         }}
       >
         {main}
-      </main>
-    </div>
+      </Box>
+    </Box>
   );
+
+  if (className) {
+    return <div className={className}>{content}</div>;
+  }
+  return content;
 };

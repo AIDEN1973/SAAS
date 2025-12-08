@@ -1,9 +1,9 @@
 /**
  * SchemaFieldEditor Component
- * 
+ *
  * [불변 규칙] 필드 추가/수정/삭제 UI
  * [불변 규칙] Anti-Pattern 강제: Tailwind class, script 삽입 금지
- * 
+ *
  * 기술문서: docu/스키마에디터.txt 14. Schema Editor 기능
  */
 
@@ -135,8 +135,8 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
             </label>
             <Select
               value={editingField.kind}
-              onChange={(e) => {
-                const newKind = e.target.value as FormFieldSchema['kind'];
+              onChange={(value) => {
+                const newKind = String(value) as FormFieldSchema['kind'];
                 const updated: FormFieldSchema = {
                   ...editingField,
                   kind: newKind,

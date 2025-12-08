@@ -421,7 +421,7 @@ export class ApiClient {
     // ⚠️ 이 메서드는 사용되지 않습니다.
     // useSchema Hook을 사용하세요.
     console.warn('[API SDK] loadSchema is deprecated. Use useSchema Hook instead.');
-    return null;
+      return null;
   }
 }
 
