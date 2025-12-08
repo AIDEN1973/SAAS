@@ -9,8 +9,7 @@
 import { createClient } from '@lib/supabase-client';
 import { getApiContext } from './context';
 import type { ApiResponse, ApiClientConfig } from './types';
-import { SchemaRegistryClient, type SchemaRegistryEntry } from '@schema-engine/registry/client';
-import type { FormSchema, UISchema } from '@schema-engine/types';
+import { SchemaRegistryClient, type SchemaRegistryEntry, type FormSchema, type UISchema } from '@schema-engine';
 
 /**
  * API Client
