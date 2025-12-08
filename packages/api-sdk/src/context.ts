@@ -1,8 +1,8 @@
 /**
  * API Context
- * 
- * [불�? 규칙] UI???�넌??ID???�종??직접 결정?��? ?�는??
- * Context??미들?�어???�증 ?�스?�에??주입?�다.
+ *
+ * [불변 규칙] UI는 테넌트 ID나 업종을 직접 결정해서는 안 됨
+ * Context는 미들웨어 또는 인증 서비스에서 주입합니다.
  */
 
 let currentContext: {
@@ -12,8 +12,8 @@ let currentContext: {
 } = {};
 
 /**
- * Context ?�정
- * 미들?�어???�증 ?�스?�에???�출
+ * Context 설정
+ * 미들웨어 또는 인증 서비스에서 호출
  */
 export function setApiContext(context: {
   tenantId?: string;
@@ -24,16 +24,15 @@ export function setApiContext(context: {
 }
 
 /**
- * Context 가?�오�?
+ * Context 가져오기
  */
 export function getApiContext() {
   return { ...currentContext };
 }
 
 /**
- * Context 초기??
+ * Context 초기화
  */
 export function clearApiContext() {
   currentContext = {};
 }
-

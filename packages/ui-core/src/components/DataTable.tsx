@@ -1,9 +1,9 @@
 /**
  * DataTable Component
- * 
- * [불�? 규칙] ?�스?�톱 ?�경?�서 ?�용?�는 고정 ?�더 + ?�평 ?�크�??�이�?
- * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
- * [불�? 규칙] PC (lg, xl)?�서 ?�용
+ *
+ * [불변 규칙] 데스크톱 환경에서 사용하는 고정 헤더 + 스크롤 가능한 테이블
+ * [불변 규칙] 스키마에서는 Tailwind 클래스를 직접 사용하지 않습니다.
+ * [불변 규칙] PC (lg, xl)에서 사용
  */
 
 import React from 'react';
@@ -30,23 +30,23 @@ export interface DataTableProps<T = any> {
 }
 
 /**
- * DataTable 컴포?�트
- * 
- * ?�스?�톱 ?�경?�서 ?�이�??�이?��? ???�식?�로 ?�시
+ * DataTable 컴포넌트
+ *
+ * 데스크톱 환경에서 테이블 데이터를 테이블 형식으로 표시
  */
 export function DataTable<T = any>({
   data,
   columns,
   keyExtractor,
   onRowClick,
-  emptyMessage = '?�이?��? ?�습?�다.',
+  emptyMessage = '?�이?��? ?�습?�다.',
   className,
   stickyHeader = true,
 }: DataTableProps<T>) {
   const mode = useResponsiveMode();
   const isDesktop = mode === 'lg' || mode === 'xl';
 
-  // ?�스?�톱???�니�?null 반환 (TableCardView ?�용)
+  // 데스크톱이 아니면 null 반환 (TableCardView 사용)
   if (!isDesktop) {
     return null;
   }

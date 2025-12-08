@@ -1,8 +1,8 @@
 /**
  * Core Metering Types
  * 
- * ?�용??계측 (출결 건수, 문자발송 ?? ?�성 모듈 ?? ?�용??????
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
+ * ?용??계측 (출결 건수, 문자발송 ?? ?성 모듈 ?? ?용??????
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존?? ?음
  */
 
 export type MetricType = 'attendance_count' | 'sms_count' | 'active_modules' | 'user_count';

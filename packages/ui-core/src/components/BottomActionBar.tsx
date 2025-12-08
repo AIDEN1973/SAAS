@@ -1,9 +1,9 @@
 /**
  * Bottom Action Bar
- * 
- * Mobile ?��?: Bottom Action Bar
- * [불�? 규칙] Mobile?�서??Bottom Action Bar�??��??�로 ?�용
- * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
+ *
+ * Mobile 전용: Bottom Action Bar
+ * [불변 규칙] Mobile에서 Bottom Action Bar를 하단으로 사용
+ * [불변 규칙] 스키마에서는 Tailwind 클래스를 직접 사용하지 않습니다.
  */
 
 import React from 'react';
@@ -17,7 +17,7 @@ export interface BottomActionBarProps {
 
 /**
  * Bottom Action Bar
- * Mobile?�서�??�시, Desktop?�서???�단?�로 ?�동
+ * Mobile에서만 표시, Desktop에서는 헤더로 이동
  */
 export const BottomActionBar: React.FC<BottomActionBarProps> = ({
   children,
@@ -27,7 +27,7 @@ export const BottomActionBar: React.FC<BottomActionBarProps> = ({
   const isMobile = mode === 'xs' || mode === 'sm';
 
   if (!isMobile) {
-    // Desktop: ?�단 ?�션 바로 변??
+    // Desktop: 헤더 액션 바로 변환
     return (
       <div
         className={clsx(className)}

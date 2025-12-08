@@ -1,8 +1,8 @@
 /**
  * Sidebar Component
- * 
- * 좌측 ?�이?�바 메뉴
- * [불�? 규칙] 반응?? Mobile?�서??Drawer�??�환, Desktop?�서??Persistent Sidebar
+ *
+ * 좌측 사이드바 메뉴
+ * [불변 규칙] 반응형 Mobile에서 Drawer로 변환, Desktop에서 Persistent Sidebar
  */
 
 import React from 'react';

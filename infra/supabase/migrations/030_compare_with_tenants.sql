@@ -61,3 +61,5 @@ ANALYZE public.tenants;
 -- 7. PostgREST 스키마 캐시 강제 새로고침
 NOTIFY pgrst, 'reload schema';
 
+
+

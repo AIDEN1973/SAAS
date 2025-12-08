@@ -7,6 +7,7 @@
     "apps/*",
     "packages/*",
     "packages/lib/*",
+    "packages/lib/date-utils",
     "packages/design-system",
     "packages/ui-core",
     "packages/schema-engine",

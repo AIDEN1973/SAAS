@@ -71,3 +71,5 @@ NOTIFY pgrst, 'reload schema';
 -- 10. 테이블 통계 업데이트 (PostgREST가 테이블을 인식하도록)
 ANALYZE public.user_tenant_roles;
 
+
+

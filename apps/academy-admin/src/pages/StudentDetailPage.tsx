@@ -1,20 +1,26 @@
 /**
  * 학생 상세 페이지
- * 
+ *
  * [불변 규칙] api-sdk를 통해서만 데이터 요청
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ErrorBoundary } from '@ui-core/react';
+import { ErrorBoundary, useModal } from '@ui-core/react';
 import { Container, Card, Button, Input, Select, Textarea } from '@ui-core/react';
-import { SchemaForm } from '@schema-engine';
+import { SchemaForm, SchemaDetail } from '@schema-engine';
+import { toKST } from '@lib/date-utils';
 import { studentFormSchema } from '../schemas/student.schema';
+import { studentDetailSchema } from '../schemas/student.detail.schema';
+import { guardianFormSchema } from '../schemas/guardian.schema';
+import { consultationFormSchema } from '../schemas/consultation.schema';
+import { classAssignmentFormSchema } from '../schemas/class-assignment.schema';
 import {
   useStudent,
   useGuardians,
   useConsultations,
+  useStudentTags,
   useStudentTagsByStudent,
   useUpdateStudent,
   useCreateGuardian,
@@ -37,19 +43,28 @@ import type { Tag } from '@core/tags';
 export function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { showAlert, showConfirm } = useModal();
   const [activeTab, setActiveTab] = useState<'info' | 'guardians' | 'consultations' | 'tags' | 'classes'>('info');
   const [isEditing, setIsEditing] = useState(false);
   const [showGuardianForm, setShowGuardianForm] = useState(false);
   const [showConsultationForm, setShowConsultationForm] = useState(false);
   const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
   const [editingConsultationId, setEditingConsultationId] = useState<string | null>(null);
+  const [consultationTypeFilter, setConsultationTypeFilter] = useState<ConsultationType | 'all'>('all');
 
   const { data: student, isLoading: studentLoading } = useStudent(id || null);
   const { data: guardians, isLoading: guardiansLoading } = useGuardians(id || null);
-  const { data: consultations, isLoading: consultationsLoading } = useConsultations(id || null);
+  const { data: allConsultations, isLoading: consultationsLoading } = useConsultations(id || null);
   const { data: studentTags, isLoading: tagsLoading } = useStudentTagsByStudent(id || null);
   const { data: studentClasses, isLoading: classesLoading } = useStudentClasses(id || null);
   const { data: allClasses } = useClasses({ status: 'active' });
+
+  // 학습일지 필터링 (요구사항: 상담일지/학습일지 관리)
+  const consultations = useMemo(() => {
+    if (!allConsultations) return [];
+    if (consultationTypeFilter === 'all') return allConsultations;
+    return allConsultations.filter((c) => c.consultation_type === consultationTypeFilter);
+  }, [allConsultations, consultationTypeFilter]);
 
   const updateStudent = useUpdateStudent();
   const createGuardian = useCreateGuardian();
@@ -184,7 +199,8 @@ export function StudentDetailPage() {
                 setEditingGuardianId(null);
               }}
               onDelete={async (guardianId) => {
-                if (confirm('정말 삭제하시겠습니까?')) {
+                const confirmed = await showConfirm('정말 삭제하시겠습니까?', '보호자 삭제');
+                if (confirmed) {
                   await deleteGuardian.mutateAsync({ guardianId, studentId: student.id });
                 }
               }}
@@ -198,6 +214,7 @@ export function StudentDetailPage() {
               isLoading={consultationsLoading}
               showForm={showConsultationForm}
               editingConsultationId={editingConsultationId}
+              consultationTypeFilter={consultationTypeFilter}
               onShowForm={() => setShowConsultationForm(true)}
               onHideForm={() => {
                 setShowConsultationForm(false);
@@ -218,7 +235,8 @@ export function StudentDetailPage() {
                 setEditingConsultationId(null);
               }}
               onDelete={async (consultationId) => {
-                if (confirm('정말 삭제하시겠습니까?')) {
+                const confirmed = await showConfirm('정말 삭제하시겠습니까?', '상담일지 삭제');
+                if (confirmed) {
                   await deleteConsultation.mutateAsync({ consultationId, studentId: student.id });
                 }
               }}
@@ -227,9 +245,10 @@ export function StudentDetailPage() {
                   await generateAISummary.mutateAsync({ consultationId, studentId: student.id });
                 } catch (error) {
                   console.error('AI 요약 생성 실패:', error);
-                  alert('AI 요약 생성에 실패했습니다.');
+                  showAlert('AI 요약 생성에 실패했습니다.', '오류', 'error');
                 }
               }}
+              onFilterChange={setConsultationTypeFilter}
             />
           )}
 
@@ -283,54 +302,26 @@ interface StudentInfoTabProps {
 
 function StudentInfoTab({ student, isEditing, onCancel, onSave }: StudentInfoTabProps) {
   if (!isEditing) {
+    // SchemaDetail 사용
+    const detailData = {
+      name: student.name,
+      birth_date: student.birth_date || '',
+      gender: student.gender === 'male' ? '남' : student.gender === 'female' ? '여' : '',
+      phone: student.phone || '',
+      email: student.email || '',
+      address: student.address || '',
+      school_name: student.school_name || '',
+      grade: student.grade || '',
+      status: student.status === 'active' ? '재원' : student.status === 'on_leave' ? '휴원' : student.status === 'withdrawn' ? '퇴원' : '졸업',
+      notes: student.notes || '',
+    };
+
     return (
       <Card padding="md" variant="default">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-md)' }}>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>이름</label>
-            <p style={{ fontSize: 'var(--font-size-base)' }}>{student.name}</p>
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>생년월일</label>
-            <p style={{ fontSize: 'var(--font-size-base)' }}>{student.birth_date || '-'}</p>
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>성별</label>
-            <p style={{ fontSize: 'var(--font-size-base)' }}>{student.gender === 'male' ? '남' : student.gender === 'female' ? '여' : '-'}</p>
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>전화번호</label>
-            <p style={{ fontSize: 'var(--font-size-base)' }}>{student.phone || '-'}</p>
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>이메일</label>
-            <p style={{ fontSize: 'var(--font-size-base)' }}>{student.email || '-'}</p>
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>주소</label>
-            <p style={{ fontSize: 'var(--font-size-base)' }}>{student.address || '-'}</p>
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>학교</label>
-            <p style={{ fontSize: 'var(--font-size-base)' }}>{student.school_name || '-'}</p>
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>학년</label>
-            <p style={{ fontSize: 'var(--font-size-base)' }}>{student.grade || '-'}</p>
-          </div>
-          <div>
-            <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>상태</label>
-            <p style={{ fontSize: 'var(--font-size-base)' }}>
-              {student.status === 'active' ? '재원' : student.status === 'on_leave' ? '휴원' : student.status === 'withdrawn' ? '퇴원' : '졸업'}
-            </p>
-          </div>
-          {student.notes && (
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>비고</label>
-              <p style={{ fontSize: 'var(--font-size-base)' }}>{student.notes}</p>
-            </div>
-          )}
-        </div>
+        <SchemaDetail
+          schema={studentDetailSchema}
+          data={detailData}
+        />
       </Card>
     );
   }
@@ -422,30 +413,19 @@ function GuardiansTab({
   onDelete,
 }: GuardiansTabProps) {
   const editingGuardian = editingGuardianId ? guardians.find((g) => g.id === editingGuardianId) : null;
-  const [formData, setFormData] = useState({
-    name: editingGuardian?.name || '',
-    relationship: editingGuardian?.relationship || 'parent',
-    phone: editingGuardian?.phone || '',
-    email: editingGuardian?.email || '',
-    is_primary: editingGuardian?.is_primary || false,
-    notes: editingGuardian?.notes || '',
-  });
+  const { showAlert } = useModal();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (data: any) => {
+    try {
     if (editingGuardianId) {
-      await onUpdate(editingGuardianId, formData);
+        await onUpdate(editingGuardianId, data);
     } else {
-      await onCreate(formData);
+        await onCreate(data);
     }
-    setFormData({
-      name: '',
-      relationship: 'parent',
-      phone: '',
-      email: '',
-      is_primary: false,
-      notes: '',
-    });
+      onHideForm();
+    } catch (error) {
+      showAlert('오류', error instanceof Error ? error.message : '학부모 정보 저장에 실패했습니다.');
+    }
   };
 
   if (isLoading) {
@@ -464,78 +444,49 @@ function GuardiansTab({
 
       {showForm && (
         <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-          <h3 style={{ marginBottom: 'var(--spacing-md)' }}>{editingGuardianId ? '학부모 수정' : '학부모 추가'}</h3>
-          <form onSubmit={handleSubmit}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>이름 *</label>
-                <Input
-                  value={formData.name}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
-                  fullWidth
-                  required
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>관계 *</label>
-                <Select
-                  value={formData.relationship}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, relationship: e.target.value as GuardianRelationship })}
-                  fullWidth
-                  required
-                >
-                  <option value="parent">부모</option>
-                  <option value="guardian">보호자</option>
-                  <option value="other">기타</option>
-                </Select>
-              </div>
-              <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>전화번호 *</label>
-                <Input
-                  value={formData.phone}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, phone: e.target.value })}
-                  fullWidth
-                  required
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>이메일</label>
-                <Input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, email: e.target.value })}
-                  fullWidth
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-                  <input
-                    type="checkbox"
-                    checked={formData.is_primary}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, is_primary: e.target.checked })}
-                  />
-                  주 보호자
-                </label>
-              </div>
-              <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>비고</label>
-                <Textarea
-                  value={formData.notes}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, notes: e.target.value })}
-                  fullWidth
-                  rows={3}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
-                <Button type="button" variant="outline" onClick={onHideForm}>
-                  취소
-                </Button>
-                <Button type="submit" variant="solid">
-                  {editingGuardianId ? '수정' : '추가'}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+            <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
+              {editingGuardianId ? '학부모 수정' : '학부모 추가'}
+            </h3>
+            <Button variant="ghost" size="sm" onClick={onHideForm}>
+              닫기
                 </Button>
               </div>
-            </div>
-          </form>
+          <SchemaForm
+            schema={guardianFormSchema}
+            onSubmit={handleSubmit}
+            defaultValues={editingGuardian ? {
+              name: editingGuardian.name,
+              relationship: editingGuardian.relationship,
+              phone: editingGuardian.phone || '',
+              email: editingGuardian.email || '',
+              is_primary: editingGuardian.is_primary || false,
+              notes: editingGuardian.notes || '',
+            } : {
+              relationship: 'parent',
+              is_primary: false,
+            }}
+            actionContext={{
+              apiCall: async (endpoint: string, method: string, body?: any) => {
+                const { apiClient } = await import('@api-sdk/core');
+                if (method === 'POST') {
+                  const response = await apiClient.post(endpoint, body);
+                  if (response.error) {
+                    throw new Error(response.error.message);
+                  }
+                  return response.data;
+                }
+                const response = await apiClient.get(endpoint);
+                if (response.error) {
+                  throw new Error(response.error.message);
+                }
+                return response.data;
+              },
+              showToast: (message: string, variant?: string) => {
+                showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+              },
+            }}
+          />
         </Card>
       )}
 
@@ -590,6 +541,7 @@ interface ConsultationsTabProps {
   isLoading: boolean;
   showForm: boolean;
   editingConsultationId: string | null;
+  consultationTypeFilter: ConsultationType | 'all';
   onShowForm: () => void;
   onHideForm: () => void;
   onEdit: (consultationId: string) => void;
@@ -597,6 +549,7 @@ interface ConsultationsTabProps {
   onUpdate: (consultationId: string, data: any) => Promise<void>;
   onDelete: (consultationId: string) => Promise<void>;
   onGenerateAISummary: (consultationId: string) => Promise<void>;
+  onFilterChange: (filter: ConsultationType | 'all') => void;
 }
 
 function ConsultationsTab({
@@ -604,6 +557,7 @@ function ConsultationsTab({
   isLoading,
   showForm,
   editingConsultationId,
+  consultationTypeFilter,
   onShowForm,
   onHideForm,
   onEdit,
@@ -611,26 +565,22 @@ function ConsultationsTab({
   onUpdate,
   onDelete,
   onGenerateAISummary,
+  onFilterChange,
 }: ConsultationsTabProps) {
   const editingConsultation = editingConsultationId ? consultations.find((c) => c.id === editingConsultationId) : null;
-  const [formData, setFormData] = useState({
-    consultation_date: editingConsultation?.consultation_date || new Date().toISOString().split('T')[0],
-    consultation_type: editingConsultation?.consultation_type || 'counseling',
-    content: editingConsultation?.content || '',
-  });
+  const { showAlert } = useModal();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (data: any) => {
+    try {
     if (editingConsultationId) {
-      await onUpdate(editingConsultationId, formData);
+        await onUpdate(editingConsultationId, data);
     } else {
-      await onCreate(formData);
+        await onCreate(data);
     }
-    setFormData({
-      consultation_date: new Date().toISOString().split('T')[0],
-      consultation_type: 'counseling',
-      content: '',
-    });
+      onHideForm();
+    } catch (error) {
+      showAlert('오류', error instanceof Error ? error.message : '상담일지 저장에 실패했습니다.');
+    }
   };
 
   if (isLoading) {
@@ -640,7 +590,37 @@ function ConsultationsTab({
   return (
     <div>
       {!showForm && (
-        <div style={{ marginBottom: 'var(--spacing-md)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+          <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+            <Button
+              variant={consultationTypeFilter === 'all' ? 'solid' : 'outline'}
+              size="sm"
+              onClick={() => onFilterChange('all')}
+            >
+              전체
+            </Button>
+            <Button
+              variant={consultationTypeFilter === 'counseling' ? 'solid' : 'outline'}
+              size="sm"
+              onClick={() => onFilterChange('counseling')}
+            >
+              상담일지
+            </Button>
+            <Button
+              variant={consultationTypeFilter === 'learning' ? 'solid' : 'outline'}
+              size="sm"
+              onClick={() => onFilterChange('learning')}
+            >
+              학습일지
+            </Button>
+            <Button
+              variant={consultationTypeFilter === 'behavior' ? 'solid' : 'outline'}
+              size="sm"
+              onClick={() => onFilterChange('behavior')}
+            >
+              행동일지
+            </Button>
+          </div>
           <Button variant="solid" onClick={onShowForm}>
             상담일지 추가
           </Button>
@@ -649,53 +629,46 @@ function ConsultationsTab({
 
       {showForm && (
         <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-          <h3 style={{ marginBottom: 'var(--spacing-md)' }}>{editingConsultationId ? '상담일지 수정' : '상담일지 추가'}</h3>
-          <form onSubmit={handleSubmit}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>상담일자 *</label>
-                <Input
-                  type="date"
-                  value={formData.consultation_date}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, consultation_date: e.target.value })}
-                  fullWidth
-                  required
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>상담 유형 *</label>
-                <Select
-                  value={formData.consultation_type}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, consultation_type: e.target.value as ConsultationType })}
-                  fullWidth
-                  required
-                >
-                  <option value="counseling">상담</option>
-                  <option value="learning">학습</option>
-                  <option value="behavior">행동</option>
-                  <option value="other">기타</option>
-                </Select>
-              </div>
-              <div>
-                <label style={{ fontSize: 'var(--font-size-sm)', display: 'block', marginBottom: 'var(--spacing-xs)' }}>상담 내용 *</label>
-                <Textarea
-                  value={formData.content}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, content: e.target.value })}
-                  fullWidth
-                  rows={8}
-                  required
-                />
-              </div>
-              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
-                <Button type="button" variant="outline" onClick={onHideForm}>
-                  취소
-                </Button>
-                <Button type="submit" variant="solid">
-                  {editingConsultationId ? '수정' : '추가'}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+            <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
+              {editingConsultationId ? '상담일지 수정' : '상담일지 추가'}
+            </h3>
+            <Button variant="ghost" size="sm" onClick={onHideForm}>
+              닫기
                 </Button>
               </div>
-            </div>
-          </form>
+          <SchemaForm
+            schema={consultationFormSchema}
+            onSubmit={handleSubmit}
+            defaultValues={editingConsultation ? {
+              consultation_date: editingConsultation.consultation_date,
+              consultation_type: editingConsultation.consultation_type,
+              content: editingConsultation.content,
+            } : {
+              consultation_date: toKST().format('YYYY-MM-DD'),
+              consultation_type: 'counseling',
+            }}
+            actionContext={{
+              apiCall: async (endpoint: string, method: string, body?: any) => {
+                const { apiClient } = await import('@api-sdk/core');
+                if (method === 'POST') {
+                  const response = await apiClient.post(endpoint, body);
+                  if (response.error) {
+                    throw new Error(response.error.message);
+                  }
+                  return response.data;
+                }
+                const response = await apiClient.get(endpoint);
+                if (response.error) {
+                  throw new Error(response.error.message);
+                }
+                return response.data;
+              },
+              showToast: (message: string, variant?: string) => {
+                showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+              },
+            }}
+          />
         </Card>
       )}
 
@@ -764,35 +737,87 @@ interface TagsTabProps {
 }
 
 function TagsTab({ studentTags, isLoading, studentId, onUpdateTags }: TagsTabProps) {
-  // TODO: 전체 태그 목록 조회 및 태그 선택 UI 구현
-  // 현재는 간단히 표시만 함
-  if (isLoading) {
+  const { data: allTags, isLoading: allTagsLoading } = useStudentTags();
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+
+  // 학생 태그가 로드되면 선택된 태그 ID 업데이트
+  useEffect(() => {
+    if (studentTags) {
+      setSelectedTagIds(studentTags.map((tag) => tag.id));
+    }
+  }, [studentTags]);
+
+  const handleTagToggle = (tagId: string) => {
+    setSelectedTagIds((prev) => {
+      const newIds = prev.includes(tagId)
+        ? prev.filter((id) => id !== tagId)
+        : [...prev, tagId];
+      return newIds;
+    });
+  };
+
+  const handleSave = async () => {
+    await onUpdateTags(selectedTagIds);
+  };
+
+  if (isLoading || allTagsLoading) {
     return <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>;
   }
 
   return (
     <Card padding="md" variant="default">
-      <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
-        태그 관리 기능은 추후 구현 예정입니다.
-      </p>
-      {studentTags.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xs)' }}>
-          {studentTags.map((tag) => (
-            <span
-              key={tag.id}
-              style={{
-                padding: 'var(--spacing-xs) var(--spacing-sm)',
-                fontSize: 'var(--font-size-sm)',
-                borderRadius: '4px',
-                color: '#ffffff',
-                backgroundColor: tag.color,
-              }}
-            >
-              {tag.name}
-            </span>
-          ))}
+      <div style={{ marginBottom: 'var(--spacing-md)' }}>
+        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
+          태그 관리
+        </h3>
+        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
+          학생에게 태그를 추가하거나 제거할 수 있습니다.
+        </p>
+      </div>
+
+      {/* 전체 태그 목록 */}
+      {allTags && allTags.length > 0 && (
+        <div style={{ marginBottom: 'var(--spacing-md)' }}>
+          <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
+            사용 가능한 태그
+          </h4>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xs)' }}>
+            {allTags.map((tag) => {
+              const isSelected = selectedTagIds.includes(tag.id);
+              return (
+                <button
+                  key={tag.id}
+                  onClick={() => handleTagToggle(tag.id)}
+                  style={{
+                    padding: 'var(--spacing-xs) var(--spacing-sm)',
+                    fontSize: 'var(--font-size-sm)',
+                    borderRadius: '4px',
+                    border: isSelected ? `2px solid ${tag.color}` : '2px solid transparent',
+                    color: isSelected ? '#ffffff' : tag.color,
+                    backgroundColor: isSelected ? tag.color : 'transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {tag.name}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
+
+      {/* 저장 버튼 */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--spacing-sm)', marginTop: 'var(--spacing-md)' }}>
+        <Button
+          variant="solid"
+          color="primary"
+          onClick={handleSave}
+          disabled={isLoading}
+        >
+          저장
+        </Button>
+      </div>
     </Card>
   );
 }
@@ -822,9 +847,10 @@ function ClassesTab({
   onAssign,
   onUnassign,
 }: ClassesTabProps) {
+  const { showAlert, showConfirm } = useModal();
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState('');
-  const [enrolledAt, setEnrolledAt] = useState(new Date().toISOString().split('T')[0]);
+  const [enrolledAt, setEnrolledAt] = useState(toKST().format('YYYY-MM-DD'));
 
   // 이미 배정된 반 ID 목록
   const assignedClassIds = studentClasses
@@ -846,29 +872,29 @@ function ClassesTab({
     { value: 'sunday', label: '일요일' },
   ];
 
-  const handleAssign = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedClassId) return;
+  const handleAssign = async (data: any) => {
+    if (!data.class_id) return;
 
     try {
-      await onAssign(selectedClassId, enrolledAt);
+      await onAssign(data.class_id, data.enrolled_at || toKST().format('YYYY-MM-DD'));
       setShowAssignForm(false);
       setSelectedClassId('');
-      setEnrolledAt(new Date().toISOString().split('T')[0]);
+      setEnrolledAt(toKST().format('YYYY-MM-DD'));
     } catch (error) {
       console.error('Failed to assign class:', error);
-      alert('반 배정에 실패했습니다.');
+      showAlert('반 배정에 실패했습니다.', '오류', 'error');
     }
   };
 
   const handleUnassign = async (classId: string) => {
-    if (!confirm('정말 이 반에서 제외하시겠습니까?')) return;
+    const confirmed = await showConfirm('정말 이 반에서 제외하시겠습니까?', '반 제외');
+    if (!confirmed) return;
 
     try {
-      await onUnassign(classId, new Date().toISOString().split('T')[0]);
+      await onUnassign(classId, toKST().format('YYYY-MM-DD'));
     } catch (error) {
       console.error('Failed to unassign class:', error);
-      alert('반 제외에 실패했습니다.');
+      showAlert('반 제외에 실패했습니다.', '오류', 'error');
     }
   };
 
@@ -895,46 +921,60 @@ function ClassesTab({
 
       {showAssignForm && (
         <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-          <h3 style={{ marginBottom: 'var(--spacing-md)' }}>반 배정</h3>
-          <form onSubmit={handleAssign}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              <Select
-                label="반 선택"
-                value={selectedClassId}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedClassId(e.target.value)}
-                required
-                fullWidth
-              >
-                <option value="">반을 선택하세요</option>
-                {availableClasses.map((classItem) => {
-                  const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
-                  return (
-                    <option key={classItem.id} value={classItem.id}>
-                      {classItem.name} ({dayLabel} {classItem.start_time}~{classItem.end_time})
-                    </option>
-                  );
-                })}
-              </Select>
-
-              <Input
-                label="배정일"
-                type="date"
-                value={enrolledAt}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnrolledAt(e.target.value)}
-                required
-                fullWidth
-              />
-
-              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
-                <Button type="button" variant="outline" onClick={() => setShowAssignForm(false)}>
-                  취소
-                </Button>
-                <Button type="submit" variant="solid">
-                  배정
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+            <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>반 배정</h3>
+            <Button variant="ghost" size="sm" onClick={() => setShowAssignForm(false)}>
+              닫기
                 </Button>
               </div>
-            </div>
-          </form>
+          <SchemaForm
+            schema={{
+              ...classAssignmentFormSchema,
+              form: {
+                ...classAssignmentFormSchema.form,
+                fields: [
+                  {
+                    ...classAssignmentFormSchema.form.fields[0],
+                    options: [
+                      { label: '반을 선택하세요', value: '' },
+                      ...availableClasses.map((classItem) => {
+                        const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
+                        return {
+                          label: `${classItem.name} (${dayLabel} ${classItem.start_time}~${classItem.end_time})`,
+                          value: classItem.id,
+                        };
+                      }),
+                    ],
+                  },
+                  classAssignmentFormSchema.form.fields[1],
+                ],
+              },
+            }}
+            onSubmit={handleAssign}
+            defaultValues={{
+              enrolled_at: toKST().format('YYYY-MM-DD'),
+            }}
+            actionContext={{
+              apiCall: async (endpoint: string, method: string, body?: any) => {
+                const { apiClient } = await import('@api-sdk/core');
+                if (method === 'POST') {
+                  const response = await apiClient.post(endpoint, body);
+                  if (response.error) {
+                    throw new Error(response.error.message);
+                  }
+                  return response.data;
+                }
+                const response = await apiClient.get(endpoint);
+                if (response.error) {
+                  throw new Error(response.error.message);
+                }
+                return response.data;
+              },
+              showToast: (message: string, variant?: string) => {
+                showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+              },
+            }}
+          />
         </Card>
       )}
 

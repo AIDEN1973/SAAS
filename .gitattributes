@@ -1,0 +1,30 @@
+# 모든 텍스트 파일을 UTF-8로 처리
+* text=auto eol=lf
+
+# 소스 코드 파일들
+*.ts text eol=lf charset=utf-8
+*.tsx text eol=lf charset=utf-8
+*.js text eol=lf charset=utf-8
+*.jsx text eol=lf charset=utf-8
+*.json text eol=lf charset=utf-8
+*.md text eol=lf charset=utf-8
+*.txt text eol=lf charset=utf-8
+*.css text eol=lf charset=utf-8
+*.scss text eol=lf charset=utf-8
+*.html text eol=lf charset=utf-8
+*.xml text eol=lf charset=utf-8
+*.yml text eol=lf charset=utf-8
+*.yaml text eol=lf charset=utf-8
+
+# 바이너리 파일
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+

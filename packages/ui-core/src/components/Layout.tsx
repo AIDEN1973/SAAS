@@ -1,11 +1,11 @@
 /**
  * Layout Components
- * 
- * 반응???�이?�웃 컴포?�트
+ *
+ * 반응형 레이아웃 컴포넌트
  * Mobile: Card-first
  * Tablet: 2-column + Drawer Overlay
  * Desktop: Multi-panel + Persistent Sidebar
- * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
+ * [불변 규칙] 스키마에서는 Tailwind 클래스를 직접 사용하지 않습니다.
  */
 
 import React from 'react';
@@ -65,7 +65,9 @@ export const Container: React.FC<ContainerProps> = ({
 
 export interface GridProps {
   children: React.ReactNode;
-  columns?: 1 | 2 | 3 | 4;
+  columns?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 'auto-fit' | 'auto-fill';
+  columnTemplate?: string; // 복잡한 그리드 템플릿 (예: '100px repeat(7, 1fr)', 'repeat(5, 1fr)')
+  minColumnWidth?: string; // auto-fit/auto-fill과 함께 사용 (예: '60px', '100px')
   gap?: SpacingToken;
   className?: string;
   style?: React.CSSProperties;
@@ -74,14 +76,13 @@ export interface GridProps {
 export const Grid: React.FC<GridProps> = ({
   children,
   columns = 1,
+  columnTemplate,
+  minColumnWidth,
   gap = 'md',
   className,
   style,
 }) => {
   const mode = useResponsiveMode();
-  
-  // 반응??컬럼 ??조정
-  const responsiveColumns = (mode === 'xs' || mode === 'sm') ? 1 : mode === 'md' ? 2 : columns;
 
   const gapMap: Record<SpacingToken, string> = {
     xs: 'var(--spacing-xs)',
@@ -93,12 +94,32 @@ export const Grid: React.FC<GridProps> = ({
     '3xl': 'var(--spacing-3xl)',
   };
 
+  // gridTemplateColumns 계산
+  let gridTemplateColumns: string;
+
+  if (columnTemplate) {
+    // columnTemplate이 있으면 우선 사용 (복잡한 그리드 레이아웃)
+    gridTemplateColumns = columnTemplate;
+  } else if (columns === 'auto-fit' || columns === 'auto-fill') {
+    // auto-fit/auto-fill 사용
+    if (minColumnWidth) {
+      gridTemplateColumns = `repeat(${columns}, minmax(${minColumnWidth}, 1fr))`;
+    } else {
+      // minColumnWidth가 없으면 기본값 사용
+      gridTemplateColumns = `repeat(${columns}, minmax(100px, 1fr))`;
+    }
+  } else {
+    // 일반 columns 사용 (반응형 조정)
+    const responsiveColumns = (mode === 'xs' || mode === 'sm') ? 1 : mode === 'md' ? Math.min(columns, 2) : columns;
+    gridTemplateColumns = `repeat(${responsiveColumns}, 1fr)`;
+  }
+
   return (
     <div
       className={clsx(className)}
       style={{
         display: 'grid',
-        gridTemplateColumns: `repeat(${responsiveColumns}, 1fr)`,
+        gridTemplateColumns,
         gap: gapMap[gap],
         ...style,
       }}
@@ -117,7 +138,7 @@ export interface SidebarLayoutProps {
 
 /**
  * Sidebar Layout
- * Mobile: Sidebar ?��? (Drawer�??�환)
+ * Mobile: Sidebar 숨김 (Drawer로 변환)
  * Desktop: Persistent Sidebar
  */
 export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
@@ -130,7 +151,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
   const isMobile = mode === 'xs' || mode === 'sm';
 
   if (isMobile) {
-    // Mobile: Sidebar??Drawer�?처리 (별도 컴포?�트 ?�요)
+    // Mobile: Sidebar를 Drawer로 처리 (별도 컴포넌트 필요)
     return (
       <div
         className={clsx(className)}

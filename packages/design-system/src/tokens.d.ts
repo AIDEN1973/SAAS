@@ -14,7 +14,7 @@ export type BreakpointToken = 'mobile' | 'tablet' | 'desktop';
 export declare const spacing: Record<SpacingToken, string>;
 /**
  * Color Tokens
- * Multi-Tenant Theme Engine?�서 override 가??
+ * Multi-Tenant Theme Engine?�서 override 가능
  */
 export declare const colors: {
     primary: {

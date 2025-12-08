@@ -38,6 +38,7 @@
       "@core/metering/service": ["./packages/core/core-metering/src/service"],
       "@core/tags": ["./packages/core/core-tags/src"],
       "@core/tags/service": ["./packages/core/core-tags/src/service"],
+      "@core/billing": ["./packages/core/core-billing/src"],
       "@core/party": ["./packages/core/core-party/src"],
       "@core/party/service": ["./packages/core/core-party/src/service"],
       "@core-ui/*": ["./packages/ui-core/src/*"],

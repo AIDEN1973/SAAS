@@ -1,8 +1,8 @@
 /**
  * Core Tenancy Types
- * 
- * ?�넌??(user_tenant_roles 기반)
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
+ *
+ * 테넌트(user_tenant_roles 기반)
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
  */
 
 export type TenantRole = 'owner' | 'admin' | 'sub_admin' | 'manager' | 'staff' | 'teacher' | 'assistant' | 'counselor' | 'parent' | 'super_admin';
@@ -37,7 +37,7 @@ export interface CreateUserTenantRoleInput {
 }
 
 /**
- * ?�넌???�성 ?�력
+ * 테넌트 생성 입력
  */
 export interface CreateTenantInput {
   name: string;
@@ -48,10 +48,9 @@ export interface CreateTenantInput {
 }
 
 /**
- * ?�넌???�보??결과
+ * 테넌트 온보딩 결과
  */
 export interface TenantOnboardingResult {
   tenant: Tenant;
   user_tenant_role: UserTenantRole;
 }
-

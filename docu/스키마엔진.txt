@@ -189,8 +189,8 @@ export interface FormFieldSchema {
     colSpan?: number;  // Grid column span (1-12)
   };
   // SDUI v1.1: options도 i18n 키 지원
-  options?: Array<{ 
-    value: string; 
+  options?: Array<{
+    value: string;
     labelKey?: string;  // i18n 키
     label?: string;  // 하위 호환성
   }>;  // select/multiselect/radio용
@@ -220,7 +220,7 @@ export interface FormFieldSchema {
     // ⚠️ 중요: validate 함수는 Schema Registry(JSONB)에 저장될 수 없으므로,
     // Registry 기반 운영 시 validate는 사용할 수 없고 pattern 또는 min/max 등 정형 Validation만 허용됩니다.
     // validate 함수는 fallbackSchema(로컬 스키마) 전용입니다.
-    // 
+    //
     // 📌 런타임 처리:
     // - Registry에서 로드된 스키마에서는 validation.validate는 항상 undefined이며,
     //   런타임에서 절대 사용되지 않습니다 (사용하려면 fallbackSchema에만 정의).
@@ -304,17 +304,17 @@ USING (
   -- ⚠️ 중요: Super Admin은 SaaS 플랫폼 전체 관리자 역할입니다.
   -- 기술문서 PART 1의 RBAC 용어에 따르면, super_admin은 테넌트 레벨이 아닌
   -- SaaS 플랫폼 전체를 관리하는 본사 관리자 역할입니다.
-  -- 
+  --
   -- 🔍 RBAC 구조 분리 (필수):
   -- - Platform RBAC (SaaS 전체 관리자): user_platform_roles 테이블 필수
   -- - Tenant RBAC (학원/매장 단위 관리자): user_tenant_roles 테이블
-  -- 
+  --
   -- ⚠️ 중요: RLS 정책은 반드시 user_platform_roles 기반으로 검사해야 하며,
   -- user_tenant_roles는 테넌트 운영 권한이므로 Platform Schema Registry를 관리할 수 없습니다.
-  -- 
+  --
   -- tenant 레벨 관리자(admin)는 한 테넌트의 스키마조차 수정할 수 없습니다.
   -- platform 관리자(super_admin)는 모든 테넌트/업종의 스키마를 관리할 수 있습니다.
-  -- 
+  --
   -- 과거 설계에서는 user_tenant_roles를 사용했으나,
   -- 현재는 user_platform_roles를 기준으로 Platform-level RBAC를 분리하여 사용합니다.
   -- USING: SELECT/DELETE에 대한 조건
@@ -378,7 +378,7 @@ import { apiClient, getApiContext } from '@api-sdk/core';
 
 export function useSchema(entity: string, fallbackSchema?: FormSchema) {
   const context = getApiContext();
-  
+
   return useQuery({
     queryKey: ['schema', entity, context.tenantId, context.industryType],
     queryFn: async () => {
@@ -392,11 +392,11 @@ export function useSchema(entity: string, fallbackSchema?: FormSchema) {
           },
         }
       );
-      
+
       if (response.error || !response.data) {
         // ⚠️ 중요: fallbackSchema는 트러블슈팅용입니다.
         // 스키마 부재 시 앱이 죽지 않도록 fallback을 유지해야 합니다.
-        // 
+        //
         // ⚠️ 필수 규칙: fallbackSchema는 entity + industry 조합으로 개별 제공되어야 합니다.
         // - academy/studentFormSchema
         // - salon/customerFormSchema
@@ -404,7 +404,7 @@ export function useSchema(entity: string, fallbackSchema?: FormSchema) {
         // 각각 별도로 존재해야 하며, 업종별로 구분된 fallback 스키마를 제공해야 합니다.
         return fallbackSchema || null;
       }
-      
+
       return response.data;
     },
     // ⚠️ 중요: staleTime 운영 모드별 설정
@@ -550,7 +550,7 @@ export function evaluateConditionRule(
 
   // exists / not_exists 연산자 처리
   if (op === 'exists' || op === 'not_exists') {
-    const exists = Array.isArray(fieldValue) 
+    const exists = Array.isArray(fieldValue)
       ? fieldValue.length > 0
       : fieldValue !== null && fieldValue !== undefined && fieldValue !== '';
     return op === 'exists' ? exists : !exists;
@@ -629,14 +629,14 @@ export function evaluateMultiConditionRule(
   watchedValues: Record<string, any>
 ): boolean {
   const { conditions, logic } = multiRule;
-  
+
   if (conditions.length === 0) return false;
-  
+
   const results = conditions.map((rule) => {
     const refValue = watchedValues[rule.field];
     return evaluateConditionRule(rule, refValue);
   });
-  
+
   if (logic === 'and') {
     return results.every((result) => result === true);
   } else {
@@ -680,7 +680,7 @@ export function getConditionalActions(
   // 복수 조건 우선 처리 (conditions가 있으면 condition보다 우선)
   if (field.conditions) {
     const conditionMet = evaluateMultiConditionRule(field.conditions, watchedValues);
-    
+
     // SDUI v1.1: then/else 구조 지원 (action보다 우선)
     if (field.conditions.then || field.conditions.else) {
       const actionsToApply = conditionMet ? field.conditions.then : field.conditions.else;
@@ -701,7 +701,7 @@ export function getConditionalActions(
       else if (action === 'enable' && !conditionMet) isDisabled = true;
       if (action === 'require' && conditionMet) isRequired = true;
     }
-    
+
     return { isHidden, isDisabled, isRequired, actions: dynamicActions };
   }
 
@@ -804,7 +804,7 @@ function SchemaFieldComponent({
   setValue: setFormValue,
 }: SchemaFieldProps) {
   const { name, kind, ui, options } = field;
-  
+
   // SDUI v1.1: i18n 키 처리 (Loader 단계에서 바인딩되지 않은 경우)
   // labelKey가 있으면 translations에서 조회, 없으면 기존 label 사용
   const label = ui?.labelKey ? (translations[ui.labelKey] || ui.labelKey) : ui?.label;
@@ -833,12 +833,12 @@ function SchemaFieldComponent({
   // ⚠️ 최적화: 조건이 없는 필드는 useWatch를 호출하지 않음
   // fieldsToWatch.length === 0이면 name: undefined → RHF는 폼 전체를 구독하여 불필요한 리렌더링 발생
   const hasConditions = fieldsToWatch.length > 0;
-  
+
   const watched = useWatch({
     control,
     name: hasConditions ? fieldsToWatch : [],  // 조건이 없으면 빈 배열로 전달 (폼 전체 구독 방지)
   });
-  
+
   const watchedValues = React.useMemo(() => {
     if (!hasConditions) return {} as Record<string, any>;
     // watched가 배열인 경우 필드명과 매핑
@@ -855,7 +855,7 @@ function SchemaFieldComponent({
   // 2) 조건 평가
   // SDUI v1.1: then/else 구조 지원, 동적 액션(setValue, setOptions, switchComponent) 반환
   const { isHidden, isDisabled, isRequired, actions: conditionalActions } = getConditionalActions(field, watchedValues);
-  
+
   // SDUI v1.1: 동적 컴포넌트 전환 처리
   const effectiveComponentType = conditionalActions?.switchComponent?.to || field.customComponentType;
 
@@ -867,9 +867,9 @@ function SchemaFieldComponent({
   //   self-referential 조건("내 값이 X면 내 값을 Y로 바꿔라")은 스키마 레벨에서 금지
   React.useEffect(() => {
     if (!setFormValue || conditionalActions?.setValue === undefined) return;
-    
+
     // react-hook-form의 setValue는 현재 값과 비교하여 불필요한 업데이트 방지
-    setFormValue(name, conditionalActions.setValue, { 
+    setFormValue(name, conditionalActions.setValue, {
       shouldValidate: false,  // 조건부 setValue는 validation 트리거하지 않음
       shouldDirty: false,      // 사용자 입력이 아니므로 dirty 상태 변경하지 않음
     });
@@ -881,11 +881,11 @@ function SchemaFieldComponent({
   // 2. field.options (스키마에 정의된 정적 옵션)
   // ⚠️ 참고: setOptions는 select/multiselect/radio에만 적용되며, kind: 'custom' 위젯에는 적용되지 않습니다.
   const [dynamicOptions, setDynamicOptions] = React.useState<Array<{ value: string; labelKey?: string; label?: string }> | undefined>(options);
-  
+
   React.useEffect(() => {
     if (conditionalActions?.setOptions) {
       const { type, options: staticOptions, endpoint } = conditionalActions.setOptions;
-      
+
       if (type === 'static' && staticOptions) {
         setDynamicOptions(staticOptions);
       } else if (type === 'api' && endpoint) {
@@ -901,7 +901,7 @@ function SchemaFieldComponent({
             const res = await apiClient.get(endpoint);
             // apiClient.get() 반환 형태 처리: { data, error } 또는 직접 데이터
             const data = (res as any).data ?? res;
-            
+
             // API 응답을 options 형식으로 변환
             if (Array.isArray(data)) {
               setDynamicOptions(data.map((item: any) => ({
@@ -936,7 +936,7 @@ function SchemaFieldComponent({
     : baseRules;
 
   const error = errors[name]?.message as string | undefined;
-  
+
   // ⚠️ 중요: Tailwind 클래스를 직접 사용하지 않고, props 기반으로 core-ui에 전달
   // 스키마는 논리적 구조만 정의하고, 스타일은 core-ui가 담당합니다.
   // 기술문서 UI 문서 2.3 "schema-engine ↔ core-ui 통신 방식" 참조
@@ -944,7 +944,7 @@ function SchemaFieldComponent({
   // ⚠️ 보완: Renderer는 스타일 로직을 가져서는 안 됩니다.
   // → core-ui의 FormFieldLayout만 사용하도록 명시
   const colSpan = ui?.colSpan ?? 12;
-  
+
   // 🍀 4) 각 필드 렌더링에 isDisabled 적용
 
   // text/email/phone/password → register
@@ -958,7 +958,7 @@ function SchemaFieldComponent({
         : kind === 'password'
         ? 'password'
         : 'text';
-    
+
     return (
       <FormFieldLayout colSpan={colSpan}>
         <Input
@@ -1160,7 +1160,7 @@ export const SchemaField = React.memo(SchemaFieldComponent);
 
 /**
  * Custom Widget Field Component
- * 
+ *
  * SDUI v1.1: Custom Widget을 동적으로 로드하여 렌더링합니다.
  */
 const CustomWidgetField: React.FC<{
@@ -1184,10 +1184,10 @@ const CustomWidgetField: React.FC<{
       try {
         setLoading(true);
         setError(null);
-        
+
         // SDUI v1.1: Widget Not Found 처리 강화
         const Component = await loadWidget(componentType);
-        
+
         if (mounted) {
           if (!Component) {
             setError(new Error(`Widget "${componentType}" not found in registry.`));
@@ -1392,10 +1392,10 @@ import { studentFormSchema } from '../schemas/student.schema'; // Fallback
 export function StudentsPage() {
   // Schema Registry에서 스키마 조회 (Fallback: 로컬 스키마)
   const { data: schema, isLoading: schemaLoading } = useSchema('student', studentFormSchema);
-  
+
   // schema가 없으면 fallback 사용
   const formSchema = schema || studentFormSchema;
-  
+
   // ... 나머지 코드
 }
 
@@ -1587,7 +1587,7 @@ function LargeForm() {
 function MyForm() {
   const schema = useMemo(() => studentFormSchema, []);
   const defaultValues = useMemo(() => ({ name: '', email: '' }), []);
-  
+
   return <SchemaForm schema={schema} defaultValues={defaultValues} />;
 }
 ```
@@ -1641,12 +1641,12 @@ migration_script 필드:
 -- Industry: academy
 
 -- 1. 새 컬럼 추가 (Backward Compatible)
-ALTER TABLE students 
+ALTER TABLE students
 ADD COLUMN IF NOT EXISTS middle_name text;
 
 -- 2. 기존 컬럼 데이터 마이그레이션
-UPDATE students 
-SET middle_name = split_part(full_name, ' ', 2) 
+UPDATE students
+SET middle_name = split_part(full_name, ' ', 2)
 WHERE full_name IS NOT NULL AND middle_name IS NULL;
 
 -- 3. (선택) 기존 컬럼 삭제 (Breaking Change)
@@ -1837,7 +1837,7 @@ function SchemaForm({ schema, actionContext, ... }) {
       formData: data,
     });
   };
-  
+
   // onSubmitSuccess/onSubmitError는 Action Engine 내부에서 처리
 }
 ```
@@ -1918,7 +1918,13 @@ export interface TableSchema extends BaseSchema {
       filterable?: boolean;  // SDUI v1.1
       type?: 'text' | 'number' | 'date' | 'tag' | 'badge' | 'custom';  // SDUI v1.1
     }>;
-    rowActions?: string[];  // 'edit', 'delete', 'view' 등
+    rowActions?: string[];  // 'edit', 'delete', 'view' 등 (하위 호환성)
+    rowActionHandlers?: {  // SDUI v1.2: Action Engine 연결 (권장)
+      edit?: ActionDefinition;
+      delete?: ActionDefinition;
+      view?: ActionDefinition;
+      [key: string]: ActionDefinition | undefined;
+    };
     bulkActions?: string[];  // 'delete', 'export' 등
     pagination?: {
       pageSizeOptions?: number[];  // SDUI v1.1
@@ -1930,6 +1936,48 @@ export interface TableSchema extends BaseSchema {
   };
 }
 ```
+
+⚠️ 중요: rowActionHandlers 사용 예시 (SDUI v1.2)
+
+TableSchema에서 rowActions의 'edit' 클릭 시 Action Engine으로 연결하는 방법:
+
+```typescript
+{
+  "type": "table",
+  "table": {
+    "rowActions": ["edit", "delete"],  // 하위 호환성 유지
+    "rowActionHandlers": {
+      "edit": {
+        "event": "onRowAction",
+        "type": "openModal",
+        "schemaKey": "teacher.edit"  // 스키마 키로 모달 폼 로드
+      },
+      "delete": {
+        "event": "onRowAction",
+        "type": "confirm",
+        "titleKey": "DELETE.CONFIRM.TITLE",
+        "confirmMessageKey": "DELETE.CONFIRM.MESSAGE",
+        "actions": [
+          {
+            "event": "onConfirm",
+            "type": "api.call",
+            "endpoint": "/api/teachers/{rowId}",
+            "method": "DELETE"
+          },
+          {
+            "event": "onConfirmSuccess",
+            "type": "toast",
+            "messageKey": "DELETE.SUCCESS",
+            "variant": "success"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+→ 상세 가이드라인은 `docu/UI_가이드라인_모달_페이지_선택.md` 참조
 
 16.3 DetailSchema
 
@@ -2003,7 +2051,7 @@ export function SchemaRenderer({ schema, ...props }) {
 
 17.1 Widget Not Found 처리
 
-스키마에서 customComponentType을 잘못 입력하면 앱이 죽을 수 있으므로, 
+스키마에서 customComponentType을 잘못 입력하면 앱이 죽을 수 있으므로,
 반드시 "Widget Not Found" 처리가 필요합니다.
 
 구현:
@@ -2032,7 +2080,7 @@ registerWidget('BankTransferInput', () => import('@widgets-academy/BankTransferI
 현재 구조:
 ```typescript
 {
-  conditions: [ConditionRule], 
+  conditions: [ConditionRule],
   logic: 'and' | 'or'
 }
 ```

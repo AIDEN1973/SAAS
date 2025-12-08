@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Validation Rules Builder
  * 
  * [불변 규칙] React Hook Form의 validation rules를 스키마에서 생성합니다.

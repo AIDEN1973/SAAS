@@ -1,6 +1,6 @@
 /**
  * Multi-Tenant Theme Engine
- * 
+ *
  * Theme Merge Priority:
  * 1. system default tokens
  * 2. industry tokens
@@ -42,8 +42,8 @@ export interface ThemeConfig {
 
 /**
  * Theme Engine
- * 
- * [불�? 규칙] ?�마?????�이?�에???�차?�으�?override?�어 최종 Token Set???�성?�다.
+ *
+ * [불변 규칙] 스키마 이에 따라 순차적으로 override하여 최종 Token Set을 생성한다.
  */
 export class ThemeEngine {
   private config: ThemeConfig;
@@ -55,7 +55,7 @@ export class ThemeEngine {
   }
 
   /**
-   * Theme Merge Priority???�라 ?�큰 병합
+   * Theme Merge Priority에 따라 토큰 병합
    */
   private mergeThemes(): ThemeTokens {
     // 1. System default tokens
@@ -91,7 +91,7 @@ export class ThemeEngine {
 
   private deepMerge(target: any, source: any): any {
     const output = { ...target };
-    
+
     if (source) {
       Object.keys(source).forEach((key) => {
         if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
@@ -101,18 +101,18 @@ export class ThemeEngine {
         }
       });
     }
-    
+
     return output;
   }
 
   private applyDarkMode(tokens: ThemeTokens): ThemeTokens {
-    // Dark mode 변??로직
-    // ?�제 구현?�서???�상 ?�버????처리
+    // Dark mode 변환 로직
+    // 실제 구현에서는 현재 서버에서 처리
     return tokens;
   }
 
   private applyHighContrast(tokens: ThemeTokens): ThemeTokens {
-    // High contrast 변??로직
+    // High contrast 변환 로직
     return tokens;
   }
 
@@ -122,28 +122,28 @@ export class ThemeEngine {
   }
 
   /**
-   * 최종 병합???�큰 반환
+   * 최종 병합된 토큰 반환
    */
   getTokens(): ThemeTokens {
     return this.mergedTokens;
   }
 
   /**
-   * Spacing ?�큰 가?�오�?
+   * Spacing 토큰 가져오기
    */
   getSpacing(token: SpacingToken): string {
     return this.mergedTokens.spacing[token];
   }
 
   /**
-   * Color ?�큰 가?�오�?
+   * Color 토큰 가져오기
    */
   getColor(token: ColorToken, variant: 'light' | 'DEFAULT' | 'dark' = 'DEFAULT'): string {
     return this.mergedTokens.colors[token][variant];
   }
 
   /**
-   * Size ?�큰 가?�오�?
+   * Size 토큰 가져오기
    */
   getSize(token: SizeToken): string {
     return this.mergedTokens.sizes[token];
@@ -151,7 +151,7 @@ export class ThemeEngine {
 }
 
 /**
- * Default Theme Engine ?�스?�스 ?�성
+ * Default Theme Engine 인스턴스 생성
  */
 export function createTheme(config: ThemeConfig): ThemeEngine {
   return new ThemeEngine(config);

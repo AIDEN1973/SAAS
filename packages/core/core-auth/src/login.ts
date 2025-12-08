@@ -1,9 +1,9 @@
-﻿/**
+/**
  * Core Auth Login Service
- * 
+ *
  * 로그인 서비스 (Supabase Auth 매핑)
  * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
- * 
+ *
  * ⚠️ 주의: 실제 인증 로직은 Supabase Auth를 직접 사용하니
  * 이 서비스는 로그인 관련 유틸리티와 헬퍼 함수만 제공합니다.
  */
@@ -17,7 +17,7 @@ export class LoginService {
 
   /**
    * 이메일/비밀번호 로그인
-   * 
+   *
    * [기술문서 요구사항]
    * - 이메일/비밀번호 로그인(loginWithEmail)
    * - 로그인 후 사용자 인증 및 테넌트 목록 조회 및 테넌트 선택
@@ -47,11 +47,11 @@ export class LoginService {
       // Supabase Auth 에러 코드에 따른 상세 메시지
       // [기술문서 요구사항] 에러 메시지는 민감 정보 출력 금지, 사용자 친화적 메시지 제공
       let errorMessage = '로그인에 실패했습니다.';
-      
+
       // 에러 코드 기반 처리 (Supabase Auth 공식 에러 코드)
       const errorCode = error.code || '';
       const errorMsg = error.message || '';
-      
+
       // 이메일 인증 필요
       if (errorCode === 'email_not_confirmed' || errorMsg.includes('Email not confirmed') || errorMsg.includes('email_not_confirmed')) {
         errorMessage = '이메일 인증이 필요합니다. 이메일을 확인해주세요.';
@@ -120,10 +120,10 @@ export class LoginService {
 
   /**
    * 소셜 로그인(OAuth)
-   * 
+   *
    * ⚠️ 주의: OAuth는 리다이렉트 방식이므로 이 메서드는 URL을 반환하니
    * 실제 인증은 브라우저에서 처리합니다.
-   * 
+   *
    * [불변 규칙] 브라우저에서만 사용 코드이므로 window 객체 사용 가능
    */
   async loginWithOAuth(input: OAuthLoginInput): Promise<{ url: string }> {
@@ -131,9 +131,9 @@ export class LoginService {
     if (typeof window === 'undefined') {
       throw new Error('소셜 로그인은 브라우저 환경에서만 사용할 수 있습니다.');
     }
-    
+
     const redirectTo = input.redirectTo || `${window.location.origin}/auth/callback`;
-    
+
     const { data, error } = await this.supabase.auth.signInWithOAuth({
       provider: input.provider,
       options: {
@@ -154,7 +154,7 @@ export class LoginService {
 
   /**
    * OTP 로그인(전화번호 인증)
-   * 
+   *
    * 1단계: 전화번호로 OTP 전송
    * 2단계: OTP 코드로 인증
    */
@@ -204,7 +204,7 @@ export class LoginService {
 
   /**
    * 사용자의 테넌트 목록 조회
-   * 
+   *
    * ⚠️ 주의: 이 함수는 RLS 정책의 영향을 받습니다.
    * user_tenant_roles 테이블의 RLS 정책: user_id = auth.uid()
    * tenants 테이블의 RLS 정책: user_tenant_roles를 통한 간접 참조
@@ -237,7 +237,7 @@ export class LoginService {
     // RLS 정책: id IN (SELECT tenant_id FROM user_tenant_roles WHERE user_id = auth.uid())
     // 이 정책이 제대로 동작하려면 user_tenant_roles가 먼저 조회 가능해야 함
     const tenantIds = rolesData.map(r => r.tenant_id);
-    
+
     const { data: tenantsData, error: tenantsError } = await this.supabase
       .from('tenants')
       .select('id, name, industry_type')
@@ -283,24 +283,24 @@ export class LoginService {
 
   /**
    * 테넌트 선택
-   * 
+   *
    * 선택한 테넌트의 tenant_id를 JWT claim에 포함하여 새 세션 생성
-   * 
+   *
    * [기술문서 요구사항]
    * - 로그인 프로세스 3단계: 테넌트 선택 (JWT claim에 tenant_id 포함)
    * - 로그인 프로세스 4단계: 세션 새로고침 (업데이트된 JWT 받기)
-   * 
+   *
    * ⚠️ 중요: JWT claim 업데이트는 Supabase Database Trigger 또는 Edge Function에서 처리합니다.
    * - Database Trigger: user_tenant_roles 변경 시 자동으로 JWT claim 업데이트
    * - 또는 Edge Function: selectTenant 호출 시 tenant_id를 JWT claim에 포함하여 새 토큰 발급
-   * 
+   *
    * 현재 구현은 세션을 새로고침하여 최신 JWT를 받아오니
    * 실제 JWT claim에 tenant_id가 포함되려면 Supabase 설정이 필요합니다.
    */
   async selectTenant(tenantId: string): Promise<TenantSelectionResult> {
     // 현재 세션 확인
     const { data: { session }, error: sessionError } = await this.supabase.auth.getSession();
-    
+
     if (sessionError || !session) {
       throw new Error('세션이 없습니다. 다시 로그인해주세요.');
     }
@@ -318,9 +318,46 @@ export class LoginService {
     }
 
     // 세션 새로고침 (JWT claim 업데이트는 Edge Function에서 처리)
-    const { data: refreshData, error: refreshError } = await this.supabase.auth.refreshSession(session);
+    // Rate limit 에러 방지를 위해 재시도 로직 추가
+    let retries = 0;
+    const maxRetries = 3;
+    let refreshError: any = null;
+    let refreshData: any = null;
 
-    if (refreshError || !refreshData.session) {
+    while (retries < maxRetries) {
+      try {
+        const result = await this.supabase.auth.refreshSession(session);
+        refreshError = result.error;
+        refreshData = result.data;
+
+        if (!refreshError && refreshData?.session) {
+          break; // 성공
+        }
+
+        // Rate limit 에러인 경우 재시도
+        if (refreshError?.message?.includes('rate limit') || refreshError?.message?.includes('429')) {
+          retries++;
+          if (retries < maxRetries) {
+            // 지수 백오프: 1초, 2초, 4초 대기
+            const delay = Math.pow(2, retries) * 1000;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+        } else {
+          // Rate limit이 아닌 다른 에러는 즉시 실패
+          break;
+        }
+      } catch (error) {
+        refreshError = error;
+        break;
+      }
+    }
+
+    if (refreshError || !refreshData?.session) {
+      // Rate limit 에러인 경우 더 명확한 메시지 제공
+      if (refreshError?.message?.includes('rate limit') || refreshError?.message?.includes('429')) {
+        throw new Error('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.');
+      }
       throw new Error(`세션 새로고침 실패: ${refreshError?.message || '알 수 없는 오류'}`);
     }
 
@@ -358,7 +395,7 @@ export class LoginService {
 
 /**
  * Default Service Instance
- * 
+ *
  * [불변 규칙] 브라우저 코드에서 사용하는 인증 서비스 인스턴스
  */
 export const loginService = new LoginService();

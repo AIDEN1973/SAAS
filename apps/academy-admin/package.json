@@ -17,6 +17,7 @@
     "@env-registry/core": "file:../../packages/env-registry",
     "@hooks/use-class": "file:../../packages/hooks/use-class",
     "@hooks/use-student": "file:../../packages/hooks/use-student",
+    "@lib/date-utils": "file:../../packages/lib/date-utils",
     "@lib/supabase-client": "file:../../packages/lib/supabase-client",
     "@services/attendance-service": "file:../../packages/services/attendance-service",
     "@services/class-service": "file:../../packages/services/class-service",

@@ -25,7 +25,7 @@ export type { SidebarProps, SidebarItem } from './Sidebar';
 export { AppLayout } from './AppLayout';
 export type { AppLayoutProps } from './AppLayout';
 
-// AppShellLayout?� AppLayout??별칭 (문서 ?�환??
+// AppShellLayout은 AppLayout의 별칭 (문서 호환성)
 export { AppLayout as AppShellLayout } from './AppLayout';
 export type { AppLayoutProps as AppShellLayoutProps } from './AppLayout';
 
@@ -100,4 +100,3 @@ export type { FormFieldLayoutProps } from './FormFieldLayout';
 
 export { DatePicker } from './DatePicker';
 export type { DatePickerProps } from './DatePicker';
-

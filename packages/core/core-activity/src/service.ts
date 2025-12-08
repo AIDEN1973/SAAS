@@ -1,8 +1,8 @@
 /**
  * Core Activity Service
- * 
- * Activity Feed / ?�?�라???�벤??기록 ?�비??
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
+ *
+ * Activity Feed / 타임라인 이벤트 기록 서비스
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -17,7 +17,7 @@ export class ActivityService {
   private supabase = createServerClient();
 
   /**
-   * ?�동 기록
+   * 활동 기록
    */
   async createActivity(
     tenantId: string,
@@ -45,7 +45,7 @@ export class ActivityService {
   }
 
   /**
-   * ?�동 목록 조회 (?�?�라??
+   * 활동 목록 조회 (타임라인)
    */
   async getActivities(
     tenantId: string,
@@ -96,4 +96,3 @@ export class ActivityService {
  * Default Service Instance
  */
 export const activityService = new ActivityService();
-

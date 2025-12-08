@@ -3,7 +3,27 @@
 
 멀티테넌트 + Supabase + Monorepo 아키텍처를 전제로 한다.
 
-Cursor가 생성하는 모든 코드/SQL은 아래 규칙을 “절대 변경하지 않는다”고 가정한다.
+Cursor가 생성하는 모든 코드/SQL은 아래 규칙을 "절대 변경하지 않는다"고 가정한다.
+
+0-1. 파일 생성 금지 규칙 (Critical)
+
+[불변 규칙] AI 에이전트는 다음 파일 형식을 생성하지 않습니다:
+
+❌ 금지:
+- *.md 파일 (마크다운 문서)
+- *.txt 파일 (텍스트 문서)
+
+✅ 예외:
+- 사용자가 명시적으로 요청한 경우에만 생성 가능
+- 기존 문서 수정은 허용
+
+이유:
+1. 문서는 개발자가 직접 작성하고 관리해야 함
+2. 자동 생성된 문서는 품질이 보장되지 않음
+3. 문서 중복 생성 방지
+4. 프로젝트 구조 명확성 유지
+
+⚠️ 중요: 코드 생성 시 문서 파일(.md, .txt)을 자동으로 생성하지 않습니다.
 
 특히 아래 키워드/패턴은 이름을 바꾸거나 변형하면 안 됨:
 
@@ -545,6 +565,48 @@ useResponsiveMode() + core-ui 컴포넌트 조합 우선.
 
 PC: DataTable
 
+4-3. 알림/경고 모달 규칙 (Critical)
+
+[불변 규칙] 모든 알림/경고/확인 대화상자는 커스텀 모달을 사용해야 합니다.
+
+❌ 금지:
+- window.alert()
+- window.confirm()
+- window.prompt()
+
+✅ 허용:
+- useModal().showAlert(message, title?, type?)
+- useModal().showConfirm(message, title?)
+- 커스텀 Modal 컴포넌트
+
+이유:
+1. 일관된 UX: 모든 알림이 동일한 디자인 시스템 사용
+2. 접근성: 커스텀 모달은 접근성 개선 가능
+3. 모바일 최적화: 모바일에서 네이티브 alert는 부자연스러움
+4. 테마 지원: 다크모드, 테넌트 테마 적용 가능
+5. i18n 지원: 다국어 메시지 지원
+
+사용 예시:
+```typescript
+import { useModal } from '@ui-core/react';
+
+function MyComponent() {
+  const { showAlert, showConfirm } = useModal();
+
+  // 알림
+  showAlert('저장되었습니다.', '성공', 'success');
+  showAlert('저장에 실패했습니다.', '오류', 'error');
+
+  // 확인
+  const confirmed = await showConfirm('정말 삭제하시겠습니까?', '삭제 확인');
+  if (confirmed) {
+    await deleteItem.mutateAsync(id);
+  }
+}
+```
+
+참고: 상세 가이드라인은 `docu/UI_가이드라인_모달_페이지_선택.md` 참조
+
 5. 시간 & 타임존(KST) 규칙
 5-1. 저장/표시 원칙
 
@@ -922,7 +984,7 @@ x-tenant-id 헤더 이름 그대로 사용.
 
 Cursor는 이 함수를 다른 경로에 생성하거나 이름을 변경하면 안 된다.
 
-[불변 규칙] findTenantByDomain()의 시그니처는 
+[불변 규칙] findTenantByDomain()의 시그니처는
 
 (domain: string) => Promise<{ id: uuid, tenant_id: uuid, status: string } | null>
 
@@ -1075,7 +1137,7 @@ GeoJSON 좌표 변환 예시:
 
 // GeoJSON은 [lng, lat] 순서이므로 Kakao LatLng(lat, lng)로 변환
 const polygon = new kakao.maps.Polygon({
-  path: feature.geometry.coordinates[0].map(([lng, lat]: [number, number]) => 
+  path: feature.geometry.coordinates[0].map(([lng, lat]: [number, number]) =>
     new kakao.maps.LatLng(lat, lng)  // 순서 변환: [lng, lat] → LatLng(lat, lng)
   ),
   // ...

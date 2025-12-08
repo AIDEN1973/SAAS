@@ -1,9 +1,9 @@
 /**
  * Attendance Service
- * 
- * 출결 관�??�비???�이??
- * [불�? 규칙] Service Layer??Industry Layer�??�핑?�여 비즈?�스 로직 ?�공
- * [불�? 규칙] ?�라?�언?�는 Service Layer�??�해?�만 ?�이???�근
+ *
+ * 출결 관리 서비스 레이어
+ * [불변 규칙] Service Layer는 Industry Layer를 매핑하여 비즈니스 로직 제공
+ * [불변 규칙] 클라이언트는 Service Layer를 통해만 데이터에 접근
  */
 
 import { academyService } from '@industry/academy/service';
@@ -15,7 +15,7 @@ import type {
 
 export class AttendanceService {
   /**
-   * 출결 로그 ?�성
+   * 출결 로그 생성
    */
   async createAttendanceLog(
     tenantId: string,
@@ -36,7 +36,7 @@ export class AttendanceService {
   }
 
   /**
-   * ?�생�?출결 로그 조회
+   * 학생별 출결 로그 조회
    */
   async getAttendanceLogsByStudent(
     tenantId: string,
@@ -58,7 +58,7 @@ export class AttendanceService {
   }
 
   /**
-   * 출결 로그 ??��
+   * 출결 로그 삭제
    */
   async deleteAttendanceLog(
     tenantId: string,
@@ -69,4 +69,3 @@ export class AttendanceService {
 }
 
 export const attendanceService = new AttendanceService();
-

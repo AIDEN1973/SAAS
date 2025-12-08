@@ -1,8 +1,8 @@
 /**
  * Modal Component
- * 
- * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
- * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
+ *
+ * [불변 규칙] 스키마에서는 Tailwind 클래스를 직접 사용하지 않습니다.
+ * [불변 규칙] 모든 스타일은 design-system 토큰을 사용합니다.
  */
 
 import React, { useEffect } from 'react';
@@ -24,9 +24,9 @@ export interface ModalProps {
 }
 
 /**
- * Modal 컴포?�트
- * 
- * ?�버?�이?� ?�께 ?�시?�는 모달 ?�이?�로�?
+ * Modal 컴포넌트
+ *
+ * 오버레이 위에 표시되는 모달 레이아웃
  */
 export const Modal: React.FC<ModalProps> = ({
   isOpen,

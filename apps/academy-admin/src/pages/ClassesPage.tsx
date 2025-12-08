@@ -1,26 +1,30 @@
-﻿/**
+/**
  * 반 관리 페이지
- * 
+ *
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  * [요구사항] 반 리스트 + 캘린더 뷰 생성 (Calendar-like) 제공
  */
 
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary } from '@ui-core/react';
-import { Container, Card, Button, Input } from '@ui-core/react';
-import { SchemaForm } from '@schema-engine';
+import React, { useState, useMemo } from 'react';
+import { ErrorBoundary, useModal } from '@ui-core/react';
+import { Container, Card, Button, Modal } from '@ui-core/react';
+import { SchemaForm, SchemaFilter } from '@schema-engine';
+import { apiClient } from '@api-sdk/core';
+import { toKST } from '@lib/date-utils';
 import {
   useClasses,
+  useClass,
   useCreateClass,
   useUpdateClass,
   useDeleteClass,
   useClassStatistics,
   useTeachers,
+  useAssignTeacher,
 } from '@hooks/use-class';
-import type { Class, CreateClassInput, ClassFilter, ClassStatus, DayOfWeek } from '@services/class-service';
-import { classFormSchema } from '../schemas/class.schema';
+import type { Class, CreateClassInput, UpdateClassInput, ClassFilter, ClassStatus, DayOfWeek } from '@services/class-service';
+import { createClassFormSchema } from '../schemas/class.schema';
+import { classFilterSchema } from '../schemas/class.filter.schema';
 
 const DAYS_OF_WEEK: { value: DayOfWeek; label: string }[] = [
   { value: 'monday', label: '월요일' },
@@ -33,41 +37,62 @@ const DAYS_OF_WEEK: { value: DayOfWeek; label: string }[] = [
 ];
 
 export function ClassesPage() {
-  const navigate = useNavigate();
+  const { showConfirm } = useModal();
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [filter, setFilter] = useState<ClassFilter>({});
-  const [searchQuery, setSearchQuery] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
 
   const { data: classes, isLoading, error } = useClasses({
     ...filter,
-    search: searchQuery.trim() || undefined, // 빈 문자열이면 undefined로 변환
+    search: filter.search?.trim() || undefined, // 빈 문자열이면 undefined로 변환
   });
   const { data: teachers } = useTeachers();
   const createClass = useCreateClass();
   const updateClass = useUpdateClass();
   const deleteClass = useDeleteClass();
+  const assignTeacher = useAssignTeacher();
 
-  const handleStatusFilter = (status: ClassStatus | 'all') => {
-    setFilter((prev) => ({
-      ...prev,
-      status: status === 'all' ? undefined : status,
-    }));
-  };
-
-  const handleDayFilter = (day: DayOfWeek | 'all') => {
-    setFilter((prev) => ({
-      ...prev,
-      day_of_week: day === 'all' ? undefined : day,
-    }));
-  };
+  const handleFilterChange = React.useCallback((filters: Record<string, any>) => {
+    setFilter({
+      search: filters.search || undefined,
+      status: filters.status || undefined,
+      day_of_week: filters.day_of_week || undefined,
+    });
+  }, []);
 
   const handleCreateClass = async (input: CreateClassInput) => {
     try {
-      await createClass.mutateAsync(input);
+      // 강사 배정 정보 분리
+      const { teacher_ids, ...classInput } = input;
+
+      // 반 생성
+      const createdClass = await createClass.mutateAsync(classInput);
+
+      // 강사 배정 (teacher_ids가 있는 경우)
+      if (teacher_ids && teacher_ids.length > 0 && createdClass) {
+        for (const teacherId of teacher_ids) {
+          await assignTeacher.mutateAsync({
+            class_id: createdClass.id,
+            teacher_id: teacherId,
+            role: 'teacher', // 기본값: 담임 강사
+            assigned_at: toKST().format('YYYY-MM-DD'),
+          });
+        }
+      }
+
       setShowCreateForm(false);
     } catch (error) {
       console.error('Failed to create class:', error);
+    }
+  };
+
+  const handleUpdateClass = async (classId: string, input: UpdateClassInput) => {
+    try {
+      await updateClass.mutateAsync({ classId, input });
+      setEditingClassId(null);
+    } catch (error) {
+      console.error('Failed to update class:', error);
     }
   };
 
@@ -110,60 +135,15 @@ export function ClassesPage() {
 
           {/* 검색 및 필터 패널 */}
           <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              <div style={{ flex: 1 }}>
-                <Input
-                  placeholder="반 이름 검색.."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  fullWidth
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
-                <Button
-                  variant={!filter.status ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => handleStatusFilter('all')}
-                >
-                  전체
-                </Button>
-                <Button
-                  variant={filter.status === 'active' ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => handleStatusFilter('active')}
-                >
-                  운영중
-                </Button>
-                <Button
-                  variant={filter.status === 'inactive' ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => handleStatusFilter('inactive')}
-                >
-                  비활성
-                </Button>
-              </div>
-
-              <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
-                <Button
-                  variant={!filter.day_of_week ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => handleDayFilter('all')}
-                >
-                  전체 요일
-                </Button>
-                {DAYS_OF_WEEK.map((day) => (
-                  <Button
-                    key={day.value}
-                    variant={filter.day_of_week === day.value ? 'solid' : 'outline'}
-                    size="sm"
-                    onClick={() => handleDayFilter(day.value)}
-                  >
-                    {day.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
+            <SchemaFilter
+              schema={classFilterSchema}
+              onFilterChange={handleFilterChange}
+              defaultValues={{
+                search: filter.search || '',
+                status: filter.status || '',
+                day_of_week: filter.day_of_week || '',
+              }}
+            />
           </Card>
 
           {/* 반 생성 폼 */}
@@ -183,15 +163,26 @@ export function ClassesPage() {
           ) : viewMode === 'list' ? (
             <ClassListView
               classes={classes || []}
-              onEdit={(classId) => navigate(`/classes/${classId}`)}
+              onEdit={(classId) => setEditingClassId(classId)}
               onDelete={async (classId) => {
-                if (confirm('정말 이 반을 삭제하시겠습니까?')) {
+                const confirmed = await showConfirm('정말 이 반을 삭제하시겠습니까?', '반 삭제');
+                if (confirmed) {
                   await deleteClass.mutateAsync(classId);
                 }
               }}
             />
           ) : (
             <ClassCalendarView classes={classes || []} />
+          )}
+
+          {/* 반 수정 모달 */}
+          {editingClassId && (
+            <EditClassModal
+              classId={editingClassId}
+              teachers={teachers || []}
+              onSave={handleUpdateClass}
+              onClose={() => setEditingClassId(null)}
+            />
           )}
         </div>
       </Container>
@@ -224,6 +215,9 @@ function CreateClassForm({
       room: data.room || undefined,
       notes: data.notes || undefined,
       status: data.status || 'active',
+      teacher_ids: data.teacher_ids && Array.isArray(data.teacher_ids) && data.teacher_ids.length > 0
+        ? data.teacher_ids
+        : undefined,
     };
     onSubmit(input);
   };
@@ -237,7 +231,7 @@ function CreateClassForm({
         </Button>
       </div>
       <SchemaForm
-        schema={classFormSchema}
+        schema={createClassFormSchema(teachers)}
         onSubmit={handleSubmit}
         defaultValues={{
           day_of_week: 'monday',
@@ -246,8 +240,112 @@ function CreateClassForm({
           capacity: 20,
           status: 'active',
         }}
+        actionContext={{
+          apiCall: async (endpoint: string, method: string, body?: any) => {
+            const { apiClient } = await import('@api-sdk/core');
+            if (method === 'POST') {
+              const response = await apiClient.post(endpoint, body);
+              if (response.error) {
+                throw new Error(response.error.message);
+              }
+              return response.data;
+            }
+            const response = await apiClient.get(endpoint);
+            if (response.error) {
+              throw new Error(response.error.message);
+            }
+            return response.data;
+          },
+        }}
       />
     </Card>
+  );
+}
+
+/**
+ * 반 수정 모달
+ */
+function EditClassModal({
+  classId,
+  teachers,
+  onSave,
+  onClose,
+}: {
+  classId: string;
+  teachers: any[];
+  onSave: (classId: string, input: UpdateClassInput) => Promise<void>;
+  onClose: () => void;
+}) {
+  const { data: classData, isLoading } = useClass(classId);
+  const classFormSchema = useMemo(() => createClassFormSchema(teachers), [teachers]);
+
+  const handleSubmit = async (data: any) => {
+    const input: UpdateClassInput = {
+      name: data.name || undefined,
+      subject: data.subject || undefined,
+      grade: data.grade || undefined,
+      day_of_week: data.day_of_week || undefined,
+      start_time: data.start_time || undefined,
+      end_time: data.end_time || undefined,
+      capacity: data.capacity || undefined,
+      room: data.room || undefined,
+      notes: data.notes || undefined,
+      status: data.status || undefined,
+    };
+    await onSave(classId, input);
+  };
+
+  if (isLoading) {
+    return (
+      <Modal isOpen={true} onClose={onClose} title="반 수정" size="lg">
+        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>
+      </Modal>
+    );
+  }
+
+  if (!classData) {
+    return (
+      <Modal isOpen={true} onClose={onClose} title="반 수정" size="lg">
+        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>반을 찾을 수 없습니다.</div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal isOpen={true} onClose={onClose} title="반 수정" size="lg">
+      <SchemaForm
+        schema={classFormSchema}
+        onSubmit={handleSubmit}
+        defaultValues={{
+          name: classData.name,
+          subject: classData.subject || '',
+          grade: classData.grade || '',
+          day_of_week: classData.day_of_week,
+          start_time: classData.start_time,
+          end_time: classData.end_time,
+          capacity: classData.capacity,
+          room: classData.room || '',
+          notes: classData.notes || '',
+          status: classData.status,
+        }}
+        actionContext={{
+          apiCall: async (endpoint: string, method: string, body?: any) => {
+            if (method === 'POST') {
+              const response = await apiClient.post(endpoint, body);
+              if (response.error) {
+                throw new Error(response.error.message);
+              }
+              return response.data;
+            }
+            const response = await apiClient.get(endpoint);
+            if (response.error) {
+              throw new Error(response.error.message);
+            }
+            return response.data;
+          },
+        }}
+      />
+    </Modal>
   );
 }
 
@@ -335,60 +433,133 @@ function ClassCard({
 }
 
 /**
- * 반 캘린더 뷰 (생성중)
- * [요구사항] 반 생성 (Calendar-like) 제공
+ * 반 캘린더 뷰
+ * [요구사항] 반 편성표(Calendar-like) 제공
+ * 시간대별 그리드 형태로 개선
  */
 function ClassCalendarView({ classes }: { classes: Class[] }) {
+  // 시간대 생성 (08:00 ~ 22:00, 30분 단위)
+  const timeSlots = React.useMemo(() => {
+    const slots: string[] = [];
+    for (let hour = 8; hour < 22; hour++) {
+      slots.push(`${hour.toString().padStart(2, '0')}:00`);
+      slots.push(`${hour.toString().padStart(2, '0')}:30`);
+    }
+    return slots;
+  }, []);
+
   // 요일별로 반 그룹화
   const classesByDay = DAYS_OF_WEEK.map((day) => ({
     day,
     classes: classes.filter((c) => c.day_of_week === day.value),
   }));
 
+  // 시간대에 반이 있는지 확인하는 함수
+  const getClassAtTime = (dayClasses: Class[], timeSlot: string) => {
+    return dayClasses.find((c) => {
+      const start = c.start_time;
+      const end = c.end_time;
+      return timeSlot >= start && timeSlot < end;
+    });
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-      {classesByDay.map(({ day, classes: dayClasses }) => (
-        <Card key={day.value} padding="md" variant="default">
-          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)' }}>
+    <div style={{ overflowX: 'auto' }}>
+      <Card padding="lg" variant="default">
+        <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)' }}>
+          반 편성표
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '100px repeat(7, 1fr)', gap: 'var(--spacing-xs)', minWidth: '800px' }}>
+          {/* 헤더 */}
+          <div style={{ padding: 'var(--spacing-sm)', fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)' }}>
+            시간
+          </div>
+          {DAYS_OF_WEEK.map((day) => (
+            <div
+              key={day.value}
+              style={{
+                padding: 'var(--spacing-sm)',
+                fontWeight: 'var(--font-weight-semibold)',
+                fontSize: 'var(--font-size-sm)',
+                textAlign: 'center',
+                backgroundColor: 'var(--color-background-secondary)',
+                borderRadius: 'var(--radius-sm)',
+              }}
+            >
             {day.label}
-          </h3>
-          {dayClasses.length === 0 ? (
-            <div style={{ color: 'var(--color-text-secondary)', textAlign: 'center', padding: 'var(--spacing-lg)' }}>
-              등록된 반이 없습니다.
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
-              {dayClasses
-                .sort((a, b) => a.start_time.localeCompare(b.start_time))
-                .map((classItem) => (
+          ))}
+
+          {/* 시간대별 행 */}
+          {timeSlots.map((timeSlot) => (
+            <React.Fragment key={timeSlot}>
+              <div
+                style={{
+                  padding: 'var(--spacing-xs)',
+                  fontSize: 'var(--font-size-xs)',
+                  color: 'var(--color-text-secondary)',
+                  textAlign: 'right',
+                }}
+              >
+                {timeSlot}
+              </div>
+              {DAYS_OF_WEEK.map((day) => {
+                const dayClasses = classesByDay.find((d) => d.day.value === day.value)?.classes || [];
+                const classAtTime = getClassAtTime(dayClasses, timeSlot);
+                const isStartTime = classAtTime?.start_time === timeSlot;
+
+                return (
                   <div
-                    key={classItem.id}
+                    key={`${day.value}-${timeSlot}`}
                     style={{
-                      padding: 'var(--spacing-sm)',
-                      borderRadius: 'var(--radius-md)',
-                      backgroundColor: `${classItem.color}20`,
-                      borderLeft: `4px solid ${classItem.color}`,
+                      minHeight: '30px',
+                      padding: isStartTime ? 'var(--spacing-xs)' : '0',
+                      backgroundColor: classAtTime
+                        ? `${classAtTime.color}20`
+                        : 'transparent',
+                      borderLeft: isStartTime ? `4px solid ${classAtTime.color}` : 'none',
+                      borderRadius: isStartTime ? 'var(--radius-sm)' : '0',
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontWeight: 'var(--font-weight-semibold)' }}>{classItem.name}</div>
-                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                          {classItem.start_time} ~ {classItem.end_time} | {classItem.current_count} / {classItem.capacity}명
-                        </div>
-                      </div>
-                      {classItem.room && (
-                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                          {classItem.room}
+                    {isStartTime && classAtTime && (
+                      <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)' }}>
+                        {classAtTime.name}
                         </div>
                       )}
                     </div>
+                );
+              })}
+            </React.Fragment>
+          ))}
+        </div>
+
+        {/* 범례 */}
+        {classes.length > 0 && (
+          <div style={{ marginTop: 'var(--spacing-md)', display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-sm)' }}>
+            {classes.map((classItem) => (
+              <div
+                key={classItem.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--spacing-xs)',
+                  fontSize: 'var(--font-size-sm)',
+                }}
+              >
+                <div
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    backgroundColor: classItem.color,
+                    borderRadius: 'var(--radius-sm)',
+                  }}
+                />
+                <span>{classItem.name}</span>
                   </div>
                 ))}
             </div>
           )}
         </Card>
-      ))}
     </div>
   );
 }

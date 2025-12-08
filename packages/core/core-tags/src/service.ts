@@ -1,8 +1,8 @@
 /**
  * Core Tags Service
- * 
- * 공통 ?�깅 ?�스??
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
+ *
+ * 공통 태깅 시스템
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -13,7 +13,7 @@ export class TagsService {
   private supabase = createServerClient();
 
   /**
-   * ?�그 목록 조회
+   * 태그 목록 조회
    */
   async getTags(
     tenantId: string,
@@ -40,7 +40,7 @@ export class TagsService {
   }
 
   /**
-   * ?�그 ?�성
+   * 태그 생성
    */
   async createTag(
     tenantId: string,
@@ -66,7 +66,7 @@ export class TagsService {
   }
 
   /**
-   * ?�티?�에 ?�그 ?�당
+   * 엔티티에 태그 할당
    */
   async assignTag(
     tenantId: string,
@@ -93,7 +93,7 @@ export class TagsService {
   }
 
   /**
-   * ?�티?�에 ?�러 ?�그 ?�당
+   * 엔티티에 여러 태그 할당
    */
   async assignTags(
     tenantId: string,
@@ -118,7 +118,7 @@ export class TagsService {
   }
 
   /**
-   * ?�티?�의 ?�그 조회
+   * 엔티티의 태그 조회
    */
   async getEntityTags(
     tenantId: string,
@@ -146,7 +146,7 @@ export class TagsService {
       throw new Error(`Failed to fetch entity tags: ${error.message}`);
     }
 
-    // Supabase join 결과 ?�???�전?�게 처리
+    // Supabase join 결과 안전하게 처리
     type TagAssignmentWithTag = {
       tag_id: string;
       tags: Tag | Tag[] | null;
@@ -154,7 +154,7 @@ export class TagsService {
     return (data || [])
       .map((item: any) => {
         const tags = item.tags;
-        // Supabase??join 결과�?배열�?반환?????�음
+        // Supabase는 join 결과를 배열로 반환할 수 있음
         if (Array.isArray(tags)) {
           return tags[0] || null;
         }
@@ -164,7 +164,7 @@ export class TagsService {
   }
 
   /**
-   * ?�그 ?�당 ?�제
+   * 태그 할당 제거
    */
   async removeTag(
     tenantId: string,
@@ -192,4 +192,3 @@ export class TagsService {
  * Default Service Instance
  */
 export const tagsService = new TagsService();
-

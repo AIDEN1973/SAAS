@@ -1,8 +1,8 @@
 /**
  * Tabs Component
- * 
- * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
- * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
+ *
+ * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
+ * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
  */
 
 import React, { useState } from 'react';
@@ -26,9 +26,9 @@ export interface TabsProps {
 }
 
 /**
- * Tabs 컴포?�트
- * 
- * ???�비게이??컴포?�트
+ * Tabs 컴포넌트
+ *
+ * 탭 네비게이션 컴포넌트
  */
 export const Tabs: React.FC<TabsProps> = ({
   items,
@@ -133,4 +133,3 @@ export const Tabs: React.FC<TabsProps> = ({
     </div>
   );
 };
-

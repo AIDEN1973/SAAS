@@ -1,18 +1,18 @@
 /**
- * ?�버/Edge ?�경�??�경변??로딩 ?�략
+ * 서버/Edge 환경변수 로딩 전략
  * - Edge Function (Supabase): Deno.env.toObject()
  * - Vercel (App/Node): process.env
- * - 로컬 개발: process.env (dotenv 로드 ??
- * 
- * ?�️ 주의: 브라?��? ?�경?�서???�용 불�? (resolveEnv() ?�출 ???�러 발생)
- * 
- * ?�경변???�일 ?�치:
- * - 루트 ?�렉?�리: .env.local (로컬 개발?? 중앙 관�?
- * - dotenv??server.ts?�서 초기???�점??로드??
+ * - 로컬 개발: process.env (dotenv 로드 후)
+ *
+ * ⚠️ 주의: 브라우저 환경에서는 사용 불가 (resolveEnv() 호출 시 에러 발생)
+ *
+ * 환경변수 파일 위치:
+ * - 루트 디렉토리: .env.local (로컬 개발용, 중앙 관리)
+ * - dotenv는 server.ts에서 초기 진입점에서 로드됨
  */
 export function resolveEnv(): Record<string, string | undefined> {
-  // Edge Function ?�경 감�? (Supabase Edge Functions??Deno ?��???
-  // @ts-ignore - Deno??Edge Function ?�경?�서�?존재
+  // Edge Function 환경 감지 (Supabase Edge Functions는 Deno 런타임 사용)
+  // @ts-ignore - Deno는 Edge Function 환경에서만 존재
   if (typeof Deno !== 'undefined' && Deno.env) {
     // @ts-ignore
     const env: Record<string, string | undefined> = {};
@@ -23,16 +23,16 @@ export function resolveEnv(): Record<string, string | undefined> {
     }
     return env;
   }
-  
-  // Node.js / Vercel ?�경
-  // dotenv??server.ts?�서 ?��? 로드?�어 ?�음
+
+  // Node.js / Vercel 환경
+  // dotenv는 server.ts에서 이미 로드되어 있음
   if (typeof process !== 'undefined' && process.env) {
     return process.env;
   }
-  
+
   throw new Error(
-    '?�경변???�근 불�?: Edge/App/Node ?�경??감�??????�습?�다.\n' +
-    '브라?��? ?�경?�서??env-registry/server�??�용?????�습?�다.\n' +
-    '?�라?�언??코드?�서??NEXT_PUBLIC_* ??빌드?�??값을 직접 ?�용?�세??'
+    '환경변수 접근 불가: Edge/App/Node 환경이 감지되지 않았습니다.\n' +
+    '브라우저 환경에서는 env-registry/server를 사용할 수 없습니다.\n' +
+    '클라이언트 코드에서는 NEXT_PUBLIC_* 접두사의 빌드 타임 값을 직접 사용하세요.'
   );
 }

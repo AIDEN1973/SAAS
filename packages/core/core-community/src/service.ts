@@ -1,8 +1,8 @@
 /**
  * Core Community Service
- * 
- * 게시???��?/공�? ?�비??
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
+ *
+ * 게시판/댓글/공지 공통 모듈 서비스
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -43,7 +43,7 @@ export class CommunityService {
       query = query.or(`title.ilike.%${filter.search}%,content.ilike.%${filter.search}%`);
     }
 
-    // 고정글 먼�?, �??�음 최신??
+    // 고정글 먼저, 그 다음 최신순
     query = query.order('is_pinned', { ascending: false });
     query = query.order('created_at', { ascending: false });
 
@@ -57,7 +57,7 @@ export class CommunityService {
   }
 
   /**
-   * 게시글 ?�세 조회
+   * 게시글 상세 조회
    */
   async getPost(tenantId: string, postId: string): Promise<Post | null> {
     const { data, error } = await withTenant(
@@ -79,7 +79,7 @@ export class CommunityService {
   }
 
   /**
-   * 게시글 ?�성
+   * 게시글 생성
    */
   async createPost(
     tenantId: string,
@@ -93,7 +93,7 @@ export class CommunityService {
         content: input.content,
         post_type: input.post_type,
         is_pinned: input.is_pinned ?? false,
-        created_by: null, // TODO: auth.uid()?�서 가?�오�?
+        created_by: null, // TODO: auth.uid()에서 가져오기
       })
       .select()
       .single();
@@ -106,7 +106,7 @@ export class CommunityService {
   }
 
   /**
-   * 게시글 ?�정
+   * 게시글 수정
    */
   async updatePost(
     tenantId: string,
@@ -130,7 +130,7 @@ export class CommunityService {
   }
 
   /**
-   * 게시글 ??��
+   * 게시글 삭제
    */
   async deletePost(tenantId: string, postId: string): Promise<void> {
     const { error } = await withTenant(
@@ -147,7 +147,7 @@ export class CommunityService {
   }
 
   /**
-   * ?��? 목록 조회
+   * 댓글 목록 조회
    */
   async getComments(
     tenantId: string,
@@ -170,7 +170,7 @@ export class CommunityService {
   }
 
   /**
-   * ?��? ?�성
+   * 댓글 생성
    */
   async createComment(
     tenantId: string,
@@ -182,7 +182,7 @@ export class CommunityService {
         tenant_id: tenantId,
         post_id: input.post_id,
         content: input.content,
-        created_by: null, // TODO: auth.uid()?�서 가?�오�?
+        created_by: null, // TODO: auth.uid()에서 가져오기
       })
       .select()
       .single();
@@ -195,7 +195,7 @@ export class CommunityService {
   }
 
   /**
-   * ?��? ??��
+   * 댓글 삭제
    */
   async deleteComment(
     tenantId: string,
@@ -219,4 +219,3 @@ export class CommunityService {
  * Default Service Instance
  */
 export const communityService = new CommunityService();
-

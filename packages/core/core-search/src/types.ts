@@ -1,10 +1,10 @@
 /**
  * Core Search Types
- * 
- * Full Text Search 공통 ?�이??
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
- * 
- * ?�️ 중요: Phase 1?� PostgreSQL Full Text Search, Phase 2+?�서 ?��? 검???�진 검??
+ *
+ * Full Text Search 공통 시스템
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ *
+ * ⚠️ 중요: Phase 1은 PostgreSQL Full Text Search, Phase 2+에서 전문 검색엔진(Meilisearch, Algolia 등) 검토
  */
 
 export type SearchEntityType = 'person' | 'consultation' | 'post' | 'review' | 'event';
@@ -24,4 +24,3 @@ export interface SearchInput {
   limit?: number;
   offset?: number;
 }
-

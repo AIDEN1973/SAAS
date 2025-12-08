@@ -1,12 +1,15 @@
 /**
  * Class Form Schema
- * 
+ *
  * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
+ * [동적 옵션] 강사 목록은 동적으로 채워집니다.
  */
 
 import type { FormSchema } from '@schema-engine';
+import type { Teacher } from '@services/class-service';
 
-export const classFormSchema: FormSchema = {
+export function createClassFormSchema(teachers?: Teacher[]): FormSchema {
+  return {
   version: '1.0.0',
   minSupportedClient: '1.0.0',
   entity: 'class',
@@ -120,6 +123,17 @@ export const classFormSchema: FormSchema = {
         },
       },
       {
+        name: 'teacher_ids',
+        kind: 'multiselect',
+        ui: {
+          label: '강사 배정',
+          colSpan: 1,
+        },
+        options: [
+          ...(teachers?.map((t) => ({ label: t.name, value: t.id })) || []),
+        ],
+      },
+      {
         name: 'notes',
         kind: 'textarea',
         ui: {
@@ -129,11 +143,37 @@ export const classFormSchema: FormSchema = {
       },
     ],
     submit: {
+      labelKey: 'CLASS.FORM.SUBMIT',
       label: '생성',
       variant: 'solid',
       color: 'primary',
       size: 'md',
     },
-  },
-};
+    // SDUI v1.1: Action Engine 지원
+    actions: [
+      {
+        event: 'onSubmit',
+        type: 'api.call',
+        endpoint: 'classes',
+        method: 'POST',
+        body: 'form',
+      },
+      {
+        event: 'onSubmitSuccess',
+        type: 'toast',
+        messageKey: 'CLASS.CREATE.SUCCESS',
+        message: '반이 생성되었습니다.',
+        variant: 'success',
+      },
+      {
+        event: 'onSubmitError',
+        type: 'toast',
+        messageKey: 'CLASS.CREATE.ERROR',
+        message: '반 생성에 실패했습니다.',
+        variant: 'error',
+      },
+    ],
+    },
+  };
+}
 

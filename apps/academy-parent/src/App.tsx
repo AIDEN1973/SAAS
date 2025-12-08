@@ -5,19 +5,19 @@ function App() {
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
         <Card padding="md" variant="default">
-          <h1 style={{ 
-            fontSize: '1.5rem', 
-            fontWeight: 'var(--font-weight-bold)', 
+          <h1 style={{
+            fontSize: '1.5rem',
+            fontWeight: 'var(--font-weight-bold)',
             marginBottom: 'var(--spacing-md)',
             color: 'var(--color-text)'
           }}>
-            ?�어??- ?��?�?
+            디어쌤 - 학부모
           </h1>
-          <p style={{ 
+          <p style={{
             color: 'var(--color-text-secondary)',
             margin: 0
           }}>
-            ?�경?�정???�료?�었?�니??
+            환경설정이 완료되었습니다.
           </p>
         </Card>
       </Container>

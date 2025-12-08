@@ -1,0 +1,95 @@
+/**
+ * Notification Form Schema
+ *
+ * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
+ * [불변 규칙] Tailwind 클래스 직접 사용 금지, props 기반 전달
+ */
+
+import type { FormSchema } from '@schema-engine';
+
+export const notificationFormSchema: FormSchema = {
+  version: '1.0.0',
+  minSupportedClient: '1.0.0',
+  entity: 'notification',
+  type: 'form',
+  form: {
+    layout: {
+      columns: 1,
+      columnGap: 'md',
+      rowGap: 'md',
+    },
+    fields: [
+      {
+        name: 'channel',
+        kind: 'select',
+        ui: {
+          label: '채널',
+        },
+        options: [
+          { value: 'sms', label: 'SMS' },
+          { value: 'kakao', label: '카카오 알림톡' },
+          { value: 'email', label: '이메일' },
+          { value: 'push', label: '푸시 알림' },
+        ],
+        validation: {
+          required: true,
+        },
+      },
+      {
+        name: 'recipient',
+        kind: 'text',
+        ui: {
+          label: '수신자',
+          placeholder: '전화번호 또는 이메일을 입력하세요',
+        },
+        validation: {
+          required: true,
+        },
+      },
+      {
+        name: 'content',
+        kind: 'textarea',
+        ui: {
+          label: '내용',
+          placeholder: '메시지 내용을 입력하세요',
+        },
+        validation: {
+          required: true,
+          minLength: 1,
+        },
+      },
+    ],
+    submit: {
+      labelKey: 'NOTIFICATION.FORM.SUBMIT',
+      label: '발송',
+      variant: 'solid',
+      color: 'primary',
+      size: 'md',
+    },
+    // SDUI v1.1: Action Engine 지원
+    actions: [
+      {
+        event: 'onSubmit',
+        type: 'api.call',
+        endpoint: 'notifications',
+        method: 'POST',
+        body: 'form',
+      },
+      {
+        event: 'onSubmitSuccess',
+        type: 'toast',
+        messageKey: 'NOTIFICATION.SEND.SUCCESS',
+        message: '메시지가 발송되었습니다.',
+        variant: 'success',
+      },
+      {
+        event: 'onSubmitError',
+        type: 'toast',
+        messageKey: 'NOTIFICATION.SEND.ERROR',
+        message: '메시지 발송에 실패했습니다.',
+        variant: 'error',
+      },
+    ],
+  },
+};
+

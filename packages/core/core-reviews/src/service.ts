@@ -1,8 +1,8 @@
 /**
  * Core Reviews Service
- * 
- * 리뷰/?��? ?�스???�비??
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
+ *
+ * 리뷰/평점 관리 서비스
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -53,7 +53,7 @@ export class ReviewsService {
   }
 
   /**
-   * 리뷰 ?�세 조회
+   * 리뷰 상세 조회
    */
   async getReview(tenantId: string, reviewId: string): Promise<Review | null> {
     const { data, error } = await withTenant(
@@ -75,7 +75,7 @@ export class ReviewsService {
   }
 
   /**
-   * 리뷰 ?�성
+   * 리뷰 생성
    */
   async createReview(
     tenantId: string,
@@ -94,7 +94,7 @@ export class ReviewsService {
         title: input.title,
         content: input.content,
         is_visible: input.is_visible ?? true,
-        created_by: null, // TODO: auth.uid()?�서 가?�오�?
+        created_by: null, // TODO: auth.uid()에서 가져오기
       })
       .select()
       .single();
@@ -107,7 +107,7 @@ export class ReviewsService {
   }
 
   /**
-   * 리뷰 ?�정
+   * 리뷰 수정
    */
   async updateReview(
     tenantId: string,
@@ -135,7 +135,7 @@ export class ReviewsService {
   }
 
   /**
-   * 리뷰 ??��
+   * 리뷰 삭제
    */
   async deleteReview(tenantId: string, reviewId: string): Promise<void> {
     const { error } = await withTenant(
@@ -156,4 +156,3 @@ export class ReviewsService {
  * Default Service Instance
  */
 export const reviewsService = new ReviewsService();
-

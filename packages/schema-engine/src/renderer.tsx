@@ -1,7 +1,8 @@
 /**
  * SDUI Renderer
- * 
- * [불�? 규칙] ?�키마�? UI 컴포?�트�??�더�? * [불�? 규칙] Tailwind ?�래?�는 ui-core?�서�??�용
+ *
+ * [불변 규칙] 스키마를 UI 컴포넌트로 렌더링
+ * [불변 규칙] Tailwind 클래스는 ui-core에서만 사용
  */
 
 import React from 'react';
@@ -12,20 +13,21 @@ import { SchemaForm } from './react/SchemaForm';
 
 /**
  * Form Renderer (Deprecated)
- * 
- * ?�️ ???�수???�거?�입?�다. SchemaForm 컴포?�트�??�용?�세??
- * 
+ *
+ * ⚠️ 이 함수는 더 이상 사용되지 않습니다. SchemaForm 컴포넌트를 사용하세요.
+ *
  * @deprecated Use SchemaForm component instead
  */
 
 export function renderForm(schema: FormSchema): React.ReactElement {
   const validation = validateSchema(schema);
-  
+
   if (!validation.valid) {
     throw new Error(`Invalid form schema: ${validation.errors?.message}`);
   }
 
-  // SchemaForm 컴포?�트�??�용?�도�?변�?  // ???�수???�위 ?�환?�을 ?�해 ?��??��?�? ?��??�으�?SchemaForm???�용?�니??
+  // SchemaForm 컴포넌트를 사용하도록 변경
+  // 이 함수는 하위 호환성을 위해 유지되지만, 실제로는 SchemaForm을 사용합니다.
   return React.createElement(SchemaForm, { schema });
 }
 
@@ -34,19 +36,19 @@ export function renderForm(schema: FormSchema): React.ReactElement {
  */
 export function renderTable(schema: TableSchema): React.ReactElement {
   const validation = validateSchema(schema);
-  
+
   if (!validation.valid) {
     throw new Error(`Invalid table schema: ${validation.errors?.message}`);
   }
 
   const { table } = schema;
 
-  // TODO: Table 컴포?�트�?ui-core??추�??�여 Tailwind 직접 ?�용 ?�거
-  // ?�재??기본 HTML table ?�용 (?�후 ui-core/Table 컴포?�트�?교체 ?�정)
+  // TODO: Table 컴포넌트를 ui-core에 추가하여 Tailwind 직접 사용 제거
+  // 현재는 기본 HTML table 사용 (향후 ui-core/Table 컴포넌트로 교체 예정)
   return (
     <Container maxWidth="full" padding="xs">
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ 
+        <table style={{
           minWidth: '100%',
           borderCollapse: 'collapse',
         }}>
@@ -73,7 +75,7 @@ export function renderTable(schema: TableSchema): React.ReactElement {
             </tr>
           </thead>
           <tbody style={{ backgroundColor: 'var(--color-white)' }}>
-            {/* ?�이?�는 ?��??�서 주입 */}
+            {/* 데이터는 외부에서 주입 */}
           </tbody>
         </table>
       </div>
@@ -90,7 +92,7 @@ export function renderSchema(schema: UISchema): React.ReactElement {
   } else if ('table' in schema) {
     return renderTable(schema);
   }
-  
+
   throw new Error('Unknown schema type');
 }
 
@@ -107,8 +109,8 @@ export const SchemaRenderer: React.FC<SchemaRendererProps> = ({ schema, data: _d
     return renderSchema(schema);
   } catch (error) {
     return (
-      <Card 
-        padding="md" 
+      <Card
+        padding="md"
         variant="outlined"
         style={{
           backgroundColor: 'var(--color-red-50)',
@@ -116,10 +118,9 @@ export const SchemaRenderer: React.FC<SchemaRendererProps> = ({ schema, data: _d
         }}
       >
         <p style={{ color: 'var(--color-red-800)' }}>
-          Schema ?�더�??�류: {error instanceof Error ? error.message : 'Unknown error'}
+          Schema 렌더링 오류: {error instanceof Error ? error.message : 'Unknown error'}
         </p>
       </Card>
     );
   }
 };
-

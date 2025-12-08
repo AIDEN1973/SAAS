@@ -1,8 +1,8 @@
 /**
  * Skeleton Component
- * 
- * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
- * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
+ *
+ * [불변 규칙] 스키마에서는 Tailwind 클래스를 직접 사용하지 않습니다.
+ * [불변 규칙] 모든 스타일은 design-system 토큰을 사용합니다.
  */
 
 import React from 'react';
@@ -17,9 +17,9 @@ export interface SkeletonProps {
 }
 
 /**
- * Skeleton 컴포?�트
- * 
- * 로딩 ?�켈?�톤
+ * Skeleton 컴포넌트
+ *
+ * 로딩 스켈레톤
  */
 export const Skeleton: React.FC<SkeletonProps> = ({
   width,

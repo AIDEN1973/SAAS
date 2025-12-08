@@ -1,11 +1,12 @@
 /**
  * Schema Engine Core
- * 
- * SDUI ?�더??+ Meta-Schema + Versioning + Condition Rule
- * SDUI v1.1 ?�터?�라?�즈 ?�장?? * 
- * 기술문서: 
- * - docu/?�키마엔�?txt (기존)
- * - SDUI 기술문서 v1.1 (?�터?�라?�즈 ?�장??
+ *
+ * SDUI 엔진 + Meta-Schema + Versioning + Condition Rule
+ * SDUI v1.1 추가 기능 확장
+ *
+ * 기술문서:
+ * - docu/스키마엔진.txt (기존)
+ * - SDUI 기술문서 v1.1 (추가 기능 확장)
  */
 
 export * from './types';
@@ -37,11 +38,11 @@ export type { ActionContext } from './core/actionEngine';
 export type { ActionDefinition, ActionType } from './types';
 
 // SDUI v1.1: Custom Widget Registry
-export { 
-  registerWidget, 
-  loadWidget, 
-  initializeWidgetRegistry, 
-  getRegisteredWidgets 
+export {
+  registerWidget,
+  loadWidget,
+  initializeWidgetRegistry,
+  getRegisteredWidgets
 } from './widgets/registry';
 export type { WidgetRegistry, WidgetLoader } from './widgets/registry';
 
@@ -55,7 +56,7 @@ export type { SchemaFieldProps } from './react/SchemaField';
 export { SchemaForm, SchemaFormWithMethods } from './react/SchemaForm';
 export type { SchemaFormProps, SchemaFormWithMethodsProps } from './react/SchemaForm';
 
-// SDUI v1.1: 추�? ?�더?�들
+// SDUI v1.1: 추가 렌더러들
 export { SchemaTable } from './react/SchemaTable';
 export type { SchemaTableProps } from './react/SchemaTable';
 export { SchemaDetail } from './react/SchemaDetail';
@@ -64,4 +65,3 @@ export { SchemaFilter } from './react/SchemaFilter';
 export type { SchemaFilterProps } from './react/SchemaFilter';
 export { SchemaWidget } from './react/SchemaWidget';
 export type { SchemaWidgetProps } from './react/SchemaWidget';
-

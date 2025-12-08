@@ -1,9 +1,9 @@
 /**
  * useClass Hook
- * 
- * React Query 기반 �?강사 관�?Hook
- * [불�? 규칙] tenant 변�???invalidateQueries() ?�동 발생
- * [불�? 규칙] api-sdk�??�해?�만 ?�이???�청
+ *
+ * React Query 기반 반/강사 관리 Hook
+ * [불변 규칙] tenant 변경 시 invalidateQueries() 자동 발생
+ * [불변 규칙] api-sdk를 통해서만 데이터 요청
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -22,8 +22,8 @@ import type {
 } from '@services/class-service';
 
 /**
- * �?목록 조회 Hook
- * [불�? 규칙] Zero-Trust: tenantId??Context?�서 ?�동?�로 가?�옴
+ * 반 목록 조회 Hook
+ * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
  */
 export function useClasses(filter?: ClassFilter) {
   const context = getApiContext();
@@ -49,7 +49,7 @@ export function useClasses(filter?: ClassFilter) {
 }
 
 /**
- * �??�세 조회 Hook
+ * 반 상세 조회 Hook
  */
 export function useClass(classId: string | null) {
   const context = getApiContext();
@@ -76,7 +76,7 @@ export function useClass(classId: string | null) {
 }
 
 /**
- * �??�성 Hook
+ * 반 생성 Hook
  */
 export function useCreateClass() {
   const queryClient = useQueryClient();
@@ -107,7 +107,7 @@ export function useCreateClass() {
 }
 
 /**
- * �??�정 Hook
+ * 반 수정 Hook
  */
 export function useUpdateClass() {
   const queryClient = useQueryClient();
@@ -144,7 +144,7 @@ export function useUpdateClass() {
 }
 
 /**
- * �???�� Hook
+ * 반 삭제 Hook
  */
 export function useDeleteClass() {
   const queryClient = useQueryClient();
@@ -157,7 +157,7 @@ export function useDeleteClass() {
         throw new Error('Tenant ID is required');
       }
 
-      // ?�프????��: status�?'archived'�?변�?
+      // 소프트 삭제: status를 'archived'로 변경
       const response = await apiClient.patch<Class>('academy_classes', classId, {
         status: 'archived',
       });
@@ -175,7 +175,7 @@ export function useDeleteClass() {
 }
 
 /**
- * 반별 ?�계 조회 Hook
+ * 반별 통계 조회 Hook
  */
 export function useClassStatistics(classId: string | null) {
   const context = getApiContext();
@@ -186,8 +186,8 @@ export function useClassStatistics(classId: string | null) {
     queryFn: async () => {
       if (!tenantId || !classId) return null;
 
-      // TODO: 출결 ?�이?��? 구현?�면 ?�제 ?�계 계산
-      // ?�재??기본�?반환
+      // TODO: 출결 테이블이 구현되면 실제 통계 계산
+      // 현재는 기본값 반환
       const classData = await apiClient.get<Class>('academy_classes', {
         filters: { id: classId },
         limit: 1,
@@ -199,16 +199,16 @@ export function useClassStatistics(classId: string | null) {
 
       const classInfo = classData.data[0];
       return {
-        attendance_rate: 0,  // TODO: 출결 ?�이??기반 계산
+        attendance_rate: 0,  // TODO: 출결 테이블 기반 계산
         capacity_rate: (classInfo.current_count / classInfo.capacity) * 100,
-        late_rate: 0,  // TODO: 출결 ?�이??기반 계산
+        late_rate: 0,  // TODO: 출결 테이블 기반 계산
       };
     },
     enabled: !!tenantId && !!classId,
   });
 }
 
-// ==================== 강사(Teacher) 관�?====================
+// ==================== 강사(Teacher) 관리 =====================
 
 /**
  * 강사 목록 조회 Hook
@@ -222,7 +222,7 @@ export function useTeachers(filter?: TeacherFilter) {
     queryFn: async () => {
       if (!tenantId) return [];
 
-      // persons + academy_teachers 조인?�여 조회
+      // persons + academy_teachers 조인하여 조회
       const response = await apiClient.get<any>('persons', {
         select: `
           *,
@@ -247,7 +247,7 @@ export function useTeachers(filter?: TeacherFilter) {
         throw new Error(response.error.message);
       }
 
-      // ?�이??변?? persons + academy_teachers ??Teacher
+      // 데이터 변환 persons + academy_teachers -> Teacher
       return (response.data || []).map((person: any) => {
         const teacherData = person.academy_teachers?.[0] || {};
         return {
@@ -276,7 +276,7 @@ export function useTeachers(filter?: TeacherFilter) {
 }
 
 /**
- * 강사 ?�세 조회 Hook
+ * 강사 상세 조회 Hook
  */
 export function useTeacher(teacherId: string | null) {
   const context = getApiContext();
@@ -341,7 +341,7 @@ export function useTeacher(teacherId: string | null) {
 }
 
 /**
- * 강사 ?�성 Hook
+ * 강사 생성 Hook
  */
 export function useCreateTeacher() {
   const queryClient = useQueryClient();
@@ -354,7 +354,7 @@ export function useCreateTeacher() {
         throw new Error('Tenant ID is required');
       }
 
-      // 1. persons ?�이블에 ?�성
+      // 1. persons 테이블에 생성
       const personResponse = await apiClient.post<any>('persons', {
         name: input.name,
         email: input.email,
@@ -369,7 +369,7 @@ export function useCreateTeacher() {
 
       const person = personResponse.data!;
 
-      // 2. academy_teachers ?�이블에 ?�장 ?�보 ?�??
+      // 2. academy_teachers 테이블에 확장 정보 추가
       const teacherResponse = await apiClient.post<any>('academy_teachers', {
         person_id: person.id,
         employee_id: input.employee_id,
@@ -382,7 +382,7 @@ export function useCreateTeacher() {
       });
 
       if (teacherResponse.error) {
-        // 롤백: persons ??��
+        // 롤백: persons 삭제
         await apiClient.delete('persons', person.id);
         throw new Error(teacherResponse.error.message);
       }
@@ -414,7 +414,7 @@ export function useCreateTeacher() {
 }
 
 /**
- * 강사 ?�정 Hook
+ * 강사 수정 Hook
  */
 export function useUpdateTeacher() {
   const queryClient = useQueryClient();
@@ -433,7 +433,7 @@ export function useUpdateTeacher() {
         throw new Error('Tenant ID is required');
       }
 
-      // 1. persons ?�이�??�데?�트
+      // 1. persons 테이블 업데이트
       const personUpdate: any = {};
       if (input.name !== undefined) personUpdate.name = input.name;
       if (input.email !== undefined) personUpdate.email = input.email;
@@ -447,7 +447,7 @@ export function useUpdateTeacher() {
         }
       }
 
-      // 2. academy_teachers ?�이�??�데?�트
+      // 2. academy_teachers 테이블 업데이트
       const teacherUpdate: any = {};
       if (input.employee_id !== undefined) teacherUpdate.employee_id = input.employee_id;
       if (input.specialization !== undefined) teacherUpdate.specialization = input.specialization;
@@ -458,7 +458,7 @@ export function useUpdateTeacher() {
       if (input.notes !== undefined) teacherUpdate.notes = input.notes;
 
       if (Object.keys(teacherUpdate).length > 0) {
-        // academy_teachers??person_id�?PK�??�용
+        // academy_teachers는 person_id를 PK로 사용
         const teacherResponse = await apiClient.get('academy_teachers', {
           filters: { person_id: teacherId },
           limit: 1,
@@ -477,7 +477,7 @@ export function useUpdateTeacher() {
         }
       }
 
-      // 3. ?�데?�트???�이??조회?�여 반환
+      // 3. 업데이트된 데이터 조회하여 반환
       const teacherResponse = await apiClient.get<any>('persons', {
         select: `
           *,
@@ -539,7 +539,7 @@ export function useUpdateTeacher() {
 }
 
 /**
- * 강사 ??�� Hook
+ * 강사 삭제 Hook
  */
 export function useDeleteTeacher() {
   const queryClient = useQueryClient();
@@ -552,7 +552,7 @@ export function useDeleteTeacher() {
         throw new Error('Tenant ID is required');
       }
 
-      // ?�프????��: status�?'resigned'�?변�?
+      // 소프트 삭제: status를 'resigned'로 변경
       const teacherResponse = await apiClient.get('academy_teachers', {
         filters: { person_id: teacherId },
         limit: 1,
@@ -583,7 +583,7 @@ export function useDeleteTeacher() {
   });
 }
 
-// ==================== �?강사 ?�결 관�?====================
+// ==================== 반/강사 연결 관리 =====================
 
 /**
  * 반별 강사 목록 조회 Hook
@@ -645,7 +645,7 @@ export function useAssignTeacher() {
 }
 
 /**
- * 강사 배정 ?�제 Hook
+ * 강사 배정 제거 Hook
  */
 export function useUnassignTeacher() {
   const queryClient = useQueryClient();
@@ -664,7 +664,7 @@ export function useUnassignTeacher() {
         throw new Error('Tenant ID is required');
       }
 
-      // class_teachers?�서 ?�당 ?�코??찾기
+      // class_teachers에서 해당 레코드 찾기
       const findResponse = await apiClient.get('class_teachers', {
         filters: { class_id: classId, teacher_id: teacherId, is_active: true },
         limit: 1,
@@ -693,4 +693,3 @@ export function useUnassignTeacher() {
     },
   });
 }
-

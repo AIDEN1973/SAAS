@@ -1,11 +1,11 @@
 /**
  * useAuth Hook
- * 
- * React Query 기반 ?�증 관�?Hook
- * [불�? 규칙] api-sdk�??�해?�만 ?�이???�청
- * [불�? 규칙] Zero-Trust: tenantId??Context?�서 ?�동?�로 가?�옴
- * 
- * [?�외] ?�증 관???�업?� Supabase Auth API�?직접 ?�용?�는 것이 ?�용??
+ *
+ * React Query 기반 인증 관리 Hook
+ * [불변 규칙] api-sdk를 통해서만 데이터 요청
+ * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ *
+ * [예외] 인증 관리는 Supabase Auth API를 직접 사용하는 것이 일반적임
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -14,7 +14,7 @@ import { loginService, signupService } from '@core/auth';
 import type { LoginInput, OAuthLoginInput, OTPLoginInput, LoginResult, TenantSelectionResult, B2BSignupInput, SignupResult } from '@core/auth';
 
 /**
- * ?�재 ?�션 조회 Hook
+ * 현재 세션 조회 Hook
  */
 export function useSession() {
   return useQuery({
@@ -22,19 +22,19 @@ export function useSession() {
     queryFn: async () => {
       const supabase = createClient();
       const { data: { session }, error } = await supabase.auth.getSession();
-      
+
       if (error) {
         throw new Error(error.message);
       }
-      
+
       return session;
     },
-    staleTime: 5 * 60 * 1000, // 5�?
+    staleTime: 5 * 60 * 1000, // 5분
   });
 }
 
 /**
- * ?�메??비�?번호 로그??Hook
+ * 이메일/비밀번호 로그인 Hook
  */
 export function useLoginWithEmail() {
   const queryClient = useQueryClient();
@@ -44,14 +44,14 @@ export function useLoginWithEmail() {
       return loginService.loginWithEmail(input);
     },
     onSuccess: () => {
-      // ?�션 캐시 무효??
+      // 세션 캐시 무효화
       queryClient.invalidateQueries({ queryKey: ['auth', 'session'] });
     },
   });
 }
 
 /**
- * ?�셜 로그??Hook
+ * 소셜 로그인 Hook
  */
 export function useLoginWithOAuth() {
   return useMutation({
@@ -62,7 +62,7 @@ export function useLoginWithOAuth() {
 }
 
 /**
- * OTP ?�송 Hook
+ * OTP 전송 Hook
  */
 export function useSendOTP() {
   return useMutation({
@@ -73,7 +73,7 @@ export function useSendOTP() {
 }
 
 /**
- * OTP 로그??Hook
+ * OTP 로그인 Hook
  */
 export function useLoginWithOTP() {
   const queryClient = useQueryClient();
@@ -89,7 +89,7 @@ export function useLoginWithOTP() {
 }
 
 /**
- * ?�용???�넌??목록 조회 Hook
+ * 사용자의 테넌트 목록 조회 Hook
  */
 export function useUserTenants() {
   const { data: session } = useSession();
@@ -103,12 +103,12 @@ export function useUserTenants() {
       return loginService.getUserTenants(session.user.id);
     },
     enabled: !!session?.user?.id,
-    staleTime: 5 * 60 * 1000, // 5�?
+    staleTime: 5 * 60 * 1000, // 5분
   });
 }
 
 /**
- * ?�넌???�택 Hook
+ * 테넌트 선택 Hook
  */
 export function useSelectTenant() {
   const queryClient = useQueryClient();
@@ -118,7 +118,7 @@ export function useSelectTenant() {
       return loginService.selectTenant(tenantId);
     },
     onSuccess: () => {
-      // ?�션 �??�넌???�보 캐시 무효??
+      // 세션 및 테넌트 정보 캐시 무효화
       queryClient.invalidateQueries({ queryKey: ['auth', 'session'] });
       queryClient.invalidateQueries({ queryKey: ['auth', 'user-tenants'] });
     },
@@ -126,7 +126,7 @@ export function useSelectTenant() {
 }
 
 /**
- * 로그?�웃 Hook
+ * 로그아웃 Hook
  */
 export function useLogout() {
   const queryClient = useQueryClient();
@@ -136,14 +136,14 @@ export function useLogout() {
       return loginService.logout();
     },
     onSuccess: () => {
-      // 모든 ?�증 관??캐시 무효??
+      // 모든 인증 관련 캐시 무효화
       queryClient.clear();
     },
   });
 }
 
 /**
- * B2B ?�원가??Hook
+ * B2B 회원가입 Hook
  */
 export function useSignupWithEmail() {
   const queryClient = useQueryClient();
@@ -159,7 +159,7 @@ export function useSignupWithEmail() {
 }
 
 /**
- * ?�메???�증 ?�인 Hook
+ * 이메일 인증 확인 Hook
  */
 export function useVerifyEmail() {
   const queryClient = useQueryClient();
@@ -175,7 +175,7 @@ export function useVerifyEmail() {
 }
 
 /**
- * ?�메???�증 ?�전??Hook
+ * 이메일 인증 재전송 Hook
  */
 export function useResendVerificationEmail() {
   return useMutation({

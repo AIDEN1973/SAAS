@@ -58,3 +58,5 @@ WHERE table_schema = 'public'
   AND table_name IN ('user_tenant_roles', 'tenants')
 ORDER BY table_name;
 
+
+

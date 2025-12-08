@@ -45,3 +45,5 @@ WHERE table_schema = 'public'
   AND grantee IN ('authenticated', 'anon')
 ORDER BY grantee, privilege_type;
 
+
+

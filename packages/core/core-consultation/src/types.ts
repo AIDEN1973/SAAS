@@ -1,8 +1,8 @@
 /**
  * Core Consultation Types
  * 
- * ?�담/기록 관�?공통 모듈
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
+ * ?담/기록 관?공통 모듈
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존?? ?음
  */
 
 export interface Consultation {

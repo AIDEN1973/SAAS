@@ -1,9 +1,9 @@
 /**
  * Drawer Component
- * 
- * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
- * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
- * [불�? 규칙] 모바???�경?�서 Fullscreen Drawer ?�용
+ *
+ * [불변 규칙] 스키마에서는 Tailwind 클래스를 직접 사용하지 않습니다.
+ * [불변 규칙] 모든 스타일은 design-system 토큰을 사용합니다.
+ * [불변 규칙] 모바일 환경에서 Fullscreen Drawer 사용
  */
 
 import React, { useEffect } from 'react';
@@ -26,10 +26,10 @@ export interface DrawerProps {
 }
 
 /**
- * Drawer 컴포?�트
- * 
- * 모바?? Fullscreen Drawer
- * ?�스?�톱: ?�이??Drawer
+ * Drawer 컴포넌트
+ *
+ * 모바일 Fullscreen Drawer
+ * 데스크톱: 사이드 Drawer
  */
 export const Drawer: React.FC<DrawerProps> = ({
   isOpen,
@@ -178,7 +178,7 @@ export const Drawer: React.FC<DrawerProps> = ({
                 minHeight: '44px',
               }}
             >
-              ??
+              ✕
             </Button>
           </div>
         )}

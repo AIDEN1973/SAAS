@@ -1,12 +1,12 @@
 /**
  * SchemaForm Component
- * 
+ *
  * [불변 규칙] React Hook Form과 통합된 FormSchema Renderer
  * [불변 규칙] SchemaField를 사용하여 개별 필드 렌더링
  * [불변 규칙] Grid 레이아웃 적용
  * [불변 규칙] SDUI v1.1: Action Engine 연동, i18n 키 지원
- * 
- * 기술문서: 
+ *
+ * 기술문서:
  * - docu/스키마엔진.txt 8. Renderer 통합
  * - SDUI 기술문서 v1.1 - 10. Form Engine
  */
@@ -32,7 +32,7 @@ export interface SchemaFormProps {
 
 /**
  * SchemaForm 컴포넌트
- * 
+ *
  * FormSchema를 React Hook Form과 통합하여 렌더링합니다.
  * SchemaField를 사용하여 개별 필드를 렌더링하고, Condition Rule을 지원합니다.
  */
@@ -126,9 +126,11 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     <Card padding={layout?.columnGap || 'md'} className={className}>
       <form onSubmit={handleSubmit(onFormSubmit)}>
         <Grid
-          // ⚠️ 참고: Grid 컴포넌트는 현재 1-4까지만 지원하지만, 스키마에서는 1-12를 허용합니다.
-          // 5 이상의 값은 4로 제한됩니다. 향후 core-ui Grid 컴포넌트가 확장되면 제거 예정.
-          columns={Math.min((layout?.columns || 1), 4) as 1 | 2 | 3 | 4}
+          columns={layout?.columns === 'auto-fit' || layout?.columns === 'auto-fill'
+            ? layout.columns
+            : (typeof layout?.columns === 'number' ? Math.min(layout.columns, 12) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 : 1)}
+          columnTemplate={layout?.columnTemplate}
+          minColumnWidth={layout?.minColumnWidth}
           gap={layout?.columnGap || 'md'}
         >
           {formConfig.fields.map((field) => (
@@ -165,7 +167,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
 
 /**
  * SchemaForm with form methods exposed
- * 
+ *
  * useForm의 메서드를 외부에서 접근할 수 있도록 하는 고급 컴포넌트
  */
 export interface SchemaFormWithMethodsProps extends SchemaFormProps {
@@ -262,9 +264,11 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
     <Card padding={layout?.columnGap || 'md'} className={className}>
       <form onSubmit={handleSubmit(onFormSubmit)}>
         <Grid
-          // ⚠️ 참고: Grid 컴포넌트는 현재 1-4까지만 지원하지만, 스키마에서는 1-12를 허용합니다.
-          // 5 이상의 값은 4로 제한됩니다. 향후 core-ui Grid 컴포넌트가 확장되면 제거 예정.
-          columns={Math.min((layout?.columns || 1), 4) as 1 | 2 | 3 | 4}
+          columns={layout?.columns === 'auto-fit' || layout?.columns === 'auto-fill'
+            ? layout.columns
+            : (typeof layout?.columns === 'number' ? Math.min(layout.columns, 12) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 : 1)}
+          columnTemplate={layout?.columnTemplate}
+          minColumnWidth={layout?.minColumnWidth}
           gap={layout?.columnGap || 'md'}
         >
           {formConfig.fields.map((field) => (

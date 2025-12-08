@@ -1,9 +1,9 @@
 /**
  * useResponsiveMode Hook
- * 
- * [불�? 규칙] 반응??모드?????�을 ?�해?�만 ?�근?�다.
- * [불�? 규칙] CSS Media Query�?직접 ?�성?��? ?�는??
- * [불�? 규칙] UI 문서 기�?: xs (0px), sm (640px), md (768px), lg (1024px), xl (1280px)
+ *
+ * [불변 규칙] 반응형 모드는 Hook을 통해만 접근한다.
+ * [불변 규칙] CSS Media Query를 직접 사용해서는 안 된다.
+ * [불변 규칙] UI 문서 기준: xs (0px), sm (640px), md (768px), lg (1024px), xl (1280px)
  */
 
 import { useState, useEffect } from 'react';
@@ -12,13 +12,13 @@ import { BreakpointToken } from '@design-system/core';
 export type ResponsiveMode = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 /**
- * ?�재 ?�면 ?�기???�른 반응??모드 반환
- * 
- * xs: 0px (모바??기본)
- * sm: 640px (??모바??/ ?��? ?�블�?
- * md: 768px (?�블�?
- * lg: 1024px (?��? ?�스?�톱)
- * xl: 1280px (???�스?�톱)
+ * 현재 화면 크기에 따른 반응형 모드 반환
+ *
+ * xs: 0px (모바일 기본)
+ * sm: 640px (대형 모바일/ 작은 태블릿)
+ * md: 768px (태블릿)
+ * lg: 1024px (작은 데스크톱)
+ * xl: 1280px (큰 데스크톱)
  */
 export function useResponsiveMode(): ResponsiveMode {
   const [mode, setMode] = useState<ResponsiveMode>('xs');
@@ -26,7 +26,7 @@ export function useResponsiveMode(): ResponsiveMode {
   useEffect(() => {
     const updateMode = () => {
       const width = window.innerWidth;
-      
+
       if (width >= 1280) {
         setMode('xl');
       } else if (width >= 1024) {
@@ -42,7 +42,7 @@ export function useResponsiveMode(): ResponsiveMode {
 
     updateMode();
     window.addEventListener('resize', updateMode);
-    
+
     return () => window.removeEventListener('resize', updateMode);
   }, []);
 
@@ -50,31 +50,31 @@ export function useResponsiveMode(): ResponsiveMode {
 }
 
 /**
- * ?�정 브레?�크?�인???�상?��? ?�인
- * 
- * @param breakpoint - ?�인??브레?�크?�인??('mobile' | 'tablet' | 'desktop')
- * @returns ?�재 모드가 ?�당 브레?�크?�인???�상?�면 true
+ * 특정 브레이크포인트 이상인지 확인
+ *
+ * @param breakpoint - 확인할 브레이크포인트 ('mobile' | 'tablet' | 'desktop')
+ * @returns 현재 모드가 해당 브레이크포인트 이상이면 true
  */
 export function useBreakpoint(breakpoint: BreakpointToken): boolean {
   const mode = useResponsiveMode();
-  
-  // BreakpointToken??ResponsiveMode�?매핑
+
+  // BreakpointToken을 ResponsiveMode로 매핑
   const breakpointToMode: Record<BreakpointToken, ResponsiveMode> = {
     mobile: 'xs',
     tablet: 'md',
     desktop: 'lg',
   };
-  
+
   const breakpointOrder: ResponsiveMode[] = ['xs', 'sm', 'md', 'lg', 'xl'];
   const currentIndex = breakpointOrder.indexOf(mode);
   const targetMode = breakpointToMode[breakpoint];
   const targetIndex = breakpointOrder.indexOf(targetMode);
-  
+
   return currentIndex >= targetIndex;
 }
 
 /**
- * 모바??모드?��? ?�인 (xs ?�는 sm)
+ * 모바일 모드인지 확인 (xs 또는 sm)
  */
 export function useIsMobile(): boolean {
   const mode = useResponsiveMode();
@@ -82,7 +82,7 @@ export function useIsMobile(): boolean {
 }
 
 /**
- * ?�블�?모드?��? ?�인 (md)
+ * 태블릿 모드인지 확인 (md)
  */
 export function useIsTablet(): boolean {
   const mode = useResponsiveMode();
@@ -90,10 +90,9 @@ export function useIsTablet(): boolean {
 }
 
 /**
- * ?�스?�톱 모드?��? ?�인 (lg ?�는 xl)
+ * 데스크톱 모드인지 확인 (lg 또는 xl)
  */
 export function useIsDesktop(): boolean {
   const mode = useResponsiveMode();
   return mode === 'lg' || mode === 'xl';
 }
-

@@ -1,7 +1,7 @@
 /**
  * SchemaDetail Component
  * 
- * SDUI v1.1: Detail Schema ?�더??(?�기 ?�용 ?�보 ?�면)
+ * SDUI v1.1: Detail Schema 렌더러(읽기 전용 정보 화면)
  * 
  * 기술문서: SDUI 기술문서 v1.1 - 15. Detail Engine
  */
@@ -10,7 +10,7 @@ import React from 'react';
 import { Grid } from '@ui-core/react';
 import type { DetailSchema } from '../types';
 // import { SchemaField } from './SchemaField'; // TODO: 향후 사용 예정
-// TODO: useForm ?�???�기 ?�용 ?�이???�용
+// TODO: useForm 없이 읽기 전용 필드 사용
 
 export interface SchemaDetailProps {
   schema: DetailSchema;
@@ -19,10 +19,10 @@ export interface SchemaDetailProps {
 }
 
 /**
- * SchemaDetail 컴포?�트
+ * SchemaDetail 컴포넌트
  * 
- * DetailSchema�??�기 ?�용?�로 ?�더링합?�다.
- * FormFieldSchema�??�사?�하???�력 불�? ?�태�??�시?�니??
+ * DetailSchema를 읽기 전용으로 렌더링합니다.
+ * FormFieldSchema를 사용하되 입력 불가 상태로 표시합니다.
  */
 export const SchemaDetail: React.FC<SchemaDetailProps> = ({
   schema,
@@ -31,8 +31,8 @@ export const SchemaDetail: React.FC<SchemaDetailProps> = ({
 }) => {
   const layout = schema.detail.layout;
   
-  // TODO: ?�기 ?�용 ?�드 ?�더�?
-  // SchemaField�??�사?�하??disabled={true} ?�는 readonly 모드�??�시
+  // TODO: 읽기 전용 필드 렌더링
+  // SchemaField를 사용하되 disabled={true} 또는 readonly 모드로 표시
   
   return (
     <div className={className}>
@@ -56,4 +56,3 @@ export const SchemaDetail: React.FC<SchemaDetailProps> = ({
     </div>
   );
 };
-

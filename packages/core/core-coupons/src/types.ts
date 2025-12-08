@@ -1,8 +1,8 @@
 /**
  * Core Coupons Types
  * 
- * 쿠폰/?�인 관�?
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
+ * 쿠폰/?인 관?
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존?? ?음
  */
 
 export type DiscountType = 'percentage' | 'fixed';

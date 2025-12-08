@@ -1,16 +1,15 @@
-﻿/**
+/**
  * 강사 관리 페이지
- * 
+ *
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  * [요구사항] 강사 프로필 보기
  */
 
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary } from '@ui-core/react';
-import { Container, Card, Button, Input } from '@ui-core/react';
-import { SchemaForm } from '@schema-engine';
+import React, { useState } from 'react';
+import { ErrorBoundary, useModal } from '@ui-core/react';
+import { Container, Card, Button, Modal } from '@ui-core/react';
+import { SchemaForm, SchemaFilter } from '@schema-engine';
 import {
   useTeachers,
   useTeacher,
@@ -18,29 +17,30 @@ import {
   useUpdateTeacher,
   useDeleteTeacher,
 } from '@hooks/use-class';
-import type { Teacher, CreateTeacherInput, TeacherFilter, TeacherStatus } from '@services/class-service';
+import type { Teacher, CreateTeacherInput, UpdateTeacherInput, TeacherFilter, TeacherStatus } from '@services/class-service';
 import { teacherFormSchema } from '../schemas/teacher.schema';
+import { teacherFilterSchema } from '../schemas/teacher.filter.schema';
 
 export function TeachersPage() {
-  const navigate = useNavigate();
+  const { showConfirm } = useModal();
   const [filter, setFilter] = useState<TeacherFilter>({});
-  const [searchQuery, setSearchQuery] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null);
 
   const { data: teachers, isLoading, error } = useTeachers({
     ...filter,
-    search: searchQuery.trim() || undefined, // 빈 문자열이면 undefined로 변환
+    search: filter.search?.trim() || undefined, // 빈 문자열이면 undefined로 변환
   });
   const createTeacher = useCreateTeacher();
   const updateTeacher = useUpdateTeacher();
   const deleteTeacher = useDeleteTeacher();
 
-  const handleStatusFilter = (status: TeacherStatus | 'all') => {
-    setFilter((prev) => ({
-      ...prev,
-      status: status === 'all' ? undefined : status,
-    }));
-  };
+  const handleFilterChange = React.useCallback((filters: Record<string, any>) => {
+    setFilter({
+      search: filters.search || undefined,
+      status: filters.status || undefined,
+    });
+  }, []);
 
   const handleCreateTeacher = async (input: CreateTeacherInput) => {
     try {
@@ -48,6 +48,15 @@ export function TeachersPage() {
       setShowCreateForm(false);
     } catch (error) {
       console.error('Failed to create teacher:', error);
+    }
+  };
+
+  const handleUpdateTeacher = async (teacherId: string, input: UpdateTeacherInput) => {
+    try {
+      await updateTeacher.mutateAsync({ teacherId, input });
+      setEditingTeacherId(null);
+    } catch (error) {
+      console.error('Failed to update teacher:', error);
     }
   };
 
@@ -74,47 +83,14 @@ export function TeachersPage() {
 
           {/* 검색 및 필터 패널 */}
           <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              <div style={{ flex: 1 }}>
-                <Input
-                  placeholder="강사 이름 검색.."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  fullWidth
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
-                <Button
-                  variant={!filter.status ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => handleStatusFilter('all')}
-                >
-                  전체
-                </Button>
-                <Button
-                  variant={filter.status === 'active' ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => handleStatusFilter('active')}
-                >
-                  재직중
-                </Button>
-                <Button
-                  variant={filter.status === 'on_leave' ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => handleStatusFilter('on_leave')}
-                >
-                  휴직
-                </Button>
-                <Button
-                  variant={filter.status === 'resigned' ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => handleStatusFilter('resigned')}
-                >
-                  퇴직
-                </Button>
-              </div>
-            </div>
+            <SchemaFilter
+              schema={teacherFilterSchema}
+              onFilterChange={handleFilterChange}
+              defaultValues={{
+                search: filter.search || '',
+                status: filter.status || '',
+              }}
+            />
           </Card>
 
           {/* 강사 등록 폼 */}
@@ -136,9 +112,10 @@ export function TeachersPage() {
                 <TeacherCard
                   key={teacher.id}
                   teacher={teacher}
-                  onEdit={(teacherId) => navigate(`/teachers/${teacherId}`)}
+                  onEdit={(teacherId) => setEditingTeacherId(teacherId)}
                   onDelete={async (teacherId) => {
-                    if (confirm('정말 이 강사를 삭제하시겠습니까?')) {
+                    const confirmed = await showConfirm('정말 이 강사를 삭제하시겠습니까?', '강사 삭제');
+                    if (confirmed) {
                       await deleteTeacher.mutateAsync(teacherId);
                     }
                   }}
@@ -152,6 +129,15 @@ export function TeachersPage() {
                 </Card>
               )}
             </div>
+          )}
+
+          {/* 강사 수정 모달 */}
+          {editingTeacherId && (
+            <EditTeacherModal
+              teacherId={editingTeacherId}
+              onSave={handleUpdateTeacher}
+              onClose={() => setEditingTeacherId(null)}
+            />
           )}
         </div>
       </Container>
@@ -201,8 +187,115 @@ function CreateTeacherForm({
         defaultValues={{
           status: 'active',
         }}
+        actionContext={{
+          apiCall: async (endpoint: string, method: string, body?: any) => {
+            const { apiClient } = await import('@api-sdk/core');
+            if (method === 'POST') {
+              const response = await apiClient.post(endpoint, body);
+              if (response.error) {
+                throw new Error(response.error.message);
+              }
+              return response.data;
+            }
+            const response = await apiClient.get(endpoint);
+            if (response.error) {
+              throw new Error(response.error.message);
+            }
+            return response.data;
+          },
+        }}
       />
     </Card>
+  );
+}
+
+/**
+ * 강사 수정 모달
+ */
+function EditTeacherModal({
+  teacherId,
+  onSave,
+  onClose,
+}: {
+  teacherId: string;
+  onSave: (teacherId: string, input: UpdateTeacherInput) => Promise<void>;
+  onClose: () => void;
+}) {
+  const { data: teacher, isLoading } = useTeacher(teacherId);
+
+  const handleSubmit = async (data: any) => {
+    const input: UpdateTeacherInput = {
+      name: data.name || undefined,
+      email: data.email || undefined,
+      phone: data.phone || undefined,
+      address: data.address || undefined,
+      employee_id: data.employee_id || undefined,
+      specialization: data.specialization || undefined,
+      hire_date: data.hire_date || undefined,
+      status: data.status || undefined,
+      profile_image_url: data.profile_image_url || undefined,
+      bio: data.bio || undefined,
+      notes: data.notes || undefined,
+    };
+    await onSave(teacherId, input);
+  };
+
+  if (isLoading) {
+    return (
+      <Modal isOpen={true} onClose={onClose} title="강사 수정" size="lg">
+        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>
+      </Modal>
+    );
+  }
+
+  if (!teacher) {
+    return (
+      <Modal isOpen={true} onClose={onClose} title="강사 수정" size="lg">
+        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>강사를 찾을 수 없습니다.</div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal isOpen={true} onClose={onClose} title="강사 수정" size="lg">
+      <SchemaForm
+        schema={teacherFormSchema}
+        onSubmit={handleSubmit}
+        defaultValues={{
+          name: teacher.name,
+          email: teacher.email || '',
+          phone: teacher.phone || '',
+          address: teacher.address || '',
+          employee_id: teacher.employee_id || '',
+          specialization: teacher.specialization || '',
+          hire_date: teacher.hire_date || '',
+          status: teacher.status,
+          profile_image_url: teacher.profile_image_url || '',
+          bio: teacher.bio || '',
+          notes: teacher.notes || '',
+        }}
+        actionContext={{
+          apiCall: async (endpoint: string, method: string, body?: any) => {
+            const { apiClient } = await import('@api-sdk/core');
+            if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
+              const response = await apiClient.post(endpoint, body);
+              if (response.error) {
+                throw new Error(response.error.message);
+              }
+              return response.data;
+            }
+            const response = await apiClient.get(endpoint);
+            if (response.error) {
+              throw new Error(response.error.message);
+            }
+            return response.data;
+          },
+          showToast: (message: string, variant?: string) => {
+            // showAlert는 useModal에서 가져와야 하지만, 여기서는 handleSubmit에서 처리
+          },
+        }}
+      />
+    </Modal>
   );
 }
 

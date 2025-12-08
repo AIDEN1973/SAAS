@@ -1,8 +1,8 @@
 /**
  * Core Calendar Service
- * 
- * ?�정/?�약/?�업 ?��?�??�비??
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
+ *
+ * 일정/예약/업무 일정 공통 시스템 서비스
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -18,7 +18,7 @@ export class CalendarService {
   private supabase = createServerClient();
 
   /**
-   * ?��?�?목록 조회
+   * 일정 목록 조회
    */
   async getSchedules(
     tenantId: string,
@@ -57,7 +57,7 @@ export class CalendarService {
   }
 
   /**
-   * ?��?�??�세 조회
+   * 일정 상세 조회
    */
   async getSchedule(
     tenantId: string,
@@ -82,7 +82,7 @@ export class CalendarService {
   }
 
   /**
-   * ?��?�??�성
+   * 일정 생성
    */
   async createSchedule(
     tenantId: string,
@@ -111,7 +111,7 @@ export class CalendarService {
   }
 
   /**
-   * ?��?�??�정
+   * 일정 수정
    */
   async updateSchedule(
     tenantId: string,
@@ -135,7 +135,7 @@ export class CalendarService {
   }
 
   /**
-   * ?��?�???��
+   * 일정 삭제
    */
   async deleteSchedule(
     tenantId: string,
@@ -159,4 +159,3 @@ export class CalendarService {
  * Default Service Instance
  */
 export const calendarService = new CalendarService();
-

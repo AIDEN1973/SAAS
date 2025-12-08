@@ -1,8 +1,8 @@
 /**
  * Core Reviews Types
- * 
- * 리뷰/?��? ?�스??
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
+ *
+ * 리뷰/평점 시스템
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
  */
 
 export interface Review {
@@ -38,4 +38,3 @@ export interface ReviewFilter {
   rating?: number;
   is_visible?: boolean;
 }
-

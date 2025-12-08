@@ -1,8 +1,8 @@
 /**
  * Pagination Component
- * 
- * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
- * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
+ *
+ * [불변 규칙] 스키마에서는 Tailwind 클래스를 직접 사용하지 않습니다.
+ * [불변 규칙] 모든 스타일은 design-system 토큰을 사용합니다.
  */
 
 import React from 'react';
@@ -19,9 +19,9 @@ export interface PaginationProps {
 }
 
 /**
- * Pagination 컴포?�트
- * 
- * ?�이지?�이??컨트�?
+ * Pagination 컴포넌트
+ *
+ * 페이지네이션 컨트롤
  */
 export const Pagination: React.FC<PaginationProps> = ({
   currentPage,
@@ -34,18 +34,18 @@ export const Pagination: React.FC<PaginationProps> = ({
   const getVisiblePages = () => {
     const pages: number[] = [];
     const half = Math.floor(maxVisible / 2);
-    
+
     let start = Math.max(1, currentPage - half);
     let end = Math.min(totalPages, start + maxVisible - 1);
-    
+
     if (end - start < maxVisible - 1) {
       start = Math.max(1, end - maxVisible + 1);
     }
-    
+
     for (let i = start; i <= end; i++) {
       pages.push(i);
     }
-    
+
     return pages;
   };
 
@@ -88,9 +88,9 @@ export const Pagination: React.FC<PaginationProps> = ({
           minHeight: '44px',
         }}
       >
-        ??
+        ‹
       </Button>
-      
+
       {visiblePages.map((page) => (
         <Button
           key={page}
@@ -106,7 +106,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           {page}
         </Button>
       ))}
-      
+
       <Button
         variant="outline"
         size="sm"
@@ -117,7 +117,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           minHeight: '44px',
         }}
       >
-        ??
+        ›
       </Button>
       {showFirstLast && (
         <Button

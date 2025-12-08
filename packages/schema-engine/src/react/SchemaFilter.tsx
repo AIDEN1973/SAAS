@@ -1,7 +1,7 @@
 /**
  * SchemaFilter Component
  * 
- * SDUI v1.1: Filter Schema ?�더??(Table ?�단 검??조건)
+ * SDUI v1.1: Filter Schema 렌더러(Table 상단 검색 조건)
  * 
  * 기술문서: SDUI 기술문서 v1.1 - 15. Filter Engine
  */
@@ -20,10 +20,10 @@ export interface SchemaFilterProps {
 }
 
 /**
- * SchemaFilter 컴포?�트
+ * SchemaFilter 컴포넌트
  * 
- * FilterSchema�??�더링합?�다.
- * FormFieldSchema�??�사?�하?? submit???�닌 "?�터 변�??�벤??�?발생?�킵?�다.
+ * FilterSchema를 렌더링합니다.
+ * FormFieldSchema를 사용하되 submit이 아닌 "필터 변경 이벤트"를 발생시킵니다.
  */
 export const SchemaFilter: React.FC<SchemaFilterProps> = ({
   schema,
@@ -37,11 +37,28 @@ export const SchemaFilter: React.FC<SchemaFilterProps> = ({
 
   const { register, control, watch, formState: { errors } } = form;
   
-  // ?�터 �?변�?감시
+  // 필터 값 변경 감시
   const watchedValues = watch();
   
+  // 이전 값과 비교하여 실제 변경이 있을 때만 호출
+  const prevValuesRef = React.useRef<Record<string, any>>({});
+  
   React.useEffect(() => {
-    if (onFilterChange) {
+    // 초기 마운트 시에는 호출하지 않음
+    if (Object.keys(prevValuesRef.current).length === 0) {
+      prevValuesRef.current = watchedValues;
+      return;
+    }
+    
+    // 값이 실제로 변경되었는지 확인
+    const hasChanged = Object.keys(watchedValues).some(
+      key => watchedValues[key] !== prevValuesRef.current[key]
+    ) || Object.keys(prevValuesRef.current).some(
+      key => !(key in watchedValues) || watchedValues[key] !== prevValuesRef.current[key]
+    );
+    
+    if (hasChanged && onFilterChange) {
+      prevValuesRef.current = watchedValues;
       onFilterChange(watchedValues);
     }
   }, [watchedValues, onFilterChange]);
@@ -67,4 +84,3 @@ export const SchemaFilter: React.FC<SchemaFilterProps> = ({
     </div>
   );
 };
-

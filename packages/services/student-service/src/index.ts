@@ -1,21 +1,20 @@
 /**
  * Student Service
- * 
- * [불�? 규칙] Service Layer??Industry Layer�??�핑?�여 ?�공?�니??
- * [불�? 규칙] ?�라?�언?�에?�는 ?�?�만 import: import type { ... } from '@services/student-service'
- * [불�? 규칙] ?�버 코드???�버/Edge?�서�??�용: import { studentService } from '@services/student-service/service'
- * 
- * ?�️ 주의: ??index.ts?�서???�?�만 export?�니??
- * ?�버 코드???�라?�언??번들???�함?��? ?�도�?'./service'?�서 직접 import?�세??
- * 
- * ?�제 비즈?�스 로직?� @industry/academy/service???�습?�다.
+ *
+ * [불변 규칙] Service Layer는 Industry Layer를 매핑하여 제공합니다.
+ * [불변 규칙] 클라이언트에는 타입만 import: import type { ... } from '@services/student-service'
+ * [불변 규칙] 서버 코드는 서버/Edge에서만 사용: import { studentService } from '@services/student-service/service'
+ *
+ * ⚠️ 주의: 이 index.ts에서는 타입만 export합니다.
+ * 서버 코드는 클라이언트 번들에 포함되지 않도록 './service'에서 직접 import하세요.
+ *
+ * 현재 비즈니스 로직은 @industry/academy/service를 따릅니다.
  */
 
-// ?�?�만 export (?�라?�언?�에?�도 ?�용 가?? ?�버 코드???�함?��? ?�음)
-// ?�?��? Industry Layer?�서 ?�export
+// 타입만 export (클라이언트에도 사용 가능, 서버 코드는 포함되지 않음)
+// 타입은 Industry Layer에서 re-export
 export * from './types';
 
-// ?�버 ?�용 코드????index.ts?�서 export?��? ?�습?�다.
-// ?�버?�서??직접 import: import { studentService } from '@services/student-service/service'
-// ?�는: import { studentService } from '@services/student-service/dist/service' (빌드 ??
-
+// 서버 사용 코드는 이 index.ts에서 export하지 않습니다.
+// 서버에서는 직접 import: import { studentService } from '@services/student-service/service'
+// 또는: import { studentService } from '@services/student-service/dist/service' (빌드 후)

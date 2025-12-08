@@ -1,10 +1,10 @@
 /**
  * Auth Service
- * 
- * [불�? 규칙] Service Layer??Core Layer??auth/tenancy ?�비?��? ?�핑?�여 ?�공?�니??
- * [불�? 규칙] Service Layer??Industry Layer�?직접 ?�용?��? ?�습?�다.
- * 
- * [초기?? 로그?? 로그?�웃, ?�원가??로직 ?�거??- 처음부???�시 구현 ?�요
+ *
+ * [불변 규칙] Service Layer는 Core Layer의 auth/tenancy 서비스를 매핑하여 제공합니다.
+ * [불변 규칙] Service Layer는 Industry Layer를 직접 사용하지 않습니다.
+ *
+ * [초기화] 로그인, 로그아웃, 회원가입 로직 구현 필요 - 처음부터 다시 구현 필요
  */
 
 import { loginService } from '@core/auth/login';
@@ -22,12 +22,12 @@ import type {
 } from './types';
 
 /**
- * Auth Service (Core Layer ?�퍼)
- * 
- * Service Layer??Core Layer??loginService, signupService, tenantOnboardingService�??�핑?�여 ?�공?�니??
+ * Auth Service (Core Layer 래퍼)
+ *
+ * Service Layer는 Core Layer의 loginService, signupService, tenantOnboardingService를 매핑하여 제공합니다.
  */
 export class AuthService {
-  // TODO: 로그?? 로그?�웃, ?�원가??로직 구현 ?�요
+  // TODO: 로그인, 로그아웃, 회원가입 로직 구현 필요
   // - loginWithEmail
   // - loginWithOAuth
   // - loginWithOTP

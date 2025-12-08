@@ -1,14 +1,14 @@
-﻿/**
+/**
  * Schema Loader
- * 
- * SDUI v1.1: Schema Registry?�서 ?�키마�? 로드?�고 처리?�는 ?�진
- * 
- * ??��:
- * - Registry?�서 메�??�이??조회
- * - Storage?�서 JSON ?�일 ?�운로드
- * - JSON ?�싱
- * - Validator / Migration / i18n Binding ?�출
- * 
+ *
+ * SDUI v1.1: Schema Registry에서 스키마를 로드하고 처리하는 엔진
+ *
+ * 기능:
+ * - Registry에서 메타데이터 조회
+ * - Storage에서 JSON 파일 다운로드
+ * - JSON 파싱
+ * - Validator / Migration / i18n Binding 호출
+ *
  * 기술문서: SDUI 기술문서 v1.1 - 4. Schema Loader
  */
 
@@ -33,25 +33,26 @@ export interface SchemaLoadResult {
 
 /**
  * Schema Loader
- * 
- * SDUI v1.1: Registry?�서 ?�키마�? 로드?�고 검�?마이그레?�션/i18n 바인?�을 ?�행?�니??
- * 
- * 지??방식:
- * 1. schema_json 직접 ?�??방식 (?�재 구현)
- * 2. storage_path 기반 방식 (SDUI v1.1, ?�후 ?�장)
- * 
- * @param options - ?�키�?로드 ?�션
- * @returns 로드???�키�? */
+ *
+ * SDUI v1.1: Registry에서 스키마를 로드하고 검증/마이그레이션/i18n 바인딩을 수행합니다.
+ *
+ * 지원 방식:
+ * 1. schema_json 직접 파싱 방식 (현재 구현)
+ * 2. storage_path 기반 방식 (SDUI v1.1, 향후 확장)
+ *
+ * @param options - 스키마 로드 옵션
+ * @returns 로드된 스키마
+ */
 export async function loadSchema(options: SchemaLoadOptions): Promise<SchemaLoadResult> {
   const { tenantId, entity, type, locale = 'ko', clientVersion } = options;
 
   try {
-    // ?�재 구현: SchemaRegistryService�??�해 schema_json 직접 조회
-    // SDUI v1.1: ?�후 storage_path 방식??지???�정
+    // 현재 구현: SchemaRegistryService를 통해 schema_json 직접 조회
+    // SDUI v1.1: 향후 storage_path 방식으로 전환 예정
     const { SchemaRegistryService } = await import('@core/schema-registry');
     const registryService = new SchemaRegistryService();
-    
-    // ?�키�?조회 (?�선?�위 ?�용)
+
+    // 스키마 조회 (우선순위 적용)
     const schema = await registryService.getSchema(entity, {
       tenantId,
       industryType: undefined, // TODO: context에서 가져오기
@@ -69,7 +70,7 @@ export async function loadSchema(options: SchemaLoadOptions): Promise<SchemaLoad
       );
     }
 
-    // ?�??체크
+    // 타입 체크
     if (schema.type !== type) {
       throw new SchemaLoadError(
         `Schema type mismatch: expected ${type}, got ${schema.type}`,
@@ -92,21 +93,21 @@ export async function loadSchema(options: SchemaLoadOptions): Promise<SchemaLoad
       );
     }
 
-    // 2. Migration (?�요??경우)
+    // 2. Migration (필요한 경우)
     const migratedSchema = migrateSchema(schema, schema.version);
 
     // 3. i18n Binding
     const localizedSchema = await bindI18n(migratedSchema, {
       tenantId,
       locale,
-      loadFromDB: true,  // SDUI v1.1: DB?�서 번역 로드
+      loadFromDB: true,  // SDUI v1.1: DB에서 번역 로드
     });
 
     // 4. Client Version Check
     if (clientVersion && schema.minClient) {
       const [schemaMajor, schemaMinor] = schema.minClient.split('.').map(Number);
       const [clientMajor, clientMinor] = clientVersion.split('.').map(Number);
-      
+
       if (schemaMajor > clientMajor || (schemaMajor === clientMajor && schemaMinor > clientMinor)) {
         throw new SchemaLoadError(
           `Client version ${clientVersion} is not compatible with schema version ${schema.version} (minClient: ${schema.minClient})`,
@@ -126,8 +127,8 @@ export async function loadSchema(options: SchemaLoadOptions): Promise<SchemaLoad
     if (error instanceof SchemaLoadError) {
       throw error;
     }
-    
-    // ?????�는 ?�러
+
+    // 알 수 없는 오류
     throw new SchemaLoadError(
       `Failed to load schema: ${error instanceof Error ? error.message : String(error)}`,
       'SchemaCorrupted',
@@ -139,7 +140,8 @@ export async function loadSchema(options: SchemaLoadOptions): Promise<SchemaLoad
 }
 
 /**
- * Schema Loader ?�러 ?�?? */
+ * Schema Loader 오류 클래스
+ */
 export class SchemaLoadError extends Error {
   constructor(
     message: string,
@@ -152,6 +154,3 @@ export class SchemaLoadError extends Error {
     this.name = 'SchemaLoadError';
   }
 }
-
-
-

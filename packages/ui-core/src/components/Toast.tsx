@@ -1,8 +1,8 @@
 /**
  * Toast Component
- * 
- * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
- * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
+ *
+ * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
+ * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -20,9 +20,9 @@ export interface ToastProps {
 }
 
 /**
- * Toast 컴포?�트
- * 
- * ?�림 메시지�??�시?�는 ?�스??
+ * Toast 컴포넌트
+ *
+ * 알림 메시지를 표시하는 토스트
  */
 export const Toast: React.FC<ToastProps> = ({
   message,
@@ -37,7 +37,7 @@ export const Toast: React.FC<ToastProps> = ({
     if (duration > 0) {
       const timer = setTimeout(() => {
         setIsVisible(false);
-        setTimeout(() => onClose?.(), 300); // ?�니메이???��?
+        setTimeout(() => onClose?.(), 300); // 애니메이션 대기
       }, duration);
       return () => clearTimeout(timer);
     }
@@ -113,11 +113,10 @@ export const Toast: React.FC<ToastProps> = ({
               padding: 0,
             }}
           >
-            ??
+            ×
           </Button>
         )}
       </div>
     </Card>
   );
 };
-

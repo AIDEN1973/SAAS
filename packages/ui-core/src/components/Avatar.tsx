@@ -1,8 +1,8 @@
 /**
  * Avatar Component
- * 
- * [불�? 규칙] ?�키마에??Tailwind ?�래?��? 직접 ?�용?��? ?�는??
- * [불�? 규칙] 모든 ?��??��? design-system ?�큰???�용?�다.
+ *
+ * [불변 규칙] 스키마에서는 Tailwind 클래스를 직접 사용하지 않습니다.
+ * [불변 규칙] 모든 스타일은 design-system 토큰을 사용합니다.
  */
 
 import React from 'react';
@@ -19,9 +19,9 @@ export interface AvatarProps {
 }
 
 /**
- * Avatar 컴포?�트
- * 
- * ?�로???��?지 ?�는 ?�니???�시
+ * Avatar 컴포넌트
+ *
+ * 프로필 이미지가 없는 경우 이니셜 표시
  */
 export const Avatar: React.FC<AvatarProps> = ({
   src,

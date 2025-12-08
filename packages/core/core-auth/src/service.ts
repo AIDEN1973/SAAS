@@ -1,11 +1,11 @@
 /**
  * Core Auth Service
- * 
- * ?�증 ?�비??(Supabase Auth ?�핑)
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
- * 
- * ?�️ 주의: ?�제 ?�증 로직?� Supabase Auth�?직접 ?�용?�니??
- * ???�비?�는 ?�증 관???�틸리티?� ?�퍼 ?�수�??�공?�니??
+ *
+ * 인증 서비스(Supabase Auth 매핑)
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ *
+ * ⚠️ 주의: 실제 인증 로직은 Supabase Auth를 직접 사용합니다.
+ * 이 서비스는 인증 관리의 유틸리티와 헬퍼 함수만 제공합니다.
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -15,7 +15,7 @@ export class AuthService {
   private supabase = createServerClient();
 
   /**
-   * ?�재 ?�용??조회
+   * 현재 사용자 조회
    */
   async getCurrentUser(): Promise<User | null> {
     const { data: { user }, error } = await this.supabase.auth.getUser();
@@ -33,7 +33,7 @@ export class AuthService {
   }
 
   /**
-   * ?�용??ID�?조회
+   * 사용자 ID로 조회
    */
   async getUserById(userId: string): Promise<User | null> {
     const { data, error } = await this.supabase.auth.admin.getUserById(userId);
@@ -55,4 +55,3 @@ export class AuthService {
  * Default Service Instance
  */
 export const authService = new AuthService();
-

@@ -1,10 +1,10 @@
-﻿/**
+/**
  * 회원가입 페이지 (B2B)
- * 
+ *
  * [기술문서 요구사항]
  * - 회원가입 프로세스: 사용자 계정 생성 + 이메일 인증(선택) + 테넌트 생성 및 정보 및 업종 및 초기 화면 로드
  * - [불변 규칙] 사용자 계정은 생성하며, 테넌트 생성은 core-tenancy/onboarding에서 처리
- * 
+ *
  * [UI 문서 요구사항]
  * - Zero-Trust 원칙 준수
  * - 반응형 지원 (xs, sm, md, lg, xl)
@@ -41,12 +41,12 @@ export function SignupPage() {
 
       // 회원가입 성공
       showAlert('성공', '회원가입이 완료되었습니다.');
-      
+
       // 테넌트 선택 (자동으로 하나의 테넌트가 생성됨)
       navigate('/');
     } catch (error) {
       const message = error instanceof Error ? error.message : '회원가입에 실패했습니다.';
-      
+
       // 개발 환경에서 상세 에러 로그
       if (import.meta.env?.DEV) {
         console.error('회원가입 실패 상세:', {
@@ -75,24 +75,60 @@ export function SignupPage() {
   const loading = signup.isPending;
 
   return (
-    <Container maxWidth="sm" className="flex items-center justify-center min-h-screen py-8">
-      <Card className="w-full p-6 md:p-8">
-        <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">B2B 학원가입</h1>
+    <Container
+      maxWidth="sm"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        paddingTop: 'var(--spacing-xl)',
+        paddingBottom: 'var(--spacing-xl)'
+      }}
+    >
+      <Card
+        padding={isMobile ? 'lg' : 'xl'}
+        style={{ width: '100%' }}
+      >
+        <h1 style={{
+          fontSize: isMobile ? 'var(--font-size-2xl)' : 'var(--font-size-3xl)',
+          fontWeight: 'var(--font-weight-bold)',
+          marginBottom: 'var(--spacing-lg)',
+          textAlign: 'center'
+        }}>
+          B2B 학원가입
+        </h1>
 
         <SchemaForm
           schema={signupFormSchema}
           onSubmit={handleSignup}
-          defaultValues={{
-            industryType: 'academy',
-          }}
         />
 
         {/* 로그인 링크 */}
-        <div className="mt-6 text-center">
-          <span className="text-gray-600">이미 계정이 있으신가요? </span>
+        <div style={{
+          marginTop: 'var(--spacing-lg)',
+          textAlign: 'center'
+        }}>
+          <span style={{ color: 'var(--color-text-secondary)' }}>
+            이미 계정이 있으신가요?{' '}
+          </span>
           <button
             onClick={() => navigate('/auth/login')}
-            className="text-primary hover:underline"
+            style={{
+              color: 'var(--color-primary)',
+              textDecoration: 'none',
+              cursor: 'pointer',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              font: 'inherit'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.textDecoration = 'underline';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.textDecoration = 'none';
+            }}
           >
             로그인
           </button>

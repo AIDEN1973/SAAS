@@ -1,11 +1,11 @@
 /**
  * Core Search Service
- * 
- * Full Text Search ?�비??(PostgreSQL FTS 기반)
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
- * 
- * ?�️ 중요: Phase 1?� PostgreSQL Full Text Search
- * Phase 2+?�서 ?��? 검???�진(Meilisearch, Algolia ?? 검??
+ *
+ * Full Text Search 서비스(PostgreSQL FTS 기반)
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ *
+ * ⚠️ 중요: Phase 1은 PostgreSQL Full Text Search
+ * Phase 2+에서 전문 검색엔진(Meilisearch, Algolia 등) 검토
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -20,14 +20,14 @@ export class SearchService {
   private supabase = createServerClient();
 
   /**
-   * ?�합 검??
+   * 통합 검색
    */
   async search(
     tenantId: string,
     input: SearchInput
   ): Promise<SearchResult[]> {
     // Phase 1: PostgreSQL Full Text Search
-    // �??�티???�?�별�?검????결과 병합
+    // 엔티티 타입별로 검색하여 결과 병합
     const results: SearchResult[] = [];
 
     const entityTypes = input.entity_types || ['person', 'consultation', 'post', 'review', 'event'];
@@ -37,17 +37,17 @@ export class SearchService {
       results.push(...entityResults);
     }
 
-    // 관?�도 ???�렬
+    // 관련도 순 정렬
     results.sort((a, b) => (b.relevance || 0) - (a.relevance || 0));
 
-    // ?�이�?
+    // 페이징
     const limit = input.limit || 20;
     const offset = input.offset || 0;
     return results.slice(offset, offset + limit);
   }
 
   /**
-   * ?�정 ?�티???�??검??
+   * 특정 엔티티 타입 검색
    */
   private async searchEntity(
     tenantId: string,
@@ -55,11 +55,11 @@ export class SearchService {
     query: string
   ): Promise<SearchResult[]> {
     // PostgreSQL Full Text Search 구현
-    // �??�티???�?�별 ?�이블에??검??
-    // ?? persons, consultations, posts, reviews, events
+    // 엔티티 타입별 테이블에 검색
+    // 예: persons, consultations, posts, reviews, events
 
-    // 기본 구현: ILIKE 검??(Phase 1)
-    // Phase 2+?�서 PostgreSQL FTS ?�덱???�용
+    // 기본 구현: ILIKE 검색(Phase 1)
+    // Phase 2+에서 PostgreSQL FTS 인덱스 사용
 
     let tableName: string;
     let titleColumn: string;
@@ -112,7 +112,7 @@ export class SearchService {
     return (data || []).map((item: any) => ({
       id: item.id,
       entity_type: entityType,
-      relevance: 1, // 기본�? Phase 2+?�서 ?�제 관?�도 계산
+      relevance: 1, // 기본값, Phase 2+에서 실제 관련도 계산
       created_at: item.created_at,
     }));
   }
@@ -122,4 +122,3 @@ export class SearchService {
  * Default Service Instance
  */
 export const searchService = new SearchService();
-

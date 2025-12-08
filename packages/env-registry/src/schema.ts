@@ -1,56 +1,55 @@
 import { z } from 'zod';
 
-// ?�버/Edge ?�용 ?�키�?(모든 ?�경변???�함)
+// 서버/Edge 사용 스키마(모든 환경변수 포함)
 export const envServerSchema = z.object({
   // Supabase
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(1),
-  SERVICE_ROLE_KEY: z.string().min(1),  // Edge Function / ?�버 ?�용
-  SUPABASE_READ_REPLICA_URL: z.string().url().optional(),  // Phase 2+ Read Replica (?�기 ?�용)
-  
-  // ?�경 구분
+  SERVICE_ROLE_KEY: z.string().min(1),  // Edge Function / 서버 사용
+  SUPABASE_READ_REPLICA_URL: z.string().url().optional(),  // Phase 2+ Read Replica (읽기 전용)
+
+  // 환경 구분
   NODE_ENV: z.enum(['development', 'staging', 'production']),
-  
-  // 결제/?�림뱅킹 (Phase 1 ?�수, ?�제 ?�용 ?�점??requireEnv()�?체크)
+
+  // 결제/알림뱅킹 (Phase 1 선택, 실제 사용 시점에 requireEnv()로 체크)
   PAYMENT_ALIMBANK_API_URL: z.string().url().optional(),
   PAYMENT_ALIMBANK_API_KEY: z.string().min(1).optional(),
   PAYMENT_WEBHOOK_SECRET: z.string().min(1).optional(),
-  
+
   // Phase 2+ (Role 분리)
   PAYMENT_WEBHOOK_ROLE_KEY: z.string().min(1).optional(),
   BILLING_BATCH_ROLE_KEY: z.string().min(1).optional(),
   ANALYTICS_ROLE_KEY: z.string().min(1).optional(),
-  
+
   // Custom Domain (Phase 2+)
   CUSTOM_DOMAIN_VERIFY_SECRET: z.string().min(1).optional(),
-  
-  // ?��? ?�커 (Phase 2+)
+
+  // 외부 워커 (Phase 2+)
   AWS_LAMBDA_ANALYTICS_FUNCTION_NAME: z.string().optional(),
   CLOUDFLARE_WORKER_ANALYTICS_URL: z.string().url().optional(),
-  
-  // Kakao Maps API (Phase 2+ 지??기능?? ?�버/Edge Function ?�용)
+
+  // Kakao Maps API (Phase 2+ 지도기능용 서버/Edge Function 사용)
   KAKAO_REST_API_KEY: z.string().min(1).optional(),
 });
 
-// ?�라?�언???�용 ?�키�?(NEXT_PUBLIC_* ??빌드?�???�출 값만)
+// 클라이언트 사용 스키마(NEXT_PUBLIC_*는 빌드 타임에 추출 값만)
 export const envClientSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),  // ?�수
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),  // ?�수
-  NEXT_PUBLIC_KAKAO_JS_KEY: z.string().min(1).optional(),  // Phase 2+ 지??기능??(JavaScript SDK)
-  // ?�라?�언?�에 ?�출 가?�한 공개 값만 ?�함
-  // ?��? Service Role Key??비�? �??�함 금�?
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),  // 필수
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),  // 필수
+  NEXT_PUBLIC_KAKAO_JS_KEY: z.string().min(1).optional(),  // Phase 2+ 지도기능용(JavaScript SDK)
+  // 클라이언트에 노출 가능한 공개 값만 포함
+  // 절대 Service Role Key는 비밀 값이므로 포함 금지
 });
 
-// ?�버/Edge ?�용 공통 ?�키�?(?�명, 버전?�보 ??
-// ?�라?�언?�에???�요??값�? NEXT_PUBLIC_*�?envClient???�함
+// 서버/Edge 사용 공통 스키마(앱명, 버전정보 등)
+// 클라이언트에서도 필요한 값은 NEXT_PUBLIC_*로 envClient에 포함
 export const envCommonSchema = z.object({
   APP_NAME: z.string().min(1).optional(),
   APP_VERSION: z.string().min(1).optional(),
   INDUSTRY_MODE: z.enum(['academy', 'salon', 'realestate', 'gym', 'ngo']).optional(),
-  // ?�버/Edge?�서�??�용?�는 공개 �?
+  // 서버/Edge에서 사용하는 공개 값
 });
 
 export type EnvServer = z.infer<typeof envServerSchema>;
 export type EnvClient = z.infer<typeof envClientSchema>;
 export type EnvCommon = z.infer<typeof envCommonSchema>;
-

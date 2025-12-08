@@ -264,13 +264,13 @@ storage 파일삭제 정책:
 async function deleteTenant(tenantId: string) {
   // 1. 테넌트 상태를 'deleting'으로 변경
   await db.updateTenantStatus(tenantId, 'deleting');
-  
+
   // 2. 삭제 예약 (30일 후)
   await db.scheduleDeletion(tenantId, new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
-  
+
   // 3. Storage 파일 삭제 예약
   await scheduleStorageDeletion(tenantId, 30);
-  
+
   // 4. audit.events는 보관 (삭제하지 않음)
 }
 ```
@@ -317,7 +317,7 @@ tenant_features (
 industry_type, status, role, provider 등은 ENUM 또는 CHECK로 표준화:
 
 -- 예시
-ALTER TABLE tenants 
+ALTER TABLE tenants
   ADD CONSTRAINT chk_tenants_status CHECK (status IN ('active','paused','closed'));
 
 ALTER TABLE tenants
@@ -1161,27 +1161,27 @@ const envServerSchema = z.object({
   SUPABASE_ANON_KEY: z.string().min(1),
   SERVICE_ROLE_KEY: z.string().min(1),  // Edge Function / 서버 전용
   SUPABASE_READ_REPLICA_URL: z.string().url().optional(),  // Phase 2+ Read Replica (읽기 전용)
-  
+
   // 환경 구분
   NODE_ENV: z.enum(['development', 'staging', 'production']),
-  
+
   // 결제/알림뱅킹 (Phase 1 필수, 실제 사용 시점에 requireEnv()로 체크)
   PAYMENT_ALIMBANK_API_URL: z.string().url().optional(),
   PAYMENT_ALIMBANK_API_KEY: z.string().min(1).optional(),
   PAYMENT_WEBHOOK_SECRET: z.string().min(1).optional(),
-  
+
   // Phase 2+ (Role 분리)
   PAYMENT_WEBHOOK_ROLE_KEY: z.string().min(1).optional(),
   BILLING_BATCH_ROLE_KEY: z.string().min(1).optional(),
   ANALYTICS_ROLE_KEY: z.string().min(1).optional(),
-  
+
   // Custom Domain (Phase 2+)
   CUSTOM_DOMAIN_VERIFY_SECRET: z.string().min(1).optional(),
-  
+
   // 외부 워커 (Phase 2+)
   AWS_LAMBDA_ANALYTICS_FUNCTION_NAME: z.string().optional(),
   CLOUDFLARE_WORKER_ANALYTICS_URL: z.string().url().optional(),
-  
+
   // Kakao Maps API (Phase 2+ 지도 기능용, 서버/Edge Function 전용)
   KAKAO_REST_API_KEY: z.string().min(1).optional(),
 });
@@ -1215,9 +1215,9 @@ export { envServerSchema, envClientSchema, envCommonSchema };
  * - Edge Function (Supabase): Deno.env.toObject()
  * - Vercel (App/Node): process.env
  * - 로컬 개발: process.env (dotenv로 루트 디렉토리의 .env.local 파일 자동 로드)
- * 
+ *
  * ⚠️ 주의: 브라우저 환경에서는 사용 불가 (resolveEnv() 호출 시 에러 발생)
- * 
+ *
  * 환경변수 파일 위치:
  * - 프로젝트 루트 디렉토리: .env.local (로컬 개발용, 중앙 관리)
  * - packages/env-registry/src/server.ts에서 dotenv로 자동 로드
@@ -1231,12 +1231,12 @@ export function resolveEnv(): Record<string, string | undefined> {
     }
     return env;
   }
-  
+
   // Node.js / Vercel 환경
   if (typeof process !== 'undefined' && process.env) {
     return process.env;
   }
-  
+
   throw new Error(
     '환경변수 접근 불가: Edge/App/Node 환경을 감지할 수 없습니다.\n' +
     '브라우저 환경에서는 env-registry/server를 사용할 수 없습니다.\n' +
@@ -1251,17 +1251,17 @@ import { resolveEnv } from './resolve';
 function validateEnvServer(): EnvServer {
   const rawEnv = resolveEnv();
   const parsed = envServerSchema.safeParse(rawEnv);
-  
+
   if (!parsed.success) {
-    const errors = parsed.error.errors.map(e => 
+    const errors = parsed.error.errors.map(e =>
       `${e.path.join('.')}: ${e.message}`
     ).join('\n');
-    
+
     const missingVars = parsed.error.errors
       .filter(e => e.code === 'invalid_type' && e.received === 'undefined')
       .map(e => e.path.join('.'))
       .join(', ');
-    
+
     throw new Error(
       `환경변수 검증 실패:\n${errors}\n\n` +
       (missingVars ? `누락된 필수 환경변수: ${missingVars}\n\n` : '') +
@@ -1269,7 +1269,7 @@ function validateEnvServer(): EnvServer {
       `프로젝트 루트 디렉토리에 .env.local 파일을 생성하거나, packages/env-registry/.env.example 파일을 참고하세요.`
     );
   }
-  
+
   return parsed.data;
 }
 
@@ -1302,7 +1302,7 @@ function validateEnvClient(): EnvClient {
     const parsed = envClientSchema.safeParse(rawEnv);
     return parsed.success ? parsed.data : ({} as EnvClient);
   }
-  
+
   // 서버 사이드 렌더링 중에도 클라이언트 스키마만 사용
   const rawEnv: Record<string, string | undefined> = {};
   if (process.env) {
@@ -1325,7 +1325,7 @@ function validateEnvCommon(): EnvCommon {
   // 공통 환경변수는 기본적으로 서버/Edge에서 사용
   // 클라이언트에서 필요한 값은 NEXT_PUBLIC_*로 별도 노출
   const rawEnv: Record<string, string | undefined> = {};
-  
+
   if (typeof process !== 'undefined' && process.env) {
     // APP_NAME, APP_VERSION, INDUSTRY_MODE 등 공개 값만
     for (const key in process.env) {
@@ -1334,7 +1334,7 @@ function validateEnvCommon(): EnvCommon {
       }
     }
   }
-  
+
   const parsed = envCommonSchema.safeParse(rawEnv);
   return parsed.success ? parsed.data : ({} as EnvCommon);
 }
@@ -1396,7 +1396,7 @@ import { envServer } from '@env-registry/server';  // ESLint 에러 발생
 - 환경변수는 배포 플랫폼(Vercel, Supabase Secrets 등)에서 관리
 - 코드에는 기본값이나 예시만 포함
 
-⚠️ 중요: 
+⚠️ 중요:
 - .env.local 파일은 프로젝트 루트 디렉토리에만 생성 (각 앱별로 생성하지 않음)
 - .env.local 파일에는 실제 Service Role Key를 포함하지 않고, 개발용 테스트 키만 사용합니다.
 
@@ -1442,11 +1442,11 @@ import { envServer, type EnvServer } from '@env-registry/server';
 /**
  * 환경변수가 실제로 필요한 시점에만 체크하는 유틸 (Lazy Validation)
  * Phase 1에서 알림뱅킹은 필수이지만, 스키마는 optional로 정의되어 있음
- * 
+ *
  * 사용 패턴:
  * const secret = envServer.PAYMENT_ALIMBANK_SECRET;
  * if (!secret) throw new Error("PAYMENT_ALIMBANK_SECRET missing");
- * 
+ *
  * 또는 requireEnv() 유틸 사용:
  */
 export function requireEnv<K extends keyof EnvServer>(
@@ -1538,9 +1538,9 @@ export async function getTenantSecret(
       .eq('secret_key', secretKey),
     tenantId
   ).single();
-  
+
   if (!data) return null;
-  
+
   // 복호화 후 반환
   return decryptSecret(data.secret_value, data.key_version);
 }
@@ -1817,7 +1817,7 @@ Core 테이블은 industry_type + tenant_id 복합 인덱스가 필수
 
 예시:
 
-CREATE INDEX idx_students_industry_tenant 
+CREATE INDEX idx_students_industry_tenant
 ON students(industry_type, tenant_id, created_at DESC);
 
 
@@ -2080,7 +2080,7 @@ RLS 조건과 WHERE 절 조건이 일치하도록 설계
 SELECT * FROM students WHERE name = '김철수';
 
 -- ✅ 올바른 예 (RLS + 명시적 필터)
-SELECT * FROM students 
+SELECT * FROM students
 WHERE tenant_id = :tenant_id AND name = '김철수';
 
 
@@ -2484,7 +2484,7 @@ export async function rollbackSchema(entity: string, industryType: string | null
   }
 
   // 3. 현재 버전 비활성화
-  await db.update('meta.schema_registry', 
+  await db.update('meta.schema_registry',
     { id: active.id },
     { status: 'deprecated', deprecated_at: now() }
   );
@@ -3338,7 +3338,7 @@ Billing Mapping Example
 기타비용
 
 출결 Hook 흐름
-출석 체크 → 출결 이벤트 발생 → core-notification → 학부모 알림  
+출석 체크 → 출결 이벤트 발생 → core-notification → 학부모 알림
 → core-metering → 사용량 기록 → core-billing → 월말 자동청구
 
 Service Layer 연동:
@@ -3493,7 +3493,7 @@ RLS Layer (PostgreSQL RLS):
 
 보안 흐름:
 ```
-UI → @api-sdk/core (Context에서 tenant_id 가져오기) 
+UI → @api-sdk/core (Context에서 tenant_id 가져오기)
   → Service Layer (tenant_id 파라미터로 전달)
   → withTenant() (쿼리 필터링)
   → RLS (최종 보안 검증)
@@ -3723,9 +3723,9 @@ Edge Functions	Service Role	Webhook·배치·서명 검증용
 ❌ 금지 예시:
 ```typescript
 // Edge Function에서 set_config 사용 (더 이상 사용하지 않음)
-await supabase.rpc('set_config', { 
-  key: 'app.current_tenant_id', 
-  value: verified_tenant_id 
+await supabase.rpc('set_config', {
+  key: 'app.current_tenant_id',
+  value: verified_tenant_id
 });
 ```
 
@@ -3841,6 +3841,33 @@ SplitTableLayout (태블릿 전용)
 FormField
 
 Drawer / Modal
+
+⚠️ 중요: 모달 사용 규칙 (Critical)
+
+[불변 규칙] 모든 알림/경고/확인 대화상자는 커스텀 모달을 사용해야 합니다.
+
+❌ 금지:
+- window.alert()
+- window.confirm()
+- window.prompt()
+
+✅ 허용:
+- useModal().showAlert(message, title?, type?)
+- useModal().showConfirm(message, title?)
+- 커스텀 Modal 컴포넌트
+
+이유:
+1. 일관된 UX: 모든 알림이 동일한 디자인 시스템 사용
+2. 접근성: 커스텀 모달은 접근성 개선 가능
+3. 모바일 최적화: 모바일에서 네이티브 alert는 부자연스러움
+4. 테마 지원: 다크모드, 테넌트 테마 적용 가능
+5. i18n 지원: 다국어 메시지 지원
+
+모달 vs 페이지 선택 기준:
+- 모달: 간단한 수정 작업, 목록에서 빠른 액션, 확인/알림 메시지, 모바일 환경
+- 페이지: 복잡한 작업, 독립적인 작업 흐름, 상세 정보 조회, URL 공유 필요
+
+→ 상세 가이드라인은 `docu/UI_가이드라인_모달_페이지_선택.md` 참조
 
 AppShellLayout
 
@@ -4089,13 +4116,13 @@ async function processWebhook(provider: string, idempotencyKey: string, event: W
   if (existing && existing.status === 'success') {
     return { status: 'duplicate', event: existing }; // 이미 처리된 이벤트
   }
-  
+
   // 2. 동시 처리 방지 (SELECT FOR UPDATE)
   const locked = await db.lockWebhookEvent(provider, idempotencyKey);
   if (!locked) {
     throw new Error('Event is being processed by another worker');
   }
-  
+
   // 3. 이벤트 처리
   try {
     await processPaymentEvent(event);
@@ -4129,11 +4156,11 @@ Duplicate 처리 정책:
 정산 불일치 감지:
 ```sql
 -- 일별 정산 불일치 조회
-SELECT 
+SELECT
   DATE(event_timestamp) as settlement_date,
   provider,
   SUM(CASE WHEN status = 'success' THEN amount ELSE 0 END) as webhook_total,
-  (SELECT SUM(amount) FROM settlement_records 
+  (SELECT SUM(amount) FROM settlement_records
    WHERE provider = w.provider AND date = DATE(w.event_timestamp)) as settlement_total,
   ABS(webhook_total - settlement_total) as mismatch_amount
 FROM audit.webhook_events w
@@ -4161,7 +4188,7 @@ HAVING ABS(webhook_total - settlement_total) > 0.01; -- 1원 이상 차이
 async function retryPayment(paymentId: string, attempt: number = 1) {
   const maxAttempts = 5;
   const backoff = [5000, 30000, 120000, 600000, 1800000]; // ms
-  
+
   try {
     const result = await processPayment(paymentId);
     return result;
@@ -4243,10 +4270,10 @@ async function processPaymentWithPartialFailure(paymentId: string) {
     { name: 'notification_sent', fn: () => sendNotification(paymentId) },
     { name: 'settlement_recorded', fn: () => recordSettlement(paymentId) },
   ];
-  
+
   const completedSteps = [];
   const failedSteps = [];
-  
+
   for (const step of steps) {
     try {
       await step.fn();
@@ -4258,7 +4285,7 @@ async function processPaymentWithPartialFailure(paymentId: string) {
       break; // 실패한 단계에서 중단
     }
   }
-  
+
   // 실패한 단계만 재시도
   if (failedSteps.length > 0) {
     await retryFailedSteps(paymentId, failedSteps);
@@ -4284,7 +4311,7 @@ async function processPaymentWithPartialFailure(paymentId: string) {
 ```typescript
 async function retryPaymentRequest(paymentId: string, reason: string) {
   const originalPayment = await getPayment(paymentId);
-  
+
   // 동일 idempotency_key로 재요청
   const retryPayment = await createPayment({
     ...originalPayment,
@@ -4292,11 +4319,11 @@ async function retryPaymentRequest(paymentId: string, reason: string) {
     retry_count: originalPayment.retry_count + 1,
     retry_reason: reason,
   });
-  
+
   if (retryPayment.retry_count > 3) {
     throw new Error('Maximum retry count exceeded');
   }
-  
+
   return retryPayment;
 }
 ```
@@ -4319,7 +4346,7 @@ async function sendNotificationWithFallback(userId: string, message: string) {
     { name: 'sms', fn: () => sendSMS(userId, message) },
     { name: 'email', fn: () => sendEmail(userId, message) },
   ];
-  
+
   for (const channel of channels) {
     try {
       await channel.fn();
@@ -4331,7 +4358,7 @@ async function sendNotificationWithFallback(userId: string, message: string) {
       continue;
     }
   }
-  
+
   // 모든 채널 실패 시 재시도 큐에 추가
   await addToRetryQueue(userId, message, { maxRetries: 5, ttl: 24 * 60 * 60 * 1000 });
   return { success: false, queued: true };
@@ -4380,20 +4407,20 @@ late event drop 로직:
 ```typescript
 async function processWebhook(provider: string, idempotencyKey: string, event: WebhookEvent) {
   const existing = await db.findWebhookEvent(provider, idempotencyKey);
-  
+
   if (existing) {
     // 순서 보장 검증 (Phase 2+ 선택적)
     if (event.timestamp < existing.event_timestamp) {
       // late event, 무시
       return { status: 'ignored', reason: 'late_event' };
     }
-    
+
     // 상태 전이 규칙 검증
     if (!isValidTransition(existing.status, event.status)) {
       return { status: 'rejected', reason: 'invalid_transition' };
     }
   }
-  
+
   // 처리 진행...
 }
 ```
@@ -4490,13 +4517,13 @@ IP 기반 rate-limit: 1분당 최대 30회
 async function verifyPublicToken(token: string, invoiceId: string) {
   // 1. 토큰 검증
   const payload = await verifyToken(token);
-  
+
   // 2. 사용 여부 확인
   const used = await kv.get(`token:${payload.jti}`);
   if (used) {
     throw new Error('Token already used');
   }
-  
+
   // 3. Rate limit 확인
   const rateLimitKey = `rate:invoice:${invoiceId}`;
   const count = await kv.incr(rateLimitKey);
@@ -4506,10 +4533,10 @@ async function verifyPublicToken(token: string, invoiceId: string) {
   if (count > 10) {
     throw new Error('Rate limit exceeded');
   }
-  
+
   // 4. 토큰 사용 기록
   await kv.set(`token:${payload.jti}`, 'used', { ex: 600 });
-  
+
   return payload;
 }
 ```
@@ -5024,7 +5051,7 @@ CREATE TABLE analytics.daily_store_metrics (
   region_id          uuid NOT NULL REFERENCES core_regions(id),
   industry_type      text NOT NULL,
   date_kst           date NOT NULL,
-  
+
   -- 공통 Core KPI (모든 업종 공통)
   revenue_total      numeric(18,2) NOT NULL DEFAULT 0,
   revenue_refund     numeric(18,2) NOT NULL DEFAULT 0,
@@ -5032,14 +5059,14 @@ CREATE TABLE analytics.daily_store_metrics (
   new_members        integer       NOT NULL DEFAULT 0,
   churned_members    integer       NOT NULL DEFAULT 0,
   visit_count        integer       NOT NULL DEFAULT 0,
-  
+
   -- 업종별 확장 KPI (nullable, Industry Layer에서 채움)
   lesson_count       integer       NULL,   -- 학원: 수업 수
   class_fill_rate    numeric(5,2) NULL,   -- 학원: 반 정원 대비 채움률
   contract_count     integer       NULL,   -- 부동산: 체결 계약 수
   listing_count      integer       NULL,   -- 부동산: 등록 매물 수
   attendance_count   integer       NULL,   -- 체육관: 출석 횟수
-  
+
   created_at         timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (tenant_id, store_id, date_kst)
 );
@@ -5060,24 +5087,24 @@ CREATE TABLE analytics.daily_region_metrics (
   region_level       text NOT NULL CHECK (region_level IN ('dong', 'gu_gun', 'si', 'nation')),
   region_code        text NOT NULL,         -- core_regions.code
   date_kst           date NOT NULL,
-  
+
   store_count        integer NOT NULL,      -- 해당 지역/업종의 매장 수
-  
+
   -- 공통 KPI의 통계 값들
   revenue_avg        numeric(18,2) NOT NULL,
   revenue_median     numeric(18,2) NOT NULL,
   revenue_p25        numeric(18,2) NOT NULL,
   revenue_p75        numeric(18,2) NOT NULL,
-  
+
   active_members_avg    numeric(18,2) NOT NULL,
   active_members_median numeric(18,2) NOT NULL,
   active_members_p25    numeric(18,2) NOT NULL,
   active_members_p75    numeric(18,2) NOT NULL,
-  
+
   -- 필요 시 업종별 KPI 요약
   lesson_count_avg      numeric(18,2) NULL,
   contract_count_avg    numeric(18,2) NULL,
-  
+
   created_at         timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (industry_type, region_level, region_code, date_kst)
 );
@@ -5136,14 +5163,14 @@ export async function getRegionMetrics(industryType: string, regionLevel: string
     .eq('region_code', regionCode)
     .eq('date_kst', dateKst)
     .single();
-  
+
   if (!metrics || metrics.store_count < 3) {
     return {
       error: 'INSUFFICIENT_SAMPLE',
       message: '해당 지역의 통계는 매장 수 부족으로 제공되지 않습니다.',
     };
   }
-  
+
   return metrics;
 }
 
@@ -5398,9 +5425,9 @@ CREATE POLICY region_metrics_industry_region_filter ON analytics.daily_region_me
 FOR SELECT TO authenticated
 USING (
   industry_type = (
-    SELECT industry_type FROM core_stores 
+    SELECT industry_type FROM core_stores
     WHERE id IN (
-      SELECT store_id FROM analytics.daily_store_metrics 
+      SELECT store_id FROM analytics.daily_store_metrics
       WHERE tenant_id = (auth.jwt() -> 'tenant_id')::uuid
       LIMIT 1
     )
@@ -5436,7 +5463,7 @@ export const analyticsService = {
         .lte('date_kst', range.to),
       tenantId,
     );
-    
+
     // 2) 내 매장의 region / industry 정보 조회
     const store = await withTenant(
       supabase
@@ -5446,14 +5473,14 @@ export const analyticsService = {
         .single(),
       tenantId,
     );
-    
+
     // 3) region_id → region_code, level 매핑
     const region = await supabase
       .from('core_regions')
       .select('level, code')
       .eq('id', store.region_id)
       .single();
-    
+
     // 4) 동일 업종 + 동일 지역 벤치마크
     const benchmarks = await supabase
       .from('analytics.daily_region_metrics')
@@ -5463,10 +5490,10 @@ export const analyticsService = {
       .eq('region_code', region.code)
       .gte('date_kst', range.from)
       .lte('date_kst', range.to);
-    
+
     return { myMetrics, benchmarks };
   },
-  
+
   async getStoreComparison(tenantId: string, storeId: string, monthKst: string) {
     // 전월 대비 비교
     const current = await withTenant(
@@ -5478,7 +5505,7 @@ export const analyticsService = {
         .lte('date_kst', endOfMonth(monthKst)),
       tenantId,
     );
-    
+
     const prev = await withTenant(
       supabase
         .from('analytics.daily_store_metrics')
@@ -5488,23 +5515,23 @@ export const analyticsService = {
         .lte('date_kst', endOfPrevMonth(monthKst)),
       tenantId,
     );
-    
+
     // 합산/평균 후 증감률 계산 (서버에서)
     const currentSummary = {
       revenue: sum(current.data, 'revenue_total'),
       members: avg(current.data, 'active_members'),
     };
-    
+
     const prevSummary = {
       revenue: sum(prev.data, 'revenue_total'),
       members: avg(prev.data, 'active_members'),
     };
-    
+
     const diffRate = {
       revenue: ((currentSummary.revenue - prevSummary.revenue) / prevSummary.revenue) * 100,
       members: ((currentSummary.members - prevSummary.members) / prevSummary.members) * 100,
     };
-    
+
     return { currentSummary, prevSummary, diffRate };
   },
 };
@@ -5649,12 +5676,12 @@ export async function geocodeAddress(address: string) {
       },
     }
   );
-  
+
   const data = await response.json();
   if (!data.documents || data.documents.length === 0) {
     throw new Error('주소를 찾을 수 없습니다.');
   }
-  
+
   const result = data.documents[0];
   return {
     longitude: parseFloat(result.x),
@@ -5780,12 +5807,12 @@ const loadRegionPolygons = async (regionLevel: 'dong' | 'gu_gun' | 'si') => {
   const geoJsonUrl = `/regions/${regionLevel}.json`;
   const response = await fetch(geoJsonUrl);
   const geoJson = await response.json();
-  
+
   // Kakao Maps Polygon으로 변환
   geoJson.features.forEach((feature: any) => {
     // ⚠️ 중요: GeoJSON은 [lng, lat] 순서이므로 Kakao LatLng(lat, lng)로 변환
     const polygon = new kakao.maps.Polygon({
-      path: feature.geometry.coordinates[0].map(([lng, lat]: [number, number]) => 
+      path: feature.geometry.coordinates[0].map(([lng, lat]: [number, number]) =>
         new kakao.maps.LatLng(lat, lng)  // 순서 변환: [lng, lat] → LatLng(lat, lng)
       ),
       strokeWeight: 2,
@@ -5794,9 +5821,9 @@ const loadRegionPolygons = async (regionLevel: 'dong' | 'gu_gun' | 'si') => {
       fillColor: '#fff',
       fillOpacity: 0.5,
     });
-    
+
     polygon.setMap(map);
-    
+
     // 클릭 이벤트: region_code 전달 → Analytics API 호출
     kakao.maps.event.addListener(polygon, 'click', () => {
       const regionCode = feature.properties.code;
@@ -5894,7 +5921,7 @@ import { envClient } from '@env-registry/client';
 
 export function KakaoMapWrapper({ children }: { children: React.ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
-  
+
   return (
     <>
       <Script
@@ -5917,16 +5944,16 @@ import { envClient } from '@env-registry/client';
 
 export function useKakaoMap() {
   const [isLoaded, setIsLoaded] = useState(false);
-  
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
+
     // 중복 로드 방지
     if (window.kakao && window.kakao.maps) {
       setIsLoaded(true);
       return;
     }
-    
+
     const script = document.createElement('script');
     script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${envClient.NEXT_PUBLIC_KAKAO_JS_KEY}&libraries=services,clusterer&autoload=false`;
     script.async = true;
@@ -5934,12 +5961,12 @@ export function useKakaoMap() {
       setIsLoaded(true);
     };
     document.head.appendChild(script);
-    
+
     return () => {
       // cleanup (필요 시)
     };
   }, []);
-  
+
   return { isLoaded };
 }
 
@@ -6010,7 +6037,7 @@ export const analyticsService = {
       .eq('date_kst', dateKst)
       .eq('region_level', regionLevel);
   },
-  
+
   async getStoreLocations(tenantId: string) {
     return withTenant(
       supabase
@@ -6064,11 +6091,11 @@ Core Layer는 analytics.events / analytics.daily_store_metrics / analytics.daily
 export const academyAnalyticsMapper = {
   calculateDailyMetrics(events: AnalyticsEvent[]): DailyStoreMetrics {
     const baseMetrics = defaultAnalyticsMapper.calculateDailyMetrics(events);
-    
+
     // 업종별 KPI 계산
     const lessonCount = events.filter(e => e.event_type === 'lesson_attended').length;
     const classFillRate = calculateClassFillRate(events);
-    
+
     return {
       ...baseMetrics,
       lesson_count: lessonCount,
@@ -6112,7 +6139,7 @@ MVP/Phase 1에서는 KST 기준 집계 + daily_metrics / monthly_revenue 테이�
 ```sql
 -- 집계 전후 데이터 비교
 WITH source_data AS (
-  SELECT 
+  SELECT
     tenant_id,
     date,
     SUM(amount) as source_total
@@ -6121,14 +6148,14 @@ WITH source_data AS (
   GROUP BY tenant_id, date
 ),
 aggregated_data AS (
-  SELECT 
+  SELECT
     tenant_id,
     date,
     total_revenue as agg_total
   FROM analytics.daily_metrics
   WHERE date >= _start_date AND date < _end_date
 )
-SELECT 
+SELECT
   s.tenant_id,
   s.date,
   s.source_total,
@@ -6152,11 +6179,11 @@ async function validateBackfill(tenantIds: string[], startDate: Date, endDate: D
     FROM validate_aggregation($1, $2, $3)
     WHERE diff > 0.01
   `, [tenantIds, startDate, endDate]);
-  
+
   if (discrepancies.length > 0) {
     // 알람 발송
     await sendAlert('Analytics aggregation mismatch', discrepancies);
-    
+
     // 자동 재집계 (선택적)
     if (autoFix) {
       await backfillDailyMetrics(tenantIds, startDate, endDate);
@@ -6348,7 +6375,7 @@ Edge Function 응답 시간
 
 17-3. KST / UTC 이중 표기 규칙
 
-배치 : 매일 04:00 KST 실행  
+배치 : 매일 04:00 KST 실행
 # Supabase cron 설정값 : 19:00 UTC (KST-9)
 
 
@@ -6472,18 +6499,18 @@ export const themeService = {
   async getTenantTheme(tenantId: string) {
     // 1. 시스템 기본 토큰
     const systemTokens = getSystemDefaultTokens();
-    
+
     // 2. 업종별 토큰
     const tenant = await getTenant(tenantId);
     const industryTokens = getIndustryTokens(tenant.industry_type);
-    
+
     // 3. 테넌트별 오버라이드
     const override = await supabase
       .from('tenant_theme_overrides')
       .select('theme_tokens')
       .eq('tenant_id', tenantId)
       .single();
-    
+
     // 4. 병합 (우선순위 순서)
     return mergeThemeTokens([
       systemTokens,
@@ -6506,16 +6533,16 @@ FOR ALL TO authenticated
 USING (
   tenant_id = (auth.jwt() -> 'tenant_id')::uuid
   OR EXISTS (
-    SELECT 1 FROM auth.users 
-    WHERE id = auth.uid() 
+    SELECT 1 FROM auth.users
+    WHERE id = auth.uid()
     AND role = 'super_admin'
   )
 )
 WITH CHECK (
   tenant_id = (auth.jwt() -> 'tenant_id')::uuid
   OR EXISTS (
-    SELECT 1 FROM auth.users 
-    WHERE id = auth.uid() 
+    SELECT 1 FROM auth.users
+    WHERE id = auth.uid()
     AND role = 'super_admin'
   )
 );
@@ -6932,12 +6959,12 @@ WHERE date BETWEEN CURRENT_DATE - INTERVAL '30 days' AND CURRENT_DATE;
 
 ✅ 허용 예시:
 -- KST 기준 날짜 사용
-SELECT * FROM invoices 
+SELECT * FROM invoices
 WHERE date = (timezone('Asia/Seoul', now()))::date;
 
 -- KST 기준 기간 조회
-WHERE date BETWEEN 
-  (timezone('Asia/Seoul', now()) - INTERVAL '30 days')::date 
+WHERE date BETWEEN
+  (timezone('Asia/Seoul', now()) - INTERVAL '30 days')::date
   AND (timezone('Asia/Seoul', now()))::date;
 
 [불변 규칙] 앱 레이어에서 KST 기준 날짜를 계산해서 파라미터로 넘기는 것이 더 안전합니다.
@@ -6951,7 +6978,7 @@ export async function getMonthlyInvoices(tenantId: string, monthKst: string) {
   // KST 기준 날짜를 앱 레이어에서 계산
   const startDate = toKST(`${monthKst}-01`).startOf('month').toDate();
   const endDate = toKST(`${monthKst}-01`).endOf('month').toDate();
-  
+
   return withTenant(
     supabase
       .from('invoices')
@@ -6975,7 +7002,7 @@ export async function getTodayAttendance(tenantId: string) {
   // KST 기준 오늘 0시 ~ 23:59:59
   const todayKst = toKST().startOf('day');
   const tomorrowKst = toKST().add(1, 'day').startOf('day');
-  
+
   return withTenant(
     supabase
       .from('attendance_logs')
@@ -6999,7 +7026,7 @@ CREATE TABLE analytics.daily_metrics (
   -- date는 항상 KST 기준이어야 함 (UTC 변환 후 저장)
   -- 타입 캐스팅을 명시적으로 처리 (date vs date 비교)
   CONSTRAINT chk_date_valid CHECK (
-    date >= DATE '2020-01-01' 
+    date >= DATE '2020-01-01'
     AND date <= (timezone('Asia/Seoul', now()))::date + INTERVAL '1 day'
   )
 );
@@ -7255,7 +7282,7 @@ KMS 정책: Admin Read Only, Rotation 다중 승인(2FA)
 회전 시 데이터 마이그레이션:
 
 -- 배치 스크립트 예시
-UPDATE guardians 
+UPDATE guardians
 SET email_enc = encrypt_new_key(email_enc, old_key_version, new_key_version),
     key_version = 2
 WHERE key_version = 1;
@@ -7605,7 +7632,7 @@ CREATE TABLE public.tenant_domains (
   tenant_id uuid NOT NULL,
   domain text NOT NULL,            -- customers domain, e.g. 'www.abcacademy.com'
   is_primary boolean DEFAULT false,
-  status text NOT NULL DEFAULT 'pending', 
+  status text NOT NULL DEFAULT 'pending',
   verified_at timestamptz,
   created_at timestamptz DEFAULT now(),
   UNIQUE(domain)
@@ -7653,8 +7680,8 @@ abandoned 상태 도메인은 30일 후 자동 삭제 (또는 수동 정리)
 
 ```sql
 -- 도메인 등록 시 충돌 검증
-SELECT COUNT(*) FROM tenant_domains 
-WHERE domain = :domain 
+SELECT COUNT(*) FROM tenant_domains
+WHERE domain = :domain
   AND status IN ('pending', 'verifying', 'active');
 -- 결과가 0이 아니면 등록 거부
 ```
@@ -7847,7 +7874,7 @@ fallback 시 기본 도메인은 항상 app.dearsaas.com 으로 리다이렉트�
 
 예시 코드:
 
-const tenant = await findTenantByDomain(host) 
+const tenant = await findTenantByDomain(host)
   || await findTenantByDefaultDomain()
   || null;
 
@@ -8871,7 +8898,7 @@ async function invalidateMasterDataCache(type: string, id: string) {
     'class': [`class::${id}*`, `student::*`],
     'template': [`invoice_template::${id}*`, `tenant::*::invoice*`]
   };
-  
+
   for (const pattern of patterns[type] || []) {
     await kv.deletePattern(pattern);
   }

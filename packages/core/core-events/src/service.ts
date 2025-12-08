@@ -1,8 +1,8 @@
 /**
  * Core Events Service
- * 
- * ?�벤???�로모션 관�??�비??
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
+ *
+ * 이벤트/프로모션 관리 서비스
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -19,7 +19,7 @@ export class EventsService {
   private supabase = createServerClient();
 
   /**
-   * ?�벤??목록 조회
+   * 이벤트 목록 조회
    */
   async getEvents(
     tenantId: string,
@@ -58,7 +58,7 @@ export class EventsService {
   }
 
   /**
-   * ?�벤???�세 조회
+   * 이벤트 상세 조회
    */
   async getEvent(tenantId: string, eventId: string): Promise<Event | null> {
     const { data, error } = await withTenant(
@@ -80,7 +80,7 @@ export class EventsService {
   }
 
   /**
-   * ?�벤???�성
+   * 이벤트 생성
    */
   async createEvent(
     tenantId: string,
@@ -108,7 +108,7 @@ export class EventsService {
   }
 
   /**
-   * ?�벤???�정
+   * 이벤트 수정
    */
   async updateEvent(
     tenantId: string,
@@ -132,7 +132,7 @@ export class EventsService {
   }
 
   /**
-   * ?�벤????��
+   * 이벤트 삭제
    */
   async deleteEvent(tenantId: string, eventId: string): Promise<void> {
     const { error } = await withTenant(
@@ -149,7 +149,7 @@ export class EventsService {
   }
 
   /**
-   * ?�벤??참여
+   * 이벤트 참여
    */
   async participateInEvent(
     tenantId: string,
@@ -174,7 +174,7 @@ export class EventsService {
   }
 
   /**
-   * ?�벤??참여??목록 조회
+   * 이벤트 참여자 목록 조회
    */
   async getEventParticipants(
     tenantId: string,
@@ -201,4 +201,3 @@ export class EventsService {
  * Default Service Instance
  */
 export const eventsService = new EventsService();
-

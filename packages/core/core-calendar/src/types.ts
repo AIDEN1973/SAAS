@@ -1,8 +1,8 @@
 /**
  * Core Calendar Types
  * 
- * ?�정/?�약/?�업 ?��?�?공통 ?�메??
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
+ * ?정/?약/?업 ???공통 ?메??
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존?? ?음
  */
 
 export type RepeatPattern = 'daily' | 'weekly' | 'monthly' | 'none';

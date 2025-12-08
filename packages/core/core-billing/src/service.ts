@@ -1,8 +1,8 @@
 /**
  * Core Billing Service
- * 
- * 과금 ?�비??(invoices / invoice_items)
- * [불�? 규칙] Core Layer??Industry 모듈???�존?��? ?�음
+ *
+ * 과금 서비스(invoices / invoice_items)
+ * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
@@ -20,7 +20,7 @@ export class BillingService {
   private supabase = createServerClient();
 
   /**
-   * ?�보?�스 목록 조회
+   * 인보이스 목록 조회
    */
   async getInvoices(
     tenantId: string,
@@ -59,7 +59,7 @@ export class BillingService {
   }
 
   /**
-   * ?�보?�스 ?�세 조회
+   * 인보이스 상세 조회
    */
   async getInvoice(tenantId: string, invoiceId: string): Promise<Invoice | null> {
     const { data, error } = await withTenant(
@@ -81,13 +81,13 @@ export class BillingService {
   }
 
   /**
-   * ?�보?�스 ?�성
+   * 인보이스 생성
    */
   async createInvoice(
     tenantId: string,
     input: CreateInvoiceInput
   ): Promise<Invoice> {
-    // ?�보?�스 ?�성
+    // 인보이스 생성
     const { data: invoice, error: invoiceError } = await this.supabase
       .from('invoices')
       .insert({
@@ -105,7 +105,7 @@ export class BillingService {
       throw new Error(`Failed to create invoice: ${invoiceError.message}`);
     }
 
-    // ?�보?�스 ?�이???�성
+    // 인보이스 아이템 생성
     if (input.items && input.items.length > 0) {
       const items = input.items.map((item) => ({
         tenant_id: tenantId,
@@ -130,7 +130,7 @@ export class BillingService {
   }
 
   /**
-   * ?�보?�스 ?�정
+   * 인보이스 수정
    */
   async updateInvoice(
     tenantId: string,
@@ -154,7 +154,7 @@ export class BillingService {
   }
 
   /**
-   * ?�보?�스 ?�이??목록 조회
+   * 인보이스 아이템 목록 조회
    */
   async getInvoiceItems(
     tenantId: string,
@@ -177,7 +177,7 @@ export class BillingService {
   }
 
   /**
-   * ?�보?�스 ?�이??추�?
+   * 인보이스 아이템 추가
    */
   async addInvoiceItem(
     tenantId: string,
@@ -210,4 +210,3 @@ export class BillingService {
  * Default Service Instance
  */
 export const billingService = new BillingService();
-

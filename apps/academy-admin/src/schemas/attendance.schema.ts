@@ -1,6 +1,6 @@
 /**
  * Attendance Form Schema
- * 
+ *
  * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
  * [동적 옵션] 학생 및 반 목록은 동적으로 채워집니다.
  */
@@ -109,11 +109,36 @@ export function createAttendanceFormSchema(
         },
       ],
       submit: {
+        labelKey: 'ATTENDANCE.FORM.SUBMIT',
         label: '저장',
         variant: 'solid',
         color: 'primary',
         size: 'md',
       },
+      // SDUI v1.1: Action Engine 지원
+      actions: [
+        {
+          event: 'onSubmit',
+          type: 'api.call',
+          endpoint: 'attendances',
+          method: 'POST',
+          body: 'form',
+        },
+        {
+          event: 'onSubmitSuccess',
+          type: 'toast',
+          messageKey: 'ATTENDANCE.SAVE.SUCCESS',
+          message: '출결 기록이 저장되었습니다.',
+          variant: 'success',
+        },
+        {
+          event: 'onSubmitError',
+          type: 'toast',
+          messageKey: 'ATTENDANCE.SAVE.ERROR',
+          message: '출결 기록 저장에 실패했습니다.',
+          variant: 'error',
+        },
+      ],
     },
   };
 }

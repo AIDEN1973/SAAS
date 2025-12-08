@@ -1,10 +1,10 @@
 /**
  * 테넌트 선택 페이지
- * 
+ *
  * [기술문서 요구사항]
  * - 로그인 후 여러 테넌트가 있는 경우 테넌트 선택
  * - 테넌트 선택 시 JWT claim에 tenant_id 포함
- * 
+ *
  * [UI 문서 요구사항]
  * - Zero-Trust 원칙 준수
  * - 반응형 지원 (xs, sm, md, lg, xl)
@@ -47,9 +47,17 @@ export function TenantSelectionPage() {
 
   if (tenantsLoading) {
     return (
-      <Container maxWidth="md" className="flex items-center justify-center min-h-screen">
-        <Card className="w-full p-6">
-          <p className="text-center">테넌트 목록을 불러오는 중..</p>
+      <Container
+        maxWidth="md"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh'
+        }}
+      >
+        <Card padding="lg" style={{ width: '100%' }}>
+          <p style={{ textAlign: 'center' }}>테넌트 목록을 불러오는 중..</p>
         </Card>
       </Container>
     );
@@ -57,10 +65,29 @@ export function TenantSelectionPage() {
 
   if (!tenants || tenants.length === 0) {
     return (
-      <Container maxWidth="md" className="flex items-center justify-center min-h-screen">
-        <Card className="w-full p-6">
-          <h1 className="text-2xl font-bold mb-4">테넌트 없음</h1>
-          <p className="text-gray-500 mb-4">소속된 테넌트가 없습니다.</p>
+      <Container
+        maxWidth="md"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh'
+        }}
+      >
+        <Card padding="lg" style={{ width: '100%' }}>
+          <h1 style={{
+            fontSize: 'var(--font-size-2xl)',
+            fontWeight: 'var(--font-weight-bold)',
+            marginBottom: 'var(--spacing-md)'
+          }}>
+            테넌트 없음
+          </h1>
+          <p style={{
+            color: 'var(--color-text-secondary)',
+            marginBottom: 'var(--spacing-md)'
+          }}>
+            소속된 테넌트가 없습니다.
+          </p>
           <Button onClick={() => navigate('/auth/signup')} variant="solid">
             회원가입
           </Button>
@@ -70,23 +97,57 @@ export function TenantSelectionPage() {
   }
 
   return (
-    <Container maxWidth="md" className="flex items-center justify-center min-h-screen py-8">
-      <Card className="w-full p-6 md:p-8">
-        <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">테넌트 선택</h1>
-        <p className="text-gray-600 mb-6 text-center">소속된 테넌트를 선택해주세요.</p>
+    <Container
+      maxWidth="md"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        paddingTop: 'var(--spacing-xl)',
+        paddingBottom: 'var(--spacing-xl)'
+      }}
+    >
+      <Card
+        padding={isMobile ? 'lg' : 'xl'}
+        style={{ width: '100%' }}
+      >
+        <h1 style={{
+          fontSize: isMobile ? 'var(--font-size-2xl)' : 'var(--font-size-3xl)',
+          fontWeight: 'var(--font-weight-bold)',
+          marginBottom: 'var(--spacing-lg)',
+          textAlign: 'center'
+        }}>
+          테넌트 선택
+        </h1>
+        <p style={{
+          color: 'var(--color-text-secondary)',
+          marginBottom: 'var(--spacing-lg)',
+          textAlign: 'center'
+        }}>
+          소속된 테넌트를 선택해주세요.
+        </p>
 
-        <div className="space-y-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
           {tenants.map((tenant) => (
             <Button
               key={tenant.id}
               variant={selectedTenantId === tenant.id ? 'solid' : 'outline'}
               onClick={() => handleSelectTenant(tenant.id)}
               disabled={selectTenant.isPending}
-              className="w-full justify-start p-4 h-auto"
+              style={{
+                width: '100%',
+                justifyContent: 'flex-start',
+                padding: 'var(--spacing-md)',
+                height: 'auto'
+              }}
             >
-              <div className="text-left">
-                <div className="font-semibold">{tenant.name}</div>
-                <div className="text-sm text-gray-500">
+              <div style={{ textAlign: 'left', width: '100%' }}>
+                <div style={{ fontWeight: 'var(--font-weight-semibold)' }}>{tenant.name}</div>
+                <div style={{
+                  fontSize: 'var(--font-size-sm)',
+                  color: 'var(--color-text-secondary)'
+                }}>
                   {tenant.industry_type} · {tenant.role}
                 </div>
               </div>
@@ -95,7 +156,13 @@ export function TenantSelectionPage() {
         </div>
 
         {selectTenant.isPending && (
-          <p className="mt-4 text-center text-gray-500">테넌트를 선택하는 중..</p>
+          <p style={{
+            marginTop: 'var(--spacing-md)',
+            textAlign: 'center',
+            color: 'var(--color-text-secondary)'
+          }}>
+            테넌트를 선택하는 중..
+          </p>
         )}
       </Card>
     </Container>

@@ -1,8 +1,8 @@
 /**
  * Student Service
- * 
- * [불�? 규칙] Service Layer??Industry Layer�??�용?�여 ?�종�?비즈?�스 로직???�출?�다.
- * [불�? 규칙] Service Layer??Core Layer�?직접 ?�용?��? ?�고, Industry Layer�??�해 ?�근?�다.
+ *
+ * [불변 규칙] Service Layer는 Industry Layer를 사용하여 업종별 비즈니스 로직을 호출합니다.
+ * [불변 규칙] Service Layer는 Core Layer를 직접 사용하지 않고, Industry Layer를 통해 접근합니다.
  */
 
 import { academyService } from '@industry/academy/service';
@@ -17,15 +17,15 @@ import type {
 import type { Tag } from '@core/tags';
 
 /**
- * Student Service (Industry Layer ?�퍼)
- * 
- * Service Layer??Industry Layer??academyService�??�핑?�여 ?�공?�니??
- * ?�후 ?�른 ?�종(체육관 ????추�??�면 industry-gym??gymService�??�용?�는 별도 Service�??�성?�니??
+ * Student Service (Industry Layer 래퍼)
+ *
+ * Service Layer는 Industry Layer의 academyService를 매핑하여 제공합니다.
+ * 향후 다른 업종(체육관 등)을 추가하면 industry-gym의 gymService를 사용하는 별도 Service를 생성합니다.
  */
 export class StudentService {
 
   /**
-   * ?�생 목록 조회 (?�터�?지??
+   * 학생 목록 조회 (필터링/페이징)
    */
   async getStudents(
     tenantId: string,
@@ -35,14 +35,14 @@ export class StudentService {
   }
 
   /**
-   * ?�생 ?�세 조회
+   * 학생 상세 조회
    */
   async getStudent(tenantId: string, studentId: string): Promise<Student | null> {
     return academyService.getStudent(tenantId, studentId);
   }
 
   /**
-   * ?�생 ?�성
+   * 학생 생성
    */
   async createStudent(
     tenantId: string,
@@ -54,7 +54,7 @@ export class StudentService {
   }
 
   /**
-   * ?�생 ?�정
+   * 학생 수정
    */
   async updateStudent(
     tenantId: string,
@@ -66,7 +66,7 @@ export class StudentService {
   }
 
   /**
-   * ?�생 ??�� (Soft delete: status�?'withdrawn'?�로 변�?
+   * 학생 삭제 (Soft delete: status를 'withdrawn'으로 변경)
    */
   async deleteStudent(
     tenantId: string,
@@ -77,14 +77,14 @@ export class StudentService {
   }
 
   /**
-   * ?��?�?목록 조회
+   * 학부모 목록 조회
    */
   async getGuardians(tenantId: string, studentId: string): Promise<Guardian[]> {
     return academyService.getGuardians(tenantId, studentId);
   }
 
   /**
-   * ?��?�??�성
+   * 학부모 생성
    */
   async createGuardians(
     tenantId: string,
@@ -95,152 +95,9 @@ export class StudentService {
   }
 
   /**
-   * ?�생 ?�그 목록 조회 (core-tags ?�용)
+   * 학생 태그 목록 조회 (core-tags 사용)
    */
   async getTags(tenantId: string): Promise<Tag[]> {
     return academyService.getTags(tenantId);
   }
-
-  /**
-   * ?�생???�그 조회 (core-tags ?�용)
-   */
-  async getStudentTags(tenantId: string, studentId: string): Promise<Tag[]> {
-    return academyService.getStudentTags(tenantId, studentId);
-  }
-
-  /**
-   * ?�담?��? 목록 조회
-   */
-  async getConsultations(
-    tenantId: string,
-    studentId: string
-  ): Promise<StudentConsultation[]> {
-    return academyService.getConsultations(tenantId, studentId);
-  }
-
-  /**
-   * ?�담?��? ?�성
-   */
-  async createConsultation(
-    tenantId: string,
-    studentId: string,
-    consultation: Omit<StudentConsultation, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>,
-    userId: string
-  ): Promise<StudentConsultation> {
-    return academyService.createConsultation(tenantId, studentId, consultation, userId);
-  }
-
-  /**
-   * ?�담?��? ?�정
-   */
-  async updateConsultation(
-    tenantId: string,
-    consultationId: string,
-    consultation: Partial<Omit<StudentConsultation, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at' | 'created_by'>>,
-    userId?: string
-  ): Promise<StudentConsultation> {
-    return academyService.updateConsultation(tenantId, consultationId, consultation, userId);
-  }
-
-  /**
-   * ?�담?��? ??��
-   */
-  async deleteConsultation(
-    tenantId: string,
-    consultationId: string
-  ): Promise<void> {
-    return academyService.deleteConsultation(tenantId, consultationId);
-  }
-
-  /**
-   * ?��?�??�정
-   */
-  async updateGuardian(
-    tenantId: string,
-    guardianId: string,
-    guardian: Partial<Omit<Guardian, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>>
-  ): Promise<Guardian> {
-    return academyService.updateGuardian(tenantId, guardianId, guardian);
-  }
-
-  /**
-   * ?��?�???��
-   */
-  async deleteGuardian(
-    tenantId: string,
-    guardianId: string
-  ): Promise<void> {
-    return academyService.deleteGuardian(tenantId, guardianId);
-  }
-
-  /**
-   * ?�생 ?�그 ?�데?�트
-   */
-  async updateStudentTags(
-    tenantId: string,
-    studentId: string,
-    tagIds: string[]
-  ): Promise<void> {
-    return academyService.updateStudentTags(tenantId, studentId, tagIds);
-  }
-
-  /**
-   * ?�생 �?배정
-   */
-  async enrollStudentToClass(
-    tenantId: string,
-    studentId: string,
-    classId: string,
-    enrolledAt?: string
-  ) {
-    return academyService.enrollStudentToClass(tenantId, studentId, classId, enrolledAt);
-  }
-
-  /**
-   * ?�생 �??�제
-   */
-  async unenrollStudentFromClass(
-    tenantId: string,
-    studentId: string,
-    classId: string,
-    leftAt?: string
-  ): Promise<void> {
-    return academyService.unenrollStudentFromClass(tenantId, studentId, classId, leftAt);
-  }
-
-  /**
-   * ?�생??�?목록 조회
-   */
-  async getStudentClasses(tenantId: string, studentId: string) {
-    return academyService.getStudentClasses(tenantId, studentId);
-  }
-
-  /**
-   * ?�담?��? AI ?�약 ?�성
-   */
-  async generateConsultationAISummary(
-    tenantId: string,
-    consultationId: string
-  ): Promise<string> {
-    return academyService.generateConsultationAISummary(tenantId, consultationId);
-  }
-
-  /**
-   * ?�생 ?�괄 ?�록 (?��?)
-   * [?�구?�항] ?�생 ?�괄 ?�록(?��?)
-   */
-  async bulkCreateStudents(
-    tenantId: string,
-    industryType: string,
-    students: CreateStudentInput[],
-    userId?: string
-  ): Promise<Student[]> {
-    return academyService.bulkCreateStudents(tenantId, industryType, students, userId);
-  }
 }
-
-/**
- * Default Service Instance
- */
-export const studentService = new StudentService();
-

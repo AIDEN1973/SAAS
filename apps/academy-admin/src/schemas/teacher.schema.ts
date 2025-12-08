@@ -1,6 +1,6 @@
 /**
  * Teacher Form Schema
- * 
+ *
  * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
  */
 
@@ -95,11 +95,36 @@ export const teacherFormSchema: FormSchema = {
       },
     ],
     submit: {
+      labelKey: 'TEACHER.FORM.SUBMIT',
       label: '등록',
       variant: 'solid',
       color: 'primary',
       size: 'md',
     },
+    // SDUI v1.1: Action Engine 지원
+    actions: [
+      {
+        event: 'onSubmit',
+        type: 'api.call',
+        endpoint: 'teachers',
+        method: 'POST',
+        body: 'form',
+      },
+      {
+        event: 'onSubmitSuccess',
+        type: 'toast',
+        messageKey: 'TEACHER.CREATE.SUCCESS',
+        message: '강사가 등록되었습니다.',
+        variant: 'success',
+      },
+      {
+        event: 'onSubmitError',
+        type: 'toast',
+        messageKey: 'TEACHER.CREATE.ERROR',
+        message: '강사 등록에 실패했습니다.',
+        variant: 'error',
+      },
+    ],
   },
 };
 
