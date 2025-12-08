@@ -11,7 +11,7 @@
  * 기술문서: docu/스키마엔진.txt 5. Registry Client
  */
 
-import type { FormSchema, TableSchema, UISchema } from '../types';
+import type { UISchema } from '../types';
 import { checkSchemaVersion } from '../validator';
 
 export interface SchemaRegistryClientOptions {
@@ -51,7 +51,7 @@ export class SchemaRegistryClient {
    * 
    * @deprecated Use SchemaRegistryService.getSchema instead
    */
-  async getSchema(entity: string): Promise<UISchema | null> {
+  async getSchema(_entity: string): Promise<UISchema | null> {
     // 실제 구현은 Service Layer에서 DB에서 조회
     // 여기서는 인터페이스만 정의
     throw new Error('getSchema must be implemented by Service Layer. Use SchemaRegistryService.getSchema instead.');
