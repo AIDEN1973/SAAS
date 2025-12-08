@@ -22,8 +22,6 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   label,
   error,
   helperText,
-  size = 'md',
-  fullWidth = false,
   className,
   value,
   onChange,
