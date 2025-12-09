@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getApiContext } from '@api-sdk/core';
 import { apiClient } from '@api-sdk/core';
-import { ThemeEngine, createTheme, type ThemeMode, type IndustryType } from '@design-system/core';
+import { createTheme, type ThemeMode, type IndustryType } from '@design-system/core';
 import { applyThemeToCSS, resetTheme } from '../utils/applyTheme';
 
 /**
