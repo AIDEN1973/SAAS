@@ -43,7 +43,6 @@ export const FormField: React.FC<FormFieldProps> = ({
       {label && (
         <label
           style={{
-            fontSize: 'var(--font-size-sm)',
             fontWeight: 'var(--font-weight-medium)',
             color: 'var(--color-text)',
           }}
@@ -65,7 +64,6 @@ export const FormField: React.FC<FormFieldProps> = ({
       {error && (
         <span
           style={{
-            fontSize: 'var(--font-size-sm)',
             color: 'var(--color-error)',
           }}
         >
@@ -75,7 +73,6 @@ export const FormField: React.FC<FormFieldProps> = ({
       {helperText && !error && (
         <span
           style={{
-            fontSize: 'var(--font-size-sm)',
             color: 'var(--color-text-secondary)',
           }}
         >

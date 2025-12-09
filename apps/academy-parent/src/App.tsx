@@ -1,6 +1,8 @@
-import { ErrorBoundary, Container, Card } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, useTheme } from '@ui-core/react';
 
 function App() {
+  // 테넌트별 테마 적용
+  useTheme({ mode: 'auto' });
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">

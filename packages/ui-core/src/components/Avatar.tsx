@@ -35,27 +35,22 @@ export const Avatar: React.FC<AvatarProps> = ({
     xs: {
       width: '24px',
       height: '24px',
-      fontSize: 'var(--font-size-xs)',
     },
     sm: {
       width: '32px',
       height: '32px',
-      fontSize: 'var(--font-size-sm)',
     },
     md: {
       width: '40px',
       height: '40px',
-      fontSize: 'var(--font-size-base)',
     },
     lg: {
       width: '48px',
       height: '48px',
-      fontSize: 'var(--font-size-lg)',
     },
     xl: {
       width: '64px',
       height: '64px',
-      fontSize: 'var(--font-size-xl)',
     },
   };
 

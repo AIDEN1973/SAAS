@@ -1,6 +1,6 @@
 /**
  * Error Boundary
- * 
+ *
  * [불변 규칙] 각 카테고리마다 다른 UI/메시지·로그 요구:
  * - Schema Validation Failure
  * - Widget Rendering Failure
@@ -36,7 +36,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     // 에러 타입 식별
     let errorType: ErrorBoundaryState['errorType'] = 'unknown';
-    
+
     if (error.message.includes('schema') || error.message.includes('Schema')) {
       errorType = 'schema';
     } else if (error.message.includes('widget') || error.message.includes('Widget')) {
@@ -84,7 +84,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           <div style={{ padding: 'var(--spacing-md)' }}>
             <h3
               style={{
-                fontSize: 'var(--font-size-lg)',
                 fontWeight: 'var(--font-weight-semibold)',
                 color: 'var(--color-red-800)',
                 marginBottom: 'var(--spacing-sm)',
@@ -95,7 +94,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             </h3>
             <p
               style={{
-                fontSize: 'var(--font-size-sm)',
                 color: 'var(--color-red-600)',
                 marginBottom: 'var(--spacing-md)',
                 marginTop: 'var(--spacing-sm)',
@@ -107,7 +105,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <details style={{ marginTop: 'var(--spacing-md)' }}>
                 <summary
                   style={{
-                    fontSize: 'var(--font-size-sm)',
                     color: 'var(--color-text-secondary)',
                     cursor: 'pointer',
                   }}
@@ -117,7 +114,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 <pre
                   style={{
                     marginTop: 'var(--spacing-sm)',
-                    fontSize: 'var(--font-size-xs)',
                     color: 'var(--color-text-secondary)',
                     overflow: 'auto',
                     whiteSpace: 'pre-wrap',

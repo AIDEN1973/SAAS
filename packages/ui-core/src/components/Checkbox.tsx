@@ -42,7 +42,6 @@ export const Checkbox: React.FC<CheckboxProps> = ({
           alignItems: 'center',
           gap: 'var(--spacing-sm)',
           cursor: 'pointer',
-          fontSize: 'var(--font-size-base)',
           color: 'var(--color-text)',
         }}
       >
@@ -72,7 +71,6 @@ export const Checkbox: React.FC<CheckboxProps> = ({
       {error && (
         <span
           style={{
-            fontSize: 'var(--font-size-sm)',
             color: 'var(--color-error)',
             marginLeft: '28px',
           }}
@@ -83,7 +81,6 @@ export const Checkbox: React.FC<CheckboxProps> = ({
       {helperText && !error && (
         <span
           style={{
-            fontSize: 'var(--font-size-sm)',
             color: 'var(--color-text-secondary)',
             marginLeft: '28px',
           }}

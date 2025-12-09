@@ -79,7 +79,6 @@ export const Accordion: React.FC<AccordionProps> = ({
                 border: 'none',
                 backgroundColor: 'transparent',
                 cursor: item.disabled ? 'not-allowed' : 'pointer',
-                fontSize: 'var(--font-size-base)',
                 fontWeight: 'var(--font-weight-medium)',
                 color: 'var(--color-text)',
                 textAlign: 'left',
@@ -98,7 +97,6 @@ export const Accordion: React.FC<AccordionProps> = ({
               <span>{item.title}</span>
               <span
                 style={{
-                  fontSize: 'var(--font-size-lg)',
                   transition: 'transform 0.2s ease',
                   transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                 }}

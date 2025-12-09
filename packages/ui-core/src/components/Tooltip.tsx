@@ -114,7 +114,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
             ...tooltipStyle,
             maxWidth: '200px',
             pointerEvents: 'none',
-            fontSize: 'var(--font-size-sm)',
             color: 'var(--color-text)',
             backgroundColor: 'var(--color-white)',
             padding: 'var(--spacing-sm)',

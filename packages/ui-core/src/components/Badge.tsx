@@ -78,27 +78,22 @@ export const Badge: React.FC<BadgeProps> = ({
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
       padding: 'var(--spacing-xs) var(--spacing-sm)',
-      fontSize: 'var(--font-size-xs)',
       lineHeight: 1.2,
     },
     sm: {
       padding: 'var(--spacing-xs) var(--spacing-sm)',
-      fontSize: 'var(--font-size-xs)',
       lineHeight: 1.2,
     },
     md: {
       padding: 'var(--spacing-xs) var(--spacing-sm)',
-      fontSize: 'var(--font-size-sm)',
       lineHeight: 1.3,
     },
     lg: {
       padding: 'var(--spacing-sm) var(--spacing-md)',
-      fontSize: 'var(--font-size-base)',
       lineHeight: 1.4,
     },
     xl: {
       padding: 'var(--spacing-sm) var(--spacing-md)',
-      fontSize: 'var(--font-size-base)',
       lineHeight: 1.4,
     },
   };

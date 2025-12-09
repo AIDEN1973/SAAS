@@ -52,9 +52,10 @@ export function TableCardView<T = any>({
     return (
       <div
         style={{
-          padding: 'var(--spacing-xl)',
+          padding: 'var(--spacing-3xl)',
           textAlign: 'center',
-          color: 'var(--color-text-secondary)',
+          color: 'var(--color-text-tertiary)',
+          fontSize: 'var(--font-size-sm)',
         }}
       >
         {emptyMessage}
@@ -77,17 +78,18 @@ export function TableCardView<T = any>({
           <Card
             key={key}
             variant="default"
-            padding="md"
+            padding="lg"
             onClick={onRowClick ? () => onRowClick(row) : undefined}
             style={{
               cursor: onRowClick ? 'pointer' : 'default',
+              transition: 'var(--transition-all)',
             }}
           >
             <div
               style={{
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 'var(--spacing-sm)',
+                gap: 'var(--spacing-md)',
               }}
             >
               {columns.map((column) => {
@@ -103,17 +105,19 @@ export function TableCardView<T = any>({
                   >
                     <div
                       style={{
+                        fontWeight: 'var(--font-weight-semibold)',
                         fontSize: 'var(--font-size-xs)',
-                        fontWeight: 'var(--font-weight-medium)',
                         color: 'var(--color-text-secondary)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
                       }}
                     >
                       {column.label}
                     </div>
                     <div
                       style={{
-                        fontSize: 'var(--font-size-base)',
                         color: 'var(--color-text)',
+                        fontSize: 'var(--font-size-sm)',
                       }}
                     >
                       {column.render ? column.render(value, row) : value}

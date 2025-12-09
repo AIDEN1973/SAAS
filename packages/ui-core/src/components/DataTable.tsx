@@ -39,7 +39,7 @@ export function DataTable<T = any>({
   columns,
   keyExtractor,
   onRowClick,
-  emptyMessage = '?�이?��? ?�습?�다.',
+  emptyMessage = '데이터가 없습니다.',
   className,
   stickyHeader = true,
 }: DataTableProps<T>) {
@@ -57,14 +57,18 @@ export function DataTable<T = any>({
       style={{
         width: '100%',
         overflowX: 'auto',
+        borderRadius: 'var(--border-radius-xl)',
         border: '1px solid var(--color-gray-200)',
-        borderRadius: 'var(--border-radius-lg)',
+        backgroundColor: 'var(--color-white)',
+        boxShadow: 'var(--shadow-sm)',
+        overflow: 'hidden',
       }}
     >
       <table
         style={{
           width: '100%',
-          borderCollapse: 'collapse',
+          borderCollapse: 'separate',
+          borderSpacing: 0,
           minWidth: '100%',
         }}
       >
@@ -78,18 +82,27 @@ export function DataTable<T = any>({
           }}
         >
           <tr>
-            {columns.map((column) => (
+            {columns.map((column, index) => (
               <th
                 key={column.key}
                 style={{
-                  padding: 'var(--spacing-md)',
+                  padding: 'var(--spacing-lg) var(--spacing-md)',
                   textAlign: column.align || 'left',
-                  fontSize: 'var(--font-size-sm)',
                   fontWeight: 'var(--font-weight-semibold)',
-                  color: 'var(--color-text)',
-                  borderBottom: '2px solid var(--color-gray-200)',
+                  fontSize: 'var(--font-size-sm)',
+                  color: 'var(--color-text-secondary)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  borderBottom: '1px solid var(--color-gray-200)',
                   whiteSpace: 'nowrap',
                   width: column.width,
+                  backgroundColor: 'var(--color-gray-50)',
+                  ...(index === 0 && {
+                    paddingLeft: 'var(--spacing-lg)',
+                  }),
+                  ...(index === columns.length - 1 && {
+                    paddingRight: 'var(--spacing-lg)',
+                  }),
                 }}
               >
                 {column.label}
@@ -105,9 +118,10 @@ export function DataTable<T = any>({
               <td
                 colSpan={columns.length}
                 style={{
-                  padding: 'var(--spacing-xl)',
+                  padding: 'var(--spacing-3xl)',
                   textAlign: 'center',
-                  color: 'var(--color-text-secondary)',
+                  color: 'var(--color-text-tertiary)',
+                  fontSize: 'var(--font-size-sm)',
                 }}
               >
                 {emptyMessage}
@@ -122,8 +136,9 @@ export function DataTable<T = any>({
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                   style={{
                     cursor: onRowClick ? 'pointer' : 'default',
-                    borderBottom: '1px solid var(--color-gray-200)',
-                    transition: 'background-color 0.2s ease',
+                    borderBottom: '1px solid var(--color-gray-100)',
+                    transition: 'var(--transition-all)',
+                    backgroundColor: 'var(--color-white)',
                   }}
                   onMouseEnter={(e) => {
                     if (onRowClick) {
@@ -131,19 +146,25 @@ export function DataTable<T = any>({
                     }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.backgroundColor = 'var(--color-white)';
                   }}
                 >
-                  {columns.map((column) => {
+                  {columns.map((column, colIndex) => {
                     const value = (row as any)[column.key];
                     return (
                       <td
                         key={column.key}
                         style={{
-                          padding: 'var(--spacing-md)',
+                          padding: 'var(--spacing-lg) var(--spacing-md)',
                           textAlign: column.align || 'left',
-                          fontSize: 'var(--font-size-base)',
                           color: 'var(--color-text)',
+                          fontSize: 'var(--font-size-sm)',
+                          ...(colIndex === 0 && {
+                            paddingLeft: 'var(--spacing-lg)',
+                          }),
+                          ...(colIndex === columns.length - 1 && {
+                            paddingRight: 'var(--spacing-lg)',
+                          }),
                         }}
                       >
                         {column.render ? column.render(value, row) : value}

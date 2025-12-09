@@ -52,7 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const renderItem = (item: SidebarItem, level: number = 0) => {
     const isActive = currentPath === item.path;
-    const paddingLeft = level * 16 + 16;
+    const paddingLeft = level * 20 + 16;
 
     return (
       <div key={item.id}>
@@ -72,29 +72,55 @@ export const Sidebar: React.FC<SidebarProps> = ({
               ? 'var(--color-primary)'
               : 'var(--color-text-secondary)',
             fontWeight: isActive ? 'var(--font-weight-semibold)' : 'var(--font-weight-medium)',
+            fontSize: 'var(--font-size-sm)',
             border: 'none',
             cursor: 'pointer',
-            transition: 'all 0.2s ease',
+            transition: 'var(--transition-all)',
+            position: 'relative',
+            minHeight: '44px',
           }}
           onMouseEnter={(e) => {
             if (!isActive) {
               e.currentTarget.style.backgroundColor = 'var(--color-gray-100)';
-              e.currentTarget.style.transform = 'translateX(4px)';
+              e.currentTarget.style.color = 'var(--color-text)';
             }
           }}
           onMouseLeave={(e) => {
             if (!isActive) {
               e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.transform = 'translateX(0)';
+              e.currentTarget.style.color = 'var(--color-text-secondary)';
             }
           }}
         >
+          {isActive && (
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '3px',
+                height: '60%',
+                backgroundColor: 'var(--color-primary)',
+                borderRadius: '0 2px 2px 0',
+              }}
+            />
+          )}
           {item.icon && (
-            <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+            <span
+              style={{
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '20px',
+                height: '20px',
+              }}
+            >
               {item.icon}
             </span>
           )}
-          <span>{item.label}</span>
+          <span style={{ flex: 1 }}>{item.label}</span>
         </button>
         {item.children && item.children.length > 0 && (
           <div style={{ marginLeft: 'var(--spacing-md)', marginTop: 'var(--spacing-xs)' }}>
@@ -111,6 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         height: '100%',
         overflowY: 'auto',
         padding: 'var(--spacing-md)',
+        paddingTop: 'var(--spacing-lg)',
       }}
     >
       <div
@@ -134,8 +161,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             style={{
               position: 'fixed',
               inset: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              zIndex: 40,
+              backgroundColor: 'var(--overlay-background)',
+              zIndex: 'var(--z-modal-backdrop)',
             }}
             onClick={onClose}
           />
@@ -148,11 +175,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             top: 0,
             left: 0,
             height: '100%',
-            zIndex: 50,
-            width: '16rem',
+            zIndex: 'var(--z-modal)',
+            width: '280px',
+            maxWidth: '85vw',
             backgroundColor: 'var(--color-white)',
             borderRight: '1px solid var(--color-gray-200)',
-            boxShadow: 'var(--shadow-lg)',
+            boxShadow: 'var(--shadow-xl)',
             transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
             transition: 'var(--transition-transform)',
           }}
@@ -162,24 +190,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: 'var(--spacing-md)',
+              padding: 'var(--spacing-lg)',
               borderBottom: '1px solid var(--color-gray-200)',
+              backgroundColor: 'var(--color-gray-50)',
             }}
           >
             <h2
               style={{
+                fontWeight: 'var(--font-weight-bold)',
                 fontSize: 'var(--font-size-lg)',
-                fontWeight: 'var(--font-weight-semibold)',
                 margin: 0,
                 color: 'var(--color-text)',
+                letterSpacing: '-0.02em',
               }}
             >
               메뉴
             </h2>
             {onClose && (
-              <Button variant="ghost" size="sm" onClick={onClose}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                style={{
+                  padding: 'var(--spacing-sm)',
+                  borderRadius: 'var(--border-radius-md)',
+                  minWidth: '44px',
+                  minHeight: '44px',
+                }}
+              >
                 <svg
-                  style={{ width: 'var(--spacing-lg)', height: 'var(--spacing-lg)' }}
+                  style={{ width: '20px', height: '20px' }}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -187,7 +227,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
+                    strokeWidth={2.5}
                     d="M6 18L18 6M6 6l12 12"
                   />
                 </svg>
@@ -206,9 +246,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       className={clsx(className)}
       style={{
         height: '100%',
+        width: '280px',
+        minWidth: '280px',
         backgroundColor: 'var(--color-white)',
         borderRight: '1px solid var(--color-gray-200)',
         boxShadow: 'var(--shadow-sm)',
+        transition: 'var(--transition-all)',
       }}
     >
       {sidebarContent}

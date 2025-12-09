@@ -40,6 +40,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         flexDirection: 'column',
         height: '100vh',
         overflow: 'hidden',
+        backgroundColor: 'var(--color-background)',
       }}
     >
       {/* Header */}
@@ -56,6 +57,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           display: 'flex',
           flex: 1,
           overflow: 'hidden',
+          position: 'relative',
         }}
       >
         {/* Sidebar */}
@@ -74,7 +76,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           style={{
             flex: 1,
             overflowY: 'auto',
-            backgroundColor: 'var(--color-gray-50, #f9fafb)',
+            overflowX: 'hidden',
+            backgroundColor: 'var(--color-background)',
+            padding: 'var(--spacing-xl)',
+            transition: 'var(--transition-all)',
           }}
         >
           {children}

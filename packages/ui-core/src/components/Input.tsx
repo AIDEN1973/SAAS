@@ -1,6 +1,6 @@
 /**
  * Input Component
- * 
+ *
  * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
  * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
  */
@@ -29,23 +29,18 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
       padding: 'var(--spacing-xs) var(--spacing-sm)',
-      fontSize: 'var(--font-size-xs)',
     },
     sm: {
       padding: 'var(--spacing-xs) var(--spacing-sm)',
-      fontSize: 'var(--font-size-sm)',
     },
     md: {
       padding: 'var(--spacing-sm) var(--spacing-md)',
-      fontSize: 'var(--font-size-base)',
     },
     lg: {
       padding: 'var(--spacing-md) var(--spacing-lg)',
-      fontSize: 'var(--font-size-lg)',
     },
     xl: {
       padding: 'var(--spacing-lg) var(--spacing-xl)',
-      fontSize: 'var(--font-size-xl)',
     },
   };
 
@@ -73,7 +68,6 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
       {label && (
         <label
           style={{
-            fontSize: 'var(--font-size-sm)',
             fontWeight: 'var(--font-weight-medium)',
             color: 'var(--color-text)',
             marginBottom: 'var(--spacing-xs)',
@@ -101,7 +95,6 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
       {error && (
         <span
           style={{
-            fontSize: 'var(--font-size-sm)',
             color: 'var(--color-red-500)',
             marginTop: 'var(--spacing-xs)',
           }}
@@ -112,7 +105,6 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
       {helperText && !error && (
         <span
           style={{
-            fontSize: 'var(--font-size-sm)',
             color: 'var(--color-text-secondary)',
             marginTop: 'var(--spacing-xs)',
           }}

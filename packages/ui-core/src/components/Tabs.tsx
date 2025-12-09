@@ -95,7 +95,6 @@ export const Tabs: React.FC<TabsProps> = ({
                   ? '2px solid var(--color-primary)'
                   : '2px solid transparent',
                 cursor: item.disabled ? 'not-allowed' : 'pointer',
-                fontSize: 'var(--font-size-base)',
                 fontWeight: isActive ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)',
                 whiteSpace: 'nowrap',
                 transition: 'all 0.2s ease',

@@ -48,7 +48,8 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
       style={{
         display: 'flex',
         height: '100%',
-        gap: 'var(--spacing-md)',
+        gap: 'var(--spacing-lg)',
+        transition: 'var(--transition-all)',
       }}
     >
       {/* Left: List */}
@@ -57,6 +58,11 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
           width: listWidth,
           minWidth: '200px',
           overflow: 'auto',
+          borderRadius: 'var(--border-radius-xl)',
+          backgroundColor: 'var(--color-white)',
+          border: '1px solid var(--color-gray-200)',
+          boxShadow: 'var(--shadow-sm)',
+          padding: 'var(--spacing-md)',
         }}
       >
         {list}
@@ -71,8 +77,9 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
           minWidth: detailMinWidth,
           overflow: 'auto',
           position: 'sticky',
-          top: 0,
-          maxHeight: '100vh',
+          top: 'var(--spacing-xl)',
+          maxHeight: 'calc(100vh - var(--spacing-2xl))',
+          transition: 'var(--transition-all)',
         }}
       >
         {onDetailClose && (
@@ -86,17 +93,41 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
             <button
               onClick={onDetailClose}
               style={{
-                padding: 'var(--spacing-xs)',
+                padding: 'var(--spacing-sm)',
                 border: 'none',
+                borderRadius: 'var(--border-radius-md)',
                 backgroundColor: 'transparent',
                 cursor: 'pointer',
-                fontSize: 'var(--font-size-lg)',
                 color: 'var(--color-text-secondary)',
                 minWidth: '44px',
                 minHeight: '44px',
+                transition: 'var(--transition-all)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-gray-100)';
+                e.currentTarget.style.color = 'var(--color-text)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = 'var(--color-text-secondary)';
               }}
             >
-              ✕
+              <svg
+                style={{ width: '20px', height: '20px' }}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
             </button>
           </div>
         )}

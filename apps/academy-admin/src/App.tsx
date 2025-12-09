@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import { AppLayout, Button, useModal } from '@ui-core/react';
+import { AppLayout, Button, useModal, useTheme } from '@ui-core/react';
 import type { SidebarItem } from '@ui-core/react';
 import { StudentsPage } from './pages/StudentsPage';
 import { StudentDetailPage } from './pages/StudentDetailPage';
@@ -19,6 +19,8 @@ import { SchemaEditorPage } from '../../super-admin/src/pages/SchemaEditorPage';
 import { AuthGuard } from '../../super-admin/src/components/AuthGuard';
 
 function AppContent() {
+  // 테넌트별 테마 적용
+  useTheme({ mode: 'auto' });
   const location = useLocation();
   const navigate = useNavigate();
   const { showAlert } = useModal();

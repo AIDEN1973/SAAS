@@ -44,7 +44,6 @@ export const Switch: React.FC<SwitchProps> = ({
           alignItems: 'center',
           gap: 'var(--spacing-sm)',
           cursor: 'pointer',
-          fontSize: 'var(--font-size-base)',
           color: 'var(--color-text)',
         }}
       >
@@ -114,7 +113,6 @@ export const Switch: React.FC<SwitchProps> = ({
       {error && (
         <span
           style={{
-            fontSize: 'var(--font-size-sm)',
             color: 'var(--color-error)',
             marginLeft: '52px',
           }}
@@ -125,7 +123,6 @@ export const Switch: React.FC<SwitchProps> = ({
       {helperText && !error && (
         <span
           style={{
-            fontSize: 'var(--font-size-sm)',
             color: 'var(--color-text-secondary)',
             marginLeft: '52px',
           }}

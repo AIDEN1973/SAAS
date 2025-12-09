@@ -92,7 +92,6 @@ export const Toast: React.FC<ToastProps> = ({
       >
         <span
           style={{
-            fontSize: 'var(--font-size-base)',
             color: 'var(--color-text)',
             flex: 1,
           }}

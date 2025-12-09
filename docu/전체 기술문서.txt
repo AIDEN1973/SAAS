@@ -6451,58 +6451,193 @@ SQL 변수: snake_case (예: _tenant_id, _start_date)
 Theme Merge Priority (우선순위 순서):
 
 1. system default tokens (시스템 기본 토큰)
-2. industry tokens (업종별 토큰)
-3. tenant theme override (테넌트별 오버라이드)
-4. dark mode (다크모드)
-5. high contrast (forced-colors, 접근성)
+2. industry tokens (업종별 토큰) - `industry_themes` 테이블에서 조회
+3. tenant theme override (테넌트별 오버라이드) - `tenant_theme_overrides` 테이블에서 조회
+4. dark mode (다크모드) - 시스템 설정 자동 감지 (`prefers-color-scheme: dark`)
+5. high contrast (forced-colors, 접근성) - 시스템 설정 자동 감지 (`prefers-contrast: high`) 또는 수동 설정
 
 → UI는 위 레이어에서 순차적으로 override되어 최종 Token Set을 사용합니다.
+
+**Backend와 Frontend 역할 분리**:
+- **Backend의 `getTenantTheme()`**: light 기준 neutral 토큰만 병합 (1-3번 레이어)
+  - 시스템 기본 토큰 + 업종별 토큰 + 테넌트 오버라이드를 병합하여 반환
+  - 다크모드/High Contrast 적용은 하지 않음
+- **Frontend의 `ThemeEngine`**: Backend 토큰 + 다크모드/High Contrast 적용 (4-5번 레이어)
+  - Backend에서 받은 토큰에 다크모드/High Contrast 변환을 적용하여 최종 토큰 생성
+  - 시스템 설정 자동 감지 및 CSS 변수 적용까지 담당
+
+**다크모드 및 High Contrast 자동 감지**:
+- `mode: 'auto'`일 때 시스템 다크모드 설정 자동 감지 (`prefers-color-scheme: dark`)
+- `highContrast: false`일 때 시스템 High Contrast 설정 자동 감지 (`prefers-contrast: high`)
+- 시스템 설정 변경 시 자동으로 테마 재적용
+- **브라우저 지원 fallback**: `prefers-contrast` / `forced-colors`를 지원하지 않는 브라우저에서는 사용자 설정(수동 토글) 우선, 접근성 설정 페이지에서 수동 토글 가능
+
+업종별 Theme Tokens 저장 위치:
+
+**⚠️ 중요: Industry 타입 표준**
+- 전체 시스템에서 사용하는 Industry 타입 표준: `'academy'`, `'salon'`, `'realestate'`, `'gym'`, `'ngo'`
+- `industry_themes` 테이블의 CHECK 제약도 이 표준을 따름
+- 다른 테이블(`tenants`, `schema_registry` 등)의 `industry_type` 컬럼도 동일한 표준 사용
+
+```sql
+CREATE TABLE IF NOT EXISTS industry_themes (
+  industry_type text PRIMARY KEY CHECK (industry_type IN ('academy', 'salon', 'realestate', 'gym', 'ngo')),
+  theme_tokens jsonb NOT NULL,  -- 업종별 테마 토큰
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  updated_by uuid REFERENCES auth.users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_industry_themes_type ON industry_themes(industry_type);
+```
 
 테넌트별 Theme Override 저장 위치:
 
 ```sql
-CREATE TABLE tenant_theme_overrides (
+CREATE TABLE IF NOT EXISTS tenant_theme_overrides (
   tenant_id uuid PRIMARY KEY REFERENCES tenants(id),
   theme_tokens jsonb NOT NULL,  -- 테넌트별 오버라이드 토큰
   updated_at timestamptz NOT NULL DEFAULT now(),
   updated_by uuid REFERENCES auth.users(id)
 );
 
-CREATE INDEX idx_tenant_theme_overrides_tenant ON tenant_theme_overrides(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_theme_overrides_tenant ON tenant_theme_overrides(tenant_id);
 ```
 
 테넌트별 Theme Override 예시:
 
+**⚠️ 중요: v1.0 정책**
+- 업종/테넌트 테마 오버라이드는 **colors만 지원**
+- typography/spacing은 시스템 공통 토큰 사용 (업종/테넌트별 커스터마이징 불가)
+- 향후 버전에서 typography/spacing 오버라이드 지원 가능
+
 ```json
 {
   "colors": {
-    "primary": "#FF5733",
-    "secondary": "#33FF57"
-  },
-  "typography": {
-    "fontFamily": "Noto Sans KR",
-    "fontSize": {
-      "base": "16px"
+    "primary": {
+      "light": "#60a5fa",
+      "DEFAULT": "#3b82f6",
+      "dark": "#2563eb"
+    },
+    "secondary": {
+      "light": "#a78bfa",
+      "DEFAULT": "#8b5cf6",
+      "dark": "#7c3aed"
     }
-  },
-  "spacing": {
-    "base": "8px"
   }
 }
 ```
 
-Backend에서 Theme Token API 공급:
+참고: 테이블 스키마는 향후 확장을 위해 `theme_tokens jsonb`로 설계되었으나, v1.0에서는 colors만 사용합니다.
+
+Frontend에서 Theme Token 적용 (실제 구현):
+
+```typescript
+// packages/ui-core/src/hooks/useTheme.ts
+export function useTheme(options: {
+  mode?: ThemeMode;
+  highContrast?: boolean;
+} = {}) {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+  const industryType = context.industryType;
+
+  // 다크모드 자동 감지 (options.mode + 시스템 설정)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (options.mode === 'dark') return true;
+    if (options.mode === 'light') return false;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  // High Contrast 자동 감지 (options.highContrast + 시스템 설정)
+  const [isHighContrast, setIsHighContrast] = useState(() => {
+    if (options.highContrast) return true;
+    return window.matchMedia('(prefers-contrast: high)').matches;
+  });
+
+  // actualMode / actualHighContrast는 options + 시스템 설정 자동 감지 결과
+  const actualMode: ThemeMode = options.mode === 'auto'
+    ? (isDarkMode ? 'dark' : 'light')
+    : (options.mode || 'auto');
+  const actualHighContrast = options.highContrast || isHighContrast;
+
+  // 1. 업종별 테마 토큰 조회 (industry_themes 테이블)
+  const { data: industryThemeOverride } = useQuery({
+    queryKey: ['industry-theme', industryType],
+    queryFn: async () => {
+      if (!industryType) return null;
+      const response = await apiClient.get('industry_themes', {
+        filters: { industry_type: industryType },
+      });
+      return response.data?.[0]?.theme_tokens || null;
+    },
+    enabled: !!industryType,
+    staleTime: 10 * 60 * 1000, // 10분
+  });
+
+  // 2. 테넌트별 테마 오버라이드 조회 (tenant_theme_overrides 테이블)
+  const { data: tenantThemeOverride } = useQuery({
+    queryKey: ['tenant-theme', tenantId],
+    queryFn: async () => {
+      if (!tenantId) return null;
+      const response = await apiClient.get('tenant_theme_overrides', {
+        filters: { tenant_id: tenantId },
+      });
+      return response.data?.[0]?.theme_tokens || null;
+    },
+    enabled: !!tenantId,
+    staleTime: 5 * 60 * 1000, // 5분
+  });
+
+  // 3. ThemeEngine으로 병합 (우선순위 순서)
+  // v1.0 정책: colors만 지원 (typography/spacing은 시스템 공통)
+  const themeEngine = createTheme({
+    mode: actualMode,
+    industry: industryType,
+    tenantId,
+    industryTheme: industryThemeOverride?.colors ? {
+      industry: industryType!,
+      tokens: { colors: industryThemeOverride.colors },
+    } : undefined,
+    tenantTheme: tenantThemeOverride?.colors ? {
+      tenantId,
+      tokens: { colors: tenantThemeOverride.colors },
+    } : undefined,
+    highContrast: actualHighContrast,
+  });
+
+  // 4. CSS 변수로 적용
+  const mergedTokens = themeEngine.getTokens();
+  applyThemeToCSS(mergedTokens);
+}
+```
+
+**Graceful Fallback 동작**:
+- 각 레이어에서 정의되지 않은 토큰은 하위 레이어(system/industry)의 값이 유지됨
+- `industry_themes` 또는 `tenant_theme_overrides` 레코드가 없어도 system-only로 정상 렌더링됨
+- API 오류 발생 시에도 기본 테마로 fallback하여 UI가 깨지지 않음
+
+Backend에서 Theme Token API 공급 (참고용):
+
+**⚠️ 중요: Backend 역할 제한**
+- Backend의 `getTenantTheme()`는 **light 기준 neutral 토큰만 병합** (1-3번 레이어)
+- 다크모드/High Contrast 적용은 하지 않음 (4-5번 레이어는 Frontend에서 처리)
+- Backend는 토큰 데이터만 제공하고, 모드 변환은 Frontend ThemeEngine에서 수행
 
 ```typescript
 // services/theme-service.ts
 export const themeService = {
   async getTenantTheme(tenantId: string) {
-    // 1. 시스템 기본 토큰
+    // 1. 시스템 기본 토큰 (light 모드 기준)
     const systemTokens = getSystemDefaultTokens();
 
-    // 2. 업종별 토큰
+    // 2. 업종별 토큰 (industry_themes 테이블에서 조회)
     const tenant = await getTenant(tenantId);
-    const industryTokens = getIndustryTokens(tenant.industry_type);
+    const industryTheme = await supabase
+      .from('industry_themes')
+      .select('theme_tokens')
+      .eq('industry_type', tenant.industry_type)
+      .single();
+    const industryTokens = industryTheme?.theme_tokens || {};
 
     // 3. 테넌트별 오버라이드
     const override = await supabase
@@ -6511,7 +6646,8 @@ export const themeService = {
       .eq('tenant_id', tenantId)
       .single();
 
-    // 4. 병합 (우선순위 순서)
+    // 4. 병합 (우선순위 순서: system → industry → tenant)
+    // 다크모드/High Contrast는 적용하지 않음 (Frontend에서 처리)
     return mergeThemeTokens([
       systemTokens,
       industryTokens,

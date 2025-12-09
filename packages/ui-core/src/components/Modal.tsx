@@ -149,7 +149,6 @@ export const Modal: React.FC<ModalProps> = ({
           >
             <h2
               style={{
-                fontSize: 'var(--font-size-lg)',
                 fontWeight: 'var(--font-weight-semibold)',
                 color: 'var(--color-text)',
                 margin: 0,

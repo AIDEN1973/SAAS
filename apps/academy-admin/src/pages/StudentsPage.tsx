@@ -253,33 +253,13 @@ export function StudentsPage() {
             <SchemaTable
               key={`student-table-${JSON.stringify(filter)}`}
               schema={studentTableSchemaData}
-              apiCall={async (endpoint: string, method: string) => {
-                const response = await apiClient.get<Student>('students', {
-                  filters: {
+              filters={{
                     ...(filter.status && { status: filter.status }),
                     ...(filter.grade && { grade: filter.grade }),
-                    ...(filter.class_id && { class_id: filter.class_id }),
-                  },
-                  orderBy: { column: 'created_at', ascending: false },
-                });
-                if (response.error) {
-                  throw new Error(response.error.message);
-                }
-                // 필터 적용
-                let filteredData = response.data || [];
-                if (filter.search) {
-                  const searchLower = filter.search.toLowerCase();
-                  filteredData = filteredData.filter((s) =>
-                    s.name.toLowerCase().includes(searchLower) ||
-                    s.phone?.toLowerCase().includes(searchLower) ||
-                    s.email?.toLowerCase().includes(searchLower)
-                  );
-                }
-                if (filter.tag_ids && filter.tag_ids.length > 0) {
-                  // 태그 필터는 클라이언트 측에서 처리 (API에서 지원하지 않는 경우)
-                  // TODO: API에서 태그 필터 지원 시 서버 측으로 이동
-                }
-                return filteredData;
+                ...(filter.search && { search: filter.search }),
+              }}
+              actionContext={{
+                navigate: (path: string) => navigate(path),
               }}
             />
           )}

@@ -88,23 +88,18 @@ export const Button: React.FC<ButtonProps> = ({
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
       padding: 'var(--spacing-xs) var(--spacing-sm)',
-      fontSize: 'var(--font-size-xs)',
     },
     sm: {
       padding: 'var(--spacing-sm) var(--spacing-md)',
-      fontSize: 'var(--font-size-sm)',
     },
     md: {
       padding: 'var(--spacing-sm) var(--spacing-md)',
-      fontSize: 'var(--font-size-base)',
     },
     lg: {
       padding: 'var(--spacing-md) var(--spacing-lg)',
-      fontSize: 'var(--font-size-lg)',
     },
     xl: {
       padding: 'var(--spacing-lg) var(--spacing-xl)',
-      fontSize: 'var(--font-size-xl)',
     },
   };
 

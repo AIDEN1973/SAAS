@@ -1,10 +1,12 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { ErrorBoundary } from '@ui-core/react';
+import { ErrorBoundary, useTheme } from '@ui-core/react';
 import { SchemaEditorPage } from './pages/SchemaEditorPage';
 import { LoginPage } from './pages/LoginPage';
 import { AuthGuard } from './components/AuthGuard';
 
 function App() {
+  // 테넌트별 테마 적용 (super-admin은 본사 관리자용이므로 기본 테마 사용)
+  useTheme({ mode: 'auto' });
   return (
     <BrowserRouter
       future={{

@@ -31,23 +31,18 @@ export const Select: React.FC<SelectProps> = ({
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
       padding: 'var(--spacing-xs) var(--spacing-sm)',
-      fontSize: 'var(--font-size-xs)',
     },
     sm: {
       padding: 'var(--spacing-xs) var(--spacing-sm)',
-      fontSize: 'var(--font-size-sm)',
     },
     md: {
       padding: 'var(--spacing-sm) var(--spacing-md)',
-      fontSize: 'var(--font-size-base)',
     },
     lg: {
       padding: 'var(--spacing-md) var(--spacing-lg)',
-      fontSize: 'var(--font-size-lg)',
     },
     xl: {
       padding: 'var(--spacing-lg) var(--spacing-xl)',
-      fontSize: 'var(--font-size-xl)',
     },
   };
 
@@ -76,7 +71,6 @@ export const Select: React.FC<SelectProps> = ({
       {label && (
         <label
           style={{
-            fontSize: 'var(--font-size-sm)',
             fontWeight: 'var(--font-weight-medium)',
             color: 'var(--color-text)',
             marginBottom: 'var(--spacing-xs)',
@@ -105,7 +99,6 @@ export const Select: React.FC<SelectProps> = ({
       {error && (
         <span
           style={{
-            fontSize: 'var(--font-size-sm)',
             color: 'var(--color-red-500)',
             marginTop: 'var(--spacing-xs)',
           }}
@@ -116,7 +109,6 @@ export const Select: React.FC<SelectProps> = ({
       {helperText && !error && (
         <span
           style={{
-            fontSize: 'var(--font-size-sm)',
             color: 'var(--color-text-secondary)',
             marginTop: 'var(--spacing-xs)',
           }}

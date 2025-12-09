@@ -1,6 +1,8 @@
-import { ErrorBoundary, Container, Card } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, useTheme } from '@ui-core/react';
 
 function App() {
+  // 테넌트별 테마 적용 (public-gateway는 로그인 전 접근 가능하므로 기본 테마 사용)
+  useTheme({ mode: 'auto' });
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">

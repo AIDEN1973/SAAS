@@ -21,6 +21,8 @@ export interface SchemaTableProps {
   translations?: Record<string, string>;
   // API 호출 함수 (선택적, 없으면 @api-sdk/core의 apiClient 사용)
   apiCall?: (endpoint: string, method: string, body?: any) => Promise<any>;
+  // SDUI v1.1: 필터 파라미터 (선택적)
+  filters?: Record<string, any>;
 }
 
 /**
@@ -35,12 +37,13 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   actionContext,
   translations = {},
   apiCall,
+  filters,
 }) => {
   const { dataSource, columns, rowActions, rowActionHandlers } = schema.table;
 
   // SDUI v1.1: API 데이터 소스 로드
   const { data, isLoading, error } = useQuery({
-    queryKey: ['schema-table', schema.entity, dataSource.endpoint],
+    queryKey: ['schema-table', schema.entity, dataSource.endpoint, filters],
     queryFn: async () => {
       if (dataSource.type !== 'api') {
         throw new Error('Only API data source is supported');
@@ -53,7 +56,10 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
         const { apiClient } = await import('@api-sdk/core');
         // ⚠️ 참고: apiClient.get()은 method 옵션을 지원하지 않으므로, GET만 사용
         // POST가 필요한 경우 apiCall prop을 사용해야 합니다.
-        const res = await apiClient.get(dataSource.endpoint);
+        const res = await apiClient.get(dataSource.endpoint, {
+          filters: filters,
+          orderBy: { column: 'created_at', ascending: false },
+        });
         const data = (res as any).data ?? res;
         return data;
       }

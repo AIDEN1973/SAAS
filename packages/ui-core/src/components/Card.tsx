@@ -60,7 +60,7 @@ export const Card: React.FC<CardProps> = ({
     ...variantStyles[variant],
     ...(onClick && {
       cursor: 'pointer',
-      transition: 'all 0.2s ease',
+      transition: 'var(--transition-all)',
     }),
     ...style,
   };

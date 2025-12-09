@@ -55,6 +55,7 @@ export const Container: React.FC<ContainerProps> = ({
         maxWidth: maxWidthMap[maxWidth],
         paddingLeft: paddingMap[padding],
         paddingRight: paddingMap[padding],
+        transition: 'var(--transition-all)',
         ...style,
       }}
     >
@@ -121,6 +122,7 @@ export const Grid: React.FC<GridProps> = ({
         display: 'grid',
         gridTemplateColumns,
         gap: gapMap[gap],
+        transition: 'var(--transition-all)',
         ...style,
       }}
     >
@@ -170,6 +172,8 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
       className={clsx(className)}
       style={{
         display: 'flex',
+        gap: 'var(--spacing-lg)',
+        transition: 'var(--transition-all)',
       }}
     >
       <aside
@@ -177,7 +181,12 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
           display: 'block',
           width: sidebarWidth,
           minWidth: sidebarWidth,
-          borderRight: '1px solid var(--color-gray-200)',
+          borderRadius: 'var(--border-radius-xl)',
+          border: '1px solid var(--color-gray-200)',
+          backgroundColor: 'var(--color-white)',
+          boxShadow: 'var(--shadow-sm)',
+          padding: 'var(--spacing-lg)',
+          transition: 'var(--transition-all)',
         }}
       >
         {sidebar}
@@ -186,6 +195,12 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
         style={{
           flex: 1,
           overflow: 'auto',
+          borderRadius: 'var(--border-radius-xl)',
+          backgroundColor: 'var(--color-white)',
+          border: '1px solid var(--color-gray-200)',
+          boxShadow: 'var(--shadow-sm)',
+          padding: 'var(--spacing-lg)',
+          transition: 'var(--transition-all)',
         }}
       >
         {main}
