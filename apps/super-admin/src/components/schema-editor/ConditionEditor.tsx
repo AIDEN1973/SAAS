@@ -1,9 +1,9 @@
 /**
  * ConditionEditor Component
- * 
+ *
  * [불변 규칙] Condition Rule 설정 UI
  * [불변 규칙] condition과 conditions는 동시에 사용 불가
- * 
+ *
  * 기술문서: docu/스키마에디터.txt 8. Condition Rule Engine
  */
 
@@ -99,7 +99,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
             <Select
               label="참조 필드"
               value={condition.field}
-              onChange={(e) => handleSingleConditionChange('field', e.target.value)}
+              onChange={(value) => handleSingleConditionChange('field', String(value))}
             >
               {allFields
                 .filter((f) => f.name !== field.name)
@@ -112,7 +112,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
             <Select
               label="연산자"
               value={condition.op}
-              onChange={(e) => handleSingleConditionChange('op', e.target.value)}
+              onChange={(value) => handleSingleConditionChange('op', String(value))}
             >
               {operators.map((op) => (
                 <option key={op.value} value={op.value}>
@@ -133,7 +133,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
             <Select
               label="연산자 (AND/OR)"
               value={multiCondition.logic || 'and'}
-              onChange={(e) => handleMultiConditionChange({ logic: e.target.value as 'and' | 'or' })}
+              onChange={(value) => handleMultiConditionChange({ logic: String(value) as 'and' | 'or' })}
             >
               <option value="and">AND (모두 만족)</option>
               <option value="or">OR (하나라도 만족)</option>
@@ -153,7 +153,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
                   <Select
                     label="참조 필드"
                     value={cond.field}
-                    onChange={(e) => handleConditionItemChange(index, 'field', e.target.value)}
+                    onChange={(value) => handleConditionItemChange(index, 'field', String(value))}
                   >
                     {allFields
                       .filter((f) => f.name !== field.name)
@@ -166,7 +166,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
                   <Select
                     label="연산자"
                     value={cond.op}
-                    onChange={(e) => handleConditionItemChange(index, 'op', e.target.value)}
+                    onChange={(value) => handleConditionItemChange(index, 'op', String(value))}
                   >
                     {operators.map((op) => (
                       <option key={op.value} value={op.value}>

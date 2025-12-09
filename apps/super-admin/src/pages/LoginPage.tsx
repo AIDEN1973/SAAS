@@ -1,6 +1,6 @@
 /**
  * Super Admin 로그인 페이지
- * 
+ *
  * [불변 규칙] 스키마 엔진 기반 로그인 폼
  * [불변 규칙] Zero-Trust: 인증 로직은 core-auth 모듈에서 공통 관리
  * [불변 규칙] academy-admin 앱과 동일한 인증 로직 사용
@@ -39,7 +39,7 @@ export function LoginPage() {
   const handleEmailLogin = async (data: { email: string; password: string }) => {
     try {
       const result = await loginWithEmail.mutateAsync({ email: data.email, password: data.password });
-      
+
       if (result.tenants.length === 0) {
         showAlert(
           '알림',
@@ -52,7 +52,7 @@ export function LoginPage() {
       if (result.tenants.length === 1) {
         // 테넌트가 하나면 자동 선택
         await selectTenant.mutateAsync(result.tenants[0].id);
-        
+
         // returnTo 파라미터 확인
         const returnTo = searchParams.get('returnTo');
         if (returnTo) {
@@ -93,7 +93,7 @@ export function LoginPage() {
   const handleOTPLogin = async (data: { otp: string }) => {
     try {
       const result = await loginWithOTP.mutateAsync({ phone, otp: data.otp });
-      
+
       if (result.tenants.length === 0) {
         showAlert(
           '알림',
@@ -105,7 +105,7 @@ export function LoginPage() {
 
       if (result.tenants.length === 1) {
         await selectTenant.mutateAsync(result.tenants[0].id);
-        
+
         const returnTo = searchParams.get('returnTo');
         if (returnTo) {
           window.location.href = decodeURIComponent(returnTo);

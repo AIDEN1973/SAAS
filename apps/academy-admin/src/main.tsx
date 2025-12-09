@@ -3,10 +3,19 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { setApiContext } from '@api-sdk/core';
 import { ModalProvider } from '@ui-core/react';
+// Atlaskit v21에서는 ThemeProvider가 필요 없습니다. 기본 테마가 자동 적용됩니다.
 import App from './App';
 // 전역 스타일은 @ui-core/react에서 중앙 관리
 import '@ui-core/react/styles';
 import { checkSupabaseUrl, checkEnvVariables } from './utils/checkSupabaseUrl';
+
+// Atlaskit Feature Gate 비활성화 (독립 애플리케이션에서 사용 시 필요)
+// Atlaskit을 Atlassian 제품 외부에서 사용할 때 Feature Gate 체크를 우회합니다.
+if (typeof window !== 'undefined') {
+  (window as any).__CRITERION__ = {
+    getFeatureFlagOverride: () => false,
+  };
+}
 
 // 개발 환경에서 Supabase URL 확인
 if (import.meta.env.DEV) {

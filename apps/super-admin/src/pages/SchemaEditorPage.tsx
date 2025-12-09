@@ -1,10 +1,10 @@
 /**
  * Schema Editor Page
- * 
+ *
  * [불변 규칙] Super Admin 전용 No-Code UI Builder
  * [불변 규칙] Zero-Trust: 모든 권한 검증은 RLS에서 처리
  * [불변 규칙] Dual Validation: Client-Side + Server-Side
- * 
+ *
  * 기술문서: docu/스키마에디터.txt
  */
 
@@ -26,7 +26,7 @@ export function SchemaEditorPage() {
   const { showAlert, showConfirm } = useModal();
   const activateSchema = useActivateSchema();
   const deleteSchema = useDeleteSchema();
-  
+
   const [selectedSchema, setSelectedSchema] = useState<SchemaRegistryEntry | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [localFormSchema, setLocalFormSchema] = useState<FormSchema | null>(null);
@@ -118,7 +118,7 @@ export function SchemaEditorPage() {
 
   const handleFieldsChange = (fields: FormSchema['form']['fields']) => {
     if (!editingFormSchema) return;
-    
+
     const updated: FormSchema = {
       ...editingFormSchema,
       form: {
@@ -126,16 +126,16 @@ export function SchemaEditorPage() {
         fields,
       },
     };
-    
+
     setLocalFormSchema(updated);
   };
 
   const handleFieldValidationChange = (index: number, validation: FormSchema['form']['fields'][0]['validation']) => {
     if (!editingFormSchema) return;
-    
+
     const newFields = [...editingFormSchema.form.fields];
     newFields[index] = { ...newFields[index], validation };
-    
+
     handleFieldsChange(newFields);
   };
 
@@ -145,16 +145,16 @@ export function SchemaEditorPage() {
     conditions: FormSchema['form']['fields'][0]['conditions']
   ) => {
     if (!editingFormSchema) return;
-    
+
     const newFields = [...editingFormSchema.form.fields];
     newFields[index] = { ...newFields[index], condition, conditions };
-    
+
     handleFieldsChange(newFields);
   };
 
   const handleLayoutChange = (layout: FormSchema['form']['layout']) => {
     if (!editingFormSchema) return;
-    
+
     const updated: FormSchema = {
       ...editingFormSchema,
       form: {
@@ -162,7 +162,7 @@ export function SchemaEditorPage() {
         layout,
       },
     };
-    
+
     setLocalFormSchema(updated);
   };
 
@@ -174,14 +174,14 @@ export function SchemaEditorPage() {
 
   const handleActivate = async () => {
     if (!selectedSchema) return;
-    
+
     const confirmed = await showConfirm(
       '스키마 활성화',
       `이 스키마를 활성화하면 기존 active 스키마는 deprecated로 변경됩니다. 계속하시겠습니까?`
     );
-    
+
     if (!confirmed) return;
-    
+
     try {
       await activateSchema.mutateAsync(selectedSchema.id);
       showAlert('성공', '스키마가 활성화되었습니다.');
@@ -194,14 +194,14 @@ export function SchemaEditorPage() {
 
   const handleDelete = async () => {
     if (!selectedSchema) return;
-    
+
     const confirmed = await showConfirm(
       '스키마 삭제',
       '이 스키마를 삭제하시겠습니까? (draft만 삭제 가능)'
     );
-    
+
     if (!confirmed) return;
-    
+
     try {
       await deleteSchema.mutateAsync(selectedSchema.id);
       showAlert('성공', '스키마가 삭제되었습니다.');

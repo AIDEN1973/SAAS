@@ -1,12 +1,12 @@
 /**
  * Card Component
  *
+ * [불변 규칙] Atlaskit Primitives Box를 래핑하여 사용합니다.
  * [불변 규칙] 스키마에서는 Tailwind 클래스를 직접 사용하지 않습니다.
- * [불변 규칙] 모든 스타일은 design-system 토큰을 사용합니다.
+ * [불변 규칙] 모든 스타일은 Atlaskit 테마를 사용합니다.
  */
 
 import React from 'react';
-import { clsx } from 'clsx';
 import { SpacingToken } from '@design-system/core';
 
 export interface CardProps {
@@ -67,14 +67,14 @@ export const Card: React.FC<CardProps> = ({
 
   return (
     <div
-      className={clsx(className)}
+      className={className}
       style={cardStyle}
       onClick={onClick}
-      onMouseEnter={onClick ? (e) => {
+      onMouseEnter={onClick ? (e: React.MouseEvent<HTMLDivElement>) => {
         e.currentTarget.style.boxShadow = 'var(--shadow-xl)';
         e.currentTarget.style.transform = 'translateY(-2px)';
       } : undefined}
-      onMouseLeave={onClick ? (e) => {
+      onMouseLeave={onClick ? (e: React.MouseEvent<HTMLDivElement>) => {
         e.currentTarget.style.boxShadow = variant === 'elevated' ? 'var(--shadow-lg)' : 'var(--shadow-sm)';
         e.currentTarget.style.transform = 'translateY(0)';
       } : undefined}

@@ -9,10 +9,10 @@ import '@ui-core/react/styles';
 
 /**
  * [불변 규칙] Zero-Trust: Context는 미들웨어나 인증 시스템에서 설정되어야 함
- * 
+ *
  * 개발 환경에서는 임시로 설정 (실제 프로덕션에서는 미들웨어에서 설정)
  * TODO: 미들웨어 구현 시 이 부분 제거
- * 
+ *
  * 주의: super-admin은 본사 관리자용이므로 tenantId가 선택적일 수 있음
  */
 if (import.meta.env.DEV) {

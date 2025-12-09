@@ -7,6 +7,9 @@
  * 3. tenant theme override
  * 4. dark mode
  * 5. high contrast (forced-colors)
+ *
+ * [불변 규칙] Atlaskit 테마와 통합하여 사용합니다.
+ * [불변 규칙] Atlaskit의 기본 테마를 사용하며, 테넌트별 테마 override는 지원하지 않습니다.
  */
 
 import { colors, spacing, sizes, breakpoints, type SpacingToken, type ColorToken, type SizeToken } from './tokens';

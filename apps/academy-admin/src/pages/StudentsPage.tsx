@@ -340,10 +340,10 @@ function StudentCard({ student, tags, onDetailClick }: StudentCardProps) {
       )}
 
       <Grid columns={2} gap="sm" style={{ marginTop: 'var(--spacing-md)' }}>
-        <Button variant="outline" size="sm" fullWidth onClick={(e) => { e.stopPropagation(); onDetailClick(); }}>
+        <Button variant="outline" size="sm" fullWidth onClick={(e) => { e?.stopPropagation(); onDetailClick(); }}>
           상세
         </Button>
-        <Button variant="outline" size="sm" fullWidth onClick={(e) => { e.stopPropagation(); onDetailClick(); }}>
+        <Button variant="outline" size="sm" fullWidth onClick={(e) => { e?.stopPropagation(); onDetailClick(); }}>
           수정
         </Button>
       </Grid>

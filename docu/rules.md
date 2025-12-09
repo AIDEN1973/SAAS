@@ -67,7 +67,7 @@ packages/hooks/*             # React Query Hooks
 
 packages/lib/*               # 공통 유틸
 
-packages/core-ui/*           # UI 컴포넌트
+# UI 컴포넌트는 Atlaskit 사용 (@atlaskit/components)
 
 특히 packages/env-registry는 모든 앱/서비스에서 환경변수 접근의 유일한 경로입니다.
 
@@ -79,7 +79,8 @@ packages/core-ui/*           # UI 컴포넌트
 
 apps/* → hooks/* → services/* → industry/* → core/* → DB
 
-apps/* → core/*, core-ui/*, lib/*
+apps/* → core/*, lib/*
+apps/* → schema-engine (Atlaskit 컴포넌트 간접 사용)
 
 industry-* → core/*
 
@@ -113,6 +114,8 @@ React 컴포넌트 → DB 쿼리/SQL 직접 작성 금지
 
 [불변 규칙] Core Layer 모듈은 다른 Core Layer 모듈을 import할 수 있습니다 (예: core-consultation → core-storage).
 
+[불변 규칙] Cursor는 Industry Layer와 Core Layer 사이에 새로운 공통 패키지를 자동 생성하지 않는다.
+
 [불변 규칙] 외부 라이브러리 사용 시 멀티테넌트 격리와 Zero-Trust 아키텍처를 우선 고려합니다.
 
 [불변 규칙] 자체 구현 권장 모듈: core-calendar, core-community, core-search (Phase 1은 PostgreSQL FTS)
@@ -142,6 +145,15 @@ React 컴포넌트 → DB 쿼리/SQL 직접 작성 금지
 [불변 규칙] Cursor는 클라이언트 코드 생성 시 envServer를 import하면 안 되며, NEXT_PUBLIC_* 값만 직접 사용해야 합니다.
 
 [불변 규칙] Cursor는 클라이언트 코드에서 NEXT_PUBLIC_* prefix가 없는 환경변수(process.env.SUPABASE_URL 등)를 절대 사용하면 안 된다. 클라이언트는 NEXT_PUBLIC_* 또는 envClient만 사용한다.
+
+[불변 규칙] Cursor는 env-registry import 경로를 다음 3개로만 사용한다:
+- @env-registry/server
+- @env-registry/client
+- @env-registry/common
+
+이 외의 경로(@env-registry/core/server 등)는 절대 생성하지 않는다.
+
+[불변 규칙] Cursor는 env-registry 모듈을 절대 상대경로(../)로 import하지 않는다.
 
 [불변 규칙] packages/env-registry는 Edge/App/Node 환경을 자동으로 인식하며, 각 환경에 맞는 환경변수 로딩 전략을 사용합니다.
 
@@ -284,12 +296,12 @@ ESLint 규칙:
       {
         "paths": [
           {
-            "name": "@env-registry/core/server",
-            "message": "클라이언트 코드에서는 @env-registry/core/server를 import할 수 없습니다."
+            "name": "@env-registry/server",
+            "message": "클라이언트 코드에서는 @env-registry/server를 import할 수 없습니다."
           },
           {
-            "name": "@env-registry/core/common",
-            "message": "클라이언트 코드에서는 @env-registry/core/common을 import할 수 없습니다."
+            "name": "@env-registry/common",
+            "message": "클라이언트 코드에서는 @env-registry/common을 import할 수 없습니다."
           }
         ]
       }
@@ -350,6 +362,10 @@ export const attendanceService = {
 
 [불변 규칙] INSERT 시에는 row object 안에 tenant_id 필드를 직접 포함한다.
 
+[불변 규칙] Cursor는 INSERT 쿼리에서 withTenant()를 절대 사용하지 않는다. INSERT는 반드시 row object에 tenant_id를 직접 포함한다.
+
+[불변 규칙] Cursor는 INSERT 쿼리에서 withTenant()를 단 1번도 호출해서는 안 된다.
+
 SELECT/UPDATE/DELETE 쿼리는 반드시 withTenant()를 사용해 tenant_id 필터를 강제한다.
 
 Cursor는 이 2가지 패턴을 혼용해도 혼동하지 않도록 반드시 규칙을 분리해 기억한다.
@@ -357,6 +373,8 @@ Cursor는 이 2가지 패턴을 혼용해도 혼동하지 않도록 반드시 �
 [불변 규칙] Cursor는 INSERT 문에서 tenant_id를 row object 외에 .eq('tenant_id') 형태로 중복 포함하는 코드를 생성하면 안 된다.
 
 [불변 규칙] Cursor는 SELECT/UPDATE/DELETE 쿼리 생성 시 .eq('tenant_id', ...)를 직접 사용하면 안 되며, 반드시 withTenant() 감싸기 패턴을 사용해야 한다.
+
+[불변 규칙] Cursor는 SELECT/UPDATE/DELETE 쿼리에서 .eq('tenant_id', ...)를 생성하지 않는다.
 
 // services/_db.ts
 export function withTenant<T>(
@@ -434,6 +452,8 @@ WITH CHECK (
 );
 
 → ⚠️ 주의: 이 방식은 PgBouncer Transaction Pooling과 호환되지 않습니다. Session Pooling 또는 전용 커넥션을 사용하는 경우에만 유효합니다.
+
+[불변 규칙] Cursor는 새로운 SQL 생성 시 OPTION 2 (current_setting 기반 RLS)를 절대 사용하지 않는다.
 
 [불변 규칙] RLS 정책 이름은 반드시 tenant_isolation_<table> 형식을 따라야 한다.
 
@@ -555,15 +575,15 @@ const mode = useResponsiveMode();
 Breakpoint/모드 값은 위 스펙을 기준으로 쓴다.
 
 반응형 로직은 개별 CSS media query 직접 작성보다
-useResponsiveMode() + core-ui 컴포넌트 조합 우선.
+Atlaskit 컴포넌트는 기본적으로 반응형을 지원하므로, 필요 시 CSS Media Query를 사용합니다.
 
 4-2. 테이블/리스트 UI 패턴
 
-휴대폰: TableCardView (행 → 카드)
+휴대폰: Atlaskit DynamicTable (컴팩트 모드) 또는 카드 레이아웃
 
-태블릿: compact table 또는 SplitTableLayout
+태블릿: Atlaskit DynamicTable (컴팩트 모드)
 
-PC: DataTable
+PC: Atlaskit DynamicTable (기본 모드)
 
 4-3. 알림/경고 모달 규칙 (Critical)
 
@@ -583,12 +603,12 @@ PC: DataTable
 1. 일관된 UX: 모든 알림이 동일한 디자인 시스템 사용
 2. 접근성: 커스텀 모달은 접근성 개선 가능
 3. 모바일 최적화: 모바일에서 네이티브 alert는 부자연스러움
-4. 테마 지원: 다크모드, 테넌트 테마 적용 가능
+4. 다크모드: Atlaskit의 기본 다크모드 지원
 5. i18n 지원: 다국어 메시지 지원
 
 사용 예시:
 ```typescript
-import { useModal } from '@ui-core/react';
+import { ModalDialog } from '@atlaskit/modal-dialog';
 
 function MyComponent() {
   const { showAlert, showConfirm } = useModal();
@@ -779,14 +799,20 @@ logger.warn('User data:', maskPII(user));  // 객체도 maskPII 적용 후 전�
 
 Edge Function / 서버 코드에서만 사용.
 
-환경변수에서 주입 (중앙 env 시스템 사용).
+환경변수에서 주입 (중앙 env-registry 시스템 사용).
 
-import { env } from '@lib/env';
+⚠️ 중요: @lib/env 같은 별도 래퍼는 사용하지 않습니다. 반드시 @env-registry/server의 envServer를 직접 사용합니다.
+
+✅ 허용 예시:
+import { envServer } from '@env-registry/server';
 
 const supabase = createClient(
-  env.SUPABASE_URL,
-  env.SERVICE_ROLE_KEY,
+  envServer.SUPABASE_URL,
+  envServer.SERVICE_ROLE_KEY,
 );
+
+❌ 금지 예시:
+import { env } from '@lib/env';  // 구 버전 래퍼 - 사용 금지
 
 7-2. Role 분리 (Phase 2+ 전용)
 
@@ -882,6 +908,8 @@ Cursor는:
 
 큰 루프/수백만 row 집계 로직을 Edge Function 안에 넣지 않는다.
 
+[불변 규칙] Cursor는 Edge Function 안에 대규모 루프(for, while) 또는 수천/수만 row를 직접 처리하는 코드를 생성하지 않는다.
+
 8-2. Analytics 집계 패턴
 
 Phase 1 (MVP):
@@ -930,6 +958,10 @@ Phase 2+ 고급 기능:
 [불변 규칙] analytics.daily_store_metrics는 RLS + tenant_id 필터가 적용되는 "자기 매장 전용 KPI" 테이블입니다.
 
 [불변 규칙] analytics.daily_region_metrics는 집계·익명화된 region-level 통계 테이블이며, 일반 매장 사용자는 "자기 업종 + 자기 지역의 통계만" 볼 수 있습니다.
+
+[불변 규칙] analytics.daily_region_metrics 조회 시 Cursor는 withTenant()를 사용하지 않는다. 이 테이블은 익명 집계 테이블이며 RLS 정책이 별도로 정의된다.
+
+[불변 규칙] analytics.daily_region_metrics는 tenant_id 컬럼을 사용해 필터링하지 않는다.
 
 [불변 규칙] 지역 통계는 store_count >= 3 조건을 만족할 때만 사용자에게 제공합니다. 조건 미충족 시 에러 메시지를 반환합니다.
 
@@ -1068,16 +1100,27 @@ RLS / 테넌시
 
 컬럼: tenant_id
 
+⚠️ 레거시 패턴 (기존 코드에만 존재, 새 코드에서는 사용 금지):
+
 설정 키: app.current_tenant_id
 
 RLS 패턴:
 
 tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid
 
-
 Edge Function tenant 설정:
 
 SELECT set_config('app.current_tenant_id', :tenant_id::text, true);
+
+⚠️ 중요: app.current_tenant_id / set_config 기반 RLS 패턴은 과거 코드에만 남아 있을 수 있는 레거시입니다.
+
+Cursor는:
+- 기존 SQL에서 이 패턴을 '이름 변경/기능 변경'하지 않고 그대로 보존하되,
+- 기존 SQL을 리팩터링하는 PR에서도 Cursor는 app.current_tenant_id 관련 코드를 삭제·수정·교체하지 않습니다.
+- 새로운 코드/SQL을 생성할 때는 이 패턴을 절대 사용하지 않고,
+  오직 JWT claim 기반 RLS(auth.jwt() -> 'tenant_id')만 사용해야 합니다.
+
+→ 상세 내용은 2-4, 2-5 섹션 참조
 
 
 공통 유틸
@@ -1096,7 +1139,7 @@ Edge Function 디렉토리 명은 kebab-case (예: payment-webhook, public-gatew
 
 보안/키
 
-Service Role 키는 항상 환경변수에서 주입 (process.env.SERVICE_ROLE_KEY 등)
+Service Role 키는 항상 @env-registry/server의 envServer를 통해 주입 (envServer.SERVICE_ROLE_KEY)
 
 프론트엔드 코드에서 Service Role Key 사용 금지
 
@@ -1106,32 +1149,56 @@ Service Role 키는 항상 환경변수에서 주입 (process.env.SERVICE_ROLE_K
 
 12-1. Kakao Maps API 사용 규칙
 
-[불변 규칙] 주소 → 좌표 변환은 반드시 Kakao Local API를 사용합니다.
+[불변 규칙] 주소 → 좌표 변환은 반드시 Kakao Local REST API를 사용하며, 서버/Edge Function에서만 수행합니다.
+
+[불변 규칙] REST API 호출은 Next.js Server Components / Route Handlers / Supabase Edge Functions에서만 허용됩니다. Client Component에서는 절대 금지합니다.
 
 [불변 규칙] Kakao Maps API Key는 클라이언트와 서버에서 분리하여 사용합니다:
-- 클라이언트(프론트엔드): envClient.NEXT_PUBLIC_KAKAO_JS_KEY (JavaScript SDK용)
-- 서버/Edge Function: envServer.KAKAO_REST_API_KEY (REST API용, 서버 전용)
+- 클라이언트(프론트엔드): envClient.NEXT_PUBLIC_KAKAO_JS_KEY (JavaScript SDK용, 지도 표시 등)
+- 서버/Edge Function: envServer.KAKAO_REST_API_KEY (REST API용, 주소→좌표 변환 등)
 
 [불변 규칙] 절대 NEXT_PUBLIC_KAKAO_REST_API_KEY 같은 형태로 클라이언트에 REST API Key를 노출하면 안 됩니다.
+
+[불변 규칙] 클라이언트에서는 Kakao JS SDK + JS_KEY만 사용하며, REST API 호출은 항상 서버/Edge에서 처리합니다.
+
+[불변 규칙] Cursor는 Client Component에서 Kakao Local REST API를 호출하는 fetch() 요청을 절대 생성하지 않는다.
+
+[불변 규칙] Cursor는 Client Component 안에서 'fetch("https://dapi.kakao.com")' 형태의 코드를 절대 생성하지 않는다.
 
 [불변 규칙] GeoJSON은 [lng, lat] 배열이므로 Kakao Polygon 생성 시 반드시 (lat, lng)로 변환해야 합니다.
 
 Kakao Maps API 사용 예시:
 
+⚠️ 중요: 주소 → 좌표 변환(Kakao Local REST API)은 Next.js Server Components / Route Handlers / Supabase Edge Functions에서만 수행하며, REST API Key를 사용합니다.
+클라이언트(Client Component)에서는 Kakao JS SDK + JS_KEY만 사용하며, REST API 호출은 절대 금지합니다.
+
+✅ 서버/Edge Function 예시 (REST API 호출):
 // services/store-service.ts
-import { envClient } from '@env-registry/client';
+import { envServer } from '@env-registry/server';
 
 export async function geocodeAddress(address: string) {
   const response = await fetch(
     `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(address)}`,
     {
       headers: {
-        'Authorization': `KakaoAK ${envClient.NEXT_PUBLIC_KAKAO_JS_KEY}`,  // 클라이언트에서는 JS_KEY만 사용
+        'Authorization': `KakaoAK ${envServer.KAKAO_REST_API_KEY}`, // REST API Key는 서버 전용
       },
     }
   );
   // ...
 }
+
+✅ 클라이언트 예시 (JS SDK 사용):
+// components/MapComponent.tsx
+import { envClient } from '@env-registry/client';
+
+// Kakao JS SDK 초기화
+useEffect(() => {
+  const script = document.createElement('script');
+  script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${envClient.NEXT_PUBLIC_KAKAO_JS_KEY}&autoload=false`;
+  document.head.appendChild(script);
+  // ...
+}, []);
 
 GeoJSON 좌표 변환 예시:
 
@@ -1210,6 +1277,8 @@ const benchmarks = await supabase
 
 ⚠️ 중요: 위 기준 중 하나라도 도달하면 해당 업종만 선택적으로 분리합니다. 전체 구조를 변경하지 않고 필요한 업종만 분리하는 것이 핵심 원칙입니다.
 
+[불변 규칙] Cursor는 industry-specific prefix 테이블(예: academy_*)을 자동 생성하지 않는다. 개발자가 명시 요청한 경우에만 생성한다.
+
 → 상세 내용은 기술문서 PART 1의 3-3 "스키마 분리" 섹션 참조
 
 14. Hot Tenant 샤딩 트리거 기준 규칙 (Phase 4+ 전용)
@@ -1282,7 +1351,7 @@ SSL 만료 알림 정책:
 
 [불변 규칙] 모바일 환경에서 키패드와 버튼은 터치하기 쉬운 크기와 간격을 유지합니다.
 
-[불변 규칙] 태블릿 환경에서는 SplitTableLayout을 사용하여 화면 공간을 효율적으로 활용합니다.
+[불변 규칙] 태블릿 환경에서는 Atlaskit DynamicTable의 컴팩트 모드를 사용하여 화면 공간을 효율적으로 활용합니다.
 
 [불변 규칙] 모바일 환경에서는 하단 네비게이션 바를 사용하여 주요 기능에 빠르게 접근할 수 있도록 합니다.
 
@@ -1293,9 +1362,9 @@ SSL 만료 알림 정책:
 [불변 규칙] 모바일 환경에서도 웹 접근성 표준(WCAG 2.1 AA)을 준수합니다.
 
 전환 규칙:
-- 화면 너비 < 768px (모바일): TableCardView 사용 (행 → 카드)
-- 화면 너비 768px ~ 1024px (태블릿): SplitTableLayout 또는 compact table
-- 화면 너비 > 1024px (데스크톱): DataTable 사용
+- 화면 너비 < 768px (모바일): Atlaskit DynamicTable (컴팩트 모드) 또는 카드 레이아웃
+- 화면 너비 768px ~ 1024px (태블릿): Atlaskit DynamicTable (컴팩트 모드)
+- 화면 너비 > 1024px (데스크톱): Atlaskit DynamicTable (기본 모드)
 
 버튼 최소 크기:
 - 높이: 최소 44px (iOS HIG 기준)
