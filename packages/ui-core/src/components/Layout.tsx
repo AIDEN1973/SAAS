@@ -66,7 +66,7 @@ export const Container: React.FC<ContainerProps> = ({
 
 export interface GridProps {
   children: React.ReactNode;
-  columns?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 'auto-fit' | 'auto-fill';
+  columns?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 'auto-fit' | 'auto-fill' | { xs?: number; sm?: number; md?: number; lg?: number; xl?: number };
   columnTemplate?: string; // 복잡한 그리드 템플릿 (예: '100px repeat(7, 1fr)', 'repeat(5, 1fr)')
   minColumnWidth?: string; // auto-fit/auto-fill과 함께 사용 (예: '60px', '100px')
   gap?: SpacingToken;
@@ -109,9 +109,19 @@ export const Grid: React.FC<GridProps> = ({
       // minColumnWidth가 없으면 기본값 사용
       gridTemplateColumns = `repeat(${columns}, minmax(100px, 1fr))`;
     }
+  } else if (typeof columns === 'object' && columns !== null) {
+    // 반응형 객체인 경우
+    const responsiveColumns =
+      (mode === 'xl' && columns.xl !== undefined) ? columns.xl :
+      (mode === 'lg' && columns.lg !== undefined) ? columns.lg :
+      (mode === 'md' && columns.md !== undefined) ? columns.md :
+      (mode === 'sm' && columns.sm !== undefined) ? columns.sm :
+      (columns.xs !== undefined) ? columns.xs : 1;
+    gridTemplateColumns = `repeat(${responsiveColumns}, 1fr)`;
   } else {
     // 일반 columns 사용 (반응형 조정)
-    const responsiveColumns = (mode === 'xs' || mode === 'sm') ? 1 : mode === 'md' ? Math.min(columns, 2) : columns;
+    const numColumns = typeof columns === 'number' ? columns : 1;
+    const responsiveColumns = (mode === 'xs' || mode === 'sm') ? 1 : mode === 'md' ? Math.min(numColumns, 2) : numColumns;
     gridTemplateColumns = `repeat(${responsiveColumns}, 1fr)`;
   }
 
@@ -181,7 +191,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
           display: 'block',
           width: sidebarWidth,
           minWidth: sidebarWidth,
-          borderRadius: 'var(--border-radius-xl)',
+          borderRadius: 'var(--border-radius-sm)',
           border: '1px solid var(--color-gray-200)',
           backgroundColor: 'var(--color-white)',
           boxShadow: 'var(--shadow-sm)',
@@ -195,7 +205,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
         style={{
           flex: 1,
           overflow: 'auto',
-          borderRadius: 'var(--border-radius-xl)',
+          borderRadius: 'var(--border-radius-sm)',
           backgroundColor: 'var(--color-white)',
           border: '1px solid var(--color-gray-200)',
           boxShadow: 'var(--shadow-sm)',

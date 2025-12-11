@@ -7,9 +7,10 @@
  */
 
 import React, { useState } from 'react';
-import { ErrorBoundary, useModal } from '@ui-core/react';
-import { Container, Card, Button, Modal } from '@ui-core/react';
+import { ErrorBoundary, useModal, useResponsiveMode } from '@ui-core/react';
+import { Container, Card, Button, Modal, Drawer } from '@ui-core/react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
+import { useSchema } from '@hooks/use-schema';
 import {
   useTeachers,
   useTeacher,
@@ -23,6 +24,9 @@ import { teacherFilterSchema } from '../schemas/teacher.filter.schema';
 
 export function TeachersPage() {
   const { showConfirm } = useModal();
+  const mode = useResponsiveMode();
+  const isMobile = mode === 'xs' || mode === 'sm';
+  const isTablet = mode === 'md';
   const [filter, setFilter] = useState<TeacherFilter>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null);
@@ -34,6 +38,14 @@ export function TeachersPage() {
   const createTeacher = useCreateTeacher();
   const updateTeacher = useUpdateTeacher();
   const deleteTeacher = useDeleteTeacher();
+
+  // Schema Registry 연동 (아키텍처 문서 S3 참조)
+  const { data: teacherFormSchemaData } = useSchema('teacher', teacherFormSchema, 'form');
+  const { data: teacherFilterSchemaData } = useSchema('teacher_filter', teacherFilterSchema, 'filter');
+
+  // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
+  const effectiveFormSchema = teacherFormSchemaData || teacherFormSchema;
+  const effectiveFilterSchema = teacherFilterSchemaData || teacherFilterSchema;
 
   const handleFilterChange = React.useCallback((filters: Record<string, any>) => {
     setFilter({
@@ -84,7 +96,7 @@ export function TeachersPage() {
           {/* 검색 및 필터 패널 */}
           <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
             <SchemaFilter
-              schema={teacherFilterSchema}
+              schema={effectiveFilterSchema}
               onFilterChange={handleFilterChange}
               defaultValues={{
                 search: filter.search || '',
@@ -93,19 +105,48 @@ export function TeachersPage() {
             />
           </Card>
 
-          {/* 강사 등록 폼 */}
+          {/* 강사 등록 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
           {showCreateForm && (
-            <CreateTeacherForm
-              onSubmit={handleCreateTeacher}
-              onCancel={() => setShowCreateForm(false)}
-            />
+            <>
+              {isMobile || isTablet ? (
+                // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
+                <Drawer
+                  isOpen={showCreateForm}
+                  onClose={() => setShowCreateForm(false)}
+                  title="강사 등록"
+                  position={isMobile ? 'bottom' : 'right'}
+                  width={isTablet ? '500px' : '100%'}
+                >
+                  <CreateTeacherForm
+                    onSubmit={handleCreateTeacher}
+                    onCancel={() => setShowCreateForm(false)}
+                    effectiveFormSchema={effectiveFormSchema}
+                  />
+                </Drawer>
+              ) : (
+                // 데스크톱: 인라인 폼 (기존 방식)
+                <CreateTeacherForm
+                  onSubmit={handleCreateTeacher}
+                  onCancel={() => setShowCreateForm(false)}
+                  effectiveFormSchema={effectiveFormSchema}
+                />
+              )}
+            </>
           )}
 
           {/* 강사 목록 */}
           {isLoading ? (
-            <div>로딩 중..</div>
+            <Card padding="lg" variant="default">
+              <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+                로딩 중...
+              </div>
+            </Card>
           ) : error ? (
-            <div>오류: {error.message}</div>
+            <Card padding="md" variant="outlined">
+              <div style={{ color: 'var(--color-error)', padding: 'var(--spacing-md)' }}>
+                오류: {error.message}
+              </div>
+            </Card>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 'var(--spacing-md)' }}>
               {teachers?.map((teacher) => (
@@ -151,10 +192,17 @@ export function TeachersPage() {
 function CreateTeacherForm({
   onSubmit,
   onCancel,
+  effectiveFormSchema,
 }: {
   onSubmit: (input: CreateTeacherInput) => void;
   onCancel: () => void;
+  effectiveFormSchema: any;
 }) {
+  const mode = useResponsiveMode();
+  const isMobile = mode === 'xs' || mode === 'sm';
+  const isTablet = mode === 'md';
+  const showHeader = !isMobile && !isTablet;
+
   const handleSubmit = async (data: any) => {
     // 스키마에서 받은 데이터를 CreateTeacherInput 형식으로 변환
     const input: CreateTeacherInput = {
@@ -174,15 +222,17 @@ function CreateTeacherForm({
   };
 
   return (
-    <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>강사 등록</h3>
-        <Button variant="ghost" size="sm" onClick={onCancel}>
-          취소
-        </Button>
-      </div>
+    <div style={showHeader ? { marginBottom: 'var(--spacing-md)' } : {}}>
+      {showHeader && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>강사 등록</h3>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            취소
+          </Button>
+        </div>
+      )}
       <SchemaForm
-        schema={teacherFormSchema}
+        schema={effectiveFormSchema}
         onSubmit={handleSubmit}
         defaultValues={{
           status: 'active',
@@ -205,7 +255,7 @@ function CreateTeacherForm({
           },
         }}
       />
-    </Card>
+    </div>
   );
 }
 
@@ -222,6 +272,10 @@ function EditTeacherModal({
   onClose: () => void;
 }) {
   const { data: teacher, isLoading } = useTeacher(teacherId);
+
+  // Schema Registry 연동 (아키텍처 문서 S3 참조)
+  const { data: teacherFormSchemaData } = useSchema('teacher', teacherFormSchema, 'form');
+  const effectiveFormSchema = teacherFormSchemaData || teacherFormSchema;
 
   const handleSubmit = async (data: any) => {
     const input: UpdateTeacherInput = {
@@ -259,7 +313,7 @@ function EditTeacherModal({
   return (
     <Modal isOpen={true} onClose={onClose} title="강사 수정" size="lg">
       <SchemaForm
-        schema={teacherFormSchema}
+        schema={effectiveFormSchema}
         onSubmit={handleSubmit}
         defaultValues={{
           name: teacher.name,
@@ -319,9 +373,9 @@ function TeacherCard({
   };
 
   const statusColors: Record<TeacherStatus, string> = {
-    active: '#10b981',
-    on_leave: '#f59e0b',
-    resigned: '#ef4444',
+    active: 'var(--color-success)',
+    on_leave: 'var(--color-warning)',
+    resigned: 'var(--color-error)',
   };
 
   return (
@@ -329,7 +383,7 @@ function TeacherCard({
       padding="md"
       variant="default"
       style={{
-        borderLeft: `4px solid ${statusColors[teacher.status]}`,
+        borderLeft: `var(--border-width-thick) solid ${statusColors[teacher.status]}`,
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--spacing-sm)' }}>
@@ -341,8 +395,8 @@ function TeacherCard({
             <span
               style={{
                 fontSize: 'var(--font-size-xs)',
-                padding: '2px 8px',
-                borderRadius: 'var(--radius-full)',
+                padding: 'var(--spacing-xs) var(--spacing-sm)',
+                borderRadius: 'var(--border-radius-full)',
                 backgroundColor: `${statusColors[teacher.status]}20`,
                 color: statusColors[teacher.status],
               }}
@@ -375,7 +429,7 @@ function TeacherCard({
               width: '100%',
               maxWidth: '200px',
               height: 'auto',
-              borderRadius: 'var(--radius-md)',
+              borderRadius: 'var(--border-radius-md)',
             }}
           />
         </div>
@@ -387,7 +441,7 @@ function TeacherCard({
         {teacher.email && <div>이메일: {teacher.email}</div>}
         {teacher.hire_date && <div>입사일: {teacher.hire_date}</div>}
         {teacher.bio && (
-          <div style={{ marginTop: 'var(--spacing-xs)', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)' }}>
+          <div style={{ marginTop: 'var(--spacing-xs)', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-bg-secondary)', borderRadius: 'var(--border-radius-md)' }}>
             {teacher.bio}
           </div>
         )}

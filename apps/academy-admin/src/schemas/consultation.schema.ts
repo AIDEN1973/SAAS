@@ -14,7 +14,7 @@ export const consultationFormSchema: FormSchema = {
   type: 'form',
   form: {
     layout: {
-      columns: 1,
+      columns: 2,
       columnGap: 'md',
       rowGap: 'md',
     },
@@ -55,7 +55,7 @@ export const consultationFormSchema: FormSchema = {
         ui: {
           labelKey: 'CONSULTATION.FORM.CONTENT.LABEL',
           label: '상담 내용',
-          colSpan: 1,
+          colSpan: 2,
         },
         validation: {
           required: true,

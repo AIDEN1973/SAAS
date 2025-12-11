@@ -24,8 +24,7 @@ export const studentFormSchema: FormSchema = {
         name: 'name',
         kind: 'text',
         ui: {
-          labelKey: 'STUDENT.FORM.NAME.LABEL',
-          label: '이름', // 하위 호환성
+          label: '이름',
           colSpan: 1,
         },
         validation: {
@@ -36,7 +35,6 @@ export const studentFormSchema: FormSchema = {
         name: 'birth_date',
         kind: 'date',
         ui: {
-          labelKey: 'STUDENT.FORM.BIRTH_DATE.LABEL',
           label: '생년월일',
           colSpan: 1,
         },
@@ -45,21 +43,19 @@ export const studentFormSchema: FormSchema = {
         name: 'gender',
         kind: 'select',
         ui: {
-          labelKey: 'STUDENT.FORM.GENDER.LABEL',
           label: '성별',
           colSpan: 1,
         },
         options: [
-          { labelKey: 'STUDENT.FORM.GENDER.SELECT', label: '선택', value: '' },
-          { labelKey: 'STUDENT.FORM.GENDER.MALE', label: '남', value: 'male' },
-          { labelKey: 'STUDENT.FORM.GENDER.FEMALE', label: '여', value: 'female' },
+          { label: '선택', value: '' },
+          { label: '남', value: 'male' },
+          { label: '여', value: 'female' },
         ],
       },
       {
         name: 'phone',
         kind: 'phone',
         ui: {
-          labelKey: 'STUDENT.FORM.PHONE.LABEL',
           label: '전화번호',
           colSpan: 1,
         },
@@ -68,25 +64,14 @@ export const studentFormSchema: FormSchema = {
         name: 'email',
         kind: 'email',
         ui: {
-          labelKey: 'STUDENT.FORM.EMAIL.LABEL',
           label: '이메일',
           colSpan: 1,
-        },
-      },
-      {
-        name: 'address',
-        kind: 'text',
-        ui: {
-          labelKey: 'STUDENT.FORM.ADDRESS.LABEL',
-          label: '주소',
-          colSpan: 2,
         },
       },
       {
         name: 'school_name',
         kind: 'text',
         ui: {
-          labelKey: 'STUDENT.FORM.SCHOOL_NAME.LABEL',
           label: '학교',
           colSpan: 1,
         },
@@ -95,7 +80,6 @@ export const studentFormSchema: FormSchema = {
         name: 'grade',
         kind: 'text',
         ui: {
-          labelKey: 'STUDENT.FORM.GRADE.LABEL',
           label: '학년',
           colSpan: 1,
         },
@@ -104,30 +88,35 @@ export const studentFormSchema: FormSchema = {
         name: 'status',
         kind: 'select',
         ui: {
-          labelKey: 'STUDENT.FORM.STATUS.LABEL',
           label: '상태',
           colSpan: 1,
         },
         options: [
-          { labelKey: 'STUDENT.FORM.STATUS.ACTIVE', label: '재원', value: 'active' },
-          { labelKey: 'STUDENT.FORM.STATUS.ON_LEAVE', label: '휴원', value: 'on_leave' },
-          { labelKey: 'STUDENT.FORM.STATUS.WITHDRAWN', label: '퇴원', value: 'withdrawn' },
-          { labelKey: 'STUDENT.FORM.STATUS.GRADUATED', label: '졸업', value: 'graduated' },
+          { label: '재원', value: 'active' },
+          { label: '휴원', value: 'on_leave' },
+          { label: '퇴원', value: 'withdrawn' },
+          { label: '졸업', value: 'graduated' },
         ],
         defaultValue: 'active',
+      },
+      {
+        name: 'address',
+        kind: 'text',
+        ui: {
+          label: '주소',
+          colSpan: 2,
+        },
       },
       {
         name: 'notes',
         kind: 'textarea',
         ui: {
-          labelKey: 'STUDENT.FORM.NOTES.LABEL',
           label: '비고',
           colSpan: 2,
         },
       },
     ],
     submit: {
-      labelKey: 'STUDENT.FORM.SUBMIT',
       label: '등록',
       variant: 'solid',
       color: 'primary',

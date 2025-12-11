@@ -14,7 +14,7 @@ export const autoNotificationSettingsFormSchema: FormSchema = {
   type: 'form',
   form: {
     layout: {
-      columns: 1,
+      columns: 2,
       columnGap: 'md',
       rowGap: 'md',
     },
@@ -25,6 +25,7 @@ export const autoNotificationSettingsFormSchema: FormSchema = {
         ui: {
           label: '등원 알림 발송',
           description: '학생 등원 시 학부모에게 자동으로 알림을 발송합니다.',
+          colSpan: 1,
         },
       },
       {
@@ -33,6 +34,7 @@ export const autoNotificationSettingsFormSchema: FormSchema = {
         ui: {
           label: '하원 알림 발송',
           description: '학생 하원 시 학부모에게 자동으로 알림을 발송합니다.',
+          colSpan: 1,
         },
       },
       {
@@ -41,6 +43,7 @@ export const autoNotificationSettingsFormSchema: FormSchema = {
         ui: {
           label: '청구 생성 알림 발송',
           description: '청구서 생성 시 학부모에게 자동으로 알림을 발송합니다.',
+          colSpan: 1,
         },
       },
       {
@@ -49,6 +52,7 @@ export const autoNotificationSettingsFormSchema: FormSchema = {
         ui: {
           label: '미납 알림 발송',
           description: '미납 발생 시 학부모에게 자동으로 알림을 발송합니다.',
+          colSpan: 1,
         },
       },
       {
@@ -56,6 +60,7 @@ export const autoNotificationSettingsFormSchema: FormSchema = {
         kind: 'select',
         ui: {
           label: '기본 알림 채널',
+          colSpan: 1,
         },
         options: [
           { value: 'sms', label: 'SMS' },

@@ -24,10 +24,47 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { data: tenants, isLoading: tenantsLoading } = useUserTenants();
   const selectTenant = useSelectTenant();
   const [tenantSelected, setTenantSelected] = useState(false);
+  const [currentTenantId, setCurrentTenantId] = useState<string | undefined>(() => {
+    // 초기값을 getApiContext()에서 가져옴
+    return getApiContext()?.tenantId;
+  });
   const isSelectingRef = useRef(false); // 중복 호출 방지
 
   const context = getApiContext();
-  const hasTenantId = !!context?.tenantId;
+  const hasTenantId = !!currentTenantId || !!context?.tenantId;
+
+  console.log('[ProtectedRoute] Rendering:', {
+    pathname: location.pathname,
+    hasSession: !!session,
+    sessionLoading,
+    tenantsCount: tenants?.length || 0,
+    tenantsLoading,
+    hasTenantId,
+    tenantSelected,
+    currentTenantId,
+    contextTenantId: context?.tenantId,
+  });
+
+  // Context 변경 감지를 위한 effect (폴링 방식)
+  useEffect(() => {
+    const checkContext = () => {
+      const context = getApiContext();
+      if (context?.tenantId && context.tenantId !== currentTenantId) {
+        console.log('[ProtectedRoute] Context tenantId changed:', {
+          old: currentTenantId,
+          new: context.tenantId,
+        });
+        setCurrentTenantId(context.tenantId);
+      }
+    };
+
+    // 즉시 확인
+    checkContext();
+
+    // 주기적으로 확인 (다른 컴포넌트에서 setApiContext를 호출한 경우를 대비)
+    const interval = setInterval(checkContext, 100);
+    return () => clearInterval(interval);
+  }, [currentTenantId]);
 
   // [중요] React Hooks 규칙: 모든 Hook은 조건부 return 이전에 호출되어야 합니다.
   // 테넌트가 하나이고 아직 선택되지 않은 경우 자동 선택
@@ -47,12 +84,14 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     const autoSelectTenant = async () => {
       isSelectingRef.current = true;
       try {
+        console.log('[ProtectedRoute] Auto-selecting tenant:', tenants[0].id);
         // 세션 새로고침 없이 Context만 설정 (rate limit 방지)
         // 실제로는 세션 새로고침이 필요하지 않을 수 있음
         setApiContext({
           tenantId: tenants[0].id,
           industryType: tenants[0].industry_type as 'academy' | 'salon' | 'realestate' | 'gym' | 'ngo',
         });
+        setCurrentTenantId(tenants[0].id); // state도 업데이트하여 리렌더링 트리거
         setTenantSelected(true);
 
         // 세션 새로고침은 선택적으로 수행 (필요한 경우에만)
@@ -67,6 +106,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
             tenantId: tenants[0].id,
             industryType: tenants[0].industry_type as 'academy' | 'salon' | 'realestate' | 'gym' | 'ngo',
           });
+          setCurrentTenantId(tenants[0].id); // state도 업데이트
           setTenantSelected(true);
         }
         isSelectingRef.current = false;
@@ -79,7 +119,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     };
 
     autoSelectTenant();
-  }, [tenants, hasTenantId, tenantSelected, selectTenant.isPending]);
+  }, [tenants, hasTenantId, tenantSelected, selectTenant.isPending, currentTenantId]);
 
   // 세션 로딩 중
   if (sessionLoading) {
@@ -150,6 +190,35 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
+  // 테넌트가 하나인데 tenantId가 아직 설정되지 않은 경우 대기
+  // setApiContext가 호출되었지만 아직 반영되지 않았을 수 있음
+  if (tenants.length === 1 && !hasTenantId) {
+    console.log('[ProtectedRoute] Waiting for tenantId to be set:', {
+      tenantSelected,
+      currentTenantId,
+      contextTenantId: getApiContext()?.tenantId,
+    });
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+        }}
+      >
+        <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
+          테넌트 정보를 설정하는 중...
+        </p>
+      </div>
+    );
+  }
+
   // 모든 조건을 만족한 경우 실제 컴포넌트 렌더링
+  console.log('[ProtectedRoute] Rendering children:', {
+    hasTenantId,
+    currentTenantId,
+    contextTenantId: getApiContext()?.tenantId,
+  });
   return <>{children}</>;
 }

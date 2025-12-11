@@ -569,10 +569,17 @@ export class AcademyService {
       throw new Error('상담기록을 찾을 수 없습니다.');
     }
 
+    // 2. PII 마스킹 적용 (아키텍처 문서 3.1.5, 898-950줄: 상담일지 요약 시 개인정보 마스킹 규칙)
+    // TODO: 실제 AI 서비스 연동 시 PII 마스킹된 content를 전달해야 함
+    // import { maskPII } from '@core/pii-utils';
+    // const maskedContent = maskPII(consultation.content);
+    // 주의: 실제 AI 연동 시 consultation.content를 그대로 전달하지 말고 PII 마스킹 적용 필수
+
     // 2. AI 요약 생성 (Phase 1: Supabase)
     // TODO: 향후 AI 연동 구현
     // - Edge Function 호출: fns-ai-summarize-consultation
     // - 또는 외부 AI API 직접 호출
+    // - 실제 AI 연동 시 마스킹된 content를 전달해야 함
     const aiSummary = `[AI 요약] ${consultation.content.substring(0, 100)}... (요약 기능은 향후 구현 예정입니다)`;
 
     // 3. 상담기록에 AI 요약 추가

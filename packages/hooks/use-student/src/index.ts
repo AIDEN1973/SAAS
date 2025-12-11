@@ -25,3 +25,10 @@ export {
   useAssignStudentToClass,
   useUnassignStudentFromClass,
 } from './useStudent';
+
+export {
+  useStudentTaskCards,
+  useCompleteStudentTaskCard,
+} from './useStudentTaskCard';
+
+export type { StudentTaskCard } from './useStudentTaskCard';

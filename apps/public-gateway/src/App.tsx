@@ -1,29 +1,41 @@
-import { ErrorBoundary, Container, Card, useTheme } from '@ui-core/react';
+/**
+ * Public Gateway 앱
+ *
+ * 아키텍처 문서 11.1 섹션 참조
+ *
+ * Public Gateway 역할:
+ * - 학부모 앱 접근
+ * - QR 출결 접근
+ * - 공개 API 제공
+ */
+
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ErrorBoundary, useTheme } from '@ui-core/react';
+import { QRAttendancePage } from './pages/QRAttendancePage';
+import { PaymentPage } from './pages/PaymentPage';
+import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
+import { HomePage } from './pages/HomePage';
 
 function App() {
   // 테넌트별 테마 적용 (public-gateway는 로그인 전 접근 가능하므로 기본 테마 사용)
   useTheme({ mode: 'auto' });
+
   return (
+    <BrowserRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
     <ErrorBoundary>
-      <Container maxWidth="xl" padding="lg">
-        <Card padding="md" variant="default">
-          <h1 style={{
-            fontSize: '1.5rem',
-            fontWeight: 'var(--font-weight-bold)',
-            marginBottom: 'var(--spacing-md)',
-            color: 'var(--color-text)'
-          }}>
-            디어쌤 - 공개 게이트웨이
-          </h1>
-          <p style={{
-            color: 'var(--color-text-secondary)',
-            margin: 0
-          }}>
-            환경설정이 완료되었습니다.
-          </p>
-        </Card>
-      </Container>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/attend" element={<QRAttendancePage />} />
+          <Route path="/payment" element={<PaymentPage />} />
+          <Route path="/payment/success" element={<PaymentSuccessPage />} />
+        </Routes>
     </ErrorBoundary>
+    </BrowserRouter>
   );
 }
 

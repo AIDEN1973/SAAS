@@ -8,12 +8,13 @@
 
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, useModal } from '@ui-core/react';
-import { Container, Grid, Card, Button, Input } from '@ui-core/react';
+import { ErrorBoundary, useModal, useResponsiveMode } from '@ui-core/react';
+import { Container, Grid, Card, Button, Input, Modal, Drawer } from '@ui-core/react';
 import { SchemaForm, SchemaFilter, SchemaTable } from '@schema-engine';
 import { useStudents, useStudentTags, useStudentTagsByStudent, useCreateStudent, useBulkCreateStudents } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
 import { apiClient, getApiContext } from '@api-sdk/core';
+import { useSchema } from '@hooks/use-schema';
 import type { StudentFilter, StudentStatus, Student, CreateStudentInput } from '@services/student-service';
 import type { Tag } from '@core/tags';
 import { studentFormSchema } from '../schemas/student.schema';
@@ -24,6 +25,9 @@ import { studentTableSchema } from '../schemas/student.table.schema';
 export function StudentsPage() {
   const navigate = useNavigate();
   const { showAlert } = useModal();
+  const mode = useResponsiveMode();
+  const isMobile = mode === 'xs' || mode === 'sm';
+  const isTablet = mode === 'md';
   const [filter, setFilter] = useState<StudentFilter>({});
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -39,7 +43,16 @@ export function StudentsPage() {
   const createStudent = useCreateStudent();
   const bulkCreateStudents = useBulkCreateStudents();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const studentTableSchemaData = studentTableSchema;
+
+  // Schema Registry 연동 (아키텍처 문서 S3 참조)
+  const { data: studentFormSchemaData } = useSchema('student', studentFormSchema, 'form');
+  const { data: studentFilterSchemaData } = useSchema('student_filter', createStudentFilterSchema(classes || []), 'filter');
+  const { data: studentTableSchemaData } = useSchema('student_table', studentTableSchema, 'table');
+
+  // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
+  const effectiveFormSchema = studentFormSchemaData || studentFormSchema;
+  const effectiveFilterSchema = studentFilterSchemaData || createStudentFilterSchema(classes || []);
+  const effectiveTableSchema = studentTableSchemaData || studentTableSchema;
 
   const handleFilterChange = React.useCallback((filters: Record<string, any>) => {
     setFilter((prev) => ({
@@ -82,7 +95,7 @@ export function StudentsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
               {/* SchemaFilter 사용 */}
               <SchemaFilter
-                schema={createStudentFilterSchema(classes)}
+                schema={effectiveFilterSchema}
                 onFilterChange={handleFilterChange}
                 defaultValues={{
                   search: filter.search || '',
@@ -206,7 +219,7 @@ export function StudentsPage() {
                   onClick={() => handleTagFilter(tag.id)}
                   style={{
                     backgroundColor: filter.tag_ids?.includes(tag.id) ? tag.color : undefined,
-                    color: filter.tag_ids?.includes(tag.id) ? '#ffffff' : undefined,
+                    color: filter.tag_ids?.includes(tag.id) ? 'var(--color-white)' : undefined,
                   }}
                 >
                   {tag.name}
@@ -215,15 +228,39 @@ export function StudentsPage() {
             </div>
           )}
 
-          {/* 학생 등록 폼 */}
+          {/* 학생 등록 폼 - 반응형: 모바일/태블릿은 모달/드로어, 데스크톱은 인라인 */}
           {showCreateForm && (
-            <CreateStudentForm
-              onClose={() => setShowCreateForm(false)}
-              onSubmit={async (data) => {
-                await createStudent.mutateAsync(data);
-                setShowCreateForm(false);
-              }}
-            />
+            <>
+              {isMobile || isTablet ? (
+                // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
+                <Drawer
+                  isOpen={showCreateForm}
+                  onClose={() => setShowCreateForm(false)}
+                  title="학생 등록"
+                  position={isMobile ? 'bottom' : 'right'}
+                  width={isTablet ? '500px' : '100%'}
+                >
+                  <CreateStudentForm
+                    onClose={() => setShowCreateForm(false)}
+                    onSubmit={async (data) => {
+                      await createStudent.mutateAsync(data);
+                      setShowCreateForm(false);
+                    }}
+                    effectiveFormSchema={effectiveFormSchema}
+                  />
+                </Drawer>
+              ) : (
+                // 데스크톱: 인라인 폼 (기존 방식)
+                <CreateStudentForm
+                  onClose={() => setShowCreateForm(false)}
+                  onSubmit={async (data) => {
+                    await createStudent.mutateAsync(data);
+                    setShowCreateForm(false);
+                  }}
+                  effectiveFormSchema={effectiveFormSchema}
+                />
+              )}
+            </>
           )}
 
           {/* 학생 목록 */}
@@ -234,11 +271,11 @@ export function StudentsPage() {
           )}
           {error && (
             <Card padding="md" variant="outlined">
-              <div style={{ color: '#ef4444' }}>오류: {error.message}</div>
+              <div style={{ color: 'var(--color-error)' }}>오류: {error.message}</div>
             </Card>
           )}
           {students && viewMode === 'card' && (
-            <Grid columns={3} gap="md">
+            <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="md">
               {students.map((student) => (
                 <StudentCard
                   key={student.id}
@@ -249,10 +286,10 @@ export function StudentsPage() {
               ))}
             </Grid>
           )}
-          {viewMode === 'table' && studentTableSchemaData && (
+          {viewMode === 'table' && effectiveTableSchema && (
             <SchemaTable
               key={`student-table-${JSON.stringify(filter)}`}
-              schema={studentTableSchemaData}
+              schema={effectiveTableSchema}
               filters={{
                     ...(filter.status && { status: filter.status }),
                     ...(filter.grade && { grade: filter.grade }),
@@ -288,11 +325,14 @@ function StudentCard({ student, tags, onDetailClick }: StudentCardProps) {
   const status = student.status as keyof typeof statusConfig;
   const statusInfo = statusConfig[status] || statusConfig.withdrawn;
 
+  // 아키텍처 문서 3.1.4 요구사항: 이름, 학부모, 연락처, 대표반만 표시
+  const studentWithExtras = student as Student & { primary_guardian_name?: string; primary_class_name?: string };
+
   return (
     <Card
       variant="elevated"
       padding="md"
-      style={{ cursor: 'pointer', transition: 'box-shadow 0.3s ease-in-out' }}
+      style={{ cursor: 'pointer', transition: `box-shadow var(--transition-slow)` }}
       onClick={onDetailClick}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 'var(--spacing-sm)' }}>
@@ -301,7 +341,7 @@ function StudentCard({ student, tags, onDetailClick }: StudentCardProps) {
           style={{
             padding: 'var(--spacing-xs) var(--spacing-sm)',
             fontSize: 'var(--font-size-xs)',
-            borderRadius: '0.25rem',
+            borderRadius: 'var(--border-radius-sm)',
             backgroundColor: statusInfo.bgColor,
             color: statusInfo.textColor,
           }}
@@ -310,36 +350,40 @@ function StudentCard({ student, tags, onDetailClick }: StudentCardProps) {
         </span>
       </div>
 
-      {student.grade && (
+      {/* 아키텍처 문서 3.1.4 요구사항: 학부모 정보 표시 */}
+      {studentWithExtras.primary_guardian_name && (
         <p style={{
-          fontSize: '0.875rem',
+          fontSize: 'var(--font-size-sm)',
           color: 'var(--color-text-secondary)',
-          marginBottom: 'var(--spacing-sm)'
+          marginBottom: 'var(--spacing-xs)'
         }}>
-          학년: {student.grade}
+          학부모: {studentWithExtras.primary_guardian_name}
         </p>
       )}
 
-      {(studentTags || []).length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xs)', marginBottom: 'var(--spacing-sm)' }}>
-          {(studentTags || []).map((tag: { id: string; name: string; color: string }) => (
-            <span
-              key={tag.id}
-              style={{
-                padding: 'var(--spacing-xs) var(--spacing-sm)',
-                fontSize: '0.75rem',
-                borderRadius: '0.25rem',
-                color: '#ffffff',
-                backgroundColor: tag.color,
-              }}
-            >
-              {tag.name}
-            </span>
-          ))}
-        </div>
+      {/* 아키텍처 문서 3.1.4 요구사항: 연락처 표시 */}
+      {student.phone && (
+        <p style={{
+          fontSize: 'var(--font-size-sm)',
+          color: 'var(--color-text-secondary)',
+          marginBottom: 'var(--spacing-xs)'
+        }}>
+          연락처: {student.phone}
+        </p>
       )}
 
-      <Grid columns={2} gap="sm" style={{ marginTop: 'var(--spacing-md)' }}>
+      {/* 아키텍처 문서 3.1.4 요구사항: 대표반 표시 */}
+      {studentWithExtras.primary_class_name && (
+        <p style={{
+          fontSize: 'var(--font-size-sm)',
+          color: 'var(--color-text-secondary)',
+          marginBottom: 'var(--spacing-sm)'
+        }}>
+          대표반: {studentWithExtras.primary_class_name}
+        </p>
+      )}
+
+      <Grid columns={{ xs: 1, sm: 2 }} gap="sm" style={{ marginTop: 'var(--spacing-md)' }}>
         <Button variant="outline" size="sm" fullWidth onClick={(e) => { e?.stopPropagation(); onDetailClick(); }}>
           상세
         </Button>
@@ -355,11 +399,15 @@ function StudentCard({ student, tags, onDetailClick }: StudentCardProps) {
 interface CreateStudentFormProps {
   onClose: () => void;
   onSubmit: (data: CreateStudentInput) => Promise<void>;
+  effectiveFormSchema: any;
 }
 
-function CreateStudentForm({ onClose, onSubmit }: CreateStudentFormProps) {
+function CreateStudentForm({ onClose, onSubmit, effectiveFormSchema }: CreateStudentFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { showAlert } = useModal();
+  const mode = useResponsiveMode();
+  const isMobile = mode === 'xs' || mode === 'sm';
+  const isTablet = mode === 'md';
 
   const handleSubmit = async (data: any) => {
     setIsSubmitting(true);
@@ -383,20 +431,30 @@ function CreateStudentForm({ onClose, onSubmit }: CreateStudentFormProps) {
     }
   };
 
+  // Drawer 내부에서는 헤더가 Drawer에 있으므로 중복 제거
+  // 데스크톱에서만 인라인으로 표시되므로 showHeader는 데스크톱에서만 true
+  const showHeader = !isMobile && !isTablet;
+  // Drawer 내부에서 사용될 때는 padding 중복 방지를 위해 disableCardPadding=true
+  // 모바일/태블릿에서는 Drawer를 사용하므로 disableCardPadding=true
+  const isInDrawer = isMobile || isTablet;
+
   return (
-    <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>학생 등록</h3>
-        <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
-          닫기
-        </Button>
-      </div>
+    <div style={showHeader ? { marginBottom: 'var(--spacing-md)' } : {}}>
+      {showHeader && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>학생 등록</h3>
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
+            닫기
+          </Button>
+        </div>
+      )}
       <SchemaForm
-        schema={studentFormSchema}
+        schema={effectiveFormSchema}
         onSubmit={handleSubmit}
         defaultValues={{
           status: 'active',
         }}
+        disableCardPadding={isInDrawer}
         actionContext={{
           apiCall: async (endpoint: string, method: string, body?: any) => {
             if (method === 'POST') {
@@ -417,6 +475,6 @@ function CreateStudentForm({ onClose, onSubmit }: CreateStudentFormProps) {
           },
         }}
       />
-    </Card>
+    </div>
   );
 }

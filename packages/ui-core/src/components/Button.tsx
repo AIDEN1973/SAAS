@@ -105,7 +105,7 @@ export const Button: React.FC<ButtonProps> = ({
 
   const baseStyle: React.CSSProperties = {
     fontWeight: 'var(--font-weight-semibold)',
-    borderRadius: 'var(--border-radius-lg)',
+    borderRadius: 'var(--border-radius-sm)',
     border: 'none',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
@@ -120,12 +120,12 @@ export const Button: React.FC<ButtonProps> = ({
       color: 'var(--color-white)',
     },
     outline: {
-      backgroundColor: 'transparent',
+      backgroundColor: 'var(--color-white)',
       color: colorVars.main,
-      border: `2px solid ${colorVars.main}`,
+      border: `1px solid ${colorVars.main}`,
     },
     ghost: {
-      backgroundColor: 'transparent',
+      backgroundColor: 'var(--color-white)',
       color: colorVars.main,
     },
   };
@@ -142,25 +142,21 @@ export const Button: React.FC<ButtonProps> = ({
       onMouseEnter={(e) => {
         if (variant === 'solid') {
           e.currentTarget.style.backgroundColor = colorVars.dark;
-          e.currentTarget.style.transform = 'translateY(-1px)';
           e.currentTarget.style.boxShadow = 'var(--shadow-md)';
         } else if (variant === 'outline' || variant === 'ghost') {
           e.currentTarget.style.backgroundColor = colorVars.bg50;
-          e.currentTarget.style.transform = 'translateY(-1px)';
         }
       }}
       onMouseLeave={(e) => {
         if (variant === 'solid') {
           e.currentTarget.style.backgroundColor = colorVars.main;
-          e.currentTarget.style.transform = 'translateY(0)';
           e.currentTarget.style.boxShadow = 'none';
         } else {
-          e.currentTarget.style.backgroundColor = 'transparent';
-          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.backgroundColor = 'var(--color-white)';
         }
       }}
       onFocus={(e) => {
-        e.currentTarget.style.boxShadow = `0 0 0 2px ${colorVars.bg50}, 0 0 0 4px ${colorVars.main}`;
+        e.currentTarget.style.boxShadow = `0 0 0 2px ${colorVars.bg50}, 0 0 0 2px ${colorVars.main}`;
       }}
       onBlur={(e) => {
         e.currentTarget.style.boxShadow = 'none';

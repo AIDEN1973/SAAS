@@ -1,6 +1,6 @@
 /**
  * Core Config Types
- * 
+ *
  * ?경?정 (tenant_settings 기반)
  * [불변 규칙] Core Layer는 Industry 모듈에 의존?? ?음
  */
@@ -11,6 +11,7 @@ export interface TenantConfig {
     absent_after?: number;  // 결석 기? (?
     auto_notification?: boolean;  // ?동 출결 ?림 발송
     notification_channel?: 'sms' | 'kakao';  // 기본 ?림 채널
+    qr_enabled?: boolean;  // QR 출결 활성화
   };
   billing?: {
     cycle?: 'monthly' | 'quarterly' | 'yearly';
@@ -28,6 +29,7 @@ export interface UpdateConfigInput {
     absent_after?: number;
     auto_notification?: boolean;
     notification_channel?: 'sms' | 'kakao';
+    qr_enabled?: boolean;
   };
   billing?: {
     cycle?: 'monthly' | 'quarterly' | 'yearly';

@@ -185,7 +185,7 @@ UI/UX 문서에서는 UI 아키텍처를 개념적으로 다음과 같이 설명
 │  ├─ industry/                 # 업종별 모듈 (학원/미용/네일/부동산/체육관/비영리)
 │  │  ├─ industry-academy/
 │  │  ├─ industry-salon/
-│  │  ├─ industry-realestate/
+│  │  ├─ industry-real-estate/
 │  │  ├─ industry-gym/
 │  │  ├─ industry-ngo/
 │  │  └─ ...
@@ -278,7 +278,7 @@ async function deleteTenant(tenantId: string) {
 용어	설명
 Platform	전체 SaaS 생성 플랫폼
 Tenant(테넌트)	하나의 사업자(학원/매장/지점 1개)
-Industry	업종 레이어(academy/salon/realestate/gym/ngo 등)
+Industry	업종 레이어(academy/salon/real_estate/gym/ngo 등)
 User	개인 계정 (여러 테넌트에 소속 가능)
 SaaS 제품	업종별 패키지(학원관리, 네일샵관리 등)
 2-2. 핵심 테이블
@@ -321,7 +321,7 @@ ALTER TABLE tenants
   ADD CONSTRAINT chk_tenants_status CHECK (status IN ('active','paused','closed'));
 
 ALTER TABLE tenants
-  ADD CONSTRAINT chk_tenants_industry CHECK (industry_type IN ('academy','salon','realestate','gym','ngo'));
+  ADD CONSTRAINT chk_tenants_industry CHECK (industry_type IN ('academy','salon','real_estate','gym','ngo'));
 
 tenant_settings.value는 JSON Schema 유효성(서버단) + 마이그레이션 시 기본값 강제
 
@@ -1200,7 +1200,7 @@ const envClientSchema = z.object({
 const envCommonSchema = z.object({
   APP_NAME: z.string().min(1).optional(),
   APP_VERSION: z.string().min(1).optional(),
-  INDUSTRY_MODE: z.enum(['academy', 'salon', 'realestate', 'gym', 'ngo']).optional(),
+  INDUSTRY_MODE: z.enum(['academy', 'salon', 'real_estate', 'gym', 'ngo']).optional(),
   // 서버/Edge에서만 사용하는 공개 값
 });
 
@@ -3369,7 +3369,7 @@ Billing Mapping
 
 패키지/회원권
 
-7-3. industry-realestate (부동산)
+7-3. industry-real-estate (부동산)
 Domain
 
 매물
@@ -6475,13 +6475,13 @@ Theme Merge Priority (우선순위 순서):
 업종별 Theme Tokens 저장 위치:
 
 **⚠️ 중요: Industry 타입 표준**
-- 전체 시스템에서 사용하는 Industry 타입 표준: `'academy'`, `'salon'`, `'realestate'`, `'gym'`, `'ngo'`
+- 전체 시스템에서 사용하는 Industry 타입 표준: `'academy'`, `'salon'`, `'real_estate'`, `'gym'`, `'ngo'`
 - `industry_themes` 테이블의 CHECK 제약도 이 표준을 따름
 - 다른 테이블(`tenants`, `schema_registry` 등)의 `industry_type` 컬럼도 동일한 표준 사용
 
 ```sql
 CREATE TABLE IF NOT EXISTS industry_themes (
-  industry_type text PRIMARY KEY CHECK (industry_type IN ('academy', 'salon', 'realestate', 'gym', 'ngo')),
+  industry_type text PRIMARY KEY CHECK (industry_type IN ('academy', 'salon', 'real_estate', 'gym', 'ngo')),
   theme_tokens jsonb NOT NULL,  -- 업종별 테마 토큰
   updated_at timestamptz NOT NULL DEFAULT now(),
   updated_by uuid REFERENCES auth.users(id)

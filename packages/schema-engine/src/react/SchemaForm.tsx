@@ -14,6 +14,7 @@
 import React from 'react';
 import { useForm, UseFormReturn } from 'react-hook-form';
 import { Grid, Button, Card } from '@ui-core/react';
+import { useResponsiveMode } from '@ui-core/react';
 import type { FormSchema } from '../types';
 import { validateSchema } from '../validator';
 import { SchemaField } from './SchemaField';
@@ -28,6 +29,8 @@ export interface SchemaFormProps {
   actionContext?: Partial<ActionContext>;
   // SDUI v1.1: i18n 번역 (선택적)
   translations?: Record<string, string>;
+  // Card padding 제어 (Drawer/Modal 내부에서 사용 시)
+  disableCardPadding?: boolean;
 }
 
 /**
@@ -43,6 +46,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
   className,
   actionContext,
   translations = {},
+  disableCardPadding = false,
 }) => {
   // 1) Schema Validation
   const validation = validateSchema(schema);
@@ -121,17 +125,142 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
 
   const { form: formConfig } = schema;
   const layout = formConfig.layout;
+  const mode = useResponsiveMode();
+
+  // SDUI v1.1: 반응형 레이아웃 지원
+  // responsive 옵션이 있으면 현재 모드에 맞는 레이아웃 사용
+  const effectiveLayout = React.useMemo(() => {
+    if (layout?.responsive) {
+      const isMobile = mode === 'xs' || mode === 'sm';
+      const isTablet = mode === 'md';
+      const isDesktop = mode === 'lg' || mode === 'xl';
+
+      if (isMobile && layout.responsive.mobile) {
+        return { ...layout, ...layout.responsive.mobile };
+      } else if (isTablet && layout.responsive.tablet) {
+        return { ...layout, ...layout.responsive.tablet };
+      } else if (isDesktop && layout.responsive.desktop) {
+        return { ...layout, ...layout.responsive.desktop };
+      }
+    }
+    return layout;
+  }, [layout, mode]);
+
+  // Grid columns 계산 (반응형 고려)
+  // ⚠️ 중요: SchemaForm에서 직접 반응형 처리를 하여 모바일에서 1열로 강제합니다.
+  // Grid 컴포넌트의 자동 반응형 처리에 의존하지 않고 명시적으로 처리합니다.
+  const gridColumns = React.useMemo(() => {
+    if (effectiveLayout?.columns === 'auto-fit' || effectiveLayout?.columns === 'auto-fill') {
+      return effectiveLayout.columns;
+    }
+    if (typeof effectiveLayout?.columns === 'number') {
+      const numColumns = Math.min(effectiveLayout.columns, 12);
+      // 반응형 처리: 모바일은 항상 1열, 태블릿은 최대 2열, 데스크톱은 원래 값
+      const isMobile = mode === 'xs' || mode === 'sm';
+      const isTablet = mode === 'md';
+
+      if (isMobile) {
+        return 1;
+      } else if (isTablet) {
+        return Math.min(numColumns, 2) as 1 | 2;
+      } else {
+        return numColumns as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+      }
+    }
+    return 1;
+  }, [effectiveLayout, mode]);
+
+  // Grid gap 계산 (반응형 고려)
+  // 모바일에서는 더 작은 gap 사용, 데스크톱에서는 원래 값 사용
+  const gridGap = React.useMemo(() => {
+    const baseGap = effectiveLayout?.columnGap || 'md';
+    const isMobile = mode === 'xs' || mode === 'sm';
+    // 모바일에서는 최소 'sm' gap 보장
+    if (isMobile) {
+      return baseGap === 'xs' ? 'xs' : 'sm';
+    }
+    return baseGap;
+  }, [effectiveLayout?.columnGap, mode]);
+
+  // Card padding 계산 (반응형 고려)
+  // 모바일에서도 적절한 padding 보장
+  const cardPadding = React.useMemo(() => {
+    if (disableCardPadding) return undefined;
+    const basePadding = effectiveLayout?.columnGap || 'md';
+    const isMobile = mode === 'xs' || mode === 'sm';
+    // 모바일에서는 최소 'sm' padding 보장
+    if (isMobile) {
+      return basePadding === 'xs' ? 'xs' : 'sm';
+    }
+    return basePadding;
+  }, [effectiveLayout?.columnGap, mode, disableCardPadding]);
+
+  // Form padding 계산 (disableCardPadding일 때 form에 직접 padding 적용)
+  // Drawer/Modal 내부에서 사용될 때도 적절한 여백 보장
+  const formPadding = React.useMemo(() => {
+    if (!disableCardPadding) return undefined;
+
+    const basePadding = effectiveLayout?.columnGap || 'md';
+    const isMobile = mode === 'xs' || mode === 'sm';
+
+    const spacingMap: Record<string, string> = {
+      xs: 'var(--spacing-xs)',
+      sm: 'var(--spacing-sm)',
+      md: 'var(--spacing-md)',
+      lg: 'var(--spacing-lg)',
+      xl: 'var(--spacing-xl)',
+      '2xl': 'var(--spacing-2xl)',
+      '3xl': 'var(--spacing-3xl)',
+    };
+
+    // 모바일에서는 최소 'sm' padding 보장
+    const effectivePadding = isMobile && basePadding !== 'xs' ? 'sm' : basePadding;
+
+    return spacingMap[effectivePadding] || `var(--spacing-${effectivePadding})`;
+  }, [disableCardPadding, effectiveLayout?.columnGap, mode]);
+
+  // rowGap 스타일 계산 (반응형 고려)
+  const rowGapStyle = React.useMemo(() => {
+    const baseRowGap = effectiveLayout?.rowGap || 'md';
+    const isMobile = mode === 'xs' || mode === 'sm';
+
+    const spacingMap: Record<string, string> = {
+      xs: 'var(--spacing-xs)',
+      sm: 'var(--spacing-sm)',
+      md: 'var(--spacing-md)',
+      lg: 'var(--spacing-lg)',
+      xl: 'var(--spacing-xl)',
+      '2xl': 'var(--spacing-2xl)',
+      '3xl': 'var(--spacing-3xl)',
+    };
+
+    // 모바일에서는 최소 'sm' rowGap 보장
+    const effectiveRowGap = isMobile && baseRowGap !== 'xs' ? 'sm' : baseRowGap;
+
+    return {
+      rowGap: spacingMap[effectiveRowGap] || `var(--spacing-${effectiveRowGap})`,
+    };
+  }, [effectiveLayout?.rowGap, mode]);
 
   return (
-    <Card padding={layout?.columnGap || 'md'} className={className}>
-      <form onSubmit={handleSubmit(onFormSubmit)}>
+    <Card
+      padding={cardPadding}
+      className={className}
+      style={disableCardPadding ? { width: '100%', margin: 0, padding: 0 } : undefined}
+    >
+      <form
+        onSubmit={handleSubmit(onFormSubmit)}
+        style={disableCardPadding ? {
+          width: '100%',
+          padding: formPadding,
+        } : undefined}
+      >
         <Grid
-          columns={layout?.columns === 'auto-fit' || layout?.columns === 'auto-fill'
-            ? layout.columns
-            : (typeof layout?.columns === 'number' ? Math.min(layout.columns, 12) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 : 1)}
-          columnTemplate={layout?.columnTemplate}
-          minColumnWidth={layout?.minColumnWidth}
-          gap={layout?.columnGap || 'md'}
+          columns={gridColumns}
+          columnTemplate={effectiveLayout?.columnTemplate}
+          minColumnWidth={effectiveLayout?.minColumnWidth}
+          gap={gridGap}
+          style={rowGapStyle}
         >
           {formConfig.fields.map((field) => (
             <SchemaField
@@ -142,6 +271,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
               control={control}
               translations={translations}
               setValue={setValue}
+              gridColumns={typeof gridColumns === 'number' ? gridColumns : undefined}
             />
           ))}
         </Grid>
@@ -182,6 +312,7 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
   className,
   actionContext,
   translations = {},
+  disableCardPadding = false,
 }) => {
   const validation = validateSchema(schema);
   if (!validation.valid) {
@@ -259,17 +390,142 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
 
   const { form: formConfig } = schema;
   const layout = formConfig.layout;
+  const mode = useResponsiveMode();
+
+  // SDUI v1.1: 반응형 레이아웃 지원
+  // responsive 옵션이 있으면 현재 모드에 맞는 레이아웃 사용
+  const effectiveLayout = React.useMemo(() => {
+    if (layout?.responsive) {
+      const isMobile = mode === 'xs' || mode === 'sm';
+      const isTablet = mode === 'md';
+      const isDesktop = mode === 'lg' || mode === 'xl';
+
+      if (isMobile && layout.responsive.mobile) {
+        return { ...layout, ...layout.responsive.mobile };
+      } else if (isTablet && layout.responsive.tablet) {
+        return { ...layout, ...layout.responsive.tablet };
+      } else if (isDesktop && layout.responsive.desktop) {
+        return { ...layout, ...layout.responsive.desktop };
+      }
+    }
+    return layout;
+  }, [layout, mode]);
+
+  // Grid columns 계산 (반응형 고려)
+  // ⚠️ 중요: SchemaForm에서 직접 반응형 처리를 하여 모바일에서 1열로 강제합니다.
+  // Grid 컴포넌트의 자동 반응형 처리에 의존하지 않고 명시적으로 처리합니다.
+  const gridColumns = React.useMemo(() => {
+    if (effectiveLayout?.columns === 'auto-fit' || effectiveLayout?.columns === 'auto-fill') {
+      return effectiveLayout.columns;
+    }
+    if (typeof effectiveLayout?.columns === 'number') {
+      const numColumns = Math.min(effectiveLayout.columns, 12);
+      // 반응형 처리: 모바일은 항상 1열, 태블릿은 최대 2열, 데스크톱은 원래 값
+      const isMobile = mode === 'xs' || mode === 'sm';
+      const isTablet = mode === 'md';
+
+      if (isMobile) {
+        return 1;
+      } else if (isTablet) {
+        return Math.min(numColumns, 2) as 1 | 2;
+      } else {
+        return numColumns as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+      }
+    }
+    return 1;
+  }, [effectiveLayout, mode]);
+
+  // Grid gap 계산 (반응형 고려)
+  // 모바일에서는 더 작은 gap 사용, 데스크톱에서는 원래 값 사용
+  const gridGap = React.useMemo(() => {
+    const baseGap = effectiveLayout?.columnGap || 'md';
+    const isMobile = mode === 'xs' || mode === 'sm';
+    // 모바일에서는 최소 'sm' gap 보장
+    if (isMobile) {
+      return baseGap === 'xs' ? 'xs' : 'sm';
+    }
+    return baseGap;
+  }, [effectiveLayout?.columnGap, mode]);
+
+  // Card padding 계산 (반응형 고려)
+  // 모바일에서도 적절한 padding 보장
+  const cardPadding = React.useMemo(() => {
+    if (disableCardPadding) return undefined;
+    const basePadding = effectiveLayout?.columnGap || 'md';
+    const isMobile = mode === 'xs' || mode === 'sm';
+    // 모바일에서는 최소 'sm' padding 보장
+    if (isMobile) {
+      return basePadding === 'xs' ? 'xs' : 'sm';
+    }
+    return basePadding;
+  }, [effectiveLayout?.columnGap, mode, disableCardPadding]);
+
+  // Form padding 계산 (disableCardPadding일 때 form에 직접 padding 적용)
+  // Drawer/Modal 내부에서 사용될 때도 적절한 여백 보장
+  const formPadding = React.useMemo(() => {
+    if (!disableCardPadding) return undefined;
+
+    const basePadding = effectiveLayout?.columnGap || 'md';
+    const isMobile = mode === 'xs' || mode === 'sm';
+
+    const spacingMap: Record<string, string> = {
+      xs: 'var(--spacing-xs)',
+      sm: 'var(--spacing-sm)',
+      md: 'var(--spacing-md)',
+      lg: 'var(--spacing-lg)',
+      xl: 'var(--spacing-xl)',
+      '2xl': 'var(--spacing-2xl)',
+      '3xl': 'var(--spacing-3xl)',
+    };
+
+    // 모바일에서는 최소 'sm' padding 보장
+    const effectivePadding = isMobile && basePadding !== 'xs' ? 'sm' : basePadding;
+
+    return spacingMap[effectivePadding] || `var(--spacing-${effectivePadding})`;
+  }, [disableCardPadding, effectiveLayout?.columnGap, mode]);
+
+  // rowGap 스타일 계산 (반응형 고려)
+  const rowGapStyle = React.useMemo(() => {
+    const baseRowGap = effectiveLayout?.rowGap || 'md';
+    const isMobile = mode === 'xs' || mode === 'sm';
+
+    const spacingMap: Record<string, string> = {
+      xs: 'var(--spacing-xs)',
+      sm: 'var(--spacing-sm)',
+      md: 'var(--spacing-md)',
+      lg: 'var(--spacing-lg)',
+      xl: 'var(--spacing-xl)',
+      '2xl': 'var(--spacing-2xl)',
+      '3xl': 'var(--spacing-3xl)',
+    };
+
+    // 모바일에서는 최소 'sm' rowGap 보장
+    const effectiveRowGap = isMobile && baseRowGap !== 'xs' ? 'sm' : baseRowGap;
+
+    return {
+      rowGap: spacingMap[effectiveRowGap] || `var(--spacing-${effectiveRowGap})`,
+    };
+  }, [effectiveLayout?.rowGap, mode]);
 
   return (
-    <Card padding={layout?.columnGap || 'md'} className={className}>
-      <form onSubmit={handleSubmit(onFormSubmit)}>
+    <Card
+      padding={cardPadding}
+      className={className}
+      style={disableCardPadding ? { width: '100%', margin: 0, padding: 0 } : undefined}
+    >
+      <form
+        onSubmit={handleSubmit(onFormSubmit)}
+        style={disableCardPadding ? {
+          width: '100%',
+          padding: formPadding,
+        } : undefined}
+      >
         <Grid
-          columns={layout?.columns === 'auto-fit' || layout?.columns === 'auto-fill'
-            ? layout.columns
-            : (typeof layout?.columns === 'number' ? Math.min(layout.columns, 12) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 : 1)}
-          columnTemplate={layout?.columnTemplate}
-          minColumnWidth={layout?.minColumnWidth}
-          gap={layout?.columnGap || 'md'}
+          columns={gridColumns}
+          columnTemplate={effectiveLayout?.columnTemplate}
+          minColumnWidth={effectiveLayout?.minColumnWidth}
+          gap={gridGap}
+          style={rowGapStyle}
         >
           {formConfig.fields.map((field) => (
             <SchemaField
@@ -280,6 +536,7 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
               control={control}
               translations={translations}
               setValue={setValue}
+              gridColumns={typeof gridColumns === 'number' ? gridColumns : undefined}
             />
           ))}
         </Grid>

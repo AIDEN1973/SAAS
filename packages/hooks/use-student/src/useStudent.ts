@@ -59,6 +59,42 @@ export function useStudents(filter?: StudentFilter) {
       }
 
       const personsData = response.data || [];
+      const studentIds = personsData.map((p: any) => p.id);
+
+      // 학부모 정보 조회 (주 보호자만)
+      const guardiansResponse = await apiClient.get<any>('guardians', {
+        filters: { student_id: studentIds, is_primary: true },
+      });
+      const guardiansMap = new Map();
+      if (!guardiansResponse.error && guardiansResponse.data) {
+        guardiansResponse.data.forEach((g: any) => {
+          if (!guardiansMap.has(g.student_id)) {
+            guardiansMap.set(g.student_id, g.name);
+          }
+        });
+      }
+
+      // 대표반 정보 조회 (활성 반 중 첫 번째)
+      const studentClassesResponse = await apiClient.get<any>('student_classes', {
+        filters: { student_id: studentIds, is_active: true },
+      });
+      const studentClassMap = new Map();
+      if (!studentClassesResponse.error && studentClassesResponse.data) {
+        const classIds = [...new Set(studentClassesResponse.data.map((sc: any) => sc.class_id))];
+        if (classIds.length > 0) {
+          const classesResponse = await apiClient.get<any>('academy_classes', {
+            filters: { id: classIds },
+          });
+          if (!classesResponse.error && classesResponse.data) {
+            const classMap = new Map(classesResponse.data.map((c: any) => [c.id, c.name]));
+            studentClassesResponse.data.forEach((sc: any) => {
+              if (!studentClassMap.has(sc.student_id) && classMap.has(sc.class_id)) {
+                studentClassMap.set(sc.student_id, classMap.get(sc.class_id));
+              }
+            });
+          }
+        }
+      }
 
       // 데이터 변환 persons + academy_students -> Student
       let students: Student[] = personsData.map((person: any) => {
@@ -82,7 +118,10 @@ export function useStudents(filter?: StudentFilter) {
           updated_at: person.updated_at,
           created_by: academyData.created_by,
           updated_by: academyData.updated_by,
-        } as Student;
+          // 아키텍처 문서 3.1.4 요구사항: 학부모, 대표반 정보 추가
+          primary_guardian_name: guardiansMap.get(person.id) || undefined,
+          primary_class_name: studentClassMap.get(person.id) || undefined,
+        } as Student & { primary_guardian_name?: string; primary_class_name?: string };
       });
 
       // 클라이언트 측 필터링
@@ -804,8 +843,15 @@ export function useGenerateConsultationAISummary() {
 
       const consultation = consultationResponse.data[0];
 
+      // 2. PII 마스킹 적용 (아키텍처 문서 3.1.5, 898-950줄: 상담일지 요약 시 개인정보 마스킹 규칙)
+      // TODO: 실제 AI 서비스 연동 시 PII 마스킹된 content를 전달해야 함
+      // 현재는 플레이스홀더이지만, 향후 실제 AI 연동 시 마스킹 로직 적용 필요
+      // import { maskPII } from '@core/pii-utils';
+      // const maskedContent = maskPII(consultation.content);
+
       // 2. AI 요약 생성 (Phase 1: 플레이스홀더)
       // TODO: 실제 AI 서비스 연동 (Edge Function 또는 외부 AI API)
+      // 주의: 실제 AI 연동 시 consultation.content를 그대로 전달하지 말고 PII 마스킹 적용 필수
       const placeholderSummary = `[AI 요약] ${consultation.content.substring(0, 100)}... (요약 기능은 곧 제공될 예정입니다.)`;
 
       // 3. ai_summary 업데이트

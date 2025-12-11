@@ -1,6 +1,6 @@
 /**
  * Meta-Schema Validator
- * 
+ *
  * [불변 규칙] 스키마 구조는 다음 계층에서 검증
  * - 개발(local dev)
  * - CI 빌드 계층
@@ -13,7 +13,7 @@ import { FormSchema, SchemaVersion, ConditionRule, MultiConditionRule } from './
 
 /**
  * Schema Version Validator
- * 
+ *
  * SDUI v1.1: minClient 사용 (minSupportedClient는 하위 호환)
  */
 const schemaVersionBase = z.object({
@@ -33,7 +33,7 @@ const schemaVersionBase = z.object({
 
 /**
  * Layout Schema Validator
- * 
+ *
  * SDUI v1.1: columns를 number로 확장 (1-12)
  */
 const layoutSchema = z.object({
@@ -63,10 +63,10 @@ const layoutSchema = z.object({
 
 /**
  * Condition Rule Validator (단일 조건)
- * 
+ *
  * SDUI v1.1: then/else 구조 지원 (action보다 우선)
  */
-const conditionRuleSchema: z.ZodType<ConditionRule> = z.object({
+const conditionRuleSchema = z.object({
   field: z.string().min(1),
   op: z.enum(['==', '!=', 'eq', 'ne', 'in', 'not_in', 'exists', 'not_exists', 'gt', 'gte', 'lt', 'lte', '>', '>=', '<', '<=']),  // SDUI v1.1: 비교 연산자
   value: z.any().optional(),  // exists/not_exists의 경우 불필요
@@ -121,10 +121,10 @@ const conditionRuleSchema: z.ZodType<ConditionRule> = z.object({
 
 /**
  * Multi Condition Rule Validator (복수 조건 AND/OR)
- * 
+ *
  * SDUI v1.1: then/else 구조 지원
  */
-const multiConditionRuleSchema: z.ZodType<MultiConditionRule> = z.object({
+const multiConditionRuleSchema = z.object({
   conditions: z.array(conditionRuleSchema).min(1),
   logic: z.enum(['and', 'or']),
   // SDUI v1.1: then/else 구조 (action보다 우선)
@@ -162,7 +162,7 @@ const multiConditionRuleSchema: z.ZodType<MultiConditionRule> = z.object({
 
 /**
  * Form Field Schema Validator
- * 
+ *
  * [불변 규칙] Tailwind 클래스 문자열 사용 금지 검증
  * [불변 규칙] Field kind와 options 강제 검증
  * [불변 규칙] ConditionRule 구조 검증
@@ -215,13 +215,13 @@ const formFieldSchema = z.object({
     validate: z.function().optional(),
   }).optional(),
 }).refine((data) => {
-  // select/multiselect/radio는 options 필수
+  // select/multiselect/radio는 options 필수 (빈 배열도 허용 - 동적 옵션 로딩 시)
   if (['select', 'multiselect', 'radio'].includes(data.kind)) {
-    return data.options && data.options.length > 0;
+    return Array.isArray(data.options); // options가 배열이면 허용 (빈 배열 포함)
   }
   return true;
 }, {
-  message: 'select/multiselect/radio 필드는 options가 필수입니다.',
+  message: 'select/multiselect/radio 필드는 options 배열이 필수입니다.',
 }).refine((data) => {
   // text/textarea/date 등은 options가 존재하면 안됨 (custom 제외)
   if (!['select', 'multiselect', 'radio', 'custom'].includes(data.kind)) {
@@ -290,6 +290,7 @@ const formFieldSchema = z.object({
  * Form Schema Validator
  */
 export const formSchemaValidator = schemaVersionBase.extend({
+  type: z.literal('form'),
   form: z.object({
     layout: layoutSchema.optional(),
     fields: z.array(formFieldSchema),
@@ -299,11 +300,11 @@ export const formSchemaValidator = schemaVersionBase.extend({
       size: z.enum(['xs', 'sm', 'md', 'lg', 'xl']).optional(),
     }).optional(),
   }),
-});
+}).passthrough(); // 추가 필드 허용 (table, detail 등이 있어도 무시)
 
 /**
  * Table Column Schema Validator
- * 
+ *
  * SDUI v1.1: i18n 지원, width를 number로 변경
  */
 const tableColumnSchema = z.object({
@@ -339,21 +340,26 @@ export const tableSchemaValidator = schemaVersionBase.extend({
     selection: z.enum(['none', 'single', 'multiple']).optional(),  // SDUI v1.1
     virtualization: z.boolean().optional(),
   }),
-});
+}).passthrough(); // 추가 필드 허용 (form, detail 등이 있어도 무시)
 
 /**
  * Schema Validator
- * 
+ *
  * [불변 규칙] 실행 코드 존재 여부 검증
  */
 export function validateSchema(schema: unknown): {
   valid: boolean;
   errors?: z.ZodError;
 } {
-  try {
-    // Form Schema 검증 시도
-    const parsed = formSchemaValidator.parse(schema) as FormSchema;
-    
+  // 스키마 타입 확인 (type 필드가 있는 경우)
+  const schemaObj = schema as any;
+  const schemaType = schemaObj?.type;
+
+  // type이 'form'인 경우 Form Schema만 검증
+  if (schemaType === 'form') {
+    try {
+      const parsed = formSchemaValidator.parse(schema) as unknown as FormSchema;
+
     // condition과 conditions 충돌 검사
     // 참조 필드 존재 검사: condition/conditions에서 참조하는 필드가 스키마에 반드시 존재해야 함
     const fieldNames = new Set(parsed.form.fields.map((f) => f.name));
@@ -361,26 +367,26 @@ export function validateSchema(schema: unknown): {
     const conditionConflictFields: string[] = [];
     const selfReferentialFields: string[] = [];
     const validateFunctionFields: string[] = [];
-    
+
     for (const field of parsed.form.fields) {
       // 중요: condition과 conditions를 동시에 사용할 수 없습니다.
       // conditions가 있는 경우 condition은 금지됩니다.
       if (field.condition && field.conditions) {
         conditionConflictFields.push(`필드 "${field.name}"에서 condition과 conditions를 동시에 사용할 수 없습니다. conditions가 있는 경우 condition은 금지됩니다.`);
       }
-      
+
       // ⚠️ 중요: validate 함수는 Registry 기반 스키마에서 사용 불가
       // Registry에 저장되는 스키마는 JSONB이므로 함수를 직렬화할 수 없음
       if (field.validation?.validate && typeof field.validation.validate === 'function') {
         validateFunctionFields.push(`필드 "${field.name}": validate 함수는 Registry 기반 스키마에서 사용할 수 없습니다. fallbackSchema(로컬 TypeScript 파일) 전용입니다.`);
       }
-      
+
       // 단일 조건 검사
       if (field.condition) {
         if (!fieldNames.has(field.condition.field)) {
           missingFields.push(`필드 "${field.name}"의 condition이 참조하는 필드 "${field.condition.field}"가 스키마에 존재하지 않습니다.`);
         }
-        
+
         // setValue self-referential 검증
         const referencedFields = new Set([field.condition.field]);
         if (field.condition.then?.setValue !== undefined || field.condition.else?.setValue !== undefined) {
@@ -389,7 +395,7 @@ export function validateSchema(schema: unknown): {
           }
         }
       }
-      
+
       // 복수 조건 검사
       if (field.conditions) {
         const referencedFields = new Set<string>();
@@ -399,7 +405,7 @@ export function validateSchema(schema: unknown): {
           }
           referencedFields.add(rule.field);
         }
-        
+
         // setValue self-referential 검증
         if (field.conditions.then?.setValue !== undefined || field.conditions.else?.setValue !== undefined) {
           if (referencedFields.has(field.name)) {
@@ -408,7 +414,7 @@ export function validateSchema(schema: unknown): {
         }
       }
     }
-    
+
     if (conditionConflictFields.length > 0) {
       return {
         valid: false,
@@ -421,7 +427,7 @@ export function validateSchema(schema: unknown): {
         ]),
       };
     }
-    
+
     if (missingFields.length > 0) {
       return {
         valid: false,
@@ -434,7 +440,7 @@ export function validateSchema(schema: unknown): {
         ]),
       };
     }
-    
+
     if (selfReferentialFields.length > 0) {
       return {
         valid: false,
@@ -447,7 +453,7 @@ export function validateSchema(schema: unknown): {
         ]),
       };
     }
-    
+
     if (validateFunctionFields.length > 0) {
       return {
         valid: false,
@@ -460,11 +466,157 @@ export function validateSchema(schema: unknown): {
         ]),
       };
     }
-    
+
+      return { valid: true };
+    } catch (formError) {
+      if (formError instanceof z.ZodError) {
+        return {
+          valid: false,
+          errors: formError,
+        };
+      }
+      return {
+        valid: false,
+        errors: formError as z.ZodError,
+      };
+    }
+  }
+
+  // type이 'table'인 경우 Table Schema만 검증
+  if (schemaType === 'table') {
+    try {
+      tableSchemaValidator.parse(schema);
+      return { valid: true };
+    } catch (tableError) {
+      if (tableError instanceof z.ZodError) {
+        return {
+          valid: false,
+          errors: tableError,
+        };
+      }
+      return {
+        valid: false,
+        errors: tableError as z.ZodError,
+      };
+    }
+  }
+
+  // type이 없는 경우 또는 다른 타입인 경우: Form Schema 먼저 시도, 실패하면 Table Schema 시도 (하위 호환성)
+  try {
+    // Form Schema 검증 시도
+    const parsed = formSchemaValidator.parse(schema) as unknown as FormSchema;
+
+    // condition과 conditions 충돌 검사
+    // 참조 필드 존재 검사: condition/conditions에서 참조하는 필드가 스키마에 반드시 존재해야 함
+    const fieldNames = new Set(parsed.form.fields.map((f) => f.name));
+    const missingFields: string[] = [];
+    const conditionConflictFields: string[] = [];
+    const selfReferentialFields: string[] = [];
+    const validateFunctionFields: string[] = [];
+
+    for (const field of parsed.form.fields) {
+      // 중요: condition과 conditions를 동시에 사용할 수 없습니다.
+      // conditions가 있는 경우 condition은 금지됩니다.
+      if (field.condition && field.conditions) {
+        conditionConflictFields.push(`필드 "${field.name}"에서 condition과 conditions를 동시에 사용할 수 없습니다. conditions가 있는 경우 condition은 금지됩니다.`);
+      }
+
+      // ⚠️ 중요: validate 함수는 Registry 기반 스키마에서 사용 불가
+      // Registry에 저장되는 스키마는 JSONB이므로 함수를 직렬화할 수 없음
+      if (field.validation?.validate && typeof field.validation.validate === 'function') {
+        validateFunctionFields.push(`필드 "${field.name}": validate 함수는 Registry 기반 스키마에서 사용할 수 없습니다. fallbackSchema(로컬 TypeScript 파일) 전용입니다.`);
+      }
+
+      // 단일 조건 검사
+      if (field.condition) {
+        if (!fieldNames.has(field.condition.field)) {
+          missingFields.push(`필드 "${field.name}"의 condition이 참조하는 필드 "${field.condition.field}"가 스키마에 존재하지 않습니다.`);
+        }
+
+        // setValue self-referential 검증
+        const referencedFields = new Set([field.condition.field]);
+        if (field.condition.then?.setValue !== undefined || field.condition.else?.setValue !== undefined) {
+          if (referencedFields.has(field.name)) {
+            selfReferentialFields.push(`필드 "${field.name}": setValue 대상 필드가 condition에서 참조하는 필드와 동일합니다. self-referential setValue는 금지됩니다.`);
+          }
+        }
+      }
+
+      // 복수 조건 검사
+      if (field.conditions) {
+        const referencedFields = new Set<string>();
+        for (const rule of field.conditions.conditions) {
+          if (!fieldNames.has(rule.field)) {
+            missingFields.push(`필드 "${field.name}"의 conditions가 참조하는 필드 "${rule.field}"가 스키마에 존재하지 않습니다.`);
+          }
+          referencedFields.add(rule.field);
+        }
+
+        // setValue self-referential 검증
+        if (field.conditions.then?.setValue !== undefined || field.conditions.else?.setValue !== undefined) {
+          if (referencedFields.has(field.name)) {
+            selfReferentialFields.push(`필드 "${field.name}": setValue 대상 필드가 conditions에서 참조하는 필드와 동일합니다. self-referential setValue는 금지됩니다.`);
+          }
+        }
+      }
+    }
+
+    if (conditionConflictFields.length > 0) {
+      return {
+        valid: false,
+        errors: new z.ZodError([
+          {
+            code: 'custom',
+            path: [],
+            message: conditionConflictFields.join(' '),
+          },
+        ]),
+      };
+    }
+
+    if (missingFields.length > 0) {
+      return {
+        valid: false,
+        errors: new z.ZodError([
+          {
+            code: 'custom',
+            path: [],
+            message: missingFields.join(' '),
+          },
+        ]),
+      };
+    }
+
+    if (selfReferentialFields.length > 0) {
+      return {
+        valid: false,
+        errors: new z.ZodError([
+          {
+            code: 'custom',
+            path: [],
+            message: selfReferentialFields.join(' '),
+          },
+        ]),
+      };
+    }
+
+    if (validateFunctionFields.length > 0) {
+      return {
+        valid: false,
+        errors: new z.ZodError([
+          {
+            code: 'custom',
+            path: [],
+            message: validateFunctionFields.join(' '),
+          },
+        ]),
+      };
+    }
+
     return { valid: true };
   } catch (formError) {
     if (formError instanceof z.ZodError) {
-      // Table Schema 검증 시도
+      // Table Schema 검증 시도 (하위 호환성)
       try {
         tableSchemaValidator.parse(schema);
         return { valid: true };
@@ -486,7 +638,7 @@ export function validateSchema(schema: unknown): {
 
 /**
  * Schema Version 체크
- * 
+ *
  * SDUI v1.1: minClient를 사용하여 클라이언트 버전 호환성 체크
  */
 export function checkSchemaVersion(

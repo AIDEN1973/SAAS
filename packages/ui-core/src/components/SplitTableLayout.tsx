@@ -58,7 +58,7 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
           width: listWidth,
           minWidth: '200px',
           overflow: 'auto',
-          borderRadius: 'var(--border-radius-xl)',
+          borderRadius: 'var(--border-radius-sm)',
           backgroundColor: 'var(--color-white)',
           border: '1px solid var(--color-gray-200)',
           boxShadow: 'var(--shadow-sm)',
@@ -95,7 +95,7 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
               style={{
                 padding: 'var(--spacing-sm)',
                 border: 'none',
-                borderRadius: 'var(--border-radius-md)',
+                borderRadius: 'var(--border-radius-sm)',
                 backgroundColor: 'transparent',
                 cursor: 'pointer',
                 color: 'var(--color-text-secondary)',

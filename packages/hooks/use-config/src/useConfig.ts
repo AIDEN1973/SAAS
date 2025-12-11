@@ -30,12 +30,16 @@ export function useConfig() {
       });
 
       if (response.error) {
-        // 설정이 없으면 빈 객체 반환 (undefined 방지)
-        if (response.error.code === 'PGRST116') {
+        // 설정이 없거나 테이블이 없으면 빈 객체 반환 (undefined 방지)
+        // PGRST116: 데이터 없음, PGRST205: 테이블이 스키마 캐시에 없음
+        if (response.error.code === 'PGRST116' || response.error.code === 'PGRST205') {
           return {} as TenantConfig;
         }
         // 다른 오류도 빈 객체 반환 (undefined 방지)
-        console.error('Failed to fetch config:', response.error);
+        // 개발 환경에서만 에러 출력 (프로덕션에서는 조용히 처리)
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to fetch config:', response.error);
+        }
         return {} as TenantConfig;
       }
 

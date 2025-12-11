@@ -56,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onMenuClick}
             style={{
               padding: 'var(--spacing-sm)',
-              borderRadius: 'var(--border-radius-md)',
+              borderRadius: 'var(--border-radius-sm)',
               minWidth: '44px',
               minHeight: '44px',
             }}
@@ -81,7 +81,7 @@ export const Header: React.FC<HeaderProps> = ({
             style={{
               display: 'flex',
               alignItems: 'center',
-              borderRadius: 'var(--border-radius-md)',
+              borderRadius: 'var(--border-radius-sm)',
             }}
           >
             {logo}

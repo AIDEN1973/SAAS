@@ -1,6 +1,6 @@
 /**
  * Signup Form Schema
- * 
+ *
  * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
  * [불변 규칙] Tailwind 클래스 직접 사용 금지, props 기반 전달
  */
@@ -15,7 +15,7 @@ export const signupFormSchema: FormSchema = {
   type: 'form',
   form: {
     layout: {
-      columns: 1,
+      columns: 2,
       columnGap: 'md',
       rowGap: 'md',
     },
@@ -26,6 +26,7 @@ export const signupFormSchema: FormSchema = {
         kind: 'text',
         ui: {
           label: '이름',
+          colSpan: 1,
         },
         validation: {
           required: '이름을 입력해주세요.',
@@ -37,6 +38,7 @@ export const signupFormSchema: FormSchema = {
         kind: 'email',
         ui: {
           label: '이메일',
+          colSpan: 1,
         },
         validation: {
           required: '이메일을 입력해주세요.',
@@ -49,6 +51,7 @@ export const signupFormSchema: FormSchema = {
         ui: {
           label: '전화번호 (선택)',
           placeholder: '010-1234-5678',
+          colSpan: 1,
         },
         defaultValue: '',
       },
@@ -57,6 +60,7 @@ export const signupFormSchema: FormSchema = {
         kind: 'password',
         ui: {
           label: '비밀번호',
+          colSpan: 1,
         },
         validation: {
           required: '비밀번호를 입력해주세요.',
@@ -69,6 +73,7 @@ export const signupFormSchema: FormSchema = {
         kind: 'password',
         ui: {
           label: '비밀번호 확인',
+          colSpan: 1,
         },
         validation: {
           required: '비밀번호 확인을 입력해주세요.',
@@ -85,6 +90,7 @@ export const signupFormSchema: FormSchema = {
         ui: {
           label: '테넌트 이름',
           placeholder: '예: 서울 학원',
+          colSpan: 1,
         },
         validation: {
           required: '테넌트 이름을 입력해주세요.',
@@ -96,6 +102,7 @@ export const signupFormSchema: FormSchema = {
         kind: 'select',
         ui: {
           label: '업종',
+          colSpan: 1,
         },
         options: [
           { label: '학원', value: 'academy' },

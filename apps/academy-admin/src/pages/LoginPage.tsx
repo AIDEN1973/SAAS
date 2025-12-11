@@ -262,7 +262,7 @@ export function LoginPage() {
             }}>
               <div style={{
                 width: '100%',
-                borderTop: '1px solid var(--color-gray-300)'
+                borderTop: `var(--border-width-thin) solid var(--color-gray-300)`
               }}></div>
             </div>
             <div style={{

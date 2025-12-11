@@ -14,7 +14,7 @@ export const productFormSchema: FormSchema = {
   type: 'form',
   form: {
     layout: {
-      columns: 1,
+      columns: 2,
       columnGap: 'md',
       rowGap: 'md',
     },
@@ -25,6 +25,7 @@ export const productFormSchema: FormSchema = {
         ui: {
           label: '상품명',
           placeholder: '상품명을 입력하세요',
+          colSpan: 1,
         },
         validation: {
           required: true,
@@ -35,6 +36,7 @@ export const productFormSchema: FormSchema = {
         kind: 'select',
         ui: {
           label: '상품 유형',
+          colSpan: 1,
         },
         options: [
           { value: 'monthly', label: '월정액' },
@@ -51,6 +53,7 @@ export const productFormSchema: FormSchema = {
         ui: {
           label: '금액',
           placeholder: '금액을 입력하세요',
+          colSpan: 1,
         },
         validation: {
           required: true,
@@ -63,6 +66,7 @@ export const productFormSchema: FormSchema = {
         ui: {
           label: '설명',
           placeholder: '상품 설명을 입력하세요',
+          colSpan: 2,
         },
       },
     ],

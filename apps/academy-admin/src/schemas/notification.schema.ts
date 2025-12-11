@@ -14,7 +14,7 @@ export const notificationFormSchema: FormSchema = {
   type: 'form',
   form: {
     layout: {
-      columns: 1,
+      columns: 2,
       columnGap: 'md',
       rowGap: 'md',
     },
@@ -24,6 +24,7 @@ export const notificationFormSchema: FormSchema = {
         kind: 'select',
         ui: {
           label: '채널',
+          colSpan: 1,
         },
         options: [
           { value: 'sms', label: 'SMS' },
@@ -41,6 +42,7 @@ export const notificationFormSchema: FormSchema = {
         ui: {
           label: '수신자',
           placeholder: '전화번호 또는 이메일을 입력하세요',
+          colSpan: 1,
         },
         validation: {
           required: true,
@@ -52,6 +54,7 @@ export const notificationFormSchema: FormSchema = {
         ui: {
           label: '내용',
           placeholder: '메시지 내용을 입력하세요',
+          colSpan: 2,
         },
         validation: {
           required: true,

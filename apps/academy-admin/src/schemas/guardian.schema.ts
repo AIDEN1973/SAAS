@@ -14,7 +14,7 @@ export const guardianFormSchema: FormSchema = {
   type: 'form',
   form: {
     layout: {
-      columns: 1,
+      columns: 2,
       columnGap: 'md',
       rowGap: 'md',
     },
@@ -86,7 +86,7 @@ export const guardianFormSchema: FormSchema = {
         ui: {
           labelKey: 'GUARDIAN.FORM.NOTES.LABEL',
           label: '비고',
-          colSpan: 1,
+          colSpan: 2,
         },
       },
     ],

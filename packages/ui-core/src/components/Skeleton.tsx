@@ -30,7 +30,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
 }) => {
   const baseStyle: React.CSSProperties = {
     backgroundColor: 'var(--color-gray-200)',
-    borderRadius: variant === 'circular' ? '50%' : variant === 'text' ? '4px' : 'var(--border-radius-md)',
+    borderRadius: variant === 'circular' ? '50%' : variant === 'text' ? '4px' : 'var(--border-radius-sm)',
     animation: 'pulse 1.5s ease-in-out infinite',
     ...(width && { width: typeof width === 'number' ? `${width}px` : width }),
     ...(height && { height: typeof height === 'number' ? `${height}px` : height }),

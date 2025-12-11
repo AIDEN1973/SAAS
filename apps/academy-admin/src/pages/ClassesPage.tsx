@@ -7,10 +7,11 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { ErrorBoundary, useModal } from '@ui-core/react';
-import { Container, Card, Button, Modal } from '@ui-core/react';
+import { ErrorBoundary, useModal, useResponsiveMode } from '@ui-core/react';
+import { Container, Card, Button, Modal, Drawer } from '@ui-core/react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
 import { apiClient } from '@api-sdk/core';
+import { useSchema } from '@hooks/use-schema';
 import { toKST } from '@lib/date-utils';
 import {
   useClasses,
@@ -38,20 +39,59 @@ const DAYS_OF_WEEK: { value: DayOfWeek; label: string }[] = [
 
 export function ClassesPage() {
   const { showConfirm } = useModal();
+  const mode = useResponsiveMode();
+  const isMobile = mode === 'xs' || mode === 'sm';
+  const isTablet = mode === 'md';
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [filter, setFilter] = useState<ClassFilter>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [showAllClasses, setShowAllClasses] = useState(false); // Today-First 기준: 기본값은 false
+
+  // Today-First 기준: 기본적으로 오늘 수업 있는 반만 필터링
+  const todayFilter: ClassFilter = React.useMemo(() => {
+    if (showAllClasses) {
+      return filter; // 전체 반 보기 모드
+    }
+
+    // 오늘 요일 계산 (월요일=1, 일요일=0)
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0(일) ~ 6(토)
+    const dayOfWeekMap: Record<number, DayOfWeek> = {
+      0: 'sunday',
+      1: 'monday',
+      2: 'tuesday',
+      3: 'wednesday',
+      4: 'thursday',
+      5: 'friday',
+      6: 'saturday',
+    };
+    const todayDayOfWeek = dayOfWeekMap[dayOfWeek];
+
+    return {
+      ...filter,
+      day_of_week: todayDayOfWeek, // 오늘 요일로 필터링
+      status: 'active', // 활성 반만
+    };
+  }, [filter, showAllClasses]);
 
   const { data: classes, isLoading, error } = useClasses({
-    ...filter,
-    search: filter.search?.trim() || undefined, // 빈 문자열이면 undefined로 변환
+    ...todayFilter,
+    search: todayFilter.search?.trim() || undefined, // 빈 문자열이면 undefined로 변환
   });
   const { data: teachers } = useTeachers();
   const createClass = useCreateClass();
   const updateClass = useUpdateClass();
   const deleteClass = useDeleteClass();
   const assignTeacher = useAssignTeacher();
+
+  // Schema Registry 연동 (아키텍처 문서 S3 참조)
+  const { data: classFormSchemaData } = useSchema('class', createClassFormSchema(teachers || []), 'form');
+  const { data: classFilterSchemaData } = useSchema('class_filter', classFilterSchema, 'filter');
+
+  // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
+  const effectiveFormSchema = classFormSchemaData || createClassFormSchema(teachers || []);
+  const effectiveFilterSchema = classFilterSchemaData || classFilterSchema;
 
   const handleFilterChange = React.useCallback((filters: Record<string, any>) => {
     setFilter({
@@ -101,14 +141,33 @@ export function ClassesPage() {
       <Container maxWidth="xl" padding="lg">
         <div style={{ marginBottom: 'var(--spacing-xl)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-            <h1 style={{
-              fontSize: 'var(--font-size-2xl)',
-              fontWeight: 'var(--font-weight-bold)',
-              color: 'var(--color-text)'
-            }}>
-              반 관리
-            </h1>
+            <div>
+              <h1 style={{
+                fontSize: 'var(--font-size-2xl)',
+                fontWeight: 'var(--font-weight-bold)',
+                color: 'var(--color-text)',
+                marginBottom: 'var(--spacing-xs)'
+              }}>
+                반 관리
+              </h1>
+              {/* Today-First 기준: 기본 화면은 "오늘 수업 있는 반" (아키텍처 문서 3.2.1 참조) */}
+              {!showAllClasses && (
+                <p style={{
+                  fontSize: 'var(--font-size-sm)',
+                  color: 'var(--color-text-secondary)'
+                }}>
+                  오늘 수업이 있는 반만 표시됩니다.
+                </p>
+              )}
+            </div>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+              <Button
+                variant={showAllClasses ? 'outline' : 'solid'}
+                size="sm"
+                onClick={() => setShowAllClasses(!showAllClasses)}
+              >
+                {showAllClasses ? '오늘 수업만' : '전체 반 보기'}
+              </Button>
               <Button
                 variant={viewMode === 'list' ? 'solid' : 'outline'}
                 size="sm"
@@ -136,7 +195,7 @@ export function ClassesPage() {
           {/* 검색 및 필터 패널 */}
           <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
             <SchemaFilter
-              schema={classFilterSchema}
+              schema={effectiveFilterSchema}
               onFilterChange={handleFilterChange}
               defaultValues={{
                 search: filter.search || '',
@@ -146,20 +205,50 @@ export function ClassesPage() {
             />
           </Card>
 
-          {/* 반 생성 폼 */}
+          {/* 반 생성 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
           {showCreateForm && (
-            <CreateClassForm
-              teachers={teachers || []}
-              onSubmit={handleCreateClass}
-              onCancel={() => setShowCreateForm(false)}
-            />
+            <>
+              {isMobile || isTablet ? (
+                // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
+                <Drawer
+                  isOpen={showCreateForm}
+                  onClose={() => setShowCreateForm(false)}
+                  title="반 생성"
+                  position={isMobile ? 'bottom' : 'right'}
+                  width={isTablet ? '500px' : '100%'}
+                >
+                  <CreateClassForm
+                    teachers={teachers || []}
+                    effectiveFormSchema={effectiveFormSchema}
+                    onSubmit={handleCreateClass}
+                    onCancel={() => setShowCreateForm(false)}
+                  />
+                </Drawer>
+              ) : (
+                // 데스크톱: 인라인 폼 (기존 방식)
+                <CreateClassForm
+                  teachers={teachers || []}
+                  effectiveFormSchema={effectiveFormSchema}
+                  onSubmit={handleCreateClass}
+                  onCancel={() => setShowCreateForm(false)}
+                />
+              )}
+            </>
           )}
 
           {/* 반 목록 또는 캘린더 뷰 */}
           {isLoading ? (
-            <div>로딩 중..</div>
+            <Card padding="lg" variant="default">
+              <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+                로딩 중...
+              </div>
+            </Card>
           ) : error ? (
-            <div>오류: {error.message}</div>
+            <Card padding="md" variant="outlined">
+              <div style={{ color: 'var(--color-error)', padding: 'var(--spacing-md)' }}>
+                오류: {error.message}
+              </div>
+            </Card>
           ) : viewMode === 'list' ? (
             <ClassListView
               classes={classes || []}
@@ -195,13 +284,20 @@ export function ClassesPage() {
  */
 function CreateClassForm({
   teachers,
+  effectiveFormSchema,
   onSubmit,
   onCancel,
 }: {
   teachers: any[];
+  effectiveFormSchema: any;
   onSubmit: (input: CreateClassInput) => void;
   onCancel: () => void;
 }) {
+  const mode = useResponsiveMode();
+  const isMobile = mode === 'xs' || mode === 'sm';
+  const isTablet = mode === 'md';
+  const showHeader = !isMobile && !isTablet;
+
   const handleSubmit = async (data: any) => {
     // 스키마에서 받은 데이터를 CreateClassInput 형식으로 변환
     const input: CreateClassInput = {
@@ -223,15 +319,17 @@ function CreateClassForm({
   };
 
   return (
-    <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>반 생성</h3>
-        <Button variant="ghost" size="sm" onClick={onCancel}>
-          취소
-        </Button>
-      </div>
+    <div style={showHeader ? { marginBottom: 'var(--spacing-md)' } : {}}>
+      {showHeader && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>반 생성</h3>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            취소
+          </Button>
+        </div>
+      )}
       <SchemaForm
-        schema={createClassFormSchema(teachers)}
+        schema={effectiveFormSchema}
         onSubmit={handleSubmit}
         defaultValues={{
           day_of_week: 'monday',
@@ -258,7 +356,7 @@ function CreateClassForm({
           },
         }}
       />
-    </Card>
+    </div>
   );
 }
 
@@ -276,8 +374,15 @@ function EditClassModal({
   onSave: (classId: string, input: UpdateClassInput) => Promise<void>;
   onClose: () => void;
 }) {
+  const { showAlert } = useModal();
+  const mode = useResponsiveMode();
+  const isMobile = mode === 'xs' || mode === 'sm';
+  const isTablet = mode === 'md';
   const { data: classData, isLoading } = useClass(classId);
-  const classFormSchema = useMemo(() => createClassFormSchema(teachers), [teachers]);
+
+  // Schema Registry 연동 (아키텍처 문서 S3 참조)
+  const { data: classFormSchemaData } = useSchema('class', createClassFormSchema(teachers || []), 'form');
+  const classFormSchema = useMemo(() => classFormSchemaData || createClassFormSchema(teachers || []), [classFormSchemaData, teachers]);
 
   const handleSubmit = async (data: any) => {
     const input: UpdateClassInput = {
@@ -343,6 +448,9 @@ function EditClassModal({
             }
             return response.data;
           },
+          showToast: (message: string, variant?: string) => {
+            showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+          },
         }}
       />
     </Modal>
@@ -397,7 +505,7 @@ function ClassCard({
       padding="md"
       variant="default"
       style={{
-        borderLeft: `4px solid ${classItem.color}`,
+        borderLeft: `var(--border-width-thick) solid ${classItem.color}`,
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--spacing-sm)' }}>
@@ -483,7 +591,7 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
                 fontSize: 'var(--font-size-sm)',
                 textAlign: 'center',
                 backgroundColor: 'var(--color-background-secondary)',
-                borderRadius: 'var(--radius-sm)',
+                borderRadius: 'var(--border-radius-sm)',
               }}
             >
             {day.label}
@@ -517,8 +625,8 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
                       backgroundColor: classAtTime
                         ? `${classAtTime.color}20`
                         : 'transparent',
-                      borderLeft: isStartTime ? `4px solid ${classAtTime.color}` : 'none',
-                      borderRadius: isStartTime ? 'var(--radius-sm)' : '0',
+                      borderLeft: isStartTime ? `var(--border-width-thick) solid ${classAtTime.color}` : 'none',
+                      borderRadius: isStartTime ? 'var(--border-radius-sm)' : '0',
                     }}
                   >
                     {isStartTime && classAtTime && (
@@ -551,7 +659,7 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
                     width: '16px',
                     height: '16px',
                     backgroundColor: classItem.color,
-                    borderRadius: 'var(--radius-sm)',
+                    borderRadius: 'var(--border-radius-sm)',
                   }}
                 />
                 <span>{classItem.name}</span>

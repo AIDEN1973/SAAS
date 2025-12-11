@@ -100,6 +100,7 @@
 
   /* Z-Index Layers */
   --z-base: 0;
+  --z-sticky-header: 1;  /* 테이블 헤더 등 sticky 요소용 */
   --z-dropdown: 1000;
   --z-sticky: 1020;
   --z-fixed: 1030;
@@ -117,14 +118,16 @@
   --spacing-xl: 2rem;      /* 32px */
   --spacing-2xl: 3rem;     /* 48px */
   --spacing-3xl: 4rem;     /* 64px */
+  --spacing-bottom-action-bar: 5rem;  /* 80px - 모바일 하단 액션 바 높이 */
 
   /* Typography */
   --font-size-xs: 0.75rem;    /* 12px */
   --font-size-sm: 0.875rem;   /* 14px */
-  --font-size-base: 1rem;     /* 16px */
+  --font-size-base: 0.9375rem; /* 15px */
   --font-size-lg: 1.125rem;   /* 18px */
   --font-size-xl: 1.25rem;    /* 20px */
   --font-size-2xl: 1.5rem;    /* 24px */
+  --font-size-3xl: 1.875rem;  /* 30px */
 
   /* Border Radius - 더 둥근 모던 모서리 */
   --border-radius-sm: 0.5rem;     /* 8px */
@@ -133,6 +136,15 @@
   --border-radius-xl: 1.5rem;    /* 24px */
   --border-radius-2xl: 2rem;     /* 32px */
   --border-radius-full: 9999px;
+
+  /* Border Width */
+  --border-width-thin: 1px;
+  --border-width-base: 2px;
+  --border-width-thick: 4px;
+
+  /* Transform Values */
+  --transform-lift: translateY(-2px);
+  --transform-center: translate(-50%, -50%);
 
   /* Transition - 부드러운 애니메이션 */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -193,7 +205,7 @@
 
 html {
   font-family: var(--font-family);
-  font-size: var(--font-size-sm);  /* 14px (0.875rem) - 기본 폰트 사이즈 */
+  font-size: var(--font-size-base);  /* 15px (0.9375rem) - 기본 폰트 사이즈 */
   line-height: var(--line-height);
   font-weight: var(--font-weight-normal);
 }

@@ -7,7 +7,6 @@
  */
 
 import React, { useState } from 'react';
-import { Box } from '@atlaskit/primitives';
 
 export interface TabItem {
   key: string;
@@ -22,6 +21,7 @@ export interface TabsProps {
   activeKey?: string;
   onChange?: (key: string) => void;
   className?: string;
+  style?: React.CSSProperties;
   variant?: 'default' | 'pills';
 }
 
@@ -36,6 +36,8 @@ export const Tabs: React.FC<TabsProps> = ({
   activeKey: controlledActiveKey,
   onChange,
   className,
+  style,
+  variant = 'default',
 }) => {
   const [internalActiveKey, setInternalActiveKey] = useState(defaultActiveKey || items[0]?.key || '');
   const activeKey = controlledActiveKey !== undefined ? controlledActiveKey : internalActiveKey;
@@ -51,14 +53,15 @@ export const Tabs: React.FC<TabsProps> = ({
   };
 
   const activeIndex = items.findIndex((item) => item.key === activeKey);
+  const isPills = variant === 'pills';
 
   return (
-    <div className={className}>
-      <Box
-        as="div"
+    <div className={className} style={style}>
+      <div
         style={{
           display: 'flex',
-          borderBottom: '2px solid var(--color-gray-200)',
+          gap: isPills ? 'var(--spacing-xs)' : 0,
+          borderBottom: isPills ? 'none' : '2px solid var(--color-gray-200)',
         }}
       >
         {items.map((item, index) => {
@@ -72,9 +75,24 @@ export const Tabs: React.FC<TabsProps> = ({
                 padding: 'var(--spacing-md) var(--spacing-lg)',
                 minHeight: '44px',
                 border: 'none',
-                backgroundColor: 'transparent',
-                color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                borderBottom: isActive ? '2px solid var(--color-primary)' : '2px solid transparent',
+                backgroundColor: isPills
+                  ? isActive
+                    ? 'var(--color-primary)'
+                    : 'var(--color-gray-100)'
+                  : 'transparent',
+                color: isPills
+                  ? isActive
+                    ? 'var(--color-white)'
+                    : 'var(--color-text-secondary)'
+                  : isActive
+                  ? 'var(--color-primary)'
+                  : 'var(--color-text-secondary)',
+                borderBottom: isPills
+                  ? 'none'
+                  : isActive
+                  ? '2px solid var(--color-primary)'
+                  : '2px solid transparent',
+                borderRadius: isPills ? 'var(--border-radius-sm)' : 0,
                 cursor: item.disabled ? 'not-allowed' : 'pointer',
                 fontWeight: isActive ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)',
                 whiteSpace: 'nowrap',
@@ -86,12 +104,12 @@ export const Tabs: React.FC<TabsProps> = ({
             </button>
           );
         })}
-      </Box>
+      </div>
       {items.map((item, index) => (
         index === activeIndex && (
-          <Box key={item.key} as="div" style={{ padding: 'var(--spacing-lg)' }}>
+          <div key={item.key} style={{ padding: 'var(--spacing-lg)' }}>
             {item.content}
-          </Box>
+          </div>
         )
       ))}
     </div>

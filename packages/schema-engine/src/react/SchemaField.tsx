@@ -1,10 +1,10 @@
 /**
  * SchemaField Component
- * 
+ *
  * [불변 규칙] React Hook Form과 통합된 Schema Field Renderer
  * [불변 규칙] Condition Rule 기반 동적 UI 렌더링
  * [불변 규칙] Tailwind 클래스를 직접 사용하지 않고, core-ui 컴포넌트만 사용
- * 
+ *
  * 기술문서: docu/스키마엔진.txt 8. Renderer 통합
  */
 
@@ -44,14 +44,16 @@ export interface SchemaFieldProps {
   translations?: Record<string, string>;
   // SDUI v1.1: 동적 필드 값 설정 (setValue 액션용)
   setValue?: UseFormSetValue<any>;
+  // Grid의 실제 컬럼 수 (반응형 처리용)
+  gridColumns?: number;
 }
 
 /**
  * SchemaField 컴포넌트
- * 
+ *
  * FormFieldSchema를 React Hook Form과 통합하여 렌더링합니다.
  * Condition Rule을 지원하여 동적으로 hidden/disabled/required 상태를 제어합니다.
- * 
+ *
  * ⚠️ 성능 최적화: React.memo로 감싸서 불필요한 리렌더링을 방지합니다.
  * useWatch는 감시 필드가 변하면 해당 SchemaField 컴포넌트가 리렌더되므로,
  * 필드가 100개 이상이면 성능 문제가 발생할 수 있습니다.
@@ -63,15 +65,16 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
   control,
   translations = {},
   setValue: setFormValue,
+  gridColumns,
 }) => {
   const { name, kind, ui, options } = field;
-  
+
   // SDUI v1.1: i18n 키 처리 (Loader 단계에서 바인딩되지 않은 경우)
   // labelKey가 있으면 translations에서 조회, 없으면 기존 label 사용
   const label = ui?.labelKey ? (translations[ui.labelKey] || ui.labelKey) : ui?.label;
   const placeholder = ui?.placeholderKey ? (translations[ui.placeholderKey] || ui.placeholderKey) : ui?.placeholder;
   // const description = ui?.descriptionKey ? (translations[ui.descriptionKey] || ui.descriptionKey) : ui?.description; // TODO: 향후 사용 예정
-  
+
   // 1) 조건부 필드 감시
   // 단일 조건 또는 복수 조건에서 참조하는 모든 필드를 감시
   const fieldsToWatch = React.useMemo(() => {
@@ -91,12 +94,12 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
   // ⚠️ 최적화: 조건이 없는 필드는 useWatch를 호출하지 않음
   // fieldsToWatch.length === 0이면 name: []로 전달하여 폼 전체 구독 방지
   const hasConditions = fieldsToWatch.length > 0;
-  
+
   const watched = useWatch({
     control,
     name: hasConditions ? fieldsToWatch : [],  // 조건이 없으면 빈 배열로 전달 (폼 전체 구독 방지)
   });
-  
+
   const watchedValues = React.useMemo(() => {
     if (!hasConditions) return {} as Record<string, any>;
     // watched가 배열인 경우 필드명과 매핑
@@ -119,7 +122,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
   // ⚠️ 중요: dynamicOptions는 API 기반 옵션만 저장하며, 초기값은 undefined입니다.
   // static 옵션은 effectiveOptions에서 직접 사용합니다.
   const [dynamicOptions, setDynamicOptions] = React.useState<Array<{ value: string; labelKey?: string; label?: string }> | undefined>(undefined);
-  
+
   // effectiveOptions: conditionalActions.setOptions가 있으면 우선, 없으면 field.options
   const effectiveOptions = React.useMemo(() => {
     if (conditionalActions && conditionalActions.setOptions) {
@@ -139,7 +142,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
   const setOptionsConfig = conditionalActions?.setOptions;
   const setOptionsEndpoint = setOptionsConfig?.type === 'api' ? setOptionsConfig.endpoint : undefined;
   const setOptionsType = setOptionsConfig?.type;
-  
+
   React.useEffect(() => {
     if (setOptionsType === 'api' && setOptionsEndpoint) {
       const endpoint = setOptionsEndpoint; // 타입 가드: 이 시점에서 endpoint는 string
@@ -151,7 +154,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
           const { apiClient } = await import('@api-sdk/core');
           const res = await apiClient.get(endpoint);
           const data = (res as any).data ?? res;
-          
+
           if (mounted && Array.isArray(data)) {
             setDynamicOptions(
               data.map((item: any) => ({
@@ -201,13 +204,15 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
     : baseRules;
 
   const error = errors[name]?.message as string | undefined;
-  
+
   // ⚠️ 중요: Tailwind 클래스를 직접 사용하지 않고, props 기반으로 core-ui에 전달
   // 스키마는 논리적 구조만 정의하고, 스타일은 core-ui가 담당합니다.
   // 기술문서 UI 문서 2.3 "schema-engine ↔ core-ui 통신 방식" 참조
   // Renderer는 layout의 구조적 전달만 수행하고 스타일을 직접 다루지 않아야 합니다.
-  const colSpan = ui?.colSpan ?? 12;
-  
+  // 반응형 처리: Grid의 실제 컬럼 수보다 큰 colSpan은 Grid 컬럼 수로 제한
+  const baseColSpan = ui?.colSpan ?? 12;
+  const colSpan = gridColumns && baseColSpan > gridColumns ? gridColumns : baseColSpan;
+
   // 🍀 4) 각 필드 렌더링에 isDisabled 적용
 
   // text/email/phone/password → register
@@ -434,7 +439,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
 
 /**
  * Custom Widget Field Component
- * 
+ *
  * SDUI v1.1: Custom Widget을 동적으로 로드하여 렌더링합니다.
  */
 const CustomWidgetField: React.FC<{
@@ -458,10 +463,10 @@ const CustomWidgetField: React.FC<{
       try {
         setLoading(true);
         setError(null);
-        
+
         // SDUI v1.1: Widget Not Found 처리 강화
         const Component = await loadWidget(componentType);
-        
+
         if (mounted) {
           if (!Component) {
             // Widget이 레지스트리에 없거나 로드 실패

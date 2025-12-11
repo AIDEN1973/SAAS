@@ -187,6 +187,9 @@ export const Drawer: React.FC<DrawerProps> = ({
           style={{
             flex: 1,
             overflow: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            width: '100%',
           }}
         >
           {children}

@@ -14,7 +14,7 @@ export const billingFormSchema: FormSchema = {
   type: 'form',
   form: {
     layout: {
-      columns: 1,
+      columns: 2,
       columnGap: 'md',
       rowGap: 'md',
     },
@@ -25,6 +25,7 @@ export const billingFormSchema: FormSchema = {
         ui: {
           label: '납부자 ID',
           placeholder: '납부자 ID를 입력하세요',
+          colSpan: 1,
         },
         validation: {
           required: true,
@@ -36,6 +37,7 @@ export const billingFormSchema: FormSchema = {
         ui: {
           label: '금액',
           placeholder: '금액을 입력하세요',
+          colSpan: 1,
         },
         validation: {
           required: true,
@@ -47,6 +49,7 @@ export const billingFormSchema: FormSchema = {
         kind: 'date',
         ui: {
           label: '마감일',
+          colSpan: 1,
         },
         validation: {
           required: true,

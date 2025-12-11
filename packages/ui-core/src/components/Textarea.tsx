@@ -47,7 +47,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   const textareaStyle: React.CSSProperties = {
     ...sizeStyles[size],
     border: `1px solid ${error ? 'var(--color-red-500)' : 'var(--color-gray-300)'}`,
-    borderRadius: 'var(--border-radius-lg)',
+    borderRadius: 'var(--border-radius-sm)',
     backgroundColor: 'var(--color-white)',
     color: 'var(--color-text)',
     outline: 'none',

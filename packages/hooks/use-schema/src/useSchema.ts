@@ -52,38 +52,92 @@ export function useSchema<T extends SchemaType = 'form'>(
       //
       // 참고: 기술문서 예시에서는 params를 사용하지만, 실제 apiClient.get 구현은 filters를 사용합니다.
       // apiClient.get의 두 번째 파라미터는 options 객체이며, 그 안에 filters 속성이 있습니다.
-      const response = await apiClient.get<SchemaByType<T>>(
-        `schema-registry/${entity}`,
-        {
-          filters: {
-            tenant_id: context.tenantId,
-            industry_type: context.industryType,
-            client_version: '1.0.0',
-            type,
-          },
-        }
-      );
+      const table = `schema-registry/${entity}`;
 
-      if (response.error || !response.data || (Array.isArray(response.data) && response.data.length === 0)) {
-        // ⚠️ 중요: fallbackSchema는 폴백으로 사용됩니다
-        // 스키마 부재로 인해 UI가 죽지 않도록 fallback을 제공해야 합니다
-        //
-        // ⚠️ 필수 규칙: fallbackSchema는 entity + industry 조합으로 개별 제공되어야 합니다
-        // - academy/studentFormSchema
-        // - salon/customerFormSchema
-        // - realestate/contractFormSchema
-        // 각각 별도로 존재해야 하며, 업종별로 구분된 fallback 스키마를 제공해야 합니다
+      try {
+        const response = await apiClient.get<SchemaByType<T>>(
+          table,
+          {
+            filters: {
+              tenant_id: context.tenantId,
+              industry_type: context.industryType,
+              client_version: '1.0.0',
+              type,
+            },
+          }
+        );
+
+        // 404 에러는 스키마가 없다는 것을 의미하므로 조용히 처리
+        // PGRST116은 "데이터 없음" 에러 코드입니다
+        // schema-registry 엔드포인트는 스키마가 없을 수 있으므로 404는 정상적인 상황입니다
+        const isNotFoundError = response.error && (
+          response.error.code === 'PGRST116' ||
+          response.error.code === 'PGRST204' || // 테이블 없음
+          response.error.message?.toLowerCase().includes('404') ||
+          response.error.message?.toLowerCase().includes('not found') ||
+          response.error.message?.toLowerCase().includes('does not exist')
+        );
+
+        // schema-registry 요청은 항상 조용히 처리 (스키마가 없을 수 있음)
+        // 모든 schema-registry 요청은 404가 정상이므로 로그를 출력하지 않음
+        const isSchemaRegistryRequest = table.startsWith('schema-registry/');
+
+        if (
+          response.error ||
+          !response.data ||
+          (Array.isArray(response.data) && response.data.length === 0) ||
+          isNotFoundError
+        ) {
+          // ⚠️ 중요: fallbackSchema는 폴백으로 사용됩니다
+          // 스키마 부재로 인해 UI가 죽지 않도록 fallback을 제공해야 합니다
+          //
+          // ⚠️ 필수 규칙: fallbackSchema는 entity + industry 조합으로 개별 제공되어야 합니다
+          // - academy/studentFormSchema
+          // - salon/customerFormSchema
+          // - realestate/contractFormSchema
+          // 각각 별도로 존재해야 하며, 업종별로 구분된 fallback 스키마를 제공해야 합니다
+
+          // schema-registry 요청의 경우 로그를 출력하지 않음 (404는 정상적인 상황)
+          // 다른 에러의 경우에만 개발 환경에서 로그 출력
+          if (import.meta.env.DEV && response.error && !isNotFoundError && !isSchemaRegistryRequest) {
+            console.log(`[useSchema] Schema not found in registry, using fallback: ${entity} (${type})`);
+          }
+
+          return (fallbackSchema as SchemaByType<T>) || null;
+        }
+
+        // response.data가 배열인 경우 첫 번째 요소 반환
+        const schema = Array.isArray(response.data) ? response.data[0] : response.data;
+        return schema as SchemaByType<T>;
+      } catch (error: any) {
+        // 네트워크 에러나 기타 예외도 조용히 처리 (404는 정상적인 상황)
+        const isNotFoundError = error?.code === 'PGRST116' ||
+          error?.code === 'PGRST204' ||
+          error?.message?.toLowerCase().includes('404') ||
+          error?.message?.toLowerCase().includes('not found') ||
+          error?.status === 404 ||
+          error?.statusCode === 404;
+
+        // schema-registry 요청의 404 에러는 조용히 처리
+        if (isNotFoundError || table.startsWith('schema-registry/')) {
+          return (fallbackSchema as SchemaByType<T>) || null;
+        }
+
+        // 예상치 못한 에러의 경우에만 개발 환경에서 로그 출력
+        if (import.meta.env.DEV) {
+          console.warn(`[useSchema] Unexpected error fetching schema: ${entity} (${type})`, error);
+        }
+
         return (fallbackSchema as SchemaByType<T>) || null;
       }
-
-      // response.data가 배열인 경우 첫 번째 요소 반환
-      const schema = Array.isArray(response.data) ? response.data[0] : response.data;
-      return schema as SchemaByType<T>;
     },
     // ⚠️ 중요: staleTime 운영 모드에 맞게 설정
     // - 운영 모드(Production): staleTime=5분 이상 (성능 최적화)
     // - 개발/릴리즈 환경: staleTime=0 사용 가능(스키마 변경이 빈번한 경우)
     staleTime: 5 * 60 * 1000, // 5분(운영 모드 기준)
     enabled: !!context.tenantId, // tenantId가 있을 때만 조회
+    retry: false, // 404 에러는 재시도하지 않음 (스키마가 없을 수 있음)
+    retryOnMount: false, // 마운트 시 재시도하지 않음
+    refetchOnWindowFocus: false, // 윈도우 포커스 시 재조회하지 않음 (스키마는 자주 변경되지 않음)
   });
 }

@@ -13,6 +13,7 @@ import { useResponsiveMode } from '../hooks/useResponsiveMode';
 export interface BottomActionBarProps {
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 /**
@@ -22,6 +23,7 @@ export interface BottomActionBarProps {
 export const BottomActionBar: React.FC<BottomActionBarProps> = ({
   children,
   className,
+  style,
 }) => {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
@@ -37,6 +39,7 @@ export const BottomActionBar: React.FC<BottomActionBarProps> = ({
           gap: 'var(--spacing-sm)',
           padding: 'var(--spacing-md)',
           borderBottom: '1px solid var(--color-gray-200)',
+          ...style,
         }}
       >
         {children}
@@ -61,6 +64,7 @@ export const BottomActionBar: React.FC<BottomActionBarProps> = ({
         justifyContent: 'space-between',
         gap: 'var(--spacing-sm)',
         zIndex: 50,
+        ...style,
       }}
     >
       {children}

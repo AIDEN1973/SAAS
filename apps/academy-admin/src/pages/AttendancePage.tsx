@@ -12,27 +12,64 @@
  * - 출결 히스토리 조회
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '@ui-core/react';
-import { Container, Card, Button, Input, Badge, Switch, Select, useModal } from '@ui-core/react';
+import { Container, Card, Button, Input, Badge, Switch, Select, useModal, Checkbox, Tabs, BottomActionBar } from '@ui-core/react';
+import type { TabItem } from '@ui-core/react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
 import { useAttendanceLogs, useCreateAttendanceLog, useDeleteAttendanceLog } from '@hooks/use-attendance';
 import { useStudents } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
 import { useConfig, useUpdateConfig } from '@hooks/use-config';
 import type { AttendanceFilter, AttendanceType, AttendanceStatus } from '@services/attendance-service';
+import type { Student } from '@services/student-service';
 import { useResponsiveMode } from '@ui-core/react';
 import type { ColorToken } from '@design-system/core';
+import type { Class, DayOfWeek } from '@services/class-service';
 import { toKST } from '@lib/date-utils';
 import { createAttendanceFormSchema } from '../schemas/attendance.schema';
-import { createAttendanceFilterSchema } from '../schemas/attendance.filter.schema';
-import { attendanceSettingsFormSchema } from '../schemas/attendance-settings.schema';
+import { createAttendanceFilterSchema, createAttendanceHeaderFilterSchema } from '../schemas/attendance.filter.schema';
+// 출결 설정은 환경설정 > 출결 설정으로 이동 (아키텍처 문서 3.3.7)
+// import { attendanceSettingsFormSchema } from '../schemas/attendance-settings.schema';
+import { apiClient } from '@api-sdk/core';
+import { useSchema } from '@hooks/use-schema';
+import { useUserRole } from '@hooks/use-auth';
+
+// 학생 출결 상태 인터페이스
+interface StudentAttendanceState {
+  student_id: string;
+  check_in: boolean;
+  check_out: boolean;
+  status: AttendanceStatus;
+  ai_predicted?: boolean; // AI 예측값 여부
+  user_modified?: boolean; // 사용자가 수정했는지 여부 (사용자 입력 시 AI 데이터 override)
+}
 
 export function AttendancePage() {
+  const navigate = useNavigate();
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
+  const { data: userRole } = useUserRole();
 
-  // 필터 상태
+  // 역할별 권한 체크 (아키텍처 문서 2.3, 498-507줄)
+  // Assistant: 출결 입력만 가능, 수정 권한 없음
+  // Teacher: 출결 입력 및 수정 모두 가능
+  const canModifyAttendance = userRole !== 'assistant';
+
+  // 화면 모드: 'today' (오늘 출결하기) 또는 'qr' (QR 출결 실행)
+  // 아키텍처 문서 3.3.1: 출결 메인 화면은 "오늘 출결하기"와 "QR 출결 실행(학생용)" 두 개만 있어야 함
+  const [viewMode, setViewMode] = useState<'today' | 'qr'>('today');
+
+  // 오늘 출결하기 관련 상태
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>(toKST().format('YYYY-MM-DD'));
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [studentAttendanceStates, setStudentAttendanceStates] = useState<Record<string, StudentAttendanceState>>({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 필터 상태 (출결 기록 조회는 Advanced 메뉴로 이동 - 아키텍처 문서에 명시되지 않음)
   const [filter, setFilter] = useState<AttendanceFilter>({
     date_from: toKST().format('YYYY-MM-DD'),
     date_to: toKST().format('YYYY-MM-DD'),
@@ -44,11 +81,11 @@ export function AttendancePage() {
   const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
-  // 통계/히트맵 상태
-  const [showStatistics, setShowStatistics] = useState(false);
+  // 통계/히트맵 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8)
+  // const [showStatistics, setShowStatistics] = useState(false);
 
-  // 출결 설정 상태
-  const [showSettings, setShowSettings] = useState(false);
+  // 출결 설정은 환경설정 > 출결 설정으로 이동 (아키텍처 문서 1716줄)
+  // const [showSettings, setShowSettings] = useState(false);
   const { data: config } = useConfig();
   const updateConfig = useUpdateConfig();
 
@@ -79,9 +116,216 @@ export function AttendancePage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
 
   // 데이터 조회
-  const { data: attendanceLogs, isLoading, error } = useAttendanceLogs(filter);
-  const { data: students } = useStudents();
-  const { data: classes } = useClasses();
+  const { data: attendanceLogsData, isLoading: isLoadingLogs, error: errorLogs } = useAttendanceLogs(filter);
+  const attendanceLogs = attendanceLogsData || [];
+  const { data: students, isLoading: isLoadingStudents, error: errorStudents } = useStudents();
+  const { data: classes, isLoading: isLoadingClasses, error: errorClasses } = useClasses();
+
+  // 오늘 수업 필터링 (Today-First Principle)
+  const todayClassesFilter = useMemo(() => {
+    // 오늘 요일 계산 (월요일=1, 일요일=0)
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0(일) ~ 6(토)
+    const dayOfWeekMap: Record<number, DayOfWeek> = {
+      0: 'sunday',
+      1: 'monday',
+      2: 'tuesday',
+      3: 'wednesday',
+      4: 'thursday',
+      5: 'friday',
+      6: 'saturday',
+    };
+    const todayDayOfWeek = dayOfWeekMap[dayOfWeek];
+    return { day_of_week: todayDayOfWeek, status: 'active' as const };
+  }, []);
+
+  // 오늘 수업 반 목록
+  const { data: todayClasses } = useClasses(todayClassesFilter);
+
+  // 오늘 수업 반의 학생 ID 목록 조회
+  const { data: todayClassStudentIds } = useQuery({
+    queryKey: ['today-class-student-ids', todayClasses?.map(c => c.id)],
+    queryFn: async () => {
+      if (!todayClasses || todayClasses.length === 0) return new Set<string>();
+
+      const classIds = todayClasses.map(c => c.id);
+      const studentIdsSet = new Set<string>();
+
+      // 각 반에 대해 student_classes 조회
+      for (const classId of classIds) {
+        const response = await apiClient.get<any>('student_classes', {
+          filters: { class_id: classId, is_active: true },
+        });
+
+        if (!response.error && response.data) {
+          response.data.forEach((sc: any) => {
+            studentIdsSet.add(sc.student_id);
+          });
+        }
+      }
+
+      return studentIdsSet;
+    },
+    enabled: !!todayClasses && todayClasses.length > 0,
+  });
+
+  // 오늘 수업 학생 목록 (오늘 수업이 있는 반에 속한 학생만)
+  const todayStudents = useMemo(() => {
+    if (!students || !todayClassStudentIds) return [];
+
+    return students.filter(s => todayClassStudentIds.has(s.id));
+  }, [students, todayClassStudentIds]);
+
+  // 선택된 반의 학생 ID 목록 조회
+  const { data: selectedClassStudentIds } = useQuery({
+    queryKey: ['selected-class-student-ids', selectedClassId],
+    queryFn: async () => {
+      if (!selectedClassId) return null;
+
+      const response = await apiClient.get<any>('student_classes', {
+        filters: { class_id: selectedClassId, is_active: true },
+      });
+
+      if (response.error || !response.data) return new Set<string>();
+
+      return new Set<string>(response.data.map((sc: any) => sc.student_id));
+    },
+    enabled: !!selectedClassId,
+  });
+
+  // 선택된 반의 학생 목록
+  const filteredStudents = useMemo(() => {
+    if (!todayStudents) return [];
+
+    let filtered = todayStudents;
+
+    // 반 필터
+    if (selectedClassId && selectedClassStudentIds) {
+      filtered = filtered.filter(s => selectedClassStudentIds.has(s.id));
+    }
+
+    // 검색 필터
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(s =>
+        s.name?.toLowerCase().includes(query) ||
+        s.phone?.includes(query)
+      );
+    }
+
+    return filtered;
+  }, [todayStudents, selectedClassId, selectedClassStudentIds, searchQuery]);
+
+  // AI 출석 예측 조회 (초기 상태에만 적용)
+  const { data: aiPredictions, isLoading: isLoadingPredictions } = useQuery({
+    queryKey: ['ai-attendance-predictions', selectedDate, selectedClassId, filteredStudents.map(s => s.id)],
+    queryFn: async () => {
+      if (!filteredStudents || filteredStudents.length === 0) return {};
+
+      try {
+        // TODO: Edge Function으로 AI 예측 API 호출
+        // 현재는 과거 출결 패턴 기반 간단한 예측
+        const predictions: Record<string, { check_in: boolean; check_out: boolean; status: AttendanceStatus }> = {};
+
+        // 각 학생의 과거 출결 패턴 조회
+        const thirtyDaysAgo = new Date(selectedDate);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const dateFrom = thirtyDaysAgo.toISOString().split('T')[0];
+
+        for (const student of filteredStudents) {
+          try {
+            // 학생의 과거 출결 데이터 조회
+            const pastLogsResponse = await apiClient.get<any>('attendance_logs', {
+              filters: {
+                student_id: student.id,
+                occurred_at: { gte: dateFrom, lte: selectedDate },
+                attendance_type: 'check_in',
+              },
+              limit: 30,
+            });
+
+            const pastLogs = pastLogsResponse.data || [];
+
+            if (pastLogs.length > 0) {
+              // 출석률 계산
+              const presentCount = pastLogs.filter((log: any) => log.status === 'present').length;
+              const attendanceRate = presentCount / pastLogs.length;
+
+              // 출석률이 70% 이상이면 출석 예측
+              if (attendanceRate >= 0.7) {
+                predictions[student.id] = {
+                  check_in: true,
+                  check_out: false,
+                  status: attendanceRate >= 0.9 ? 'present' : 'late',
+                };
+              }
+            }
+          } catch (error) {
+            console.error(`Failed to predict attendance for student ${student.id}:`, error);
+          }
+        }
+
+        return predictions;
+      } catch (error) {
+        console.error('AI 예측 실패:', error);
+        // AI 예측 실패 시 빈 객체 반환 (모든 학생 미체크 상태)
+        return {};
+      }
+    },
+    enabled: filteredStudents.length > 0 && viewMode === 'today',
+    staleTime: 1000 * 60 * 5, // 5분간 캐시 유지
+  });
+
+  // 전체 로딩 상태 (아키텍처 문서 3.3.3: loading 상태)
+  // isLoadingPredictions 정의 이후에 계산해야 함
+  const isLoading = isLoadingLogs || isLoadingStudents || isLoadingClasses || isLoadingPredictions;
+
+  // 전체 에러 상태 (아키텍처 문서 3.3.3: error 상태)
+  const error = errorLogs || errorStudents || errorClasses;
+
+  // AI 예측값을 초기 상태에 적용 (한 번만 실행)
+  useEffect(() => {
+    if (!aiPredictions || Object.keys(studentAttendanceStates).length > 0) {
+      // 이미 사용자가 수정한 경우 AI 예측값 적용하지 않음
+      return;
+    }
+
+    if (isLoadingPredictions) return;
+
+    // AI 예측값을 초기 상태로 설정
+    const newStates: Record<string, StudentAttendanceState> = {};
+
+    filteredStudents.forEach(student => {
+      const prediction = aiPredictions[student.id];
+      if (prediction) {
+        newStates[student.id] = {
+          student_id: student.id,
+          check_in: prediction.check_in,
+          check_out: prediction.check_out,
+          status: prediction.status,
+          ai_predicted: true,
+          user_modified: false,
+        };
+      } else {
+        // AI 예측이 없는 경우 미체크 상태
+        newStates[student.id] = {
+          student_id: student.id,
+          check_in: false,
+          check_out: false,
+          status: 'present',
+          ai_predicted: false,
+          user_modified: false,
+        };
+      }
+    });
+
+    setStudentAttendanceStates(newStates);
+  }, [aiPredictions, isLoadingPredictions, filteredStudents]);
+
+  // 선택된 반/날짜 변경 시 상태 초기화
+  useEffect(() => {
+    setStudentAttendanceStates({});
+  }, [selectedClassId, selectedDate]);
 
   // 출결 필터 스키마 생성 (동적 옵션)
   const attendanceFilterSchema = useMemo(
@@ -89,8 +333,21 @@ export function AttendancePage() {
     [students, classes]
   );
 
-  // 출결 설정 스키마 조회
-  const attendanceSettingsSchema = attendanceSettingsFormSchema;
+  // 출결 화면 헤더 필터 스키마 생성 (반 선택, 날짜 선택, 검색)
+  const attendanceHeaderFilterSchema = useMemo(
+    () => createAttendanceHeaderFilterSchema(todayClasses),
+    [todayClasses]
+  );
+
+  // Schema Registry 연동 (아키텍처 문서 S3 참조)
+  const { data: attendanceHeaderFilterSchemaData } = useSchema(
+    'attendance_header_filter',
+    attendanceHeaderFilterSchema,
+    'filter'
+  );
+
+  // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
+  const effectiveHeaderFilterSchema = attendanceHeaderFilterSchemaData || attendanceHeaderFilterSchema;
 
   // 필터 변경 핸들러
   const handleFilterChange = React.useCallback((filters: Record<string, any>) => {
@@ -168,24 +425,8 @@ export function AttendancePage() {
     };
   }, [videoRef, stream]);
 
-  // 설정 저장
-  const handleSaveSettings = async () => {
-    try {
-      await updateConfig.mutateAsync({
-        attendance: {
-          late_after: attendanceConfig.late_after,
-          absent_after: attendanceConfig.absent_after,
-          auto_notification: attendanceConfig.auto_notification,
-          notification_channel: attendanceConfig.notification_channel,
-        },
-      });
-      setShowSettings(false);
-      showAlert('설정이 저장되었습니다.', '저장 완료', 'success');
-    } catch (error) {
-      console.error('설정 저장 실패:', error);
-      showAlert('설정 저장 중 오류가 발생했습니다.', '오류', 'error');
-    }
-  };
+  // 출결 설정은 환경설정 > 출결 설정으로 이동 (아키텍처 문서 3.3.7, 1716줄)
+  // handleSaveSettings 함수 제거됨
 
   // 출결 기록 생성
   const handleCreateAttendance = async (data: any) => {
@@ -270,6 +511,7 @@ export function AttendancePage() {
     if (videoRef) {
       videoRef.srcObject = null;
     }
+    // QR 스캔 완료 후 QR 탭에 머물러 있음 (아키텍처 문서 3.3.5: QR 출결 실행은 별도 화면)
   };
 
   // QR 코드 스캔 처리 (간단한 텍스트 입력으로 대체)
@@ -312,243 +554,8 @@ export function AttendancePage() {
     }
   };
 
-  // 통계 계산
-  const calculateStatistics = () => {
-    if (!attendanceLogs || !classes) return null;
-
-    const stats: Record<string, {
-      total: number;
-      present: number;
-      late: number;
-      absent: number;
-      attendanceRate: number;
-    }> = {};
-
-    classes.forEach(cls => {
-      const classLogs = attendanceLogs.filter(log => log.class_id === cls.id);
-      const present = classLogs.filter(log => log.status === 'present').length;
-      const late = classLogs.filter(log => log.status === 'late').length;
-      const absent = classLogs.filter(log => log.status === 'absent').length;
-      const total = classLogs.length;
-
-      stats[cls.id] = {
-        total,
-        present,
-        late,
-        absent,
-        attendanceRate: total > 0 ? Math.round((present / total) * 100) : 0,
-      };
-    });
-
-    return stats;
-  };
-
-  // 요일별 패턴 분석
-  const analyzeDayPattern = () => {
-    if (!attendanceLogs) return null;
-
-    const dayStats: Record<string, { checkIn: number; checkOut: number; late: number }> = {
-      '일': { checkIn: 0, checkOut: 0, late: 0 },
-      '월': { checkIn: 0, checkOut: 0, late: 0 },
-      '화': { checkIn: 0, checkOut: 0, late: 0 },
-      '수': { checkIn: 0, checkOut: 0, late: 0 },
-      '목': { checkIn: 0, checkOut: 0, late: 0 },
-      '금': { checkIn: 0, checkOut: 0, late: 0 },
-      '토': { checkIn: 0, checkOut: 0, late: 0 },
-    };
-
-    attendanceLogs.forEach(log => {
-      const dateKST = toKST(log.occurred_at);
-      const dayName = dateKST.format('ddd');
-
-      if (dayStats[dayName]) {
-        if (log.attendance_type === 'check_in') dayStats[dayName].checkIn++;
-        if (log.attendance_type === 'check_out') dayStats[dayName].checkOut++;
-        if (log.status === 'late') dayStats[dayName].late++;
-      }
-    });
-
-    return dayStats;
-  };
-
-  // 시간대별 패턴 분석
-  const analyzeTimePattern = () => {
-    if (!attendanceLogs) return null;
-
-    const timeStats: Record<number, number> = {};
-    for (let i = 0; i < 24; i++) {
-      timeStats[i] = 0;
-    }
-
-    attendanceLogs.forEach(log => {
-      const dateKST = toKST(log.occurred_at);
-      const hour = dateKST.hour();
-      timeStats[hour] = (timeStats[hour] || 0) + 1;
-    });
-
-    return timeStats;
-  };
-
-  // 반별 출결 히트맵 계산 (문서 요구사항: 반별 출결 히트맵)
-  const calculateClassHeatmap = () => {
-    if (!attendanceLogs || !classes) return null;
-
-    // 날짜 범위 계산
-    const dates: string[] = [];
-    const dateSet = new Set<string>();
-    attendanceLogs.forEach(log => {
-      const dateStr = toKST(log.occurred_at).format('YYYY-MM-DD');
-      dateSet.add(dateStr);
-    });
-    dates.push(...Array.from(dateSet).sort());
-
-    // 반별 날짜별 출결 통계
-    const heatmap: Record<string, Record<string, {
-      present: number;
-      late: number;
-      absent: number;
-      total: number;
-      attendanceRate: number;
-    }>> = {};
-
-    classes.forEach(cls => {
-      heatmap[cls.id] = {};
-      dates.forEach(dateStr => {
-        heatmap[cls.id][dateStr] = {
-          present: 0,
-          late: 0,
-          absent: 0,
-          total: 0,
-          attendanceRate: 0,
-        };
-      });
-    });
-
-    // 출결 데이터 집계
-    attendanceLogs.forEach(log => {
-      if (!log.class_id) return;
-      const dateStr = toKST(log.occurred_at).format('YYYY-MM-DD');
-      const classData = heatmap[log.class_id]?.[dateStr];
-      if (!classData) return;
-
-      classData.total++;
-      if (log.status === 'present') classData.present++;
-      else if (log.status === 'late') classData.late++;
-      else if (log.status === 'absent') classData.absent++;
-
-      if (classData.total > 0) {
-        classData.attendanceRate = Math.round((classData.present / classData.total) * 100);
-      }
-    });
-
-    return { dates, heatmap };
-  };
-
-  // AI 기반 비정상 출결 탐지 (문서 요구사항: AI 기반 비정상 출결 탐지 - Phase 1 MVP 기본 구조)
-  const detectAbnormalAttendance = () => {
-    if (!attendanceLogs || !classes) return null;
-
-    const anomalies: Array<{
-      type: 'frequent_late' | 'sudden_absence' | 'irregular_pattern';
-      student_id: string;
-      student_name: string;
-      description: string;
-      severity: 'low' | 'medium' | 'high';
-    }> = [];
-
-    // 학생별 출결 패턴 분석
-    const studentPatterns: Record<string, {
-      total: number;
-      late: number;
-      absent: number;
-      recentLate: number; // 최근 7일 지각
-      recentAbsent: number; // 최근 7일 결석
-    }> = {};
-
-    const nowKST = toKST();
-    const sevenDaysAgo = nowKST.subtract(7, 'day');
-
-    attendanceLogs.forEach(log => {
-      if (!studentPatterns[log.student_id]) {
-        studentPatterns[log.student_id] = {
-          total: 0,
-          late: 0,
-          absent: 0,
-          recentLate: 0,
-          recentAbsent: 0,
-        };
-      }
-
-      const pattern = studentPatterns[log.student_id];
-      pattern.total++;
-
-      if (log.status === 'late') {
-        pattern.late++;
-        const logDate = toKST(log.occurred_at);
-        if (logDate.isAfter(sevenDaysAgo) || logDate.isSame(sevenDaysAgo, 'day')) {
-          pattern.recentLate++;
-        }
-      } else if (log.status === 'absent') {
-        pattern.absent++;
-        const logDate = toKST(log.occurred_at);
-        if (logDate.isAfter(sevenDaysAgo) || logDate.isSame(sevenDaysAgo, 'day')) {
-          pattern.recentAbsent++;
-        }
-      }
-    });
-
-    // 이상 패턴 탐지
-    Object.entries(studentPatterns).forEach(([studentId, pattern]) => {
-      const student = students?.find(s => s.id === studentId);
-      if (!student) return;
-
-      // 1. 빈번한 지각 (최근 7일 지각률 > 30%)
-      if (pattern.total > 0) {
-        const recentTotal = attendanceLogs.filter(
-          log => {
-            const logDate = toKST(log.occurred_at);
-            return log.student_id === studentId && (logDate.isAfter(sevenDaysAgo) || logDate.isSame(sevenDaysAgo, 'day'));
-          }
-        ).length;
-
-        if (recentTotal > 0 && (pattern.recentLate / recentTotal) > 0.3) {
-          anomalies.push({
-            type: 'frequent_late',
-            student_id: studentId,
-            student_name: student.name,
-            description: `최근 7일간 지각률이 ${Math.round((pattern.recentLate / recentTotal) * 100)}%입니다.`,
-            severity: pattern.recentLate >= 3 ? 'high' : 'medium',
-          });
-        }
-
-        // 2. 갑작스러운 결석 (최근 7일 결석률 > 50%)
-        if (recentTotal > 0 && (pattern.recentAbsent / recentTotal) > 0.5) {
-          anomalies.push({
-            type: 'sudden_absence',
-            student_id: studentId,
-            student_name: student.name,
-            description: `최근 7일간 결석률이 ${Math.round((pattern.recentAbsent / recentTotal) * 100)}%입니다.`,
-            severity: pattern.recentAbsent >= 3 ? 'high' : 'medium',
-          });
-        }
-
-        // 3. 불규칙한 패턴 (전체 지각률 > 40% 또는 결석률 > 20%)
-        const lateRate = pattern.late / pattern.total;
-        const absentRate = pattern.absent / pattern.total;
-        if (lateRate > 0.4 || absentRate > 0.2) {
-          anomalies.push({
-            type: 'irregular_pattern',
-            student_id: studentId,
-            student_name: student.name,
-            description: `전체 지각률 ${Math.round(lateRate * 100)}%, 결석률 ${Math.round(absentRate * 100)}%입니다.`,
-            severity: lateRate > 0.5 || absentRate > 0.3 ? 'high' : 'medium',
-          });
-        }
-      }
-    });
-
-    return anomalies;
-  };
+  // 통계/히트맵/패턴 분석 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8)
+  // calculateStatistics, analyzeDayPattern, analyzeTimePattern, calculateClassHeatmap, detectAbnormalAttendance 함수 제거됨
 
   // 출석부 출력
   const handlePrintAttendance = () => {
@@ -621,8 +628,8 @@ export function AttendancePage() {
               body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; }
               h1 { text-align: center; margin-bottom: 30px; }
               table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              th { background-color: #f2f2f2; font-weight: bold; }
+              th, td { border: var(--border-width-thin) solid var(--color-border); padding: var(--spacing-xs); text-align: left; }
+              th { background-color: var(--color-gray-50); font-weight: var(--font-weight-semibold); }
               @media print { @page { margin: 1cm; } }
             </style>
           </head>
@@ -689,8 +696,14 @@ export function AttendancePage() {
     }
   };
 
-  // 출결 기록 삭제
+  // 출결 기록 삭제 (아키텍처 문서 2.3: Assistant는 수정 권한 없음)
   const handleDeleteAttendance = async (logId: string) => {
+    // 역할별 권한 체크
+    if (!canModifyAttendance) {
+      showAlert('출결 수정 권한이 없습니다. Teacher 또는 Admin에게 요청해주세요.', '권한 없음', 'warning');
+      return;
+    }
+
     const confirmed = await showConfirm('정말 삭제하시겠습니까?', '삭제 확인');
     if (!confirmed) {
       return;
@@ -740,6 +753,109 @@ export function AttendancePage() {
     }
   };
 
+  // 출결 저장 핸들러
+  const handleSaveAttendance = useCallback(async () => {
+    if (isSaving) return;
+
+    setIsSaving(true);
+    try {
+      const attendanceRecords = Object.values(studentAttendanceStates)
+        .filter(state => state.check_in || state.check_out)
+        .map(state => ({
+          student_id: state.student_id,
+          class_id: selectedClassId || undefined,
+          occurred_at: toKST(selectedDate).format('YYYY-MM-DDTHH:mm'),
+          attendance_type: (state.check_in ? 'check_in' : 'check_out') as AttendanceType,
+          status: state.status,
+        }));
+
+      // TODO: 실제 API 호출로 대체
+      for (const record of attendanceRecords) {
+        await createAttendance.mutateAsync(record);
+      }
+
+      // Success 상태 (아키텍처 문서 3.3.3: success 상태 - 2초 후 자동 닫기)
+      showAlert('출결 정보가 저장되었습니다.', '성공', 'success');
+      setStudentAttendanceStates({});
+
+      // 2초 후 자동으로 데이터 새로고침 (아키텍처 문서 3.3.3: auto_close_duration: 2000)
+      setTimeout(() => {
+        // 출결 상태 초기화 및 화면 유지 (아키텍처 문서 3.3.3: on_auto_close: 'refresh_data')
+        // 이미 setStudentAttendanceStates({})로 초기화했으므로 추가 작업 불필요
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to save attendance:', error);
+      showAlert('출결 저장에 실패했습니다.', '오류', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [studentAttendanceStates, selectedClassId, selectedDate, isSaving, createAttendance, showAlert]);
+
+  // 일괄 등원/하원 핸들러
+  const handleBulkCheckIn = useCallback(() => {
+    const newStates = { ...studentAttendanceStates };
+    filteredStudents.forEach(student => {
+      if (!newStates[student.id]) {
+        newStates[student.id] = {
+          student_id: student.id,
+          check_in: true,
+          check_out: false,
+          status: 'present',
+          ai_predicted: false,
+          user_modified: true,
+        };
+      } else {
+        newStates[student.id] = {
+          ...newStates[student.id],
+          check_in: true,
+          user_modified: true,
+        };
+      }
+    });
+    setStudentAttendanceStates(newStates);
+  }, [filteredStudents, studentAttendanceStates]);
+
+  const handleBulkCheckOut = useCallback(() => {
+    const newStates = { ...studentAttendanceStates };
+    filteredStudents.forEach(student => {
+      if (!newStates[student.id]) {
+        newStates[student.id] = {
+          student_id: student.id,
+          check_in: false,
+          check_out: true,
+          status: 'present',
+          ai_predicted: false,
+          user_modified: true,
+        };
+      } else {
+        newStates[student.id] = {
+          ...newStates[student.id],
+          check_out: true,
+          user_modified: true,
+        };
+      }
+    });
+    setStudentAttendanceStates(newStates);
+  }, [filteredStudents, studentAttendanceStates]);
+
+  // 출결 요약 통계
+  const attendanceSummary = useMemo(() => {
+    const states = Object.values(studentAttendanceStates);
+    const total = filteredStudents.length;
+    const present = states.filter(s => s.check_in && s.status === 'present').length;
+    const late = states.filter(s => s.check_in && s.status === 'late').length;
+    const absent = states.filter(s => s.status === 'absent').length;
+    return { total, present, late, absent };
+  }, [studentAttendanceStates, filteredStudents]);
+
+  // 탭 아이템 (아키텍처 문서 3.3.1: "오늘 출결하기"와 "QR 출결 실행" 두 개만)
+  // QR 출결은 설정 활성화 시에만 표시 (아키텍처 문서 1700-1701줄)
+  const qrEnabled = config?.attendance?.qr_enabled ?? false;
+  const tabItems: TabItem[] = [
+    { key: 'today', label: '오늘 출결하기', content: null },
+    ...(qrEnabled ? [{ key: 'qr', label: 'QR 출결 실행', content: null }] : []),
+  ];
+
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
@@ -753,255 +869,422 @@ export function AttendancePage() {
             출결 관리
           </h1>
 
-          {/* 필터 패널 */}
-          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              <SchemaFilter
-                schema={attendanceFilterSchema}
-                onFilterChange={handleFilterChange}
-                defaultValues={{
-                  date_from: filter.date_from || toKST().format('YYYY-MM-DD'),
-                  date_to: filter.date_to || toKST().format('YYYY-MM-DD'),
-                  student_id: filter.student_id || '',
-                  class_id: filter.class_id || '',
-                  attendance_type: filter.attendance_type || '',
-                  status: filter.status || '',
-                }}
-              />
+          {/* 탭 메뉴 */}
+          <Tabs
+            items={tabItems}
+            activeKey={viewMode}
+            onChange={(key) => setViewMode(key as 'today' | 'qr')}
+            style={{ marginBottom: 'var(--spacing-md)' }}
+          />
 
-              {/* 출결 기록 버튼 */}
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowSettings(true)}
-                  fullWidth={isMobile}
-                >
-                  설정
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    console.log('통계 버튼 클릭됨', { attendanceLogs: attendanceLogs?.length, showStatistics });
-                    if (!attendanceLogs || attendanceLogs.length === 0) {
-                      showAlert('출결 기록이 없어 통계를 표시할 수 없습니다.', '알림', 'info');
-                      return;
-                    }
-                    setShowStatistics(true);
+          {/* 오늘 출결하기 화면 */}
+          {viewMode === 'today' && (
+            <>
+              {/* AttendanceHeader: 반 선택, 날짜 선택, 검색 (아키텍처 문서 3.3.3) - SchemaFilter 사용 */}
+              <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 0.6 : 1 }}>
+                <SchemaFilter
+                  schema={effectiveHeaderFilterSchema}
+                  onFilterChange={(filters: Record<string, any>) => {
+                    setSelectedClassId(filters.class_id || null);
+                    setSelectedDate(filters.date || toKST().format('YYYY-MM-DD'));
+                    setSearchQuery(filters.search || '');
                   }}
-                  fullWidth={isMobile}
-                >
-                  통계
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleStartQRScanner}
-                  fullWidth={isMobile}
-                >
-                  QR 출결
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    console.log('출석부 출력 버튼 클릭 이벤트 발생', {
-                      attendanceLogs: attendanceLogs?.length,
-                      disabled: !attendanceLogs || attendanceLogs.length === 0
-                    });
-                    handlePrintAttendance();
+                  defaultValues={{
+                    class_id: selectedClassId || '',
+                    date: selectedDate,
+                    search: searchQuery,
                   }}
-                  fullWidth={isMobile}
-                >
-                  출석부 출력
-                </Button>
-                <Button
-                  variant="solid"
-                  color="primary"
-                  onClick={() => setShowCreateForm(true)}
-                  fullWidth={isMobile}
-                >
-                  출결 기록
-                </Button>
-              </div>
-            </div>
-          </Card>
+                />
+              </Card>
 
-          {/* 출결 설정 패널 - SchemaForm 사용 */}
-          {showSettings && attendanceSettingsSchema && (
-            <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-                <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>출결 설정</h3>
-                <Button variant="ghost" size="sm" onClick={() => setShowSettings(false)}>
-                  닫기
-                </Button>
-              </div>
-              <SchemaForm
-                schema={attendanceSettingsSchema}
-                onSubmit={async (data) => {
-                  setAttendanceConfig({
-                    late_after: data.late_after,
-                    absent_after: data.absent_after,
-                    auto_notification: data.auto_notification || false,
-                    notification_channel: data.notification_channel || 'sms',
-                  });
-                  await handleSaveSettings();
-                }}
-                defaultValues={{
-                  late_after: attendanceConfig.late_after,
-                  absent_after: attendanceConfig.absent_after,
-                  auto_notification: attendanceConfig.auto_notification,
-                  notification_channel: attendanceConfig.notification_channel,
-                }}
-                actionContext={{
-                  apiCall: async (endpoint: string, method: string, body?: any) => {
-                    const { apiClient } = await import('@api-sdk/core');
-                    if (method === 'POST') {
-                      const response = await apiClient.post(endpoint, body);
-                      if (response.error) {
-                        throw new Error(response.error.message);
-                      }
-                      return response.data;
-                    }
-                    const response = await apiClient.get(endpoint);
-                    if (response.error) {
-                      throw new Error(response.error.message);
-                    }
-                    return response.data;
-                  },
-                  showToast: (message: string, variant?: string) => {
-                    showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-                  },
-                }}
-              />
-            </Card>
-          )}
-
-          {/* 출결 기록 폼 */}
-          {showCreateForm && (
-            <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-                <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>출결 기록</h3>
-                <Button variant="ghost" size="sm" onClick={() => setShowCreateForm(false)}>
-                  닫기
-                </Button>
-              </div>
-              {attendanceConfig.auto_notification && (
-                <div style={{
-                  padding: 'var(--spacing-sm)',
-                  backgroundColor: 'var(--color-info-50)',
-                  borderRadius: 'var(--border-radius-sm)',
-                  fontSize: 'var(--font-size-sm)',
-                  color: 'var(--color-text-secondary)',
-                  marginBottom: 'var(--spacing-md)'
-                }}>
-                  자동 알림이 활성화되어 있습니다. 출결 기록 시 학부모에게 자동으로 알림이 발송됩니다.
+              {/* AttendanceSummary: 총원/출석/지각/결석 (아키텍처 문서 3.3.3) */}
+              <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 0.6 : 1 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 'var(--spacing-md)' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                      총원
+                    </div>
+                    <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
+                      {attendanceSummary.total}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                      출석
+                    </div>
+                    <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
+                      {attendanceSummary.present}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                      지각
+                    </div>
+                    <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-warning)' }}>
+                      {attendanceSummary.late}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                      결석
+                    </div>
+                    <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-error)' }}>
+                      {attendanceSummary.absent}
+                    </div>
+                  </div>
                 </div>
+              </Card>
+
+              {/* AttendanceActions: 일괄 등원/하원/저장 버튼 (아키텍처 문서 3.3.3) */}
+              {/* 모바일: Bottom Action Bar, 데스크톱: Card */}
+              {isMobile ? (
+                <BottomActionBar style={{ pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 0.6 : 1 }}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBulkCheckIn}
+                    disabled={isSaving || isLoading}
+                  >
+                    일괄 등원
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBulkCheckOut}
+                    disabled={isSaving || isLoading}
+                  >
+                    일괄 하원
+                  </Button>
+                  <div style={{ flex: 1 }} />
+                  <Button
+                    variant="solid"
+                    color="primary"
+                    size="sm"
+                    onClick={handleSaveAttendance}
+                    disabled={isSaving || isLoading}
+                  >
+                    {isSaving ? '저장 중...' : '저장'}
+                  </Button>
+                </BottomActionBar>
+              ) : (
+                <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 0.6 : 1 }}>
+                  <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
+                    <Button
+                      variant="outline"
+                      onClick={handleBulkCheckIn}
+                      disabled={isSaving || isLoading}
+                    >
+                      일괄 등원
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleBulkCheckOut}
+                      disabled={isSaving || isLoading}
+                    >
+                      일괄 하원
+                    </Button>
+                    <div style={{ flex: 1 }} />
+                    {/* 통계 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8) */}
+                    <Button
+                      variant="solid"
+                      color="primary"
+                      onClick={handleSaveAttendance}
+                      disabled={isSaving || isLoading}
+                    >
+                      {isSaving ? '저장 중...' : '저장'}
+                    </Button>
+                  </div>
+                </Card>
               )}
-              <SchemaForm
-                schema={attendanceSchema}
-                onSubmit={handleCreateAttendance}
-                defaultValues={{
-                  occurred_at: toKST().format('YYYY-MM-DDTHH:mm'),
-                  attendance_type: 'check_in',
-                  status: 'present',
-                }}
-                actionContext={{
-                  apiCall: async (endpoint: string, method: string, body?: any) => {
-                    const { apiClient } = await import('@api-sdk/core');
-                    if (method === 'POST') {
-                      const response = await apiClient.post(endpoint, body);
-                      if (response.error) {
-                        throw new Error(response.error.message);
-                      }
-                      return response.data;
-                    }
-                    const response = await apiClient.get(endpoint);
-                    if (response.error) {
-                      throw new Error(response.error.message);
-                    }
-                    return response.data;
-                  },
-                  showToast: (message: string, variant?: string) => {
-                    showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-                  },
-                }}
-              />
-            </Card>
-          )}
 
-          {/* 출결 로그 목록 */}
-          {isLoading && (
-            <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-              로딩 중...
-            </div>
-          )}
-          {error && (
-            <Card padding="md" variant="outlined">
-              <div style={{ color: 'var(--color-error)' }}>오류: {error.message}</div>
-            </Card>
-          )}
-          {attendanceLogs && attendanceLogs.length === 0 && (
-            <Card padding="md" variant="outlined">
-              <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                출결 기록이 없습니다.
-              </div>
-            </Card>
-          )}
-          {attendanceLogs && attendanceLogs.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
-              {attendanceLogs.map((log) => {
-                const student = students?.find((s) => s.id === log.student_id);
-                const classInfo = classes?.find((c) => c.id === log.class_id);
-                const occurredDateKST = toKST(log.occurred_at);
-                const dateStr = occurredDateKST.format('YYYY-MM-DD');
-                const timeStr = occurredDateKST.format('HH:mm');
-
-                return (
-                  <Card key={log.id} padding="md" variant="default">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 'var(--spacing-sm)' }}>
-                      <div style={{ flex: 1, minWidth: isMobile ? '100%' : '200px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', marginBottom: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
-                            {student?.name || '알 수 없음'}
-                          </span>
-                          {classInfo && (
-                            <Badge variant="soft" color="info">
-                              {classInfo.name}
-                            </Badge>
-                          )}
-                        </div>
-                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                          {dateStr} {timeStr}
-                        </div>
-                        {log.notes && (
-                          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                            {log.notes}
-                          </div>
-                        )}
+              {/* AttendanceStudentList: 학생 리스트 + 체크박스 UI */}
+              {/* 모바일: Bottom Action Bar를 위한 하단 패딩 추가 */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--spacing-sm)',
+                paddingBottom: isMobile ? 'var(--spacing-bottom-action-bar)' : '0', // Bottom Action Bar 높이만큼 패딩
+              }}>
+                {/* 로딩 상태 (아키텍처 문서 3.3.3: loading 상태) */}
+                {isLoading && (
+                  <Card padding="md" variant="default">
+                    <div style={{
+                      textAlign: 'center',
+                      padding: 'var(--spacing-xl)',
+                      pointerEvents: 'none',
+                      opacity: 0.7
+                    }}>
+                      <div style={{
+                        fontSize: 'var(--font-size-base)',
+                        color: 'var(--color-text-secondary)',
+                        marginBottom: 'var(--spacing-md)'
+                      }}>
+                        출결 정보를 불러오는 중...
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
-                        <Badge variant="solid" color={getTypeBadgeColor(log.attendance_type)}>
-                          {log.attendance_type === 'check_in' ? '등원' : log.attendance_type === 'check_out' ? '하원' : log.attendance_type === 'late' ? '지각' : '결석'}
-                        </Badge>
-                        <Badge variant="solid" color={getStatusBadgeColor(log.status)}>
-                          {log.status === 'present' ? '출석' : log.status === 'late' ? '지각' : log.status === 'absent' ? '결석' : '사유'}
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteAttendance(log.id)}
-                          style={{ color: 'var(--color-error)' }}
-                        >
-                          삭제
-                        </Button>
+                      {/* 스켈레톤 UI (아키텍처 문서 3.3.3: show_skeleton: true) */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+                        {[1, 2, 3].map(i => (
+                          <div
+                            key={i}
+                            style={{
+                              height: '80px',
+                              backgroundColor: 'var(--color-gray-100)',
+                              borderRadius: 'var(--border-radius-md)',
+                              opacity: 0.7,
+                            }}
+                          />
+                        ))}
                       </div>
                     </div>
                   </Card>
-                );
-              })}
-            </div>
+                )}
+
+                {/* 에러 상태 (아키텍처 문서 3.3.3: error 상태) */}
+                {!isLoading && error && (
+                  <Card padding="md" variant="outlined">
+                    <div style={{
+                      textAlign: 'center',
+                      padding: 'var(--spacing-lg)',
+                      color: 'var(--color-error)'
+                    }}>
+                      <div style={{
+                        fontSize: 'var(--font-size-base)',
+                        fontWeight: 'var(--font-weight-semibold)',
+                        marginBottom: 'var(--spacing-md)'
+                      }}>
+                        출결 정보를 불러올 수 없습니다.
+                      </div>
+                      <div style={{
+                        fontSize: 'var(--font-size-sm)',
+                        color: 'var(--color-text-secondary)',
+                        marginBottom: 'var(--spacing-md)'
+                      }}>
+                        {error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'}
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          // 데이터 재조회를 위해 쿼리 무효화 및 재시도
+                          window.location.reload();
+                        }}
+                      >
+                        다시 시도
+                      </Button>
+                    </div>
+                  </Card>
+                )}
+
+                {/* 정상 상태: 학생 리스트 */}
+                {!isLoading && !error && filteredStudents.length === 0 && (
+                  <Card padding="md" variant="outlined">
+                    <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                      오늘 수업 학생이 없습니다.
+                    </div>
+                  </Card>
+                )}
+                {!isLoading && !error && filteredStudents.length > 0 && (
+                  filteredStudents.map(student => {
+                    const state = studentAttendanceStates[student.id] || {
+                      student_id: student.id,
+                      check_in: false,
+                      check_out: false,
+                      status: 'present' as AttendanceStatus,
+                      ai_predicted: false,
+                      user_modified: false,
+                    };
+
+                    // 학생 정보 확장 (아키텍처 문서 3.3.3: 학년/반, 사진 표시)
+                    const studentWithExtras = student as Student & { primary_class_name?: string };
+                    const studentGrade = student.grade ? `${student.grade}학년` : '';
+                    const studentClass = studentWithExtras.primary_class_name || '';
+                    const gradeClassInfo = [studentGrade, studentClass].filter(Boolean).join(' ');
+
+                    return (
+                      <Card key={student.id} padding="md" variant="default">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
+                          {/* StudentInfo: 이름, 학년/반, 사진 (아키텍처 문서 3.3.3) */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', flex: 1, minWidth: '200px' }}>
+                            {/* 사진 (선택) */}
+                            {student.profile_image_url && (
+                              <img
+                                src={student.profile_image_url}
+                                alt={student.name}
+                                style={{
+                                  width: '48px',
+                                  height: '48px',
+                                  borderRadius: 'var(--border-radius-full)',
+                                  objectFit: 'cover',
+                                  flexShrink: 0,
+                                }}
+                              />
+                            )}
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
+                                {student.name}
+                              </div>
+                              {gradeClassInfo && (
+                                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                                  {gradeClassInfo}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* AttendanceStatus: 등원 체크박스, 하원 체크박스, 지각/결석 배지, AI 예측 표시 (아키텍처 문서 3.3.3) */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', cursor: 'pointer' }}>
+                              <Checkbox
+                                checked={state.check_in}
+                                onChange={(e) => {
+                                  setStudentAttendanceStates(prev => ({
+                                    ...prev,
+                                    [student.id]: {
+                                      ...state,
+                                      check_in: e.target.checked,
+                                      user_modified: true, // 사용자 입력 시 AI 데이터 override
+                                      ai_predicted: false, // 사용자 수정 시 AI 예측 플래그 제거
+                                    },
+                                  }));
+                                }}
+                              />
+                              <span>등원</span>
+                              {state.ai_predicted && !state.user_modified && (
+                                <Badge variant="soft" color="info" style={{ fontSize: 'var(--font-size-xs)' }}>
+                                  AI 예측
+                                </Badge>
+                              )}
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', cursor: 'pointer' }}>
+                              <Checkbox
+                                checked={state.check_out}
+                                onChange={(e) => {
+                                  setStudentAttendanceStates(prev => ({
+                                    ...prev,
+                                    [student.id]: {
+                                      ...state,
+                                      check_out: e.target.checked,
+                                      user_modified: true, // 사용자 입력 시 AI 데이터 override
+                                      ai_predicted: false, // 사용자 수정 시 AI 예측 플래그 제거
+                                    },
+                                  }));
+                                }}
+                              />
+                              <span>하원</span>
+                            </label>
+                            {/* 지각/결석 배지 (아키텍처 문서 3.3.3) */}
+                            {state.status === 'late' && (
+                              <Badge variant="solid" color="warning">지각</Badge>
+                            )}
+                            {state.status === 'absent' && (
+                              <Badge variant="solid" color="error">결석</Badge>
+                            )}
+                            {state.status === 'excused' && (
+                              <Badge variant="solid" color="info">사유</Badge>
+                            )}
+                            {/* 상태 변경 Select (배지와 함께 사용) */}
+                            <Select
+                              value={state.status}
+                              onChange={(e) => {
+                                setStudentAttendanceStates(prev => ({
+                                  ...prev,
+                                  [student.id]: {
+                                    ...state,
+                                    status: e.target.value as AttendanceStatus,
+                                    user_modified: true, // 사용자 입력 시 AI 데이터 override
+                                    ai_predicted: false, // 사용자 수정 시 AI 예측 플래그 제거
+                                  },
+                                }));
+                              }}
+                              style={{ minWidth: '100px' }}
+                            >
+                              <option value="present">출석</option>
+                              <option value="late">지각</option>
+                              <option value="absent">결석</option>
+                              <option value="excused">사유</option>
+                            </Select>
+                          </div>
+
+                          {/* ActionButtons: 등원 버튼, 하원 버튼, 상세 보기 버튼 (아키텍처 문서 3.3.3) */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setStudentAttendanceStates(prev => ({
+                                  ...prev,
+                                  [student.id]: {
+                                    ...state,
+                                    check_in: !state.check_in,
+                                    user_modified: true,
+                                    ai_predicted: false,
+                                  },
+                                }));
+                              }}
+                            >
+                              등원
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setStudentAttendanceStates(prev => ({
+                                  ...prev,
+                                  [student.id]: {
+                                    ...state,
+                                    check_out: !state.check_out,
+                                    user_modified: true,
+                                    ai_predicted: false,
+                                  },
+                                }));
+                              }}
+                            >
+                              하원
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => navigate(`/students/${student.id}`)}
+                            >
+                              상세
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })
+                )}
+              </div>
+            </>
           )}
 
-          {/* QR 스캐너 모달 */}
-          {showQRScanner && (
+          {/* QR 출결 실행 화면 (아키텍처 문서 3.3.1: 설정 활성화 시에만 표시) */}
+          {viewMode === 'qr' && (
+            <>
+              {/* QR 스캐너 */}
+              {!showQRScanner && (
+                <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', alignItems: 'center' }}>
+                    <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
+                      QR 출결 실행
+                    </h3>
+                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
+                      QR 코드를 스캔하여 출결을 기록합니다.
+                    </p>
+                    <Button
+                      variant="solid"
+                      color="primary"
+                      onClick={handleStartQRScanner}
+                      size="lg"
+                      style={{ minWidth: '200px' }}
+                    >
+                      QR 스캔 시작
+                    </Button>
+                  </div>
+                </Card>
+              )}
+
+              {/* QR 스캐너 모달 */}
+              {showQRScanner && (
             <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', position: 'relative' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
                 <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>QR 출결</h3>
@@ -1014,7 +1297,7 @@ export function AttendancePage() {
                   width: '100%',
                   maxWidth: '500px',
                   aspectRatio: '1',
-                  backgroundColor: '#000',
+                  backgroundColor: 'var(--color-gray-900)',
                   borderRadius: 'var(--border-radius-md)',
                   overflow: 'hidden',
                   position: 'relative'
@@ -1031,11 +1314,11 @@ export function AttendancePage() {
                       position: 'absolute',
                       top: '50%',
                       left: '50%',
-                      transform: 'translate(-50%, -50%)',
+                      transform: 'var(--transform-center)',
                       width: '200px',
                       height: '200px',
-                      border: '2px solid #fff',
-                      borderRadius: '8px',
+                      border: `var(--border-width-base) solid var(--color-white)`,
+                      borderRadius: 'var(--border-radius-md)',
                       pointerEvents: 'none'
                     }} />
                   )}
@@ -1075,296 +1358,8 @@ export function AttendancePage() {
             </Card>
           )}
 
-          {/* 통계/히트맵 패널 */}
-          {showStatistics && (
-            <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-                <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>출결 통계</h3>
-                <Button variant="ghost" size="sm" onClick={() => setShowStatistics(false)}>
-                  닫기
-                </Button>
-              </div>
-
-              {/* 반별 통계 */}
-              {classes && classes.length > 0 && (
-                <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-                  <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
-                    반별 출결 통계
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
-                    {classes.map((cls) => {
-                      const stats = calculateStatistics();
-                      const classStats = stats?.[cls.id];
-                      if (!classStats) return null;
-
-                      return (
-                        <Card key={cls.id} padding="sm" variant="outlined">
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-xs)' }}>
-                            <span style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)' }}>
-                              {cls.name}
-                            </span>
-                            <Badge variant="soft" color={classStats.attendanceRate >= 90 ? 'success' : classStats.attendanceRate >= 70 ? 'warning' : 'error'}>
-                              출석률 {classStats.attendanceRate}%
-                            </Badge>
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)' }}>
-                            <div>
-                              <span style={{ color: 'var(--color-text-secondary)' }}>전체: </span>
-                              <strong>{classStats.total}</strong>
-                            </div>
-                            <div>
-                              <span style={{ color: 'var(--color-text-secondary)' }}>출석: </span>
-                              <strong style={{ color: 'var(--color-success)' }}>{classStats.present}</strong>
-                            </div>
-                            <div>
-                              <span style={{ color: 'var(--color-text-secondary)' }}>지각: </span>
-                              <strong style={{ color: 'var(--color-warning)' }}>{classStats.late}</strong>
-                            </div>
-                            <div>
-                              <span style={{ color: 'var(--color-text-secondary)' }}>결석: </span>
-                              <strong style={{ color: 'var(--color-error)' }}>{classStats.absent}</strong>
-                            </div>
-                          </div>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* 요일별 패턴 */}
-              <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-                <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
-                  요일별 출결 패턴
-                </h4>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--font-size-sm)' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        <th style={{ padding: 'var(--spacing-xs)', textAlign: 'left' }}>요일</th>
-                        <th style={{ padding: 'var(--spacing-xs)', textAlign: 'right' }}>등원</th>
-                        <th style={{ padding: 'var(--spacing-xs)', textAlign: 'right' }}>하원</th>
-                        <th style={{ padding: 'var(--spacing-xs)', textAlign: 'right' }}>지각</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        const dayPattern = analyzeDayPattern();
-                        if (!dayPattern) return null;
-                        return ['월', '화', '수', '목', '금', '토', '일'].map(day => (
-                          <tr key={day} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                            <td style={{ padding: 'var(--spacing-xs)' }}>{day}</td>
-                            <td style={{ padding: 'var(--spacing-xs)', textAlign: 'right' }}>{dayPattern[day]?.checkIn || 0}</td>
-                            <td style={{ padding: 'var(--spacing-xs)', textAlign: 'right' }}>{dayPattern[day]?.checkOut || 0}</td>
-                            <td style={{ padding: 'var(--spacing-xs)', textAlign: 'right', color: 'var(--color-warning)' }}>
-                              {dayPattern[day]?.late || 0}
-                            </td>
-                          </tr>
-                        ));
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* 반별 출결 히트맵 (문서 요구사항: 반별 출결 히트맵) */}
-              <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-                <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
-                  반별 출결 히트맵
-                </h4>
-                <div style={{ overflowX: 'auto' }}>
-                  {(() => {
-                    const heatmapData = calculateClassHeatmap();
-                    if (!heatmapData) return <p style={{ color: 'var(--color-text-secondary)' }}>출결 데이터가 없습니다.</p>;
-
-                    const { dates, heatmap } = heatmapData;
-                    if (dates.length === 0) return <p style={{ color: 'var(--color-text-secondary)' }}>출결 데이터가 없습니다.</p>;
-
-                    return (
-                      <div style={{ display: 'inline-block', minWidth: '100%' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--font-size-xs)' }}>
-                          <thead>
-                            <tr style={{ borderBottom: '2px solid var(--color-border)' }}>
-                              <th style={{ padding: 'var(--spacing-xs)', textAlign: 'left', position: 'sticky', left: 0, backgroundColor: 'var(--color-background)', zIndex: 1 }}>
-                                반 / 날짜
-                              </th>
-                              {dates.slice(0, 30).map(dateStr => {
-                                const dateKST = toKST(dateStr);
-                                return (
-                                  <th
-                                    key={dateStr}
-                                    style={{
-                                      padding: 'var(--spacing-xs)',
-                                      textAlign: 'center',
-                                      minWidth: '60px',
-                                      fontSize: 'var(--font-size-xs)',
-                                    }}
-                                    title={dateKST.format('YYYY-MM-DD')}
-                                  >
-                                    {dateKST.format('M/D')}
-                                  </th>
-                                );
-                              })}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(classes || []).map(cls => (
-                              <tr key={cls.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                                <td
-                                  style={{
-                                    padding: 'var(--spacing-xs)',
-                                    position: 'sticky',
-                                    left: 0,
-                                    backgroundColor: 'var(--color-background)',
-                                    zIndex: 1,
-                                    fontWeight: 'var(--font-weight-medium)',
-                                  }}
-                                >
-                                  {cls.name}
-                                </td>
-                                {dates.slice(0, 30).map(dateStr => {
-                                  const dayData = heatmap[cls.id]?.[dateStr];
-                                  if (!dayData || dayData.total === 0) {
-                                    return (
-                                      <td
-                                        key={dateStr}
-                                        style={{
-                                          padding: 'var(--spacing-xs)',
-                                          textAlign: 'center',
-                                          backgroundColor: 'var(--color-background-secondary)',
-                                          color: 'var(--color-text-secondary)',
-                                        }}
-                                        title="데이터 없음"
-                                      >
-                                        -
-                                      </td>
-                                    );
-                                  }
-
-                                  const intensity = dayData.attendanceRate / 100;
-                                  const bgColor = dayData.attendanceRate >= 90
-                                    ? `rgba(34, 197, 94, ${0.3 + intensity * 0.5})` // 초록
-                                    : dayData.attendanceRate >= 70
-                                    ? `rgba(234, 179, 8, ${0.3 + intensity * 0.5})` // 노랑
-                                    : `rgba(239, 68, 68, ${0.3 + intensity * 0.5})`; // 빨강
-
-                                  return (
-                                    <td
-                                      key={dateStr}
-                                      style={{
-                                        padding: 'var(--spacing-xs)',
-                                        textAlign: 'center',
-                                        backgroundColor: bgColor,
-                                        fontWeight: 'var(--font-weight-medium)',
-                                        color: intensity > 0.5 ? '#fff' : 'var(--color-text)',
-                                      }}
-                                      title={`${dateStr}: 출석률 ${dayData.attendanceRate}% (출석: ${dayData.present}, 지각: ${dayData.late}, 결석: ${dayData.absent})`}
-                                    >
-                                      {dayData.attendanceRate}%
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        {dates.length > 30 && (
-                          <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-xs)', textAlign: 'center' }}>
-                            최근 30일만 표시됩니다. (전체 {dates.length}일)
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* 시간대별 패턴 */}
-              <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-                <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
-                  시간대별 출결 히트맵
-                </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(60px, 1fr))', gap: 'var(--spacing-xs)' }}>
-                  {(() => {
-                    const timePattern = analyzeTimePattern();
-                    if (!timePattern) return null;
-                    const maxCount = Math.max(...Object.values(timePattern));
-                    return Array.from({ length: 24 }, (_, i) => {
-                      const count = timePattern[i] || 0;
-                      const intensity = maxCount > 0 ? count / maxCount : 0;
-                      return (
-                        <div
-                          key={i}
-                          style={{
-                            padding: 'var(--spacing-xs)',
-                            backgroundColor: `rgba(34, 197, 94, ${0.2 + intensity * 0.8})`,
-                            borderRadius: 'var(--border-radius-sm)',
-                            textAlign: 'center',
-                            fontSize: 'var(--font-size-xs)',
-                            color: intensity > 0.5 ? '#fff' : 'var(--color-text)',
-                          }}
-                          title={`${i}시: ${count}건`}
-                        >
-                          <div style={{ fontWeight: 'var(--font-weight-semibold)' }}>{i}시</div>
-                          <div>{count}</div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-
-              {/* AI 기반 비정상 출결 탐지 (문서 요구사항: AI 기반 비정상 출결 탐지) */}
-              <div>
-                <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
-                  AI 기반 비정상 출결 탐지
-                </h4>
-                {(() => {
-                  const anomalies = detectAbnormalAttendance();
-                  if (!anomalies || anomalies.length === 0) {
-                    return (
-                      <Card padding="sm" variant="outlined">
-                        <p style={{ color: 'var(--color-success)', textAlign: 'center', padding: 'var(--spacing-md)' }}>
-                          이상 패턴이 감지되지 않았습니다.
-                        </p>
-                      </Card>
-                    );
-                  }
-
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
-                      {anomalies.map((anomaly, idx) => (
-                        <Card key={idx} padding="sm" variant="outlined">
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--spacing-sm)' }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', marginBottom: 'var(--spacing-xs)' }}>
-                                <Badge
-                                  variant="soft"
-                                  color={
-                                    anomaly.severity === 'high' ? 'error' :
-                                    anomaly.severity === 'medium' ? 'warning' : 'info'
-                                  }
-                                >
-                                  {anomaly.type === 'frequent_late' ? '빈번한 지각' :
-                                   anomaly.type === 'sudden_absence' ? '갑작스러운 결석' :
-                                   '불규칙한 패턴'}
-                                </Badge>
-                                <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>
-                                  {anomaly.student_name}
-                                </span>
-                              </div>
-                              <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', margin: 0 }}>
-                                {anomaly.description}
-                              </p>
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
-            </Card>
+          {/* 통계/히트맵/패턴 분석 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8) */}
+            </>
           )}
 
         </div>

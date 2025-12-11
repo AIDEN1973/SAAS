@@ -13,7 +13,7 @@ export const bulkNotificationFormSchema: FormSchema = {
   type: 'form',
   form: {
     layout: {
-      columns: 1,
+      columns: 2,
       columnGap: 'md',
       rowGap: 'md',
     },
@@ -23,6 +23,7 @@ export const bulkNotificationFormSchema: FormSchema = {
         kind: 'select',
         ui: {
           label: '채널',
+          colSpan: 1,
         },
         options: [
           { value: 'sms', label: 'SMS' },
@@ -34,12 +35,22 @@ export const bulkNotificationFormSchema: FormSchema = {
         },
       },
       {
+        name: 'scheduled_at',
+        kind: 'datetime',
+        ui: {
+          label: '예약 발송 시간',
+          description: '즉시 발송하려면 비워두세요',
+          colSpan: 1,
+        },
+      },
+      {
         name: 'recipients',
         kind: 'textarea',
         ui: {
           label: '수신자 목록',
           placeholder: '전화번호 또는 이메일을 한 줄에 하나씩 입력하세요',
           description: '각 수신자를 한 줄에 하나씩 입력하세요',
+          colSpan: 2,
         },
         validation: {
           required: true,
@@ -51,17 +62,10 @@ export const bulkNotificationFormSchema: FormSchema = {
         ui: {
           label: '내용',
           placeholder: '메시지 내용을 입력하세요',
+          colSpan: 2,
         },
         validation: {
           required: true,
-        },
-      },
-      {
-        name: 'scheduled_at',
-        kind: 'datetime',
-        ui: {
-          label: '예약 발송 시간',
-          description: '즉시 발송하려면 비워두세요',
         },
       },
     ],

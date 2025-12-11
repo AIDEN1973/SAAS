@@ -8,8 +8,9 @@
  */
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge } from '@ui-core/react';
+import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer } from '@ui-core/react';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -25,6 +26,10 @@ export function NotificationsPage() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const mode = useResponsiveMode();
+  const isMobile = mode === 'xs' || mode === 'sm';
+  const isTablet = mode === 'md';
+  const navigate = useNavigate();
 
   const [filter, setFilter] = useState<{ channel?: NotificationChannel; status?: NotificationStatus }>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -67,18 +72,54 @@ export function NotificationsPage() {
   const { data: templates, isLoading: templatesLoading } = useQuery({
     queryKey: ['notification-templates', tenantId],
     queryFn: async () => {
-      // TODO: notification_templates 테이블이 생성되면 실제 조회로 변경
-      // 현재는 플레이스홀더
+      if (!tenantId) return [];
+
+      try {
+        const response = await apiClient.get<any>('notification_templates', {
+          filters: {},
+          orderBy: { column: 'created_at', ascending: false },
+        });
+
+        if (response.error) {
+          // 테이블이 아직 생성되지 않았을 수 있으므로 빈 배열 반환
+          if (response.error.message?.includes('does not exist') || response.error.message?.includes('relation')) {
+            return [];
+          }
+          throw new Error(response.error.message);
+        }
+
+        return response.data || [];
+      } catch (error) {
+        // 테이블이 없으면 빈 배열 반환
       return [];
+      }
     },
-    enabled: !!tenantId && activeTab === 'templates',
+    enabled: false, // 템플릿 관리는 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙)
   });
 
   // 템플릿 생성
   const createTemplate = useMutation({
     mutationFn: async (data: any) => {
-      // TODO: notification_templates 테이블이 생성되면 실제 생성으로 변경
-      return { id: 'temp-' + Date.now(), ...data };
+      if (!tenantId) throw new Error('Tenant ID is required');
+
+      try {
+        const response = await apiClient.post<any>('notification_templates', {
+          name: data.name,
+          channel: data.channel,
+          content: data.content,
+        });
+
+        if (response.error) {
+          throw new Error(response.error.message);
+        }
+
+        return response.data!;
+      } catch (error) {
+        if (error instanceof Error && (error.message.includes('does not exist') || error.message.includes('relation'))) {
+          throw new Error('notification_templates 테이블이 아직 생성되지 않았습니다. 마이그레이션을 실행해주세요.');
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notification-templates', tenantId] });
@@ -90,18 +131,60 @@ export function NotificationsPage() {
     },
   });
 
-  // 자동 알림 설정 저장
+  // 자동 알림 설정 저장 (tenant_settings에 저장)
   const saveAutoNotificationSettings = useMutation({
     mutationFn: async (data: any) => {
-      // TODO: 실제 자동 알림 설정 API 엔드포인트 구현 필요
-      // 현재는 플레이스홀더
-      const response = await apiClient.post<any>('notification-settings/auto', data);
+      if (!tenantId) throw new Error('Tenant ID is required');
 
-      if (response.error) {
-        throw new Error(response.error.message);
+      // tenant_settings의 notification 섹션 업데이트
+      // [불변 규칙] Zero-Trust: tenant_id는 apiClient가 자동으로 주입하므로 filters에서 제거
+      const settingsResponse = await apiClient.get<any>('tenant_settings', {
+        limit: 1,
+      });
+
+      let settingsId: string | null = null;
+      let currentSettings: any = {};
+
+      if (!settingsResponse.error && settingsResponse.data && settingsResponse.data.length > 0) {
+        settingsId = settingsResponse.data[0].id;
+        currentSettings = settingsResponse.data[0].settings || {};
       }
 
-      return response.data || {};
+      const updatedSettings = {
+        ...currentSettings,
+        notification: {
+          auto_notification: {
+            check_in: data.check_in_notification || false,
+            check_out: data.check_out_notification || false,
+            invoice_created: data.invoice_created_notification || false,
+            overdue: data.overdue_notification || false,
+            channel: data.notification_channel || 'sms',
+          },
+        },
+      };
+
+      if (settingsId) {
+        const updateResponse = await apiClient.patch('tenant_settings', settingsId, {
+          settings: updatedSettings,
+        });
+
+        if (updateResponse.error) {
+          throw new Error(updateResponse.error.message);
+      }
+
+        return updateResponse.data;
+      } else {
+        // [불변 규칙] Zero-Trust: tenant_id는 RLS 정책에 의해 자동으로 설정되므로 제거
+        const createResponse = await apiClient.post<any>('tenant_settings', {
+          settings: updatedSettings,
+        });
+
+        if (createResponse.error) {
+          throw new Error(createResponse.error.message);
+        }
+
+        return createResponse.data;
+      }
     },
     onSuccess: () => {
       setShowAutoNotificationSettings(false);
@@ -226,7 +309,7 @@ export function NotificationsPage() {
             메시지/공지
           </h1>
 
-          {/* 탭 선택 */}
+          {/* 탭 선택 (한 페이지에 하나의 기능 원칙: 최대 1~2탭) */}
           <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
               <Button
@@ -243,24 +326,33 @@ export function NotificationsPage() {
               >
                 메시지 발송
               </Button>
+            </div>
+          </Card>
+
+          {/* 빠른 링크 (한 페이지에 하나의 기능 원칙 준수: 나머지는 별도 페이지) */}
+          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
+                추가 기능:
+              </span>
               <Button
-                variant={activeTab === 'templates' ? 'solid' : 'outline'}
+                variant="outline"
                 size="sm"
-                onClick={() => setActiveTab('templates')}
+                onClick={() => navigate('/notifications/templates')}
               >
                 템플릿 관리
               </Button>
               <Button
-                variant={activeTab === 'bulk' ? 'solid' : 'outline'}
+                variant="outline"
                 size="sm"
-                onClick={() => setActiveTab('bulk')}
+                onClick={() => navigate('/notifications/bulk')}
               >
                 단체문자/예약
               </Button>
               <Button
-                variant={activeTab === 'auto-settings' ? 'solid' : 'outline'}
+                variant="outline"
                 size="sm"
-                onClick={() => setActiveTab('auto-settings')}
+                onClick={() => navigate('/notifications/auto-settings')}
               >
                 자동 알림 설정
               </Button>
@@ -331,55 +423,43 @@ export function NotificationsPage() {
             </Card>
           )}
 
-          {/* 메시지 발송 폼 (모달) */}
+          {/* 메시지 발송 폼 - 반응형: 모바일/태블릿은 Drawer, 데스크톱은 Modal */}
           {schema && (
-            <Modal
-              isOpen={showCreateForm}
-              onClose={() => setShowCreateForm(false)}
-              title="새 메시지 발송"
-              size="md"
-            >
-              <SchemaForm
-                schema={schema}
-                onSubmit={handleCreateNotification}
-                defaultValues={{}}
-                actionContext={{
-                  apiCall: async (endpoint: string, method: string, body?: any) => {
-                    if (method === 'POST') {
-                      const response = await apiClient.post(endpoint, body);
-                      if (response.error) {
-                        throw new Error(response.error.message);
-                      }
-                      return response.data;
-                    }
-                    const response = await apiClient.get(endpoint);
-                    if (response.error) {
-                      throw new Error(response.error.message);
-                    }
-                    return response.data;
-                  },
-                  showToast: (message: string, variant?: string) => {
-                    showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-                  },
-                }}
-              />
-            </Modal>
-          )}
-            </>
-          )}
-
-          {/* 메시지 발송 탭 */}
-          {activeTab === 'send' && (
-            <Card padding="lg" variant="default">
-              <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
-                <Button
-                  variant="solid"
-                  onClick={() => setShowCreateForm(true)}
+            <>
+              {isMobile || isTablet ? (
+                <Drawer
+                  isOpen={showCreateForm}
+                  onClose={() => setShowCreateForm(false)}
+                  title="새 메시지 발송"
+                  position={isMobile ? 'bottom' : 'right'}
+                  width={isTablet ? '500px' : '100%'}
                 >
-                  새 메시지 발송
-                </Button>
-              </div>
-              {schema && (
+                  <SchemaForm
+                    schema={schema}
+                    onSubmit={handleCreateNotification}
+                    defaultValues={{}}
+                    actionContext={{
+                      apiCall: async (endpoint: string, method: string, body?: any) => {
+                        if (method === 'POST') {
+                          const response = await apiClient.post(endpoint, body);
+                          if (response.error) {
+                            throw new Error(response.error.message);
+                          }
+                          return response.data;
+                        }
+                        const response = await apiClient.get(endpoint);
+                        if (response.error) {
+                          throw new Error(response.error.message);
+                        }
+                        return response.data;
+                      },
+                      showToast: (message: string, variant?: string) => {
+                        showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+                      },
+                    }}
+                  />
+                </Drawer>
+              ) : (
                 <Modal
                   isOpen={showCreateForm}
                   onClose={() => setShowCreateForm(false)}
@@ -412,228 +492,97 @@ export function NotificationsPage() {
                   />
                 </Modal>
               )}
-            </Card>
+            </>
+          )}
+            </>
           )}
 
-          {/* 템플릿 관리 탭 - [요구사항] 템플릿 관리 */}
-          {activeTab === 'templates' && (
+          {/* 메시지 발송 탭 */}
+          {activeTab === 'send' && (
             <Card padding="lg" variant="default">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-                <h2>템플릿 관리</h2>
+              <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
                 <Button
                   variant="solid"
-                  size="sm"
-                  onClick={() => setShowTemplateForm(true)}
+                  onClick={() => setShowCreateForm(true)}
                 >
-                  새 템플릿 생성
+                  새 메시지 발송
                 </Button>
               </div>
-
-              {templatesLoading ? (
-                <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center' }}>
-                  로딩 중...
-                </div>
-              ) : templates && templates.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-                  {templates.map((template: any) => (
-                    <Card
-                      key={template.id}
-                      padding="md"
-                      variant="default"
+              {schema && (
+                <>
+                  {isMobile || isTablet ? (
+                    <Drawer
+                      isOpen={showCreateForm}
+                      onClose={() => setShowCreateForm(false)}
+                      title="새 메시지 발송"
+                      position={isMobile ? 'bottom' : 'right'}
+                      width={isTablet ? '500px' : '100%'}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
-                            <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)' }}>
-                              {template.name}
-                            </h4>
-                            <Badge variant="outline">
-                              {channelLabels[template.channel as NotificationChannel]}
-                            </Badge>
-                          </div>
-                          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                            {template.content}
-                          </p>
-                        </div>
-                        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-                          <Button variant="outline" size="sm">수정</Button>
-                          <Button variant="outline" size="sm">삭제</Button>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                  등록된 템플릿이 없습니다.
-                </div>
-              )}
-
-              {/* 템플릿 생성 모달 */}
-              {templateSchema && (
-                <Modal
-                  isOpen={showTemplateForm}
-                  onClose={() => setShowTemplateForm(false)}
-                  title="새 템플릿 생성"
-                  size="md"
-                >
-                  <SchemaForm
-                    schema={templateSchema}
-                    onSubmit={handleCreateTemplate}
-                    defaultValues={{}}
-                    actionContext={{
-                      apiCall: async (endpoint: string, method: string, body?: any) => {
-                        if (method === 'POST') {
-                          const response = await apiClient.post(endpoint, body);
-                          if (response.error) {
-                            throw new Error(response.error.message);
-                          }
-                          return response.data;
-                        }
-                        const response = await apiClient.get(endpoint);
-                        if (response.error) {
-                          throw new Error(response.error.message);
-                        }
-                        return response.data;
-                      },
-                      showToast: (message: string, variant?: string) => {
-                        showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-                      },
-                    }}
-                  />
-                </Modal>
+                      <SchemaForm
+                        schema={schema}
+                        onSubmit={handleCreateNotification}
+                        defaultValues={{}}
+                        actionContext={{
+                          apiCall: async (endpoint: string, method: string, body?: any) => {
+                            if (method === 'POST') {
+                              const response = await apiClient.post(endpoint, body);
+                              if (response.error) {
+                                throw new Error(response.error.message);
+                              }
+                              return response.data;
+                            }
+                            const response = await apiClient.get(endpoint);
+                            if (response.error) {
+                              throw new Error(response.error.message);
+                            }
+                            return response.data;
+                          },
+                          showToast: (message: string, variant?: string) => {
+                            showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+                          },
+                        }}
+                      />
+                    </Drawer>
+                  ) : (
+                    <Modal
+                      isOpen={showCreateForm}
+                      onClose={() => setShowCreateForm(false)}
+                      title="새 메시지 발송"
+                      size="md"
+                    >
+                      <SchemaForm
+                        schema={schema}
+                        onSubmit={handleCreateNotification}
+                        defaultValues={{}}
+                        actionContext={{
+                          apiCall: async (endpoint: string, method: string, body?: any) => {
+                            if (method === 'POST') {
+                              const response = await apiClient.post(endpoint, body);
+                              if (response.error) {
+                                throw new Error(response.error.message);
+                              }
+                              return response.data;
+                            }
+                            const response = await apiClient.get(endpoint);
+                            if (response.error) {
+                              throw new Error(response.error.message);
+                            }
+                            return response.data;
+                          },
+                          showToast: (message: string, variant?: string) => {
+                            showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+                          },
+                        }}
+                      />
+                    </Modal>
+                  )}
+                </>
               )}
             </Card>
           )}
 
-          {/* 단체문자/예약 탭 - [요구사항] 단체문자, 예약 발송 */}
-          {activeTab === 'bulk' && (
-            <Card padding="lg" variant="default">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-                <h2>단체문자/예약 발송</h2>
-                <Button
-                  variant="solid"
-                  size="sm"
-                  onClick={() => setShowBulkForm(true)}
-                >
-                  새 발송
-                </Button>
-              </div>
 
-              {bulkSchema && (
-                <SchemaForm
-                  schema={bulkSchema}
-                  onSubmit={handleSendBulkNotification}
-                  defaultValues={{
-                    recipients: '',
-                    content: '',
-                  }}
-                  actionContext={{
-                    apiCall: async (endpoint: string, method: string, body?: any) => {
-                      if (method === 'POST') {
-                        const response = await apiClient.post(endpoint, body);
-                        if (response.error) {
-                          throw new Error(response.error.message);
-                        }
-                        return response.data;
-                      }
-                      const response = await apiClient.get(endpoint);
-                      if (response.error) {
-                        throw new Error(response.error.message);
-                      }
-                      return response.data;
-                    },
-                    showToast: (message: string, variant?: string) => {
-                      showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-                    },
-                  }}
-                />
-              )}
-
-              {/* 단체문자 발송 모달 */}
-              {bulkSchema && (
-                <Modal
-                  isOpen={showBulkForm}
-                  onClose={() => setShowBulkForm(false)}
-                  title="단체문자/예약 발송"
-                  size="lg"
-                >
-                  <SchemaForm
-                    schema={bulkSchema}
-                    onSubmit={handleSendBulkNotification}
-                    defaultValues={{
-                      recipients: '',
-                      content: '',
-                    }}
-                    actionContext={{
-                      apiCall: async (endpoint: string, method: string, body?: any) => {
-                        if (method === 'POST') {
-                          const response = await apiClient.post(endpoint, body);
-                          if (response.error) {
-                            throw new Error(response.error.message);
-                          }
-                          return response.data;
-                        }
-                        const response = await apiClient.get(endpoint);
-                        if (response.error) {
-                          throw new Error(response.error.message);
-                        }
-                        return response.data;
-                      },
-                      showToast: (message: string, variant?: string) => {
-                        showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-                      },
-                    }}
-                  />
-                </Modal>
-              )}
-            </Card>
-          )}
-
-          {/* 자동 알림 설정 탭 - [요구사항] 자동 알림 설정 (등원/하원, 청구 생성, 미납 알림) */}
-          {activeTab === 'auto-settings' && (
-            <Card padding="lg" variant="default">
-              <h2 style={{ marginBottom: 'var(--spacing-md)' }}>자동 알림 설정</h2>
-              {autoNotificationSettingsSchema ? (
-                <SchemaForm
-                  schema={autoNotificationSettingsSchema}
-                  onSubmit={async (data: any) => {
-                    await saveAutoNotificationSettings.mutateAsync(data);
-                  }}
-                  defaultValues={{
-                    check_in_notification: false,
-                    check_out_notification: false,
-                    invoice_created_notification: false,
-                    overdue_notification: false,
-                    notification_channel: 'sms',
-                  }}
-                  actionContext={{
-                    apiCall: async (endpoint: string, method: string, body?: any) => {
-                      if (method === 'POST') {
-                        const response = await apiClient.post(endpoint, body);
-                        if (response.error) {
-                          throw new Error(response.error.message);
-                        }
-                        return response.data;
-                      }
-                      const response = await apiClient.get(endpoint);
-                      if (response.error) {
-                        throw new Error(response.error.message);
-                      }
-                      return response.data;
-                    },
-                    showToast: (message: string, variant?: string) => {
-                      showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-                    },
-                  }}
-                />
-              ) : (
-                <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                  로딩 중...
-                </div>
-              )}
-            </Card>
-          )}
+          {/* 단체문자/예약과 자동 알림 설정은 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙) */}
         </div>
       </Container>
     </ErrorBoundary>

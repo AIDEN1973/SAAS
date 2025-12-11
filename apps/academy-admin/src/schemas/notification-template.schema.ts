@@ -13,7 +13,7 @@ export const notificationTemplateFormSchema: FormSchema = {
   type: 'form',
   form: {
     layout: {
-      columns: 1,
+      columns: 2,
       columnGap: 'md',
       rowGap: 'md',
     },
@@ -24,6 +24,7 @@ export const notificationTemplateFormSchema: FormSchema = {
         ui: {
           label: '템플릿명',
           placeholder: '템플릿명을 입력하세요',
+          colSpan: 1,
         },
         validation: {
           required: true,
@@ -34,6 +35,7 @@ export const notificationTemplateFormSchema: FormSchema = {
         kind: 'select',
         ui: {
           label: '채널',
+          colSpan: 1,
         },
         options: [
           { value: 'sms', label: 'SMS' },
@@ -50,6 +52,7 @@ export const notificationTemplateFormSchema: FormSchema = {
         ui: {
           label: '내용',
           placeholder: '템플릿 내용을 입력하세요. 변수는 {{변수명}} 형식으로 사용하세요.',
+          colSpan: 2,
         },
         validation: {
           required: true,

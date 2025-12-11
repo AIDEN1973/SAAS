@@ -49,7 +49,7 @@ export const Select: React.FC<SelectProps> = ({
   const selectStyle: React.CSSProperties = {
     ...sizeStyles[size],
     border: `1px solid ${error ? 'var(--color-red-500)' : 'var(--color-gray-200)'}`,
-    borderRadius: 'var(--border-radius-lg)',
+    borderRadius: 'var(--border-radius-sm)',
     backgroundColor: 'var(--color-white)',
     color: 'var(--color-text)',
     outline: 'none',

@@ -13,7 +13,7 @@ export const studentSelectFormSchema: FormSchema = {
   type: 'form',
   form: {
     layout: {
-      columns: 1,
+      columns: 2,
       columnGap: 'md',
       rowGap: 'md',
     },
@@ -23,6 +23,7 @@ export const studentSelectFormSchema: FormSchema = {
         kind: 'select',
         ui: {
           label: '학생 선택',
+          colSpan: 1,
         },
         // options는 동적으로 로드되어야 하므로 빈 배열로 시작
         options: [],

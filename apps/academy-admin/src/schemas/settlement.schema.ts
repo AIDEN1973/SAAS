@@ -15,7 +15,7 @@ export const settlementFormSchema: FormSchema = {
   type: 'form',
   form: {
     layout: {
-      columns: 1,
+      columns: 2,
       columnGap: 'md',
       rowGap: 'md',
     },
@@ -25,6 +25,7 @@ export const settlementFormSchema: FormSchema = {
         kind: 'number',
         ui: {
           label: '연도',
+          colSpan: 1,
         },
         validation: {
           required: true,
@@ -38,6 +39,7 @@ export const settlementFormSchema: FormSchema = {
         kind: 'number',
         ui: {
           label: '월',
+          colSpan: 1,
         },
         validation: {
           required: true,

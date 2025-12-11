@@ -5,7 +5,7 @@
  * [불변 규칙] 반응형 Mobile에서 Drawer로 변환, Desktop에서 Persistent Sidebar
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { clsx } from 'clsx';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 import { Button } from './Button';
@@ -17,6 +17,7 @@ export interface SidebarItem {
   path?: string;
   onClick?: () => void;
   children?: SidebarItem[];
+  isAdvanced?: boolean; // Advanced 메뉴 여부 (펼치기/접기 가능)
 }
 
 export interface SidebarProps {
@@ -38,8 +39,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   const handleItemClick = (item: SidebarItem) => {
+    // Advanced 메뉴이고 children이 있으면 펼치기/접기 토글
+    if (item.isAdvanced && item.children && item.children.length > 0) {
+      setExpandedItems((prev) => {
+        const next = new Set(prev);
+        if (next.has(item.id)) {
+          next.delete(item.id);
+        } else {
+          next.add(item.id);
+        }
+        return next;
+      });
+      return;
+    }
+
+    // 일반 메뉴 클릭 처리
     if (item.onClick) {
       item.onClick();
     } else if (onItemClick) {
@@ -50,9 +67,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
+  /**
+   * 사이드바 아이템 활성 상태 판단
+   *
+   * 활성화 규칙:
+   * 1. 정확한 경로 일치
+   * 2. 하위 경로 매칭 (예: /students/home → /students/:id, /students/list 등)
+   * 3. 특수 경로 처리:
+   *    - /home: / 또는 /home 활성화
+   *    - /students/home: /students/* 모든 하위 경로 활성화
+   *    - /billing/home: /billing/* 모든 하위 경로 활성화
+   */
+  const isItemActive = (itemPath: string | undefined, currentPath: string | undefined): boolean => {
+    if (!currentPath || !itemPath) return false;
+
+    // 정확한 경로 일치
+    if (currentPath === itemPath) return true;
+
+    // 루트 경로 처리: /home → / 또는 /home 또는 /home/* 모든 하위 경로
+    if (itemPath === '/home' && (currentPath === '/' || currentPath === '/home' || currentPath.startsWith('/home/'))) {
+      return true;
+    }
+
+    // students 경로 처리: /students/home → /students/* 모든 하위 경로
+    if (itemPath === '/students/home' && currentPath.startsWith('/students')) {
+      return true;
+    }
+
+    // billing 경로 처리: /billing/home → /billing/* 모든 하위 경로
+    if (itemPath === '/billing/home' && currentPath.startsWith('/billing')) {
+      return true;
+    }
+
+    // 일반 하위 경로 매칭: /classes → /classes, /classes/123 등
+    // 단, /classes와 /classes-other 같은 경로는 구분해야 함
+    if (currentPath.startsWith(itemPath + '/') ||
+        (itemPath !== '/' && currentPath === itemPath)) {
+      return true;
+    }
+
+    return false;
+  };
+
   const renderItem = (item: SidebarItem, level: number = 0) => {
-    const isActive = currentPath === item.path;
+    const isActive = isItemActive(item.path, currentPath);
     const paddingLeft = level * 20 + 16;
+    const isExpanded = expandedItems.has(item.id);
+    const hasChildren = item.children && item.children.length > 0;
+    const isAdvanced = item.isAdvanced;
 
     return (
       <div key={item.id}>
@@ -61,7 +123,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           style={{
             width: '100%',
             textAlign: 'left',
-            borderRadius: 'var(--border-radius-lg)',
+            borderRadius: 'var(--border-radius-sm)',
             padding: `var(--spacing-sm) var(--spacing-md)`,
             paddingLeft: `${paddingLeft}px`,
             display: 'flex',
@@ -106,6 +168,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
             />
           )}
+          {/* 펼치기/접기 아이콘 (Advanced 메뉴 또는 children이 있는 경우) */}
+          {(isAdvanced || hasChildren) && (
+            <span
+              style={{
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '16px',
+                height: '16px',
+                transition: 'var(--transition-transform)',
+                transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+              }}
+            >
+              <svg
+                style={{ width: '12px', height: '12px' }}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </span>
+          )}
           {item.icon && (
             <span
               style={{
@@ -122,9 +213,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
           <span style={{ flex: 1 }}>{item.label}</span>
         </button>
-        {item.children && item.children.length > 0 && (
+        {/* 하위 메뉴 렌더링 (펼쳐진 경우만) */}
+        {hasChildren && isExpanded && (
           <div style={{ marginLeft: 'var(--spacing-md)', marginTop: 'var(--spacing-xs)' }}>
-            {item.children.map((child) => renderItem(child, level + 1))}
+            {item.children!.map((child) => renderItem(child, level + 1))}
           </div>
         )}
       </div>
@@ -213,7 +305,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={onClose}
                 style={{
                   padding: 'var(--spacing-sm)',
-                  borderRadius: 'var(--border-radius-md)',
+                  borderRadius: 'var(--border-radius-sm)',
                   minWidth: '44px',
                   minHeight: '44px',
                 }}

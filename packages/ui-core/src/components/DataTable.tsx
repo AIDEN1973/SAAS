@@ -57,7 +57,7 @@ export function DataTable<T = any>({
       style={{
         width: '100%',
         overflowX: 'auto',
-        borderRadius: 'var(--border-radius-xl)',
+        borderRadius: 'var(--border-radius-sm)',
         border: '1px solid var(--color-gray-200)',
         backgroundColor: 'var(--color-white)',
         boxShadow: 'var(--shadow-sm)',

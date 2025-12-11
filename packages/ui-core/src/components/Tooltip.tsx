@@ -117,7 +117,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
             color: 'var(--color-text)',
             backgroundColor: 'var(--color-white)',
             padding: 'var(--spacing-sm)',
-            borderRadius: 'var(--border-radius-md)',
+            borderRadius: 'var(--border-radius-sm)',
             boxShadow: 'var(--shadow-lg)',
             border: '1px solid var(--color-gray-200)',
           }}

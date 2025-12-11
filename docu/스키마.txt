@@ -1,5 +1,6 @@
 [
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "id",
     "data_type": "uuid",
@@ -7,6 +8,7 @@
     "column_default": "gen_random_uuid()"
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -14,6 +16,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "name",
     "data_type": "text",
@@ -21,6 +24,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "subject",
     "data_type": "text",
@@ -28,6 +32,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "grade",
     "data_type": "text",
@@ -35,6 +40,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "day_of_week",
     "data_type": "text",
@@ -42,6 +48,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "start_time",
     "data_type": "time without time zone",
@@ -49,6 +56,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "end_time",
     "data_type": "time without time zone",
@@ -56,6 +64,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "capacity",
     "data_type": "integer",
@@ -63,6 +72,7 @@
     "column_default": "20"
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "current_count",
     "data_type": "integer",
@@ -70,6 +80,7 @@
     "column_default": "0"
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "color",
     "data_type": "text",
@@ -77,6 +88,7 @@
     "column_default": "'#3b82f6'::text"
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "room",
     "data_type": "text",
@@ -84,6 +96,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "notes",
     "data_type": "text",
@@ -91,6 +104,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "status",
     "data_type": "text",
@@ -98,6 +112,7 @@
     "column_default": "'active'::text"
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -105,6 +120,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "updated_at",
     "data_type": "timestamp with time zone",
@@ -112,6 +128,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "created_by",
     "data_type": "uuid",
@@ -119,6 +136,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_classes",
     "column_name": "updated_by",
     "data_type": "uuid",
@@ -126,6 +144,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_students",
     "column_name": "person_id",
     "data_type": "uuid",
@@ -133,6 +152,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_students",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -140,6 +160,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_students",
     "column_name": "birth_date",
     "data_type": "date",
@@ -147,6 +168,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_students",
     "column_name": "gender",
     "data_type": "text",
@@ -154,6 +176,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_students",
     "column_name": "school_name",
     "data_type": "text",
@@ -161,6 +184,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_students",
     "column_name": "grade",
     "data_type": "text",
@@ -168,6 +192,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_students",
     "column_name": "class_name",
     "data_type": "text",
@@ -175,6 +200,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_students",
     "column_name": "status",
     "data_type": "text",
@@ -182,6 +208,7 @@
     "column_default": "'active'::text"
   },
   {
+    "table_schema": "public",
     "table_name": "academy_students",
     "column_name": "notes",
     "data_type": "text",
@@ -189,6 +216,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_students",
     "column_name": "profile_image_url",
     "data_type": "text",
@@ -196,6 +224,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_students",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -203,6 +232,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "academy_students",
     "column_name": "updated_at",
     "data_type": "timestamp with time zone",
@@ -210,6 +240,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "academy_students",
     "column_name": "created_by",
     "data_type": "uuid",
@@ -217,6 +248,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_students",
     "column_name": "updated_by",
     "data_type": "uuid",
@@ -224,6 +256,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_teachers",
     "column_name": "person_id",
     "data_type": "uuid",
@@ -231,6 +264,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_teachers",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -238,6 +272,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_teachers",
     "column_name": "employee_id",
     "data_type": "text",
@@ -245,6 +280,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_teachers",
     "column_name": "specialization",
     "data_type": "text",
@@ -252,6 +288,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_teachers",
     "column_name": "hire_date",
     "data_type": "date",
@@ -259,6 +296,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_teachers",
     "column_name": "status",
     "data_type": "text",
@@ -266,6 +304,7 @@
     "column_default": "'active'::text"
   },
   {
+    "table_schema": "public",
     "table_name": "academy_teachers",
     "column_name": "profile_image_url",
     "data_type": "text",
@@ -273,6 +312,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_teachers",
     "column_name": "bio",
     "data_type": "text",
@@ -280,6 +320,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_teachers",
     "column_name": "notes",
     "data_type": "text",
@@ -287,6 +328,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_teachers",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -294,6 +336,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "academy_teachers",
     "column_name": "updated_at",
     "data_type": "timestamp with time zone",
@@ -301,6 +344,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "academy_teachers",
     "column_name": "created_by",
     "data_type": "uuid",
@@ -308,6 +352,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "academy_teachers",
     "column_name": "updated_by",
     "data_type": "uuid",
@@ -315,6 +360,135 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "student_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "insight_type",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "title",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "summary",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "details",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "confidence_score",
+    "data_type": "numeric",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'active'::text"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "related_entity_type",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "related_entity_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "metadata",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "created_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "ai_insights",
+    "column_name": "updated_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
     "table_name": "attendance_logs",
     "column_name": "id",
     "data_type": "bigint",
@@ -322,6 +496,7 @@
     "column_default": "nextval('attendance_logs_id_seq'::regclass)"
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -329,6 +504,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs",
     "column_name": "student_id",
     "data_type": "uuid",
@@ -336,6 +512,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs",
     "column_name": "class_id",
     "data_type": "uuid",
@@ -343,6 +520,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs",
     "column_name": "occurred_at",
     "data_type": "timestamp with time zone",
@@ -350,6 +528,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs",
     "column_name": "attendance_type",
     "data_type": "text",
@@ -357,6 +536,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs",
     "column_name": "status",
     "data_type": "text",
@@ -364,6 +544,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs",
     "column_name": "notes",
     "data_type": "text",
@@ -371,6 +552,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs",
     "column_name": "created_by",
     "data_type": "uuid",
@@ -378,6 +560,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -385,6 +568,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs_2025",
     "column_name": "id",
     "data_type": "bigint",
@@ -392,6 +576,7 @@
     "column_default": "nextval('attendance_logs_id_seq'::regclass)"
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs_2025",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -399,6 +584,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs_2025",
     "column_name": "student_id",
     "data_type": "uuid",
@@ -406,6 +592,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs_2025",
     "column_name": "class_id",
     "data_type": "uuid",
@@ -413,6 +600,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs_2025",
     "column_name": "occurred_at",
     "data_type": "timestamp with time zone",
@@ -420,6 +608,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs_2025",
     "column_name": "attendance_type",
     "data_type": "text",
@@ -427,6 +616,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs_2025",
     "column_name": "status",
     "data_type": "text",
@@ -434,6 +624,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs_2025",
     "column_name": "notes",
     "data_type": "text",
@@ -441,6 +632,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs_2025",
     "column_name": "created_by",
     "data_type": "uuid",
@@ -448,6 +640,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "attendance_logs_2025",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -455,6 +648,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "class_teachers",
     "column_name": "id",
     "data_type": "uuid",
@@ -462,6 +656,7 @@
     "column_default": "gen_random_uuid()"
   },
   {
+    "table_schema": "public",
     "table_name": "class_teachers",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -469,6 +664,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "class_teachers",
     "column_name": "class_id",
     "data_type": "uuid",
@@ -476,6 +672,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "class_teachers",
     "column_name": "teacher_id",
     "data_type": "uuid",
@@ -483,6 +680,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "class_teachers",
     "column_name": "role",
     "data_type": "text",
@@ -490,6 +688,7 @@
     "column_default": "'teacher'::text"
   },
   {
+    "table_schema": "public",
     "table_name": "class_teachers",
     "column_name": "assigned_at",
     "data_type": "date",
@@ -497,6 +696,7 @@
     "column_default": "CURRENT_DATE"
   },
   {
+    "table_schema": "public",
     "table_name": "class_teachers",
     "column_name": "unassigned_at",
     "data_type": "date",
@@ -504,6 +704,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "class_teachers",
     "column_name": "is_active",
     "data_type": "boolean",
@@ -511,6 +712,7 @@
     "column_default": "true"
   },
   {
+    "table_schema": "public",
     "table_name": "class_teachers",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -518,6 +720,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "guardians",
     "column_name": "id",
     "data_type": "uuid",
@@ -525,6 +728,7 @@
     "column_default": "gen_random_uuid()"
   },
   {
+    "table_schema": "public",
     "table_name": "guardians",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -532,6 +736,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "guardians",
     "column_name": "student_id",
     "data_type": "uuid",
@@ -539,6 +744,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "guardians",
     "column_name": "name",
     "data_type": "text",
@@ -546,6 +752,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "guardians",
     "column_name": "relationship",
     "data_type": "text",
@@ -553,6 +760,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "guardians",
     "column_name": "phone",
     "data_type": "text",
@@ -560,6 +768,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "guardians",
     "column_name": "email",
     "data_type": "text",
@@ -567,6 +776,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "guardians",
     "column_name": "is_primary",
     "data_type": "boolean",
@@ -574,6 +784,7 @@
     "column_default": "false"
   },
   {
+    "table_schema": "public",
     "table_name": "guardians",
     "column_name": "notes",
     "data_type": "text",
@@ -581,6 +792,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "guardians",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -588,6 +800,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "guardians",
     "column_name": "updated_at",
     "data_type": "timestamp with time zone",
@@ -595,6 +808,863 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
+    "table_name": "industry_themes",
+    "column_name": "industry_type",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "industry_themes",
+    "column_name": "theme_tokens",
+    "data_type": "jsonb",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "industry_themes",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "industry_themes",
+    "column_name": "updated_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoice_items",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoice_items",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoice_items",
+    "column_name": "invoice_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoice_items",
+    "column_name": "item_type",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoice_items",
+    "column_name": "category",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoice_items",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoice_items",
+    "column_name": "description",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoice_items",
+    "column_name": "quantity",
+    "data_type": "numeric",
+    "is_nullable": "NO",
+    "column_default": "1"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoice_items",
+    "column_name": "unit_price",
+    "data_type": "numeric",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoice_items",
+    "column_name": "total_price",
+    "data_type": "numeric",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoice_items",
+    "column_name": "sort_order",
+    "data_type": "integer",
+    "is_nullable": "NO",
+    "column_default": "0"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoice_items",
+    "column_name": "metadata",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoice_items",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "student_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "invoice_number",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "amount",
+    "data_type": "numeric",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "amount_paid",
+    "data_type": "numeric",
+    "is_nullable": "NO",
+    "column_default": "0"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "amount_due",
+    "data_type": "numeric",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'draft'::text"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "period_start",
+    "data_type": "date",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "period_end",
+    "data_type": "date",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "due_date",
+    "data_type": "date",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "issued_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "paid_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "messaging_delivery_failed",
+    "data_type": "boolean",
+    "is_nullable": "NO",
+    "column_default": "false"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "ai_status",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "notes",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "metadata",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "created_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "invoices",
+    "column_name": "updated_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notification_templates",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notification_templates",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notification_templates",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notification_templates",
+    "column_name": "channel",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notification_templates",
+    "column_name": "type",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notification_templates",
+    "column_name": "content",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notification_templates",
+    "column_name": "variables",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notification_templates",
+    "column_name": "is_active",
+    "data_type": "boolean",
+    "is_nullable": "NO",
+    "column_default": "true"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notification_templates",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notification_templates",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notification_templates",
+    "column_name": "created_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notification_templates",
+    "column_name": "updated_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "recipient_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "recipient_type",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "channel",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "type",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "title",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "message",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'pending'::text"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "sent_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "delivered_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "failed_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "failure_reason",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "retry_count",
+    "data_type": "integer",
+    "is_nullable": "NO",
+    "column_default": "0"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "max_retries",
+    "data_type": "integer",
+    "is_nullable": "NO",
+    "column_default": "3"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "related_entity_type",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "related_entity_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "metadata",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "notifications",
+    "column_name": "created_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_methods",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_methods",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_methods",
+    "column_name": "provider",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_methods",
+    "column_name": "method_type",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_methods",
+    "column_name": "is_default",
+    "data_type": "boolean",
+    "is_nullable": "NO",
+    "column_default": "false"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_methods",
+    "column_name": "is_active",
+    "data_type": "boolean",
+    "is_nullable": "NO",
+    "column_default": "true"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_methods",
+    "column_name": "config",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_methods",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_methods",
+    "column_name": "description",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_methods",
+    "column_name": "metadata",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_methods",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_methods",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_methods",
+    "column_name": "created_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payment_methods",
+    "column_name": "updated_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "invoice_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "payment_number",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "amount",
+    "data_type": "numeric",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "provider",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "payment_method",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'pending'::text"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "paid_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "failed_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "failure_reason",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "retry_count",
+    "data_type": "integer",
+    "is_nullable": "NO",
+    "column_default": "0"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "max_retries",
+    "data_type": "integer",
+    "is_nullable": "NO",
+    "column_default": "3"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "last_retry_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "last_retry_status",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "webhook_received_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "webhook_data",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "notes",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "metadata",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "created_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "payments",
+    "column_name": "updated_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
     "table_name": "persons",
     "column_name": "id",
     "data_type": "uuid",
@@ -602,6 +1672,7 @@
     "column_default": "gen_random_uuid()"
   },
   {
+    "table_schema": "public",
     "table_name": "persons",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -609,6 +1680,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "persons",
     "column_name": "name",
     "data_type": "text",
@@ -616,6 +1688,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "persons",
     "column_name": "email",
     "data_type": "text",
@@ -623,6 +1696,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "persons",
     "column_name": "phone",
     "data_type": "text",
@@ -630,6 +1704,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "persons",
     "column_name": "address",
     "data_type": "text",
@@ -637,6 +1712,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "persons",
     "column_name": "person_type",
     "data_type": "text",
@@ -644,6 +1720,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "persons",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -651,6 +1728,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "persons",
     "column_name": "updated_at",
     "data_type": "timestamp with time zone",
@@ -658,6 +1736,311 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "description",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "category",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "price_type",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "unit_price",
+    "data_type": "numeric",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "is_active",
+    "data_type": "boolean",
+    "is_nullable": "NO",
+    "column_default": "true"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "package_sessions",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "package_validity_days",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "metadata",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "created_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "products",
+    "column_name": "updated_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "settlement_number",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "settlement_period_start",
+    "data_type": "date",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "settlement_period_end",
+    "data_type": "date",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "total_revenue",
+    "data_type": "numeric",
+    "is_nullable": "NO",
+    "column_default": "0"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "total_refund",
+    "data_type": "numeric",
+    "is_nullable": "NO",
+    "column_default": "0"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "net_revenue",
+    "data_type": "numeric",
+    "is_nullable": "NO",
+    "column_default": "0"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "commission_rate",
+    "data_type": "numeric",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "commission_amount",
+    "data_type": "numeric",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "settlement_amount",
+    "data_type": "numeric",
+    "is_nullable": "NO",
+    "column_default": "0"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'pending'::text"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "settled_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "settlement_date",
+    "data_type": "date",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "provider",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "provider_settlement_id",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "provider_settlement_data",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "notes",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "metadata",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "created_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "settlements",
+    "column_name": "updated_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
     "table_name": "student_classes",
     "column_name": "id",
     "data_type": "uuid",
@@ -665,6 +2048,7 @@
     "column_default": "gen_random_uuid()"
   },
   {
+    "table_schema": "public",
     "table_name": "student_classes",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -672,6 +2056,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "student_classes",
     "column_name": "student_id",
     "data_type": "uuid",
@@ -679,6 +2064,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "student_classes",
     "column_name": "class_id",
     "data_type": "uuid",
@@ -686,6 +2072,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "student_classes",
     "column_name": "enrolled_at",
     "data_type": "date",
@@ -693,6 +2080,7 @@
     "column_default": "CURRENT_DATE"
   },
   {
+    "table_schema": "public",
     "table_name": "student_classes",
     "column_name": "left_at",
     "data_type": "date",
@@ -700,6 +2088,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "student_classes",
     "column_name": "is_active",
     "data_type": "boolean",
@@ -707,6 +2096,7 @@
     "column_default": "true"
   },
   {
+    "table_schema": "public",
     "table_name": "student_classes",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -714,6 +2104,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "student_consultations",
     "column_name": "id",
     "data_type": "uuid",
@@ -721,6 +2112,7 @@
     "column_default": "gen_random_uuid()"
   },
   {
+    "table_schema": "public",
     "table_name": "student_consultations",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -728,6 +2120,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "student_consultations",
     "column_name": "student_id",
     "data_type": "uuid",
@@ -735,6 +2128,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "student_consultations",
     "column_name": "consultation_date",
     "data_type": "date",
@@ -742,6 +2136,7 @@
     "column_default": "CURRENT_DATE"
   },
   {
+    "table_schema": "public",
     "table_name": "student_consultations",
     "column_name": "consultation_type",
     "data_type": "text",
@@ -749,6 +2144,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "student_consultations",
     "column_name": "content",
     "data_type": "text",
@@ -756,6 +2152,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "student_consultations",
     "column_name": "ai_summary",
     "data_type": "text",
@@ -763,6 +2160,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "student_consultations",
     "column_name": "created_by",
     "data_type": "uuid",
@@ -770,6 +2168,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "student_consultations",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -777,6 +2176,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "student_consultations",
     "column_name": "updated_at",
     "data_type": "timestamp with time zone",
@@ -784,6 +2184,247 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
+    "table_name": "student_task_cards",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_task_cards",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_task_cards",
+    "column_name": "student_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_task_cards",
+    "column_name": "task_type",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_task_cards",
+    "column_name": "priority",
+    "data_type": "integer",
+    "is_nullable": "NO",
+    "column_default": "50"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_task_cards",
+    "column_name": "title",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_task_cards",
+    "column_name": "description",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_task_cards",
+    "column_name": "action_url",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_task_cards",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_task_cards",
+    "column_name": "expires_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_task_cards",
+    "column_name": "metadata",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "student_task_cards",
+    "column_name": "created_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "industry_type",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "birth_date",
+    "data_type": "date",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "gender",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "phone",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "email",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "address",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "school_name",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "grade",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "notes",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "profile_image_url",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "created_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "students",
+    "column_name": "updated_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
     "table_name": "tag_assignments",
     "column_name": "id",
     "data_type": "uuid",
@@ -791,6 +2432,7 @@
     "column_default": "gen_random_uuid()"
   },
   {
+    "table_schema": "public",
     "table_name": "tag_assignments",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -798,6 +2440,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tag_assignments",
     "column_name": "entity_id",
     "data_type": "uuid",
@@ -805,6 +2448,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tag_assignments",
     "column_name": "entity_type",
     "data_type": "text",
@@ -812,6 +2456,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tag_assignments",
     "column_name": "tag_id",
     "data_type": "uuid",
@@ -819,6 +2464,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tag_assignments",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -826,6 +2472,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "tags",
     "column_name": "id",
     "data_type": "uuid",
@@ -833,6 +2480,7 @@
     "column_default": "gen_random_uuid()"
   },
   {
+    "table_schema": "public",
     "table_name": "tags",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -840,6 +2488,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tags",
     "column_name": "name",
     "data_type": "text",
@@ -847,6 +2496,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tags",
     "column_name": "color",
     "data_type": "text",
@@ -854,6 +2504,7 @@
     "column_default": "'#3b82f6'::text"
   },
   {
+    "table_schema": "public",
     "table_name": "tags",
     "column_name": "description",
     "data_type": "text",
@@ -861,6 +2512,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tags",
     "column_name": "entity_type",
     "data_type": "text",
@@ -868,6 +2520,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tags",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -875,6 +2528,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "tenant_features",
     "column_name": "id",
     "data_type": "uuid",
@@ -882,6 +2536,7 @@
     "column_default": "gen_random_uuid()"
   },
   {
+    "table_schema": "public",
     "table_name": "tenant_features",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -889,6 +2544,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tenant_features",
     "column_name": "feature_key",
     "data_type": "text",
@@ -896,6 +2552,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tenant_features",
     "column_name": "enabled",
     "data_type": "boolean",
@@ -903,6 +2560,7 @@
     "column_default": "false"
   },
   {
+    "table_schema": "public",
     "table_name": "tenant_features",
     "column_name": "quota",
     "data_type": "integer",
@@ -910,6 +2568,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tenant_features",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -917,6 +2576,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "tenant_features",
     "column_name": "updated_at",
     "data_type": "timestamp with time zone",
@@ -924,6 +2584,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "tenant_settings",
     "column_name": "id",
     "data_type": "uuid",
@@ -931,6 +2592,7 @@
     "column_default": "gen_random_uuid()"
   },
   {
+    "table_schema": "public",
     "table_name": "tenant_settings",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -938,6 +2600,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tenant_settings",
     "column_name": "key",
     "data_type": "text",
@@ -945,6 +2608,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tenant_settings",
     "column_name": "value",
     "data_type": "jsonb",
@@ -952,6 +2616,7 @@
     "column_default": "'{}'::jsonb"
   },
   {
+    "table_schema": "public",
     "table_name": "tenant_settings",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -959,6 +2624,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "tenant_settings",
     "column_name": "updated_at",
     "data_type": "timestamp with time zone",
@@ -966,6 +2632,47 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
+    "table_name": "tenant_theme_overrides",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_theme_overrides",
+    "column_name": "tenant_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_theme_overrides",
+    "column_name": "theme_tokens",
+    "data_type": "jsonb",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_theme_overrides",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "table_schema": "public",
+    "table_name": "tenant_theme_overrides",
+    "column_name": "updated_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "table_schema": "public",
     "table_name": "tenants",
     "column_name": "id",
     "data_type": "uuid",
@@ -973,6 +2680,7 @@
     "column_default": "gen_random_uuid()"
   },
   {
+    "table_schema": "public",
     "table_name": "tenants",
     "column_name": "name",
     "data_type": "text",
@@ -980,6 +2688,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tenants",
     "column_name": "industry_type",
     "data_type": "text",
@@ -987,6 +2696,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "tenants",
     "column_name": "plan",
     "data_type": "text",
@@ -994,6 +2704,7 @@
     "column_default": "'basic'::text"
   },
   {
+    "table_schema": "public",
     "table_name": "tenants",
     "column_name": "status",
     "data_type": "text",
@@ -1001,6 +2712,7 @@
     "column_default": "'active'::text"
   },
   {
+    "table_schema": "public",
     "table_name": "tenants",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -1008,6 +2720,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "tenants",
     "column_name": "updated_at",
     "data_type": "timestamp with time zone",
@@ -1015,6 +2728,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "user_platform_roles",
     "column_name": "id",
     "data_type": "uuid",
@@ -1022,6 +2736,7 @@
     "column_default": "gen_random_uuid()"
   },
   {
+    "table_schema": "public",
     "table_name": "user_platform_roles",
     "column_name": "user_id",
     "data_type": "uuid",
@@ -1029,6 +2744,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "user_platform_roles",
     "column_name": "role",
     "data_type": "text",
@@ -1036,6 +2752,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "user_platform_roles",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -1043,6 +2760,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "user_platform_roles",
     "column_name": "updated_at",
     "data_type": "timestamp with time zone",
@@ -1050,6 +2768,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "user_platform_roles",
     "column_name": "created_by",
     "data_type": "uuid",
@@ -1057,6 +2776,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "user_tenant_roles",
     "column_name": "id",
     "data_type": "uuid",
@@ -1064,6 +2784,7 @@
     "column_default": "gen_random_uuid()"
   },
   {
+    "table_schema": "public",
     "table_name": "user_tenant_roles",
     "column_name": "user_id",
     "data_type": "uuid",
@@ -1071,6 +2792,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "user_tenant_roles",
     "column_name": "tenant_id",
     "data_type": "uuid",
@@ -1078,6 +2800,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "user_tenant_roles",
     "column_name": "role",
     "data_type": "text",
@@ -1085,6 +2808,7 @@
     "column_default": null
   },
   {
+    "table_schema": "public",
     "table_name": "user_tenant_roles",
     "column_name": "created_at",
     "data_type": "timestamp with time zone",
@@ -1092,6 +2816,7 @@
     "column_default": "now()"
   },
   {
+    "table_schema": "public",
     "table_name": "user_tenant_roles",
     "column_name": "updated_at",
     "data_type": "timestamp with time zone",

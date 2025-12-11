@@ -8,8 +8,9 @@
  */
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge } from '@ui-core/react';
+import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer } from '@ui-core/react';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -27,37 +28,20 @@ export function BillingPage() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const mode = useResponsiveMode();
+  const isMobile = mode === 'xs' || mode === 'sm';
+  const isTablet = mode === 'md';
 
   const [filter, setFilter] = useState<{ status?: InvoiceStatus }>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<'invoices' | 'products' | 'settlement' | 'teacher-revenue-split'>('invoices');
   const [showProductForm, setShowProductForm] = useState(false);
   const [showSettlementForm, setShowSettlementForm] = useState(false);
   const [showTeacherRevenueSplitForm, setShowTeacherRevenueSplitForm] = useState(false);
-  const [activeTab, setActiveTab] = useState<'invoices' | 'products' | 'payments' | 'reports'>('invoices');
+  const navigate = useNavigate();
 
-  // 월 자동 청구 생성
-  const generateMonthlyInvoices = useMutation({
-    mutationFn: async () => {
-      // TODO: 실제 월 자동 청구 생성 API 엔드포인트 구현 필요
-      // 현재는 플레이스홀더
-      const response = await apiClient.post<any>('invoices/generate-monthly', {
-        month: toKST().format('YYYY-MM'), // YYYY-MM 형식 (KST)
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-
-      return response.data || { generated_count: 0 };
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices', tenantId] });
-      showAlert('성공', `월 자동 청구가 생성되었습니다. (${data.generated_count || 0}개)`);
-    },
-    onError: (error: Error) => {
-      showAlert('오류', error.message);
-    },
-  });
+  // 월 자동 청구 생성은 배치 작업으로 자동 실행됨 (아키텍처 문서 2617줄: 매일 04:00 KST)
+  // 수동 실행은 더 이상 필요하지 않음 (Zero-Management Platform 철학)
 
   // 스키마 조회 (Registry에서 가져오거나 fallback 사용)
   const { data: schema } = useSchema('invoice', billingFormSchema, 'form');
@@ -163,97 +147,40 @@ export function BillingPage() {
     },
   });
 
-  // 매출 통계 조회
-  const { data: revenueStats } = useQuery({
-    queryKey: ['revenue-stats', tenantId],
-    queryFn: async () => {
-      // 인보이스에서 매출 통계 계산
-      const invoiceResponse = await apiClient.get<Invoice>('invoices', {
-        filters: { status: 'paid' },
-        orderBy: { column: 'created_at', ascending: false },
-      });
-
-      if (invoiceResponse.error) {
-        return { monthlyRevenue: 0, subjectRevenue: [], totalRevenue: 0 };
-      }
-
-      const invoices = invoiceResponse.data || [];
-      const nowKST = toKST();
-      const currentMonth = nowKST.month(); // 0-based (0-11)
-      const currentYear = nowKST.year();
-
-      // 월 매출 계산
-      const monthlyRevenue = invoices
-        .filter((inv) => {
-          const invDate = toKST(inv.created_at);
-          return invDate.month() === currentMonth && invDate.year() === currentYear;
-        })
-        .reduce((sum, inv) => sum + inv.amount, 0);
-
-      // 전체 매출
-      const totalRevenue = invoices.reduce((sum, inv) => sum + inv.amount, 0);
-
-      // 과목별 매출 집계 (invoice_items 기반)
-      const invoiceIds = invoices.map((inv) => inv.id);
-      const subjectRevenueMap = new Map<string, { total_amount: number; item_count: number }>();
-
-      if (invoiceIds.length > 0) {
-        // 각 인보이스의 아이템 조회
-        for (const invoiceId of invoiceIds) {
-          const itemsResponse = await apiClient.get<any>('invoice_items', {
-            filters: { invoice_id: invoiceId },
-          });
-
-          if (!itemsResponse.error && itemsResponse.data) {
-            itemsResponse.data.forEach((item: any) => {
-              const category = item.category || '기타';
-              const amount = (item.quantity || 1) * (item.unit_price || 0);
-
-              if (subjectRevenueMap.has(category)) {
-                const existing = subjectRevenueMap.get(category)!;
-                existing.total_amount += amount;
-                existing.item_count += 1;
-              } else {
-                subjectRevenueMap.set(category, {
-                  total_amount: amount,
-                  item_count: 1,
-                });
-              }
-            });
-          }
-        }
-      }
-
-      const subjectRevenue = Array.from(subjectRevenueMap.entries()).map(([category, data]) => ({
-        category,
-        total_amount: data.total_amount,
-        item_count: data.item_count,
-      }));
-
-      return {
-        monthlyRevenue,
-        totalRevenue,
-        subjectRevenue,
-      };
-    },
-    enabled: !!tenantId && activeTab === 'reports',
-  });
+  // 매출 통계 조회는 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙)
 
   // 정산 실행
   const executeSettlement = useMutation({
     mutationFn: async (data: { year: number; month: number }) => {
-      // TODO: 실제 정산 API 엔드포인트 구현 필요
-      // 현재는 플레이스홀더
-      const response = await apiClient.post<any>('settlements/execute', {
-        year: data.year,
-        month: data.month,
+      if (!tenantId) throw new Error('Tenant ID is required');
+
+      // 해당 월의 청구서 및 결제 내역 조회
+      const periodStart = `${data.year}-${String(data.month).padStart(2, '0')}-01`;
+      const periodEnd = toKST(`${data.year}-${String(data.month).padStart(2, '0')}-01`).endOf('month').format('YYYY-MM-DD');
+
+      const invoicesResponse = await apiClient.get<any>('invoices', {
+        filters: {
+          period_start: { gte: periodStart, lte: periodEnd },
+        },
       });
 
-      if (response.error) {
-        throw new Error(response.error.message);
+      if (invoicesResponse.error) {
+        throw new Error(invoicesResponse.error.message);
       }
 
-      return response.data || { settlement_id: '', total_amount: 0 };
+      const invoices = invoicesResponse.data || [];
+
+      // 결제 완료된 청구서만 집계
+      const paidInvoices = invoices.filter((inv: any) => inv.status === 'paid');
+      const totalAmount = paidInvoices.reduce((sum: number, inv: any) => sum + (inv.amount_paid || 0), 0);
+
+      // TODO: settlements 테이블이 생성되면 실제 정산 기록 저장
+      // 현재는 계산만 수행
+      return {
+        settlement_id: `settlement-${data.year}-${data.month}-${Date.now()}`,
+        total_amount: totalAmount,
+        invoice_count: paidInvoices.length,
+      };
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['revenue-stats', tenantId] });
@@ -265,18 +192,59 @@ export function BillingPage() {
     },
   });
 
-  // 강사 매출 배분 설정 저장
+  // 강사 매출 배분 설정 저장 (tenant_settings에 저장)
   const saveTeacherRevenueSplit = useMutation({
     mutationFn: async (data: any) => {
-      // TODO: 실제 강사 매출 배분 설정 API 엔드포인트 구현 필요
-      // 현재는 플레이스홀더
-      const response = await apiClient.post<any>('teacher-revenue-split/settings', data);
+      if (!tenantId) throw new Error('Tenant ID is required');
 
-      if (response.error) {
-        throw new Error(response.error.message);
+      // tenant_settings의 billing 섹션 업데이트
+      // [불변 규칙] Zero-Trust: tenant_id는 apiClient가 자동으로 주입하므로 filters에서 제거
+      const settingsResponse = await apiClient.get<any>('tenant_settings', {
+        limit: 1,
+      });
+
+      let settingsId: string | null = null;
+      let currentSettings: any = {};
+
+      if (!settingsResponse.error && settingsResponse.data && settingsResponse.data.length > 0) {
+        settingsId = settingsResponse.data[0].id;
+        currentSettings = settingsResponse.data[0].settings || {};
       }
 
-      return response.data || {};
+      const updatedSettings = {
+        ...currentSettings,
+        billing: {
+          ...currentSettings.billing,
+          teacher_revenue_split: {
+            enabled: data.enabled || false,
+            split_method: data.split_method || 'percentage',
+            split_rules: data.split_rules || {},
+          },
+        },
+      };
+
+      if (settingsId) {
+        const updateResponse = await apiClient.patch('tenant_settings', settingsId, {
+          settings: updatedSettings,
+        });
+
+        if (updateResponse.error) {
+          throw new Error(updateResponse.error.message);
+        }
+
+        return updateResponse.data;
+      } else {
+        // [불변 규칙] Zero-Trust: tenant_id는 RLS 정책에 의해 자동으로 설정되므로 제거
+        const createResponse = await apiClient.post<any>('tenant_settings', {
+          settings: updatedSettings,
+        });
+
+        if (createResponse.error) {
+          throw new Error(createResponse.error.message);
+        }
+
+        return createResponse.data;
+      }
     },
     onSuccess: () => {
       setShowTeacherRevenueSplitForm(false);
@@ -367,34 +335,30 @@ export function BillingPage() {
             수납/청구 관리
           </h1>
 
-          {/* 탭 선택 */}
+          {/* 빠른 링크 (한 페이지에 하나의 기능 원칙 준수: 청구서 관리만 메인, 나머지는 별도 페이지) */}
           <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
+                관련 기능:
+              </span>
               <Button
-                variant={activeTab === 'invoices' ? 'solid' : 'outline'}
+                variant="outline"
                 size="sm"
-                onClick={() => setActiveTab('invoices')}
-              >
-                인보이스
-              </Button>
-              <Button
-                variant={activeTab === 'products' ? 'solid' : 'outline'}
-                size="sm"
-                onClick={() => setActiveTab('products')}
+                onClick={() => navigate('/billing/products')}
               >
                 상품 관리
               </Button>
               <Button
-                variant={activeTab === 'payments' ? 'solid' : 'outline'}
+                variant="outline"
                 size="sm"
-                onClick={() => setActiveTab('payments')}
+                onClick={() => navigate('/billing/payments')}
               >
                 결제 관리
               </Button>
               <Button
-                variant={activeTab === 'reports' ? 'solid' : 'outline'}
+                variant="outline"
                 size="sm"
-                onClick={() => setActiveTab('reports')}
+                onClick={() => navigate('/billing/reports')}
               >
                 매출/정산
               </Button>
@@ -424,15 +388,14 @@ export function BillingPage() {
                   {statusLabels[status]}
                 </Button>
               ))}
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--spacing-sm)' }}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => generateMonthlyInvoices.mutate()}
-                  disabled={generateMonthlyInvoices.isPending}
-                >
-                  {generateMonthlyInvoices.isPending ? '생성 중...' : '월 자동 청구 생성'}
-                </Button>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center' }}>
+                <div style={{
+                  fontSize: 'var(--font-size-sm)',
+                  color: 'var(--color-text-secondary)',
+                  marginRight: 'var(--spacing-sm)'
+                }}>
+                  💡 월 자동 청구는 매일 04:00에 자동으로 생성됩니다 (Zero-Management)
+                </div>
                 <Button
                   variant="solid"
                   size="sm"
@@ -468,110 +431,52 @@ export function BillingPage() {
             </Card>
           )}
 
-          {/* 인보이스 생성 폼 (모달) */}
+          {/* 인보이스 생성 폼 - 반응형: 모바일/태블릿은 Drawer, 데스크톱은 Modal */}
           {schema && (
-            <Modal
-              isOpen={showCreateForm}
-              onClose={() => setShowCreateForm(false)}
-              title="새 인보이스 생성"
-              size="md"
-            >
-              <SchemaForm
-                schema={schema}
-                onSubmit={handleCreateInvoice}
-                defaultValues={{}}
-                actionContext={{
-                  apiCall: async (endpoint: string, method: string, body?: any) => {
-                    if (method === 'POST') {
-                      const response = await apiClient.post(endpoint, body);
-                      if (response.error) {
-                        throw new Error(response.error.message);
-                      }
-                      return response.data;
-                    }
-                    const response = await apiClient.get(endpoint);
-                    if (response.error) {
-                      throw new Error(response.error.message);
-                    }
-                    return response.data;
-                  },
-                  showToast: (message: string, variant?: string) => {
-                    showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-                  },
-                }}
-              />
-            </Modal>
-          )}
-            </>
-          )}
-
-          {/* 상품 관리 탭 - [요구사항] 월정액/횟수제/패키지 상품 */}
-          {activeTab === 'products' && (
-            <Card padding="lg" variant="default">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-                <h2>상품 관리</h2>
-                <Button
-                  variant="solid"
-                  size="sm"
-                  onClick={() => setShowProductForm(true)}
+            <>
+              {isMobile || isTablet ? (
+                <Drawer
+                  isOpen={showCreateForm}
+                  onClose={() => setShowCreateForm(false)}
+                  title="새 인보이스 생성"
+                  position={isMobile ? 'bottom' : 'right'}
+                  width={isTablet ? '500px' : '100%'}
                 >
-                  새 상품 생성
-                </Button>
-              </div>
-
-              {productsLoading ? (
-                <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center' }}>
-                  로딩 중...
-                </div>
-              ) : products && products.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-                  {products.map((product: any) => (
-                    <Card
-                      key={product.id}
-                      padding="md"
-                      variant="default"
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
-                            <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)' }}>
-                              {product.name}
-                            </h4>
-                            <Badge variant="outline">
-                              {product.type === 'monthly' ? '월정액' :
-                               product.type === 'session' ? '횟수제' :
-                               product.type === 'package' ? '패키지' : product.type}
-                            </Badge>
-                          </div>
-                          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                            {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(product.amount)}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-                          <Button variant="outline" size="sm">수정</Button>
-                          <Button variant="outline" size="sm">삭제</Button>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
+                  <SchemaForm
+                    schema={schema}
+                    onSubmit={handleCreateInvoice}
+                    defaultValues={{}}
+                    actionContext={{
+                      apiCall: async (endpoint: string, method: string, body?: any) => {
+                        if (method === 'POST') {
+                          const response = await apiClient.post(endpoint, body);
+                          if (response.error) {
+                            throw new Error(response.error.message);
+                          }
+                          return response.data;
+                        }
+                        const response = await apiClient.get(endpoint);
+                        if (response.error) {
+                          throw new Error(response.error.message);
+                        }
+                        return response.data;
+                      },
+                      showToast: (message: string, variant?: string) => {
+                        showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+                      },
+                    }}
+                  />
+                </Drawer>
               ) : (
-                <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                  등록된 상품이 없습니다.
-                </div>
-              )}
-
-              {/* 상품 생성 모달 */}
-              {productSchema && (
                 <Modal
-                  isOpen={showProductForm}
-                  onClose={() => setShowProductForm(false)}
-                  title="새 상품 생성"
+                  isOpen={showCreateForm}
+                  onClose={() => setShowCreateForm(false)}
+                  title="새 인보이스 생성"
                   size="md"
                 >
                   <SchemaForm
-                    schema={productSchema}
-                    onSubmit={handleCreateProduct}
+                    schema={schema}
+                    onSubmit={handleCreateInvoice}
                     defaultValues={{}}
                     actionContext={{
                       apiCall: async (endpoint: string, method: string, body?: any) => {
@@ -595,264 +500,43 @@ export function BillingPage() {
                   />
                 </Modal>
               )}
-            </Card>
+            </>
+          )}
+            </>
           )}
 
-          {/* 결제 관리 탭 - [요구사항] 결제 수단 (계좌이체/카드/간편결제) */}
-          {activeTab === 'payments' && (
-            <Card padding="lg" variant="default">
-              <h2 style={{ marginBottom: 'var(--spacing-md)' }}>결제 수단 설정</h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-                {/* 계좌이체(알림뱅킹) */}
-                <Card padding="md" variant="outlined">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
-                        계좌이체 (알림뱅킹)
-                      </h4>
-                      <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                        계좌이체 결제를 위한 알림뱅킹 연동 설정
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm">설정</Button>
-                  </div>
-                </Card>
-
-                {/* 카드 결제 */}
-                <Card padding="md" variant="outlined">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
-                        카드 결제
-                      </h4>
-                      <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                        신용카드/체크카드 결제 연동
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm">설정</Button>
-                  </div>
-                </Card>
-
-                {/* 간편결제 - 카카오 */}
-                <Card padding="md" variant="outlined">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
-                        카카오페이
-                      </h4>
-                      <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                        카카오페이 간편결제 연동
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm">설정</Button>
-                  </div>
-                </Card>
-
-                {/* 간편결제 - 네이버 */}
-                <Card padding="md" variant="outlined">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
-                        네이버페이
-                      </h4>
-                      <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                        네이버페이 간편결제 연동
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm">설정</Button>
-                  </div>
-                </Card>
-              </div>
-            </Card>
-          )}
-
-          {/* 매출/정산 탭 - [요구사항] 정산 기능, 월 매출, 과목별 매출 */}
-          {activeTab === 'reports' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              {/* 월 매출 통계 */}
-              <Card padding="lg" variant="default">
-                <h2 style={{ marginBottom: 'var(--spacing-md)' }}>월 매출 통계</h2>
-                {revenueStats ? (
-                  <div style={{ display: 'flex', gap: 'var(--spacing-lg)' }}>
-                    <div>
-                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                        이번 달 매출
-                      </div>
-                      <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
-                        {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(revenueStats.monthlyRevenue)}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                        전체 매출
-                      </div>
-                      <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
-                        {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(revenueStats.totalRevenue)}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                    매출 데이터를 불러오는 중...
-                  </div>
-                )}
-              </Card>
-
-              {/* 과목별 매출 */}
-              <Card padding="lg" variant="default">
-                <h2 style={{ marginBottom: 'var(--spacing-md)' }}>과목별 매출</h2>
-                {revenueStats && revenueStats.subjectRevenue && revenueStats.subjectRevenue.length > 0 ? (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--font-size-sm)' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                          <th style={{ padding: 'var(--spacing-sm)', textAlign: 'left' }}>과목</th>
-                          <th style={{ padding: 'var(--spacing-sm)', textAlign: 'right' }}>총 매출</th>
-                          <th style={{ padding: 'var(--spacing-sm)', textAlign: 'right' }}>건수</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {revenueStats.subjectRevenue.map((item: any, index: number) => (
-                          <tr key={index} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                            <td style={{ padding: 'var(--spacing-sm)' }}>{item.category}</td>
-                            <td style={{ padding: 'var(--spacing-sm)', textAlign: 'right' }}>
-                              {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(item.total_amount)}
-                            </td>
-                            <td style={{ padding: 'var(--spacing-sm)', textAlign: 'right' }}>{item.item_count}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                    과목별 매출 데이터가 없습니다.
-                  </div>
-                )}
-              </Card>
-
-              {/* 강사 매출 배분 (옵션) */}
-              <Card padding="lg" variant="default">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-                  <h2>강사 매출 배분</h2>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowTeacherRevenueSplitForm(true)}
-                  >
-                    설정
-                  </Button>
-                </div>
-                <div style={{ padding: 'var(--spacing-md)', backgroundColor: 'var(--color-background-secondary)', borderRadius: 'var(--radius-md)' }}>
-                  <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                    강사별 매출 배분 기능을 설정할 수 있습니다.
-                  </p>
-                </div>
-              </Card>
-
-              {/* 정산 기능 */}
-              <Card padding="lg" variant="default">
-                <h2 style={{ marginBottom: 'var(--spacing-md)' }}>정산</h2>
-                <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center' }}>
-                  <Button
-                    variant="solid"
-                    size="md"
-                    onClick={() => setShowSettlementForm(true)}
-                    disabled={executeSettlement.isPending}
-                  >
-                    {executeSettlement.isPending ? '정산 중...' : '정산 실행'}
-                  </Button>
-                  <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-sm)' }}>
-                    월별 정산을 실행하여 정산 내역을 확인할 수 있습니다.
-                  </p>
-                </div>
-              </Card>
-
-              {/* 정산 실행 모달 */}
-              {settlementSchema && (
-                <Modal
-                  isOpen={showSettlementForm}
-                  onClose={() => setShowSettlementForm(false)}
-                  title="정산 실행"
-                  size="md"
-                >
-                  <SchemaForm
-                    schema={settlementSchema}
-                    onSubmit={async (data: any) => {
-                      await executeSettlement.mutateAsync({
-                        year: parseInt(data.year),
-                        month: parseInt(data.month),
-                      });
-                    }}
-                    defaultValues={{
-                      year: toKST().year(),
-                      month: toKST().month() + 1,
-                    }}
-                    actionContext={{
-                      apiCall: async (endpoint: string, method: string, body?: any) => {
-                        if (method === 'POST') {
-                          const response = await apiClient.post(endpoint, body);
-                          if (response.error) {
-                            throw new Error(response.error.message);
-                          }
-                          return response.data;
-                        }
-                        const response = await apiClient.get(endpoint);
-                        if (response.error) {
-                          throw new Error(response.error.message);
-                        }
-                        return response.data;
-                      },
-                      showToast: (message: string, variant?: string) => {
-                        showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-                      },
-                    }}
-                  />
-                </Modal>
-              )}
-
-              {/* 강사 매출 배분 설정 모달 */}
-              {teacherRevenueSplitSchema && (
-                <Modal
-                  isOpen={showTeacherRevenueSplitForm}
-                  onClose={() => setShowTeacherRevenueSplitForm(false)}
-                  title="강사 매출 배분 설정"
-                  size="md"
-                >
-                  <SchemaForm
-                    schema={teacherRevenueSplitSchema}
-                    onSubmit={async (data: any) => {
-                      await saveTeacherRevenueSplit.mutateAsync(data);
-                    }}
-                    defaultValues={{
-                      enabled: false,
-                      split_method: 'equal',
-                      split_percentage: 50,
-                    }}
-                    actionContext={{
-                      apiCall: async (endpoint: string, method: string, body?: any) => {
-                        if (method === 'POST') {
-                          const response = await apiClient.post(endpoint, body);
-                          if (response.error) {
-                            throw new Error(response.error.message);
-                          }
-                          return response.data;
-                        }
-                        const response = await apiClient.get(endpoint);
-                        if (response.error) {
-                          throw new Error(response.error.message);
-                        }
-                        return response.data;
-                      },
-                      showToast: (message: string, variant?: string) => {
-                        showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-                      },
-                    }}
-                  />
-                </Modal>
-              )}
+          {/* 상품 관리, 결제 관리, 매출/정산은 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙) */}
+          {/* 빠른 링크 */}
+          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
+                추가 기능:
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/billing/products')}
+              >
+                상품 관리
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/billing/payments')}
+              >
+                결제 관리
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/billing/reports')}
+              >
+                매출/정산
+              </Button>
             </div>
-          )}
+          </Card>
+
+          {/* 결제 관리, 매출/정산은 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙) */}
         </div>
       </Container>
     </ErrorBoundary>

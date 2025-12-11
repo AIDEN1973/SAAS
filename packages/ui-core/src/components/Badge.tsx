@@ -11,10 +11,11 @@ import { ColorToken, SizeToken } from '@design-system/core';
 
 export interface BadgeProps {
   children: React.ReactNode;
-  color?: ColorToken;
+  color?: ColorToken | 'blue' | 'gray' | 'green';
   size?: SizeToken;
   variant?: 'solid' | 'outline' | 'soft';
   className?: string;
+  style?: React.CSSProperties;
 }
 
 /**
@@ -28,8 +29,9 @@ export const Badge: React.FC<BadgeProps> = ({
   size = 'md',
   variant = 'solid',
   className,
+  style,
 }) => {
-  const colorMap: Record<ColorToken, {
+  const colorMap: Record<ColorToken | 'blue' | 'gray' | 'green', {
     main: string;
     light: string;
     dark: string;
@@ -71,9 +73,27 @@ export const Badge: React.FC<BadgeProps> = ({
       dark: 'var(--color-info-dark)',
       bg50: 'var(--color-info-50)',
     },
+    blue: {
+      main: '#3b82f6',
+      light: '#60a5fa',
+      dark: '#2563eb',
+      bg50: 'rgba(59, 130, 246, 0.1)',
+    },
+    gray: {
+      main: '#6b7280',
+      light: '#9ca3af',
+      dark: '#4b5563',
+      bg50: 'rgba(107, 114, 128, 0.1)',
+    },
+    green: {
+      main: '#10b981',
+      light: '#34d399',
+      dark: '#059669',
+      bg50: 'rgba(16, 185, 129, 0.1)',
+    },
   };
 
-  const colorVars = colorMap[color];
+  const colorVars = colorMap[color || 'primary'];
 
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
@@ -100,7 +120,7 @@ export const Badge: React.FC<BadgeProps> = ({
 
   const variantStyles: Record<'solid' | 'outline' | 'soft', React.CSSProperties> = {
     solid: {
-      backgroundColor: colorVars.main,
+      backgroundColor: colorVars.dark,
       color: 'var(--color-white)',
       border: 'none',
     },
@@ -116,19 +136,20 @@ export const Badge: React.FC<BadgeProps> = ({
     },
   };
 
-  const style: React.CSSProperties = {
+  const badgeStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 'var(--border-radius-md)',
+    borderRadius: 'var(--border-radius-sm)',
     fontWeight: 'var(--font-weight-medium)',
     whiteSpace: 'nowrap',
     ...sizeStyles[size],
     ...variantStyles[variant],
+    ...style,
   };
 
   return (
-    <span className={clsx(className)} style={style}>
+    <span className={clsx(className)} style={badgeStyle}>
       {children}
     </span>
   );

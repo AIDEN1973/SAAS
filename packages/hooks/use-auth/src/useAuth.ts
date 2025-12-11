@@ -12,6 +12,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@lib/supabase-client';
 import { loginService, signupService } from '@core/auth';
 import type { LoginInput, OAuthLoginInput, OTPLoginInput, LoginResult, TenantSelectionResult, B2BSignupInput, SignupResult } from '@core/auth';
+import type { TenantRole } from '@core/tenancy';
+import { apiClient, getApiContext } from '@api-sdk/core';
 
 /**
  * 현재 세션 조회 Hook
@@ -182,5 +184,71 @@ export function useResendVerificationEmail() {
     mutationFn: async (email: string): Promise<void> => {
       return signupService.resendVerificationEmail(email);
     },
+  });
+}
+
+/**
+ * 현재 테넌트에서의 사용자 역할 조회 Hook
+ * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ */
+export function useUserRole() {
+  const { data: session } = useSession();
+  // tenantId를 쿼리 키에 포함하여 tenantId 변경 시 자동으로 재조회되도록 함
+  const context = getApiContext();
+  const tenantId = context?.tenantId;
+
+  return useQuery({
+    queryKey: ['auth', 'user-role', session?.user?.id, tenantId],
+    queryFn: async () => {
+      console.log('[useUserRole] Fetching user role:', {
+        userId: session?.user?.id,
+        hasSession: !!session,
+        tenantId,
+        hasContext: !!context,
+      });
+
+      if (!session?.user?.id) {
+        console.warn('[useUserRole] No session or user ID');
+        return null;
+      }
+
+      // tenantId는 쿼리 키에서 가져오므로 여기서 다시 확인
+      if (!tenantId) {
+        console.warn('[useUserRole] No tenant ID in context');
+        return null;
+      }
+
+      console.log('[useUserRole] Querying user_tenant_roles:', {
+        user_id: session.user.id,
+        tenant_id: tenantId,
+      });
+
+      const response = await apiClient.get<any>('user_tenant_roles', {
+        filters: {
+          user_id: session.user.id,
+          tenant_id: tenantId,
+        },
+        limit: 1,
+      });
+
+      console.log('[useUserRole] Response:', {
+        error: response.error,
+        data: response.data,
+        dataLength: response.data?.length,
+        role: response.data?.[0]?.role,
+      });
+
+      if (response.error) {
+        // RLS 정책에 의해 조회 실패할 수 있음
+        console.error('[useUserRole] Error fetching role:', response.error);
+        return null;
+      }
+
+      const role = response.data?.[0]?.role || null;
+      console.log('[useUserRole] Returning role:', role);
+      return role;
+    },
+    enabled: !!session?.user?.id && !!tenantId,
+    staleTime: 5 * 60 * 1000, // 5분
   });
 }

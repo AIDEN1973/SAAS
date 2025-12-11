@@ -13,7 +13,7 @@ export const attendanceSettingsFormSchema: FormSchema = {
   type: 'form',
   form: {
     layout: {
-      columns: 1,
+      columns: 2,
       columnGap: 'md',
       rowGap: 'md',
     },
@@ -24,6 +24,7 @@ export const attendanceSettingsFormSchema: FormSchema = {
         ui: {
           label: '지각 기준 (분)',
           description: '수업 시작 시간으로부터 지각으로 처리할 기준 시간(분)입니다.',
+          colSpan: 1,
         },
         validation: {
           required: true,
@@ -36,6 +37,7 @@ export const attendanceSettingsFormSchema: FormSchema = {
         ui: {
           label: '결석 기준 (분)',
           description: '수업 시작 시간으로부터 결석으로 처리할 기준 시간(분)입니다.',
+          colSpan: 1,
         },
         validation: {
           required: true,
@@ -48,6 +50,7 @@ export const attendanceSettingsFormSchema: FormSchema = {
         ui: {
           label: '자동 출결 알림 발송',
           description: '출결 기록 시 자동으로 학부모에게 알림을 발송합니다.',
+          colSpan: 2,
         },
       },
       {
@@ -55,6 +58,7 @@ export const attendanceSettingsFormSchema: FormSchema = {
         kind: 'select',
         ui: {
           label: '기본 알림 채널',
+          colSpan: 1,
         },
         options: [
           { value: 'sms', label: 'SMS' },

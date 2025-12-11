@@ -14,7 +14,7 @@ export const teacherRevenueSplitFormSchema: FormSchema = {
   type: 'form',
   form: {
     layout: {
-      columns: 1,
+      columns: 2,
       columnGap: 'md',
       rowGap: 'md',
     },
@@ -25,6 +25,7 @@ export const teacherRevenueSplitFormSchema: FormSchema = {
         ui: {
           label: '강사 매출 배분 활성화',
           description: '강사별 매출 배분 기능을 활성화합니다.',
+          colSpan: 2,
         },
       },
       {
@@ -32,6 +33,7 @@ export const teacherRevenueSplitFormSchema: FormSchema = {
         kind: 'select',
         ui: {
           label: '배분 방식',
+          colSpan: 1,
         },
         options: [
           { value: 'equal', label: '균등 배분' },
@@ -53,6 +55,7 @@ export const teacherRevenueSplitFormSchema: FormSchema = {
         ui: {
           label: '배분 비율 (%)',
           description: '강사에게 배분할 매출 비율입니다.',
+          colSpan: 1,
         },
         validation: {
           required: true,

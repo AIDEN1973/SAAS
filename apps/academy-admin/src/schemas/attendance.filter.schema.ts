@@ -1,6 +1,6 @@
 /**
  * Attendance Filter Schema
- * 
+ *
  * [불변 규칙] 스키마 엔진 기반 FilterSchema 정의
  */
 
@@ -87,6 +87,60 @@ export const attendanceFilterSchema: FilterSchema = {
     ],
   },
 };
+
+/**
+ * 출결 화면 헤더용 필터 스키마 (반 선택, 날짜 선택, 검색)
+ */
+export function createAttendanceHeaderFilterSchema(
+  todayClasses?: Array<{ id: string; name: string }>
+): FilterSchema {
+  const classOptions = todayClasses
+    ? [{ label: '전체 반', value: '' }, ...todayClasses.map((c) => ({ label: c.name, value: c.id }))]
+    : [{ label: '전체 반', value: '' }];
+
+  return {
+    version: '1.0.0',
+    minSupportedClient: '1.0.0',
+    entity: 'attendance_header',
+    type: 'filter',
+    filter: {
+      layout: {
+        columns: 3,
+        columnGap: 'sm',
+        rowGap: 'sm',
+      },
+      fields: [
+        {
+          name: 'class_id',
+          kind: 'select',
+          ui: {
+            label: '반',
+            colSpan: 1,
+          },
+          options: classOptions,
+          defaultValue: '',
+        },
+        {
+          name: 'date',
+          kind: 'date',
+          ui: {
+            label: '날짜',
+            colSpan: 1,
+          },
+        },
+        {
+          name: 'search',
+          kind: 'text',
+          ui: {
+            label: '검색',
+            placeholder: '학생 이름 또는 전화번호 검색',
+            colSpan: 1,
+          },
+        },
+      ],
+    },
+  };
+}
 
 /**
  * 동적 옵션을 포함한 필터 스키마 생성 함수

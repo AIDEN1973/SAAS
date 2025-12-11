@@ -59,7 +59,26 @@ export class ApiClient {
         // 나머지 필터 적용 (undefined, null, 빈 문자열은 제외)
         Object.entries(searchFilters).forEach(([key, value]) => {
           if (value !== undefined && value !== null && value !== '') {
-            if (Array.isArray(value)) {
+            // 범위 연산자 처리 (gte, lte, gt, lt)
+            if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+              if ('gte' in value) {
+                query = query.gte(key, value.gte);
+              }
+              if ('lte' in value) {
+                query = query.lte(key, value.lte);
+              }
+              if ('gt' in value) {
+                query = query.gt(key, value.gt);
+              }
+              if ('lt' in value) {
+                query = query.lt(key, value.lt);
+              }
+              // 범위 연산자가 없으면 객체 전체를 무시 (예: Date 객체)
+              if (!('gte' in value || 'lte' in value || 'gt' in value || 'lt' in value)) {
+                // 객체가 범위 연산자가 아니면 무시하거나 경고
+                console.warn(`[ApiClient] Filter value for ${key} is an object without range operators, ignoring:`, value);
+              }
+            } else if (Array.isArray(value)) {
               query = query.in(key, value);
             } else {
               query = query.eq(key, value);
