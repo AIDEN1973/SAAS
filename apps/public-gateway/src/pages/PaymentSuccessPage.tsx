@@ -12,7 +12,6 @@ export function PaymentSuccessPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const paymentId = searchParams.get('payment_id');
-  const invoiceId = searchParams.get('invoice_id');
 
   useEffect(() => {
     // 5초 후 자동으로 학부모 앱으로 리다이렉트

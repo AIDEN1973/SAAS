@@ -12,7 +12,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@lib/supabase-client';
 import { loginService, signupService } from '@core/auth';
 import type { LoginInput, OAuthLoginInput, OTPLoginInput, LoginResult, TenantSelectionResult, B2BSignupInput, SignupResult } from '@core/auth';
-import type { TenantRole } from '@core/tenancy';
 import { apiClient, getApiContext } from '@api-sdk/core';
 
 /**

@@ -90,8 +90,6 @@ export function useAttendanceNotifications(studentId?: string) {
  * QR 출결 관련 Hook
  */
 export function useQRAttendance() {
-  const context = getApiContext();
-
   /**
    * QR 토큰 검증
    */

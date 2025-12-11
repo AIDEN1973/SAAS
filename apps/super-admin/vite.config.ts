@@ -42,13 +42,13 @@ export default defineConfig({
   define: {
     // 환경변수가 없으면 개발용 기본값 사용 (프로덕션에서는 반드시 환경변수 설정 필요)
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(
-      process.env.VITE_SUPABASE_URL || 
-      process.env.NEXT_PUBLIC_SUPABASE_URL || 
+      process.env.VITE_SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
       'https://xawypsrotrfoyozhrsbb.supabase.co'
     ),
     'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(
-      process.env.VITE_SUPABASE_ANON_KEY || 
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
+      process.env.VITE_SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhhd3lwc3JvdHJmb3lvemhyc2JiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5NDQ2MDYsImV4cCI6MjA4MDUyMDYwNn0.gH0THgnxtn2WCroHo2Sn1mtLsFzuq4FXJzqs0Rcfws0'
     ),
     'import.meta.env.VITE_KAKAO_JS_KEY': JSON.stringify(process.env.VITE_KAKAO_JS_KEY || process.env.NEXT_PUBLIC_KAKAO_JS_KEY || ''),
@@ -68,6 +68,15 @@ export default defineConfig({
       { find: '@core/tenancy', replacement: path.resolve(__dirname, '../../packages/core/core-tenancy/src') },
       { find: '@core/tags', replacement: path.resolve(__dirname, '../../packages/core/core-tags/src') },
       { find: '@core/schema-registry', replacement: path.resolve(__dirname, '../../packages/core/core-schema-registry/src') },
+      { find: '@core/auth', replacement: path.resolve(__dirname, '../../packages/core/core-auth/src') },
+      { find: '@core/auth/login', replacement: path.resolve(__dirname, '../../packages/core/core-auth/src/login.ts') },
+      { find: '@core/auth/signup', replacement: path.resolve(__dirname, '../../packages/core/core-auth/src/signup.ts') },
+      { find: '@core/auth/service', replacement: path.resolve(__dirname, '../../packages/core/core-auth/src/service.ts') },
+      { find: '@core/auth/types', replacement: path.resolve(__dirname, '../../packages/core/core-auth/src/types.ts') },
+      { find: '@core/tenancy', replacement: path.resolve(__dirname, '../../packages/core/core-tenancy/src') },
+      { find: '@core/tenancy/service', replacement: path.resolve(__dirname, '../../packages/core/core-tenancy/src/service.ts') },
+      { find: '@core/tenancy/onboarding', replacement: path.resolve(__dirname, '../../packages/core/core-tenancy/src/onboarding.ts') },
+      { find: '@core/config', replacement: path.resolve(__dirname, '../../packages/core/core-config/src') },
       { find: '@env-registry', replacement: path.resolve(__dirname, '../../packages/env-registry/src') },
       { find: '@lib', replacement: path.resolve(__dirname, '../../packages/lib') },
       { find: '@design-system/core', replacement: path.resolve(__dirname, '../../packages/design-system/src') },

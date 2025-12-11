@@ -14,7 +14,6 @@ import {
   useLoginWithOAuth,
   useLoginWithOTP,
   useSendOTP,
-  useUserTenants,
   useSelectTenant,
 } from '@hooks/use-auth';
 // TODO: 공통 스키마로 이동 필요
@@ -37,8 +36,8 @@ export function LoginPage() {
   const loginWithOAuth = useLoginWithOAuth();
   const sendOTP = useSendOTP();
   const loginWithOTP = useLoginWithOTP();
-  const { data: tenants } = useUserTenants();
-  const selectTenant = useSelectTenant();
+  const selectTenantMutation = useSelectTenant();
+  const selectTenant = selectTenantMutation.mutateAsync;
 
   const handleEmailLogin = async (data: { email: string; password: string }) => {
     try {
@@ -51,7 +50,7 @@ export function LoginPage() {
 
       if (result.tenants.length === 1) {
         // 테넌트가 하나면 자동 선택
-        await selectTenant.mutateAsync(result.tenants[0].id);
+        await selectTenant(result.tenants[0].id);
         navigate('/home');
       } else {
         // 여러 테넌트면 선택 페이지로 이동
@@ -99,7 +98,7 @@ export function LoginPage() {
       }
 
       if (result.tenants.length === 1) {
-        await selectTenant.mutateAsync(result.tenants[0].id);
+        await selectTenant(result.tenants[0].id);
         navigate('/home');
       } else {
         navigate('/auth/tenant-selection');
