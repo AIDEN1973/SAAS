@@ -58,6 +58,13 @@ export const Select: React.FC<SelectProps> = ({
     transition: 'all 0.2s ease',
     fontFamily: 'var(--font-family)',
     boxShadow: 'var(--shadow-sm)',
+    paddingRight: '2.5rem', // 화살표 공간 확보
+    cursor: 'pointer',
+    // 브라우저 호환성을 위한 vendor prefix
+    ...({
+      WebkitAppearance: 'none',
+      MozAppearance: 'none',
+    } as React.CSSProperties),
   };
 
   return (
@@ -79,6 +86,12 @@ export const Select: React.FC<SelectProps> = ({
           {label}
         </label>
       )}
+      <div
+        style={{
+          position: 'relative',
+          width: fullWidth ? '100%' : 'auto',
+        }}
+      >
       <select
         className={clsx(className)}
         style={selectStyle}
@@ -96,6 +109,23 @@ export const Select: React.FC<SelectProps> = ({
       >
         {children}
       </select>
+        {/* 커스텀 드롭다운 화살표 */}
+        <div
+          style={{
+            position: 'absolute',
+            right: 'var(--spacing-sm)',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            pointerEvents: 'none',
+            width: 0,
+            height: 0,
+            borderLeft: '4px solid transparent',
+            borderRight: '4px solid transparent',
+            borderTop: `6px solid ${error ? 'var(--color-red-500)' : 'var(--color-gray-500)'}`,
+            transition: 'border-top-color 0.2s ease',
+          }}
+        />
+      </div>
       {error && (
         <span
           style={{

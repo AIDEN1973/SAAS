@@ -1,9 +1,8 @@
 /**
  * Tabs Component
  *
- * [불변 규칙] Atlaskit Tabs를 래핑하여 사용합니다.
  * [불변 규칙] 스키마에서 Tailwind 클래스를 직접 사용하지 않는다.
- * [불변 규칙] 모든 스타일은 Atlaskit 테마를 사용합니다.
+ * [불변 규칙] 모든 스타일은 design-system 토큰을 사용합니다.
  */
 
 import React, { useState } from 'react';
@@ -28,7 +27,7 @@ export interface TabsProps {
 /**
  * Tabs 컴포넌트
  *
- * Atlaskit Tabs를 래핑하여 사용합니다.
+ * 커스텀 구현된 Tabs 컴포넌트입니다.
  */
 export const Tabs: React.FC<TabsProps> = ({
   items,

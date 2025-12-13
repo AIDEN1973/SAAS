@@ -71,9 +71,16 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     color: 'var(--color-text)',
     outline: 'none',
     width: fullWidth ? '100%' : 'auto',
+    appearance: 'none',
     transition: 'all 0.2s ease',
     fontFamily: 'var(--font-family)',
     boxShadow: 'var(--shadow-sm)',
+    cursor: 'pointer',
+    // 브라우저 호환성을 위한 vendor prefix
+    ...({
+      WebkitAppearance: 'none',
+      MozAppearance: 'textfield',
+    } as React.CSSProperties),
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
