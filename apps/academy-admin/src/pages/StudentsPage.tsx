@@ -28,9 +28,14 @@ export function StudentsPage() {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
   const isTablet = mode === 'md';
+  const isDesktop = mode === 'lg' || mode === 'xl';
   const [filter, setFilter] = useState<StudentFilter>({});
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+
+  // 아키텍처 문서 408-431줄: 기기별 자동 레이아웃 결정
+  // PC: 테이블 형태, Tablet: 2열 카드, Mobile: 1열 카드
+  const viewMode: 'card' | 'table' = isDesktop ? 'table' : 'card';
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false); // 아키텍처 문서 3.1.7: 고급 옵션 숨김
 
   // [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
   const { data: students, isLoading, error } = useStudents({
@@ -105,36 +110,32 @@ export function StudentsPage() {
                 }}
               />
 
-              {/* 보기 모드 전환 */}
-              <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
-                <Button
-                  variant={viewMode === 'card' ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => setViewMode('card')}
-                >
-                  카드
-                </Button>
-                <Button
-                  variant={viewMode === 'table' ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => setViewMode('table')}
-                >
-                  테이블
-                </Button>
-              </div>
+              {/* 아키텍처 문서 408-431줄: 기기별 자동 레이아웃 결정으로 사용자 선택 제거 */}
+              {/* PC: 테이블 자동, Tablet/Mobile: 카드 자동 */}
 
               {/* 학생 등록 버튼 */}
               <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
                 <Button variant="solid" color="primary" onClick={() => setShowCreateForm(true)}>
                   학생 등록
                 </Button>
+                {/* 아키텍처 문서 3.1.7: 일괄 등록은 고급 옵션 */}
+                {showAdvancedOptions && (
+                  <Button
+                    variant="outline"
+                    color="primary"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={bulkCreateStudents.isPending}
+                  >
+                    {bulkCreateStudents.isPending ? '등록 중..' : '엑셀 파일 일괄 등록'}
+                  </Button>
+                )}
+                {/* 고급 옵션 토글 버튼 */}
                 <Button
-                  variant="outline"
-                  color="primary"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={bulkCreateStudents.isPending}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
                 >
-                  {bulkCreateStudents.isPending ? '등록 중..' : '엑셀 파일 일괄 등록'}
+                  {showAdvancedOptions ? '고급 옵션 숨기기' : '고급 옵션'}
                 </Button>
                 <input
                   ref={fileInputRef}
@@ -199,8 +200,12 @@ export function StudentsPage() {
                         fileInputRef.current.value = '';
                       }
                     } catch (error) {
-                      console.error('엑셀 일괄 등록 실패:', error);
-                      showAlert('엑셀 일괄 등록에 실패했습니다.', '오류', 'error');
+                      // 에러는 showAlert로 사용자에게 표시
+                      showAlert(
+                        error instanceof Error ? error.message : '엑셀 일괄 등록에 실패했습니다.',
+                        '오류',
+                        'error'
+                      );
                     }
                   }}
                 />
@@ -208,8 +213,8 @@ export function StudentsPage() {
             </div>
           </Card>
 
-          {/* 태그 필터 */}
-          {tags && tags.length > 0 && (
+          {/* 태그 필터 - 아키텍처 문서 3.1.6: 고급 옵션 활성화 시에만 표시 */}
+          {showAdvancedOptions && tags && tags.length > 0 && (
             <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap', marginBottom: 'var(--spacing-md)' }}>
               {tags.map((tag: { id: string; name: string; color: string }) => (
                 <Button
@@ -264,41 +269,82 @@ export function StudentsPage() {
           )}
 
           {/* 학생 목록 */}
+          {/* 로딩 상태 */}
           {isLoading && (
-            <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-              로딩 중..
-            </div>
-          )}
-          {error && (
-            <Card padding="md" variant="outlined">
-              <div style={{ color: 'var(--color-error)' }}>오류: {error.message}</div>
+            <Card padding="lg" variant="default">
+              <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                학생 목록을 불러오는 중...
+              </div>
             </Card>
           )}
-          {students && viewMode === 'card' && (
-            <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="md">
-              {students.map((student) => (
-                <StudentCard
-                  key={student.id}
-                  student={student}
-                  tags={tags || []}
-                  onDetailClick={() => navigate(`/students/${student.id}`)}
-                />
-              ))}
-            </Grid>
+
+          {/* 에러 상태 (로딩 완료 후에만 표시) */}
+          {!isLoading && error && (
+            <Card padding="md" variant="outlined">
+              <div style={{ color: 'var(--color-error)' }}>
+                오류: {error instanceof Error ? error.message : '학생 목록을 불러오는데 실패했습니다.'}
+              </div>
+            </Card>
           )}
-          {viewMode === 'table' && effectiveTableSchema && (
-            <SchemaTable
-              key={`student-table-${JSON.stringify(filter)}`}
-              schema={effectiveTableSchema}
-              filters={{
+
+          {/* 학생 목록 (로딩 완료 후, 에러 없을 때만 표시) */}
+          {!isLoading && !error && students && students.length > 0 && (
+            <>
+              {viewMode === 'card' && (
+                <Grid
+                  columns={{
+                    xs: 1,      // Mobile: 1열 (아키텍처 문서 431줄)
+                    sm: 1,      // Mobile: 1열
+                    md: 2,      // Tablet: 2열 (아키텍처 문서 419줄)
+                    // lg, xl은 viewMode가 'table'이므로 사용되지 않음
+                  }}
+                  gap="md"
+                >
+                  {students.map((student) => (
+                    <StudentCard
+                      key={student.id}
+                      student={student}
+                      onDetailClick={() => navigate(`/students/${student.id}`)}
+                    />
+                  ))}
+                </Grid>
+              )}
+              {viewMode === 'table' && effectiveTableSchema && (
+                <SchemaTable
+                  key={`student-table-${JSON.stringify(filter)}`}
+                  schema={effectiveTableSchema}
+                  filters={{
                     ...(filter.status && { status: filter.status }),
                     ...(filter.grade && { grade: filter.grade }),
-                ...(filter.search && { search: filter.search }),
-              }}
-              actionContext={{
-                navigate: (path: string) => navigate(path),
-              }}
-            />
+                    ...(filter.search && { search: filter.search }),
+                  }}
+                  actionContext={{
+                    navigate: (path: string) => navigate(path),
+                  }}
+                />
+              )}
+            </>
+          )}
+
+          {/* 빈 상태 (로딩 완료 후, 에러 없을 때, 학생이 없을 때만 표시) */}
+          {!isLoading && !error && students && students.length === 0 && (
+            <Card padding="lg" variant="default">
+              <div style={{
+                textAlign: 'center',
+                color: 'var(--color-text-secondary)',
+                padding: 'var(--spacing-xl)'
+              }}>
+                <p style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-md)' }}>
+                  등록된 학생이 없습니다.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCreateForm(true)}
+                >
+                  첫 학생 등록하기
+                </Button>
+              </div>
+            </Card>
           )}
         </div>
       </Container>
@@ -308,13 +354,12 @@ export function StudentsPage() {
 
 interface StudentCardProps {
   student: Student;
-  tags: Array<{ id: string; name: string; color: string }>;
   onDetailClick: () => void;
 }
 
-function StudentCard({ student, tags, onDetailClick }: StudentCardProps) {
-  const { data: studentTags } = useStudentTagsByStudent(student.id);
-  const displayedTags = studentTags || [];
+function StudentCard({ student, onDetailClick }: StudentCardProps) {
+  // 아키텍처 문서 3.1.4: 이름, 학부모, 연락처, 대표반만 표시
+  // 태그는 고급 옵션 활성화 시에만 표시 (아키텍처 문서 3.1.6)
 
   const statusConfig = {
     active: { label: '재원', bgColor: 'var(--color-green-100)', textColor: 'var(--color-green-800)' },
@@ -387,6 +432,7 @@ function StudentCard({ student, tags, onDetailClick }: StudentCardProps) {
         <Button variant="outline" size="sm" fullWidth onClick={(e) => { e?.stopPropagation(); onDetailClick(); }}>
           상세
         </Button>
+        {/* 수정 버튼: 상세 페이지로 이동 후 수정 모드 활성화 (아키텍처 문서 3.1.4: 학생 등록/수정) */}
         <Button variant="outline" size="sm" fullWidth onClick={(e) => { e?.stopPropagation(); onDetailClick(); }}>
           수정
         </Button>

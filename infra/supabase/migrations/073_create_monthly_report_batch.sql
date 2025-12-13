@@ -24,3 +24,5 @@ COMMENT ON FUNCTION create_risk_task_card IS
 -- - AI 인사이트 요약
 
 
+
+

@@ -10,6 +10,7 @@ import React, { useState } from 'react';
 import { ErrorBoundary, useModal, useResponsiveMode } from '@ui-core/react';
 import { Container, Card, Button, Modal, Drawer } from '@ui-core/react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
+import { apiClient } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
 import {
   useTeachers,
@@ -239,7 +240,6 @@ function CreateTeacherForm({
         }}
         actionContext={{
           apiCall: async (endpoint: string, method: string, body?: any) => {
-            const { apiClient } = await import('@api-sdk/core');
             if (method === 'POST') {
               const response = await apiClient.post(endpoint, body);
               if (response.error) {
@@ -330,7 +330,6 @@ function EditTeacherModal({
         }}
         actionContext={{
           apiCall: async (endpoint: string, method: string, body?: any) => {
-            const { apiClient } = await import('@api-sdk/core');
             if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
               const response = await apiClient.post(endpoint, body);
               if (response.error) {

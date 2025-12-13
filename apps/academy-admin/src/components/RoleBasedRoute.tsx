@@ -129,19 +129,8 @@ export function RoleBasedRoute({ children, allowedRoles, fallbackPath = '/home' 
   const context = getApiContext();
   const tenantId = context?.tenantId;
 
-  console.log('[RoleBasedRoute] Rendering:', {
-    pathname: location.pathname,
-    userRole,
-    isLoading,
-    isFetching,
-    allowedRoles,
-    tenantId,
-    hasContext: !!context,
-  });
-
   // 로딩 중이거나 데이터를 가져오는 중이면 대기
   if (isLoading || isFetching) {
-    console.log('[RoleBasedRoute] Loading user role...');
     return (
       <div style={{
         display: 'flex',
@@ -158,7 +147,6 @@ export function RoleBasedRoute({ children, allowedRoles, fallbackPath = '/home' 
 
   // tenantId가 없으면 아직 컨텍스트가 설정되지 않은 상태
   if (!tenantId) {
-    console.warn('[RoleBasedRoute] No tenantId in context, waiting...');
     return (
       <div style={{
         display: 'flex',
@@ -174,33 +162,17 @@ export function RoleBasedRoute({ children, allowedRoles, fallbackPath = '/home' 
   }
 
   if (!userRole) {
-    console.warn('[RoleBasedRoute] No user role found:', {
-      pathname: location.pathname,
-      fallbackPath,
-      isLoading,
-      isFetching,
-      tenantId,
-    });
-
     // userRole이 null인 경우, 무한 리다이렉트를 방지하기 위해
     // 현재 경로가 fallbackPath와 같으면 일단 접근을 허용
     // (실제로는 user_tenant_roles 테이블에 데이터가 없거나 RLS 정책 문제일 수 있음)
     if (location.pathname === fallbackPath) {
-      console.warn('[RoleBasedRoute] Already at fallback path, allowing access to prevent infinite redirect');
       return <>{children}</>;
     }
-
-    console.warn('[RoleBasedRoute] Redirecting to:', fallbackPath);
     return <Navigate to={fallbackPath} replace />;
   }
 
   // 허용된 역할인지 확인
   if (!allowedRoles.includes(userRole)) {
-    console.warn('[RoleBasedRoute] User role not allowed:', {
-      userRole,
-      allowedRoles,
-      pathname: location.pathname,
-    });
     // 역할별 기본 경로로 리다이렉트
     const roleDefaultPath: Record<TenantRole, string> = {
       admin: '/home',
@@ -216,7 +188,6 @@ export function RoleBasedRoute({ children, allowedRoles, fallbackPath = '/home' 
     };
 
     const redirectPath = roleDefaultPath[userRole as TenantRole] || fallbackPath;
-    console.log('[RoleBasedRoute] Redirecting to:', redirectPath);
     return <Navigate to={redirectPath} replace />;
   }
 
@@ -225,27 +196,13 @@ export function RoleBasedRoute({ children, allowedRoles, fallbackPath = '/home' 
   const allowedPaths = roleRouteRules[userRole as TenantRole] || [];
   const isPathAllowedResult = isPathAllowed(location.pathname, allowedPaths);
 
-  console.log('[RoleBasedRoute] Path check:', {
-    pathname: location.pathname,
-    userRole,
-    allowedPaths,
-    isPathAllowed: isPathAllowedResult,
-    allowedRolesIncludes: allowedRoles.includes(userRole),
-  });
-
   // allowedRoles에 포함된 역할이면 경로 체크를 건너뛰고 허용
   if (allowedRoles.includes(userRole)) {
-    console.log('[RoleBasedRoute] User role is in allowedRoles, allowing access');
     return <>{children}</>;
   }
 
   // allowedRoles에 포함되지 않은 경우에만 경로 체크 수행
   if (!isPathAllowedResult) {
-    console.warn('[RoleBasedRoute] Path not allowed for role:', {
-      pathname: location.pathname,
-      userRole,
-      allowedPaths,
-    });
     const roleDefaultPath: Record<TenantRole, string> = {
       admin: '/home',
       owner: '/home',
@@ -259,11 +216,8 @@ export function RoleBasedRoute({ children, allowedRoles, fallbackPath = '/home' 
       super_admin: '/home',
     };
     const redirectPath = roleDefaultPath[userRole as TenantRole] || fallbackPath;
-    console.log('[RoleBasedRoute] Redirecting to:', redirectPath);
     return <Navigate to={redirectPath} replace />;
   }
-
-  console.log('[RoleBasedRoute] Allowing access, rendering children');
   return <>{children}</>;
 }
 

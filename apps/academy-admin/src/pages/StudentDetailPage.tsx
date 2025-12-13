@@ -45,7 +45,7 @@ import type { Tag } from '@core/tags';
 import { Badge } from '@ui-core/react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { getApiContext, apiClient } from '@api-sdk/core';
-import { useSession } from '@hooks/use-auth';
+import { useSession, useUserRole } from '@hooks/use-auth';
 
 export function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -54,14 +54,19 @@ export function StudentDetailPage() {
   const { showAlert, showConfirm } = useModal();
   const { data: session } = useSession();
   const userId = session?.user?.id;
+  const { data: userRole } = useUserRole(); // 아키텍처 문서 2.4: Teacher는 수정 제한, Assistant는 읽기 전용
 
-  // URL 경로에 따라 초기 탭 설정
+  // URL 경로에 따라 초기 탭 설정 (아키텍처 문서 3.1.1: task_type → URL 매핑 규칙)
   const getInitialTab = (): 'info' | 'guardians' | 'consultations' | 'tags' | 'classes' | 'counsel' | 'attendance' | 'risk' | 'welcome' => {
     const path = location.pathname;
-    if (path.includes('/counsel')) return 'counsel';
-    if (path.includes('/attendance')) return 'attendance';
-    if (path.includes('/risk')) return 'risk';
-    if (path.includes('/welcome')) return 'welcome';
+    if (path.includes('/counsel')) return 'counsel'; // 아키텍처 문서 755줄: counseling → /students/${student_id}/counsel
+    if (path.includes('/attendance')) return 'attendance'; // 아키텍처 문서 756줄: absence → /students/${student_id}/attendance
+    if (path.includes('/risk')) return 'risk'; // 아키텍처 문서 757줄: risk → /students/${student_id}/risk
+    if (path.includes('/welcome')) return 'welcome'; // 아키텍처 문서 758줄: new_signup → /students/${student_id}/welcome
+    if (path.includes('/guardians')) return 'guardians';
+    if (path.includes('/consultations')) return 'consultations';
+    if (path.includes('/tags')) return 'tags';
+    if (path.includes('/classes')) return 'classes';
     return 'info';
   };
 
@@ -70,9 +75,7 @@ export function StudentDetailPage() {
   // URL 변경 시 탭 업데이트
   useEffect(() => {
     const newTab = getInitialTab();
-    if (newTab !== activeTab) {
-      setActiveTab(newTab);
-    }
+    setActiveTab(newTab);
   }, [location.pathname]);
 
   const mode = useResponsiveMode();
@@ -139,7 +142,7 @@ export function StudentDetailPage() {
         <Card padding="md" variant="outlined">
           <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
             <p>학생을 찾을 수 없습니다.</p>
-            <Button variant="outline" onClick={() => navigate('/students')} style={{ marginTop: 'var(--spacing-md)' }}>
+            <Button variant="outline" onClick={() => navigate('/students/list')} style={{ marginTop: 'var(--spacing-md)' }}>
               목록으로 돌아가기
             </Button>
           </div>
@@ -157,10 +160,11 @@ export function StudentDetailPage() {
               {student.name} 학생 상세
             </h1>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-              <Button variant="outline" onClick={() => navigate('/students')}>
-                목록으로
-              </Button>
-              {!isEditing && (
+            <Button variant="outline" onClick={() => navigate('/students/list')}>
+              목록으로
+            </Button>
+              {/* 아키텍처 문서 2.4: Teacher는 수정 제한, Assistant는 읽기 전용 */}
+              {!isEditing && userRole !== 'teacher' && userRole !== 'assistant' && (
                 <Button variant="solid" onClick={() => setIsEditing(true)}>
                   수정
                 </Button>
@@ -168,35 +172,72 @@ export function StudentDetailPage() {
             </div>
           </div>
 
-          {/* 빠른 링크 (한 페이지에 하나의 기능 원칙 준수: 기본 정보만 메인, 나머지는 별도 페이지) */}
+          {/* 빠른 링크 (탭 전환: 한 페이지에 하나의 기능 원칙 준수) */}
+          {/* 아키텍처 문서 3.1.1: counsel, attendance, risk, welcome은 URL 기반, 나머지는 내부 탭 */}
           <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)', flexWrap: 'wrap' }}>
             <Button
-              variant="outline"
+              variant={activeTab === 'info' ? 'solid' : 'outline'}
               size="sm"
-              onClick={() => navigate(`/students/${id}/guardians`)}
+              onClick={() => setActiveTab('info')}
+            >
+              기본 정보
+            </Button>
+            <Button
+              variant={activeTab === 'guardians' ? 'solid' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('guardians')}
             >
               학부모 관리 ({guardians?.length || 0})
             </Button>
             <Button
-              variant="outline"
+              variant={activeTab === 'consultations' ? 'solid' : 'outline'}
               size="sm"
-              onClick={() => navigate(`/students/${id}/consultations`)}
+              onClick={() => setActiveTab('consultations')}
             >
               상담일지 ({consultations?.length || 0})
             </Button>
             <Button
-              variant="outline"
+              variant={activeTab === 'tags' ? 'solid' : 'outline'}
               size="sm"
-              onClick={() => navigate(`/students/${id}/tags`)}
+              onClick={() => setActiveTab('tags')}
             >
               태그 관리
             </Button>
             <Button
-              variant="outline"
+              variant={activeTab === 'classes' ? 'solid' : 'outline'}
               size="sm"
-              onClick={() => navigate(`/students/${id}/classes`)}
+              onClick={() => setActiveTab('classes')}
             >
               반 배정 ({studentClasses?.filter((sc) => sc.is_active).length || 0})
+            </Button>
+            {/* 아키텍처 문서 755-758줄: URL 기반 탭 */}
+            <Button
+              variant={activeTab === 'counsel' ? 'solid' : 'outline'}
+              size="sm"
+              onClick={() => navigate(`/students/${id}/counsel`)}
+            >
+              상담 기록
+            </Button>
+            <Button
+              variant={activeTab === 'attendance' ? 'solid' : 'outline'}
+              size="sm"
+              onClick={() => navigate(`/students/${id}/attendance`)}
+            >
+              출결 기록
+            </Button>
+            <Button
+              variant={activeTab === 'risk' ? 'solid' : 'outline'}
+              size="sm"
+              onClick={() => navigate(`/students/${id}/risk`)}
+            >
+              이탈 위험
+            </Button>
+            <Button
+              variant={activeTab === 'welcome' ? 'solid' : 'outline'}
+              size="sm"
+              onClick={() => navigate(`/students/${id}/welcome`)}
+            >
+              환영 메시지
             </Button>
           </div>
 
@@ -247,6 +288,7 @@ export function StudentDetailPage() {
                   await deleteGuardian.mutateAsync({ guardianId, studentId: student.id });
                 }
               }}
+              isEditable={userRole !== 'teacher' && userRole !== 'assistant'} // 아키텍처 문서 2.4: Teacher/Assistant는 수정 불가
             />
           )}
 
@@ -291,11 +333,15 @@ export function StudentDetailPage() {
                 try {
                   await generateAISummary.mutateAsync({ consultationId, studentId: student.id });
                 } catch (error) {
-                  console.error('AI 요약 생성 실패:', error);
-                  showAlert('AI 요약 생성에 실패했습니다.', '오류', 'error');
+                  showAlert(
+                    error instanceof Error ? error.message : 'AI 요약 생성에 실패했습니다.',
+                    '오류',
+                    'error'
+                  );
                 }
               }}
               onFilterChange={setConsultationTypeFilter}
+              isEditable={userRole !== 'assistant'} // 아키텍처 문서 2.4: Assistant는 상담일지 수정 불가
             />
           )}
 
@@ -308,6 +354,7 @@ export function StudentDetailPage() {
               onUpdateTags={async (tagIds) => {
                 await updateStudentTags.mutateAsync({ studentId: student.id, tagIds });
               }}
+              isEditable={userRole !== 'teacher' && userRole !== 'assistant'} // 아키텍처 문서 2.4: Teacher/Assistant는 태그 수정 불가
             />
           )}
 
@@ -332,6 +379,7 @@ export function StudentDetailPage() {
                   leftAt,
                 });
               }}
+              isEditable={userRole !== 'teacher' && userRole !== 'assistant'} // 아키텍처 문서 2.4: Teacher/Assistant는 반 배정 수정 불가
             />
           )}
 
@@ -382,10 +430,9 @@ function RiskAnalysisTab({ studentId, student }: { studentId: string | null; stu
   const tenantId = context.tenantId;
 
   // 학생의 출결 데이터 조회 (최근 30일)
+  // 기술문서 5-2: KST 기준 날짜 처리
   const thirtyDaysAgo = React.useMemo(() => {
-    const date = new Date();
-    date.setDate(date.getDate() - 30);
-    return date.toISOString().split('T')[0];
+    return toKST().subtract(30, 'day').format('YYYY-MM-DD');
   }, []);
 
   const { data: attendanceLogsData } = useAttendanceLogs({
@@ -755,6 +802,7 @@ interface GuardiansTabProps {
   onCreate: (data: any) => Promise<void>;
   onUpdate: (guardianId: string, data: any) => Promise<void>;
   onDelete: (guardianId: string) => Promise<void>;
+  isEditable?: boolean; // 아키텍처 문서 2.4: 권한 체크
 }
 
 function GuardiansTab({
@@ -769,6 +817,7 @@ function GuardiansTab({
   onCreate,
   onUpdate,
   onDelete,
+  isEditable = true,
 }: GuardiansTabProps) {
   const editingGuardian = editingGuardianId ? guardians.find((g) => g.id === editingGuardianId) : null;
   const { showAlert } = useModal();
@@ -795,7 +844,7 @@ function GuardiansTab({
 
   return (
     <div>
-      {!showForm && (
+      {!showForm && isEditable && (
         <div style={{ marginBottom: 'var(--spacing-md)' }}>
           <Button variant="solid" onClick={onShowForm}>
             학부모 추가
@@ -870,7 +919,6 @@ function GuardiansTab({
                 }}
                 actionContext={{
                   apiCall: async (endpoint: string, method: string, body?: any) => {
-                    const { apiClient } = await import('@api-sdk/core');
                     if (method === 'POST') {
                       const response = await apiClient.post(endpoint, body);
                       if (response.error) {
@@ -918,14 +966,16 @@ function GuardiansTab({
                   <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-xs)' }}>{guardian.notes}</p>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
-                <Button variant="ghost" size="sm" onClick={() => onEdit(guardian.id)}>
-                  수정
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => onDelete(guardian.id)}>
-                  삭제
-                </Button>
-              </div>
+              {isEditable && (
+                <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
+                  <Button variant="ghost" size="sm" onClick={() => onEdit(guardian.id)}>
+                    수정
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => onDelete(guardian.id)}>
+                    삭제
+                  </Button>
+                </div>
+              )}
             </div>
           </Card>
         ))}
@@ -955,6 +1005,7 @@ interface ConsultationsTabProps {
   onDelete: (consultationId: string) => Promise<void>;
   onGenerateAISummary: (consultationId: string) => Promise<void>;
   onFilterChange: (filter: ConsultationType | 'all') => void;
+  isEditable?: boolean; // 아키텍처 문서 2.4: 권한 체크
 }
 
 function ConsultationsTab({
@@ -972,6 +1023,7 @@ function ConsultationsTab({
   onDelete,
   onGenerateAISummary,
   onFilterChange,
+  isEditable = true,
 }: ConsultationsTabProps) {
   const editingConsultation = editingConsultationId ? consultations.find((c) => c.id === editingConsultationId) : null;
   const { showAlert } = useModal();
@@ -1030,9 +1082,11 @@ function ConsultationsTab({
               행동일지
             </Button>
           </div>
-          <Button variant="solid" onClick={onShowForm}>
-            상담일지 추가
-          </Button>
+          {isEditable && (
+            <Button variant="solid" onClick={onShowForm}>
+              상담일지 추가
+            </Button>
+          )}
         </div>
       )}
 
@@ -1061,7 +1115,6 @@ function ConsultationsTab({
                 disableCardPadding={true}
                 actionContext={{
                   apiCall: async (endpoint: string, method: string, body?: any) => {
-                    const { apiClient } = await import('@api-sdk/core');
                     if (method === 'POST') {
                       const response = await apiClient.post(endpoint, body);
                       if (response.error) {
@@ -1105,7 +1158,6 @@ function ConsultationsTab({
                 }}
                 actionContext={{
                   apiCall: async (endpoint: string, method: string, body?: any) => {
-                    const { apiClient } = await import('@api-sdk/core');
                     if (method === 'POST') {
                       const response = await apiClient.post(endpoint, body);
                       if (response.error) {
@@ -1164,14 +1216,16 @@ function ConsultationsTab({
                   </div>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
-                <Button variant="ghost" size="sm" onClick={() => onEdit(consultation.id)}>
-                  수정
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => onDelete(consultation.id)}>
-                  삭제
-                </Button>
-              </div>
+              {isEditable && (
+                <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
+                  <Button variant="ghost" size="sm" onClick={() => onEdit(consultation.id)}>
+                    수정
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => onDelete(consultation.id)}>
+                    삭제
+                  </Button>
+                </div>
+              )}
             </div>
           </Card>
         ))}
@@ -1191,9 +1245,10 @@ interface TagsTabProps {
   isLoading: boolean;
   studentId: string;
   onUpdateTags: (tagIds: string[]) => Promise<void>;
+  isEditable?: boolean; // 아키텍처 문서 2.4: 권한 체크
 }
 
-function TagsTab({ studentTags, isLoading, studentId, onUpdateTags }: TagsTabProps) {
+function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable = true }: TagsTabProps) {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
   const { data: allTags, isLoading: allTagsLoading } = useStudentTags();
@@ -1247,7 +1302,8 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags }: TagsTabPro
               return (
                 <button
                   key={tag.id}
-                  onClick={() => handleTagToggle(tag.id)}
+                  onClick={() => isEditable && handleTagToggle(tag.id)}
+                  disabled={!isEditable}
                   style={{
                     padding: 'var(--spacing-xs) var(--spacing-sm)',
                     fontSize: 'var(--font-size-sm)',
@@ -1255,7 +1311,8 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags }: TagsTabPro
                     border: isSelected ? `var(--border-width-base) solid ${tag.color}` : `var(--border-width-base) solid transparent`,
                     color: isSelected ? 'var(--color-white)' : tag.color,
                     backgroundColor: isSelected ? tag.color : 'transparent',
-                    cursor: 'pointer',
+                    cursor: isEditable ? 'pointer' : 'not-allowed',
+                    opacity: isEditable ? 1 : 0.6,
                     transition: 'var(--transition-all)',
                   }}
                 >
@@ -1268,30 +1325,34 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags }: TagsTabPro
       )}
 
       {/* 저장 버튼 - 모바일: Bottom Action Bar, 데스크톱: 인라인 */}
-      {isMobile ? (
-        <BottomActionBar>
-          <div style={{ flex: 1 }} />
-          <Button
-            variant="solid"
-            color="primary"
-            size="sm"
-            onClick={handleSave}
-            disabled={isLoading}
-          >
-            저장
-          </Button>
-        </BottomActionBar>
-      ) : (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--spacing-sm)', marginTop: 'var(--spacing-md)' }}>
-          <Button
-            variant="solid"
-            color="primary"
-            onClick={handleSave}
-            disabled={isLoading}
-          >
-            저장
-          </Button>
-        </div>
+      {isEditable && (
+        <>
+          {isMobile ? (
+            <BottomActionBar>
+              <div style={{ flex: 1 }} />
+              <Button
+                variant="solid"
+                color="primary"
+                size="sm"
+                onClick={handleSave}
+                disabled={isLoading}
+              >
+                저장
+              </Button>
+            </BottomActionBar>
+          ) : (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--spacing-sm)', marginTop: 'var(--spacing-md)' }}>
+              <Button
+                variant="solid"
+                color="primary"
+                onClick={handleSave}
+                disabled={isLoading}
+              >
+                저장
+              </Button>
+            </div>
+          )}
+        </>
       )}
       </Card>
     </div>
@@ -1314,6 +1375,7 @@ interface ClassesTabProps {
   effectiveClassAssignmentFormSchema: any;
   onAssign: (classId: string, enrolledAt?: string) => Promise<void>;
   onUnassign: (classId: string, leftAt?: string) => Promise<void>;
+  isEditable?: boolean; // 아키텍처 문서 2.4: 권한 체크
 }
 
 function ClassesTab({
@@ -1324,6 +1386,7 @@ function ClassesTab({
   effectiveClassAssignmentFormSchema,
   onAssign,
   onUnassign,
+  isEditable = true,
 }: ClassesTabProps) {
   const { showAlert, showConfirm } = useModal();
   const mode = useResponsiveMode();
@@ -1362,7 +1425,6 @@ function ClassesTab({
       setSelectedClassId('');
       setEnrolledAt(toKST().format('YYYY-MM-DD'));
     } catch (error) {
-      console.error('Failed to assign class:', error);
       showAlert('반 배정에 실패했습니다.', '오류', 'error');
     }
   };
@@ -1374,7 +1436,6 @@ function ClassesTab({
     try {
       await onUnassign(classId, toKST().format('YYYY-MM-DD'));
     } catch (error) {
-      console.error('Failed to unassign class:', error);
       showAlert('반 제외에 실패했습니다.', '오류', 'error');
     }
   };
@@ -1385,20 +1446,22 @@ function ClassesTab({
 
   return (
     <div>
-      <div style={{ marginBottom: 'var(--spacing-md)' }}>
-        <Button
-          variant="solid"
-          onClick={() => setShowAssignForm(!showAssignForm)}
-          disabled={availableClasses.length === 0}
-        >
-          반 배정
-        </Button>
-        {availableClasses.length === 0 && (
-          <span style={{ marginLeft: 'var(--spacing-sm)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-            배정 가능한 반이 없습니다.
-          </span>
-        )}
-      </div>
+      {isEditable && (
+        <div style={{ marginBottom: 'var(--spacing-md)' }}>
+          <Button
+            variant="solid"
+            onClick={() => setShowAssignForm(!showAssignForm)}
+            disabled={availableClasses.length === 0}
+          >
+            반 배정
+          </Button>
+          {availableClasses.length === 0 && (
+            <span style={{ marginLeft: 'var(--spacing-sm)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+              배정 가능한 반이 없습니다.
+            </span>
+          )}
+        </div>
+      )}
 
       {showAssignForm && (
         <>
@@ -1439,7 +1502,6 @@ function ClassesTab({
                 }}
                 actionContext={{
                   apiCall: async (endpoint: string, method: string, body?: any) => {
-                    const { apiClient } = await import('@api-sdk/core');
                     if (method === 'POST') {
                       const response = await apiClient.post(endpoint, body);
                       if (response.error) {
@@ -1496,7 +1558,6 @@ function ClassesTab({
                 }}
                 actionContext={{
                   apiCall: async (endpoint: string, method: string, body?: any) => {
-                    const { apiClient } = await import('@api-sdk/core');
                     if (method === 'POST') {
                       const response = await apiClient.post(endpoint, body);
                       if (response.error) {
@@ -1543,13 +1604,15 @@ function ClassesTab({
                       <div>배정일: {studentClass.enrolled_at}</div>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleUnassign(classItem.id)}
-                  >
-                    제외
-                  </Button>
+                  {isEditable && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleUnassign(classItem.id)}
+                    >
+                      제외
+                    </Button>
+                  )}
                 </div>
               </Card>
             );
@@ -1664,10 +1727,9 @@ function AttendanceTab({
   const { showAlert } = useModal();
 
   // 최근 30일 출결 내역 조회
+  // 기술문서 5-2: KST 기준 날짜 처리
   const thirtyDaysAgo = useMemo(() => {
-    const date = new Date();
-    date.setDate(date.getDate() - 30);
-    return date.toISOString().split('T')[0];
+    return toKST().subtract(30, 'day').format('YYYY-MM-DD');
   }, []);
 
   const { data: attendanceLogsData, isLoading } = useAttendanceLogs({

@@ -340,7 +340,6 @@ function CreateClassForm({
         }}
         actionContext={{
           apiCall: async (endpoint: string, method: string, body?: any) => {
-            const { apiClient } = await import('@api-sdk/core');
             if (method === 'POST') {
               const response = await apiClient.post(endpoint, body);
               if (response.error) {

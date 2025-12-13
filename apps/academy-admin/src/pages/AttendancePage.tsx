@@ -16,7 +16,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '@ui-core/react';
-import { Container, Card, Button, Input, Badge, Switch, Select, useModal, Checkbox, Tabs, BottomActionBar } from '@ui-core/react';
+import { Container, Card, Button, Input, Badge, Switch, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid } from '@ui-core/react';
 import type { TabItem } from '@ui-core/react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
 import { useAttendanceLogs, useCreateAttendanceLog, useDeleteAttendanceLog } from '@hooks/use-attendance';
@@ -51,6 +51,8 @@ export function AttendancePage() {
   const navigate = useNavigate();
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
+  const isTablet = mode === 'md'; // 아키텍처 문서 3.3.9: 태블릿 모드 감지 (768px ~ 1024px)
+  const isDesktop = mode === 'lg' || mode === 'xl'; // 아키텍처 문서 3.3.9: 데스크톱 모드 (> 1024px)
   const { data: userRole } = useUserRole();
 
   // 역할별 권한 체크 (아키텍처 문서 2.3, 498-507줄)
@@ -122,10 +124,11 @@ export function AttendancePage() {
   const { data: classes, isLoading: isLoadingClasses, error: errorClasses } = useClasses();
 
   // 오늘 수업 필터링 (Today-First Principle)
+  // 기술문서 5-2: KST 기준 날짜 처리
   const todayClassesFilter = useMemo(() => {
-    // 오늘 요일 계산 (월요일=1, 일요일=0)
-    const today = new Date();
-    const dayOfWeek = today.getDay(); // 0(일) ~ 6(토)
+    // 오늘 요일 계산 (월요일=1, 일요일=0) - KST 기준
+    const todayKST = toKST();
+    const dayOfWeek = todayKST.day(); // 0(일) ~ 6(토)
     const dayOfWeekMap: Record<number, DayOfWeek> = {
       0: 'sunday',
       1: 'monday',
@@ -223,14 +226,14 @@ export function AttendancePage() {
       if (!filteredStudents || filteredStudents.length === 0) return {};
 
       try {
-        // TODO: Edge Function으로 AI 예측 API 호출
-        // 현재는 과거 출결 패턴 기반 간단한 예측
+        // AI 출석 예측 (아키텍처 문서 3.3.2: AI가 출석을 "예측"하여 기본값 설정)
+        // 현재는 과거 출결 패턴 기반 간단한 예측 구현
+        // 향후 Edge Function으로 AI 예측 API 호출로 확장 예정
         const predictions: Record<string, { check_in: boolean; check_out: boolean; status: AttendanceStatus }> = {};
 
         // 각 학생의 과거 출결 패턴 조회
-        const thirtyDaysAgo = new Date(selectedDate);
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const dateFrom = thirtyDaysAgo.toISOString().split('T')[0];
+        // 기술문서 5-2: KST 기준 날짜 처리
+        const dateFrom = toKST(selectedDate).subtract(30, 'day').format('YYYY-MM-DD');
 
         for (const student of filteredStudents) {
           try {
@@ -261,14 +264,13 @@ export function AttendancePage() {
               }
             }
           } catch (error) {
-            console.error(`Failed to predict attendance for student ${student.id}:`, error);
+            // AI 예측 실패 시 해당 학생은 예측값 없음으로 처리 (아키텍처 문서 3.3.2: fallback_on_prediction_failure)
           }
         }
 
         return predictions;
       } catch (error) {
-        console.error('AI 예측 실패:', error);
-        // AI 예측 실패 시 빈 객체 반환 (모든 학생 미체크 상태)
+        // AI 예측 실패 시 빈 객체 반환 (모든 학생 미체크 상태) - 아키텍처 문서 3.3.2: fallback_on_prediction_failure
         return {};
       }
     },
@@ -416,7 +418,9 @@ export function AttendancePage() {
   useEffect(() => {
     if (videoRef && stream) {
       videoRef.srcObject = stream;
-      videoRef.play().catch(console.error);
+      videoRef.play().catch(() => {
+        // 비디오 재생 실패 시 무시 (카메라 권한 문제 등)
+      });
     }
     return () => {
       if (stream) {
@@ -470,7 +474,6 @@ export function AttendancePage() {
 
       setShowCreateForm(false);
     } catch (error) {
-      console.error('출결 기록 생성 실패:', error);
       showAlert(
         `출결 기록 생성 중 오류가 발생했습니다: ${error instanceof Error ? error.message : 'Unknown error'}`,
         '오류',
@@ -495,8 +498,7 @@ export function AttendancePage() {
       setShowQRScanner(true);
       setQrScanning(true);
     } catch (error) {
-      console.error('카메라 접근 실패:', error);
-        showAlert('카메라 접근 권한이 필요합니다. 브라우저 설정에서 카메라 권한을 허용해주세요.', '권한 필요', 'warning');
+      showAlert('카메라 접근 권한이 필요합니다. 브라우저 설정에서 카메라 권한을 허용해주세요.', '권한 필요', 'warning');
     }
   };
 
@@ -549,7 +551,6 @@ export function AttendancePage() {
       handleStopQRScanner();
       showAlert(`${student.name}님의 등원이 기록되었습니다.`, '출결 기록 완료', 'success');
     } catch (error) {
-      console.error('QR 스캔 처리 실패:', error);
       showAlert('QR 코드를 인식할 수 없습니다.', 'QR 스캔 오류', 'error');
     }
   };
@@ -559,60 +560,34 @@ export function AttendancePage() {
 
   // 출석부 출력
   const handlePrintAttendance = () => {
-    console.log('출석부 출력 버튼 클릭됨', {
-      attendanceLogs: attendanceLogs?.length,
-      students: students?.length,
-      classes: classes?.length,
-      attendanceLogsArray: attendanceLogs,
-      studentsArray: students,
-      classesArray: classes
-    });
-
     try {
       // 출결 기록 확인
       if (!attendanceLogs) {
-        console.warn('attendanceLogs가 undefined입니다.');
         showAlert('출결 기록을 불러오는 중입니다. 잠시 후 다시 시도해주세요.', '알림', 'info');
         return;
       }
 
       if (attendanceLogs.length === 0) {
-        console.warn('출결 기록이 없습니다.');
         showAlert('출력할 출결 기록이 없습니다.\n\n먼저 "출결 기록" 버튼을 클릭하여 출결 기록을 추가해주세요.', '알림', 'info');
         return;
       }
 
       // 학생 정보 확인
       if (!students) {
-        console.warn('students가 undefined입니다.');
         showAlert('학생 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.', '알림', 'info');
         return;
       }
 
       if (students.length === 0) {
-        console.warn('학생 정보가 없습니다.');
         showAlert('학생 정보가 없습니다.\n\n먼저 학생을 등록해주세요.', '알림', 'info');
         return;
       }
-
-      // 반 정보는 선택적이므로 경고만 표시
-      if (!classes || classes.length === 0) {
-        console.warn('반 정보가 없습니다. 반 정보 없이 출력합니다.');
-      }
-
-      console.log('출석부 출력 시작', {
-        attendanceLogsCount: attendanceLogs.length,
-        studentsCount: students.length,
-        classesCount: classes?.length || 0
-      });
 
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
         showAlert('팝업이 차단되어 있습니다. 브라우저 설정에서 팝업을 허용해주세요.', '팝업 차단', 'warning');
         return;
       }
-
-      console.log('출력 창 열기 성공');
 
       const dateStr = filter.date_from === filter.date_to
         ? filter.date_from
@@ -682,12 +657,10 @@ export function AttendancePage() {
         try {
           printWindow.print();
         } catch (printError) {
-          console.error('인쇄 실패:', printError);
           showAlert('인쇄 대화상자를 열 수 없습니다. 새 창에서 직접 인쇄해주세요.', '인쇄 오류', 'warning');
         }
       }, 100);
     } catch (error) {
-      console.error('출석부 출력 실패:', error);
       showAlert(
         `출석부 출력 중 오류가 발생했습니다: ${error instanceof Error ? error.message : 'Unknown error'}`,
         '오류',
@@ -712,7 +685,6 @@ export function AttendancePage() {
     try {
       await deleteAttendance.mutateAsync(logId);
     } catch (error) {
-      console.error('출결 기록 삭제 실패:', error);
       showAlert(
         `출결 기록 삭제 중 오류가 발생했습니다: ${error instanceof Error ? error.message : 'Unknown error'}`,
         '오류',
@@ -769,7 +741,7 @@ export function AttendancePage() {
           status: state.status,
         }));
 
-      // TODO: 실제 API 호출로 대체
+      // 출결 기록 생성 (아키텍처 문서 3.3.3: 출결 저장)
       for (const record of attendanceRecords) {
         await createAttendance.mutateAsync(record);
       }
@@ -784,7 +756,6 @@ export function AttendancePage() {
         // 이미 setStudentAttendanceStates({})로 초기화했으므로 추가 작업 불필요
       }, 2000);
     } catch (error) {
-      console.error('Failed to save attendance:', error);
       showAlert('출결 저장에 실패했습니다.', '오류', 'error');
     } finally {
       setIsSaving(false);
@@ -860,8 +831,9 @@ export function AttendancePage() {
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
         <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+          {/* 아키텍처 문서 3.3.9: 태블릿 모드 제목 최소 24px */}
           <h1 style={{
-            fontSize: 'var(--font-size-2xl)',
+            fontSize: isTablet ? 'max(var(--font-size-2xl), 24px)' : 'var(--font-size-2xl)',
             fontWeight: 'var(--font-weight-bold)',
             marginBottom: 'var(--spacing-md)',
             color: 'var(--color-text)'
@@ -897,107 +869,7 @@ export function AttendancePage() {
                 />
               </Card>
 
-              {/* AttendanceSummary: 총원/출석/지각/결석 (아키텍처 문서 3.3.3) */}
-              <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 0.6 : 1 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 'var(--spacing-md)' }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                      총원
-                    </div>
-                    <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
-                      {attendanceSummary.total}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                      출석
-                    </div>
-                    <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
-                      {attendanceSummary.present}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                      지각
-                    </div>
-                    <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-warning)' }}>
-                      {attendanceSummary.late}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                      결석
-                    </div>
-                    <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-error)' }}>
-                      {attendanceSummary.absent}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* AttendanceActions: 일괄 등원/하원/저장 버튼 (아키텍처 문서 3.3.3) */}
-              {/* 모바일: Bottom Action Bar, 데스크톱: Card */}
-              {isMobile ? (
-                <BottomActionBar style={{ pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 0.6 : 1 }}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleBulkCheckIn}
-                    disabled={isSaving || isLoading}
-                  >
-                    일괄 등원
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleBulkCheckOut}
-                    disabled={isSaving || isLoading}
-                  >
-                    일괄 하원
-                  </Button>
-                  <div style={{ flex: 1 }} />
-                  <Button
-                    variant="solid"
-                    color="primary"
-                    size="sm"
-                    onClick={handleSaveAttendance}
-                    disabled={isSaving || isLoading}
-                  >
-                    {isSaving ? '저장 중...' : '저장'}
-                  </Button>
-                </BottomActionBar>
-              ) : (
-                <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 0.6 : 1 }}>
-                  <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
-                    <Button
-                      variant="outline"
-                      onClick={handleBulkCheckIn}
-                      disabled={isSaving || isLoading}
-                    >
-                      일괄 등원
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleBulkCheckOut}
-                      disabled={isSaving || isLoading}
-                    >
-                      일괄 하원
-                    </Button>
-                    <div style={{ flex: 1 }} />
-                    {/* 통계 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8) */}
-                    <Button
-                      variant="solid"
-                      color="primary"
-                      onClick={handleSaveAttendance}
-                      disabled={isSaving || isLoading}
-                    >
-                      {isSaving ? '저장 중...' : '저장'}
-                    </Button>
-                  </div>
-                </Card>
-              )}
-
-              {/* AttendanceStudentList: 학생 리스트 + 체크박스 UI */}
+              {/* AttendanceStudentList: 학생 리스트 + 체크박스 UI (아키텍처 문서 3.3.3: Header 다음에 StudentList) */}
               {/* 모바일: Bottom Action Bar를 위한 하단 패딩 추가 */}
               <div style={{
                 display: 'flex',
@@ -1083,7 +955,15 @@ export function AttendancePage() {
                   </Card>
                 )}
                 {!isLoading && !error && filteredStudents.length > 0 && (
-                  filteredStudents.map(student => {
+                  // 아키텍처 문서 3.3.9: 태블릿 모드에서는 학생 리스트를 2열 그리드로 표시
+                  isTablet ? (
+                    <Grid
+                      columns={{
+                        md: 2, // 태블릿: 2열 그리드 (아키텍처 문서 419줄)
+                      }}
+                      gap="md"
+                    >
+                      {filteredStudents.map(student => {
                     const state = studentAttendanceStates[student.id] || {
                       student_id: student.id,
                       check_in: false,
@@ -1119,11 +999,20 @@ export function AttendancePage() {
                               />
                             )}
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
+                              {/* 아키텍처 문서 3.3.9: 태블릿 모드 기본 텍스트 최소 16px */}
+                              <div style={{
+                                fontSize: isTablet ? 'max(var(--font-size-lg), 16px)' : 'var(--font-size-lg)',
+                                fontWeight: 'var(--font-weight-semibold)',
+                                marginBottom: 'var(--spacing-xs)'
+                              }}>
                                 {student.name}
                               </div>
                               {gradeClassInfo && (
-                                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                                <div style={{
+                                  fontSize: isTablet ? 'max(var(--font-size-sm), 16px)' : 'var(--font-size-sm)',
+                                  color: 'var(--color-text-secondary)',
+                                  marginBottom: 'var(--spacing-xs)'
+                                }}>
                                   {gradeClassInfo}
                                 </div>
                               )}
@@ -1205,10 +1094,12 @@ export function AttendancePage() {
                           </div>
 
                           {/* ActionButtons: 등원 버튼, 하원 버튼, 상세 보기 버튼 (아키텍처 문서 3.3.3) */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
+                          {/* 아키텍처 문서 3.3.9: 태블릿 모드에서는 큰 터치 버튼 (등원/하원 버튼 최소 80px × 80px) */}
+                          {/* 아키텍처 문서 3.3.9: 태블릿 모드 버튼 간 간격 최소 8px */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: isTablet ? 'max(var(--spacing-sm), 8px)' : 'var(--spacing-xs)', flexWrap: 'wrap' }}>
                             <Button
                               variant="outline"
-                              size="sm"
+                              size={isTablet ? 'lg' : 'sm'}
                               onClick={() => {
                                 setStudentAttendanceStates(prev => ({
                                   ...prev,
@@ -1220,12 +1111,17 @@ export function AttendancePage() {
                                   },
                                 }));
                               }}
+                              style={isTablet ? {
+                                minWidth: '80px',
+                                minHeight: '80px',
+                                fontSize: 'max(var(--font-size-lg), 18px)', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
+                              } : undefined}
                             >
                               등원
                             </Button>
                             <Button
                               variant="outline"
-                              size="sm"
+                              size={isTablet ? 'lg' : 'sm'}
                               onClick={() => {
                                 setStudentAttendanceStates(prev => ({
                                   ...prev,
@@ -1237,13 +1133,22 @@ export function AttendancePage() {
                                   },
                                 }));
                               }}
+                              style={isTablet ? {
+                                minWidth: '80px',
+                                minHeight: '80px',
+                                fontSize: 'max(var(--font-size-lg), 18px)', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
+                              } : undefined}
                             >
                               하원
                             </Button>
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size={isTablet ? 'md' : 'sm'}
                               onClick={() => navigate(`/students/${student.id}`)}
+                              style={isTablet ? {
+                                minWidth: '48px',
+                                minHeight: '48px',
+                              } : undefined}
                             >
                               상세
                             </Button>
@@ -1251,9 +1156,301 @@ export function AttendancePage() {
                         </div>
                       </Card>
                     );
-                  })
+                  })}
+                    </Grid>
+                  ) : (
+                    // 모바일/PC: 1열 리스트 형태 (아키텍처 문서 431줄: Mobile 1열, 408줄: PC 테이블 형태는 출결 화면에서는 카드 사용)
+                    filteredStudents.map(student => {
+                      const state = studentAttendanceStates[student.id] || {
+                        student_id: student.id,
+                        check_in: false,
+                        check_out: false,
+                        status: 'present' as AttendanceStatus,
+                        ai_predicted: false,
+                        user_modified: false,
+                      };
+
+                      // 학생 정보 확장 (아키텍처 문서 3.3.3: 학년/반, 사진 표시)
+                      const studentWithExtras = student as Student & { primary_class_name?: string };
+                      const studentGrade = student.grade ? `${student.grade}학년` : '';
+                      const studentClass = studentWithExtras.primary_class_name || '';
+                      const gradeClassInfo = [studentGrade, studentClass].filter(Boolean).join(' ');
+
+                      return (
+                        <Card key={student.id} padding="md" variant="default">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
+                            {/* StudentInfo: 이름, 학년/반, 사진 (아키텍처 문서 3.3.3) */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', flex: 1, minWidth: '200px' }}>
+                              {/* 사진 (선택) */}
+                              {student.profile_image_url && (
+                                <img
+                                  src={student.profile_image_url}
+                                  alt={student.name}
+                                  style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    borderRadius: 'var(--border-radius-full)',
+                                    objectFit: 'cover',
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              )}
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
+                                  {student.name}
+                                </div>
+                                {gradeClassInfo && (
+                                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                                    {gradeClassInfo}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* AttendanceStatus: 등원 체크박스, 하원 체크박스, 지각/결석 배지, AI 예측 표시 (아키텍처 문서 3.3.3) */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', cursor: 'pointer' }}>
+                                <Checkbox
+                                  checked={state.check_in}
+                                  onChange={(e) => {
+                                    setStudentAttendanceStates(prev => ({
+                                      ...prev,
+                                      [student.id]: {
+                                        ...state,
+                                        check_in: e.target.checked,
+                                        user_modified: true, // 사용자 입력 시 AI 데이터 override
+                                        ai_predicted: false, // 사용자 수정 시 AI 예측 플래그 제거
+                                      },
+                                    }));
+                                  }}
+                                />
+                                <span>등원</span>
+                                {state.ai_predicted && !state.user_modified && (
+                                  <Badge variant="soft" color="info" style={{ fontSize: 'var(--font-size-xs)' }}>
+                                    AI 예측
+                                  </Badge>
+                                )}
+                              </label>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', cursor: 'pointer' }}>
+                                <Checkbox
+                                  checked={state.check_out}
+                                  onChange={(e) => {
+                                    setStudentAttendanceStates(prev => ({
+                                      ...prev,
+                                      [student.id]: {
+                                        ...state,
+                                        check_out: e.target.checked,
+                                        user_modified: true, // 사용자 입력 시 AI 데이터 override
+                                        ai_predicted: false, // 사용자 수정 시 AI 예측 플래그 제거
+                                      },
+                                    }));
+                                  }}
+                                />
+                                <span>하원</span>
+                              </label>
+                              {/* 지각/결석 배지 (아키텍처 문서 3.3.3) */}
+                              {state.status === 'late' && (
+                                <Badge variant="solid" color="warning">지각</Badge>
+                              )}
+                              {state.status === 'absent' && (
+                                <Badge variant="solid" color="error">결석</Badge>
+                              )}
+                              {state.status === 'excused' && (
+                                <Badge variant="solid" color="info">사유</Badge>
+                              )}
+                              {/* 상태 변경 Select (배지와 함께 사용) */}
+                              <Select
+                                value={state.status}
+                                onChange={(e) => {
+                                  setStudentAttendanceStates(prev => ({
+                                    ...prev,
+                                    [student.id]: {
+                                      ...state,
+                                      status: e.target.value as AttendanceStatus,
+                                      user_modified: true, // 사용자 입력 시 AI 데이터 override
+                                      ai_predicted: false, // 사용자 수정 시 AI 예측 플래그 제거
+                                    },
+                                  }));
+                                }}
+                                style={{ minWidth: '100px' }}
+                              >
+                                <option value="present">출석</option>
+                                <option value="late">지각</option>
+                                <option value="absent">결석</option>
+                                <option value="excused">사유</option>
+                              </Select>
+                            </div>
+
+                            {/* ActionButtons: 등원 버튼, 하원 버튼, 상세 보기 버튼 (아키텍처 문서 3.3.3) */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setStudentAttendanceStates(prev => ({
+                                    ...prev,
+                                    [student.id]: {
+                                      ...state,
+                                      check_in: !state.check_in,
+                                      user_modified: true,
+                                      ai_predicted: false,
+                                    },
+                                  }));
+                                }}
+                              >
+                                등원
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setStudentAttendanceStates(prev => ({
+                                    ...prev,
+                                    [student.id]: {
+                                      ...state,
+                                      check_out: !state.check_out,
+                                      user_modified: true,
+                                      ai_predicted: false,
+                                    },
+                                  }));
+                                }}
+                              >
+                                하원
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => navigate(`/students/${student.id}`)}
+                              >
+                                상세
+                              </Button>
+                            </div>
+                          </div>
+                        </Card>
+                      );
+                    })
+                  )
                 )}
               </div>
+
+              {/* AttendanceSummary: 총원/출석/지각/결석 (아키텍처 문서 3.3.3: StudentList 다음에 Summary) */}
+              <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 0.6 : 1 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 'var(--spacing-md)' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-sm), 16px)' : 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                      총원
+                    </div>
+                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), 24px)' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
+                      {attendanceSummary.total}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-sm), 16px)' : 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                      출석
+                    </div>
+                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), 24px)' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
+                      {attendanceSummary.present}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-sm), 16px)' : 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                      지각
+                    </div>
+                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), 24px)' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-warning)' }}>
+                      {attendanceSummary.late}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-sm), 16px)' : 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                      결석
+                    </div>
+                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), 24px)' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-error)' }}>
+                      {attendanceSummary.absent}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* AttendanceActions: 일괄 등원/하원/저장 버튼 (아키텍처 문서 3.3.3: Summary 다음에 Actions) */}
+              {/* 모바일: Bottom Action Bar, 태블릿/데스크톱: Card */}
+              {/* 아키텍처 문서 3.3.9: 태블릿 모드에서는 큰 터치 버튼 (최소 120px × 60px) */}
+              {isMobile ? (
+                <BottomActionBar style={{ pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 0.6 : 1 }}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBulkCheckIn}
+                    disabled={isSaving || isLoading}
+                  >
+                    일괄 등원
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBulkCheckOut}
+                    disabled={isSaving || isLoading}
+                  >
+                    일괄 하원
+                  </Button>
+                  <div style={{ flex: 1 }} />
+                  <Button
+                    variant="solid"
+                    color="primary"
+                    size="sm"
+                    onClick={handleSaveAttendance}
+                    disabled={isSaving || isLoading}
+                  >
+                    {isSaving ? '저장 중...' : '저장'}
+                  </Button>
+                </BottomActionBar>
+              ) : (
+                <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 0.6 : 1 }}>
+                  <div style={{ display: 'flex', gap: isTablet ? 'max(var(--spacing-md), 8px)' : 'var(--spacing-sm)', flexWrap: 'wrap' }}> {/* 아키텍처 문서 3.3.9: 버튼 간 간격 최소 8px */}
+                    <Button
+                      variant="outline"
+                      size={isTablet ? 'lg' : 'md'}
+                      onClick={handleBulkCheckIn}
+                      disabled={isSaving || isLoading}
+                      style={isTablet ? {
+                        minWidth: '120px',
+                        minHeight: '60px',
+                        fontSize: 'max(var(--font-size-lg), 18px)', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
+                      } : undefined}
+                    >
+                      일괄 등원
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size={isTablet ? 'lg' : 'md'}
+                      onClick={handleBulkCheckOut}
+                      disabled={isSaving || isLoading}
+                      style={isTablet ? {
+                        minWidth: '120px',
+                        minHeight: '60px',
+                        fontSize: 'max(var(--font-size-lg), 18px)', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
+                      } : undefined}
+                    >
+                      일괄 하원
+                    </Button>
+                    <div style={{ flex: 1 }} />
+                    {/* 통계 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8) */}
+                    <Button
+                      variant="solid"
+                      color="primary"
+                      size={isTablet ? 'lg' : 'md'}
+                      onClick={handleSaveAttendance}
+                      disabled={isSaving || isLoading}
+                      style={isTablet ? {
+                        minWidth: '120px',
+                        minHeight: '60px',
+                        fontSize: 'max(var(--font-size-lg), 18px)', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
+                      } : undefined}
+                    >
+                      {isSaving ? '저장 중...' : '저장'}
+                    </Button>
+                  </div>
+                </Card>
+              )}
             </>
           )}
 

@@ -35,14 +35,14 @@ function AppContent() {
   const logout = useLogout();
   const { data: userRole } = useUserRole();
 
-  // 디버깅: location 변경 추적
-  useEffect(() => {
-    console.log('[App.tsx] Location changed:', {
-      pathname: location.pathname,
-      search: location.search,
-      hash: location.hash,
-    });
-  }, [location]);
+  // Location 변경 추적 (필요시 디버깅용으로 활성화)
+  // useEffect(() => {
+  //   console.log('[App.tsx] Location changed:', {
+  //     pathname: location.pathname,
+  //     search: location.search,
+  //     hash: location.hash,
+  //   });
+  // }, [location]);
 
   // 전체 사이드바 아이템 정의는 getSidebarItemsForRole 함수 내부로 이동
   // (Advanced 메뉴 구조를 반영하기 위해)

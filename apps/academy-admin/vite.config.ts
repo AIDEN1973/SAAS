@@ -16,12 +16,12 @@ function excludeServerCode(): Plugin {
           return { id: 'data:text/javascript,export default {}', external: true };
         }
       }
-      
+
       // auth-service의 types와 index는 클라이언트에서 사용 가능
       if (id.includes('auth-service')) {
         return null; // auth-service의 types/index는 허용
       }
-      
+
       // 서버 전용 모듈을 빈 모듈로 대체
       if (
         id.includes('/server') ||
@@ -54,7 +54,7 @@ function excludeServerCode(): Plugin {
       if (id.includes('auth-service') && (id.includes('/service.ts') || id.includes('/service.js'))) {
         return 'export default {};';
       }
-      
+
       // auth-service의 index.ts는 타입만 export하도록 수정
       if (id.includes('auth-service') && (id.includes('/index.ts') || id.includes('/index.js'))) {
         // service.ts를 빈 모듈로 대체하고 types만 export
@@ -63,12 +63,12 @@ function excludeServerCode(): Plugin {
           // service.ts는 서버 전용이므로 클라이언트에서는 제외
         `;
       }
-      
+
       // auth-service의 types는 클라이언트에서 사용 가능
       if (id.includes('auth-service') && id.includes('/types')) {
         return null; // auth-service의 types는 허용
       }
-      
+
       // 서버 전용 파일을 빈 모듈로 대체
       if (
         id.includes('/server.ts') ||
@@ -93,16 +93,16 @@ function excludeServerCode(): Plugin {
 export default defineConfig(({ mode }) => {
   // 프로젝트 루트의 .env.local 파일을 로드
   const envDir = path.resolve(__dirname, '../..');
-  
+
   // loadEnv는 다음 순서로 로드: .env.[mode].local > .env.local > .env.[mode] > .env
   // 하지만 process.env가 우선순위가 높으므로, 명시적으로 .env.local만 로드
   const env = loadEnv(mode, envDir, '');
-  
+
   // process.env에서 잘못된 값이 있는지 확인 및 무시
   // .env.local 파일의 값만 사용하도록 강제
   const envLocalPath = path.join(envDir, '.env.local');
   let envLocal: Record<string, string> = {};
-  
+
   if (existsSync(envLocalPath)) {
     const envLocalContent = readFileSync(envLocalPath, 'utf-8');
     envLocalContent.split('\n').forEach((line: string) => {
@@ -119,7 +119,7 @@ export default defineConfig(({ mode }) => {
       }
     });
   }
-  
+
   // .env.local 파일의 값을 우선 사용
   const finalEnv = { ...env };
   if (envLocal.VITE_SUPABASE_URL) {
@@ -134,7 +134,7 @@ export default defineConfig(({ mode }) => {
   if (envLocal.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     finalEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY = envLocal.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   }
-  
+
   // 디버깅: 로드된 환경변수 출력
   console.log('🔍 Vite Config - 환경변수 로드:');
   console.log('  loadEnv 결과 VITE_SUPABASE_URL:', env.VITE_SUPABASE_URL || '(없음)');
@@ -142,34 +142,31 @@ export default defineConfig(({ mode }) => {
   console.log('  최종 사용 VITE_SUPABASE_URL:', finalEnv.VITE_SUPABASE_URL || '(없음)');
   console.log('  envDir:', envDir);
   console.log('  mode:', mode);
-  
+
   // 환경변수를 define에 주입 (VITE_ 접두사가 있는 것만)
   const define: Record<string, string> = {};
-  
-  // 강제로 올바른 값 주입 (환경변수 문제 해결)
-  const correctUrl = 'https://xawypsrotrfoyozhrsbb.supabase.co';
-  const correctAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhhd3lwc3JvdHJmb3lvemhyc2JiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5NDQ2MDYsImV4cCI6MjA4MDUyMDYwNn0.gH0THgnxtn2WCroHo2Sn1mtLsFzuq4FXJzqs0Rcfws0';
-  
-  // 로드된 환경변수 확인 (finalEnv 사용)
+
+  // 환경변수 로드 확인 (디버깅용)
   const loadedUrl = finalEnv.VITE_SUPABASE_URL || finalEnv.NEXT_PUBLIC_SUPABASE_URL;
   const loadedKey = finalEnv.VITE_SUPABASE_ANON_KEY || finalEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  
+
   console.log('🔍 Vite Config - 환경변수 로드 결과:');
   console.log('  로드된 URL:', loadedUrl || '(없음)');
-  console.log('  올바른 URL:', correctUrl);
-  console.log('  URL 일치:', loadedUrl === correctUrl ? '✅' : '❌');
-  
-  // 올바른 값으로 강제 주입
-  define['import.meta.env.VITE_SUPABASE_URL'] = JSON.stringify(correctUrl);
-  define['import.meta.env.VITE_SUPABASE_ANON_KEY'] = JSON.stringify(correctAnonKey);
-  console.log('✅ 올바른 URL로 강제 주입 완료');
-  
-  if (env.VITE_KAKAO_JS_KEY) {
-    define['import.meta.env.VITE_KAKAO_JS_KEY'] = JSON.stringify(env.VITE_KAKAO_JS_KEY);
-  } else if (env.NEXT_PUBLIC_KAKAO_JS_KEY) {
-    define['import.meta.env.VITE_KAKAO_JS_KEY'] = JSON.stringify(env.NEXT_PUBLIC_KAKAO_JS_KEY);
+  console.log('  로드된 Key:', loadedKey ? '***' : '(없음)');
+
+  // 환경변수가 없으면 경고만 출력 (강제 주입하지 않음)
+  if (!loadedUrl || !loadedKey) {
+    console.warn('⚠️  Supabase 환경변수가 설정되지 않았습니다. .env.local 파일을 확인하세요.');
   }
-  
+
+  // 환경변수를 define에 주입 (있는 경우만)
+  if (loadedUrl) {
+    define['import.meta.env.VITE_SUPABASE_URL'] = JSON.stringify(loadedUrl);
+  }
+  if (loadedKey) {
+    define['import.meta.env.VITE_SUPABASE_ANON_KEY'] = JSON.stringify(loadedKey);
+  }
+
   if (env.VITE_KAKAO_JS_KEY) {
     define['import.meta.env.VITE_KAKAO_JS_KEY'] = JSON.stringify(env.VITE_KAKAO_JS_KEY);
   } else if (env.NEXT_PUBLIC_KAKAO_JS_KEY) {

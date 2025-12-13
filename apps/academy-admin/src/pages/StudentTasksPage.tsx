@@ -10,7 +10,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, Container, Card, Button, useModal } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, Button, useModal, useResponsiveMode } from '@ui-core/react';
 import { Grid } from '@ui-core/react';
 import { StudentTaskCard } from '../components/StudentTaskCard';
 import { useStudentTaskCards, useCompleteStudentTaskCard } from '@hooks/use-student';
@@ -19,6 +19,7 @@ import type { StudentTaskCard as StudentTaskCardType } from '@hooks/use-student'
 export function StudentTasksPage() {
   const navigate = useNavigate();
   const { showAlert } = useModal();
+  const mode = useResponsiveMode(); // UI 문서 6-0: 반응형 브레이크포인트 표준 준수
   const { data: cardsData, isLoading, error } = useStudentTaskCards();
   const cards = cardsData || [];
   const completeTaskCard = useCompleteStudentTaskCard();

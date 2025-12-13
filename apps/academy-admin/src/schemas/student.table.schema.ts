@@ -25,20 +25,33 @@ export const studentTableSchema: TableSchema = {
         type: 'text',
       },
       {
-        key: 'primary_guardian_name',
-        label: '학부모',
-        sortable: false,
-        type: 'text',
-      },
-      {
-        key: 'phone',
-        label: '연락처',
-        sortable: false,
+        key: 'grade',
+        label: '학년',
+        sortable: true,
         type: 'text',
       },
       {
         key: 'primary_class_name',
-        label: '대표반',
+        label: '반',
+        sortable: false,
+        type: 'text',
+      },
+      {
+        key: 'status',
+        label: '상태',
+        sortable: true,
+        type: 'badge',
+        // 아키텍처 문서 5045줄: badge_config 사용 (snake_case)
+        // @ts-ignore - badge_config는 스키마 엔진에서 지원하지만 타입 정의에 없을 수 있음
+        badge_config: {
+          active: { color: 'green', label: '재원' },
+          on_leave: { color: 'yellow', label: '휴원' },
+          withdrawn: { color: 'gray', label: '퇴원' },
+        },
+      },
+      {
+        key: 'phone',
+        label: '연락처',
         sortable: false,
         type: 'text',
       },

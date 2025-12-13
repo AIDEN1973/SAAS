@@ -40,3 +40,5 @@ COMMENT ON FUNCTION create_risk_task_card IS
 '이탈 위험 감지 시 StudentTaskCard 생성 함수. AI 엔진에서 위험 점수 90 이상 감지 시 호출됨.';
 
 
+
+

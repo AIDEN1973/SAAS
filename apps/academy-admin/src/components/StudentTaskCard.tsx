@@ -7,6 +7,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button } from '@ui-core/react';
+import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 import type { StudentTaskCard as StudentTaskCardType } from '@hooks/use-student';
 
 interface StudentTaskCardProps {
@@ -71,14 +72,9 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
     }
   };
 
+  // 기술문서 5-2: KST 변환 필수 (toLocaleDateString 직접 사용 금지)
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return toKST(dateString).format('MM월 DD일 HH:mm');
   };
 
   return (

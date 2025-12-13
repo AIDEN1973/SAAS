@@ -16,19 +16,11 @@ import { useStudentTaskCards, useCompleteStudentTaskCard } from '@hooks/use-stud
 import type { StudentTaskCard as StudentTaskCardType } from '@hooks/use-student';
 
 export function StudentsHomePage() {
-  console.log('[StudentsHomePage] Rendering');
   const navigate = useNavigate();
   const { showAlert } = useModal();
   const { data: cardsData, isLoading, error } = useStudentTaskCards();
   const cards = cardsData || [];
   const completeCard = useCompleteStudentTaskCard();
-
-  console.log('[StudentsHomePage] State:', {
-    cards,
-    cardsLength: cards?.length,
-    isLoading,
-    error: error?.message,
-  });
 
   const handleCardAction = async (card: StudentTaskCardType) => {
     try {
@@ -37,8 +29,8 @@ export function StudentsHomePage() {
       // 액션 URL로 이동 (아키텍처 문서 751-760줄: task_type에 따른 action_url 자동 생성 규칙)
       navigate(card.action_url);
     } catch (error) {
-      console.error('카드 처리 실패:', error);
       // 에러가 있어도 액션 URL로 이동 (사용자 경험 우선)
+      // console.error는 개발 환경에서만 사용 (프로덕션에서는 제거)
       navigate(card.action_url);
     }
   };
