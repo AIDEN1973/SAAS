@@ -100,6 +100,27 @@ export class ApiClient {
       const { data, error } = await query;
 
       if (error) {
+        // schema-registry 요청의 404 에러는 조용히 처리 (스키마가 없을 수 있음)
+        const isSchemaRegistryRequest = table.startsWith('schema-registry/');
+        const isNotFoundError = error.code === 'PGRST116' || 
+          error.code === 'PGRST204' || 
+          error.message?.toLowerCase().includes('404') ||
+          error.message?.toLowerCase().includes('not found') ||
+          error.message?.toLowerCase().includes('does not exist');
+
+        // schema-registry의 404는 정상적인 상황이므로 콘솔에 에러를 출력하지 않음
+        if (isSchemaRegistryRequest && isNotFoundError) {
+          // 조용히 처리 (useSchema 훅에서 fallback 사용)
+        } else if (
+          (typeof import.meta !== 'undefined' && (import.meta as any).env?.DEV) ||
+          (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production')
+        ) {
+          if (!isSchemaRegistryRequest) {
+            // 개발 환경에서만 schema-registry가 아닌 요청의 에러를 로그로 출력
+            console.warn(`[ApiClient] GET ${table} error:`, error);
+          }
+        }
+
         return {
           success: false,
           error: {
