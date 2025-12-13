@@ -111,7 +111,7 @@ export class ApiClient {
         // schema-registry의 404는 정상적인 상황이므로 콘솔에 에러를 출력하지 않음
         if (isSchemaRegistryRequest && isNotFoundError) {
           // 조용히 처리 (useSchema 훅에서 fallback 사용)
-        } else if (import.meta.env?.DEV && !isSchemaRegistryRequest) {
+        } else if (process.env.NODE_ENV === 'development' && !isSchemaRegistryRequest) {
           // 개발 환경에서만 schema-registry가 아닌 요청의 에러를 로그로 출력
           console.warn(`[ApiClient] GET ${table} error:`, error);
         }
