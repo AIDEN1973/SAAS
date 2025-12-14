@@ -26,11 +26,11 @@ export const Spinner: React.FC<SpinnerProps> = ({
   className,
 }) => {
   const sizeMap: Record<SizeToken, string> = {
-    xs: '16px',
-    sm: '20px',
-    md: '24px',
-    lg: '32px',
-    xl: '40px',
+    xs: 'var(--size-spinner-xs)', // styles.css 준수: 스피너 크기 토큰 사용
+    sm: 'var(--size-spinner-sm)', // styles.css 준수: 스피너 크기 토큰 사용
+    md: 'var(--size-spinner-md)', // styles.css 준수: 스피너 크기 토큰 사용
+    lg: 'var(--size-spinner-lg)', // styles.css 준수: 스피너 크기 토큰 사용
+    xl: 'var(--size-spinner-xl)', // styles.css 준수: 스피너 크기 토큰 사용
   };
 
   const colorMap: Record<ColorToken, string> = {
@@ -49,10 +49,10 @@ export const Spinner: React.FC<SpinnerProps> = ({
         display: 'inline-block',
         width: sizeMap[size],
         height: sizeMap[size],
-        border: `3px solid ${colorMap[color]}20`,
+        border: `var(--border-width-spinner) solid ${colorMap[color]}20`, // styles.css 준수: 스피너 border-width 토큰 사용
         borderTopColor: colorMap[color],
-        borderRadius: '50%',
-        animation: 'spin 0.8s linear infinite',
+        borderRadius: 'var(--border-radius-full)', // styles.css 준수: border-radius 토큰 사용
+        animation: 'spin var(--transition-slow) linear infinite', // styles.css 준수: transition 토큰 사용
       }}
       role="status"
       aria-label="Loading"

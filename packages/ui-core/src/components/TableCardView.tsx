@@ -11,14 +11,14 @@ import { clsx } from 'clsx';
 import { Card } from './Card';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 
-export interface TableCardViewColumn<T = any> {
+export interface TableCardViewColumn<T = unknown> {
   key: string;
   label: string;
-  render?: (value: any, row: T) => React.ReactNode;
+  render?: (value: unknown, row: T) => React.ReactNode;
   className?: string;
 }
 
-export interface TableCardViewProps<T = any> {
+export interface TableCardViewProps<T = unknown> {
   data: T[];
   columns: TableCardViewColumn<T>[];
   keyExtractor?: (row: T) => string | number;
@@ -32,7 +32,7 @@ export interface TableCardViewProps<T = any> {
  *
  * 모바일 환경에서 테이블 데이터를 카드 형태로 표시
  */
-export function TableCardView<T = any>({
+export function TableCardView<T = unknown>({
   data,
   columns,
   keyExtractor,
@@ -93,7 +93,7 @@ export function TableCardView<T = any>({
               }}
             >
               {columns.map((column) => {
-                const value = (row as any)[column.key];
+                const value = (row as Record<string, unknown>)[column.key];
                 return (
                   <div
                     key={column.key}
@@ -120,7 +120,7 @@ export function TableCardView<T = any>({
                         fontSize: 'var(--font-size-sm)',
                       }}
                     >
-                      {column.render ? column.render(value, row) : value}
+                      {column.render ? column.render(value, row) : String(value ?? '')}
                     </div>
                   </div>
                 );

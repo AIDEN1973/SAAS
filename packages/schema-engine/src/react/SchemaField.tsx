@@ -19,7 +19,7 @@ import {
 } from 'react-hook-form';
 import { getConditionalActions } from '../core/conditionEvaluator';
 import { buildValidationRules } from '../core/validation';
-import type { FormFieldSchema } from '../types';
+import type { FormFieldSchema, ConditionRule, MultiConditionRule } from '../types';
 import { loadWidget } from '../widgets/registry';
 import {
   Input,
@@ -37,13 +37,13 @@ import {
 
 export interface SchemaFieldProps {
   field: FormFieldSchema;
-  register: UseFormRegister<any>;
-  errors: FieldErrors<any>;
-  control: Control<any>;
+  register: UseFormRegister<Record<string, unknown>>;
+  errors: FieldErrors<Record<string, unknown>>;
+  control: Control<Record<string, unknown>>;
   // SDUI v1.1: i18n 번역 (선택적, Loader 단계에서 바인딩되지 않은 경우 사용)
   translations?: Record<string, string>;
   // SDUI v1.1: 동적 필드 값 설정 (setValue 액션용)
-  setValue?: UseFormSetValue<any>;
+  setValue?: UseFormSetValue<Record<string, unknown>>;
   // Grid의 실제 컬럼 수 (반응형 처리용)
   gridColumns?: number;
 }
@@ -101,16 +101,16 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
   });
 
   const watchedValues = React.useMemo(() => {
-    if (!hasConditions) return {} as Record<string, any>;
+    if (!hasConditions) return {} as Record<string, unknown>;
     // watched가 배열인 경우 필드명과 매핑
     if (Array.isArray(watched)) {
       return fieldsToWatch.reduce((acc, key, idx) => {
         acc[key] = watched[idx];
         return acc;
-      }, {} as Record<string, any>);
+      }, {} as Record<string, unknown>);
     }
     // watched가 객체인 경우 (단일 필드)
-    return watched as Record<string, any>;
+    return watched as Record<string, unknown>;
   }, [watched, hasConditions, fieldsToWatch]);
 
   // 2) 조건 평가
@@ -153,14 +153,15 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
           // apiClient가 없으면 옵션 로드 실패 (fetch fallback 제거)
           const { apiClient } = await import('@api-sdk/core');
           const res = await apiClient.get(endpoint);
-          const data = (res as any).data ?? res;
+          const result = res as { data?: unknown[] } | unknown[];
+          const data = (result && typeof result === 'object' && 'data' in result) ? (result as { data?: unknown[] }).data ?? result : (Array.isArray(result) ? result : []);
 
           if (mounted && Array.isArray(data)) {
             setDynamicOptions(
-              data.map((item: any) => ({
-                value: item.value ?? item.id ?? String(item),
-                label: item.label ?? item.name ?? String(item),
-                labelKey: item.labelKey,
+              (data as Array<Record<string, unknown>>).map((item: Record<string, unknown>) => ({
+                value: typeof (item.value ?? item.id) === 'string' ? (item.value ?? item.id) as string : String(item),
+                label: typeof (item.label ?? item.name) === 'string' ? (item.label ?? item.name) as string : String(item),
+                labelKey: typeof item.labelKey === 'string' ? item.labelKey : undefined,
               })),
             );
           }
@@ -280,14 +281,14 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules}
+          rules={finalRules as any}
           render={({ field: f }) => (
             <Select
               label={label}
               error={error}
               disabled={isDisabled}
               fullWidth
-              value={f.value ?? (kind === 'multiselect' ? [] : '')}
+              value={(f.value ?? (kind === 'multiselect' ? [] : '')) as string | number | readonly string[]}
               onChange={f.onChange}
               onBlur={f.onBlur}
               multiple={kind === 'multiselect'}
@@ -319,7 +320,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
           <Controller
             name={name}
             control={control}
-            rules={finalRules}
+            rules={finalRules as any}
             render={({ field: f }) => (
               <div>
                 {effectiveOptions?.map((opt) => {
@@ -330,7 +331,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
                       label={translatedLabel}
                       value={opt.value}
                       checked={f.value === opt.value}
-                      onChange={(e) => {
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                         if (e.target.checked) {
                           f.onChange(opt.value);
                         }
@@ -356,12 +357,12 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules}
+          rules={finalRules as any}
           render={({ field: f }) => (
             <Checkbox
               label={label}
               checked={!!f.value}
-              onChange={(e) => f.onChange(e.target.checked)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => f.onChange(e.target.checked)}
               disabled={isDisabled}
               fullWidth
             />
@@ -378,11 +379,11 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules}
+          rules={finalRules as any}
           render={({ field: f }) => (
             <DatePicker
               label={label}
-              value={f.value}
+              value={f.value as string | Date | undefined}
               onChange={f.onChange}
               disabled={isDisabled}
               error={error}
@@ -401,11 +402,11 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules}
+          rules={finalRules as any}
           render={({ field: f }) => (
             <DatePicker
               label={label}
-              value={f.value}
+              value={f.value as string | Date | undefined}
               onChange={f.onChange}
               disabled={isDisabled}
               error={error}
@@ -428,7 +429,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         control={control}
         errors={errors}
         isDisabled={isDisabled}
-        finalRules={finalRules}
+        finalRules={finalRules as ConditionRule | MultiConditionRule | undefined}
         translations={translations}
       />
     );
@@ -446,13 +447,13 @@ const CustomWidgetField: React.FC<{
   componentType: string;
   field: FormFieldSchema;
   colSpan: number;
-  control: Control<any>;
-  errors: FieldErrors<any>;
+  control: Control<Record<string, unknown>>;
+  errors: FieldErrors<Record<string, unknown>>;
   isDisabled: boolean;
-  finalRules: any;
+  finalRules: ConditionRule | MultiConditionRule | undefined;
   translations?: Record<string, string>;
 }> = ({ componentType, field, colSpan, control, errors, isDisabled, finalRules, translations: _translations = {} }) => {
-  const [CustomComponent, setCustomComponent] = React.useState<React.ComponentType<any> | null>(null);
+  const [CustomComponent, setCustomComponent] = React.useState<React.ComponentType<Record<string, unknown>> | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<Error | null>(null);
 
@@ -561,7 +562,7 @@ const CustomWidgetField: React.FC<{
       <Controller
         name={field.name}
         control={control}
-        rules={finalRules}
+        rules={finalRules as any}
         render={({ field: f }) => (
           <CustomComponent
             {...widgetProps}

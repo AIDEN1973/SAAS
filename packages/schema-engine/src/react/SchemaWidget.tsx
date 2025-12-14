@@ -17,7 +17,7 @@ export interface SchemaWidgetProps {
   schema: WidgetSchema;
   className?: string;
   // API 호출 함수 (선택적, 없으면 @api-sdk/core의 apiClient 사용)
-  apiCall?: (endpoint: string, method: string, body?: any) => Promise<any>;
+  apiCall?: (endpoint: string, method: string, body?: unknown) => Promise<unknown>;
 }
 
 /**
@@ -49,7 +49,8 @@ export const SchemaWidget: React.FC<SchemaWidgetProps> = ({
       // @api-sdk/core를 통한 API 호출
       const { apiClient } = await import('@api-sdk/core');
       const res = await apiClient.get(dataSource.endpoint);
-      return (res as any).data ?? res;
+      const result = res as { data?: unknown } | unknown;
+      return (result && typeof result === 'object' && 'data' in result) ? (result as { data?: unknown }).data ?? result : result;
     },
     enabled: !!dataSource?.endpoint,
     refetchInterval: refreshInterval || undefined,
@@ -75,11 +76,11 @@ export const SchemaWidget: React.FC<SchemaWidgetProps> = ({
 
     switch (componentType) {
       case 'metric':
-        return renderMetricWidget(data, config);
+        return renderMetricWidget(data as Record<string, unknown>, config);
       case 'card':
-        return renderCardWidget(data, config);
+        return renderCardWidget(data as Record<string, unknown>, config);
       case 'chart':
-        return renderChartWidget(data, config);
+        return renderChartWidget(data as Record<string, unknown>, config);
       default:
         // Custom Widget 로드 시도
         return renderCustomWidget();
@@ -87,12 +88,13 @@ export const SchemaWidget: React.FC<SchemaWidgetProps> = ({
   };
 
   // Metric 위젯 렌더링 (지표 카드)
-  const renderMetricWidget = (widgetData: any, widgetConfig?: Record<string, any>) => {
+  const renderMetricWidget = (widgetData: Record<string, unknown>, widgetConfig?: Record<string, unknown>) => {
     const { label, value, trend, unit, color } = widgetConfig || {};
     const displayValue = widgetData?.value ?? value ?? widgetData ?? '-';
-    const displayLabel = widgetData?.label ?? label ?? '';
-    const displayTrend = widgetData?.trend ?? trend;
-    const displayUnit = widgetData?.unit ?? unit ?? '';
+    const displayLabel = (widgetData?.label ?? label ?? '') as string;
+    const displayTrend = (widgetData?.trend ?? trend ?? '') as string;
+    const displayUnit = (widgetData?.unit ?? unit ?? '') as string;
+    const displayColor = color as string | undefined;
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
@@ -102,8 +104,8 @@ export const SchemaWidget: React.FC<SchemaWidgetProps> = ({
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--spacing-xs)' }}>
-          <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: color || 'var(--color-text)' }}>
-            {typeof displayValue === 'number' ? displayValue.toLocaleString() : displayValue}
+          <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: displayColor || 'var(--color-text)' }}>
+            {typeof displayValue === 'number' ? displayValue.toLocaleString() : String(displayValue)}
           </div>
           {displayUnit && (
             <div style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
@@ -121,7 +123,7 @@ export const SchemaWidget: React.FC<SchemaWidgetProps> = ({
   };
 
   // Card 위젯 렌더링 (카드 형태)
-  const renderCardWidget = (widgetData: any, widgetConfig?: Record<string, any>) => {
+  const renderCardWidget = (widgetData: Record<string, unknown>, widgetConfig?: Record<string, unknown>) => {
     const { title, fields } = widgetConfig || {};
     const displayTitle = widgetData?.title ?? title ?? '';
 
@@ -129,13 +131,13 @@ export const SchemaWidget: React.FC<SchemaWidgetProps> = ({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
         {displayTitle && (
           <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
-            {displayTitle}
+            {String(displayTitle ?? '')}
           </h3>
         )}
         {fields && Array.isArray(fields) && fields.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
-            {fields.map((field: any, index: number) => {
-              const fieldKey = field.key || field.name;
+            {fields.map((field: { key: string; label?: string }, index: number) => {
+              const fieldKey = field.key;
               const fieldLabel = field.label || fieldKey;
               const fieldValue = widgetData?.[fieldKey] ?? '-';
               return (
@@ -144,7 +146,7 @@ export const SchemaWidget: React.FC<SchemaWidgetProps> = ({
                     {fieldLabel}
                   </div>
                   <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)' }}>
-                    {typeof fieldValue === 'number' ? fieldValue.toLocaleString() : fieldValue}
+                    {typeof fieldValue === 'number' ? fieldValue.toLocaleString() : String(fieldValue)}
                   </div>
                 </div>
               );
@@ -160,7 +162,7 @@ export const SchemaWidget: React.FC<SchemaWidgetProps> = ({
   };
 
   // Chart 위젯 렌더링 (차트 - 기본 구현)
-  const renderChartWidget = (widgetData: any, _widgetConfig?: Record<string, any>) => {
+  const renderChartWidget = (widgetData: Record<string, unknown>, _widgetConfig?: Record<string, unknown>) => {
     return (
       <div style={{ padding: 'var(--spacing-md)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
         차트 위젯 (구현 예정)
@@ -172,7 +174,7 @@ export const SchemaWidget: React.FC<SchemaWidgetProps> = ({
   };
 
   // Custom Widget 렌더링 (동적 로딩)
-  const [customWidgetComponent, setCustomWidgetComponent] = React.useState<React.ComponentType<any> | null>(null);
+  const [customWidgetComponent, setCustomWidgetComponent] = React.useState<React.ComponentType<Record<string, unknown>> | null>(null);
   const [customWidgetError, setCustomWidgetError] = React.useState<Error | null>(null);
 
   React.useEffect(() => {

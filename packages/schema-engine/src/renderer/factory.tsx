@@ -17,15 +17,15 @@ import { SchemaWidget } from '../react/SchemaWidget';
 
 export interface SchemaRendererProps {
   schema: UISchema;
-  onSubmit?: (data: any) => void | Promise<void>;
-  defaultValues?: Record<string, any>;
+  onSubmit?: (data: Record<string, unknown>) => void | Promise<void>;
+  defaultValues?: Record<string, unknown>;
   className?: string;
   // SDUI v1.1: Action Engine 컨텍스트 (선택적)
   actionContext?: Partial<ActionContext>;
   // SDUI v1.1: i18n 번역 (선택적)
   translations?: Record<string, string>;
   // SDUI v1.1: API 호출 함수 (Table용 선택적)
-  apiCall?: (endpoint: string, method: string, body?: any) => Promise<any>;
+  apiCall?: (endpoint: string, method: string, body?: unknown) => Promise<unknown>;
 }
 
 /**
@@ -88,7 +88,7 @@ export function SchemaRenderer({ schema, ...props }: SchemaRendererProps): React
 
     default:
       // 알려지지 않은 타입인 경우
-      console.error(`Unknown schema type: ${(schema as any).type}`);
+      console.error(`Unknown schema type: ${(schema as { type?: string }).type}`);
       return (
         <div>
           <p>알 수 없는 스키마 타입입니다.</p>

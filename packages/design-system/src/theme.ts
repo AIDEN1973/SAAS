@@ -70,12 +70,12 @@ export class ThemeEngine {
 
     // 2. Industry tokens
     if (this.config.industryTheme) {
-      merged = this.deepMerge(merged, this.config.industryTheme.tokens);
+      merged = this.deepMerge(merged as unknown as Record<string, unknown>, this.config.industryTheme.tokens as Record<string, unknown>) as unknown as ThemeTokens;
     }
 
     // 3. Tenant theme override
     if (this.config.tenantTheme) {
-      merged = this.deepMerge(merged, this.config.tenantTheme.tokens);
+      merged = this.deepMerge(merged as unknown as Record<string, unknown>, this.config.tenantTheme.tokens as Record<string, unknown>) as unknown as ThemeTokens;
     }
 
     // 4. Dark mode
@@ -91,13 +91,13 @@ export class ThemeEngine {
     return merged;
   }
 
-  private deepMerge(target: any, source: any): any {
+  private deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
     const output = { ...target };
 
     if (source) {
       Object.keys(source).forEach((key) => {
         if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-          output[key] = this.deepMerge(target[key] || {}, source[key]);
+          output[key] = this.deepMerge((target[key] || {}) as Record<string, unknown>, source[key] as Record<string, unknown>);
         } else {
           output[key] = source[key];
         }

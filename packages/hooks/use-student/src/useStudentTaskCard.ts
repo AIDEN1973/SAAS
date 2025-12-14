@@ -8,6 +8,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
+import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 
 // StudentTaskCard 타입 정의 (임시, 나중에 공통 타입으로 이동)
 export interface StudentTaskCard {
@@ -69,8 +70,8 @@ export function useStudentTaskCards() {
         throw new Error(response.error.message);
       }
 
-      // 만료된 카드 필터링 (클라이언트 측)
-      const now = new Date();
+      // 기술문서 5-2: KST 기준 날짜 처리 - 만료된 카드 필터링 (클라이언트 측)
+      const now = toKST().toDate();
       const cardsData = (response.data || []) as StudentTaskCard[];
       const cards = cardsData.filter((card: StudentTaskCard) => {
         const expiresAt = new Date(card.expires_at);

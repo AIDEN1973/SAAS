@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS public.student_classes (
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   student_id uuid NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
   class_id uuid NOT NULL,  -- classes 테이블 참조 (나중에 생성)
+  -- 기술문서 19-1-2: DEFAULT CURRENT_DATE는 레거시/직접 INSERT용이며, 앱에서는 toKST()로 계산한 값을 명시적으로 전달해야 함
   enrolled_at date NOT NULL DEFAULT CURRENT_DATE,
   left_at date,  -- 반 이동 시 이전 반의 left_at 설정
   is_active boolean NOT NULL DEFAULT true,
@@ -77,6 +78,7 @@ CREATE TABLE IF NOT EXISTS public.student_consultations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   student_id uuid NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  -- 기술문서 19-1-2: DEFAULT CURRENT_DATE는 레거시/직접 INSERT용이며, 앱에서는 toKST()로 계산한 값을 명시적으로 전달해야 함
   consultation_date date NOT NULL DEFAULT CURRENT_DATE,
   consultation_type text NOT NULL CHECK (consultation_type IN ('counseling', 'learning', 'behavior', 'other')),
   content text NOT NULL,  -- 상담 내용

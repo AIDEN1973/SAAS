@@ -5,12 +5,12 @@ interface ImportMetaEnv {
   VITE_SUPABASE_URL?: string;
   VITE_SUPABASE_ANON_KEY?: string;
   VITE_KAKAO_JS_KEY?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 function validateEnvClient(): EnvClient {
   const rawEnv: Record<string, string | undefined> = {};
-  
+
   // Vite 환경 감지 (import.meta.env 사용)
   // Vite에서는 import.meta.env를 통해 환경변수에 접근
   // 프로덕션 빌드에서는 빌드 타임에 주입되어 접근 가능합니다
@@ -23,7 +23,7 @@ function validateEnvClient(): EnvClient {
     if (metaEnv) {
       isVite = true;
       const viteEnv = metaEnv as ImportMetaEnv;
-      
+
       // Vite: VITE_* 접두사 사용
       // VITE_ 접두사를 NEXT_PUBLIC_로 매핑 (키 변환)
       // 빈 문자열 체크 (define 옵션으로 주입된 경우 빈 문자열일 수 있음)
@@ -41,7 +41,7 @@ function validateEnvClient(): EnvClient {
     // import.meta가 없는 환경 (Node.js 등 - 정상적인 동작)
     isVite = false;
   }
-  
+
   // Next.js 환경 또는 일반 Node.js 환경 (또는 Vite 프로덕션에서 process.env로 체크)
   if (typeof process !== 'undefined' && process.env) {
     // Next.js: NEXT_PUBLIC_* 접두사
@@ -50,7 +50,7 @@ function validateEnvClient(): EnvClient {
         rawEnv[key] = process.env[key];
       }
     }
-    
+
     // Vite 환경변수를 NEXT_PUBLIC_로 매핑 (VITE_*가 있는 경우)
     // 프로덕션 빌드에서 import.meta.env가 동적으로 접근되지 않는 경우 대비
     if (process.env.VITE_SUPABASE_URL && !rawEnv.NEXT_PUBLIC_SUPABASE_URL) {
@@ -63,21 +63,21 @@ function validateEnvClient(): EnvClient {
       rawEnv.NEXT_PUBLIC_KAKAO_JS_KEY = process.env.VITE_KAKAO_JS_KEY;
     }
   }
-  
+
   const parsed = envClientSchema.safeParse(rawEnv);
-  
+
   if (!parsed.success) {
-    const errors = parsed.error.errors.map(e => 
+    const errors = parsed.error.errors.map(e =>
       `${e.path.join('.')}: ${e.message}`
     ).join('\n');
     const missingVars = parsed.error.errors
       .filter(e => e.code === 'invalid_type' && e.received === 'undefined')
       .map(e => e.path.join('.'))
       .join(', ');
-    
+
     // Vite 환경인지 확인 (에러 메시지에 반영)
     const envPrefix = isVite ? 'VITE_' : 'NEXT_PUBLIC_';
-    
+
     // 디버깅 정보 수집
     const debugInfo: string[] = [];
     try {
@@ -96,7 +96,7 @@ function validateEnvClient(): EnvClient {
       debugInfo.push(`process.env.NEXT_PUBLIC_SUPABASE_URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? '설정됨' : '미설정'}`);
       debugInfo.push(`process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY: ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '설정됨' : '미설정'}`);
     }
-    
+
     throw new Error(
       `클라이언트 환경변수 검증 실패:\n${errors}\n\n` +
       (missingVars ? `누락된 필수 환경변수: ${missingVars}\n\n` : '') +
@@ -109,7 +109,7 @@ function validateEnvClient(): EnvClient {
       `참고: Vite 프로덕션 빌드에서는 빌드 타임에 환경변수가 주입되어야 합니다.`
     );
   }
-  
+
   return parsed.data;
 }
 

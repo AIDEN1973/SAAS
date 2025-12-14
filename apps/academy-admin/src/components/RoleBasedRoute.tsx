@@ -138,7 +138,7 @@ export function RoleBasedRoute({ children, allowedRoles, fallbackPath = '/home' 
         justifyContent: 'center',
         minHeight: '100vh',
       }}>
-        <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
+        <p style={{ color: 'var(--color-text-secondary)' }}>
           권한 확인 중...
         </p>
       </div>
@@ -154,7 +154,7 @@ export function RoleBasedRoute({ children, allowedRoles, fallbackPath = '/home' 
         justifyContent: 'center',
         minHeight: '100vh',
       }}>
-        <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
+        <p style={{ color: 'var(--color-text-secondary)' }}>
           테넌트 정보를 불러오는 중...
         </p>
       </div>
@@ -172,7 +172,7 @@ export function RoleBasedRoute({ children, allowedRoles, fallbackPath = '/home' 
   }
 
   // 허용된 역할인지 확인
-  if (!allowedRoles.includes(userRole)) {
+  if (!allowedRoles.includes(userRole as TenantRole)) {
     // 역할별 기본 경로로 리다이렉트
     const roleDefaultPath: Record<TenantRole, string> = {
       admin: '/home',
@@ -193,11 +193,11 @@ export function RoleBasedRoute({ children, allowedRoles, fallbackPath = '/home' 
 
   // 현재 경로가 역할의 허용된 경로 목록에 있는지 확인
   // 주의: allowedRoles에 포함된 역할이면 경로 체크를 건너뛰고 허용 (더 유연한 접근)
-  const allowedPaths = roleRouteRules[userRole as TenantRole] || [];
+  const allowedPaths = roleRouteRules[(userRole as unknown) as TenantRole] || [];
   const isPathAllowedResult = isPathAllowed(location.pathname, allowedPaths);
 
   // allowedRoles에 포함된 역할이면 경로 체크를 건너뛰고 허용
-  if (allowedRoles.includes(userRole)) {
+  if (allowedRoles.includes(userRole as TenantRole)) {
     return <>{children}</>;
   }
 

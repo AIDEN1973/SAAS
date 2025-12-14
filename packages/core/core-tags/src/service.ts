@@ -152,8 +152,9 @@ export class TagsService {
       tags: Tag | Tag[] | null;
     };
     return (data || [])
-      .map((item: any) => {
-        const tags = item.tags;
+      .map((item) => {
+        const tagItem = item as TagAssignmentWithTag;
+        const tags = tagItem.tags;
         // Supabase는 join 결과를 배열로 반환할 수 있음
         if (Array.isArray(tags)) {
           return tags[0] || null;

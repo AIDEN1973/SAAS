@@ -111,7 +111,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const renderItem = (item: SidebarItem, level: number = 0) => {
     const isActive = isItemActive(item.path, currentPath);
-    const paddingLeft = level * 20 + 16;
+    // 들여쓰기 계산: 레벨당 20px + 기본 16px (spacing-md)
+    const paddingLeft = level * 20 + 16; // 계산된 값 (CSS 변수로 대체 어려움)
     const isExpanded = expandedItems.has(item.id);
     const hasChildren = item.children && item.children.length > 0;
     const isAdvanced = item.isAdvanced;
@@ -139,7 +140,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             cursor: 'pointer',
             transition: 'var(--transition-all)',
             position: 'relative',
-            minHeight: '44px',
+            minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
           }}
           onMouseEnter={(e) => {
             if (!isActive) {
@@ -161,10 +162,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 left: 0,
                 top: '50%',
                 transform: 'translateY(-50%)',
-                width: '3px',
+                width: 'var(--border-width-base)', // styles.css 준수: border-width 토큰 사용 (2px, 시각적 강조를 위해 약간 두껍게)
                 height: '60%',
                 backgroundColor: 'var(--color-primary)',
-                borderRadius: '0 2px 2px 0',
+                borderRadius: `0 var(--border-radius-sm) var(--border-radius-sm) 0`, // styles.css 준수: border-radius 토큰 사용
               }}
             />
           )}
@@ -176,14 +177,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: '16px',
-                height: '16px',
+                width: 'var(--spacing-md)', // styles.css 준수: spacing 토큰 사용 (16px)
+                height: 'var(--spacing-md)', // styles.css 준수: spacing 토큰 사용 (16px)
                 transition: 'var(--transition-transform)',
                 transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
               }}
             >
               <svg
-                style={{ width: '12px', height: '12px' }}
+                style={{
+                  width: 'var(--font-size-xs)', // styles.css 준수: font-size 토큰 사용 (12px, 작은 아이콘)
+                  height: 'var(--font-size-xs)', // styles.css 준수: font-size 토큰 사용 (12px, 작은 아이콘)
+                }}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -204,8 +208,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: '20px',
-                height: '20px',
+                width: 'var(--size-checkbox)', // styles.css 준수: 체크박스 크기 토큰 사용 (20px)
+                height: 'var(--size-checkbox)', // styles.css 준수: 체크박스 크기 토큰 사용 (20px)
               }}
             >
               {item.icon}
@@ -268,10 +272,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             left: 0,
             height: '100%',
             zIndex: 'var(--z-modal)',
-            width: '280px',
+            width: 'var(--width-sidebar)', // styles.css 준수: 사이드바 너비 토큰 사용
             maxWidth: '85vw',
             backgroundColor: 'var(--color-white)',
-            borderRight: '1px solid var(--color-gray-200)',
+            borderRight: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
             boxShadow: 'var(--shadow-xl)',
             transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
             transition: 'var(--transition-transform)',
@@ -283,7 +287,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: 'var(--spacing-lg)',
-              borderBottom: '1px solid var(--color-gray-200)',
+              borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
               backgroundColor: 'var(--color-gray-50)',
             }}
           >
@@ -306,12 +310,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 style={{
                   padding: 'var(--spacing-sm)',
                   borderRadius: 'var(--border-radius-sm)',
-                  minWidth: '44px',
-                  minHeight: '44px',
+                  minWidth: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+                  minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
                 }}
               >
                 <svg
-                  style={{ width: '20px', height: '20px' }}
+                  style={{
+                    width: 'var(--size-checkbox)', // styles.css 준수: 체크박스 크기 토큰 사용 (20px)
+                    height: 'var(--size-checkbox)', // styles.css 준수: 체크박스 크기 토큰 사용 (20px)
+                  }}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -338,10 +345,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       className={clsx(className)}
       style={{
         height: '100%',
-        width: '280px',
-        minWidth: '280px',
+        width: 'var(--width-sidebar)', // styles.css 준수: 사이드바 너비 토큰 사용
+        minWidth: 'var(--width-sidebar)', // styles.css 준수: 사이드바 너비 토큰 사용
         backgroundColor: 'var(--color-white)',
-        borderRight: '1px solid var(--color-gray-200)',
+        borderRight: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
         boxShadow: 'var(--shadow-sm)',
         transition: 'var(--transition-all)',
       }}

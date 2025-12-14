@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS public.class_teachers (
   class_id uuid NOT NULL REFERENCES public.academy_classes(id) ON DELETE CASCADE,
   teacher_id uuid NOT NULL REFERENCES public.academy_teachers(person_id) ON DELETE CASCADE,
   role text NOT NULL DEFAULT 'teacher' CHECK (role IN ('teacher', 'assistant')),  -- 담임/부담임 구분
+  -- 기술문서 19-1-2: DEFAULT CURRENT_DATE는 레거시/직접 INSERT용이며, 앱에서는 toKST()로 계산한 값을 명시적으로 전달해야 함
   assigned_at date NOT NULL DEFAULT CURRENT_DATE,  -- 배정일
   unassigned_at date,  -- 배정 해제일
   is_active boolean NOT NULL DEFAULT true,  -- 현재 배정 여부

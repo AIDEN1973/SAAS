@@ -216,9 +216,9 @@ export function SchemaEditorPage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="full" padding="lg">
-        <div style={{ display: 'flex', gap: 'var(--spacing-md)', height: 'calc(100vh - 120px)' }}>
+        <div style={{ display: 'flex', gap: 'var(--spacing-md)', height: 'calc(100vh - var(--height-header))' }}>
           {/* 좌측: 스키마 목록 */}
-          <div style={{ width: '300px', flexShrink: 0 }}>
+          <div style={{ width: 'var(--width-sidebar)', flexShrink: 0 }}>
             <Card padding="md" variant="default">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
                 <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>

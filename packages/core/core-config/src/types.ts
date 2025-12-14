@@ -20,7 +20,7 @@ export interface TenantConfig {
     theme?: 'light' | 'dark';
     zoom?: number;  // 100 = 기본?
   };
-  [key: string]: any;  // ?종??장 ?정
+  [key: string]: unknown;  // ?종??장 ?정
 }
 
 export interface UpdateConfigInput {
@@ -38,6 +38,6 @@ export interface UpdateConfigInput {
     theme?: 'light' | 'dark';
     zoom?: number;
   };
-  [key: string]: any;
+  [key: string]: unknown;
 }
 

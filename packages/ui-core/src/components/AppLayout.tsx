@@ -78,7 +78,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
             overflowY: 'auto',
             overflowX: 'hidden',
             backgroundColor: 'var(--color-background)',
-            padding: 'var(--spacing-xl)',
+            // 모바일(xs, sm): padding 제거 (Container에서 처리), 태블릿 이상(md+): 넓은 여백 (유아이 문서 6-1 준수)
+            padding: isMobile
+              ? 0 // 모바일: padding 제거 (Container에서만 padding 처리)
+              : 'var(--spacing-xl)', // 태블릿 이상: 32px
             transition: 'var(--transition-all)',
           }}
         >

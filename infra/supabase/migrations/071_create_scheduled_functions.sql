@@ -42,3 +42,4 @@ COMMENT ON FUNCTION create_risk_task_card IS
 
 
 
+

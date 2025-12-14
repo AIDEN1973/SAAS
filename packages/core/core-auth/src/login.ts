@@ -236,7 +236,7 @@ export class LoginService {
     // ⚠️ 주의: tenants 테이블의 RLS 정책이 user_tenant_roles를 참조하므로
     // RLS 정책: id IN (SELECT tenant_id FROM user_tenant_roles WHERE user_id = auth.uid())
     // 이 정책이 제대로 동작하려면 user_tenant_roles가 먼저 조회 가능해야 함
-    const tenantIds = rolesData.map(r => r.tenant_id);
+    const tenantIds = rolesData.map((r: { tenant_id: string }) => r.tenant_id);
 
     const { data: tenantsData, error: tenantsError } = await this.supabase
       .from('tenants')
@@ -245,7 +245,7 @@ export class LoginService {
 
     if (tenantsError) {
       // tenants 조회 실패 시 role 정보만 반환
-      return rolesData.map(r => ({
+      return rolesData.map((r: { tenant_id: string; role: string }) => ({
         id: r.tenant_id,
         name: '알 수 없음',
         industry_type: 'unknown' as const,
@@ -254,12 +254,12 @@ export class LoginService {
     }
 
     // 3단계: 결과 병합
-    const tenantMap = new Map(
-      (tenantsData || []).map(t => [t.id, { id: t.id, name: t.name, industry_type: t.industry_type }])
+    const tenantMap = new Map<string, { id: string; name: string; industry_type: string }>(
+      (tenantsData || []).map((t: { id: string; name: string; industry_type: string }) => [t.id, { id: t.id, name: t.name, industry_type: t.industry_type }])
     );
 
     return rolesData
-      .map((role): TenantInfo | null => {
+      .map((role: { tenant_id: string; role: string }): TenantInfo | null => {
         const tenant = tenantMap.get(role.tenant_id);
         if (!tenant) {
           // tenant 정보가 없으면 role 정보만 반환
@@ -278,7 +278,7 @@ export class LoginService {
           role: role.role,
         };
       })
-      .filter((tenant): tenant is TenantInfo => tenant !== null);
+      .filter((tenant: TenantInfo | null): tenant is TenantInfo => tenant !== null);
   }
 
   /**
@@ -306,6 +306,8 @@ export class LoginService {
     }
 
     // 사용자가 해당 테넌트에 접근 권한이 있는지 확인
+    // ⚠️ 참고: user_tenant_roles는 user_id와 tenant_id 조합으로 조회하므로
+    // withTenant() 대신 직접 필터링 (user_id는 세션에서 가져옴)
     const { data: roleData, error: roleError } = await this.supabase
       .from('user_tenant_roles')
       .select('role')
@@ -321,8 +323,8 @@ export class LoginService {
     // Rate limit 에러 방지를 위해 재시도 로직 추가
     let retries = 0;
     const maxRetries = 3;
-    let refreshError: any = null;
-    let refreshData: any = null;
+    let refreshError: Error | null = null;
+    let refreshData: { session: { access_token: string; refresh_token: string; expires_at?: number } | null; user: unknown } | null = null;
 
     while (retries < maxRetries) {
       try {
@@ -348,7 +350,7 @@ export class LoginService {
           break;
         }
       } catch (error) {
-        refreshError = error;
+        refreshError = error instanceof Error ? error : new Error(String(error));
         break;
       }
     }

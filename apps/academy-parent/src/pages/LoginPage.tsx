@@ -39,9 +39,11 @@ export function LoginPage() {
   const selectTenantMutation = useSelectTenant();
   const selectTenant = selectTenantMutation.mutateAsync;
 
-  const handleEmailLogin = async (data: { email: string; password: string }) => {
+  const handleEmailLogin = async (data: Record<string, unknown>) => {
+    const email = String(data.email ?? '');
+    const password = String(data.password ?? '');
     try {
-      const result = await loginWithEmail.mutateAsync({ email: data.email, password: data.password });
+      const result = await loginWithEmail.mutateAsync({ email, password });
 
       if (result.tenants.length === 0) {
         showAlert('알림', '소속된 테넌트가 없습니다.\n\n회원가입을 진행하시거나, 관리자에게 문의해주세요.');
@@ -88,9 +90,11 @@ export function LoginPage() {
     }
   };
 
-  const handleOTPLogin = async (data: { phone: string; otp: string }) => {
+  const handleOTPLogin = async (data: Record<string, unknown>) => {
+    const phone = String(data.phone ?? '');
+    const otp = String(data.otp ?? '');
     try {
-      const result = await loginWithOTP.mutateAsync({ phone: data.phone, otp: data.otp });
+      const result = await loginWithOTP.mutateAsync({ phone, otp });
 
       if (result.tenants.length === 0) {
         showAlert('알림', '소속된 테넌트가 없습니다.');
@@ -211,8 +215,8 @@ export function LoginPage() {
                       ],
                     },
                   }}
-                  onSubmit={(data) => {
-                    setPhone(data.phone);
+                  onSubmit={(data: Record<string, unknown>) => {
+                    setPhone(String(data.phone ?? ''));
                     handleSendOTP();
                   }}
                   actionContext={{

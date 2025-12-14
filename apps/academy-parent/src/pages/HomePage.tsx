@@ -69,7 +69,7 @@ export function HomePage() {
             <Card padding="lg" variant="default">
               <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
                 <p>등록된 자녀가 없습니다.</p>
-                <p style={{ fontSize: 'var(--font-size-sm)', marginTop: 'var(--spacing-sm)' }}>
+                <p style={{ marginTop: 'var(--spacing-sm)' }}>
                   관리자에게 문의해주세요.
                 </p>
               </div>

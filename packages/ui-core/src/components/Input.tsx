@@ -24,6 +24,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   size = 'md',
   fullWidth = false,
   className,
+  onFocus,
+  onBlur,
   ...props
 }, ref) => {
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
@@ -46,16 +48,35 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
 
   const inputStyle: React.CSSProperties = {
     ...sizeStyles[size],
-    border: `1px solid ${error ? 'var(--color-red-500)' : 'var(--color-gray-200)'}`,
+    border: `var(--border-width-thin) solid ${error ? 'var(--color-red-500)' : 'var(--color-gray-200)'}`, // styles.css 준수: border-width 토큰 사용
     borderRadius: 'var(--border-radius-sm)',
     backgroundColor: 'var(--color-white)',
     color: 'var(--color-text)',
     outline: 'none',
     width: fullWidth ? '100%' : 'auto',
-    transition: 'all 0.2s ease',
+    transition: 'var(--transition-all)', // styles.css 준수: transition 토큰 사용
     fontFamily: 'var(--font-family)',
+    fontSize: 'var(--font-size-base)', // Select/DatePicker와 동일한 폰트 사이즈 (일관성)
+    lineHeight: 'var(--line-height)', // Select/DatePicker와 동일한 line-height (일관성)
+    boxSizing: 'border-box', // Select/DatePicker와 동일한 box-sizing (일관성)
     boxShadow: 'var(--shadow-sm)',
   };
+
+  // React Hook Form의 onBlur와 컴포넌트의 포커스 스타일 관리 병합
+  const handleFocus = React.useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-primary)';
+    // styles.css 준수: focus-ring-width 토큰 사용 (2px)
+    e.currentTarget.style.boxShadow = `0 0 0 var(--focus-ring-width) ${error ? 'var(--color-red-50)' : 'var(--color-primary-50)'}`;
+    // transform 제거: 포커스 시 위로 올라가는 효과 제거 (유아이 문서 준수)
+    onFocus?.(e);
+  }, [error, onFocus]);
+
+  const handleBlur = React.useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-gray-200)';
+    e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+    // transform 제거: 포커스 해제 시 transform 효과 제거 (유아이 문서 준수)
+    onBlur?.(e);
+  }, [error, onBlur]);
 
   return (
     <div
@@ -80,16 +101,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
         ref={ref}
         className={clsx(className)}
         style={inputStyle}
-        onFocus={(e) => {
-          e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-primary)';
-          e.currentTarget.style.boxShadow = `0 0 0 3px ${error ? 'var(--color-red-50)' : 'var(--color-primary-50)'}`;
-          e.currentTarget.style.transform = 'translateY(-1px)';
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-gray-200)';
-          e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-          e.currentTarget.style.transform = 'translateY(0)';
-        }}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         {...props}
       />
       {error && (

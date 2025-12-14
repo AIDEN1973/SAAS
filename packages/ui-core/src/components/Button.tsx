@@ -108,7 +108,7 @@ export const Button: React.FC<ButtonProps> = ({
     borderRadius: 'var(--border-radius-sm)',
     border: 'none',
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    transition: 'var(--transition-all)',
     outline: 'none',
     ...sizeStyles[size],
     ...(fullWidth && { width: '100%' }),
@@ -122,18 +122,23 @@ export const Button: React.FC<ButtonProps> = ({
     outline: {
       backgroundColor: 'var(--color-white)',
       color: colorVars.main,
-      border: `1px solid ${colorVars.main}`,
+      border: `var(--border-width-thin) solid ${colorVars.main}`, // styles.css 준수: border-width 토큰 사용
     },
     ghost: {
-      backgroundColor: 'var(--color-white)',
+      backgroundColor: 'transparent',
       color: colorVars.main,
+      border: 'none',
     },
   };
 
   const style: React.CSSProperties = {
     ...baseStyle,
     ...variantStyles[variant],
+    ...props.style, // 외부에서 전달된 style prop을 마지막에 병합하여 오버라이드 허용
   };
+
+  // style prop을 제거하여 중복 전달 방지
+  const { style: _, ...restProps } = props;
 
   return (
     <button
@@ -143,7 +148,9 @@ export const Button: React.FC<ButtonProps> = ({
         if (variant === 'solid') {
           e.currentTarget.style.backgroundColor = colorVars.dark;
           e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-        } else if (variant === 'outline' || variant === 'ghost') {
+        } else if (variant === 'outline') {
+          e.currentTarget.style.backgroundColor = colorVars.bg50;
+        } else if (variant === 'ghost') {
           e.currentTarget.style.backgroundColor = colorVars.bg50;
         }
       }}
@@ -151,17 +158,20 @@ export const Button: React.FC<ButtonProps> = ({
         if (variant === 'solid') {
           e.currentTarget.style.backgroundColor = colorVars.main;
           e.currentTarget.style.boxShadow = 'none';
-        } else {
+        } else if (variant === 'outline') {
           e.currentTarget.style.backgroundColor = 'var(--color-white)';
+        } else if (variant === 'ghost') {
+          e.currentTarget.style.backgroundColor = 'transparent';
         }
       }}
       onFocus={(e) => {
-        e.currentTarget.style.boxShadow = `0 0 0 2px ${colorVars.bg50}, 0 0 0 2px ${colorVars.main}`;
+        // 포커스 링 제거: 버튼 클릭 시 테두리 굵어지는 효과 제거 (유아이 문서 준수)
+        // 키보드 접근성은 styles.css의 button:focus-visible에서 처리
       }}
       onBlur={(e) => {
-        e.currentTarget.style.boxShadow = 'none';
+        // 포커스 링 제거: 버튼 클릭 시 테두리 굵어지는 효과 제거 (유아이 문서 준수)
       }}
-      {...props}
+      {...restProps}
     >
       {children}
     </button>

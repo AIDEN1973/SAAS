@@ -107,6 +107,7 @@ export function useUpdateConfig() {
           existingId,
           {
             value: mergedConfig,
+            // 기술문서 19-1-1: 타임스탬프는 UTC로 저장 (DB 저장 규칙)
             updated_at: new Date().toISOString(),
           }
         );

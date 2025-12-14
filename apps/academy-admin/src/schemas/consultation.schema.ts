@@ -63,7 +63,6 @@ export const consultationFormSchema: FormSchema = {
       },
     ],
     submit: {
-      labelKey: 'CONSULTATION.FORM.SUBMIT',
       label: '저장',
       variant: 'solid',
       color: 'primary',

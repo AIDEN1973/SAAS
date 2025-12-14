@@ -95,7 +95,6 @@ export const teacherFormSchema: FormSchema = {
       },
     ],
     submit: {
-      labelKey: 'TEACHER.FORM.SUBMIT',
       label: '등록',
       variant: 'solid',
       color: 'primary',

@@ -60,7 +60,7 @@ export const Tabs: React.FC<TabsProps> = ({
         style={{
           display: 'flex',
           gap: isPills ? 'var(--spacing-xs)' : 0,
-          borderBottom: isPills ? 'none' : '2px solid var(--color-gray-200)',
+          borderBottom: isPills ? 'none' : 'var(--border-width-base) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
         }}
       >
         {items.map((item, index) => {
@@ -72,7 +72,7 @@ export const Tabs: React.FC<TabsProps> = ({
               disabled={item.disabled}
               style={{
                 padding: 'var(--spacing-md) var(--spacing-lg)',
-                minHeight: '44px',
+                minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
                 border: 'none',
                 backgroundColor: isPills
                   ? isActive
@@ -89,14 +89,14 @@ export const Tabs: React.FC<TabsProps> = ({
                 borderBottom: isPills
                   ? 'none'
                   : isActive
-                  ? '2px solid var(--color-primary)'
-                  : '2px solid transparent',
+                  ? 'var(--border-width-base) solid var(--color-primary)' // styles.css 준수: border-width 토큰 사용
+                  : 'var(--border-width-base) solid transparent', // styles.css 준수: border-width 토큰 사용
                 borderRadius: isPills ? 'var(--border-radius-sm)' : 0,
                 cursor: item.disabled ? 'not-allowed' : 'pointer',
                 fontWeight: isActive ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)',
                 whiteSpace: 'nowrap',
-                transition: 'all 0.2s ease',
-                opacity: item.disabled ? 0.5 : 1,
+                transition: 'var(--transition-all)', // styles.css 준수: transition 토큰 사용
+                opacity: item.disabled ? 'var(--opacity-disabled)' : 'var(--opacity-full)', // styles.css 준수: opacity 토큰 사용
               }}
             >
               {item.label}

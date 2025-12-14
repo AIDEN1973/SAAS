@@ -65,9 +65,7 @@ export function createClassFormSchema(teachers?: Teacher[]): FormSchema {
           { label: '일요일', value: 'sunday' },
         ],
         defaultValue: 'monday',
-        validation: {
-          required: true,
-        },
+        // 아키텍처 문서 M5: 반 이름만 입력해도 생성 가능, 시간·요일·정원은 고급 옵션
       },
       {
         name: 'start_time',
@@ -77,8 +75,9 @@ export function createClassFormSchema(teachers?: Teacher[]): FormSchema {
           placeholder: '14:00',
           colSpan: 1,
         },
+        defaultValue: '14:00',
         validation: {
-          required: true,
+          // 아키텍처 문서 M5: 반 이름만 입력해도 생성 가능
           pattern: {
             value: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$',
             message: '시간 형식이 올바르지 않습니다 (예: 14:00)',
@@ -93,8 +92,9 @@ export function createClassFormSchema(teachers?: Teacher[]): FormSchema {
           placeholder: '15:30',
           colSpan: 1,
         },
+        defaultValue: '15:30',
         validation: {
-          required: true,
+          // 아키텍처 문서 M5: 반 이름만 입력해도 생성 가능
           pattern: {
             value: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$',
             message: '시간 형식이 올바르지 않습니다 (예: 15:30)',
@@ -108,11 +108,11 @@ export function createClassFormSchema(teachers?: Teacher[]): FormSchema {
           label: '정원',
           colSpan: 1,
         },
+        defaultValue: 20,
         validation: {
-          required: true,
+          // 아키텍처 문서 M5: 반 이름만 입력해도 생성 가능
           min: 1,
         },
-        defaultValue: 20,
       },
       {
         name: 'room',
@@ -143,7 +143,6 @@ export function createClassFormSchema(teachers?: Teacher[]): FormSchema {
       },
     ],
     submit: {
-      labelKey: 'CLASS.FORM.SUBMIT',
       label: '생성',
       variant: 'solid',
       color: 'primary',

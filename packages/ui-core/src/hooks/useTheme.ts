@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getApiContext } from '@api-sdk/core';
 import { apiClient } from '@api-sdk/core';
-import { createTheme, type ThemeMode, type IndustryType } from '@design-system/core';
+import { createTheme, type ThemeMode, type IndustryType, type ThemeTokens } from '@design-system/core';
 import { applyThemeToCSS, resetTheme } from '../utils/applyTheme';
 
 /**
@@ -327,7 +327,10 @@ export function useTheme(options: {
         ? {
             industry: industryType!,
             tokens: {
-              colors: industryThemeOverride.colors as any,
+              colors: industryThemeOverride.colors as ThemeTokens['colors'],
+              spacing: {} as ThemeTokens['spacing'],
+              sizes: {} as ThemeTokens['sizes'],
+              breakpoints: {} as ThemeTokens['breakpoints'],
             },
           }
         : undefined,
@@ -335,7 +338,10 @@ export function useTheme(options: {
         ? {
             tenantId,
             tokens: {
-              colors: tenantThemeOverride.colors as any,
+              colors: tenantThemeOverride.colors as ThemeTokens['colors'],
+              spacing: {} as ThemeTokens['spacing'],
+              sizes: {} as ThemeTokens['sizes'],
+              breakpoints: {} as ThemeTokens['breakpoints'],
             },
           }
         : undefined,

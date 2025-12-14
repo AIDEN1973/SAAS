@@ -72,7 +72,7 @@ export const Accordion: React.FC<AccordionProps> = ({
               style={{
                 width: '100%',
                 padding: 'var(--spacing-md)',
-                minHeight: '44px',
+                minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -82,8 +82,8 @@ export const Accordion: React.FC<AccordionProps> = ({
                 fontWeight: 'var(--font-weight-medium)',
                 color: 'var(--color-text)',
                 textAlign: 'left',
-                transition: 'background-color 0.2s ease',
-                opacity: item.disabled ? 0.5 : 1,
+                transition: 'background-color var(--transition-base)', // styles.css 준수: transition 토큰 사용
+                opacity: item.disabled ? 'var(--opacity-disabled)' : 'var(--opacity-full)', // styles.css 준수: opacity 토큰 사용
               }}
               onMouseEnter={(e) => {
                 if (!item.disabled) {
@@ -97,7 +97,7 @@ export const Accordion: React.FC<AccordionProps> = ({
               <span>{item.title}</span>
               <span
                 style={{
-                  transition: 'transform 0.2s ease',
+                  transition: 'transform var(--transition-base)', // styles.css 준수: transition 토큰 사용
                   transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                 }}
               >
@@ -108,8 +108,8 @@ export const Accordion: React.FC<AccordionProps> = ({
               <div
                 style={{
                   padding: 'var(--spacing-md)',
-                  borderTop: '1px solid var(--color-gray-200)',
-                  animation: 'fadeIn 0.2s ease',
+                  borderTop: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
+                  animation: `fadeIn var(--transition-base)`, // styles.css 준수: transition 토큰 사용
                 }}
               >
                 {item.content}

@@ -74,22 +74,22 @@ export const Badge: React.FC<BadgeProps> = ({
       bg50: 'var(--color-info-50)',
     },
     blue: {
-      main: '#3b82f6',
-      light: '#60a5fa',
-      dark: '#2563eb',
-      bg50: 'rgba(59, 130, 246, 0.1)',
+      main: 'var(--color-info)', // styles.css 준수: info 색상 사용
+      light: 'var(--color-info-light)',
+      dark: 'var(--color-info-dark)',
+      bg50: 'var(--color-info-50)',
     },
     gray: {
-      main: '#6b7280',
-      light: '#9ca3af',
-      dark: '#4b5563',
-      bg50: 'rgba(107, 114, 128, 0.1)',
+      main: 'var(--color-gray-500)', // styles.css 준수: gray 색상 사용
+      light: 'var(--color-gray-400)',
+      dark: 'var(--color-gray-600)',
+      bg50: 'var(--color-gray-50)',
     },
     green: {
-      main: '#10b981',
-      light: '#34d399',
-      dark: '#059669',
-      bg50: 'rgba(16, 185, 129, 0.1)',
+      main: 'var(--color-success)', // styles.css 준수: success 색상 사용
+      light: 'var(--color-success-light)',
+      dark: 'var(--color-success-dark)',
+      bg50: 'var(--color-success-50)',
     },
   };
 
@@ -98,23 +98,23 @@ export const Badge: React.FC<BadgeProps> = ({
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
       padding: 'var(--spacing-xs) var(--spacing-sm)',
-      lineHeight: 1.2,
+      lineHeight: 'var(--line-height)', // styles.css 준수: line-height 토큰 사용
     },
     sm: {
       padding: 'var(--spacing-xs) var(--spacing-sm)',
-      lineHeight: 1.2,
+      lineHeight: 'var(--line-height)', // styles.css 준수: line-height 토큰 사용
     },
     md: {
       padding: 'var(--spacing-xs) var(--spacing-sm)',
-      lineHeight: 1.3,
+      lineHeight: 'var(--line-height)', // styles.css 준수: line-height 토큰 사용
     },
     lg: {
       padding: 'var(--spacing-sm) var(--spacing-md)',
-      lineHeight: 1.4,
+      lineHeight: 'var(--line-height)', // styles.css 준수: line-height 토큰 사용
     },
     xl: {
       padding: 'var(--spacing-sm) var(--spacing-md)',
-      lineHeight: 1.4,
+      lineHeight: 'var(--line-height)', // styles.css 준수: line-height 토큰 사용
     },
   };
 
@@ -127,7 +127,7 @@ export const Badge: React.FC<BadgeProps> = ({
     outline: {
       backgroundColor: 'transparent',
       color: colorVars.main,
-      border: `1px solid ${colorVars.main}`,
+      border: `var(--border-width-thin) solid ${colorVars.main}`, // styles.css 준수: border-width 토큰 사용
     },
     soft: {
       backgroundColor: colorVars.bg50,

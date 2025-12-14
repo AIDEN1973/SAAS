@@ -1,10 +1,10 @@
 /**
  * SchemaPreview Component
- * 
+ *
  * [불변 규칙] 실시간 미리보기 렌더링
  * [불변 규칙] Mock Data 자동 생성
  * [불변 규칙] Condition Rule 적용
- * 
+ *
  * 기술문서: docu/스키마에디터.txt 11. Preview Renderer
  */
 
@@ -12,6 +12,7 @@ import { useMemo } from 'react';
 import { Card } from '@ui-core/react';
 import { SchemaForm, validateSchema } from '@schema-engine';
 import type { FormSchema } from '@schema-engine/types';
+import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 
 export interface SchemaPreviewProps {
   schema: FormSchema;
@@ -19,11 +20,11 @@ export interface SchemaPreviewProps {
 
 /**
  * Mock Data 생성
- * 
+ *
  * 기술문서: docu/스키마에디터.txt 11. Preview Renderer
  */
-function generateMockData(schema: FormSchema): Record<string, any> {
-  const mockData: Record<string, any> = {};
+function generateMockData(schema: FormSchema): Record<string, unknown> {
+  const mockData: Record<string, unknown> = {};
 
   schema.form.fields.forEach((field) => {
     switch (field.kind) {
@@ -36,10 +37,12 @@ function generateMockData(schema: FormSchema): Record<string, any> {
         mockData[field.name] = field.defaultValue || 0;
         break;
       case 'date':
-        mockData[field.name] = field.defaultValue || new Date().toISOString().split('T')[0];
+        // 기술문서 5-2: KST 기준 날짜 처리
+        mockData[field.name] = field.defaultValue || toKST().format('YYYY-MM-DD');
         break;
       case 'datetime':
-        mockData[field.name] = field.defaultValue || new Date().toISOString().slice(0, 16);
+        // 기술문서 5-2: KST 기준 날짜 처리
+        mockData[field.name] = field.defaultValue || toKST().format('YYYY-MM-DDTHH:mm');
         break;
       case 'select':
       case 'radio':
@@ -88,7 +91,7 @@ export function SchemaPreview({ schema }: SchemaPreviewProps) {
       <SchemaForm
         schema={schema}
         defaultValues={mockData}
-        onSubmit={(data: any) => {
+        onSubmit={(data: Record<string, unknown>) => {
           console.log('Preview Submit:', data);
         }}
       />

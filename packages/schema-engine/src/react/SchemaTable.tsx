@@ -9,6 +9,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DataTable, type DataTableColumn } from '@ui-core/react';
+import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 import type { TableSchema } from '../types';
 import { executeActionsForEvent, executeAction, type ActionContext } from '../core/actionEngine';
 
@@ -20,9 +21,9 @@ export interface SchemaTableProps {
   // SDUI v1.1: i18n 번역 (선택적)
   translations?: Record<string, string>;
   // API 호출 함수 (선택적, 없으면 @api-sdk/core의 apiClient 사용)
-  apiCall?: (endpoint: string, method: string, body?: any) => Promise<any>;
+  apiCall?: (endpoint: string, method: string, body?: unknown) => Promise<unknown>;
   // SDUI v1.1: 필터 파라미터 (선택적)
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
 }
 
 /**
@@ -60,7 +61,8 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
           filters: filters,
           orderBy: { column: 'created_at', ascending: false },
         });
-        const data = (res as any).data ?? res;
+        const result = res as { data?: unknown[] } | unknown[];
+        const data = (result && typeof result === 'object' && 'data' in result) ? (result as { data?: unknown[] }).data ?? result : (Array.isArray(result) ? result : []);
         return data;
       }
 
@@ -78,18 +80,19 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
         : (col.label || col.key),
       width: col.width !== undefined ? (typeof col.width === 'number' ? String(col.width) : col.width) : undefined,
       align: (col.type === 'number' ? 'right' : 'left') as 'left' | 'right' | 'center',
-      render: (value: any, _row: any) => {
+      render: (_value: unknown, _row: unknown) => {
         // 타입별 렌더링
         switch (col.type) {
           case 'date':
-            return value ? new Date(value).toLocaleDateString() : '-';
+            // 기술문서 5-2: KST 변환 필수
+            return _value ? toKST(_value as string | number | Date).format('YYYY-MM-DD') : '-';
           case 'number':
-            return typeof value === 'number' ? value.toLocaleString() : value;
+            return typeof _value === 'number' ? _value.toLocaleString() : String(_value ?? '-');
           case 'tag':
           case 'badge':
-            return <span>{value}</span>; // TODO: Tag/Badge 컴포넌트 사용
+            return <span>{String(_value ?? '-')}</span>; // TODO: Tag/Badge 컴포넌트 사용
           default:
-            return value ?? '-';
+            return String(_value ?? '-');
         }
       },
     }));
@@ -101,7 +104,8 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
         label: translations['TABLE.ACTIONS'] || '액션',
         width: '120',
         align: 'right' as 'left' | 'right' | 'center',
-        render: (_value: any, row: any) => {
+        render: (_value: unknown, _row: unknown) => {
+          const row = _row as Record<string, unknown>;
           return (
             <div style={{ display: 'flex', gap: 'var(--spacing-xs)', justifyContent: 'flex-end' }}>
               {Object.keys(rowActionHandlers).map((actionKey) => {
@@ -120,7 +124,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
                       };
                       // rowId를 endpoint에 치환
                       if (actionDef.endpoint && row.id) {
-                        actionDef.endpoint = actionDef.endpoint.replace('{rowId}', row.id);
+                        actionDef.endpoint = actionDef.endpoint.replace('{rowId}', String(row.id));
                       }
                       await executeAction(actionDef, fullContext);
                     }}
@@ -148,7 +152,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   }, [columns, translations, rowActionHandlers, actionContext, apiCall]);
 
   // SDUI v1.1: 행 클릭 핸들러
-  const handleRowClick = React.useCallback(async (row: any) => {
+  const handleRowClick = React.useCallback(async (row: Record<string, unknown>) => {
     if (schema.actions && schema.actions.length > 0) {
       const fullContext: ActionContext = {
         selectedRows: [row],
@@ -170,9 +174,9 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   return (
     <div className={className}>
       <DataTable
-        data={data || []}
+        data={(data || []) as Record<string, unknown>[]}
         columns={dataTableColumns}
-        keyExtractor={(row: any) => row.id || row[columns[0]?.key]}
+        keyExtractor={(row: Record<string, unknown>) => (row.id as string) || (row[columns[0]?.key] as string)}
         onRowClick={rowActions && rowActions.length > 0 ? handleRowClick : undefined}
         emptyMessage="데이터가 없습니다."
       />

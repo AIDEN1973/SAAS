@@ -75,7 +75,6 @@ export const attendanceSettingsFormSchema: FormSchema = {
       },
     ],
     submit: {
-      labelKey: 'ATTENDANCE_SETTINGS.FORM.SUBMIT',
       label: '저장',
       variant: 'solid',
       color: 'primary',

@@ -7,7 +7,7 @@
  * 기술문서: docu/스키마에디터.txt 8. Condition Rule Engine
  */
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Card, Input, Select, Button, Checkbox } from '@ui-core/react';
 import type { FormFieldSchema, ConditionRule, MultiConditionRule } from '@schema-engine/types';
 
@@ -42,7 +42,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
     { value: 'not_exists', label: '미존재 (not_exists)' },
   ];
 
-  const handleSingleConditionChange = (key: keyof ConditionRule, value: any) => {
+  const handleSingleConditionChange = (key: keyof ConditionRule, value: unknown) => {
     const updated = { ...condition, [key]: value };
     setCondition(updated);
     onChange(updated, undefined);
@@ -66,7 +66,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
     });
   };
 
-  const handleConditionItemChange = (index: number, key: keyof ConditionRule, value: any) => {
+  const handleConditionItemChange = (index: number, key: keyof ConditionRule, value: unknown) => {
     const newConditions = [...multiCondition.conditions];
     newConditions[index] = { ...newConditions[index], [key]: value };
     handleMultiConditionChange({ conditions: newConditions });
@@ -82,7 +82,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
           <Checkbox
             checked={useMultiCondition}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
               setUseMultiCondition(e.target.checked);
               if (e.target.checked) {
                 onChange(undefined, multiCondition);
@@ -99,7 +99,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
             <Select
               label="참조 필드"
               value={condition.field}
-              onChange={(value) => handleSingleConditionChange('field', String(value))}
+              onChange={(value: string | string[]) => handleSingleConditionChange('field', String(Array.isArray(value) ? value[0] : value))}
             >
               {allFields
                 .filter((f) => f.name !== field.name)
@@ -112,7 +112,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
             <Select
               label="연산자"
               value={condition.op}
-              onChange={(value) => handleSingleConditionChange('op', String(value))}
+              onChange={(value: string | string[]) => handleSingleConditionChange('op', String(Array.isArray(value) ? value[0] : value))}
             >
               {operators.map((op) => (
                 <option key={op.value} value={op.value}>
@@ -123,8 +123,8 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
             {!['exists', 'not_exists'].includes(condition.op) && (
               <Input
                 label="비교 값"
-                value={condition.value || ''}
-                onChange={(e) => handleSingleConditionChange('value', e.target.value)}
+                value={String(condition.value || '')}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSingleConditionChange('value', e.target.value)}
               />
             )}
           </div>
@@ -133,7 +133,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
             <Select
               label="연산자 (AND/OR)"
               value={multiCondition.logic || 'and'}
-              onChange={(value) => handleMultiConditionChange({ logic: String(value) as 'and' | 'or' })}
+              onChange={(value: string | string[]) => handleMultiConditionChange({ logic: String(Array.isArray(value) ? value[0] : value) as 'and' | 'or' })}
             >
               <option value="and">AND (모두 만족)</option>
               <option value="or">OR (하나라도 만족)</option>
@@ -153,7 +153,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
                   <Select
                     label="참조 필드"
                     value={cond.field}
-                    onChange={(value) => handleConditionItemChange(index, 'field', String(value))}
+                    onChange={(value: string | string[]) => handleConditionItemChange(index, 'field', String(Array.isArray(value) ? value[0] : value))}
                   >
                     {allFields
                       .filter((f) => f.name !== field.name)
@@ -166,7 +166,7 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
                   <Select
                     label="연산자"
                     value={cond.op}
-                    onChange={(value) => handleConditionItemChange(index, 'op', String(value))}
+                    onChange={(value: string | string[]) => handleConditionItemChange(index, 'op', String(Array.isArray(value) ? value[0] : value))}
                   >
                     {operators.map((op) => (
                       <option key={op.value} value={op.value}>
@@ -177,8 +177,8 @@ export function ConditionEditor({ field, allFields, onChange }: ConditionEditorP
                   {!['exists', 'not_exists'].includes(cond.op) && (
                     <Input
                       label="비교 값"
-                      value={cond.value || ''}
-                      onChange={(e) => handleConditionItemChange(index, 'value', e.target.value)}
+                      value={String(cond.value || '')}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleConditionItemChange(index, 'value', e.target.value)}
                     />
                   )}
                 </div>

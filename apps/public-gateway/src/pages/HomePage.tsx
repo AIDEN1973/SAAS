@@ -9,7 +9,7 @@ export function HomePage() {
     <Container maxWidth="xl" padding="lg">
       <Card padding="md" variant="default">
         <h1 style={{
-          fontSize: '1.5rem',
+          fontSize: 'var(--font-size-2xl)',
           fontWeight: 'var(--font-weight-bold)',
           marginBottom: 'var(--spacing-md)',
           color: 'var(--color-text)'

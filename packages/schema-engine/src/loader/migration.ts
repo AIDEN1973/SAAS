@@ -6,18 +6,18 @@
  * 기술문서: SDUI 기술문서 v1.1 - 6. Schema Migration
  */
 
-import type { BaseSchema } from '../types';
+import type { BaseSchema, FormFieldSchema } from '../types';
 
 export interface MigrationRule {
   fromVersion: string;
   toVersion: string;
   rules: {
     renameFields?: Record<string, string>;  // 필드명 변경
-    addDefaults?: Record<string, any>;       // 기본값 추가
+    addDefaults?: Record<string, unknown>;       // 기본값 추가
     removeFields?: string[];                // 필드 제거
     transformFields?: Array<{               // 필드 변환
       name: string;
-      transform: (value: any) => any;
+      transform: (value: unknown) => unknown;
     }>;
   };
 }
@@ -76,8 +76,9 @@ function applyMigrationRule(schema: BaseSchema, rule: MigrationRule): BaseSchema
 
   // 필드명 변경
   if (rule.rules.renameFields && 'fields' in migrated && Array.isArray(migrated.fields)) {
-    migrated.fields = migrated.fields.map((field: any) => {
-      const newName = rule.rules.renameFields![field.name];
+    migrated.fields = migrated.fields.map((field) => {
+      const fieldObj = field as unknown as Record<string, unknown> & { name?: string };
+      const newName = rule.rules.renameFields?.[fieldObj.name as string];
       if (newName) {
         return { ...field, name: newName };
       }
@@ -87,8 +88,9 @@ function applyMigrationRule(schema: BaseSchema, rule: MigrationRule): BaseSchema
 
   // 기본값 추가
   if (rule.rules.addDefaults && 'fields' in migrated && Array.isArray(migrated.fields)) {
-    migrated.fields = migrated.fields.map((field: any) => {
-      const defaultValue = rule.rules.addDefaults![field.name];
+    migrated.fields = migrated.fields.map((field: FormFieldSchema) => {
+      const fieldName = field.name as string;
+      const defaultValue = rule.rules.addDefaults![fieldName];
       if (defaultValue !== undefined && field.defaultValue === undefined) {
         return { ...field, defaultValue };
       }
@@ -99,7 +101,7 @@ function applyMigrationRule(schema: BaseSchema, rule: MigrationRule): BaseSchema
   // 필드 제거
   if (rule.rules.removeFields && 'fields' in migrated && Array.isArray(migrated.fields)) {
     migrated.fields = migrated.fields.filter(
-      (field: any) => !rule.rules.removeFields!.includes(field.name)
+      (field: FormFieldSchema) => !rule.rules.removeFields!.includes(field.name)
     );
   }
 

@@ -22,8 +22,8 @@ import { executeActionsForEvent, type ActionContext } from '../core/actionEngine
 
 export interface SchemaFormProps {
   schema: FormSchema;
-  onSubmit?: (data: any) => void | Promise<void>;
-  defaultValues?: Record<string, any>;
+  onSubmit?: (data: Record<string, unknown>) => void | Promise<void>;
+  defaultValues?: Record<string, unknown>;
   className?: string;
   // SDUI v1.1: Action Engine 컨텍스트 (선택적)
   actionContext?: Partial<ActionContext>;
@@ -57,7 +57,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
   // 2) React Hook Form 초기화
   // defaultValues는 스키마의 defaultValue와 병합
   const mergedDefaultValues = React.useMemo(() => {
-    const schemaDefaults: Record<string, any> = {};
+    const schemaDefaults: Record<string, unknown> = {};
     schema.form.fields.forEach((field) => {
       if (field.defaultValue !== undefined) {
         schemaDefaults[field.name] = field.defaultValue;
@@ -66,7 +66,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     return { ...schemaDefaults, ...defaultValues };
   }, [schema, defaultValues]);
 
-  const form: UseFormReturn<any> = useForm({
+  const form: UseFormReturn<Record<string, unknown>> = useForm({
     defaultValues: mergedDefaultValues,
   });
 
@@ -78,7 +78,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
   const formData = watch();
   const fullActionContext: ActionContext = React.useMemo(() => ({
     formData,
-    setFormValue: (field: string, value: any) => setValue(field, value),
+    setFormValue: (field: string, value: unknown) => setValue(field, value),
     resetForm: () => reset(),
     translations,
     ...actionContext,
@@ -86,7 +86,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
 
   // 3) Submit 핸들러
   // SDUI v1.1: Action Engine 연동
-  const onFormSubmit = async (data: any) => {
+  const onFormSubmit = async (data: Record<string, unknown>) => {
     try {
       // 스키마에 정의된 onSubmit 액션 실행 (form.actions 우선, 없으면 schema.actions)
       const actions = schema.form.actions || schema.actions;
@@ -301,7 +301,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
  * useForm의 메서드를 외부에서 접근할 수 있도록 하는 고급 컴포넌트
  */
 export interface SchemaFormWithMethodsProps extends SchemaFormProps {
-  formRef?: React.RefObject<UseFormReturn<any>>;
+  formRef?: React.RefObject<UseFormReturn<Record<string, unknown>>>;
 }
 
 export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
@@ -320,7 +320,7 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
   }
 
   const mergedDefaultValues = React.useMemo(() => {
-    const schemaDefaults: Record<string, any> = {};
+    const schemaDefaults: Record<string, unknown> = {};
     schema.form.fields.forEach((field) => {
       if (field.defaultValue !== undefined) {
         schemaDefaults[field.name] = field.defaultValue;
@@ -344,14 +344,14 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
   const formData = watch();
   const fullActionContext: ActionContext = React.useMemo(() => ({
     formData,
-    setFormValue: (field: string, value: any) => setValue(field, value),
+    setFormValue: (field: string, value: unknown) => setValue(field, value),
     resetForm: () => reset(),
     translations,
     ...actionContext,
   }), [formData, setValue, reset, translations, actionContext]);
 
   // SDUI v1.1: Action Engine 연동
-  const onFormSubmit = async (data: any) => {
+  const onFormSubmit = async (data: Record<string, unknown>) => {
     try {
       // 스키마에 정의된 onSubmit 액션 실행 (form.actions 우선, 없으면 schema.actions)
       const actions = schema.form.actions || schema.actions;

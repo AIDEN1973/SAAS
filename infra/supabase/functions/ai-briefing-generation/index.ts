@@ -25,7 +25,8 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // KST 기준 날짜 계산
+    // 기술문서 19-1-2: KST 기준 날짜 처리
+    // Edge Functions는 Deno 환경이므로 수동으로 KST 변환 수행
     const now = new Date();
     const kstOffset = 9 * 60;
     const kstTime = new Date(now.getTime() + (kstOffset * 60 * 1000));
@@ -66,7 +67,7 @@ serve(async (req) => {
 
     for (const tenant of tenants) {
       try {
-        const insights: any[] = [];
+        const insights: Array<{ id: string; title: string; summary: string; insights: string[]; created_at: string; action_url?: string }> = [];
 
         // 1. 오늘 상담 일정 확인
         const { data: consultations, error: consultationsError } = await supabase
@@ -100,8 +101,8 @@ serve(async (req) => {
           .gte('period_start', `${currentMonth}-01`);
 
         if (!invoicesError && invoices && invoices.length > 0) {
-          const totalAmount = invoices.reduce((sum: number, inv: any) => sum + (inv.amount || 0), 0);
-          const paidAmount = invoices.reduce((sum: number, inv: any) => sum + (inv.amount_paid || 0), 0);
+          const totalAmount = invoices.reduce((sum: number, inv: { amount?: number }) => sum + (inv.amount || 0), 0);
+          const paidAmount = invoices.reduce((sum: number, inv: { amount_paid?: number }) => sum + (inv.amount_paid || 0), 0);
           const expectedCollectionRate = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
 
           insights.push({
@@ -129,8 +130,8 @@ serve(async (req) => {
           .limit(100);
 
         if (!attendanceError && attendanceLogs) {
-          const absentCount = attendanceLogs.filter((log: any) => log.status === 'absent').length;
-          const lateCount = attendanceLogs.filter((log: any) => log.status === 'late').length;
+          const absentCount = attendanceLogs.filter((log: { status: string }) => log.status === 'absent').length;
+          const lateCount = attendanceLogs.filter((log: { status: string }) => log.status === 'late').length;
 
           if (absentCount > 5 || lateCount > 10) {
             insights.push({
@@ -214,6 +215,7 @@ serve(async (req) => {
     );
   }
 });
+
 
 
 

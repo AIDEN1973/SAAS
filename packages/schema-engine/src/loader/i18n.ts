@@ -45,15 +45,18 @@ async function loadTranslationsFromDB(
   try {
     // 동적 import로 Supabase 클라이언트 로드 (선택적 의존성)
     const { createClient } = await import('@lib/supabase-client');
+    const { withTenant } = await import('@lib/supabase-client/db');
     const supabase = createClient();
 
     // i18n_translations 테이블 조회
     // ⚠️ 참고: 테이블이 아직 없을 수 있으므로 에러 처리
-    const { data, error } = await supabase
-      .from('i18n_translations')
-      .select('key, value')
-      .eq('tenant_id', tenantId)
-      .eq('locale', locale);
+    const { data, error } = await withTenant(
+      supabase
+        .from('i18n_translations')
+        .select('key, value')
+        .eq('locale', locale),
+      tenantId
+    );
 
     if (error) {
       // 테이블이 없거나 접근 불가한 경우 빈 객체 반환
@@ -194,9 +197,9 @@ function bindFieldI18n(
  * Submit 버튼 i18n 바인딩
  */
 function bindSubmitI18n(
-  submit: { labelKey?: string; label?: string; [key: string]: any },
+  submit: { labelKey?: string; label?: string; [key: string]: unknown },
   translations: I18nTranslations
-): { label: string; [key: string]: any } {
+): { label: string; [key: string]: unknown } {
   return {
     ...submit,
     label: submit.labelKey

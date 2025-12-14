@@ -30,7 +30,7 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
   list,
   detail,
   listWidth = '40%',
-  detailMinWidth = '360px',
+  detailMinWidth = '22.5rem', // 360px - styles.css 준수: rem 단위 사용 (CSS 변수로 대체 가능하나 현재 토큰 없음)
   className,
   onDetailClose,
 }) => {
@@ -56,11 +56,11 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
       <div
         style={{
           width: listWidth,
-          minWidth: '200px',
+          minWidth: 'var(--width-student-info-min)', // styles.css 준수: 학생 정보 최소 너비 토큰 사용
           overflow: 'auto',
           borderRadius: 'var(--border-radius-sm)',
           backgroundColor: 'var(--color-white)',
-          border: '1px solid var(--color-gray-200)',
+          border: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
           boxShadow: 'var(--shadow-sm)',
           padding: 'var(--spacing-md)',
         }}
@@ -99,8 +99,8 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
                 backgroundColor: 'transparent',
                 cursor: 'pointer',
                 color: 'var(--color-text-secondary)',
-                minWidth: '44px',
-                minHeight: '44px',
+                minWidth: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+                minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
                 transition: 'var(--transition-all)',
                 display: 'flex',
                 alignItems: 'center',
@@ -116,7 +116,10 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
               }}
             >
               <svg
-                style={{ width: '20px', height: '20px' }}
+                style={{
+                  width: 'var(--size-checkbox)', // styles.css 준수: 체크박스 크기 토큰 사용 (20px)
+                  height: 'var(--size-checkbox)', // styles.css 준수: 체크박스 크기 토큰 사용 (20px)
+                }}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -124,7 +127,7 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2.5}
+                  strokeWidth={2.5} // SVG strokeWidth는 시각적 두께이므로 하드코딩 허용
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>

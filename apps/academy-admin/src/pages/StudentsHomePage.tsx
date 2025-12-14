@@ -124,7 +124,7 @@ export function StudentsHomePage() {
                 color: 'var(--color-text-secondary)',
                 padding: 'var(--spacing-xl)'
               }}>
-                <p style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-md)' }}>
+                <p style={{ marginBottom: 'var(--spacing-md)' }}>
                   오늘 처리할 학생 업무가 없습니다.
                 </p>
                 <Button

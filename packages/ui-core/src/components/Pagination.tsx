@@ -71,8 +71,8 @@ export const Pagination: React.FC<PaginationProps> = ({
           onClick={() => onPageChange(1)}
           disabled={currentPage === 1}
           style={{
-            minWidth: '44px',
-            minHeight: '44px',
+            minWidth: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+            minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
           }}
         >
           «
@@ -83,10 +83,10 @@ export const Pagination: React.FC<PaginationProps> = ({
         size="sm"
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        style={{
-          minWidth: '44px',
-          minHeight: '44px',
-        }}
+          style={{
+            minWidth: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+            minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+          }}
       >
         ‹
       </Button>
@@ -99,8 +99,8 @@ export const Pagination: React.FC<PaginationProps> = ({
           size="sm"
           onClick={() => onPageChange(page)}
           style={{
-            minWidth: '44px',
-            minHeight: '44px',
+            minWidth: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+            minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
           }}
         >
           {page}
@@ -112,10 +112,10 @@ export const Pagination: React.FC<PaginationProps> = ({
         size="sm"
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        style={{
-          minWidth: '44px',
-          minHeight: '44px',
-        }}
+          style={{
+            minWidth: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+            minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+          }}
       >
         ›
       </Button>
@@ -126,8 +126,8 @@ export const Pagination: React.FC<PaginationProps> = ({
           onClick={() => onPageChange(totalPages)}
           disabled={currentPage === totalPages}
           style={{
-            minWidth: '44px',
-            minHeight: '44px',
+            minWidth: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+            minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
           }}
         >
           »

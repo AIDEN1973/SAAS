@@ -15,8 +15,9 @@ import { useStudents, useStudentTags, useStudentTagsByStudent, useCreateStudent,
 import { useClasses } from '@hooks/use-class';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
-import type { StudentFilter, StudentStatus, Student, CreateStudentInput } from '@services/student-service';
+import type { StudentFilter, StudentStatus, Student, CreateStudentInput, Gender } from '@services/student-service';
 import type { Tag } from '@core/tags';
+import type { FormSchema } from '@schema-engine/types';
 import { studentFormSchema } from '../schemas/student.schema';
 import { createStudentFilterSchema } from '../schemas/student.filter.schema';
 import { studentTableSchema } from '../schemas/student.table.schema';
@@ -59,12 +60,12 @@ export function StudentsPage() {
   const effectiveFilterSchema = studentFilterSchemaData || createStudentFilterSchema(classes || []);
   const effectiveTableSchema = studentTableSchemaData || studentTableSchema;
 
-  const handleFilterChange = React.useCallback((filters: Record<string, any>) => {
+  const handleFilterChange = React.useCallback((filters: Record<string, unknown>) => {
     setFilter((prev) => ({
-      search: filters.search || undefined,
-      status: filters.status || undefined,
-      grade: filters.grade || undefined,
-      class_id: filters.class_id || undefined,
+      search: filters.search ? String(filters.search) : undefined,
+      status: filters.status as StudentStatus | StudentStatus[] | undefined,
+      grade: filters.grade ? String(filters.grade) : undefined,
+      class_id: filters.class_id ? String(filters.class_id) : undefined,
       tag_ids: prev.tag_ids, // 태그 필터는 별도로 유지
     }));
   }, []);
@@ -157,20 +158,20 @@ export function StudentsPage() {
                       const worksheet = workbook.Sheets[sheetName];
 
                       // JSON으로 변환
-                      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+                      const jsonData = XLSX.utils.sheet_to_json(worksheet) as Array<Record<string, unknown>>;
 
                       // CreateStudentInput 형식으로 변환
-                      const students: CreateStudentInput[] = jsonData.map((row: any) => ({
-                        name: row['이름'] || row['name'] || '',
-                        birth_date: row['생년월일'] || row['birth_date'] || '',
-                        gender: (row['성별'] || row['gender'] || undefined) as any,
-                        phone: row['전화번호'] || row['phone'] || '',
-                        email: row['이메일'] || row['email'] || '',
-                        address: row['주소'] || row['address'] || '',
-                        school_name: row['학교'] || row['school_name'] || '',
-                        grade: row['학년'] || row['grade'] || '',
+                      const students: CreateStudentInput[] = jsonData.map((row: Record<string, unknown>) => ({
+                        name: String(row['이름'] || row['name'] || ''),
+                        birth_date: row['생년월일'] || row['birth_date'] ? String(row['생년월일'] || row['birth_date']) : undefined,
+                        gender: (row['성별'] || row['gender'] || undefined) as Gender | undefined,
+                        phone: row['전화번호'] || row['phone'] ? String(row['전화번호'] || row['phone']) : undefined,
+                        email: row['이메일'] || row['email'] ? String(row['이메일'] || row['email']) : undefined,
+                        address: row['주소'] || row['address'] ? String(row['주소'] || row['address']) : undefined,
+                        school_name: row['학교'] || row['school_name'] ? String(row['학교'] || row['school_name']) : undefined,
+                        grade: row['학년'] || row['grade'] ? String(row['학년'] || row['grade']) : undefined,
                         status: (row['상태'] || row['status'] || 'active') as StudentStatus,
-                        notes: row['비고'] || row['notes'] || '',
+                        notes: row['비고'] || row['notes'] ? String(row['비고'] || row['notes']) : undefined,
                       })).filter((s) => s.name.trim() !== ''); // 이름이 없는 경우 제외
 
                       if (students.length === 0) {
@@ -243,7 +244,7 @@ export function StudentsPage() {
                   onClose={() => setShowCreateForm(false)}
                   title="학생 등록"
                   position={isMobile ? 'bottom' : 'right'}
-                  width={isTablet ? '500px' : '100%'}
+                  width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
                 >
                   <CreateStudentForm
                     onClose={() => setShowCreateForm(false)}
@@ -334,7 +335,7 @@ export function StudentsPage() {
                 color: 'var(--color-text-secondary)',
                 padding: 'var(--spacing-xl)'
               }}>
-                <p style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-md)' }}>
+                <p style={{ marginBottom: 'var(--spacing-md)' }}>
                   등록된 학생이 없습니다.
                 </p>
                 <Button
@@ -445,7 +446,7 @@ function StudentCard({ student, onDetailClick }: StudentCardProps) {
 interface CreateStudentFormProps {
   onClose: () => void;
   onSubmit: (data: CreateStudentInput) => Promise<void>;
-  effectiveFormSchema: any;
+  effectiveFormSchema: FormSchema;
 }
 
 function CreateStudentForm({ onClose, onSubmit, effectiveFormSchema }: CreateStudentFormProps) {
@@ -455,21 +456,21 @@ function CreateStudentForm({ onClose, onSubmit, effectiveFormSchema }: CreateStu
   const isMobile = mode === 'xs' || mode === 'sm';
   const isTablet = mode === 'md';
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     setIsSubmitting(true);
     try {
       // 스키마에서 받은 데이터를 CreateStudentInput 형식으로 변환
       const input: CreateStudentInput = {
-        name: data.name || '',
-        birth_date: data.birth_date || undefined,
-        gender: data.gender || undefined,
-        phone: data.phone || undefined,
-        email: data.email || undefined,
-        address: data.address || undefined,
-        school_name: data.school_name || undefined,
-        grade: data.grade || undefined,
-        status: data.status || 'active',
-        notes: data.notes || undefined,
+        name: String(data.name ?? ''),
+        birth_date: data.birth_date ? String(data.birth_date) : undefined,
+        gender: data.gender as Gender | undefined,
+        phone: data.phone ? String(data.phone) : undefined,
+        email: data.email ? String(data.email) : undefined,
+        address: data.address ? String(data.address) : undefined,
+        school_name: data.school_name ? String(data.school_name) : undefined,
+        grade: data.grade ? String(data.grade) : undefined,
+        status: (data.status || 'active') as StudentStatus,
+        notes: data.notes ? String(data.notes) : undefined,
       };
       await onSubmit(input);
     } finally {
@@ -502,9 +503,9 @@ function CreateStudentForm({ onClose, onSubmit, effectiveFormSchema }: CreateStu
         }}
         disableCardPadding={isInDrawer}
         actionContext={{
-          apiCall: async (endpoint: string, method: string, body?: any) => {
+          apiCall: async (endpoint: string, method: string, body?: unknown) => {
             if (method === 'POST') {
-              const response = await apiClient.post(endpoint, body);
+              const response = await apiClient.post(endpoint, body as Record<string, unknown>);
               if (response.error) {
                 throw new Error(response.error.message);
               }

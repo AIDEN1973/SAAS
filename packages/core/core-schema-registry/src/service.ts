@@ -1,10 +1,10 @@
 /**
  * Schema Registry Service
- * 
+ *
  * [불변 규칙] 기술문서 PART 1의 5. Schema Registry 운영 문서를 준수합니다.
  * [불변 규칙] meta.schema_registry는 공통 스키마이므로 tenant_id 컬럼이 없습니다.
  * [불변 규칙] SELECT 쿼리는 withTenant를 사용하지 않습니다 (공통 스키마이므로).
- * 
+ *
  * 기술문서: docu/스키마엔진.txt 4. Schema Registry (DB + RLS)
  */
 
@@ -38,7 +38,7 @@ export interface PinSchemaVersionInput {
 
 /**
  * Schema Registry Service
- * 
+ *
  * 스키마 등록, 조회, 활성화 및 Version Pinning을 담당합니다.
  */
 export class SchemaRegistryService {
@@ -46,7 +46,7 @@ export class SchemaRegistryService {
 
   /**
    * 스키마 등록
-   * 
+   *
    * [불변 규칙] status는 기본적으로 'draft'로 설정됩니다.
    * [불변 규칙] Super Admin만 등록 가능 (RLS 정책)
    */
@@ -75,7 +75,7 @@ export class SchemaRegistryService {
 
   /**
    * 스키마 조회 (우선순위 적용)
-   * 
+   *
    * SchemaRegistryClient의 resolveSchema 로직을 사용합니다.
    */
   async getSchema(
@@ -140,12 +140,12 @@ export class SchemaRegistryService {
       throw new Error(`Failed to fetch active schemas: ${error.message}`);
     }
 
-    return (data || []).map((row) => this.mapToEntry(row));
+    return (data || []).map((row: unknown) => this.mapToEntry(row as Record<string, unknown>));
   }
 
   /**
    * 스키마 활성화
-   * 
+   *
    * [불변 규칙] Super Admin만 활성화 가능 (RLS 정책)
    */
   async activateSchema(input: ActivateSchemaInput): Promise<SchemaRegistryEntry> {
@@ -154,6 +154,7 @@ export class SchemaRegistryService {
       .from('meta.schema_registry')
       .update({
         status: 'deprecated',
+        // 기술문서 19-1-1: 타임스탬프는 UTC로 저장 (DB 저장 규칙)
         deprecated_at: new Date().toISOString(),
       })
       .eq('entity', input.entity)
@@ -169,6 +170,7 @@ export class SchemaRegistryService {
       .from('meta.schema_registry')
       .update({
         status: 'active',
+        // 기술문서 19-1-1: 타임스탬프는 UTC로 저장 (DB 저장 규칙)
         activated_at: new Date().toISOString(),
       })
       .eq('entity', input.entity)
@@ -186,7 +188,7 @@ export class SchemaRegistryService {
 
   /**
    * 스키마 비활성화 (Deprecated)
-   * 
+   *
    * [불변 규칙] Super Admin만 비활성화 가능 (RLS 정책)
    */
   async deprecateSchema(input: ActivateSchemaInput): Promise<SchemaRegistryEntry> {
@@ -194,6 +196,7 @@ export class SchemaRegistryService {
       .from('meta.schema_registry')
       .update({
         status: 'deprecated',
+        // 기술문서 19-1-1: 타임스탬프는 UTC로 저장 (DB 저장 규칙)
         deprecated_at: new Date().toISOString(),
       })
       .eq('entity', input.entity)
@@ -217,6 +220,9 @@ export class SchemaRegistryService {
     entity: string,
     industryType: string | null
   ): Promise<{ pinned_version: string } | null> {
+    // ⚠️ 참고: meta.tenant_schema_pins는 tenant_id로 필터링하지만,
+    // withTenant()는 일반 테이블용이므로 직접 필터링 사용
+    // (meta 스키마는 RLS 정책이 다를 수 있음)
     const { data, error } = await this.supabase
       .from('meta.tenant_schema_pins')
       .select('pinned_version')
@@ -237,7 +243,7 @@ export class SchemaRegistryService {
 
   /**
    * Version Pinning 설정
-   * 
+   *
    * [불변 규칙] Super Admin만 설정 가능 (RLS 정책)
    */
   async pinSchemaVersion(input: PinSchemaVersionInput): Promise<void> {
@@ -261,7 +267,7 @@ export class SchemaRegistryService {
 
   /**
    * Version Pinning 제거
-   * 
+   *
    * [불변 규칙] Super Admin만 제거 가능 (RLS 정책)
    */
   async unpinSchemaVersion(
@@ -269,6 +275,9 @@ export class SchemaRegistryService {
     entity: string,
     industryType: string | null
   ): Promise<void> {
+    // ⚠️ 참고: meta.tenant_schema_pins는 tenant_id로 필터링하지만,
+    // withTenant()는 일반 테이블용이므로 직접 필터링 사용
+    // (meta 스키마는 RLS 정책이 다를 수 있음)
     const { error } = await this.supabase
       .from('meta.tenant_schema_pins')
       .delete()
@@ -283,19 +292,19 @@ export class SchemaRegistryService {
 
   /**
    * DB row를 SchemaRegistryEntry로 변환
-   * 
+   *
    * min_supported_client (snake_case) → minSupportedClient (camelCase) 변환
    */
-  private mapToEntry(row: any): SchemaRegistryEntry {
+  private mapToEntry(row: Record<string, unknown>): SchemaRegistryEntry {
     return {
-      id: row.id,
-      entity: row.entity,
-      industry_type: row.industry_type,
-      version: row.version,
-      min_supported_client: row.min_supported_client,
+      id: row.id as string,
+      entity: row.entity as string,
+      industry_type: row.industry_type as string,
+      version: row.version as string,
+      min_supported_client: (row.min_supported_client as string | null) || '',
       schema_json: row.schema_json as UISchema,
-      status: row.status,
-      activated_at: row.activated_at,
+      status: row.status as 'draft' | 'active' | 'deprecated',
+      activated_at: row.activated_at as string | null,
     };
   }
 }

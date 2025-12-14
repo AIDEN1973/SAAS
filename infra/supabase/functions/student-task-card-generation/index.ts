@@ -25,7 +25,8 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // KST 기준 날짜 계산
+    // 기술문서 19-1-2: KST 기준 날짜 처리
+    // Edge Functions는 Deno 환경이므로 수동으로 KST 변환 수행
     const now = new Date();
     const kstOffset = 9 * 60;
     const kstTime = new Date(now.getTime() + (kstOffset * 60 * 1000));
@@ -81,13 +82,13 @@ serve(async (req) => {
         if (!absentError && absentStudents) {
           // 학생별 결석 일수 집계
           const absentCounts = new Map<string, number>();
-          absentStudents.forEach((log: any) => {
+          absentStudents.forEach((log: { student_id: string; occurred_at: string }) => {
             const count = absentCounts.get(log.student_id) || 0;
             absentCounts.set(log.student_id, count + 1);
           });
 
           // 3일 이상 결석한 학생에 대해 카드 생성
-          const cardsToCreate: any[] = [];
+          const cardsToCreate: Array<{ tenant_id: string; student_id: string; task_type: string; priority: number; title: string; description: string; action_url: string; expires_at: string; absence_days?: number; last_attendance_date?: string }> = [];
           for (const [studentId, count] of absentCounts.entries()) {
             if (count >= 3) {
               // 오늘 이미 생성된 카드 확인
@@ -144,7 +145,7 @@ serve(async (req) => {
           .lte('created_at', `${today}T23:59:59`);
 
         if (!newStudentsError && newStudents) {
-          const welcomeCards: any[] = [];
+          const welcomeCards: Array<{ tenant_id: string; student_id: string; task_type: string; priority: number; title: string; description: string; action_url: string; expires_at: string; signup_date?: string }> = [];
           for (const student of newStudents) {
             // 오늘 이미 생성된 카드 확인
             const { data: existing } = await supabase
@@ -213,6 +214,7 @@ serve(async (req) => {
     );
   }
 });
+
 
 
 

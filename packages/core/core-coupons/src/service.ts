@@ -7,6 +7,7 @@
 
 import { createServerClient } from '@lib/supabase-client/server';
 import { withTenant } from '@lib/supabase-client/db';
+import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 import type {
   Coupon,
   CouponUsage,
@@ -189,7 +190,8 @@ export class CouponsService {
       throw new Error('Coupon is not active');
     }
 
-    const now = new Date().toISOString().split('T')[0];
+    // 기술문서 5-2: KST 기준 날짜 처리
+    const now = toKST().format('YYYY-MM-DD');
     if (coupon.valid_from > now || coupon.valid_until < now) {
       throw new Error('Coupon is not valid for current date');
     }

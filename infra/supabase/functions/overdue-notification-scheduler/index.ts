@@ -25,7 +25,8 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // KST 기준 오늘 날짜 계산
+    // 기술문서 19-1-2: KST 기준 날짜 처리
+    // Edge Functions는 Deno 환경이므로 수동으로 KST 변환 수행
     const now = new Date();
     const kstOffset = 9 * 60;
     const kstTime = new Date(now.getTime() + (kstOffset * 60 * 1000));
@@ -183,6 +184,7 @@ serve(async (req) => {
     );
   }
 });
+
 
 
 

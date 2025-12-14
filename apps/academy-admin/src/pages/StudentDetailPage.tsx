@@ -40,8 +40,10 @@ import { useClasses } from '@hooks/use-class';
 import { useAttendanceLogs } from '@hooks/use-attendance';
 import type { AttendanceLog } from '@services/attendance-service';
 import type { Class } from '@services/class-service';
-import type { Student, StudentStatus, Gender, GuardianRelationship, ConsultationType } from '@services/student-service';
+import type { Student, StudentStatus, Gender, GuardianRelationship, ConsultationType, Guardian, StudentConsultation } from '@services/student-service';
+import type { StudentTaskCard } from '@hooks/use-student';
 import type { Tag } from '@core/tags';
+import type { FormSchema, DetailSchema } from '@schema-engine/types';
 import { Badge } from '@ui-core/react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { getApiContext, apiClient } from '@api-sdk/core';
@@ -113,7 +115,7 @@ export function StudentDetailPage() {
   const consultations = useMemo(() => {
     if (!allConsultations) return [];
     if (consultationTypeFilter === 'all') return allConsultations;
-    return allConsultations.filter((c) => c.consultation_type === consultationTypeFilter);
+    return (allConsultations as Array<{ consultation_type: string }>).filter((c) => c.consultation_type === consultationTypeFilter);
   }, [allConsultations, consultationTypeFilter]);
 
   const updateStudent = useUpdateStudent();
@@ -259,7 +261,7 @@ export function StudentDetailPage() {
           {/* 학부모 페이지로 리다이렉트 */}
           {activeTab === 'guardians' && (
             <GuardiansTab
-              guardians={guardians || []}
+              guardians={(guardians as Guardian[]) || []}
               isLoading={guardiansLoading}
               showForm={showGuardianForm}
               editingGuardianId={editingGuardianId}
@@ -274,7 +276,7 @@ export function StudentDetailPage() {
                 setShowGuardianForm(true);
               }}
               onCreate={async (data) => {
-                await createGuardian.mutateAsync({ studentId: student.id, guardian: data });
+                await createGuardian.mutateAsync({ studentId: student.id, guardian: data as Omit<Guardian, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'> });
                 setShowGuardianForm(false);
               }}
               onUpdate={async (guardianId, data) => {
@@ -295,7 +297,7 @@ export function StudentDetailPage() {
           {/* 상담일지 탭 */}
           {activeTab === 'consultations' && (
             <ConsultationsTab
-              consultations={consultations || []}
+              consultations={(consultations as StudentConsultation[]) || []}
               isLoading={consultationsLoading}
               showForm={showConsultationForm}
               editingConsultationId={editingConsultationId}
@@ -315,7 +317,7 @@ export function StudentDetailPage() {
                   showAlert('오류', '사용자 정보를 가져올 수 없습니다. 다시 로그인해주세요.');
                   return;
                 }
-                await createConsultation.mutateAsync({ studentId: student.id, consultation: data, userId });
+                await createConsultation.mutateAsync({ studentId: student.id, consultation: data as Omit<StudentConsultation, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>, userId });
                 setShowConsultationForm(false);
               }}
               onUpdate={async (consultationId, data) => {
@@ -396,7 +398,7 @@ export function StudentDetailPage() {
                 }
                 await createConsultation.mutateAsync({
                   studentId: id!,
-                  consultation: data,
+                  consultation: data as Omit<StudentConsultation, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>,
                   userId
                 });
                 setShowConsultationForm(false);
@@ -582,7 +584,7 @@ function WelcomeTab({ studentId, student }: { studentId: string | null; student:
 
       // TODO: student_task_cards 테이블에서 welcome_message_sent 확인
       // 또는 별도 welcome_messages 테이블 확인
-      const response = await apiClient.get<any>('student_task_cards', {
+      const response = await apiClient.get<StudentTaskCard[]>('student_task_cards', {
         filters: {
           student_id: studentId,
           task_type: 'new_signup',
@@ -595,7 +597,7 @@ function WelcomeTab({ studentId, student }: { studentId: string | null; student:
       }
 
       const card = response.data[0];
-      return card.welcome_message_sent || false;
+      return (card as { welcome_message_sent?: boolean }).welcome_message_sent || false;
     },
     enabled: !!tenantId && !!studentId,
   });
@@ -608,7 +610,7 @@ function WelcomeTab({ studentId, student }: { studentId: string | null; student:
       }
 
       // 학부모 정보 조회
-      const guardiansResponse = await apiClient.get<any>('guardians', {
+      const guardiansResponse = await apiClient.get<Guardian[]>('guardians', {
         filters: { student_id: studentId, is_primary: true },
         limit: 1,
       });
@@ -620,9 +622,9 @@ function WelcomeTab({ studentId, student }: { studentId: string | null; student:
       const guardian = guardiansResponse.data[0];
 
       // 환영 메시지 발송
-      const notificationResponse = await apiClient.post<any>('notifications', {
+      const notificationResponse = await apiClient.post<{ id: string }>('notifications', {
         channel: 'sms',
-        recipient: guardian.phone,
+        recipient: (guardian as unknown as Guardian).phone,
         content: `${student.name} 학생의 학원 등록을 환영합니다! 앞으로 함께 성장해 나가겠습니다.`,
         status: 'pending',
       });
@@ -632,7 +634,7 @@ function WelcomeTab({ studentId, student }: { studentId: string | null; student:
       }
 
       // student_task_cards 업데이트 (welcome_message_sent = true)
-      const taskCardResponse = await apiClient.get<any>('student_task_cards', {
+      const taskCardResponse = await apiClient.get<StudentTaskCard[]>('student_task_cards', {
         filters: {
           student_id: studentId,
           task_type: 'new_signup',
@@ -641,7 +643,7 @@ function WelcomeTab({ studentId, student }: { studentId: string | null; student:
       });
 
       if (!taskCardResponse.error && taskCardResponse.data && taskCardResponse.data.length > 0) {
-        const cardId = taskCardResponse.data[0].id;
+        const cardId = ((taskCardResponse.data[0] as unknown) as { id: string }).id;
         await apiClient.patch('student_task_cards', cardId, {
           welcome_message_sent: true,
         });
@@ -695,12 +697,12 @@ function WelcomeTab({ studentId, student }: { studentId: string | null; student:
 
 // 기본 정보 탭 컴포넌트
 interface StudentInfoTabProps {
-  student: any;
+  student: Student;
   isEditing: boolean;
-  effectiveStudentDetailSchema: any;
-  effectiveStudentFormSchema: any;
+  effectiveStudentDetailSchema: DetailSchema;
+  effectiveStudentFormSchema: FormSchema;
   onCancel: () => void;
-  onSave: (data: any) => Promise<void>;
+  onSave: (data: Record<string, unknown>) => Promise<void>;
 }
 
 function StudentInfoTab({ student, isEditing, effectiveStudentDetailSchema, effectiveStudentFormSchema, onCancel, onSave }: StudentInfoTabProps) {
@@ -730,7 +732,7 @@ function StudentInfoTab({ student, isEditing, effectiveStudentDetailSchema, effe
   }
 
   // 수정 모드: SchemaForm 사용
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     // 스키마에서 받은 데이터를 UpdateStudentInput 형식으로 변환
     const updateData = {
       name: data.name || student.name,
@@ -791,16 +793,16 @@ function StudentInfoTab({ student, isEditing, effectiveStudentDetailSchema, effe
 
 // 학부모 탭 컴포넌트
 interface GuardiansTabProps {
-  guardians: any[];
+  guardians: Guardian[];
   isLoading: boolean;
   showForm: boolean;
   editingGuardianId: string | null;
-  effectiveGuardianFormSchema: any;
+  effectiveGuardianFormSchema: FormSchema;
   onShowForm: () => void;
   onHideForm: () => void;
   onEdit: (guardianId: string) => void;
-  onCreate: (data: any) => Promise<void>;
-  onUpdate: (guardianId: string, data: any) => Promise<void>;
+  onCreate: (data: Record<string, unknown>) => Promise<void>;
+  onUpdate: (guardianId: string, data: Record<string, unknown>) => Promise<void>;
   onDelete: (guardianId: string) => Promise<void>;
   isEditable?: boolean; // 아키텍처 문서 2.4: 권한 체크
 }
@@ -825,7 +827,7 @@ function GuardiansTab({
   const isMobile = mode === 'xs' || mode === 'sm';
   const isTablet = mode === 'md';
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
     if (editingGuardianId) {
         await onUpdate(editingGuardianId, data);
@@ -861,7 +863,7 @@ function GuardiansTab({
               onClose={onHideForm}
               title={editingGuardianId ? '학부모 수정' : '학부모 추가'}
               position={isMobile ? 'bottom' : 'right'}
-              width={isTablet ? '500px' : '100%'}
+              width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
             >
               <SchemaForm
                 schema={effectiveGuardianFormSchema}
@@ -875,9 +877,9 @@ function GuardiansTab({
                 } : {}}
                 disableCardPadding={true}
                 actionContext={{
-                  apiCall: async (endpoint: string, method: string, body?: any) => {
+                  apiCall: async (endpoint: string, method: string, body?: unknown) => {
                     if (method === 'POST') {
-                      const response = await apiClient.post(endpoint, body);
+                      const response = await apiClient.post(endpoint, body as Record<string, unknown>);
                       if (response.error) {
                         throw new Error(response.error.message);
                       }
@@ -918,9 +920,9 @@ function GuardiansTab({
                   is_primary: false,
                 }}
                 actionContext={{
-                  apiCall: async (endpoint: string, method: string, body?: any) => {
+                  apiCall: async (endpoint: string, method: string, body?: unknown) => {
                     if (method === 'POST') {
-                      const response = await apiClient.post(endpoint, body);
+                      const response = await apiClient.post(endpoint, body as Record<string, unknown>);
                       if (response.error) {
                         throw new Error(response.error.message);
                       }
@@ -955,15 +957,15 @@ function GuardiansTab({
                     </span>
                   )}
                 </div>
-                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                   {guardian.relationship === 'parent' ? '부모' : guardian.relationship === 'guardian' ? '보호자' : '기타'}
                 </p>
-                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>{guardian.phone}</p>
+                <p style={{ color: 'var(--color-text-secondary)' }}>{guardian.phone}</p>
                 {guardian.email && (
-                  <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>{guardian.email}</p>
+                  <p style={{ color: 'var(--color-text-secondary)' }}>{guardian.email}</p>
                 )}
                 {guardian.notes && (
-                  <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-xs)' }}>{guardian.notes}</p>
+                  <p style={{ color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-xs)' }}>{guardian.notes}</p>
                 )}
               </div>
               {isEditable && (
@@ -991,17 +993,17 @@ function GuardiansTab({
 
 // 상담일지 탭 컴포넌트
 interface ConsultationsTabProps {
-  consultations: any[];
+  consultations: StudentConsultation[];
   isLoading: boolean;
   showForm: boolean;
   editingConsultationId: string | null;
   consultationTypeFilter: ConsultationType | 'all';
-  effectiveConsultationFormSchema: any;
+  effectiveConsultationFormSchema: FormSchema;
   onShowForm: () => void;
   onHideForm: () => void;
   onEdit: (consultationId: string) => void;
-  onCreate: (data: any) => Promise<void>;
-  onUpdate: (consultationId: string, data: any) => Promise<void>;
+  onCreate: (data: Record<string, unknown>) => Promise<void>;
+  onUpdate: (consultationId: string, data: Record<string, unknown>) => Promise<void>;
   onDelete: (consultationId: string) => Promise<void>;
   onGenerateAISummary: (consultationId: string) => Promise<void>;
   onFilterChange: (filter: ConsultationType | 'all') => void;
@@ -1031,7 +1033,7 @@ function ConsultationsTab({
   const isMobile = mode === 'xs' || mode === 'sm';
   const isTablet = mode === 'md';
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
     if (editingConsultationId) {
         await onUpdate(editingConsultationId, data);
@@ -1099,7 +1101,7 @@ function ConsultationsTab({
               onClose={onHideForm}
               title={editingConsultationId ? '상담일지 수정' : '상담일지 추가'}
               position={isMobile ? 'bottom' : 'right'}
-              width={isTablet ? '500px' : '100%'}
+              width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
             >
               <SchemaForm
                 schema={effectiveConsultationFormSchema}
@@ -1114,9 +1116,9 @@ function ConsultationsTab({
                 }}
                 disableCardPadding={true}
                 actionContext={{
-                  apiCall: async (endpoint: string, method: string, body?: any) => {
+                  apiCall: async (endpoint: string, method: string, body?: unknown) => {
                     if (method === 'POST') {
-                      const response = await apiClient.post(endpoint, body);
+                      const response = await apiClient.post(endpoint, body as Record<string, unknown>);
                       if (response.error) {
                         throw new Error(response.error.message);
                       }
@@ -1157,9 +1159,9 @@ function ConsultationsTab({
                   consultation_type: 'counseling',
                 }}
                 actionContext={{
-                  apiCall: async (endpoint: string, method: string, body?: any) => {
+                  apiCall: async (endpoint: string, method: string, body?: unknown) => {
                     if (method === 'POST') {
-                      const response = await apiClient.post(endpoint, body);
+                      const response = await apiClient.post(endpoint, body as Record<string, unknown>);
                       if (response.error) {
                         throw new Error(response.error.message);
                       }
@@ -1194,13 +1196,13 @@ function ConsultationsTab({
                     {consultation.consultation_type === 'counseling' ? '상담' : consultation.consultation_type === 'learning' ? '학습' : consultation.consultation_type === 'behavior' ? '행동' : '기타'}
                   </span>
                 </div>
-                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap' }}>
+                <p style={{ color: 'var(--color-text)', whiteSpace: 'pre-wrap' }}>
                   {consultation.content}
                 </p>
                 {consultation.ai_summary && (
                   <div style={{ marginTop: 'var(--spacing-sm)', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-blue-50)', borderRadius: 'var(--border-radius-sm)' }}>
                     <p style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>AI 요약</p>
-                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>{consultation.ai_summary}</p>
+                    <p style={{ color: 'var(--color-text-secondary)' }}>{consultation.ai_summary}</p>
                   </div>
                 )}
                 {!consultation.ai_summary && (
@@ -1285,7 +1287,7 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
           <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
             태그 관리
           </h3>
-        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
+        <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
           학생에게 태그를 추가하거나 제거할 수 있습니다.
         </p>
       </div>
@@ -1312,7 +1314,7 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
                     color: isSelected ? 'var(--color-white)' : tag.color,
                     backgroundColor: isSelected ? tag.color : 'transparent',
                     cursor: isEditable ? 'pointer' : 'not-allowed',
-                    opacity: isEditable ? 1 : 0.6,
+                    opacity: isEditable ? 'var(--opacity-full)' : 'var(--opacity-loading)',
                     transition: 'var(--transition-all)',
                   }}
                 >
@@ -1372,7 +1374,7 @@ interface ClassesTabProps {
   }>;
   isLoading: boolean;
   allClasses: Class[];
-  effectiveClassAssignmentFormSchema: any;
+  effectiveClassAssignmentFormSchema: FormSchema;
   onAssign: (classId: string, enrolledAt?: string) => Promise<void>;
   onUnassign: (classId: string, leftAt?: string) => Promise<void>;
   isEditable?: boolean; // 아키텍처 문서 2.4: 권한 체크
@@ -1416,11 +1418,11 @@ function ClassesTab({
     { value: 'sunday', label: '일요일' },
   ];
 
-  const handleAssign = async (data: any) => {
+  const handleAssign = async (data: Record<string, unknown>) => {
     if (!data.class_id) return;
 
     try {
-      await onAssign(data.class_id, data.enrolled_at || toKST().format('YYYY-MM-DD'));
+      await onAssign(String(data.class_id ?? ''), String(data.enrolled_at || toKST().format('YYYY-MM-DD')));
       setShowAssignForm(false);
       setSelectedClassId('');
       setEnrolledAt(toKST().format('YYYY-MM-DD'));
@@ -1456,7 +1458,7 @@ function ClassesTab({
             반 배정
           </Button>
           {availableClasses.length === 0 && (
-            <span style={{ marginLeft: 'var(--spacing-sm)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+            <span style={{ marginLeft: 'var(--spacing-sm)', color: 'var(--color-text-secondary)' }}>
               배정 가능한 반이 없습니다.
             </span>
           )}
@@ -1471,7 +1473,7 @@ function ClassesTab({
               onClose={() => setShowAssignForm(false)}
               title="반 배정"
               position={isMobile ? 'bottom' : 'right'}
-              width={isTablet ? '500px' : '100%'}
+              width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
             >
               <SchemaForm
                 schema={{
@@ -1501,9 +1503,9 @@ function ClassesTab({
                   enrolled_at: toKST().format('YYYY-MM-DD'),
                 }}
                 actionContext={{
-                  apiCall: async (endpoint: string, method: string, body?: any) => {
+                  apiCall: async (endpoint: string, method: string, body?: unknown) => {
                     if (method === 'POST') {
-                      const response = await apiClient.post(endpoint, body);
+                      const response = await apiClient.post(endpoint, body as Record<string, unknown>);
                       if (response.error) {
                         throw new Error(response.error.message);
                       }
@@ -1557,9 +1559,9 @@ function ClassesTab({
                   enrolled_at: toKST().format('YYYY-MM-DD'),
                 }}
                 actionContext={{
-                  apiCall: async (endpoint: string, method: string, body?: any) => {
+                  apiCall: async (endpoint: string, method: string, body?: unknown) => {
                     if (method === 'POST') {
-                      const response = await apiClient.post(endpoint, body);
+                      const response = await apiClient.post(endpoint, body as Record<string, unknown>);
                       if (response.error) {
                         throw new Error(response.error.message);
                       }
@@ -1595,7 +1597,7 @@ function ClassesTab({
                     <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
                       {classItem.name}
                     </h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)', color: 'var(--color-text-secondary)' }}>
                       {classItem.subject && <div>과목: {classItem.subject}</div>}
                       {classItem.grade && <div>대상: {classItem.grade}</div>}
                       <div>요일: {dayLabel}</div>
@@ -1640,8 +1642,8 @@ function CounselTab({
 }: {
   studentId: string | null;
   student: Student | null | undefined;
-  effectiveConsultationFormSchema: any;
-  onCreateConsultation: (data: any) => Promise<void>;
+  effectiveConsultationFormSchema: FormSchema;
+  onCreateConsultation: (data: Record<string, unknown>) => Promise<void>;
 }) {
   const { showAlert } = useModal();
   const [showForm, setShowForm] = useState(false);
@@ -1777,9 +1779,9 @@ function AttendanceTab({
             출결 정보를 불러오는 중...
           </div>
         ) : stats ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 'var(--spacing-md)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(var(--width-button-grid-min), 1fr))`, gap: 'var(--spacing-md)' }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+              <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                 총 출결
               </div>
               <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
@@ -1787,7 +1789,7 @@ function AttendanceTab({
               </div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+              <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                 출석
               </div>
               <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
@@ -1795,7 +1797,7 @@ function AttendanceTab({
               </div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+              <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                 지각
               </div>
               <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-warning)' }}>
@@ -1803,7 +1805,7 @@ function AttendanceTab({
               </div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+              <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                 결석
               </div>
               <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-error)' }}>
@@ -1811,7 +1813,7 @@ function AttendanceTab({
               </div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+              <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                 출석률
               </div>
               <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
@@ -1857,11 +1859,11 @@ function AttendanceTab({
                         <Badge variant="soft" color={statusColor}>
                           {statusLabel}
                         </Badge>
-                        <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                        <span style={{ color: 'var(--color-text-secondary)' }}>
                           {typeLabel}
                         </span>
                       </div>
-                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                      <div style={{ color: 'var(--color-text-secondary)' }}>
                         {toKST(log.occurred_at).format('YYYY-MM-DD HH:mm')}
                       </div>
                     </div>

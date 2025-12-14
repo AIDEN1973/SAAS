@@ -24,6 +24,8 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   size = 'md',
   fullWidth = false,
   className,
+  onFocus,
+  onBlur,
   ...props
 }, ref) => {
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
@@ -46,16 +48,32 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
 
   const textareaStyle: React.CSSProperties = {
     ...sizeStyles[size],
-    border: `1px solid ${error ? 'var(--color-red-500)' : 'var(--color-gray-300)'}`,
+    border: `var(--border-width-thin) solid ${error ? 'var(--color-red-500)' : 'var(--color-gray-300)'}`, // styles.css 준수: border-width 토큰 사용
     borderRadius: 'var(--border-radius-sm)',
     backgroundColor: 'var(--color-white)',
     color: 'var(--color-text)',
     outline: 'none',
     width: fullWidth ? '100%' : 'auto',
     resize: 'vertical',
-    transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+    transition: 'border-color var(--transition-base), box-shadow var(--transition-base)', // styles.css 준수: transition 토큰 사용
     fontFamily: 'var(--font-family)',
+    fontSize: 'var(--font-size-base)', // Input/Select/DatePicker와 동일한 폰트 사이즈 (일관성)
+    lineHeight: 'var(--line-height)', // Input/Select/DatePicker와 동일한 line-height (일관성)
   };
+
+  // React Hook Form의 onBlur와 컴포넌트의 포커스 스타일 관리 병합
+  const handleFocus = React.useCallback((e: React.FocusEvent<HTMLTextAreaElement>) => {
+    e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-primary)';
+    // styles.css 준수: focus-ring-width 토큰 사용 (2px)
+    e.currentTarget.style.boxShadow = `0 0 0 var(--focus-ring-width) ${error ? 'var(--color-red-50)' : 'var(--color-primary-50)'}`;
+    onFocus?.(e);
+  }, [error, onFocus]);
+
+  const handleBlur = React.useCallback((e: React.FocusEvent<HTMLTextAreaElement>) => {
+    e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-gray-300)';
+    e.currentTarget.style.boxShadow = 'none';
+    onBlur?.(e);
+  }, [error, onBlur]);
 
   return (
     <div
@@ -80,14 +98,8 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
         ref={ref}
         className={clsx(className)}
         style={textareaStyle}
-        onFocus={(e) => {
-          e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-primary)';
-          e.currentTarget.style.boxShadow = `0 0 0 2px ${error ? 'var(--color-red-50)' : 'var(--color-primary-50)'}`;
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-gray-300)';
-          e.currentTarget.style.boxShadow = 'none';
-        }}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         {...props}
       />
       {error && (

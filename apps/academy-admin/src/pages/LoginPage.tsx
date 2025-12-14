@@ -46,9 +46,11 @@ export function LoginPage() {
   const { data: tenants } = useUserTenants();
   const selectTenant = useSelectTenant();
 
-  const handleEmailLogin = async (data: { email: string; password: string }) => {
+  const handleEmailLogin = async (data: Record<string, unknown>) => {
+    const email = String(data.email ?? '');
+    const password = String(data.password ?? '');
     try {
-      const result = await loginWithEmail.mutateAsync({ email: data.email, password: data.password });
+      const result = await loginWithEmail.mutateAsync({ email, password });
 
       if (result.tenants.length === 0) {
         // 개발 환경에서 상세 정보 표시
@@ -114,9 +116,11 @@ export function LoginPage() {
     }
   };
 
-  const handleOTPLogin = async (data: { phone: string; otp: string }) => {
+  const handleOTPLogin = async (data: Record<string, unknown>) => {
+    const phone = String(data.phone ?? '');
+    const otp = String(data.otp ?? '');
     try {
-      const result = await loginWithOTP.mutateAsync({ phone: data.phone, otp: data.otp });
+      const result = await loginWithOTP.mutateAsync({ phone, otp });
 
       if (result.tenants.length === 0) {
         // 개발 환경에서 상세 정보 표시
@@ -245,7 +249,7 @@ export function LoginPage() {
                     fields: otpLoginFormSchema.form.fields.filter((f: { name: string }) => f.name === 'otp'),
                   },
                 }}
-                onSubmit={(data: { otp: string }) => handleOTPLogin({ phone, otp: data.otp })}
+                onSubmit={(data: Record<string, unknown>) => handleOTPLogin({ phone, otp: String(data.otp ?? '') })}
               />
             )}
           </div>
@@ -314,16 +318,19 @@ export function LoginPage() {
           <span style={{ color: 'var(--color-text-secondary)' }}>
             계정이 없으신가요?{' '}
           </span>
-          <button
+          <Button
+            variant="ghost"
             onClick={() => navigate('/auth/signup')}
             style={{
               color: 'var(--color-primary)',
               textDecoration: 'none',
-              cursor: 'pointer',
-              background: 'none',
+              padding: '0 var(--spacing-xs)',
+              display: 'inline',
+              fontSize: 'inherit',
+              fontWeight: 'var(--font-weight-normal)',
+              minWidth: 'auto',
+              height: 'auto',
               border: 'none',
-              padding: 0,
-              font: 'inherit'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.textDecoration = 'underline';
@@ -333,7 +340,7 @@ export function LoginPage() {
             }}
           >
             회원가입
-          </button>
+          </Button>
         </div>
       </Card>
     </Container>

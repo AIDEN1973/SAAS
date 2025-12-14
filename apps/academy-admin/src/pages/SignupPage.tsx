@@ -28,14 +28,14 @@ export function SignupPage() {
 
   const signup = useSignupWithEmail();
 
-  const handleSignup = async (data: any) => {
+  const handleSignup = async (data: Record<string, unknown>) => {
     try {
       const result = await signup.mutateAsync({
-        email: data.email,
-        password: data.password,
-        name: data.name,
-        phone: data.phone || undefined,
-        tenant_name: data.tenantName,
+        email: String(data.email ?? ''),
+        password: String(data.password ?? ''),
+        name: String(data.name ?? ''),
+        phone: data.phone ? String(data.phone) : undefined,
+        tenant_name: String(data.tenantName ?? ''),
         industry_type: data.industryType as IndustryType,
       });
 

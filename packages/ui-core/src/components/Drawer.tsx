@@ -37,7 +37,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   title,
   children,
   position = 'right',
-  width = '320px',
+  width = 'var(--width-drawer)', // styles.css 준수: Drawer 기본 너비 토큰 사용
   height = '100%',
   closeOnOverlayClick = true,
   closeOnEscape = true,
@@ -156,7 +156,7 @@ export const Drawer: React.FC<DrawerProps> = ({
               justifyContent: 'space-between',
               marginBottom: 'var(--spacing-md)',
               paddingBottom: 'var(--spacing-md)',
-              borderBottom: '1px solid var(--color-gray-200)',
+              borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
             }}
           >
             <h2
@@ -173,8 +173,8 @@ export const Drawer: React.FC<DrawerProps> = ({
               size="sm"
               onClick={onClose}
               style={{
-                minWidth: '44px',
-                minHeight: '44px',
+                minWidth: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+                minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
               }}
             >
               ✕

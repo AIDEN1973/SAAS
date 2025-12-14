@@ -21,10 +21,11 @@ import {
 } from '@hooks/use-class';
 import type { Teacher, CreateTeacherInput, UpdateTeacherInput, TeacherFilter, TeacherStatus } from '@services/class-service';
 import { teacherFormSchema } from '../schemas/teacher.schema';
+import type { FormSchema } from '@schema-engine/types';
 import { teacherFilterSchema } from '../schemas/teacher.filter.schema';
 
 export function TeachersPage() {
-  const { showConfirm } = useModal();
+  const { showConfirm, showAlert } = useModal();
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
   const isTablet = mode === 'md';
@@ -48,10 +49,10 @@ export function TeachersPage() {
   const effectiveFormSchema = teacherFormSchemaData || teacherFormSchema;
   const effectiveFilterSchema = teacherFilterSchemaData || teacherFilterSchema;
 
-  const handleFilterChange = React.useCallback((filters: Record<string, any>) => {
+  const handleFilterChange = React.useCallback((filters: Record<string, unknown>) => {
     setFilter({
-      search: filters.search || undefined,
-      status: filters.status || undefined,
+      search: typeof filters.search === 'string' ? filters.search : undefined,
+      status: filters.status as TeacherStatus | TeacherStatus[] | undefined,
     });
   }, []);
 
@@ -60,7 +61,12 @@ export function TeachersPage() {
       await createTeacher.mutateAsync(input);
       setShowCreateForm(false);
     } catch (error) {
-      console.error('Failed to create teacher:', error);
+      // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
+      showAlert(
+        error instanceof Error ? error.message : '강사 등록에 실패했습니다.',
+        '오류',
+        'error'
+      );
     }
   };
 
@@ -69,7 +75,12 @@ export function TeachersPage() {
       await updateTeacher.mutateAsync({ teacherId, input });
       setEditingTeacherId(null);
     } catch (error) {
-      console.error('Failed to update teacher:', error);
+      // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
+      showAlert(
+        error instanceof Error ? error.message : '강사 수정에 실패했습니다.',
+        '오류',
+        'error'
+      );
     }
   };
 
@@ -116,7 +127,7 @@ export function TeachersPage() {
                   onClose={() => setShowCreateForm(false)}
                   title="강사 등록"
                   position={isMobile ? 'bottom' : 'right'}
-                  width={isTablet ? '500px' : '100%'}
+                  width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
                 >
                   <CreateTeacherForm
                     onSubmit={handleCreateTeacher}
@@ -149,7 +160,7 @@ export function TeachersPage() {
               </div>
             </Card>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 'var(--spacing-md)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(var(--width-card-min), 1fr))`, gap: 'var(--spacing-md)' }}>
               {teachers?.map((teacher) => (
                 <TeacherCard
                   key={teacher.id}
@@ -158,7 +169,16 @@ export function TeachersPage() {
                   onDelete={async (teacherId) => {
                     const confirmed = await showConfirm('정말 이 강사를 삭제하시겠습니까?', '강사 삭제');
                     if (confirmed) {
+                      try {
                       await deleteTeacher.mutateAsync(teacherId);
+                      } catch (error) {
+                        // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
+                        showAlert(
+                          error instanceof Error ? error.message : '강사 삭제에 실패했습니다.',
+                          '오류',
+                          'error'
+                        );
+                      }
                     }
                   }}
                 />
@@ -197,27 +217,27 @@ function CreateTeacherForm({
 }: {
   onSubmit: (input: CreateTeacherInput) => void;
   onCancel: () => void;
-  effectiveFormSchema: any;
+  effectiveFormSchema: FormSchema;
 }) {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
   const isTablet = mode === 'md';
   const showHeader = !isMobile && !isTablet;
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     // 스키마에서 받은 데이터를 CreateTeacherInput 형식으로 변환
     const input: CreateTeacherInput = {
-      name: data.name || '',
-      email: data.email || undefined,
-      phone: data.phone || undefined,
-      address: data.address || undefined,
-      employee_id: data.employee_id || undefined,
-      specialization: data.specialization || undefined,
-      hire_date: data.hire_date || undefined,
-      status: data.status || 'active',
-      profile_image_url: data.profile_image_url || undefined,
-      bio: data.bio || undefined,
-      notes: data.notes || undefined,
+      name: typeof data.name === 'string' ? data.name : '',
+      email: typeof data.email === 'string' ? data.email : undefined,
+      phone: typeof data.phone === 'string' ? data.phone : undefined,
+      address: typeof data.address === 'string' ? data.address : undefined,
+      employee_id: typeof data.employee_id === 'string' ? data.employee_id : undefined,
+      specialization: typeof data.specialization === 'string' ? data.specialization : undefined,
+      hire_date: typeof data.hire_date === 'string' ? data.hire_date : undefined,
+      status: (data.status as TeacherStatus) || 'active',
+      profile_image_url: typeof data.profile_image_url === 'string' ? data.profile_image_url : undefined,
+      bio: typeof data.bio === 'string' ? data.bio : undefined,
+      notes: typeof data.notes === 'string' ? data.notes : undefined,
     };
     onSubmit(input);
   };
@@ -239,9 +259,9 @@ function CreateTeacherForm({
           status: 'active',
         }}
         actionContext={{
-          apiCall: async (endpoint: string, method: string, body?: any) => {
+          apiCall: async (endpoint: string, method: string, body?: unknown) => {
             if (method === 'POST') {
-              const response = await apiClient.post(endpoint, body);
+              const response = await apiClient.post(endpoint, body as Record<string, unknown>);
               if (response.error) {
                 throw new Error(response.error.message);
               }
@@ -271,30 +291,48 @@ function EditTeacherModal({
   onSave: (teacherId: string, input: UpdateTeacherInput) => Promise<void>;
   onClose: () => void;
 }) {
+  const { showAlert } = useModal();
+  const mode = useResponsiveMode();
+  const isMobile = mode === 'xs' || mode === 'sm';
+  const isTablet = mode === 'md';
   const { data: teacher, isLoading } = useTeacher(teacherId);
 
   // Schema Registry 연동 (아키텍처 문서 S3 참조)
   const { data: teacherFormSchemaData } = useSchema('teacher', teacherFormSchema, 'form');
   const effectiveFormSchema = teacherFormSchemaData || teacherFormSchema;
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     const input: UpdateTeacherInput = {
-      name: data.name || undefined,
-      email: data.email || undefined,
-      phone: data.phone || undefined,
-      address: data.address || undefined,
-      employee_id: data.employee_id || undefined,
-      specialization: data.specialization || undefined,
-      hire_date: data.hire_date || undefined,
-      status: data.status || undefined,
-      profile_image_url: data.profile_image_url || undefined,
-      bio: data.bio || undefined,
-      notes: data.notes || undefined,
+      name: typeof data.name === 'string' ? data.name : undefined,
+      email: typeof data.email === 'string' ? data.email : undefined,
+      phone: typeof data.phone === 'string' ? data.phone : undefined,
+      address: typeof data.address === 'string' ? data.address : undefined,
+      employee_id: typeof data.employee_id === 'string' ? data.employee_id : undefined,
+      specialization: typeof data.specialization === 'string' ? data.specialization : undefined,
+      hire_date: typeof data.hire_date === 'string' ? data.hire_date : undefined,
+      status: data.status as TeacherStatus | undefined,
+      profile_image_url: typeof data.profile_image_url === 'string' ? data.profile_image_url : undefined,
+      bio: typeof data.bio === 'string' ? data.bio : undefined,
+      notes: typeof data.notes === 'string' ? data.notes : undefined,
     };
     await onSave(teacherId, input);
   };
 
+  // 반응형 처리: 모바일/태블릿은 Drawer, 데스크톱은 Modal (아키텍처 문서 6-1 참조)
   if (isLoading) {
+    if (isMobile || isTablet) {
+      return (
+        <Drawer
+          isOpen={true}
+          onClose={onClose}
+          title="강사 수정"
+          position={isMobile ? 'bottom' : 'right'}
+          width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+        >
+          <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>
+        </Drawer>
+      );
+    }
     return (
       <Modal isOpen={true} onClose={onClose} title="강사 수정" size="lg">
         <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>
@@ -303,6 +341,19 @@ function EditTeacherModal({
   }
 
   if (!teacher) {
+    if (isMobile || isTablet) {
+      return (
+        <Drawer
+          isOpen={true}
+          onClose={onClose}
+          title="강사 수정"
+          position={isMobile ? 'bottom' : 'right'}
+          width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+        >
+          <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>강사를 찾을 수 없습니다.</div>
+        </Drawer>
+      );
+    }
     return (
       <Modal isOpen={true} onClose={onClose} title="강사 수정" size="lg">
         <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>강사를 찾을 수 없습니다.</div>
@@ -310,8 +361,7 @@ function EditTeacherModal({
     );
   }
 
-  return (
-    <Modal isOpen={true} onClose={onClose} title="강사 수정" size="lg">
+  const formContent = (
       <SchemaForm
         schema={effectiveFormSchema}
         onSubmit={handleSubmit}
@@ -329,9 +379,9 @@ function EditTeacherModal({
           notes: teacher.notes || '',
         }}
         actionContext={{
-          apiCall: async (endpoint: string, method: string, body?: any) => {
+          apiCall: async (endpoint: string, method: string, body?: unknown) => {
             if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
-              const response = await apiClient.post(endpoint, body);
+              const response = await apiClient.post(endpoint, (body ?? {}) as Record<string, unknown>);
               if (response.error) {
                 throw new Error(response.error.message);
               }
@@ -344,10 +394,31 @@ function EditTeacherModal({
             return response.data;
           },
           showToast: (message: string, variant?: string) => {
-            // showAlert는 useModal에서 가져와야 하지만, 여기서는 handleSubmit에서 처리
+          showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
           },
         }}
       />
+  );
+
+  // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
+  if (isMobile || isTablet) {
+    return (
+      <Drawer
+        isOpen={true}
+        onClose={onClose}
+        title="강사 수정"
+        position={isMobile ? 'bottom' : 'right'}
+        width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+      >
+        {formContent}
+      </Drawer>
+    );
+  }
+
+  // 데스크톱: Modal 사용
+  return (
+    <Modal isOpen={true} onClose={onClose} title="강사 수정" size="lg">
+      {formContent}
     </Modal>
   );
 }
@@ -404,7 +475,7 @@ function TeacherCard({
             </span>
           </div>
           {teacher.employee_id && (
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+            <div style={{ color: 'var(--color-text-secondary)' }}>
               사원번호: {teacher.employee_id}
             </div>
           )}
@@ -426,7 +497,7 @@ function TeacherCard({
             alt={teacher.name}
             style={{
               width: '100%',
-              maxWidth: '200px',
+              maxWidth: 'var(--width-student-info-min)',
               height: 'auto',
               borderRadius: 'var(--border-radius-md)',
             }}
@@ -434,7 +505,7 @@ function TeacherCard({
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)', color: 'var(--color-text-secondary)' }}>
         {teacher.specialization && <div>전문 분야: {teacher.specialization}</div>}
         {teacher.phone && <div>전화: {teacher.phone}</div>}
         {teacher.email && <div>이메일: {teacher.email}</div>}

@@ -8,7 +8,7 @@
 
 import React from 'react';
 
-export type WidgetLoader = () => Promise<React.ComponentType<any>>;
+export type WidgetLoader = () => Promise<React.ComponentType<Record<string, unknown>>>;
 
 export interface WidgetRegistry {
   [componentType: string]: WidgetLoader;
@@ -44,7 +44,7 @@ export function registerWidget(
  */
 export async function loadWidget(
   componentType: string
-): Promise<React.ComponentType<any> | null> {
+): Promise<React.ComponentType<Record<string, unknown>> | null> {
   const loader = globalWidgetRegistry[componentType];
 
   if (!loader) {

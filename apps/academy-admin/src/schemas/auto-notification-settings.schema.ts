@@ -75,7 +75,6 @@ export const autoNotificationSettingsFormSchema: FormSchema = {
       },
     ],
     submit: {
-      labelKey: 'AUTO_NOTIFICATION_SETTINGS.FORM.SUBMIT',
       label: '저장',
       variant: 'solid',
       color: 'primary',

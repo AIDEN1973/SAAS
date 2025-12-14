@@ -79,7 +79,7 @@ export function StudentTasksPage() {
           {cards && cards.length === 0 && !isLoading && (
             <Card padding="lg" variant="default">
               <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>
-                <p style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-md)' }}>
+                <p style={{ marginBottom: 'var(--spacing-md)' }}>
                   현재 처리할 학생 업무가 없습니다.
                 </p>
               </div>

@@ -1,33 +1,33 @@
 /**
  * Action Engine
- * 
+ *
  * SDUI v1.1: 스키마에 정의된 액션을 실행하는 엔진
- * 
+ *
  * 기술문서: SDUI 기술문서 v1.1 - 13. Action Engine
  */
 
 import type { ActionDefinition } from '../types';
 
 export interface ActionContext {
-  formData?: Record<string, any>;
-  selectedRows?: any[];
+  formData?: Record<string, unknown>;
+  selectedRows?: unknown[];
   navigate?: (path: string) => void;
   openDrawer?: (schemaKey: string) => void;
   openModal?: (schemaKey: string) => void;
-  setFormValue?: (field: string, value: any) => void;
+  setFormValue?: (field: string, value: unknown) => void;
   resetForm?: () => void;
   reloadSchema?: () => Promise<void>;
   showToast?: (message: string, variant: 'success' | 'error' | 'warning' | 'info') => void;
   showConfirm?: (title: string, message: string) => Promise<boolean>;
-  apiCall?: (endpoint: string, method: string, body?: any) => Promise<any>;
+  apiCall?: (endpoint: string, method: string, body?: unknown) => Promise<unknown>;
   translations?: Record<string, string>;  // i18n 번역
 }
 
 /**
  * Action Engine
- * 
+ *
  * 스키마에 정의된 액션을 실행합니다.
- * 
+ *
  * @param action - 실행할 액션 정의
  * @param context - 실행 컨텍스트
  * @returns 실행 결과
@@ -35,41 +35,41 @@ export interface ActionContext {
 export async function executeAction(
   action: ActionDefinition,
   context: ActionContext
-): Promise<any> {
+): Promise<unknown> {
   const { type } = action;
   const translations = context.translations || {};  // SDUI v1.1: context에서 translations 가져오기
   try {
     switch (type) {
       case 'api.call':
         return await executeApiCall(action, context);
-      
+
       case 'navigate':
         return executeNavigate(action, context);
-      
+
       case 'openDrawer':
         return executeOpenDrawer(action, context);
-      
+
       case 'openModal':
         return executeOpenModal(action, context);
-      
+
       case 'setValue':
         return executeSetValue(action, context);
-      
+
       case 'reset':
         return executeReset(action, context);
-      
+
       case 'reloadSchema':
         return await executeReloadSchema(action, context);
-      
+
       case 'toast':
         return executeToast(action, context, translations);
-      
+
       case 'confirm':
         return await executeConfirm(action, context, translations);
-      
+
       case 'sequence':
         return await executeSequence(action, context);
-      
+
       default:
         console.warn(`Unknown action type: ${type}`);
         return null;
@@ -82,22 +82,22 @@ export async function executeAction(
 
 /**
  * API 호출 실행
- * 
+ *
  * SDUI v1.1: @api-sdk/core를 통한 API 호출 (권장)
  * context.apiCall이 없으면 기본 fetch 사용
  */
 async function executeApiCall(
   action: ActionDefinition,
   context: ActionContext
-): Promise<any> {
+): Promise<unknown> {
   const { endpoint, method = 'POST', body } = action;
-  
+
   if (!endpoint) {
     throw new Error('API call action requires endpoint');
   }
 
   // body 처리
-  let requestBody: any = body;
+  let requestBody: unknown = body;
   if (body === 'form' && context.formData) {
     requestBody = context.formData;
   } else if (body === 'selectedRows' && context.selectedRows) {
@@ -141,7 +141,7 @@ function executeNavigate(
   context: ActionContext
 ): void {
   const { to } = action;
-  
+
   if (!to) {
     throw new Error('Navigate action requires "to" path');
   }
@@ -161,7 +161,7 @@ function executeOpenDrawer(
   context: ActionContext
 ): void {
   const { schemaKey } = action;
-  
+
   if (!schemaKey) {
     throw new Error('OpenDrawer action requires schemaKey');
   }
@@ -181,7 +181,7 @@ function executeOpenModal(
   context: ActionContext
 ): void {
   const { schemaKey } = action;
-  
+
   if (!schemaKey) {
     throw new Error('OpenModal action requires schemaKey');
   }
@@ -201,7 +201,7 @@ function executeSetValue(
   context: ActionContext
 ): void {
   const { field, value } = action;
-  
+
   if (!field) {
     throw new Error('SetValue action requires field');
   }
@@ -250,11 +250,11 @@ function executeToast(
   translations: Record<string, string>
 ): void {
   const { messageKey, message, variant = 'info' } = action;
-  
-  const toastMessage = messageKey 
+
+  const toastMessage = messageKey
     ? (translations[messageKey] || messageKey)
     : (message || '');
-  
+
   if (!toastMessage) {
     throw new Error('Toast action requires messageKey or message');
   }
@@ -275,11 +275,11 @@ async function executeConfirm(
   translations: Record<string, string>
 ): Promise<boolean> {
   const { titleKey, title, confirmMessageKey, confirmMessage: confirmMsg } = action;
-  
-  const confirmTitle = titleKey 
+
+  const confirmTitle = titleKey
     ? (translations[titleKey] || titleKey)
     : (title || '');
-  
+
   const finalConfirmMessage = confirmMessageKey
     ? (translations[confirmMessageKey] || confirmMessageKey)
     : (confirmMsg || '');
@@ -301,26 +301,26 @@ async function executeConfirm(
 async function executeSequence(
   action: ActionDefinition,
   context: ActionContext
-): Promise<any> {
+): Promise<unknown> {
   const { actions } = action;
-  
+
   if (!actions || actions.length === 0) {
     throw new Error('Sequence action requires actions array');
   }
 
-  const results: any[] = [];
-  
+  const results: unknown[] = [];
+
   for (const subAction of actions) {
     const result = await executeAction(subAction, context);
     results.push(result);
   }
-  
+
   return results;
 }
 
 /**
  * 이벤트에 해당하는 액션들을 실행
- * 
+ *
  * @param event - 이벤트 이름 (예: 'onSubmit', 'onSubmitSuccess')
  * @param actions - 액션 정의 배열
  * @param context - 실행 컨텍스트
@@ -329,11 +329,11 @@ export async function executeActionsForEvent(
   event: string,
   actions: ActionDefinition[],
   context: ActionContext
-): Promise<any[]> {
+): Promise<unknown[]> {
   const relevantActions = actions.filter((action) => action.event === event);
-  
-  const results: any[] = [];
-  
+
+  const results: unknown[] = [];
+
   for (const action of relevantActions) {
     try {
       const result = await executeAction(action, context);
@@ -343,6 +343,6 @@ export async function executeActionsForEvent(
       // 에러가 발생해도 다음 액션을 계속 실행
     }
   }
-  
+
   return results;
 }

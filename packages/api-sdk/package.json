@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@lib/supabase-client": "file:../../packages/lib/supabase-client",
-    "@env-registry/core": "file:../../packages/env-registry",
+    "@env-registry": "file:../../packages/env-registry",
     "@schema/engine": "file:../../packages/schema-engine"
   },
   "devDependencies": {

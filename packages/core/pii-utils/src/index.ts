@@ -50,7 +50,7 @@ export function maskName(name: string | null | undefined): string {
  *
  * 객체 내의 email, phone, name 필드들을 자동으로 마스킹합니다.
  */
-export function maskPII(data: any): any {
+export function maskPII(data: unknown): unknown {
   if (data === null || data === undefined) {
     return data;
   }
@@ -75,7 +75,7 @@ export function maskPII(data: any): any {
 
   // 객체인 경우 각 필드 마스킹
   if (typeof data === 'object') {
-    const masked: any = {};
+    const masked: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(data)) {
       // PII 필드 직접 마스킹
       if (key === 'email' || key === 'user_email' || key === 'owner_email') {

@@ -1,5 +1,5 @@
 import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js';
-import { envClient } from '@env-registry/core';
+import { envClient } from '@env-registry/client';
 
 /**
  * 싱글톤 Supabase 클라이언트 인스턴스
@@ -9,10 +9,10 @@ let clientInstance: SupabaseClient | null = null;
 
 /**
  * Cross-Origin Session Storage Adapter
- * 
+ *
  * [불변 규칙] 개발 환경에서 localhost:3000과 localhost:3002 간 세션 공유
  * [불변 규칙] localStorage는 origin별로 분리되므로, URL 파라미터로 세션을 전달
- * 
+ *
  * Supabase는 기본적으로 localStorage를 사용하지만, 포트가 다르면
  * 다른 origin으로 간주되어 공유되지 않습니다.
  */
@@ -24,7 +24,7 @@ function createCrossOriginStorage() {
         const value = localStorage.getItem(key);
         if (value) return value;
       }
-      
+
       // 2. URL 파라미터에서 세션 확인 (로그인 후 리다이렉트 시)
       if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search);
@@ -44,7 +44,7 @@ function createCrossOriginStorage() {
           }
         }
       }
-      
+
       return null;
     },
     setItem: (key: string, value: string): void => {
@@ -81,14 +81,14 @@ export function createClient(): SupabaseClient {
   if (typeof window !== 'undefined' && (import.meta as any).env?.DEV) {
     const correctUrl = 'https://xawypsrotrfoyozhrsbb.supabase.co';
     const isCorrect = supabaseUrl === correctUrl;
-    
+
     console.log('🔍 Supabase 클라이언트 생성:', {
       '현재 URL': supabaseUrl,
       '올바른 URL': correctUrl,
       '일치': isCorrect ? '✅' : '❌',
       'Anon Key 설정됨': supabaseAnonKey ? '✅' : '❌',
     });
-    
+
     if (!isCorrect) {
       console.error('❌ 잘못된 Supabase URL이 사용되고 있습니다!');
       console.error('   현재:', supabaseUrl);
@@ -101,10 +101,10 @@ export function createClient(): SupabaseClient {
   // [불변 규칙] 개발 환경에서 localhost:3000과 localhost:3002 간 세션 공유
   // [불변 규칙] localStorage는 origin별로 분리되므로, sessionStorage를 사용하거나
   //            URL 파라미터로 세션을 전달해야 합니다.
-  // 
+  //
   // 참고: Supabase는 기본적으로 localStorage를 사용하지만, 포트가 다르면
   //      다른 origin으로 간주되어 공유되지 않습니다.
-  // 
+  //
   // 해결 방법:
   // 1. 같은 포트에서 서브패스로 라우팅 (권장)
   // 2. 또는 custom storage adapter 사용 (복잡함)

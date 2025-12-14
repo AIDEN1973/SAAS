@@ -35,12 +35,12 @@ export interface SchemaVersion {
 export interface BaseSchema extends SchemaVersion {
   type: SchemaType;
   tenantScoped?: boolean;  // 기본 true, false인 경우 system-global
-  layout?: any;            // 타입별 레이아웃 정의
-  fields?: any[];          // form/detail/filter에서 사용
-  columns?: any[];         // table에서 사용
+  layout?: LayoutSchema;   // 타입별 레이아웃 정의
+  fields?: FormFieldSchema[];  // form/detail/filter에서 사용
+  columns?: TableColumnSchema[];  // table에서 사용
   actions?: ActionDefinition[];  // 액션 정의
-  conditions?: any[];      // 글로벌 조건 규칙(생략 가능)
-  meta?: Record<string, any>;  // 메타데이터
+  conditions?: (ConditionRule | MultiConditionRule)[];  // 글로벌 조건 규칙(생략 가능)
+  meta?: Record<string, unknown>;  // 메타데이터
 }
 
 /**
@@ -105,7 +105,7 @@ export interface ConditionActions {
   hide?: boolean;
   disable?: boolean;
   require?: boolean;
-  setValue?: any;  // 필드 값 설정
+  setValue?: unknown;  // 필드 값 설정
   setOptions?: {  // 동적 옵션 설정
     type: 'static' | 'api';
     options?: Array<{ value: string; labelKey?: string; label?: string }>;
@@ -124,7 +124,7 @@ export interface ConditionActions {
 export interface ConditionRule {
   field: string;  // 참조할 필드명
   op: ConditionOperator;
-  value?: any;  // 비교 값 (exists/not_exists일 경우 불필요)
+  value?: unknown;  // 비교 값 (exists/not_exists일 경우 불필요)
   // ⚠️ 중요: SDUI v1.1에서 in/not_in 연산자는 value로 스칼라 또는 배열 모두 허용
   // 배열인 경우: fieldValue와 expected 배열 간 교집합/차집합 판단
   // 스칼라인 경우: 기존 동작 유지
@@ -184,7 +184,7 @@ export interface FormFieldSchema {
     labelKey?: string;  // i18n 키 (우선순위)
     label?: string;     // 직접 문자열 (하위 호환성)
   }>;
-  defaultValue?: any;
+  defaultValue?: unknown;
   condition?: ConditionRule;  // 단일 조건부 렌더링 규칙 (하위 호환성)
   conditions?: MultiConditionRule;  // 복수 조건부 렌더링 규칙 (AND/OR 지원) - condition보다 우선
   // ⚠️ 중요: condition과 conditions는 동시에 사용할 수 없습니다.
@@ -204,7 +204,7 @@ export interface FormFieldSchema {
       messageKey?: string;  // SDUI v1.1: i18n 키 지원
       message?: string;      // 하위 호환성
     };
-    validate?: (value: any) => boolean | string;
+    validate?: (value: unknown) => boolean | string;
     // ⚠️ 중요: validate 함수는 Schema Registry(JSONB)에 저장될 수 없으므로,
     // Registry 기반 운영 시 validate는 사용할 수 없고 pattern 또는 min/max 등 정형 Validation만 허용됩니다.
     // validate 함수는 fallbackSchema(로컬 스키마) 전용입니다.
@@ -234,14 +234,14 @@ export interface ActionDefinition {
   // api.call
   endpoint?: string;
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-  body?: 'form' | 'selectedRows' | Record<string, any>;
+  body?: 'form' | 'selectedRows' | Record<string, unknown>;
   // navigate
   to?: string;
   // openDrawer / openModal
   schemaKey?: string;  // 열 스키마 키
   // setValue
   field?: string;
-  value?: any;
+  value?: unknown;
   // toast
   messageKey?: string;
   message?: string;
@@ -364,7 +364,7 @@ export interface WidgetSchema extends BaseSchema {
       endpoint: string;
       method?: 'GET' | 'POST';
     };
-    config?: Record<string, any>;  // 위젯별 설정
+    config?: Record<string, unknown>;  // 위젯별 설정
     refreshInterval?: number;  // 자동 새로고침 간격 (ms)
   };
 }

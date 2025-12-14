@@ -49,6 +49,7 @@ export class ConfigService {
       .upsert({
         tenant_id: tenantId,
         settings: merged,
+        // 기술문서 19-1-1: 타임스탬프는 UTC로 저장 (DB 저장 규칙)
         updated_at: new Date().toISOString(),
       })
       .select('settings')
@@ -64,7 +65,7 @@ export class ConfigService {
   /**
    * 설정 특정 키 조회
    */
-  async getConfigValue<T = any>(
+  async getConfigValue<T = unknown>(
     tenantId: string,
     key: string
   ): Promise<T | null> {
@@ -72,10 +73,10 @@ export class ConfigService {
     if (!config) return null;
 
     const keys = key.split('.');
-    let value: any = config;
+    let value: unknown = config;
     for (const k of keys) {
-      if (value && typeof value === 'object' && k in value) {
-        value = value[k];
+      if (value && typeof value === 'object' && value !== null && k in value) {
+        value = (value as Record<string, unknown>)[k];
       } else {
         return null;
       }
@@ -89,18 +90,18 @@ export class ConfigService {
   async setConfigValue(
     tenantId: string,
     key: string,
-    value: any
+    value: unknown
   ): Promise<void> {
     const config = await this.getConfig(tenantId) || {};
     const keys = key.split('.');
 
-    let current: any = config;
+    let current: Record<string, unknown> = config;
     for (let i = 0; i < keys.length - 1; i++) {
       const k = keys[i];
-      if (!current[k] || typeof current[k] !== 'object') {
+      if (!current[k] || typeof current[k] !== 'object' || current[k] === null) {
         current[k] = {};
       }
-      current = current[k];
+      current = current[k] as Record<string, unknown>;
     }
     current[keys[keys.length - 1]] = value;
 

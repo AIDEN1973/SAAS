@@ -95,11 +95,12 @@ export class NotificationService {
     status: NotificationStatus,
     errorMessage?: string
   ): Promise<void> {
-    const updateData: any = {
+    const updateData: Partial<Notification> = {
       status,
     };
 
     if (status === 'sent' || status === 'delivered') {
+      // 기술문서 19-1-1: 타임스탬프는 UTC로 저장 (DB 저장 규칙)
       updateData.sent_at = new Date().toISOString();
     }
 

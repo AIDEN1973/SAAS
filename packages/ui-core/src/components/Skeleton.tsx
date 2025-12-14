@@ -30,8 +30,12 @@ export const Skeleton: React.FC<SkeletonProps> = ({
 }) => {
   const baseStyle: React.CSSProperties = {
     backgroundColor: 'var(--color-gray-200)',
-    borderRadius: variant === 'circular' ? '50%' : variant === 'text' ? '4px' : 'var(--border-radius-sm)',
-    animation: 'pulse 1.5s ease-in-out infinite',
+    borderRadius: variant === 'circular'
+      ? 'var(--border-radius-full)' // styles.css 준수: border-radius 토큰 사용
+      : variant === 'text'
+      ? 'var(--spacing-xxs)' // styles.css 준수: spacing 토큰 사용 (4px)
+      : 'var(--border-radius-sm)', // styles.css 준수: border-radius 토큰 사용
+    animation: 'pulse var(--transition-slow) ease-in-out infinite', // styles.css 준수: transition 토큰 사용
     ...(width && { width: typeof width === 'number' ? `${width}px` : width }),
     ...(height && { height: typeof height === 'number' ? `${height}px` : height }),
     ...style,

@@ -39,6 +39,10 @@ import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { toKST } from '@lib/date-utils';
 import { useStudents, useGenerateConsultationAISummary } from '@hooks/use-student';
+import type { Invoice } from '@core/billing';
+import type { AttendanceLog } from '@services/attendance-service';
+import type { Student, StudentConsultation } from '@services/student-service';
+import type { Class } from '@services/class-service';
 import { studentSelectFormSchema } from '../schemas/student-select.schema';
 import { useUserRole } from '@hooks/use-auth';
 
@@ -79,7 +83,17 @@ export function AIPage() {
 
       // 주간 브리핑 조회 (Phase 1 MVP는 주간 브리핑, Phase 2+는 daily_briefing)
       // 현재는 Phase 1 MVP이므로 weekly_briefing 또는 이번 주 월요일 이후의 daily_briefing 조회
-      const weeklyBriefingResponse = await apiClient.get<any>('ai_insights', {
+      interface WeeklyBriefingInsight {
+        id: string;
+        insight_type: string;
+        title: string;
+        summary: string;
+        insights?: string;
+        created_at: string;
+        action_url?: string;
+        details?: Record<string, unknown>;
+      }
+      const weeklyBriefingResponse = await apiClient.get<WeeklyBriefingInsight>('ai_insights', {
         filters: {
           insight_type: 'weekly_briefing', // Phase 1: 주간 브리핑
           created_at: { gte: `${thisWeekMonday}T00:00:00` },
@@ -90,12 +104,12 @@ export function AIPage() {
       });
 
       // weekly_briefing이 없으면 daily_briefing으로 fallback (Phase 2+ 호환성)
-      let weeklyBriefing = null;
+      let weeklyBriefing: WeeklyBriefingInsight | null = null;
       if (!weeklyBriefingResponse.error && weeklyBriefingResponse.data && weeklyBriefingResponse.data.length > 0) {
         weeklyBriefing = weeklyBriefingResponse.data[0];
       } else {
         // Phase 2+ 호환: daily_briefing 조회 (이번 주 월요일 이후)
-        const dailyBriefingResponse = await apiClient.get<any>('ai_insights', {
+        const dailyBriefingResponse = await apiClient.get<WeeklyBriefingInsight>('ai_insights', {
           filters: {
             insight_type: 'daily_briefing',
             created_at: { gte: `${thisWeekMonday}T00:00:00` },
@@ -110,7 +124,14 @@ export function AIPage() {
       }
 
       // 1. 출결 이상 탐지 (attendance_anomaly)
-      const attendanceAnomalyResponse = await apiClient.get<any>('ai_insights', {
+      interface AttendanceAnomalyInsight {
+        id: string;
+        related_entity_id?: string;
+        summary: string;
+        metadata?: { student_name?: string };
+        details?: { recommendation?: string };
+      }
+      const attendanceAnomalyResponse = await apiClient.get<AttendanceAnomalyInsight>('ai_insights', {
         filters: {
           insight_type: 'attendance_anomaly',
           created_at: { gte: `${todayDate}T00:00:00` },
@@ -120,10 +141,10 @@ export function AIPage() {
         limit: 10,
       });
 
-      const attendanceAnomalies: any[] = [];
+      const attendanceAnomalies: Array<{ student_id: string; student_name: string; issue: string; recommendation: string }> = [];
       if (!attendanceAnomalyResponse.error && attendanceAnomalyResponse.data) {
-        attendanceAnomalies.push(...attendanceAnomalyResponse.data.map((insight: any) => ({
-          student_id: insight.related_entity_id,
+        attendanceAnomalies.push(...(attendanceAnomalyResponse.data || []).map((insight: AttendanceAnomalyInsight) => ({
+          student_id: insight.related_entity_id || '',
           student_name: insight.metadata?.student_name || '알 수 없음',
           issue: insight.summary,
           recommendation: insight.details?.recommendation || '학생의 출석 패턴을 분석하고 상담을 진행하세요.',
@@ -131,9 +152,9 @@ export function AIPage() {
       }
 
       // ai_insights 테이블에 데이터가 없는 경우 fallback: 출결 데이터 기반 간단한 분석
-      let attendanceLogs: any[] = [];
+      let attendanceLogs: AttendanceLog[] = [];
       if (attendanceAnomalies.length === 0) {
-        const attendanceLogsResponse = await apiClient.get<any>('attendance_logs', {
+        const attendanceLogsResponse = await apiClient.get<AttendanceLog>('attendance_logs', {
           filters: {},
           orderBy: { column: 'occurred_at', ascending: false },
           limit: 100,
@@ -144,7 +165,7 @@ export function AIPage() {
         // 학생별 출결 패턴 분석
         const studentAttendanceMap = new Map<string, { present: number; absent: number; late: number; total: number }>();
 
-        attendanceLogs.forEach((log: any) => {
+        attendanceLogs.forEach((log: AttendanceLog) => {
           if (!log.student_id) return;
 
           if (!studentAttendanceMap.has(log.student_id)) {
@@ -171,12 +192,12 @@ export function AIPage() {
 
         // 학생 정보 일괄 조회
         if (anomalyStudentIds.length > 0) {
-          const studentsResponse = await apiClient.get<any>('persons', {
+          const studentsResponse = await apiClient.get<Student[]>('persons', {
             filters: { id: { in: anomalyStudentIds } },
           });
 
-          const students = studentsResponse.data || [];
-          const studentMap = new Map(students.map((s: any) => [s.id, s]));
+          const students = (studentsResponse.data as unknown) as Student[] || [];
+          const studentMap = new Map(students.map((s: Student) => [s.id, s]));
 
           for (const studentId of anomalyStudentIds) {
             const stats = studentAttendanceMap.get(studentId)!;
@@ -200,7 +221,13 @@ export function AIPage() {
       }
 
       // 2. 반/과목 성과 분석 (performance_analysis) - 아키텍처 문서 3.7.1: 반/과목 성과 분석
-      const performanceAnalysisResponse = await apiClient.get<any>('ai_insights', {
+      interface PerformanceAnalysisInsight {
+        id: string;
+        related_entity_id?: string;
+        metadata?: { class_name?: string };
+        details?: { performance?: string; trend?: string; recommendation?: string };
+      }
+      const performanceAnalysisResponse = await apiClient.get<PerformanceAnalysisInsight>('ai_insights', {
         filters: {
           insight_type: 'performance_analysis',
           created_at: { gte: `${todayDate}T00:00:00` },
@@ -210,10 +237,10 @@ export function AIPage() {
         limit: 10,
       });
 
-      let performanceAnalysis: any[] = [];
+      let performanceAnalysis: Array<{ class_id: string; class_name: string; performance: string; trend: string; recommendation: string }> = [];
       if (!performanceAnalysisResponse.error && performanceAnalysisResponse.data) {
-        performanceAnalysis = performanceAnalysisResponse.data.map((insight: any) => ({
-          class_id: insight.related_entity_id,
+        performanceAnalysis = (performanceAnalysisResponse.data || []).map((insight: PerformanceAnalysisInsight) => ({
+          class_id: insight.related_entity_id || '',
           class_name: insight.metadata?.class_name || '알 수 없음',
           performance: insight.details?.performance || '보통',
           trend: insight.details?.trend || '0%',
@@ -223,14 +250,14 @@ export function AIPage() {
 
       // ai_insights 테이블에 데이터가 없는 경우 fallback
       if (performanceAnalysis.length === 0) {
-        const classesResponse = await apiClient.get<any>('academy_classes', {
+        const classesResponse = await apiClient.get<Class[]>('academy_classes', {
           filters: { status: 'active' },
         });
-        const classes = classesResponse.data || [];
+        const classes = (classesResponse.data as unknown) as Class[] || [];
 
         // attendanceLogs가 비어있으면 다시 조회
         if (attendanceLogs.length === 0) {
-          const attendanceLogsResponse = await apiClient.get<any>('attendance_logs', {
+          const attendanceLogsResponse = await apiClient.get<AttendanceLog>('attendance_logs', {
             filters: {},
             orderBy: { column: 'occurred_at', ascending: false },
             limit: 100,
@@ -238,10 +265,10 @@ export function AIPage() {
           attendanceLogs = attendanceLogsResponse.data || [];
         }
 
-        performanceAnalysis = classes.map((cls: any) => {
-          const classLogs = attendanceLogs.filter((log: any) => log.class_id === cls.id);
+        performanceAnalysis = classes.map((cls: Class) => {
+          const classLogs = attendanceLogs.filter((log: AttendanceLog) => log.class_id === cls.id);
           const attendanceRate = classLogs.length > 0
-            ? (classLogs.filter((log: any) => log.status === 'present').length / classLogs.length) * 100
+            ? (classLogs.filter((log: AttendanceLog) => log.status === 'present').length / classLogs.length) * 100
             : 0;
 
           return {
@@ -259,7 +286,13 @@ export function AIPage() {
       }
 
       // 3. 지역 대비 비교 (regional_comparison) - 아키텍처 문서 3.7.1: 지역 대비 부족 영역 분석
-      const regionalComparisonResponse = await apiClient.get<any>('ai_insights', {
+      interface RegionalComparisonInsight {
+        id: string;
+        metadata?: { area?: string; status?: string };
+        summary: string;
+        details?: { recommendation?: string };
+      }
+      const regionalComparisonResponse = await apiClient.get<RegionalComparisonInsight>('ai_insights', {
         filters: {
           insight_type: 'regional_comparison',
           created_at: { gte: `${todayDate}T00:00:00` },
@@ -269,9 +302,9 @@ export function AIPage() {
         limit: 10,
       });
 
-      let regionalComparison: any[] = [];
+      let regionalComparison: Array<{ area: string; status: string; gap: string; recommendation: string }> = [];
       if (!regionalComparisonResponse.error && regionalComparisonResponse.data) {
-        regionalComparison = regionalComparisonResponse.data.map((insight: any) => ({
+        regionalComparison = (regionalComparisonResponse.data || []).map((insight: RegionalComparisonInsight) => ({
           area: insight.metadata?.area || '알 수 없음',
           status: insight.metadata?.status || '보통',
           gap: insight.summary,
@@ -313,17 +346,17 @@ export function AIPage() {
       // 현재는 간단한 리포트 데이터 수집
       const currentMonth = toKST().format('YYYY-MM');
 
-      const invoicesResponse = await apiClient.get<any>('invoices', {
+      const invoicesResponse = await apiClient.get<Invoice>('invoices', {
         filters: {
           period_start: { gte: `${currentMonth}-01` },
         },
       });
 
-      const studentsResponse = await apiClient.get<any>('persons', {
+      const studentsResponse = await apiClient.get<Student>('persons', {
         filters: {},
       });
 
-      const attendanceLogsResponse = await apiClient.get<any>('attendance_logs', {
+      const attendanceLogsResponse = await apiClient.get<AttendanceLog>('attendance_logs', {
         filters: {
           occurred_at: { gte: `${currentMonth}-01T00:00:00` },
         },
@@ -338,8 +371,8 @@ export function AIPage() {
         month: currentMonth,
         total_students: students.length,
         total_invoices: invoices.length,
-        total_revenue: invoices.reduce((sum: number, inv: any) => sum + (inv.amount_paid || 0), 0),
-        total_attendance: attendanceLogs.filter((log: any) => log.status === 'present').length,
+        total_revenue: invoices.reduce((sum: number, inv: Invoice) => sum + ((inv as Invoice & { amount_paid?: number }).amount_paid || 0), 0),
+        total_attendance: attendanceLogs.filter((log: AttendanceLog) => log.status === 'present').length,
         generated_at: toKST().toISOString(),
       };
 
@@ -377,7 +410,7 @@ export function AIPage() {
           {!isTeacher && (
             <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
               <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
+                <span style={{ color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
                   빠른 분석:
                 </span>
                 <Button
@@ -433,7 +466,7 @@ export function AIPage() {
           )}
           {isTeacher && (
             <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
+              <div style={{ color: 'var(--color-text-secondary)', textAlign: 'center' }}>
                 요약 정보만 제공됩니다. 상세 분석은 관리자에게 문의하세요.
               </div>
             </Card>
@@ -467,12 +500,12 @@ export function AIPage() {
                       <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
                         {aiInsights.weeklyBriefing.title || '이번 주 요약'}
                       </h3>
-                      <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
+                      <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
                         {aiInsights.weeklyBriefing.summary}
                       </p>
                       {aiInsights.weeklyBriefing.details && typeof aiInsights.weeklyBriefing.details === 'object' && (
-                        <div style={{ marginTop: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                          {Object.entries(aiInsights.weeklyBriefing.details).map(([key, value]: [string, any]) => (
+                        <div style={{ marginTop: 'var(--spacing-md)', color: 'var(--color-text-secondary)' }}>
+                          {Object.entries(aiInsights.weeklyBriefing.details).map(([key, value]: [string, unknown]) => (
                             <div key={key} style={{ marginBottom: 'var(--spacing-xs)' }}>
                               <strong>{key}:</strong> {typeof value === 'string' ? value : JSON.stringify(value)}
                             </div>
@@ -496,17 +529,17 @@ export function AIPage() {
                           출결 이상 탐지
                         </h2>
                       </div>
-                      <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
+                      <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
                         {aiInsights.attendanceAnomalies.length}명의 학생에게 출결 이상이 감지되었습니다.
                       </p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
-                        {aiInsights.attendanceAnomalies.slice(0, 3).map((anomaly: any, index: number) => (
-                          <div key={index} style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                        {aiInsights.attendanceAnomalies.slice(0, 3).map((anomaly: { student_name: string; issue: string }, index: number) => (
+                          <div key={index} style={{ color: 'var(--color-text-secondary)' }}>
                             • {anomaly.student_name}: {anomaly.issue}
                           </div>
                         ))}
                         {aiInsights.attendanceAnomalies.length > 3 && (
-                          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
+                          <div style={{ color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
                             외 {aiInsights.attendanceAnomalies.length - 3}건...
                           </div>
                         )}
@@ -531,22 +564,22 @@ export function AIPage() {
                           반/과목 성과 분석
                         </h2>
                       </div>
-                      <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
+                      <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
                         {aiInsights.performanceAnalysis.length}개 반의 성과를 분석했습니다.
                       </p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
-                        {aiInsights.performanceAnalysis.slice(0, 3).map((perf: any, index: number) => (
+                        {aiInsights.performanceAnalysis.slice(0, 3).map((perf: { performance: string; class_name: string; trend: string }, index: number) => (
                           <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                             <Badge color={perf.performance === '우수' ? 'success' : perf.performance === '보통' ? 'info' : 'error'}>
                               {perf.performance}
                             </Badge>
-                            <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                            <span style={{ color: 'var(--color-text-secondary)' }}>
                               {perf.class_name}: {perf.trend}
                             </span>
                           </div>
                         ))}
                         {aiInsights.performanceAnalysis.length > 3 && (
-                          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
+                          <div style={{ color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
                             외 {aiInsights.performanceAnalysis.length - 3}개 반...
                           </div>
                         )}
@@ -569,7 +602,7 @@ export function AIPage() {
                         </h2>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-                        {aiInsights.regionalComparison.map((item: any, index: number) => (
+                        {aiInsights.regionalComparison.map((item: { area: string; status: string; gap: string; recommendation: string }, index: number) => (
                           <div
                             key={index}
                             style={{
@@ -584,7 +617,7 @@ export function AIPage() {
                               </Badge>
                               <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{item.gap}</span>
                             </div>
-                            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                            <div style={{ color: 'var(--color-text-secondary)' }}>
                               {item.recommendation}
                             </div>
                           </div>
@@ -596,7 +629,7 @@ export function AIPage() {
                     <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
                       <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
                         <p>지역 비교 데이터가 없습니다.</p>
-                        <p style={{ fontSize: 'var(--font-size-sm)', marginTop: 'var(--spacing-xs)' }}>
+                        <p style={{ marginTop: 'var(--spacing-xs)' }}>
                           지역 정보를 설정하면 지역 대비 분석을 제공할 수 있습니다.
                         </p>
                       </div>
@@ -611,7 +644,7 @@ export function AIPage() {
                     <Card padding="lg" variant="default">
                       <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
                         <p>AI 인사이트 데이터가 없습니다.</p>
-                        <p style={{ fontSize: 'var(--font-size-sm)', marginTop: 'var(--spacing-xs)' }}>
+                        <p style={{ marginTop: 'var(--spacing-xs)' }}>
                           데이터가 축적되면 AI 분석 결과를 제공합니다.
                         </p>
                       </div>
@@ -654,7 +687,7 @@ function ConsultationSummaryTab() {
     queryFn: async () => {
       if (!selectedStudentId) return [];
 
-      const response = await apiClient.get<any>('student_consultations', {
+      const response = await apiClient.get<StudentConsultation>('student_consultations', {
         filters: { student_id: selectedStudentId },
         orderBy: { column: 'consultation_date', ascending: false },
       });
@@ -711,14 +744,14 @@ function ConsultationSummaryTab() {
                 ],
               },
             }}
-            onSubmit={(data) => {
-              setSelectedStudentId(data.student_id || null);
+            onSubmit={(data: Record<string, unknown>) => {
+              setSelectedStudentId((data.student_id as string) || null);
             }}
             defaultValues={{ student_id: selectedStudentId || '' }}
-            actionContext={{
-              apiCall: async (endpoint: string, method: string, body?: any) => {
+              actionContext={{
+              apiCall: async (endpoint: string, method: string, body?: unknown) => {
                 if (method === 'POST') {
-                  const response = await apiClient.post(endpoint, body);
+                  const response = await apiClient.post(endpoint, body as Record<string, unknown>);
                   if (response.error) {
                     throw new Error(response.error.message);
                   }
@@ -747,7 +780,7 @@ function ConsultationSummaryTab() {
             </div>
           ) : consultations && consultations.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              {consultations.map((consultation: any) => (
+              {consultations.map((consultation: StudentConsultation) => (
                 <Card
                   key={consultation.id}
                   padding="md"
@@ -765,7 +798,7 @@ function ConsultationSummaryTab() {
                            consultation.consultation_type === 'behavior' ? '행동' : '기타'}
                         </Badge>
                       </div>
-                      <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap', marginBottom: 'var(--spacing-sm)' }}>
+                      <p style={{ color: 'var(--color-text)', whiteSpace: 'pre-wrap', marginBottom: 'var(--spacing-sm)' }}>
                         {consultation.content}
                       </p>
                       {consultation.ai_summary ? (
@@ -773,7 +806,7 @@ function ConsultationSummaryTab() {
                           <p style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
                             🤖 AI 요약
                           </p>
-                          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                          <p style={{ color: 'var(--color-text-secondary)' }}>
                             {consultation.ai_summary}
                           </p>
                         </div>

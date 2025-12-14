@@ -132,7 +132,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           minHeight: '100vh',
         }}
       >
-        <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
+        <p style={{ color: 'var(--color-text-secondary)' }}>
           로딩 중..
         </p>
       </div>
@@ -155,7 +155,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           minHeight: '100vh',
         }}
       >
-        <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
+        <p style={{ color: 'var(--color-text-secondary)' }}>
           테넌트 정보를 불러오는 중..
         </p>
       </div>
@@ -183,7 +183,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           minHeight: '100vh',
         }}
       >
-        <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
+        <p style={{ color: 'var(--color-text-secondary)' }}>
           테넌트를 선택하는 중..
         </p>
       </div>
@@ -207,7 +207,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           minHeight: '100vh',
         }}
       >
-        <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
+        <p style={{ color: 'var(--color-text-secondary)' }}>
           테넌트 정보를 설정하는 중...
         </p>
       </div>

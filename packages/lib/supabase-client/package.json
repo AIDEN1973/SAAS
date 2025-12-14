@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
-    "@env-registry/core": "file:../../packages/env-registry"
+    "@env-registry": "file:../../packages/env-registry"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

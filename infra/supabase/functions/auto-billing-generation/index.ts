@@ -27,7 +27,8 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // KST 기준 오늘 날짜 계산
+    // 기술문서 19-1-2: KST 기준 날짜 처리
+    // Edge Functions는 Deno 환경이므로 수동으로 KST 변환 수행
     const now = new Date();
     const kstOffset = 9 * 60; // KST는 UTC+9
     const kstTime = new Date(now.getTime() + (kstOffset * 60 * 1000));
@@ -95,10 +96,10 @@ serve(async (req) => {
           continue;
         }
 
-        const existingPayerIds = new Set((existingInvoices || []).map((inv: any) => inv.payer_id));
+        const existingPayerIds = new Set((existingInvoices || []).map((inv: { payer_id?: string }) => inv.payer_id));
 
         // 청구서가 없는 학생들에 대해 청구서 생성
-        const studentsToBill = students.filter((student: any) => !existingPayerIds.has(student.id));
+        const studentsToBill = students.filter((student: { id: string }) => !existingPayerIds.has(student.id));
 
         if (studentsToBill.length === 0) {
           console.log(`[Auto Billing] All students already have invoices for tenant ${tenant.id}`);
@@ -106,7 +107,7 @@ serve(async (req) => {
         }
 
         // 청구서 생성 (billing_plans 정보는 향후 추가)
-        const invoices = studentsToBill.map((student: any) => ({
+        const invoices = studentsToBill.map((student: { id: string }) => ({
           tenant_id: tenant.id,
           payer_id: student.id,
           amount: 0, // TODO: billing_plans에서 실제 금액 가져오기
@@ -159,6 +160,7 @@ serve(async (req) => {
     );
   }
 });
+
 
 
 

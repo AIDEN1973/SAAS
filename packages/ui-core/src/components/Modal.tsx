@@ -70,19 +70,19 @@ export const Modal: React.FC<ModalProps> = ({
 
   const sizeMap: Record<'sm' | 'md' | 'lg' | 'xl' | 'full', React.CSSProperties> = {
     sm: {
-      width: isMobile ? '90%' : '400px',
+      width: isMobile ? '90%' : 'var(--width-modal-sm)', // styles.css 준수: 모달 크기 토큰 사용
       maxWidth: '90vw',
     },
     md: {
-      width: isMobile ? '90%' : '500px',
+      width: isMobile ? '90%' : 'var(--width-modal-md)', // styles.css 준수: 모달 크기 토큰 사용
       maxWidth: '90vw',
     },
     lg: {
-      width: isMobile ? '95%' : '700px',
+      width: isMobile ? '95%' : 'var(--width-modal-lg)', // styles.css 준수: 모달 크기 토큰 사용
       maxWidth: '95vw',
     },
     xl: {
-      width: isMobile ? '95%' : '900px',
+      width: isMobile ? '95%' : 'var(--width-modal-xl)', // styles.css 준수: 모달 크기 토큰 사용
       maxWidth: '95vw',
     },
     full: {
@@ -130,7 +130,7 @@ export const Modal: React.FC<ModalProps> = ({
         style={{
           position: 'relative',
           zIndex: 'var(--z-modal)',
-          maxHeight: isMobile ? '90vh' : '85vh',
+          maxHeight: isMobile ? 'var(--height-modal-max-mobile)' : 'var(--height-modal-max)', // styles.css 준수: 모달 높이 토큰 사용
           overflow: 'auto',
           ...sizeMap[size],
         }}
@@ -144,7 +144,7 @@ export const Modal: React.FC<ModalProps> = ({
               justifyContent: 'space-between',
               marginBottom: 'var(--spacing-md)',
               paddingBottom: 'var(--spacing-md)',
-              borderBottom: '1px solid var(--color-gray-200)',
+              borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
             }}
           >
             <h2
@@ -161,8 +161,8 @@ export const Modal: React.FC<ModalProps> = ({
               size="sm"
               onClick={onClose}
               style={{
-                minWidth: '44px',
-                minHeight: '44px',
+                minWidth: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+                minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
               }}
               aria-label="닫기"
             >
@@ -189,7 +189,7 @@ export const Modal: React.FC<ModalProps> = ({
               justifyContent: 'flex-end',
               gap: 'var(--spacing-sm)',
               paddingTop: 'var(--spacing-md)',
-              borderTop: '1px solid var(--color-gray-200)',
+              borderTop: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
             }}
           >
             {footer}

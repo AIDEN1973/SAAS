@@ -15,7 +15,7 @@ import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { toKST } from '@lib/date-utils';
-import type { Invoice, InvoiceStatus } from '@core/billing';
+import type { Invoice, InvoiceStatus, InvoiceItem } from '@core/billing';
 import { billingFormSchema } from '../schemas/billing.schema';
 import { productFormSchema } from '../schemas/product.schema';
 import { invoiceTableSchema } from '../schemas/invoice.table.schema';
@@ -71,7 +71,7 @@ export function BillingPage() {
 
   // 인보이스 생성
   const createInvoice = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       const response = await apiClient.post<Invoice>('invoices', {
         payer_id: data.payer_id,
         amount: data.amount,
@@ -101,7 +101,7 @@ export function BillingPage() {
     queryFn: async () => {
       // TODO: products 테이블이 생성되면 실제 조회로 변경
       // 현재는 invoice_items를 통해 상품 정보 추출
-      const response = await apiClient.get<any>('invoice_items', {
+      const response = await apiClient.get<InvoiceItem[]>('invoice_items', {
         orderBy: { column: 'created_at', ascending: false },
         limit: 100,
       });
@@ -113,8 +113,14 @@ export function BillingPage() {
 
       // invoice_items에서 상품 정보 추출 (임시)
       const items = response.data || [];
-      const productMap = new Map<string, any>();
-      items.forEach((item: any) => {
+      interface ProductInfo {
+        id: string;
+        name: string;
+        type: string;
+        amount: number;
+      }
+      const productMap = new Map<string, ProductInfo>();
+      (items as Array<{ item_type?: string; description?: string; category?: string; unit_price?: number }>).forEach((item) => {
         if (item.item_type && !productMap.has(item.item_type)) {
           productMap.set(item.item_type, {
             id: item.item_type,
@@ -132,7 +138,7 @@ export function BillingPage() {
 
   // 상품 생성
   const createProduct = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       // TODO: products 테이블이 생성되면 실제 생성으로 변경
       // 현재는 플레이스홀더
       return { id: 'temp-' + Date.now(), ...data };
@@ -158,7 +164,7 @@ export function BillingPage() {
       const periodStart = `${data.year}-${String(data.month).padStart(2, '0')}-01`;
       const periodEnd = toKST(`${data.year}-${String(data.month).padStart(2, '0')}-01`).endOf('month').format('YYYY-MM-DD');
 
-      const invoicesResponse = await apiClient.get<any>('invoices', {
+      const invoicesResponse = await apiClient.get<Invoice[]>('invoices', {
         filters: {
           period_start: { gte: periodStart, lte: periodEnd },
         },
@@ -168,11 +174,11 @@ export function BillingPage() {
         throw new Error(invoicesResponse.error.message);
       }
 
-      const invoices = invoicesResponse.data || [];
+      const invoices = (invoicesResponse.data || []) as unknown as Invoice[];
 
       // 결제 완료된 청구서만 집계
-      const paidInvoices = invoices.filter((inv: any) => inv.status === 'paid');
-      const totalAmount = paidInvoices.reduce((sum: number, inv: any) => sum + (inv.amount_paid || 0), 0);
+      const paidInvoices = invoices.filter((inv: Invoice) => inv.status === 'paid');
+      const totalAmount = paidInvoices.reduce((sum: number, inv: Invoice) => sum + ((inv as Invoice & { amount_paid?: number }).amount_paid || 0), 0);
 
       // TODO: settlements 테이블이 생성되면 실제 정산 기록 저장
       // 현재는 계산만 수행
@@ -182,7 +188,7 @@ export function BillingPage() {
         invoice_count: paidInvoices.length,
       };
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: { total_amount?: number }) => {
       queryClient.invalidateQueries({ queryKey: ['revenue-stats', tenantId] });
       setShowSettlementForm(false);
       showAlert('성공', `정산이 완료되었습니다. (정산 금액: ${new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(data.total_amount || 0)})`);
@@ -194,27 +200,32 @@ export function BillingPage() {
 
   // 강사 매출 배분 설정 저장 (tenant_settings에 저장)
   const saveTeacherRevenueSplit = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       if (!tenantId) throw new Error('Tenant ID is required');
 
       // tenant_settings의 billing 섹션 업데이트
       // [불변 규칙] Zero-Trust: tenant_id는 apiClient가 자동으로 주입하므로 filters에서 제거
-      const settingsResponse = await apiClient.get<any>('tenant_settings', {
+      interface TenantSettings {
+        id: string;
+        settings?: Record<string, unknown>;
+      }
+      const settingsResponse = await apiClient.get<TenantSettings[]>('tenant_settings', {
         limit: 1,
       });
 
       let settingsId: string | null = null;
-      let currentSettings: any = {};
+      let currentSettings: Record<string, unknown> = {};
 
-      if (!settingsResponse.error && settingsResponse.data && settingsResponse.data.length > 0) {
-        settingsId = settingsResponse.data[0].id;
-        currentSettings = settingsResponse.data[0].settings || {};
+      if (!settingsResponse.error && settingsResponse.data && Array.isArray(settingsResponse.data) && settingsResponse.data.length > 0) {
+        const firstItem = (settingsResponse.data[0] as unknown) as { id: string; settings?: Record<string, unknown> };
+        settingsId = firstItem.id;
+        currentSettings = firstItem.settings || {};
       }
 
       const updatedSettings = {
         ...currentSettings,
         billing: {
-          ...currentSettings.billing,
+          ...(currentSettings.billing as Record<string, unknown> || {}),
           teacher_revenue_split: {
             enabled: data.enabled || false,
             split_method: data.split_method || 'percentage',
@@ -235,7 +246,7 @@ export function BillingPage() {
         return updateResponse.data;
       } else {
         // [불변 규칙] Zero-Trust: tenant_id는 RLS 정책에 의해 자동으로 설정되므로 제거
-        const createResponse = await apiClient.post<any>('tenant_settings', {
+        const createResponse = await apiClient.post<{ id: string; settings?: Record<string, unknown> }>('tenant_settings', {
           settings: updatedSettings,
         });
 
@@ -279,7 +290,7 @@ export function BillingPage() {
     setFilter({ status });
   };
 
-  const handleCreateInvoice = async (data: any) => {
+  const handleCreateInvoice = async (data: Record<string, unknown>) => {
     try {
       await createInvoice.mutateAsync(data);
       // 성공 시 모달 닫기는 onSuccess에서 처리됨
@@ -288,7 +299,7 @@ export function BillingPage() {
     }
   };
 
-  const handleCreateProduct = async (data: any) => {
+  const handleCreateProduct = async (data: Record<string, unknown>) => {
     try {
       await createProduct.mutateAsync(data);
     } catch (error) {
@@ -338,7 +349,7 @@ export function BillingPage() {
           {/* 빠른 링크 (한 페이지에 하나의 기능 원칙 준수: 청구서 관리만 메인, 나머지는 별도 페이지) */}
           <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
+              <span style={{ color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
                 관련 기능:
               </span>
               <Button
@@ -440,16 +451,16 @@ export function BillingPage() {
                   onClose={() => setShowCreateForm(false)}
                   title="새 인보이스 생성"
                   position={isMobile ? 'bottom' : 'right'}
-                  width={isTablet ? '500px' : '100%'}
+                  width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
                 >
                   <SchemaForm
                     schema={schema}
                     onSubmit={handleCreateInvoice}
                     defaultValues={{}}
                     actionContext={{
-                      apiCall: async (endpoint: string, method: string, body?: any) => {
+                      apiCall: async (endpoint: string, method: string, body?: unknown) => {
                         if (method === 'POST') {
-                          const response = await apiClient.post(endpoint, body);
+                          const response = await apiClient.post(endpoint, body as Record<string, unknown>);
                           if (response.error) {
                             throw new Error(response.error.message);
                           }
@@ -479,9 +490,9 @@ export function BillingPage() {
                     onSubmit={handleCreateInvoice}
                     defaultValues={{}}
                     actionContext={{
-                      apiCall: async (endpoint: string, method: string, body?: any) => {
+                      apiCall: async (endpoint: string, method: string, body?: unknown) => {
                         if (method === 'POST') {
-                          const response = await apiClient.post(endpoint, body);
+                          const response = await apiClient.post(endpoint, body as Record<string, unknown>);
                           if (response.error) {
                             throw new Error(response.error.message);
                           }
@@ -509,7 +520,7 @@ export function BillingPage() {
           {/* 빠른 링크 */}
           <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
+              <span style={{ color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
                 추가 기능:
               </span>
               <Button

@@ -50,10 +50,10 @@ export const Switch: React.FC<SwitchProps> = ({
         <div
           style={{
             position: 'relative',
-            width: '44px',
-            height: '24px',
-            minWidth: '44px',
-            minHeight: '24px',
+            width: 'var(--size-switch-width)', // styles.css 준수: 스위치 너비 토큰 사용 (접근성)
+            height: 'var(--size-switch-height)', // styles.css 준수: 스위치 높이 토큰 사용
+            minWidth: 'var(--size-switch-width)', // styles.css 준수: 스위치 너비 토큰 사용
+            minHeight: 'var(--size-switch-height)', // styles.css 준수: 스위치 높이 토큰 사용
           }}
         >
           <input
@@ -80,21 +80,23 @@ export const Switch: React.FC<SwitchProps> = ({
               width: '100%',
               height: '100%',
               backgroundColor: checked ? 'var(--color-primary)' : 'var(--color-gray-300)',
-              borderRadius: '12px',
-              transition: 'background-color 0.2s ease',
+              borderRadius: 'var(--border-radius-full)', // styles.css 준수: border-radius 토큰 사용
+              transition: 'background-color var(--transition-base)', // styles.css 준수: transition 토큰 사용
               pointerEvents: 'none',
             }}
           />
           <div
             style={{
               position: 'absolute',
-              top: '2px',
-              left: checked ? '22px' : '2px',
-              width: '20px',
-              height: '20px',
+              top: 'var(--size-switch-thumb-offset)', // styles.css 준수: 스위치 썸 오프셋 토큰 사용
+              left: checked
+                ? `calc(var(--size-switch-width) - var(--size-switch-thumb) - var(--size-switch-thumb-offset))` // 오른쪽 끝
+                : 'var(--size-switch-thumb-offset)', // 왼쪽 끝
+              width: 'var(--size-switch-thumb)', // styles.css 준수: 스위치 썸 크기 토큰 사용
+              height: 'var(--size-switch-thumb)', // styles.css 준수: 스위치 썸 크기 토큰 사용
               backgroundColor: 'var(--color-white)',
-              borderRadius: '50%',
-              transition: 'left 0.2s ease',
+              borderRadius: 'var(--border-radius-full)', // styles.css 준수: border-radius 토큰 사용
+              transition: 'left var(--transition-base)', // styles.css 준수: transition 토큰 사용
               boxShadow: 'var(--shadow-sm)',
               pointerEvents: 'none',
             }}
@@ -114,7 +116,7 @@ export const Switch: React.FC<SwitchProps> = ({
         <span
           style={{
             color: 'var(--color-error)',
-            marginLeft: '52px',
+            marginLeft: 'var(--spacing-switch-indent)', // styles.css 준수: 스위치 들여쓰기 토큰 사용
           }}
         >
           {error}
@@ -124,7 +126,7 @@ export const Switch: React.FC<SwitchProps> = ({
         <span
           style={{
             color: 'var(--color-text-secondary)',
-            marginLeft: '52px',
+            marginLeft: 'var(--spacing-switch-indent)', // styles.css 준수: 스위치 들여쓰기 토큰 사용
           }}
         >
           {helperText}

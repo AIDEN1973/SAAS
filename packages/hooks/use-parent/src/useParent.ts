@@ -8,7 +8,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
-import type { Student } from '@services/student-service';
+import type { Student, Guardian } from '@services/student-service';
+import type { Person } from '@core/party';
 
 /**
  * 자녀 목록 조회 Hook
@@ -24,7 +25,7 @@ export function useChildren() {
     queryFn: async () => {
       // RLS 정책에 의해 현재 사용자가 보호자인 학생만 조회됨
       // guardians 테이블을 통해 자녀를 조회
-      const guardiansResponse = await apiClient.get<any>('guardians', {
+      const guardiansResponse = await apiClient.get<Guardian[]>('guardians', {
         filters: {},
         orderBy: { column: 'is_primary', ascending: false },
       });
@@ -39,10 +40,13 @@ export function useChildren() {
       }
 
       // student_id 목록 추출
-      const studentIds = [...new Set(guardians.map((g: any) => g.student_id))];
+      const studentIds = [...new Set(guardians.map((g) => (g as unknown as Guardian).student_id))];
 
       // persons + academy_students 조인하여 학생 정보 조회
-      const studentsResponse = await apiClient.get<any>('persons', {
+      interface PersonWithAcademyStudents extends Person {
+        academy_students?: Array<Record<string, unknown>>;
+      }
+      const studentsResponse = await apiClient.get<PersonWithAcademyStudents[]>('persons', {
         select: `
           id,
           tenant_id,
@@ -71,18 +75,19 @@ export function useChildren() {
 
       // 데이터 변환 persons + academy_students -> Student
       const personsData = studentsResponse.data || [];
-      const children: Student[] = personsData.map((person: any) => {
-        const academyData = person.academy_students?.[0] || {};
+      const children: Student[] = personsData.map((person) => {
+        const personWithStudents = person as unknown as Person & { academy_students?: Array<Record<string, unknown>> };
+        const academyData = personWithStudents.academy_students?.[0] || {};
         return {
-          id: person.id,
-          tenant_id: person.tenant_id,
+          id: personWithStudents.id,
+          tenant_id: personWithStudents.tenant_id,
           industry_type: 'academy',
-          name: person.name,
+          name: personWithStudents.name,
           birth_date: academyData.birth_date,
           gender: academyData.gender,
-          phone: person.phone,
-          email: person.email,
-          address: person.address,
+          phone: personWithStudents.phone,
+          email: personWithStudents.email,
+          address: personWithStudents.address,
           school_name: academyData.school_name,
           grade: academyData.grade,
           status: academyData.status || 'active',

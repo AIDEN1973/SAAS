@@ -49,7 +49,7 @@ export function NotificationsPage() {
   const { data: notifications, isLoading } = useQuery({
     queryKey: ['notifications', tenantId, filter],
     queryFn: async () => {
-      const filters: Record<string, any> = {};
+      const filters: Record<string, unknown> = {};
       if (filter.channel) filters.channel = filter.channel;
       if (filter.status) filters.status = filter.status;
 
@@ -75,7 +75,7 @@ export function NotificationsPage() {
       if (!tenantId) return [];
 
       try {
-        const response = await apiClient.get<any>('notification_templates', {
+        const response = await apiClient.get<Array<{ id: string; name: string; channel: string; content: string; created_at: string }>>('notification_templates', {
           filters: {},
           orderBy: { column: 'created_at', ascending: false },
         });
@@ -94,16 +94,16 @@ export function NotificationsPage() {
       return [];
       }
     },
-    enabled: false, // 템플릿 관리는 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙)
+    enabled: !!tenantId && activeTab === 'templates', // 템플릿 탭 활성화 시에만 조회
   });
 
   // 템플릿 생성
   const createTemplate = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       if (!tenantId) throw new Error('Tenant ID is required');
 
       try {
-        const response = await apiClient.post<any>('notification_templates', {
+        const response = await apiClient.post<{ id: string; name: string; channel: string; content: string }>('notification_templates', {
           name: data.name,
           channel: data.channel,
           content: data.content,
@@ -133,21 +133,22 @@ export function NotificationsPage() {
 
   // 자동 알림 설정 저장 (tenant_settings에 저장)
   const saveAutoNotificationSettings = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       if (!tenantId) throw new Error('Tenant ID is required');
 
       // tenant_settings의 notification 섹션 업데이트
       // [불변 규칙] Zero-Trust: tenant_id는 apiClient가 자동으로 주입하므로 filters에서 제거
-      const settingsResponse = await apiClient.get<any>('tenant_settings', {
+      const settingsResponse = await apiClient.get<Array<{ id: string; settings?: Record<string, unknown> }>>('tenant_settings', {
         limit: 1,
       });
 
       let settingsId: string | null = null;
-      let currentSettings: any = {};
+      let currentSettings: Record<string, unknown> = {};
 
-      if (!settingsResponse.error && settingsResponse.data && settingsResponse.data.length > 0) {
-        settingsId = settingsResponse.data[0].id;
-        currentSettings = settingsResponse.data[0].settings || {};
+      if (!settingsResponse.error && settingsResponse.data && Array.isArray(settingsResponse.data) && settingsResponse.data.length > 0) {
+        const firstItem = (settingsResponse.data[0] as unknown) as { id: string; settings?: Record<string, unknown> };
+        settingsId = firstItem.id;
+        currentSettings = firstItem.settings || {};
       }
 
       const updatedSettings = {
@@ -175,7 +176,7 @@ export function NotificationsPage() {
         return updateResponse.data;
       } else {
         // [불변 규칙] Zero-Trust: tenant_id는 RLS 정책에 의해 자동으로 설정되므로 제거
-        const createResponse = await apiClient.post<any>('tenant_settings', {
+        const createResponse = await apiClient.post<{ id: string; settings?: Record<string, unknown> }>('tenant_settings', {
           settings: updatedSettings,
         });
 
@@ -197,8 +198,8 @@ export function NotificationsPage() {
 
   // 단체문자/예약 발송
   const sendBulkNotification = useMutation({
-    mutationFn: async (data: any) => {
-      const recipients = data.recipients.split('\n').filter((r: string) => r.trim());
+    mutationFn: async (data: Record<string, unknown>) => {
+      const recipients = String(data.recipients ?? '').split('\n').filter((r: string) => r.trim());
 
       // 각 수신자에게 알림 생성
       const promises = recipients.map((recipient: string) =>
@@ -206,7 +207,8 @@ export function NotificationsPage() {
           channel: data.channel,
           recipient: recipient.trim(),
           content: data.content,
-          status: data.scheduled_at ? 'pending' : 'pending',
+          status: 'pending',
+          scheduled_at: data.scheduled_at || undefined, // 예약 발송 시간 (있으면 전달)
         })
       );
 
@@ -225,7 +227,7 @@ export function NotificationsPage() {
 
   // 알림 생성
   const createNotification = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       const response = await apiClient.post<Notification>('notifications', {
         channel: data.channel,
         recipient: data.recipient,
@@ -271,7 +273,7 @@ export function NotificationsPage() {
     delivered: '전달완료',
   };
 
-  const handleCreateNotification = async (data: any) => {
+  const handleCreateNotification = async (data: Record<string, unknown>) => {
     try {
       await createNotification.mutateAsync(data);
       // 성공 시 모달 닫기는 onSuccess에서 처리됨
@@ -280,7 +282,7 @@ export function NotificationsPage() {
     }
   };
 
-  const handleCreateTemplate = async (data: any) => {
+  const handleCreateTemplate = async (data: Record<string, unknown>) => {
     try {
       await createTemplate.mutateAsync(data);
     } catch (error) {
@@ -288,7 +290,7 @@ export function NotificationsPage() {
     }
   };
 
-  const handleSendBulkNotification = async (data: any) => {
+  const handleSendBulkNotification = async (data: Record<string, unknown>) => {
     try {
       await sendBulkNotification.mutateAsync(data);
     } catch (error) {
@@ -309,7 +311,7 @@ export function NotificationsPage() {
             메시지/공지
           </h1>
 
-          {/* 탭 선택 (한 페이지에 하나의 기능 원칙: 최대 1~2탭) */}
+          {/* 탭 선택 */}
           <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
               <Button
@@ -326,33 +328,24 @@ export function NotificationsPage() {
               >
                 메시지 발송
               </Button>
-            </div>
-          </Card>
-
-          {/* 빠른 링크 (한 페이지에 하나의 기능 원칙 준수: 나머지는 별도 페이지) */}
-          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
-                추가 기능:
-              </span>
               <Button
-                variant="outline"
+                variant={activeTab === 'templates' ? 'solid' : 'outline'}
                 size="sm"
-                onClick={() => navigate('/notifications/templates')}
+                onClick={() => setActiveTab('templates')}
               >
                 템플릿 관리
               </Button>
               <Button
-                variant="outline"
+                variant={activeTab === 'bulk' ? 'solid' : 'outline'}
                 size="sm"
-                onClick={() => navigate('/notifications/bulk')}
+                onClick={() => setActiveTab('bulk')}
               >
                 단체문자/예약
               </Button>
               <Button
-                variant="outline"
+                variant={activeTab === 'auto-settings' ? 'solid' : 'outline'}
                 size="sm"
-                onClick={() => navigate('/notifications/auto-settings')}
+                onClick={() => setActiveTab('auto-settings')}
               >
                 자동 알림 설정
               </Button>
@@ -400,7 +393,7 @@ export function NotificationsPage() {
               key={`notification-table-${filter.channel || 'all'}-${filter.status || 'all'}`}
               schema={notificationTableSchemaData}
               apiCall={async (endpoint: string, method: string) => {
-                const filters: Record<string, any> = {};
+                const filters: Record<string, unknown> = {};
                 if (filter.channel) filters.channel = filter.channel;
                 if (filter.status) filters.status = filter.status;
 
@@ -432,16 +425,16 @@ export function NotificationsPage() {
                   onClose={() => setShowCreateForm(false)}
                   title="새 메시지 발송"
                   position={isMobile ? 'bottom' : 'right'}
-                  width={isTablet ? '500px' : '100%'}
+                  width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
                 >
                   <SchemaForm
                     schema={schema}
                     onSubmit={handleCreateNotification}
                     defaultValues={{}}
                     actionContext={{
-                      apiCall: async (endpoint: string, method: string, body?: any) => {
+                      apiCall: async (endpoint: string, method: string, body?: unknown) => {
                         if (method === 'POST') {
-                          const response = await apiClient.post(endpoint, body);
+                          const response = await apiClient.post(endpoint, body as Record<string, unknown>);
                           if (response.error) {
                             throw new Error(response.error.message);
                           }
@@ -471,9 +464,9 @@ export function NotificationsPage() {
                     onSubmit={handleCreateNotification}
                     defaultValues={{}}
                     actionContext={{
-                      apiCall: async (endpoint: string, method: string, body?: any) => {
+                      apiCall: async (endpoint: string, method: string, body?: unknown) => {
                         if (method === 'POST') {
-                          const response = await apiClient.post(endpoint, body);
+                          const response = await apiClient.post(endpoint, body as Record<string, unknown>);
                           if (response.error) {
                             throw new Error(response.error.message);
                           }
@@ -516,16 +509,16 @@ export function NotificationsPage() {
                       onClose={() => setShowCreateForm(false)}
                       title="새 메시지 발송"
                       position={isMobile ? 'bottom' : 'right'}
-                      width={isTablet ? '500px' : '100%'}
+                      width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
                     >
                       <SchemaForm
                         schema={schema}
                         onSubmit={handleCreateNotification}
                         defaultValues={{}}
                         actionContext={{
-                          apiCall: async (endpoint: string, method: string, body?: any) => {
+                          apiCall: async (endpoint: string, method: string, body?: unknown) => {
                             if (method === 'POST') {
-                              const response = await apiClient.post(endpoint, body);
+                              const response = await apiClient.post(endpoint, body as Record<string, unknown>);
                               if (response.error) {
                                 throw new Error(response.error.message);
                               }
@@ -555,9 +548,9 @@ export function NotificationsPage() {
                         onSubmit={handleCreateNotification}
                         defaultValues={{}}
                         actionContext={{
-                          apiCall: async (endpoint: string, method: string, body?: any) => {
+                          apiCall: async (endpoint: string, method: string, body?: unknown) => {
                             if (method === 'POST') {
-                              const response = await apiClient.post(endpoint, body);
+                              const response = await apiClient.post(endpoint, body as Record<string, unknown>);
                               if (response.error) {
                                 throw new Error(response.error.message);
                               }
@@ -581,8 +574,192 @@ export function NotificationsPage() {
             </Card>
           )}
 
+          {/* 템플릿 관리 탭 */}
+          {activeTab === 'templates' && (
+            <Card padding="lg" variant="default">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+                <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>템플릿 관리</h3>
+                <Button
+                  variant="solid"
+                  size="sm"
+                  onClick={() => setShowTemplateForm(true)}
+                >
+                  새 템플릿 생성
+                </Button>
+              </div>
+              {templatesLoading ? (
+                <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+                  로딩 중...
+                </div>
+              ) : templates && templates.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(var(--width-card-min), 1fr))`, gap: 'var(--spacing-md)' }}>
+                  {(templates as unknown as Array<{ id: string; name: string; channel: string; content: string; created_at: string }>).map((template) => (
+                    <Card key={template.id} padding="md" variant="default">
+                      <h4 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
+                        {template.name}
+                      </h4>
+                      <Badge color="blue" style={{ marginBottom: 'var(--spacing-xs)' }}>
+                        {channelLabels[template.channel as NotificationChannel] || template.channel}
+                      </Badge>
+                      <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--spacing-xs)' }}>
+                        {template.content}
+                      </p>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+                  등록된 템플릿이 없습니다.
+                </div>
+              )}
+              {templateSchema && (
+                <>
+                  {isMobile || isTablet ? (
+                    <Drawer
+                      isOpen={showTemplateForm}
+                      onClose={() => setShowTemplateForm(false)}
+                      title="새 템플릿 생성"
+                      position={isMobile ? 'bottom' : 'right'}
+                      width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+                    >
+                      <SchemaForm
+                        schema={templateSchema}
+                        onSubmit={handleCreateTemplate}
+                        defaultValues={{}}
+                        actionContext={{
+                          apiCall: async (endpoint: string, method: string, body?: unknown) => {
+                            if (method === 'POST') {
+                              const response = await apiClient.post(endpoint, body as Record<string, unknown>);
+                              if (response.error) {
+                                throw new Error(response.error.message);
+                              }
+                              return response.data;
+                            }
+                            const response = await apiClient.get(endpoint);
+                            if (response.error) {
+                              throw new Error(response.error.message);
+                            }
+                            return response.data;
+                          },
+                          showToast: (message: string, variant?: string) => {
+                            showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+                          },
+                        }}
+                      />
+                    </Drawer>
+                  ) : (
+                    <Modal
+                      isOpen={showTemplateForm}
+                      onClose={() => setShowTemplateForm(false)}
+                      title="새 템플릿 생성"
+                      size="md"
+                    >
+                      <SchemaForm
+                        schema={templateSchema}
+                        onSubmit={handleCreateTemplate}
+                        defaultValues={{}}
+                        actionContext={{
+                          apiCall: async (endpoint: string, method: string, body?: unknown) => {
+                            if (method === 'POST') {
+                              const response = await apiClient.post(endpoint, body as Record<string, unknown>);
+                              if (response.error) {
+                                throw new Error(response.error.message);
+                              }
+                              return response.data;
+                            }
+                            const response = await apiClient.get(endpoint);
+                            if (response.error) {
+                              throw new Error(response.error.message);
+                            }
+                            return response.data;
+                          },
+                          showToast: (message: string, variant?: string) => {
+                            showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+                          },
+                        }}
+                      />
+                    </Modal>
+                  )}
+                </>
+              )}
+            </Card>
+          )}
 
-          {/* 단체문자/예약과 자동 알림 설정은 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙) */}
+          {/* 단체문자/예약 탭 */}
+          {activeTab === 'bulk' && (
+            <Card padding="lg" variant="default">
+              <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
+                단체문자/예약 발송
+              </h3>
+              {bulkSchema && (
+                <SchemaForm
+                  schema={bulkSchema}
+                  onSubmit={handleSendBulkNotification}
+                  defaultValues={{}}
+                  actionContext={{
+                    apiCall: async (endpoint: string, method: string, body?: unknown) => {
+                      if (method === 'POST') {
+                        const response = await apiClient.post(endpoint, body as Record<string, unknown>);
+                        if (response.error) {
+                          throw new Error(response.error.message);
+                        }
+                        return response.data;
+                      }
+                      const response = await apiClient.get(endpoint);
+                      if (response.error) {
+                        throw new Error(response.error.message);
+                      }
+                      return response.data;
+                    },
+                    showToast: (message: string, variant?: string) => {
+                      showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+                    },
+                  }}
+                />
+              )}
+            </Card>
+          )}
+
+          {/* 자동 알림 설정 탭 */}
+          {activeTab === 'auto-settings' && (
+            <Card padding="lg" variant="default">
+              <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
+                자동 알림 설정
+              </h3>
+              {autoNotificationSettingsSchema && (
+                <SchemaForm
+                  schema={autoNotificationSettingsSchema}
+                  onSubmit={async (data: Record<string, unknown>) => {
+                    try {
+                      await saveAutoNotificationSettings.mutateAsync(data);
+                    } catch (error) {
+                      // 에러는 onError에서 처리됨
+                    }
+                  }}
+                  defaultValues={{}}
+                  actionContext={{
+                    apiCall: async (endpoint: string, method: string, body?: unknown) => {
+                      if (method === 'POST') {
+                        const response = await apiClient.post(endpoint, body as Record<string, unknown>);
+                        if (response.error) {
+                          throw new Error(response.error.message);
+                        }
+                        return response.data;
+                      }
+                      const response = await apiClient.get(endpoint);
+                      if (response.error) {
+                        throw new Error(response.error.message);
+                      }
+                      return response.data;
+                    },
+                    showToast: (message: string, variant?: string) => {
+                      showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+                    },
+                  }}
+                />
+              )}
+            </Card>
+          )}
         </div>
       </Container>
     </ErrorBoundary>

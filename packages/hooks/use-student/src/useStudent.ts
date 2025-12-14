@@ -8,14 +8,19 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
+import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 import type {
   CreateStudentInput,
   UpdateStudentInput,
   StudentFilter,
   Student,
   StudentClass,
+  Guardian,
+  StudentConsultation,
 } from '@services/student-service';
 import type { Class } from '@services/class-service';
+import type { Tag, TagAssignment } from '@core/tags';
+import type { Person } from '@core/party';
 
 /**
  * 학생 목록 조회 Hook
@@ -31,7 +36,10 @@ export function useStudents(filter?: StudentFilter) {
       // [불변 규칙] 기술문서 정책: "Core Party 테이블 + 업종별 확장 테이블" 패턴 사용
       // persons + academy_students를 직접 조인하여 조회 (View 사용)
       // PostgREST가 View를 인식하지 못하는 문제로 인해 직접 조인 사용
-      const response = await apiClient.get<any>('persons', {
+      interface PersonWithAcademyStudents extends Person {
+        academy_students?: Array<Record<string, unknown>>;
+      }
+      const response = await apiClient.get<PersonWithAcademyStudents>('persons', {
         select: `
           *,
           academy_students (
@@ -59,15 +67,15 @@ export function useStudents(filter?: StudentFilter) {
       }
 
       const personsData = response.data || [];
-      const studentIds = personsData.map((p: any) => p.id);
+      const studentIds = personsData.map((p: Person) => p.id);
 
       // 학부모 정보 조회 (주 보호자만)
-      const guardiansResponse = await apiClient.get<any>('guardians', {
+      const guardiansResponse = await apiClient.get<Guardian>('guardians', {
         filters: { student_id: studentIds, is_primary: true },
       });
       const guardiansMap = new Map();
       if (!guardiansResponse.error && guardiansResponse.data) {
-        guardiansResponse.data.forEach((g: any) => {
+        guardiansResponse.data.forEach((g: Guardian) => {
           if (!guardiansMap.has(g.student_id)) {
             guardiansMap.set(g.student_id, g.name);
           }
@@ -75,19 +83,19 @@ export function useStudents(filter?: StudentFilter) {
       }
 
       // 대표반 정보 조회 (활성 반 중 첫 번째)
-      const studentClassesResponse = await apiClient.get<any>('student_classes', {
+      const studentClassesResponse = await apiClient.get<StudentClass>('student_classes', {
         filters: { student_id: studentIds, is_active: true },
       });
       const studentClassMap = new Map();
       if (!studentClassesResponse.error && studentClassesResponse.data) {
-        const classIds = [...new Set(studentClassesResponse.data.map((sc: any) => sc.class_id))];
+        const classIds = [...new Set(studentClassesResponse.data.map((sc: StudentClass) => sc.class_id))];
         if (classIds.length > 0) {
-          const classesResponse = await apiClient.get<any>('academy_classes', {
+          const classesResponse = await apiClient.get<Class>('academy_classes', {
             filters: { id: classIds },
           });
           if (!classesResponse.error && classesResponse.data) {
-            const classMap = new Map(classesResponse.data.map((c: any) => [c.id, c.name]));
-            studentClassesResponse.data.forEach((sc: any) => {
+            const classMap = new Map(classesResponse.data.map((c: Class) => [c.id, c.name]));
+            studentClassesResponse.data.forEach((sc: StudentClass) => {
               if (!studentClassMap.has(sc.student_id) && classMap.has(sc.class_id)) {
                 studentClassMap.set(sc.student_id, classMap.get(sc.class_id));
               }
@@ -97,7 +105,7 @@ export function useStudents(filter?: StudentFilter) {
       }
 
       // 데이터 변환 persons + academy_students -> Student
-      let students: Student[] = personsData.map((person: any) => {
+      let students: Student[] = personsData.map((person: Person & { academy_students?: Array<Record<string, unknown>> }) => {
         const academyData = person.academy_students?.[0] || {};
         return {
           id: person.id,
@@ -144,13 +152,13 @@ export function useStudents(filter?: StudentFilter) {
       // 반 필터 (class_id로 필터링)
       if (filter?.class_id) {
         // student_classes를 통해 해당 반에 속한 학생만 필터링
-        const studentClassesResponse = await apiClient.get<any>('student_classes', {
+        const studentClassesResponse = await apiClient.get<StudentClass>('student_classes', {
           filters: { class_id: filter.class_id, is_active: true },
         });
 
         if (!studentClassesResponse.error && studentClassesResponse.data) {
           const studentIdsInClass = new Set(
-            studentClassesResponse.data.map((sc: any) => sc.student_id)
+            studentClassesResponse.data.map((sc: StudentClass) => sc.student_id)
           );
           students = students.filter((s) => studentIdsInClass.has(s.id));
         }
@@ -176,7 +184,10 @@ export function useStudent(studentId: string | null) {
       if (!studentId) return null;
 
       // students View를 사용하여 조회 (persons + academy_students 조인)
-      const response = await apiClient.get<any>('persons', {
+      interface PersonWithAcademyStudents extends Person {
+        academy_students?: Array<Record<string, unknown>>;
+      }
+      const response = await apiClient.get<PersonWithAcademyStudents>('persons', {
         select: `
           *,
           academy_students (
@@ -246,7 +257,7 @@ export function useCreateStudent() {
   return useMutation({
     mutationFn: async (input: CreateStudentInput) => {
       // 1. persons 테이블에 생성 (공통 필드)
-      const personResponse = await apiClient.post<any>('persons', {
+      const personResponse = await apiClient.post<Person>('persons', {
         name: input.name,
         email: input.email,
         phone: input.phone,
@@ -261,7 +272,23 @@ export function useCreateStudent() {
       const person = personResponse.data!;
 
       // 2. academy_students 테이블에 확장 정보 추가
-      const academyResponse = await apiClient.post<any>('academy_students', {
+      interface AcademyStudent {
+        person_id: string;
+        tenant_id: string;
+        birth_date?: string;
+        gender?: string;
+        school_name?: string;
+        grade?: string;
+        class_name?: string;
+        status?: string;
+        notes?: string;
+        profile_image_url?: string;
+        created_at: string;
+        updated_at: string;
+        created_by?: string;
+        updated_by?: string;
+      }
+      const academyResponse = await apiClient.post<AcademyStudent>('academy_students', {
         person_id: person.id,
         birth_date: input.birth_date,
         gender: input.gender,
@@ -348,7 +375,7 @@ export function useBulkCreateStudents() {
       for (let i = 0; i < students.length; i++) {
         try {
           // 1. persons 테이블에 생성
-          const personResponse = await apiClient.post<any>('persons', {
+          const personResponse = await apiClient.post<Person>('persons', {
             name: students[i].name,
             email: students[i].email,
             phone: students[i].phone,
@@ -363,7 +390,23 @@ export function useBulkCreateStudents() {
           const person = personResponse.data!;
 
           // 2. academy_students 테이블에 확장 정보 추가
-          const academyResponse = await apiClient.post<any>('academy_students', {
+          interface AcademyStudent {
+            person_id: string;
+            tenant_id: string;
+            birth_date?: string;
+            gender?: string;
+            school_name?: string;
+            grade?: string;
+            class_name?: string;
+            status?: string;
+            notes?: string;
+            profile_image_url?: string;
+            created_at: string;
+            updated_at: string;
+            created_by?: string;
+            updated_by?: string;
+          }
+          const academyResponse = await apiClient.post<AcademyStudent>('academy_students', {
             person_id: person.id,
             birth_date: students[i].birth_date,
             gender: students[i].gender,
@@ -441,7 +484,7 @@ export function useUpdateStudent() {
       input: UpdateStudentInput;
     }) => {
       // 1. persons 테이블 업데이트 (공통 필드)
-      const personUpdate: any = {};
+      const personUpdate: Partial<{ name?: string; email?: string; phone?: string; address?: string }> = {};
       if (input.name !== undefined) personUpdate.name = input.name;
       if (input.email !== undefined) personUpdate.email = input.email;
       if (input.phone !== undefined) personUpdate.phone = input.phone;
@@ -455,7 +498,7 @@ export function useUpdateStudent() {
       }
 
       // 2. academy_students 테이블 업데이트 (업종 특화 필드)
-      const academyUpdate: any = {};
+      const academyUpdate: Partial<Student> = {};
       if (input.birth_date !== undefined) academyUpdate.birth_date = input.birth_date;
       if (input.gender !== undefined) academyUpdate.gender = input.gender;
       if (input.school_name !== undefined) academyUpdate.school_name = input.school_name;
@@ -466,7 +509,23 @@ export function useUpdateStudent() {
 
       if (Object.keys(academyUpdate).length > 0) {
         // academy_students는 person_id를 PK로 사용하므로 person_id로 조회 후 업데이트
-        const academyResponse = await apiClient.get('academy_students', {
+        interface AcademyStudent {
+          person_id: string;
+          tenant_id: string;
+          birth_date?: string;
+          gender?: string;
+          school_name?: string;
+          grade?: string;
+          class_name?: string;
+          status?: string;
+          notes?: string;
+          profile_image_url?: string;
+          created_at: string;
+          updated_at: string;
+          created_by?: string;
+          updated_by?: string;
+        }
+        const academyResponse = await apiClient.get<AcademyStudent>('academy_students', {
           filters: { person_id: studentId },
           limit: 1,
         });
@@ -485,7 +544,7 @@ export function useUpdateStudent() {
       }
 
       // 3. 업데이트된 데이터 조회하여 반환
-      const studentResponse = await apiClient.get<any>('persons', {
+      const studentResponse = await apiClient.get<Person & { academy_students?: Array<Record<string, unknown>> }>('persons', {
         select: `
           *,
           academy_students (
@@ -619,7 +678,7 @@ export function useStudentTags() {
     queryFn: async (): Promise<Array<{ id: string; name: string; color: string }>> => {
       if (!tenantId) return [];
 
-      const response = await apiClient.get<any>('tags', {
+      const response = await apiClient.get<Tag>('tags', {
         filters: { entity_type: 'student' },
         orderBy: { column: 'name', ascending: true },
       });
@@ -628,7 +687,7 @@ export function useStudentTags() {
         throw new Error(response.error.message);
       }
 
-      return (response.data || []).map((tag: any) => ({
+      return (response.data || []).map((tag: Tag) => ({
         id: tag.id,
         name: tag.name,
         color: tag.color || '#3b82f6',
@@ -653,7 +712,7 @@ export function useStudentTagsByStudent(studentId: string | null) {
       if (!studentId || !tenantId) return [];
 
       // tag_assignments를 통해 학생의 태그 조회
-      const assignmentsResponse = await apiClient.get<any>('tag_assignments', {
+      const assignmentsResponse = await apiClient.get<TagAssignment>('tag_assignments', {
         filters: { entity_id: studentId, entity_type: 'student' },
       });
 
@@ -665,10 +724,10 @@ export function useStudentTagsByStudent(studentId: string | null) {
       if (assignments.length === 0) return [];
 
       // 태그 ID 배열 추출
-      const tagIds = assignments.map((a: any) => a.tag_id);
+      const tagIds = assignments.map((a: TagAssignment) => a.tag_id);
 
       // 태그 상세 정보 조회
-      const tagsResponse = await apiClient.get<any>('tags', {
+      const tagsResponse = await apiClient.get<Tag[]>('tags', {
         filters: { id: tagIds },
       });
 
@@ -676,11 +735,14 @@ export function useStudentTagsByStudent(studentId: string | null) {
         throw new Error(tagsResponse.error.message);
       }
 
-      return (tagsResponse.data || []).map((tag: any) => ({
-        id: tag.id,
-        name: tag.name,
-        color: tag.color || '#3b82f6',
-      }));
+      return (tagsResponse.data || []).map((tag) => {
+        const tagData = tag as unknown as Tag;
+        return {
+          id: tagData.id,
+          name: tagData.name,
+          color: tagData.color || '#3b82f6',
+        };
+      });
     },
     enabled: !!tenantId && !!studentId,
   });
@@ -729,7 +791,7 @@ export function useCreateConsultation() {
       userId,
     }: {
       studentId: string;
-      consultation: Omit<any, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>;
+      consultation: Omit<StudentConsultation, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>;
       userId: string;
     }) => {
       const response = await apiClient.post('student_consultations', {
@@ -765,7 +827,7 @@ export function useUpdateConsultation() {
       studentId,
     }: {
       consultationId: string;
-      consultation: Partial<any>;
+      consultation: Partial<StudentConsultation>;
       studentId: string;
     }) => {
       const response = await apiClient.patch('student_consultations', consultationId, consultation);
@@ -832,7 +894,7 @@ export function useGenerateConsultationAISummary() {
     }) => {
       // [불변 규칙] api-sdk를 통해서만 데이터 요청
       // 1. 상담기록 조회
-      const consultationResponse = await apiClient.get<any>('student_consultations', {
+      const consultationResponse = await apiClient.get<StudentConsultation>('student_consultations', {
         filters: { id: consultationId },
         limit: 1,
       });
@@ -886,7 +948,7 @@ export function useCreateGuardian() {
       guardian,
     }: {
       studentId: string;
-      guardian: Omit<any, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>;
+      guardian: Omit<Guardian, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>;
     }) => {
       const response = await apiClient.post('guardians', {
         student_id: studentId,
@@ -920,7 +982,7 @@ export function useUpdateGuardian() {
       studentId,
     }: {
       guardianId: string;
-      guardian: Partial<any>;
+      guardian: Partial<Guardian>;
       studentId: string;
     }) => {
       const response = await apiClient.patch('guardians', guardianId, guardian);
@@ -982,7 +1044,7 @@ export function useUpdateStudentTags() {
       tagIds: string[];
     }) => {
       // 기존 태그 할당 제거
-      const existingTags = await apiClient.get('tag_assignments', {
+      const existingTags = await apiClient.get<TagAssignment>('tag_assignments', {
         filters: { entity_id: studentId, entity_type: 'student' },
       });
 
@@ -1027,7 +1089,7 @@ export function useStudentClasses(studentId: string | null) {
       if (!studentId) return [];
 
       // 1. student_classes 조회
-      const studentClassesResponse = await apiClient.get<any>('student_classes', {
+      const studentClassesResponse = await apiClient.get<StudentClass>('student_classes', {
         filters: { student_id: studentId, is_active: true },
         orderBy: { column: 'enrolled_at', ascending: false },
       });
@@ -1040,7 +1102,7 @@ export function useStudentClasses(studentId: string | null) {
       if (studentClasses.length === 0) return [];
 
       // 2. class_id 배열 추출
-      const classIds = studentClasses.map((sc: any) => sc.class_id);
+      const classIds = studentClasses.map((sc: StudentClass) => sc.class_id);
 
       // 3. academy_classes 조회
       const classesResponse = await apiClient.get<Class>('academy_classes', {
@@ -1055,7 +1117,7 @@ export function useStudentClasses(studentId: string | null) {
       const classMap = new Map(classes.map((c) => [c.id, c]));
 
       // 4. 조합하여 반환
-      return studentClasses.map((sc: any) => ({
+      return studentClasses.map((sc: StudentClass) => ({
         ...sc,
         class: classMap.get(sc.class_id) || null,
       }));
@@ -1095,7 +1157,9 @@ export function useAssignStudentToClass() {
       const response = await apiClient.post<StudentClass>('student_classes', {
         student_id: studentId,
         class_id: classId,
-        enrolled_at: enrolledAt || new Date().toISOString().split('T')[0],
+        // 기술문서 5-2: KST 기준 날짜 처리
+        // 기술문서 5-2: KST 기준 날짜 처리
+        enrolled_at: enrolledAt || toKST().format('YYYY-MM-DD'),
         is_active: true,
       });
 
@@ -1144,7 +1208,7 @@ export function useUnassignStudentFromClass() {
       }
 
       // student_classes에서 해당 배정 찾기
-      const findResponse = await apiClient.get('student_classes', {
+      const findResponse = await apiClient.get<StudentClass>('student_classes', {
         filters: { student_id: studentId, class_id: classId, is_active: true },
         limit: 1,
       });
@@ -1160,7 +1224,8 @@ export function useUnassignStudentFromClass() {
       // 현재는 apiClient를 통해 직접 호출하나, 향후 Edge Function으로 이동 권장
       const response = await apiClient.patch('student_classes', assignment.id, {
         is_active: false,
-        left_at: leftAt || new Date().toISOString().split('T')[0],
+        // 기술문서 5-2: KST 기준 날짜 처리
+        left_at: leftAt || toKST().format('YYYY-MM-DD'),
       });
 
       if (response.error) {

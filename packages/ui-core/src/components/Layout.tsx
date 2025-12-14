@@ -11,7 +11,8 @@
 import React from 'react';
 import { clsx } from 'clsx';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
-import { SpacingToken } from '@design-system/core';
+// SpacingToken은 로컬 타입으로 정의 (다른 컴포넌트와 일관성 유지)
+type SpacingToken = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
 
 export interface ContainerProps {
   children: React.ReactNode;
@@ -28,11 +29,16 @@ export const Container: React.FC<ContainerProps> = ({
   className,
   style,
 }) => {
+  const mode = useResponsiveMode();
+  const isMobile = mode === 'xs' || mode === 'sm';
+
+  // 브레이크포인트는 useResponsiveMode와 일치해야 함 (유아이 문서 6-0 준수)
+  // Container의 maxWidth는 실제 컨테이너 너비이므로 rem 단위 사용 (일관성)
   const maxWidthMap: Record<'sm' | 'md' | 'lg' | 'xl' | 'full', string> = {
-    sm: '640px',
-    md: '768px',
-    lg: '1024px',
-    xl: '1280px',
+    sm: '40rem', // 640px - 브레이크포인트 sm과 동일
+    md: '48rem', // 768px - 브레이크포인트 md와 동일
+    lg: '64rem', // 1024px - 브레이크포인트 lg와 동일
+    xl: '80rem', // 1280px - 브레이크포인트 xl과 동일
     full: '100%',
   };
 
@@ -46,6 +52,9 @@ export const Container: React.FC<ContainerProps> = ({
     '3xl': 'var(--spacing-3xl)',
   };
 
+  // 모바일(xs, sm): 적절한 여백 유지, 태블릿 이상(md+): 지정된 padding 사용 (유아이 문서 6-1 준수)
+  const effectivePadding = isMobile ? 'lg' : padding; // md = 16px (모바일 적절한 여백)
+
   return (
     <div
       className={clsx(className)}
@@ -53,8 +62,8 @@ export const Container: React.FC<ContainerProps> = ({
         margin: '0 auto',
         width: '100%',
         maxWidth: maxWidthMap[maxWidth],
-        paddingLeft: paddingMap[padding],
-        paddingRight: paddingMap[padding],
+        paddingLeft: paddingMap[effectivePadding],
+        paddingRight: paddingMap[effectivePadding],
         transition: 'var(--transition-all)',
         ...style,
       }}
@@ -106,8 +115,8 @@ export const Grid: React.FC<GridProps> = ({
     if (minColumnWidth) {
       gridTemplateColumns = `repeat(${columns}, minmax(${minColumnWidth}, 1fr))`;
     } else {
-      // minColumnWidth가 없으면 기본값 사용
-      gridTemplateColumns = `repeat(${columns}, minmax(100px, 1fr))`;
+      // minColumnWidth가 없으면 기본값 사용 (그리드 컬럼 최소 너비 토큰 사용)
+      gridTemplateColumns = `repeat(${columns}, minmax(var(--width-grid-column), 1fr))`; // styles.css 준수: 그리드 컬럼 너비 토큰 사용
     }
   } else if (typeof columns === 'object' && columns !== null) {
     // 반응형 객체인 경우
@@ -156,7 +165,7 @@ export interface SidebarLayoutProps {
 export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
   sidebar,
   main,
-  sidebarWidth = '256px',
+  sidebarWidth = 'var(--width-sidebar)', // styles.css 준수: 사이드바 너비 토큰 사용
   className,
 }) => {
   const mode = useResponsiveMode();
@@ -192,7 +201,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
           width: sidebarWidth,
           minWidth: sidebarWidth,
           borderRadius: 'var(--border-radius-sm)',
-          border: '1px solid var(--color-gray-200)',
+          border: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
           backgroundColor: 'var(--color-white)',
           boxShadow: 'var(--shadow-sm)',
           padding: 'var(--spacing-lg)',
@@ -207,7 +216,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({
           overflow: 'auto',
           borderRadius: 'var(--border-radius-sm)',
           backgroundColor: 'var(--color-white)',
-          border: '1px solid var(--color-gray-200)',
+          border: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
           boxShadow: 'var(--shadow-sm)',
           padding: 'var(--spacing-lg)',
           transition: 'var(--transition-all)',

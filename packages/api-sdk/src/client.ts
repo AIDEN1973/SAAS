@@ -7,6 +7,7 @@
  */
 
 import { createClient } from '@lib/supabase-client';
+import { withTenant } from '@lib/supabase-client/db';
 import { getApiContext } from './context';
 import type { ApiResponse, ApiClientConfig } from './types';
 import type { UISchema } from '@schema-engine';
@@ -25,34 +26,44 @@ export class ApiClient {
   /**
    * GET 요청
    */
-  async get<T = any>(
+  async get<T = unknown>(
     table: string,
     options?: {
       select?: string;
-      filters?: Record<string, any>;
+      filters?: Record<string, unknown>;
       orderBy?: { column: string; ascending?: boolean };
       limit?: number;
     }
   ): Promise<ApiResponse<T[]>> {
     try {
-      // RLS가 자동으로 tenant_id 필터링을 처리
-      // SDK는 내부적으로 Supabase 클라이언트를 사용
-      // Context와 RLS 정책에서 JWT claim을 통해 자동으로 적용
-      let query = this.supabase.from(table).select(options?.select || '*');
+      const context = getApiContext();
 
-      // 필터 처리
+      if (!context?.tenantId) {
+        return {
+          success: false,
+          error: {
+            message: 'Tenant ID is required',
+            code: 'TENANT_ID_REQUIRED',
+          },
+          data: undefined,
+        };
+      }
+
+      // 필터 처리 (withTenant 적용 전에 쿼리 빌드)
+      let baseQuery = this.supabase.from(table).select(options?.select || '*');
+
       if (options?.filters) {
         const searchFilters = { ...options.filters };
 
         // search 필터를 name 필드에 ilike로 변환 (ClassFilter 등에서 사용)
         if (searchFilters.search && typeof searchFilters.search === 'string' && searchFilters.search.trim() !== '') {
-          query = query.ilike('name', `%${searchFilters.search}%`);
+          baseQuery = baseQuery.ilike('name', `%${searchFilters.search}%`);
           delete searchFilters.search;
         }
 
         // name 필터가 ilike 패턴인 경우 별도 처리
         if (searchFilters.name && typeof searchFilters.name === 'string') {
-          query = query.ilike('name', `%${searchFilters.name}%`);
+          baseQuery = baseQuery.ilike('name', `%${searchFilters.name}%`);
           delete searchFilters.name;
         }
 
@@ -62,16 +73,16 @@ export class ApiClient {
             // 범위 연산자 처리 (gte, lte, gt, lt)
             if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
               if ('gte' in value) {
-                query = query.gte(key, value.gte);
+                baseQuery = baseQuery.gte(key, value.gte);
               }
               if ('lte' in value) {
-                query = query.lte(key, value.lte);
+                baseQuery = baseQuery.lte(key, value.lte);
               }
               if ('gt' in value) {
-                query = query.gt(key, value.gt);
+                baseQuery = baseQuery.gt(key, value.gt);
               }
               if ('lt' in value) {
-                query = query.lt(key, value.lt);
+                baseQuery = baseQuery.lt(key, value.lt);
               }
               // 범위 연산자가 없으면 객체 전체를 무시 (예: Date 객체)
               if (!('gte' in value || 'lte' in value || 'gt' in value || 'lt' in value)) {
@@ -79,9 +90,9 @@ export class ApiClient {
                 console.warn(`[ApiClient] Filter value for ${key} is an object without range operators, ignoring:`, value);
               }
             } else if (Array.isArray(value)) {
-              query = query.in(key, value);
+              baseQuery = baseQuery.in(key, value);
             } else {
-              query = query.eq(key, value);
+              baseQuery = baseQuery.eq(key, value);
             }
           }
         });
@@ -89,21 +100,28 @@ export class ApiClient {
 
       // 정렬
       if (options?.orderBy) {
-        query = query.order(options.orderBy.column, { ascending: options.orderBy.ascending ?? true });
+        baseQuery = baseQuery.order(options.orderBy.column, { ascending: options.orderBy.ascending ?? true });
       }
 
       // 제한
       if (options?.limit) {
-        query = query.limit(options.limit);
+        baseQuery = baseQuery.limit(options.limit);
       }
+
+      // [불변 규칙] SELECT 쿼리는 반드시 withTenant()를 사용하여 tenant_id 필터를 강제합니다.
+      // 단, 공통 테이블(tenant_id 컬럼이 없는 테이블)은 예외 처리
+      // 공통 테이블: industry_themes (tenant_id 없음), schema-registry (meta 스키마)
+      // tenant_theme_overrides는 tenant_id가 primary key이지만, filters에 이미 명시되어 있으므로 withTenant 사용
+      const isCommonTable = table === 'industry_themes' || table.startsWith('schema-registry/');
+      const query = isCommonTable ? baseQuery : withTenant(baseQuery, context.tenantId);
 
       const { data, error } = await query;
 
       if (error) {
         // schema-registry 요청의 404 에러는 조용히 처리 (스키마가 없을 수 있음)
         const isSchemaRegistryRequest = table.startsWith('schema-registry/');
-        const isNotFoundError = error.code === 'PGRST116' || 
-          error.code === 'PGRST204' || 
+        const isNotFoundError = error.code === 'PGRST116' ||
+          error.code === 'PGRST204' ||
           error.message?.toLowerCase().includes('404') ||
           error.message?.toLowerCase().includes('not found') ||
           error.message?.toLowerCase().includes('does not exist');
@@ -150,9 +168,9 @@ export class ApiClient {
    * [불변 규칙] industry_type은 테이블에 컬럼이 있는 경우에만 삽입합니다
    * [불변 규칙] persons 테이블은 industry_type 컬럼이 없으므로 삽입하지 않습니다
    */
-  async post<T = any>(
+  async post<T = unknown>(
     table: string,
-    data: Record<string, any>
+    data: Record<string, unknown>
   ): Promise<ApiResponse<T>> {
     try {
       const context = getApiContext();
@@ -170,7 +188,7 @@ export class ApiClient {
 
       // [불변 규칙] SDK가 자동으로 tenant_id를 삽입합니다
       // Context에서 tenant_id를 가져와서 data에 포함
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         ...data,
         tenant_id: context.tenantId,
       };
@@ -179,7 +197,7 @@ export class ApiClient {
       // industry_type이 있는 테이블: students (View), academy_students 등
       // 테이블별로 처리하거나, data에 명시적으로 포함된 경우에만 사용
       if (context.industryType && data.industry_type !== undefined) {
-        (payload as Record<string, any>).industry_type = context.industryType;
+        (payload as Record<string, unknown>).industry_type = context.industryType;
       }
 
       const { data: result, error } = await this.supabase
@@ -219,10 +237,10 @@ export class ApiClient {
   /**
    * PATCH 요청
    */
-  async patch<T = any>(
+  async patch<T = unknown>(
     table: string,
     id: string,
-    data: Record<string, any>
+    data: Record<string, unknown>
   ): Promise<ApiResponse<T>> {
     try {
       const context = getApiContext();
@@ -238,13 +256,14 @@ export class ApiClient {
         };
       }
 
-      const { data: result, error } = await this.supabase
-        .from(table)
-        .update(data)
-        .eq('id', id)
-        .eq('tenant_id', context.tenantId) // RLS와 함께 이중 보호
-        .select()
-        .single();
+      const { data: result, error } = await withTenant(
+        this.supabase
+          .from(table)
+          .update(data)
+          .eq('id', id)
+          .select(),
+        context.tenantId
+      ).single();
 
       if (error) {
         return {
@@ -295,11 +314,13 @@ export class ApiClient {
         };
       }
 
-      const { error } = await this.supabase
-        .from(table)
-        .delete()
-        .eq('id', id)
-        .eq('tenant_id', context.tenantId); // RLS와 함께 이중 보호
+      const { error } = await withTenant(
+        this.supabase
+          .from(table)
+          .delete()
+          .eq('id', id),
+        context.tenantId
+      );
 
       if (error) {
         return {
@@ -332,9 +353,9 @@ export class ApiClient {
   /**
    * PostgREST가 View를 수정하지 못하는 경우 사용
    */
-  async callRPC<T = any>(
+  async callRPC<T = unknown>(
     functionName: string,
-    params?: Record<string, any>
+    params?: Record<string, unknown>
   ): Promise<ApiResponse<T>> {
     try {
       const { data, error } = await this.supabase.rpc(functionName, params || {});
@@ -370,10 +391,10 @@ export class ApiClient {
   /**
    * 커스텀 엔드포인트 호출 (Edge Function 또는 RPC 함수)
    */
-  async callCustom<T = any>(
+  async callCustom<T = unknown>(
     endpoint: string,
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE' = 'GET',
-    body?: any
+    body?: unknown
   ): Promise<ApiResponse<T>> {
     try {
       const context = getApiContext();
@@ -406,7 +427,7 @@ export class ApiClient {
           error: getResponse.error,
         };
       } else if (method === 'POST') {
-        return this.post<T>(endpoint, body || {});
+        return this.post<T>(endpoint, (body || {}) as Record<string, unknown>);
       } else if (method === 'PATCH') {
         // PATCH는 id가 필요하므로 별도 처리 필요
         throw new Error('PATCH method requires id parameter. Use patch() method instead.');

@@ -77,7 +77,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         type="text"
         placeholder={placeholder}
         value={value}
-        onChange={handleChange as any}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e)}
         onKeyDown={handleKeyDown}
         fullWidth={fullWidth}
         style={{
@@ -90,8 +90,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           size="sm"
           onClick={handleClear}
           style={{
-            minWidth: '44px',
-            minHeight: '44px',
+            minWidth: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+            minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
           }}
         >
           ✕
@@ -102,10 +102,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         color="primary"
         size="md"
         onClick={handleSearch}
-        style={{
-          minWidth: '44px',
-          minHeight: '44px',
-        }}
+          style={{
+            minWidth: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+            minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+          }}
       >
         검색
       </Button>

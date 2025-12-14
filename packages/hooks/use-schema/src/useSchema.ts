@@ -55,11 +55,12 @@ export function useSchema<T extends SchemaType = 'form'>(
       const table = `schema-registry/${entity}`;
 
       try {
+        // meta.schema_registry는 공통 테이블이므로 tenant_id 필터를 사용하지 않음
+        // tenant_id는 Version Pinning 조회에만 사용됨
         const response = await apiClient.get<SchemaByType<T>>(
           table,
           {
             filters: {
-              tenant_id: context.tenantId,
               industry_type: context.industryType,
               client_version: '1.0.0',
               type,
@@ -109,14 +110,15 @@ export function useSchema<T extends SchemaType = 'form'>(
         // response.data가 배열인 경우 첫 번째 요소 반환
         const schema = Array.isArray(response.data) ? response.data[0] : response.data;
         return schema as SchemaByType<T>;
-      } catch (error: any) {
+      } catch (error: unknown) {
         // 네트워크 에러나 기타 예외도 조용히 처리 (404는 정상적인 상황)
-        const isNotFoundError = error?.code === 'PGRST116' ||
-          error?.code === 'PGRST204' ||
-          error?.message?.toLowerCase().includes('404') ||
-          error?.message?.toLowerCase().includes('not found') ||
-          error?.status === 404 ||
-          error?.statusCode === 404;
+        const errorObj = error as { code?: string; message?: string; status?: number; statusCode?: number } | null;
+        const isNotFoundError = errorObj?.code === 'PGRST116' ||
+          errorObj?.code === 'PGRST204' ||
+          errorObj?.message?.toLowerCase().includes('404') ||
+          errorObj?.message?.toLowerCase().includes('not found') ||
+          errorObj?.status === 404 ||
+          errorObj?.statusCode === 404;
 
         // schema-registry 요청의 404 에러는 조용히 처리
         if (isNotFoundError || table.startsWith('schema-registry/')) {

@@ -33,24 +33,24 @@ export const Avatar: React.FC<AvatarProps> = ({
 }) => {
   const sizeMap: Record<SizeToken, React.CSSProperties> = {
     xs: {
-      width: '24px',
-      height: '24px',
+      width: 'var(--size-avatar-xs)', // styles.css 준수: 아바타 크기 토큰 사용
+      height: 'var(--size-avatar-xs)', // styles.css 준수: 아바타 크기 토큰 사용
     },
     sm: {
-      width: '32px',
-      height: '32px',
+      width: 'var(--size-avatar-sm)', // styles.css 준수: 아바타 크기 토큰 사용
+      height: 'var(--size-avatar-sm)', // styles.css 준수: 아바타 크기 토큰 사용
     },
     md: {
-      width: '40px',
-      height: '40px',
+      width: 'var(--size-avatar-md)', // styles.css 준수: 아바타 크기 토큰 사용
+      height: 'var(--size-avatar-md)', // styles.css 준수: 아바타 크기 토큰 사용
     },
     lg: {
-      width: '48px',
-      height: '48px',
+      width: 'var(--size-avatar-lg)', // styles.css 준수: 아바타 크기 토큰 사용
+      height: 'var(--size-avatar-lg)', // styles.css 준수: 아바타 크기 토큰 사용
     },
     xl: {
-      width: '64px',
-      height: '64px',
+      width: 'var(--size-avatar-xl)', // styles.css 준수: 아바타 크기 토큰 사용
+      height: 'var(--size-avatar-xl)', // styles.css 준수: 아바타 크기 토큰 사용
     },
   };
 

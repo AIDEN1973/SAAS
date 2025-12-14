@@ -46,8 +46,9 @@ export class TenancyService {
     };
 
     return (data || [])
-      .map((item: any) => {
-        const tenants = item.tenants;
+      .map((item) => {
+        const itemWithTenant = item as UserTenantRoleWithTenant;
+        const tenants = itemWithTenant.tenants;
         // Supabase의 join 결과가 배열로 반환되는 경우 처리
         if (Array.isArray(tenants)) {
           return tenants[0] || null;

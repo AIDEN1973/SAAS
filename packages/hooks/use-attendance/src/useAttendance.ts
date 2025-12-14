@@ -62,7 +62,7 @@ export function useAttendanceNotifications(studentId?: string) {
       // TODO: 실제 API 엔드포인트로 교체 필요
       // 현재는 notifications 테이블에서 출결 관련 알림을 조회한다고 가정
       // RLS 정책에 의해 현재 사용자의 자녀에 대한 알림만 조회됨
-      const filters: Record<string, any> = {
+      const filters: Record<string, unknown> = {
         notification_type: 'attendance',
       };
       if (studentId) {
@@ -189,7 +189,7 @@ export function useQRAttendance() {
       // TODO: 실제 API 엔드포인트로 교체 필요
       const response = await apiClient.post<AttendanceSubmissionResult>(
         'functions/v1/fns-attendance-submit-fallback',
-        input
+        input as unknown as Record<string, unknown>
       );
 
       if (response.error) {
@@ -222,7 +222,7 @@ export function useAttendanceLogs(filter?: AttendanceFilter) {
   return useQuery<AttendanceLog[]>({
     queryKey: ['attendance-logs', tenantId, filter],
     queryFn: async (): Promise<AttendanceLog[]> => {
-      const filters: Record<string, any> = {};
+      const filters: Record<string, unknown> = {};
 
       if (filter?.student_id) {
         filters.student_id = filter.student_id;
@@ -273,7 +273,7 @@ export function useCreateAttendanceLog() {
 
   return useMutation({
     mutationFn: async (input: CreateAttendanceLogInput) => {
-      const response = await apiClient.post<AttendanceLog>('attendance_logs', input);
+      const response = await apiClient.post<AttendanceLog>('attendance_logs', input as unknown as Record<string, unknown>);
 
       if (response.error) {
         throw new Error(response.error.message);

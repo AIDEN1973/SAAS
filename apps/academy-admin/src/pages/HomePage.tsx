@@ -27,6 +27,9 @@ import { apiClient, getApiContext } from '@api-sdk/core';
 import { useClasses } from '@hooks/use-class';
 import type { DayOfWeek } from '@services/class-service';
 import { toKST } from '@lib/date-utils';
+import type { Invoice } from '@core/billing';
+import type { AttendanceLog } from '@services/attendance-service';
+import type { StudentConsultation } from '@services/student-service';
 
 interface EmergencyCard {
   id: string;
@@ -97,7 +100,7 @@ export function HomePage() {
       const cards: EmergencyCard[] = [];
 
       // 1. 결제 실패 2회 이상 체크 (아키텍처 문서 4747줄 참조)
-      const failedPaymentsResponse = await apiClient.get<any>('payments', {
+      const failedPaymentsResponse = await apiClient.get<{ id: string; status: string; created_at: string }>('payments', {
         filters: { status: 'failed' },
         orderBy: { column: 'created_at', ascending: false },
         limit: 10,
@@ -118,8 +121,9 @@ export function HomePage() {
       }
 
       // 2. 출결 오류 이벤트가 10분 이내 발생 체크 (아키텍처 문서 4747줄 참조)
-      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-      const attendanceErrorsResponse = await apiClient.get<any>('attendance_logs', {
+      // 기술문서 5-2: KST 기준 날짜 처리
+      const tenMinutesAgo = toKST().subtract(10, 'minute').toISOString();
+      const attendanceErrorsResponse = await apiClient.get<AttendanceLog>('attendance_logs', {
         filters: {
           occurred_at: { gte: tenMinutesAgo },
           status: 'error', // 출결 오류 상태 (실제 테이블 구조에 맞게 조정 필요)
@@ -141,7 +145,7 @@ export function HomePage() {
       // 3. AI 위험 점수 90 이상 체크 (아키텍처 문서 4747줄 참조)
       // TODO: ai_insights 테이블이 생성되면 실제 조회로 변경
       // 현재는 student_task_cards에서 risk 타입 카드로 대체 확인
-      const riskTaskCardsResponse = await apiClient.get<any>('student_task_cards', {
+      const riskTaskCardsResponse = await apiClient.get<Array<{ id: string; task_type: string; priority?: number; student_id?: string }>>('student_task_cards', {
         filters: {
           task_type: 'risk',
         },
@@ -150,8 +154,10 @@ export function HomePage() {
 
       if (!riskTaskCardsResponse.error && riskTaskCardsResponse.data && riskTaskCardsResponse.data.length > 0) {
         // risk 타입 카드가 있고 priority가 90 이상인 경우
-        const riskCard = riskTaskCardsResponse.data[0];
-        if (riskCard.priority >= 90) {
+        type RiskTaskCard = { id: string; task_type: string; priority?: number; student_id?: string };
+        const riskCards = riskTaskCardsResponse.data as unknown as RiskTaskCard[];
+        const riskCard = riskCards[0];
+        if (riskCard && riskCard.priority && riskCard.priority >= 90 && riskCard.student_id) {
           cards.push({
             id: 'ai-risk-emergency',
             type: 'emergency',
@@ -185,7 +191,7 @@ export function HomePage() {
         // AI 브리핑 카드는 배치 작업에서 자동 생성됨 (아키텍처 문서 3911줄: 매일 07:00 자동 생성)
         // ai_insights 테이블에서 오늘 날짜의 브리핑 카드 조회
         const todayDate = toKST().format('YYYY-MM-DD');
-        const aiInsightsResponse = await apiClient.get<any>('ai_insights', {
+        const aiInsightsResponse = await apiClient.get<Array<{ id: string; title: string; summary: string; insights: string | string[]; created_at: string; action_url?: string }>>('ai_insights', {
           filters: {
             insight_type: 'daily_briefing',
             created_at: { gte: `${todayDate}T00:00:00`, lte: `${todayDate}T23:59:59` },
@@ -196,7 +202,9 @@ export function HomePage() {
 
         if (!aiInsightsResponse.error && aiInsightsResponse.data && aiInsightsResponse.data.length > 0) {
           // ai_insights 테이블에서 조회한 데이터를 AIBriefingCard 형식으로 변환
-          const insights = aiInsightsResponse.data.map((insight: any) => ({
+          type AIInsightItem = { id: string; title: string; summary: string; insights: string | string[]; created_at: string; action_url?: string };
+          const insightsData = aiInsightsResponse.data as unknown as AIInsightItem[];
+          const insights = insightsData.map((insight) => ({
             id: insight.id,
             type: 'ai_briefing' as const,
             title: insight.title,
@@ -212,7 +220,7 @@ export function HomePage() {
         // ai_insights 테이블에 데이터가 없는 경우 (배치 작업 전 또는 실패 시) fallback 로직
         // 주의: 이는 임시 fallback이며, 정상적으로는 배치 작업에서 생성된 카드를 사용해야 함
         // todayDate는 위에서 이미 선언됨 (187줄)
-        const consultationsResponse = await apiClient.get<any>('student_consultations', {
+        const consultationsResponse = await apiClient.get<StudentConsultation[]>('student_consultations', {
           filters: {
             consultation_date: { gte: todayDate },
           },
@@ -230,23 +238,23 @@ export function HomePage() {
               '상담일지를 작성하여 학생 관리를 강화하세요.',
               '상담 내용을 바탕으로 학생의 학습 방향을 조정할 수 있습니다.',
             ],
-            created_at: new Date().toISOString(),
+            created_at: toKST().toISOString(),
             action_url: '/ai?tab=consultation', // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
           });
         }
 
         // 2. 이번 달 청구서 상태 확인
         const currentMonth = toKST().format('YYYY-MM');
-        const invoicesResponse = await apiClient.get<any>('invoices', {
+        const invoicesResponse = await apiClient.get<Invoice[]>('invoices', {
           filters: {
             period_start: { gte: `${currentMonth}-01` },
           },
         });
 
         if (!invoicesResponse.error && invoicesResponse.data) {
-          const invoices = invoicesResponse.data;
-          const totalAmount = invoices.reduce((sum: number, inv: any) => sum + (inv.amount || 0), 0);
-          const paidAmount = invoices.reduce((sum: number, inv: any) => sum + (inv.amount_paid || 0), 0);
+          const invoices = (invoicesResponse.data as unknown) as Invoice[];
+          const totalAmount = invoices.reduce((sum: number, inv: Invoice) => sum + (inv.amount || 0), 0);
+          const paidAmount = invoices.reduce((sum: number, inv: Invoice) => sum + ((inv as Invoice & { amount_paid?: number }).amount_paid || 0), 0);
           const expectedCollectionRate = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
 
           if (invoices.length > 0) {
@@ -260,7 +268,7 @@ export function HomePage() {
                   ? '수납률이 양호합니다. 현재 운영 방식을 유지하세요.'
                   : '수납률 개선이 필요합니다. 미납 학생에게 연락을 취하세요.',
               ],
-              created_at: new Date().toISOString(),
+              created_at: toKST().toISOString(),
               action_url: '/billing/home', // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
             });
           }
@@ -268,7 +276,7 @@ export function HomePage() {
 
         // 3. 출결 이상 패턴 확인 (최근 7일)
         const sevenDaysAgo = toKST().subtract(7, 'days').format('YYYY-MM-DD');
-        const attendanceLogsResponse = await apiClient.get<any>('attendance_logs', {
+        const attendanceLogsResponse = await apiClient.get<AttendanceLog[]>('attendance_logs', {
           filters: {
             occurred_at: { gte: `${sevenDaysAgo}T00:00:00` },
           },
@@ -276,9 +284,9 @@ export function HomePage() {
         });
 
         if (!attendanceLogsResponse.error && attendanceLogsResponse.data) {
-          const logs = attendanceLogsResponse.data;
-          const absentCount = logs.filter((log: any) => log.status === 'absent').length;
-          const lateCount = logs.filter((log: any) => log.status === 'late').length;
+          const logs = (attendanceLogsResponse.data as unknown) as AttendanceLog[];
+          const absentCount = logs.filter((log: AttendanceLog) => log.status === 'absent').length;
+          const lateCount = logs.filter((log: AttendanceLog) => log.status === 'late').length;
 
           if (absentCount > 5 || lateCount > 10) {
             cards.push({
@@ -290,14 +298,14 @@ export function HomePage() {
                 '출결 패턴을 분석하여 원인을 파악하세요.',
                 '지각이 많은 학생들에게 사전 안내를 제공하세요.',
               ],
-              created_at: new Date().toISOString(),
+              created_at: toKST().toISOString(),
               action_url: '/ai?tab=attendance', // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
             });
           }
         }
 
         // 4. 이탈 위험 학생 확인
-        const riskTaskCardsResponse = await apiClient.get<any>('student_task_cards', {
+        const riskTaskCardsResponse = await apiClient.get<Array<{ id: string; task_type: string }>>('student_task_cards', {
           filters: {
             task_type: 'risk',
           },
@@ -315,7 +323,7 @@ export function HomePage() {
               '이탈 위험 학생들에게 즉시 상담을 진행하세요.',
               '학생의 학습 동기를 높이기 위한 방안을 모색하세요.',
             ],
-            created_at: new Date().toISOString(),
+            created_at: toKST().toISOString(),
             action_url: '/students/home', // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
           });
         }
@@ -331,10 +339,10 @@ export function HomePage() {
     refetchInterval: 300000, // 5분마다 갱신
   });
 
-  // 오늘 요일 계산
+  // 오늘 요일 계산 (기술문서 5-2: KST 기준 날짜 처리)
   const todayDayOfWeek = React.useMemo<DayOfWeek>(() => {
-    const today = new Date();
-    const dayOfWeek = today.getDay(); // 0(일) ~ 6(토)
+    const todayKST = toKST();
+    const dayOfWeek = todayKST.day(); // 0(일) ~ 6(토)
     const dayOfWeekMap: Record<number, DayOfWeek> = {
       0: 'sunday',
       1: 'monday',
@@ -361,7 +369,7 @@ export function HomePage() {
     queryFn: async () => {
       if (!tenantId) return [];
 
-      const response = await apiClient.get<any>('attendance_logs', {
+      const response = await apiClient.get<AttendanceLog[]>('attendance_logs', {
         filters: {
           occurred_at: { gte: `${todayDate}T00:00:00`, lte: `${todayDate}T23:59:59` },
           attendance_type: 'check_in',
@@ -369,7 +377,7 @@ export function HomePage() {
       });
 
       if (response.error) return [];
-      return response.data || [];
+      return (response.data || []) as unknown as AttendanceLog[];
     },
     enabled: !!tenantId,
   });
@@ -380,9 +388,10 @@ export function HomePage() {
 
     return todayClassesData.map((cls) => {
       // 오늘 날짜의 출석 데이터에서 해당 반의 출석 수 계산
-      const attendanceCount = todayAttendanceLogs?.filter((log: any) =>
+      const logs = (todayAttendanceLogs || []) as unknown as AttendanceLog[];
+      const attendanceCount = logs.filter((log: AttendanceLog) =>
         log.class_id === cls.id && log.status === 'present'
-      ).length || 0;
+      ).length;
       const studentCount = cls.current_count || 0;
 
       return {
@@ -406,7 +415,7 @@ export function HomePage() {
       const cards: StatsCard[] = [];
 
       // 1. 학생 수 통계
-      const studentsResponse = await apiClient.get<any>('persons', {
+      const studentsResponse = await apiClient.get<Array<{ id: string }>>('persons', {
         filters: {},
       });
       if (!studentsResponse.error && studentsResponse.data) {
@@ -422,14 +431,15 @@ export function HomePage() {
 
       // 2. 이번 달 매출 통계
       const currentMonth = toKST().format('YYYY-MM');
-      const invoicesResponse = await apiClient.get<any>('invoices', {
+      const invoicesResponse = await apiClient.get<Invoice[]>('invoices', {
         filters: {
           period_start: { gte: `${currentMonth}-01` },
         },
       });
       if (!invoicesResponse.error && invoicesResponse.data) {
-        const totalRevenue = invoicesResponse.data.reduce((sum: number, inv: any) => {
-          return sum + (inv.amount_paid || 0);
+        const invoices = (invoicesResponse.data as unknown) as Invoice[];
+        const totalRevenue = invoices.reduce((sum: number, inv: Invoice) => {
+          return sum + ((inv as Invoice & { amount_paid?: number }).amount_paid || 0);
         }, 0);
         cards.push({
           id: 'stats-revenue',
@@ -455,7 +465,7 @@ export function HomePage() {
       const currentMonth = toKST().format('YYYY-MM');
 
       // 이번 달 청구서 조회
-      const invoicesResponse = await apiClient.get<any>('invoices', {
+      const invoicesResponse = await apiClient.get<Invoice[]>('invoices', {
         filters: {
           period_start: { gte: `${currentMonth}-01` },
         },
@@ -465,11 +475,11 @@ export function HomePage() {
         return null;
       }
 
-      const invoices = invoicesResponse.data;
-      const totalAmount = invoices.reduce((sum: number, inv: any) => sum + (inv.amount || 0), 0);
-      const paidAmount = invoices.reduce((sum: number, inv: any) => sum + (inv.amount_paid || 0), 0);
+      const invoices = (invoicesResponse.data as unknown) as Invoice[];
+      const totalAmount = invoices.reduce((sum: number, inv: Invoice) => sum + (inv.amount || 0), 0);
+      const paidAmount = invoices.reduce((sum: number, inv: Invoice) => sum + ((inv as Invoice & { amount_paid?: number }).amount_paid || 0), 0);
       const expectedCollectionRate = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
-      const unpaidCount = invoices.filter((inv: any) => inv.status === 'pending' || inv.status === 'overdue').length;
+      const unpaidCount = invoices.filter((inv: Invoice) => inv.status === 'pending' || inv.status === 'overdue').length;
 
       return {
         id: 'billing-summary',
@@ -597,7 +607,7 @@ export function HomePage() {
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
                 {card.title}
               </h3>
-              <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+              <p style={{ color: 'var(--color-text-secondary)' }}>
                 {card.message}
               </p>
             </div>
@@ -623,7 +633,7 @@ export function HomePage() {
                 {card.title}
               </h3>
             </div>
-            <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+            <p style={{ color: 'var(--color-text-secondary)' }}>
               {card.summary}
             </p>
           </div>
@@ -652,11 +662,11 @@ export function HomePage() {
             <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
               {card.class_name}
             </h3>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+            <div style={{ color: 'var(--color-text-secondary)' }}>
               {card.start_time}
             </div>
           </div>
-          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+          <div style={{ color: 'var(--color-text-secondary)' }}>
             출석: {card.attendance_count}/{card.student_count}
           </div>
         </Card>
@@ -681,7 +691,7 @@ export function HomePage() {
               {card.value}
             </div>
             {card.trend && (
-              <div style={{ fontSize: 'var(--font-size-sm)', color: card.trend.startsWith('+') ? 'var(--color-success)' : 'var(--color-error)' }}>
+              <div style={{ color: card.trend.startsWith('+') ? 'var(--color-success)' : 'var(--color-error)' }}>
                 {card.trend}
               </div>
             )}
@@ -704,7 +714,7 @@ export function HomePage() {
             {card.title}
           </h3>
           <div style={{ marginBottom: 'var(--spacing-xs)' }}>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+            <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
               예상 수납률
             </div>
             <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
@@ -712,7 +722,7 @@ export function HomePage() {
             </div>
           </div>
           {card.unpaid_count > 0 && (
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-error)' }}>
+            <div style={{ color: 'var(--color-error)' }}>
               미납 {card.unpaid_count}건
             </div>
           )}
@@ -776,7 +786,7 @@ export function HomePage() {
                 color: 'var(--color-text-secondary)',
                 padding: 'var(--spacing-xl)'
               }}>
-                <p style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-md)' }}>
+                <p style={{ marginBottom: 'var(--spacing-md)' }}>
                   표시할 카드가 없습니다.
                 </p>
               </div>

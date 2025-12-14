@@ -23,7 +23,7 @@ export function LayoutEditor({ layout, onChange }: LayoutEditorProps) {
     rowGap: 'md',
   };
 
-  const handleChange = (key: keyof LayoutSchema, value: any) => {
+  const handleChange = (key: keyof LayoutSchema, value: unknown) => {
     onChange({ ...currentLayout, [key]: value });
   };
 
@@ -40,7 +40,7 @@ export function LayoutEditor({ layout, onChange }: LayoutEditorProps) {
           </label>
           <Select
             value={currentLayout.type || 'grid'}
-            onChange={(value) => handleChange('type', String(value))}
+            onChange={(value: string | string[]) => handleChange('type', String(Array.isArray(value) ? value[0] : value))}
           >
             <option value="grid">Grid (격자형)</option>
             <option value="section">Section (섹션형)</option>
@@ -61,7 +61,7 @@ export function LayoutEditor({ layout, onChange }: LayoutEditorProps) {
               type="number"
               label="열 수 (columns, 1-12)"
               value={currentLayout.columns || 2}
-              onChange={(e) => handleChange('columns', parseInt(e.target.value) || 1)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('columns', parseInt(e.target.value) || 1)}
               helperText="한 줄에 배치할 필드의 개수입니다. (예: 2 = 한 줄에 2개씩, 3 = 한 줄에 3개씩)"
               min={1}
               max={12}
@@ -72,7 +72,7 @@ export function LayoutEditor({ layout, onChange }: LayoutEditorProps) {
               </label>
               <Select
                 value={currentLayout.columnGap || 'md'}
-                onChange={(value) => handleChange('columnGap', String(value))}
+                onChange={(value: string | string[]) => handleChange('columnGap', String(Array.isArray(value) ? value[0] : value))}
               >
                 <option value="xs">XS (매우 작음)</option>
                 <option value="sm">SM (작음)</option>
@@ -92,7 +92,7 @@ export function LayoutEditor({ layout, onChange }: LayoutEditorProps) {
               </label>
               <Select
                 value={currentLayout.rowGap || 'md'}
-                onChange={(value) => handleChange('rowGap', String(value))}
+                onChange={(value: string | string[]) => handleChange('rowGap', String(Array.isArray(value) ? value[0] : value))}
               >
                 <option value="xs">XS (매우 작음)</option>
                 <option value="sm">SM (작음)</option>

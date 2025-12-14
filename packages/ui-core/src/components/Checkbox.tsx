@@ -49,10 +49,10 @@ export const Checkbox: React.FC<CheckboxProps> = ({
           type="checkbox"
           className={clsx(className)}
           style={{
-            width: '20px',
-            height: '20px',
-            minWidth: '20px',
-            minHeight: '20px',
+            width: 'var(--size-checkbox)', // styles.css 준수: 체크박스 크기 토큰 사용
+            height: 'var(--size-checkbox)', // styles.css 준수: 체크박스 크기 토큰 사용
+            minWidth: 'var(--size-checkbox)', // styles.css 준수: 체크박스 크기 토큰 사용
+            minHeight: 'var(--size-checkbox)', // styles.css 준수: 체크박스 크기 토큰 사용
             cursor: 'pointer',
             accentColor: 'var(--color-primary)',
           }}
@@ -72,7 +72,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
         <span
           style={{
             color: 'var(--color-error)',
-            marginLeft: '28px',
+            marginLeft: 'var(--spacing-form-indent)', // styles.css 준수: 폼 필드 들여쓰기 토큰 사용
           }}
         >
           {error}
@@ -82,7 +82,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
         <span
           style={{
             color: 'var(--color-text-secondary)',
-            marginLeft: '28px',
+            marginLeft: 'var(--spacing-form-indent)', // styles.css 준수: 폼 필드 들여쓰기 토큰 사용
           }}
         >
           {helperText}

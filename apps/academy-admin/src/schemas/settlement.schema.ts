@@ -50,7 +50,6 @@ export const settlementFormSchema: FormSchema = {
       },
     ],
     submit: {
-      labelKey: 'SETTLEMENT.FORM.SUBMIT',
       label: '정산 실행',
       variant: 'solid',
       color: 'primary',

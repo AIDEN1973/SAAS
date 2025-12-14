@@ -25,7 +25,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   children,
   content,
   position = 'top',
-  delay = 200,
+  delay = 200, // 기본 지연 시간 (ms) - 접근성을 위한 최소값
   className,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -42,22 +42,26 @@ export const Tooltip: React.FC<TooltipProps> = ({
       let top = 0;
       let left = 0;
 
+      // offset 계산용 (CSS 변수는 JavaScript 계산에서 사용 불가하므로 숫자 사용)
+      // var(--spacing-sm) = 8px
+      const offsetPx = 8;
+
       switch (position) {
         case 'top':
-          top = triggerRect.top - tooltipRect.height - 8;
+          top = triggerRect.top - tooltipRect.height - offsetPx;
           left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
           break;
         case 'bottom':
-          top = triggerRect.bottom + 8;
+          top = triggerRect.bottom + offsetPx;
           left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
           break;
         case 'left':
           top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
-          left = triggerRect.left - tooltipRect.width - 8;
+          left = triggerRect.left - tooltipRect.width - offsetPx;
           break;
         case 'right':
           top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
-          left = triggerRect.right + 8;
+          left = triggerRect.right + offsetPx;
           break;
       }
 
@@ -112,14 +116,14 @@ export const Tooltip: React.FC<TooltipProps> = ({
           ref={tooltipRef}
           style={{
             ...tooltipStyle,
-            maxWidth: '200px',
+            maxWidth: 'var(--size-tooltip-max-width)', // styles.css 준수: 툴팁 최대 너비 토큰 사용
             pointerEvents: 'none',
             color: 'var(--color-text)',
             backgroundColor: 'var(--color-white)',
             padding: 'var(--spacing-sm)',
             borderRadius: 'var(--border-radius-sm)',
             boxShadow: 'var(--shadow-lg)',
-            border: '1px solid var(--color-gray-200)',
+            border: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
           }}
         >
           {content}

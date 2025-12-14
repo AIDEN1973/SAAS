@@ -66,7 +66,7 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
     }
   }, [currentFormSchema]);
 
-  const handleFieldChange = (field: keyof CreateSchemaInput, value: any) => {
+  const handleFieldChange = (field: keyof CreateSchemaInput, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -133,7 +133,7 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
         <Input
           label="엔티티 (entity)"
           value={formData.entity}
-          onChange={(e) => handleFieldChange('entity', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFieldChange('entity', e.target.value)}
           placeholder="student, class, teacher 등"
           helperText="이 폼이 관리할 데이터의 종류를 나타냅니다. 예: 학생(student), 반(class), 강사(teacher)"
           required
@@ -145,7 +145,7 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
           </label>
           <Select
             value={formData.industry_type || ''}
-            onChange={(value) => handleFieldChange('industry_type', String(value) || null)}
+            onChange={(value: string | string[]) => handleFieldChange('industry_type', String(Array.isArray(value) ? value[0] : value) || null)}
           >
             <option value="">공통 (null)</option>
             <option value="academy">학원 (academy)</option>
@@ -162,7 +162,7 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
         <Input
           label="버전 (version)"
           value={formData.version}
-          onChange={(e) => handleFieldChange('version', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFieldChange('version', e.target.value)}
           placeholder="1.0.0"
           helperText="스키마의 버전 번호입니다. 변경할 때마다 버전을 올려주세요. (예: 1.0.0, 1.1.0, 2.0.0)"
           required
@@ -171,7 +171,7 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
         <Input
           label="최소 클라이언트 버전 (minClient)"
           value={formData.minClient || formData.minSupportedClient || ''}
-          onChange={(e) => handleFieldChange('minClient', e.target.value || null)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFieldChange('minClient', e.target.value || null)}
           placeholder="1.0.0"
           helperText="SDUI v1.1: 이 스키마를 사용하려면 클라이언트 앱이 이 버전 이상이어야 합니다. minClient가 우선 사용되며, 보통 스키마 버전과 동일하게 설정합니다."
           required
@@ -179,7 +179,7 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
         <Input
           label="최소 지원 클라이언트 버전 (minSupportedClient, 하위 호환성)"
           value={formData.minSupportedClient}
-          onChange={(e) => handleFieldChange('minSupportedClient', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFieldChange('minSupportedClient', e.target.value)}
           placeholder="1.0.0"
           helperText="하위 호환성: minClient가 없을 때 사용됩니다. 일반적으로 minClient와 동일한 값을 설정합니다."
         />

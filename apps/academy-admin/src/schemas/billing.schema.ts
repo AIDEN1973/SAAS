@@ -57,7 +57,6 @@ export const billingFormSchema: FormSchema = {
       },
     ],
     submit: {
-      labelKey: 'INVOICE.FORM.SUBMIT',
       label: '생성',
       variant: 'solid',
       color: 'primary',

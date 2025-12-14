@@ -38,7 +38,7 @@ export const BottomActionBar: React.FC<BottomActionBarProps> = ({
           alignItems: 'center',
           gap: 'var(--spacing-sm)',
           padding: 'var(--spacing-md)',
-          borderBottom: '1px solid var(--color-gray-200)',
+          borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
           ...style,
         }}
       >
@@ -56,14 +56,14 @@ export const BottomActionBar: React.FC<BottomActionBarProps> = ({
         left: 0,
         right: 0,
         backgroundColor: 'var(--color-white)',
-        borderTop: '1px solid var(--color-gray-200)',
+        borderTop: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
         padding: 'var(--spacing-md)',
         boxShadow: 'var(--shadow-lg)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 'var(--spacing-sm)',
-        zIndex: 50,
+        zIndex: 'var(--z-fixed)', // styles.css 준수: z-index 토큰 사용
         ...style,
       }}
     >

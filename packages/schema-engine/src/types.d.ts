@@ -31,12 +31,12 @@ export interface SchemaVersion {
 export interface BaseSchema extends SchemaVersion {
     type: SchemaType;
     tenantScoped?: boolean;
-    layout?: any;
-    fields?: any[];
-    columns?: any[];
+    layout?: LayoutSchema;
+    fields?: FormFieldSchema[];
+    columns?: TableColumnSchema[];
     actions?: ActionDefinition[];
-    conditions?: any[];
-    meta?: Record<string, any>;
+    conditions?: (ConditionRule | MultiConditionRule)[];
+    meta?: Record<string, unknown>;
 }
 /**
  * Layout Type
@@ -88,7 +88,7 @@ export interface ConditionActions {
     hide?: boolean;
     disable?: boolean;
     require?: boolean;
-    setValue?: any;
+    setValue?: unknown;
     setOptions?: {
         type: 'static' | 'api';
         options?: Array<{
@@ -110,7 +110,7 @@ export interface ConditionActions {
 export interface ConditionRule {
     field: string;
     op: ConditionOperator;
-    value?: any;
+    value?: unknown;
     then?: ConditionActions;
     else?: ConditionActions;
     action?: 'show' | 'hide' | 'enable' | 'disable' | 'require';
@@ -156,7 +156,7 @@ export interface FormFieldSchema {
         labelKey?: string;
         label?: string;
     }>;
-    defaultValue?: any;
+    defaultValue?: unknown;
     condition?: ConditionRule;
     conditions?: MultiConditionRule;
     customComponentType?: string;
@@ -174,7 +174,7 @@ export interface FormFieldSchema {
             messageKey?: string;
             message?: string;
         };
-        validate?: (value: any) => boolean | string;
+        validate?: (value: unknown) => boolean | string;
     };
 }
 /**
@@ -188,11 +188,11 @@ export interface ActionDefinition {
     type: ActionType;
     endpoint?: string;
     method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-    body?: 'form' | 'selectedRows' | Record<string, any>;
+    body?: 'form' | 'selectedRows' | Record<string, unknown>;
     to?: string;
     schemaKey?: string;
     field?: string;
-    value?: any;
+    value?: unknown;
     messageKey?: string;
     message?: string;
     variant?: 'success' | 'error' | 'warning' | 'info';
@@ -301,7 +301,7 @@ export interface WidgetSchema extends BaseSchema {
             endpoint: string;
             method?: 'GET' | 'POST';
         };
-        config?: Record<string, any>;
+        config?: Record<string, unknown>;
     };
 }
 /**

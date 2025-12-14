@@ -1,11 +1,11 @@
 /**
  * Core Activity Types
- * 
+ *
  * Activity Feed / ??라???벤??기록
  * [불변 규칙] Core Layer는 Industry 모듈에 의존?? ?음
  */
 
-export type ActivityType = 
+export type ActivityType =
   | 'person.created'
   | 'person.updated'
   | 'consultation.created'
@@ -24,7 +24,7 @@ export interface Activity {
   entity_id: string;
   user_id?: string;
   description: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   created_at: string;
 }
 
@@ -34,7 +34,7 @@ export interface CreateActivityInput {
   entity_id: string;
   user_id?: string;
   description: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ActivityFilter {

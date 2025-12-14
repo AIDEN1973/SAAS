@@ -42,6 +42,7 @@ export class AnalyticsService {
         tenant_id: tenantId,
         user_id: input.user_id,
         event_type: input.event_type,
+        // 기술문서 19-1-1: 타임스탬프는 UTC로 저장 (DB 저장 규칙)
         occurred_at: input.occurred_at || new Date().toISOString(),
         payload: input.payload,
         store_id: input.store_id,

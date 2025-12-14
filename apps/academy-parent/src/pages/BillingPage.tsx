@@ -34,7 +34,7 @@ export function BillingPage() {
 
           {children && children.length > 1 && (
             <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-              <div style={{ display: 'flex', gap: 'var(--spacing-xs)', borderBottom: '2px solid var(--color-gray-200)' }}>
+              <div style={{ display: 'flex', gap: 'var(--spacing-xs)', borderBottom: 'var(--border-width-base) solid var(--color-gray-200)' }}>
                 {children.map((child) => (
                   <button
                     key={child.id}
@@ -44,10 +44,10 @@ export function BillingPage() {
                       border: 'none',
                       backgroundColor: 'transparent',
                       color: selectedChildId === child.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                      borderBottom: selectedChildId === child.id ? '2px solid var(--color-primary)' : '2px solid transparent',
+                      borderBottom: selectedChildId === child.id ? 'var(--border-width-base) solid var(--color-primary)' : 'var(--border-width-base) solid transparent',
                       cursor: 'pointer',
                       fontWeight: selectedChildId === child.id ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)',
-                      transition: 'all 0.2s ease',
+                      transition: 'var(--transition-all)',
                     }}
                   >
                     {child.name}
@@ -95,7 +95,7 @@ export function BillingPage() {
                       {item.amount_due && item.amount_due > 0 && (
                         <p style={{
                           fontSize: 'var(--font-size-sm)',
-                          color: '#ef4444',
+                          color: 'var(--color-error)',
                           marginTop: 'var(--spacing-xs)'
                         }}>
                           미납: {item.amount_due.toLocaleString()}원

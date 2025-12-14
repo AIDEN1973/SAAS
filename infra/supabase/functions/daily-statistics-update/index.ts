@@ -25,7 +25,8 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // KST 기준 어제 날짜 계산
+    // 기술문서 19-1-2: KST 기준 날짜 처리
+    // Edge Functions는 Deno 환경이므로 수동으로 KST 변환 수행
     const now = new Date();
     const kstOffset = 9 * 60;
     const kstTime = new Date(now.getTime() + (kstOffset * 60 * 1000));
@@ -73,8 +74,8 @@ serve(async (req) => {
           .gte('occurred_at', `${dateKst}T00:00:00`)
           .lte('occurred_at', `${dateKst}T23:59:59`);
 
-        const attendanceCount = attendanceError ? 0 : (attendanceLogs?.filter((log: any) => log.status === 'present').length || 0);
-        const absentCount = attendanceError ? 0 : (attendanceLogs?.filter((log: any) => log.status === 'absent').length || 0);
+        const attendanceCount = attendanceError ? 0 : (attendanceLogs?.filter((log: { status: string }) => log.status === 'present').length || 0);
+        const absentCount = attendanceError ? 0 : (attendanceLogs?.filter((log: { status: string }) => log.status === 'absent').length || 0);
 
         // 매출 통계
         const { data: invoices, error: invoicesError } = await supabase
@@ -86,7 +87,7 @@ serve(async (req) => {
 
         const revenue = invoicesError
           ? 0
-          : (invoices?.reduce((sum: number, inv: any) => sum + (inv.amount_paid || 0), 0) || 0);
+          : (invoices?.reduce((sum: number, inv: { amount_paid?: number }) => sum + (inv.amount_paid || 0), 0) || 0);
 
         // 통계 업데이트 (daily_metrics 테이블이 있다고 가정)
         // 실제 테이블 구조에 맞게 수정 필요
@@ -139,6 +140,7 @@ serve(async (req) => {
     );
   }
 });
+
 
 
 

@@ -37,7 +37,7 @@ export const Toast: React.FC<ToastProps> = ({
     if (duration > 0) {
       const timer = setTimeout(() => {
         setIsVisible(false);
-        setTimeout(() => onClose?.(), 300); // 애니메이션 대기
+        setTimeout(() => onClose?.(), 300); // 애니메이션 대기 (transition-slow = 300ms)
       }, duration);
       return () => clearTimeout(timer);
     }
@@ -74,12 +74,12 @@ export const Toast: React.FC<ToastProps> = ({
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 'var(--z-toast)',
-        minWidth: '300px',
+        minWidth: 'var(--width-card-min)', // styles.css 준수: 카드 최소 너비 토큰 사용
         maxWidth: '90vw',
         backgroundColor: 'var(--color-white)',
-        borderLeft: `4px solid ${colorMap[color]}`,
-        opacity: isVisible ? 1 : 0,
-        transition: 'opacity 0.3s ease',
+        borderLeft: `var(--border-width-thick) solid ${colorMap[color]}`, // styles.css 준수: border-width 토큰 사용
+        opacity: isVisible ? 'var(--opacity-full)' : 0, // styles.css 준수: opacity 토큰 사용
+        transition: 'opacity var(--transition-slow)', // styles.css 준수: transition 토큰 사용
       }}
     >
       <div
@@ -107,8 +107,8 @@ export const Toast: React.FC<ToastProps> = ({
               setTimeout(() => onClose(), 300);
             }}
             style={{
-              minWidth: '32px',
-              minHeight: '32px',
+              minWidth: 'var(--size-avatar-sm)', // styles.css 준수: 아바타 작은 크기 토큰 사용 (32px)
+              minHeight: 'var(--size-avatar-sm)', // styles.css 준수: 아바타 작은 크기 토큰 사용 (32px)
               padding: 0,
             }}
           >

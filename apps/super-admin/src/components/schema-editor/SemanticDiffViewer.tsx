@@ -1,9 +1,9 @@
 /**
  * SemanticDiffViewer Component
- * 
+ *
  * [불변 규칙] 버전 간 차이를 Semantic Diff로 표시
  * [불변 규칙] JSON Diff와 Semantic Diff 모두 제공
- * 
+ *
  * 기술문서: docu/스키마에디터.txt 15. Diff & History
  */
 
@@ -140,7 +140,7 @@ export function SemanticDiffViewer({ oldSchema, newSchema }: SemanticDiffViewerP
               </div>
             ))}
             {fieldDiff.length === 0 && (
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+              <div style={{ color: 'var(--color-text-secondary)' }}>
                 필드 변경사항이 없습니다.
               </div>
             )}

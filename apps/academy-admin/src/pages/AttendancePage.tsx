@@ -23,8 +23,8 @@ import { useAttendanceLogs, useCreateAttendanceLog, useDeleteAttendanceLog } fro
 import { useStudents } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
 import { useConfig, useUpdateConfig } from '@hooks/use-config';
-import type { AttendanceFilter, AttendanceType, AttendanceStatus } from '@services/attendance-service';
-import type { Student } from '@services/student-service';
+import type { AttendanceFilter, AttendanceType, AttendanceStatus, AttendanceLog } from '@services/attendance-service';
+import type { Student, StudentClass } from '@services/student-service';
 import { useResponsiveMode } from '@ui-core/react';
 import type { ColorToken } from '@design-system/core';
 import type { Class, DayOfWeek } from '@services/class-service';
@@ -156,12 +156,12 @@ export function AttendancePage() {
 
       // 각 반에 대해 student_classes 조회
       for (const classId of classIds) {
-        const response = await apiClient.get<any>('student_classes', {
+        const response = await apiClient.get<StudentClass>('student_classes', {
           filters: { class_id: classId, is_active: true },
         });
 
         if (!response.error && response.data) {
-          response.data.forEach((sc: any) => {
+          response.data.forEach((sc: { student_id: string; class_id?: string }) => {
             studentIdsSet.add(sc.student_id);
           });
         }
@@ -185,13 +185,13 @@ export function AttendancePage() {
     queryFn: async () => {
       if (!selectedClassId) return null;
 
-      const response = await apiClient.get<any>('student_classes', {
+      const response = await apiClient.get<StudentClass>('student_classes', {
         filters: { class_id: selectedClassId, is_active: true },
       });
 
       if (response.error || !response.data) return new Set<string>();
 
-      return new Set<string>(response.data.map((sc: any) => sc.student_id));
+      return new Set<string>(response.data.map((sc: { student_id: string }) => sc.student_id));
     },
     enabled: !!selectedClassId,
   });
@@ -238,7 +238,7 @@ export function AttendancePage() {
         for (const student of filteredStudents) {
           try {
             // 학생의 과거 출결 데이터 조회
-            const pastLogsResponse = await apiClient.get<any>('attendance_logs', {
+            const pastLogsResponse = await apiClient.get<AttendanceLog[]>('attendance_logs', {
               filters: {
                 student_id: student.id,
                 occurred_at: { gte: dateFrom, lte: selectedDate },
@@ -251,7 +251,7 @@ export function AttendancePage() {
 
             if (pastLogs.length > 0) {
               // 출석률 계산
-              const presentCount = pastLogs.filter((log: any) => log.status === 'present').length;
+              const presentCount = (pastLogs as unknown as AttendanceLog[]).filter((log: AttendanceLog) => log.status === 'present').length;
               const attendanceRate = presentCount / pastLogs.length;
 
               // 출석률이 70% 이상이면 출석 예측
@@ -352,14 +352,14 @@ export function AttendancePage() {
   const effectiveHeaderFilterSchema = attendanceHeaderFilterSchemaData || attendanceHeaderFilterSchema;
 
   // 필터 변경 핸들러
-  const handleFilterChange = React.useCallback((filters: Record<string, any>) => {
+  const handleFilterChange = React.useCallback((filters: Record<string, unknown>) => {
     setFilter({
-      date_from: filters.date_from || toKST().format('YYYY-MM-DD'),
-      date_to: filters.date_to || toKST().format('YYYY-MM-DD'),
-      student_id: filters.student_id || undefined,
-      class_id: filters.class_id || undefined,
-      attendance_type: filters.attendance_type || undefined,
-      status: filters.status || undefined,
+      date_from: filters.date_from ? String(filters.date_from) : toKST().format('YYYY-MM-DD'),
+      date_to: filters.date_to ? String(filters.date_to) : toKST().format('YYYY-MM-DD'),
+      student_id: filters.student_id ? String(filters.student_id) : undefined,
+      class_id: filters.class_id ? String(filters.class_id) : undefined,
+      attendance_type: filters.attendance_type as AttendanceType | undefined,
+      status: filters.status as AttendanceStatus | undefined,
     });
   }, []);
 
@@ -433,14 +433,14 @@ export function AttendancePage() {
   // handleSaveSettings 함수 제거됨
 
   // 출결 기록 생성
-  const handleCreateAttendance = async (data: any) => {
+  const handleCreateAttendance = async (data: Record<string, unknown>) => {
     if (!data.student_id) {
       showAlert('학생을 선택해주세요.', '입력 오류', 'warning');
       return;
     }
 
     try {
-      const occurredAtKST = toKST(data.occurred_at);
+      const occurredAtKST = toKST(data.occurred_at as string | number | Date);
       const classInfo = data.class_id
         ? classes?.find(c => c.id === data.class_id)
         : undefined;
@@ -461,12 +461,12 @@ export function AttendancePage() {
       }
 
       await createAttendance.mutateAsync({
-        student_id: data.student_id,
-        class_id: data.class_id || undefined,
+        student_id: String(data.student_id ?? ''),
+        class_id: data.class_id ? String(data.class_id) : undefined,
         occurred_at: occurredAtKST.toISOString(),
-        attendance_type: finalType,
-        status: finalStatus,
-        notes: data.notes || undefined,
+        attendance_type: finalType as AttendanceType,
+        status: finalStatus as AttendanceStatus,
+        notes: data.notes ? String(data.notes) : undefined,
       });
 
       // [문서 요구사항] 알림 발송은 서버에서 자동 처리됨 (core-notification → 학부모 알림)
@@ -600,12 +600,12 @@ export function AttendancePage() {
             <meta charset="UTF-8">
             <title>출석부 - ${dateStr}</title>
             <style>
-              body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; }
-              h1 { text-align: center; margin-bottom: 30px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              body { font-family: 'Malgun Gothic', sans-serif; padding: var(--spacing-xl); }
+              h1 { text-align: center; margin-bottom: var(--spacing-2xl); }
+              table { width: 100%; border-collapse: collapse; margin-top: var(--spacing-xl); }
               th, td { border: var(--border-width-thin) solid var(--color-border); padding: var(--spacing-xs); text-align: left; }
               th { background-color: var(--color-gray-50); font-weight: var(--font-weight-semibold); }
-              @media print { @page { margin: 1cm; } }
+              @media print { @page { margin: var(--print-page-margin); } }
             </style>
           </head>
           <body>
@@ -833,7 +833,7 @@ export function AttendancePage() {
         <div style={{ marginBottom: 'var(--spacing-xl)' }}>
           {/* 아키텍처 문서 3.3.9: 태블릿 모드 제목 최소 24px */}
           <h1 style={{
-            fontSize: isTablet ? 'max(var(--font-size-2xl), 24px)' : 'var(--font-size-2xl)',
+            fontSize: isTablet ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)',
             fontWeight: 'var(--font-weight-bold)',
             marginBottom: 'var(--spacing-md)',
             color: 'var(--color-text)'
@@ -853,13 +853,13 @@ export function AttendancePage() {
           {viewMode === 'today' && (
             <>
               {/* AttendanceHeader: 반 선택, 날짜 선택, 검색 (아키텍처 문서 3.3.3) - SchemaFilter 사용 */}
-              <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 0.6 : 1 }}>
+              <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
                 <SchemaFilter
                   schema={effectiveHeaderFilterSchema}
-                  onFilterChange={(filters: Record<string, any>) => {
-                    setSelectedClassId(filters.class_id || null);
-                    setSelectedDate(filters.date || toKST().format('YYYY-MM-DD'));
-                    setSearchQuery(filters.search || '');
+                  onFilterChange={(filters: Record<string, unknown>) => {
+                    setSelectedClassId(filters.class_id ? String(filters.class_id) : null);
+                    setSelectedDate(filters.date ? String(filters.date) : toKST().format('YYYY-MM-DD'));
+                    setSearchQuery(filters.search ? String(filters.search) : '');
                   }}
                   defaultValues={{
                     class_id: selectedClassId || '',
@@ -884,10 +884,9 @@ export function AttendancePage() {
                       textAlign: 'center',
                       padding: 'var(--spacing-xl)',
                       pointerEvents: 'none',
-                      opacity: 0.7
+                      opacity: 'var(--opacity-secondary)'
                     }}>
                       <div style={{
-                        fontSize: 'var(--font-size-base)',
                         color: 'var(--color-text-secondary)',
                         marginBottom: 'var(--spacing-md)'
                       }}>
@@ -899,10 +898,10 @@ export function AttendancePage() {
                           <div
                             key={i}
                             style={{
-                              height: '80px',
+                              height: 'var(--spacing-bottom-action-bar)',
                               backgroundColor: 'var(--color-gray-100)',
                               borderRadius: 'var(--border-radius-md)',
-                              opacity: 0.7,
+                              opacity: 'var(--opacity-secondary)',
                             }}
                           />
                         ))}
@@ -920,14 +919,12 @@ export function AttendancePage() {
                       color: 'var(--color-error)'
                     }}>
                       <div style={{
-                        fontSize: 'var(--font-size-base)',
                         fontWeight: 'var(--font-weight-semibold)',
                         marginBottom: 'var(--spacing-md)'
                       }}>
                         출결 정보를 불러올 수 없습니다.
                       </div>
                       <div style={{
-                        fontSize: 'var(--font-size-sm)',
                         color: 'var(--color-text-secondary)',
                         marginBottom: 'var(--spacing-md)'
                       }}>
@@ -983,15 +980,15 @@ export function AttendancePage() {
                       <Card key={student.id} padding="md" variant="default">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
                           {/* StudentInfo: 이름, 학년/반, 사진 (아키텍처 문서 3.3.3) */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', flex: 1, minWidth: '200px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', flex: 1, minWidth: 'var(--width-student-info-min)' }}>
                             {/* 사진 (선택) */}
                             {student.profile_image_url && (
                               <img
                                 src={student.profile_image_url}
                                 alt={student.name}
                                 style={{
-                                  width: '48px',
-                                  height: '48px',
+                                  width: 'var(--spacing-xl)',
+                                  height: 'var(--spacing-xl)',
                                   borderRadius: 'var(--border-radius-full)',
                                   objectFit: 'cover',
                                   flexShrink: 0,
@@ -1001,7 +998,7 @@ export function AttendancePage() {
                             <div style={{ flex: 1 }}>
                               {/* 아키텍처 문서 3.3.9: 태블릿 모드 기본 텍스트 최소 16px */}
                               <div style={{
-                                fontSize: isTablet ? 'max(var(--font-size-lg), 16px)' : 'var(--font-size-lg)',
+                                fontSize: isTablet ? 'max(var(--font-size-lg), var(--tablet-font-size-text-min))' : 'var(--font-size-lg)',
                                 fontWeight: 'var(--font-weight-semibold)',
                                 marginBottom: 'var(--spacing-xs)'
                               }}>
@@ -1009,7 +1006,7 @@ export function AttendancePage() {
                               </div>
                               {gradeClassInfo && (
                                 <div style={{
-                                  fontSize: isTablet ? 'max(var(--font-size-sm), 16px)' : 'var(--font-size-sm)',
+                                  fontSize: isTablet ? 'max(var(--font-size-sm), var(--tablet-font-size-text-min))' : 'var(--font-size-sm)',
                                   color: 'var(--color-text-secondary)',
                                   marginBottom: 'var(--spacing-xs)'
                                 }}>
@@ -1073,18 +1070,18 @@ export function AttendancePage() {
                             {/* 상태 변경 Select (배지와 함께 사용) */}
                             <Select
                               value={state.status}
-                              onChange={(e) => {
+                              onChange={(value) => {
                                 setStudentAttendanceStates(prev => ({
                                   ...prev,
                                   [student.id]: {
                                     ...state,
-                                    status: e.target.value as AttendanceStatus,
+                                    status: (Array.isArray(value) ? value[0] : value) as AttendanceStatus,
                                     user_modified: true, // 사용자 입력 시 AI 데이터 override
                                     ai_predicted: false, // 사용자 수정 시 AI 예측 플래그 제거
                                   },
                                 }));
                               }}
-                              style={{ minWidth: '100px' }}
+                              style={{ minWidth: 'var(--width-grid-column)' }}
                             >
                               <option value="present">출석</option>
                               <option value="late">지각</option>
@@ -1096,7 +1093,7 @@ export function AttendancePage() {
                           {/* ActionButtons: 등원 버튼, 하원 버튼, 상세 보기 버튼 (아키텍처 문서 3.3.3) */}
                           {/* 아키텍처 문서 3.3.9: 태블릿 모드에서는 큰 터치 버튼 (등원/하원 버튼 최소 80px × 80px) */}
                           {/* 아키텍처 문서 3.3.9: 태블릿 모드 버튼 간 간격 최소 8px */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: isTablet ? 'max(var(--spacing-sm), 8px)' : 'var(--spacing-xs)', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: isTablet ? 'max(var(--spacing-sm), var(--tablet-spacing-min))' : 'var(--spacing-xs)', flexWrap: 'wrap' }}>
                             <Button
                               variant="outline"
                               size={isTablet ? 'lg' : 'sm'}
@@ -1112,9 +1109,9 @@ export function AttendancePage() {
                                 }));
                               }}
                               style={isTablet ? {
-                                minWidth: '80px',
-                                minHeight: '80px',
-                                fontSize: 'max(var(--font-size-lg), 18px)', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
+                                minWidth: 'var(--spacing-bottom-action-bar)',
+                                minHeight: 'var(--spacing-bottom-action-bar)',
+                                fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
                               } : undefined}
                             >
                               등원
@@ -1134,9 +1131,9 @@ export function AttendancePage() {
                                 }));
                               }}
                               style={isTablet ? {
-                                minWidth: '80px',
-                                minHeight: '80px',
-                                fontSize: 'max(var(--font-size-lg), 18px)', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
+                                minWidth: 'var(--spacing-bottom-action-bar)',
+                                minHeight: 'var(--spacing-bottom-action-bar)',
+                                fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
                               } : undefined}
                             >
                               하원
@@ -1146,8 +1143,8 @@ export function AttendancePage() {
                               size={isTablet ? 'md' : 'sm'}
                               onClick={() => navigate(`/students/${student.id}`)}
                               style={isTablet ? {
-                                minWidth: '48px',
-                                minHeight: '48px',
+                                minWidth: 'var(--spacing-xl)',
+                                minHeight: 'var(--spacing-xl)',
                               } : undefined}
                             >
                               상세
@@ -1180,15 +1177,15 @@ export function AttendancePage() {
                         <Card key={student.id} padding="md" variant="default">
                           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
                             {/* StudentInfo: 이름, 학년/반, 사진 (아키텍처 문서 3.3.3) */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', flex: 1, minWidth: '200px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', flex: 1, minWidth: 'var(--width-student-info-min)' }}>
                               {/* 사진 (선택) */}
                               {student.profile_image_url && (
                                 <img
                                   src={student.profile_image_url}
                                   alt={student.name}
                                   style={{
-                                    width: '48px',
-                                    height: '48px',
+                                    width: 'var(--spacing-xl)',
+                                    height: 'var(--spacing-xl)',
                                     borderRadius: 'var(--border-radius-full)',
                                     objectFit: 'cover',
                                     flexShrink: 0,
@@ -1200,7 +1197,7 @@ export function AttendancePage() {
                                   {student.name}
                                 </div>
                                 {gradeClassInfo && (
-                                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                                  <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                                     {gradeClassInfo}
                                   </div>
                                 )}
@@ -1261,18 +1258,18 @@ export function AttendancePage() {
                               {/* 상태 변경 Select (배지와 함께 사용) */}
                               <Select
                                 value={state.status}
-                                onChange={(e) => {
+                                onChange={(value) => {
                                   setStudentAttendanceStates(prev => ({
                                     ...prev,
                                     [student.id]: {
                                       ...state,
-                                      status: e.target.value as AttendanceStatus,
+                                      status: (Array.isArray(value) ? value[0] : value) as AttendanceStatus,
                                       user_modified: true, // 사용자 입력 시 AI 데이터 override
                                       ai_predicted: false, // 사용자 수정 시 AI 예측 플래그 제거
                                     },
                                   }));
                                 }}
-                                style={{ minWidth: '100px' }}
+                                style={{ minWidth: 'var(--width-grid-column)' }}
                               >
                                 <option value="present">출석</option>
                                 <option value="late">지각</option>
@@ -1334,37 +1331,37 @@ export function AttendancePage() {
               </div>
 
               {/* AttendanceSummary: 총원/출석/지각/결석 (아키텍처 문서 3.3.3: StudentList 다음에 Summary) */}
-              <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 0.6 : 1 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 'var(--spacing-md)' }}>
+              <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(var(--width-button-grid-min), 1fr))`, gap: 'var(--spacing-md)' }}>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-sm), 16px)' : 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                    <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                       총원
                     </div>
-                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), 24px)' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
+                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
                       {attendanceSummary.total}
                     </div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-sm), 16px)' : 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                    <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                       출석
                     </div>
-                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), 24px)' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
+                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
                       {attendanceSummary.present}
                     </div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-sm), 16px)' : 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                    <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                       지각
                     </div>
-                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), 24px)' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-warning)' }}>
+                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-warning)' }}>
                       {attendanceSummary.late}
                     </div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-sm), 16px)' : 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                    <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                       결석
                     </div>
-                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), 24px)' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-error)' }}>
+                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-error)' }}>
                       {attendanceSummary.absent}
                     </div>
                   </div>
@@ -1375,7 +1372,7 @@ export function AttendancePage() {
               {/* 모바일: Bottom Action Bar, 태블릿/데스크톱: Card */}
               {/* 아키텍처 문서 3.3.9: 태블릿 모드에서는 큰 터치 버튼 (최소 120px × 60px) */}
               {isMobile ? (
-                <BottomActionBar style={{ pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 0.6 : 1 }}>
+                <BottomActionBar style={{ pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
                   <Button
                     variant="outline"
                     size="sm"
@@ -1404,17 +1401,17 @@ export function AttendancePage() {
                   </Button>
                 </BottomActionBar>
               ) : (
-                <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 0.6 : 1 }}>
-                  <div style={{ display: 'flex', gap: isTablet ? 'max(var(--spacing-md), 8px)' : 'var(--spacing-sm)', flexWrap: 'wrap' }}> {/* 아키텍처 문서 3.3.9: 버튼 간 간격 최소 8px */}
+                <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
+                  <div style={{ display: 'flex', gap: isTablet ? 'max(var(--spacing-md), var(--tablet-spacing-min))' : 'var(--spacing-sm)', flexWrap: 'wrap' }}> {/* 아키텍처 문서 3.3.9: 버튼 간 간격 최소 8px */}
                     <Button
                       variant="outline"
                       size={isTablet ? 'lg' : 'md'}
                       onClick={handleBulkCheckIn}
                       disabled={isSaving || isLoading}
                       style={isTablet ? {
-                        minWidth: '120px',
-                        minHeight: '60px',
-                        fontSize: 'max(var(--font-size-lg), 18px)', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
+                        minWidth: 'var(--width-button-min)',
+                        minHeight: 'var(--height-button-min)',
+                        fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
                       } : undefined}
                     >
                       일괄 등원
@@ -1425,9 +1422,9 @@ export function AttendancePage() {
                       onClick={handleBulkCheckOut}
                       disabled={isSaving || isLoading}
                       style={isTablet ? {
-                        minWidth: '120px',
-                        minHeight: '60px',
-                        fontSize: 'max(var(--font-size-lg), 18px)', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
+                        minWidth: 'var(--width-button-min)',
+                        minHeight: 'var(--height-button-min)',
+                        fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
                       } : undefined}
                     >
                       일괄 하원
@@ -1441,9 +1438,9 @@ export function AttendancePage() {
                       onClick={handleSaveAttendance}
                       disabled={isSaving || isLoading}
                       style={isTablet ? {
-                        minWidth: '120px',
-                        minHeight: '60px',
-                        fontSize: 'max(var(--font-size-lg), 18px)', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
+                        minWidth: 'var(--width-button-min)',
+                        minHeight: 'var(--height-button-min)',
+                        fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
                       } : undefined}
                     >
                       {isSaving ? '저장 중...' : '저장'}
@@ -1464,7 +1461,7 @@ export function AttendancePage() {
                     <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
                       QR 출결 실행
                     </h3>
-                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
+                    <p style={{ color: 'var(--color-text-secondary)', textAlign: 'center' }}>
                       QR 코드를 스캔하여 출결을 기록합니다.
                     </p>
                     <Button
@@ -1472,7 +1469,7 @@ export function AttendancePage() {
                       color="primary"
                       onClick={handleStartQRScanner}
                       size="lg"
-                      style={{ minWidth: '200px' }}
+                      style={{ minWidth: 'var(--width-student-info-min)' }}
                     >
                       QR 스캔 시작
                     </Button>
@@ -1492,8 +1489,8 @@ export function AttendancePage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', alignItems: 'center' }}>
                 <div style={{
                   width: '100%',
-                  maxWidth: '500px',
-                  aspectRatio: '1',
+                  maxWidth: 'var(--width-drawer-tablet)',
+                  aspectRatio: 'var(--aspect-ratio-square)',
                   backgroundColor: 'var(--color-gray-900)',
                   borderRadius: 'var(--border-radius-md)',
                   overflow: 'hidden',
@@ -1512,18 +1509,18 @@ export function AttendancePage() {
                       top: '50%',
                       left: '50%',
                       transform: 'var(--transform-center)',
-                      width: '200px',
-                      height: '200px',
+                      width: 'var(--width-student-info-min)',
+                      height: 'var(--width-student-info-min)',
                       border: `var(--border-width-base) solid var(--color-white)`,
                       borderRadius: 'var(--border-radius-md)',
                       pointerEvents: 'none'
                     }} />
                   )}
                 </div>
-                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
+                <p style={{ color: 'var(--color-text-secondary)', textAlign: 'center' }}>
                   QR 코드를 카메라에 맞춰주세요
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)', width: '100%', maxWidth: '500px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)', width: '100%', maxWidth: 'var(--width-drawer-tablet)' }}>
                   <Input
                     placeholder="QR 코드를 스캔하거나 학생 ID를 직접 입력하세요"
                     onKeyPress={(e) => {

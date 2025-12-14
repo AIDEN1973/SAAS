@@ -10,16 +10,16 @@ import React from 'react';
 import { clsx } from 'clsx';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 
-export interface DataTableColumn<T = any> {
+export interface DataTableColumn<T = unknown> {
   key: string;
   label: string;
-  render?: (value: any, row: T) => React.ReactNode;
+  render?: (value: unknown, row: T) => React.ReactNode;
   width?: string;
   align?: 'left' | 'center' | 'right';
   className?: string;
 }
 
-export interface DataTableProps<T = any> {
+export interface DataTableProps<T = unknown> {
   data: T[];
   columns: DataTableColumn<T>[];
   keyExtractor?: (row: T) => string | number;
@@ -34,7 +34,7 @@ export interface DataTableProps<T = any> {
  *
  * 데스크톱 환경에서 테이블 데이터를 테이블 형식으로 표시
  */
-export function DataTable<T = any>({
+export function DataTable<T = unknown>({
   data,
   columns,
   keyExtractor,
@@ -58,7 +58,7 @@ export function DataTable<T = any>({
         width: '100%',
         overflowX: 'auto',
         borderRadius: 'var(--border-radius-sm)',
-        border: '1px solid var(--color-gray-200)',
+        border: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
         backgroundColor: 'var(--color-white)',
         boxShadow: 'var(--shadow-sm)',
         overflow: 'hidden',
@@ -92,8 +92,8 @@ export function DataTable<T = any>({
                   fontSize: 'var(--font-size-sm)',
                   color: 'var(--color-text-secondary)',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  borderBottom: '1px solid var(--color-gray-200)',
+                  letterSpacing: '0.05em', // letter-spacing은 일반적으로 em 단위 사용 (상대값)
+                  borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
                   whiteSpace: 'nowrap',
                   width: column.width,
                   backgroundColor: 'var(--color-gray-50)',
@@ -136,7 +136,7 @@ export function DataTable<T = any>({
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                   style={{
                     cursor: onRowClick ? 'pointer' : 'default',
-                    borderBottom: '1px solid var(--color-gray-100)',
+                    borderBottom: 'var(--border-width-thin) solid var(--color-gray-100)', // styles.css 준수: border-width 토큰 사용
                     transition: 'var(--transition-all)',
                     backgroundColor: 'var(--color-white)',
                   }}
@@ -150,7 +150,7 @@ export function DataTable<T = any>({
                   }}
                 >
                   {columns.map((column, colIndex) => {
-                    const value = (row as any)[column.key];
+                    const value = (row as Record<string, unknown>)[column.key];
                     return (
                       <td
                         key={column.key}
@@ -167,7 +167,7 @@ export function DataTable<T = any>({
                           }),
                         }}
                       >
-                        {column.render ? column.render(value, row) : value}
+                        {column.render ? column.render(value, row) : String(value ?? '')}
                       </td>
                     );
                   })}

@@ -28,11 +28,16 @@ import { useResponsiveMode } from '@ui-core/react';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useConfig } from '@hooks/use-config';
 import { toKST } from '@lib/date-utils';
+import type { Invoice } from '@core/billing';
+import type { AttendanceLog } from '@services/attendance-service';
+import type { Student } from '@services/student-service';
 
 export function AnalyticsPage() {
   const { showAlert } = useModal();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  // [불변 규칙] Zero-Trust: industryType은 Context에서 가져와야 함 (하드코딩 금지)
+  const industryType = context?.industryType || 'academy'; // Context에서 가져오되, 없으면 fallback
   const { data: config } = useConfig();
   const mode = useResponsiveMode(); // 유아이 문서 6-0: 반응형 브레이크포인트 표준 준수
   const isMobile = mode === 'xs' || mode === 'sm';
@@ -43,7 +48,7 @@ export function AnalyticsPage() {
 
   // 지역 정보 추출 (tenant_settings.location에서 가져오기)
   const locationInfo = useMemo(() => {
-    const location = config?.location;
+    const location = config?.location as { gu?: string; dong?: string; si?: string; location_code?: string; sigungu_code?: string; sido_code?: string } | undefined;
     if (!location) {
       return {
         region: '지역 미설정',
@@ -72,7 +77,7 @@ export function AnalyticsPage() {
 
   // 지역 통계 조회 (아키텍처 문서 3.6.2: 지역 비교 그룹 결정 로직)
   const { data: regionalStats, isLoading } = useQuery({
-    queryKey: ['regional-analytics', tenantId, selectedMetric, locationInfo.location_code],
+    queryKey: ['regional-analytics', tenantId, selectedMetric, locationInfo.location_code, industryType],
     queryFn: async () => {
       if (!tenantId) return null;
 
@@ -91,28 +96,28 @@ export function AnalyticsPage() {
 
       // 우리 학원의 지표 값 계산
       if (selectedMetric === 'students') {
-        const studentsResponse = await apiClient.get<any>('persons', {
+        const studentsResponse = await apiClient.get<Student[]>('persons', {
           filters: {},
         });
         value = studentsResponse.data?.length || 0;
       } else if (selectedMetric === 'revenue') {
         const currentMonth = toKST().format('YYYY-MM');
-        const invoicesResponse = await apiClient.get<any>('invoices', {
+        const invoicesResponse = await apiClient.get<Invoice>('invoices', {
           filters: {
             period_start: { gte: `${currentMonth}-01` },
           },
         });
-        const invoices = invoicesResponse.data || [];
-        value = invoices.reduce((sum: number, inv: any) => sum + (inv.amount_paid || 0), 0);
+        const invoices = (invoicesResponse.data || []) as Invoice[];
+        value = invoices.reduce((sum: number, inv: Invoice) => sum + ((inv as Invoice & { amount_paid?: number }).amount_paid || 0), 0);
       } else if (selectedMetric === 'attendance') {
         const currentMonth = toKST().format('YYYY-MM');
-        const attendanceLogsResponse = await apiClient.get<any>('attendance_logs', {
+        const attendanceLogsResponse = await apiClient.get<AttendanceLog>('attendance_logs', {
           filters: {
             occurred_at: { gte: `${currentMonth}-01T00:00:00` },
           },
         });
         const logs = attendanceLogsResponse.data || [];
-        const presentCount = logs.filter((log: any) => log.status === 'present').length;
+        const presentCount = logs.filter((log: AttendanceLog) => log.status === 'present').length;
         value = logs.length > 0 ? Math.round((presentCount / logs.length) * 100) : 0;
       } else if (selectedMetric === 'growth') {
         // 아키텍처 문서 3.6.8: 성장 지표 (학생 성장률, 매출 성장률)
@@ -123,7 +128,7 @@ export function AnalyticsPage() {
         const lastMonthStr = lastMonth.format('YYYY-MM');
 
         // 현재 월 학생 수
-        const currentStudentsResponse = await apiClient.get<any>('persons', {
+        const currentStudentsResponse = await apiClient.get<Student[]>('persons', {
           filters: {
             person_type: 'student',
             created_at: { lte: `${currentMonthStr}-31T23:59:59` },
@@ -132,7 +137,7 @@ export function AnalyticsPage() {
         const currentStudentCount = currentStudentsResponse.data?.length || 0;
 
         // 전월 학생 수
-        const lastStudentsResponse = await apiClient.get<any>('persons', {
+        const lastStudentsResponse = await apiClient.get<Student[]>('persons', {
           filters: {
             person_type: 'student',
             created_at: { lte: `${lastMonthStr}-31T23:59:59` },
@@ -153,13 +158,20 @@ export function AnalyticsPage() {
         sampleCount = 0;
       } else {
         const today = toKST().format('YYYY-MM-DD');
-        const industryType = 'academy'; // 학원 업종
+        // [불변 규칙] Zero-Trust: industryType은 함수 상단에서 Context에서 가져온 값 사용 (이미 선언됨)
 
         // Fallback 우선순위: 동 → 구 → 시도 → 권역 (아키텍처 문서 3.6.2)
         // 1순위: 같은 행정동(location_code) 내 학원 수 확인
-        let dongMetrics: any[] = [];
+        interface RegionMetric {
+          store_count?: number;
+          active_members_avg?: string | number;
+          active_members_p75?: string | number;
+          revenue_avg?: string | number;
+          revenue_p75?: string | number;
+        }
+        let dongMetrics: RegionMetric[] = [];
         try {
-          const dongResponse = await apiClient.get<any>('daily_region_metrics', {
+          const dongResponse = await apiClient.get<RegionMetric>('daily_region_metrics', {
             filters: {
               industry_type: industryType,
               region_level: 'dong',
@@ -174,9 +186,9 @@ export function AnalyticsPage() {
           // 에러는 무시하고 fallback으로 진행 (아키텍처 문서 3.6.2: Fallback 우선순위)
         }
 
-        if (dongMetrics.length > 0 && dongMetrics[0].store_count >= minimumSampleSize) {
+        if (dongMetrics.length > 0 && (dongMetrics[0] as { store_count?: number }).store_count && (dongMetrics[0] as { store_count: number }).store_count >= minimumSampleSize) {
           comparisonGroup = 'same_dong';
-          sampleCount = dongMetrics[0].store_count;
+          sampleCount = (dongMetrics[0] as { store_count: number }).store_count;
           usedFallback = false; // 1순위 사용
           fallbackLevel = null;
           // 지표별 평균값 및 상위 10% 값 추출 (통계문서 3.1: 우리 학원 vs 상위 10% 평균)
@@ -203,9 +215,9 @@ export function AnalyticsPage() {
           }
         } else {
           // 2순위: 같은 구(sigungu_code)로 확장
-          let sigunguMetrics: any[] = [];
+          let sigunguMetrics: RegionMetric[] = [];
           try {
-            const sigunguResponse = await apiClient.get<any>('daily_region_metrics', {
+            const sigunguResponse = await apiClient.get<RegionMetric>('daily_region_metrics', {
               filters: {
                 industry_type: industryType,
                 region_level: 'gu_gun',
@@ -220,9 +232,9 @@ export function AnalyticsPage() {
             // 에러는 무시하고 fallback으로 진행 (아키텍처 문서 3.6.2: Fallback 우선순위)
           }
 
-          if (sigunguMetrics.length > 0 && sigunguMetrics[0].store_count >= minimumSampleSize) {
+          if (sigunguMetrics.length > 0 && (sigunguMetrics[0] as { store_count?: number }).store_count && (sigunguMetrics[0] as { store_count: number }).store_count >= minimumSampleSize) {
             comparisonGroup = 'same_sigungu';
-            sampleCount = sigunguMetrics[0].store_count;
+            sampleCount = (sigunguMetrics[0] as { store_count: number }).store_count;
             usedFallback = true; // 2순위 fallback 사용
             fallbackLevel = 'same_sigungu';
             if (selectedMetric === 'students') {
@@ -240,9 +252,9 @@ export function AnalyticsPage() {
             }
           } else {
             // 3순위: 같은 시도(sido_code)로 확장
-            let sidoMetrics: any[] = [];
+            let sidoMetrics: RegionMetric[] = [];
             try {
-              const sidoResponse = await apiClient.get<any>('daily_region_metrics', {
+              const sidoResponse = await apiClient.get<RegionMetric>('daily_region_metrics', {
                 filters: {
                   industry_type: industryType,
                   region_level: 'si',
@@ -257,9 +269,9 @@ export function AnalyticsPage() {
               // 에러는 무시하고 fallback으로 진행 (아키텍처 문서 3.6.2: Fallback 우선순위)
             }
 
-            if (sidoMetrics.length > 0 && sidoMetrics[0].store_count >= minimumSampleSize) {
+            if (sidoMetrics.length > 0 && (sidoMetrics[0] as { store_count?: number }).store_count && (sidoMetrics[0] as { store_count: number }).store_count >= minimumSampleSize) {
               comparisonGroup = 'same_sido';
-              sampleCount = sidoMetrics[0].store_count;
+              sampleCount = (sidoMetrics[0] as { store_count: number }).store_count;
               usedFallback = true; // 3순위 fallback 사용
               fallbackLevel = 'same_sido';
               if (selectedMetric === 'students') {
@@ -278,12 +290,19 @@ export function AnalyticsPage() {
             } else {
               // 4순위: 같은 권역(region_zone)으로 확장 (아키텍처 문서 3.6.7)
               // 권역 코드는 tenant_settings.location.region_code에 저장됨
-              const regionZoneCode = config?.location?.region_code || null;
+              const regionZoneCode = (config?.location as { region_code?: string })?.region_code || null;
               if (regionZoneCode) {
                 // 권역 단위 통계 조회 (nation 레벨 사용)
-                let regionZoneMetrics: any[] = [];
+                let regionZoneMetrics: RegionMetric[] = [];
                 try {
-                  const regionZoneResponse = await apiClient.get<any>('daily_region_metrics', {
+                  interface RegionMetric {
+                    store_count?: number;
+                    active_members_avg?: string | number;
+                    active_members_p75?: string | number;
+                    revenue_avg?: string | number;
+                    revenue_p75?: string | number;
+                  }
+                  const regionZoneResponse = await apiClient.get<RegionMetric>('daily_region_metrics', {
                     filters: {
                       industry_type: industryType,
                       region_level: 'nation',
@@ -298,9 +317,9 @@ export function AnalyticsPage() {
                   // 에러는 무시하고 fallback으로 진행 (아키텍처 문서 3.6.2: Fallback 우선순위)
                 }
 
-                if (regionZoneMetrics.length > 0 && regionZoneMetrics[0].store_count >= minimumSampleSize) {
+                if (regionZoneMetrics.length > 0 && (regionZoneMetrics[0] as { store_count?: number }).store_count && (regionZoneMetrics[0] as { store_count: number }).store_count >= minimumSampleSize) {
                   comparisonGroup = 'same_region_zone';
-                  sampleCount = regionZoneMetrics[0].store_count;
+                  sampleCount = (regionZoneMetrics[0] as { store_count: number }).store_count;
                   usedFallback = true; // 4순위 fallback 사용
                   fallbackLevel = 'same_region_zone';
                   if (selectedMetric === 'students') {
@@ -319,9 +338,9 @@ export function AnalyticsPage() {
                 } else {
                   // 5순위: 업종 필터 제거 후 지역만 비교 (아키텍처 문서 3.6.2: fallback4)
                   // 권역 단위 통계 조회 (업종 필터 제거)
-                  let allIndustryMetrics: any[] = [];
+                  let allIndustryMetrics: RegionMetric[] = [];
                   try {
-                    const allIndustryResponse = await apiClient.get<any>('daily_region_metrics', {
+                    const allIndustryResponse = await apiClient.get<RegionMetric>('daily_region_metrics', {
                       filters: {
                         // industry_type 필터 제거 (모든 업종 포함)
                         region_level: 'nation',
@@ -335,9 +354,9 @@ export function AnalyticsPage() {
                     // 에러는 무시하고 fallback으로 진행 (아키텍처 문서 3.6.2: Fallback 우선순위)
                   }
 
-                  if (allIndustryMetrics.length > 0 && allIndustryMetrics[0].store_count >= minimumSampleSize) {
+                  if (allIndustryMetrics.length > 0 && (allIndustryMetrics[0] as { store_count?: number }).store_count && (allIndustryMetrics[0] as { store_count: number }).store_count >= minimumSampleSize) {
                     comparisonGroup = 'same_region_zone';
-                    sampleCount = allIndustryMetrics[0].store_count;
+                    sampleCount = (allIndustryMetrics[0] as { store_count: number }).store_count;
                     usedFallback = true; // 5순위 fallback 사용 (업종 필터 제거)
                     fallbackLevel = 'same_region_zone';
                     industryFilterRemoved = true; // 업종 필터 제거됨
@@ -357,13 +376,13 @@ export function AnalyticsPage() {
                   } else {
                     // 최소 샘플 수 미달
                     comparisonGroup = 'insufficient';
-                    sampleCount = allIndustryMetrics.length > 0 ? allIndustryMetrics[0].store_count : 0;
+                    sampleCount = allIndustryMetrics.length > 0 ? ((allIndustryMetrics[0] as { store_count?: number }).store_count || 0) : 0;
                   }
                 }
               } else {
                 // 권역 정보가 없으면 비교 불가
                 comparisonGroup = 'insufficient';
-                sampleCount = sidoMetrics.length > 0 ? sidoMetrics[0].store_count : 0;
+                sampleCount = sidoMetrics.length > 0 ? ((sidoMetrics[0] as { store_count?: number }).store_count || 0) : 0;
               }
             }
           }
@@ -502,11 +521,11 @@ export function AnalyticsPage() {
 
       // 핵심 지표 수집
       const [studentsResponse, invoicesResponse, attendanceLogsResponse, regionalStatsResponse] = await Promise.all([
-        apiClient.get<any>('persons', { filters: {} }),
-        apiClient.get<any>('invoices', {
+        apiClient.get<Student[]>('persons', { filters: {} }),
+        apiClient.get<Invoice[]>('invoices', {
           filters: { period_start: { gte: `${currentMonthStr}-01` } },
         }),
-        apiClient.get<any>('attendance_logs', {
+        apiClient.get<AttendanceLog[]>('attendance_logs', {
           filters: { occurred_at: { gte: `${currentMonthStr}-01T00:00:00` } },
         }),
         // 지역 통계는 이미 조회된 데이터 사용
@@ -514,8 +533,8 @@ export function AnalyticsPage() {
       ]);
 
       const students = studentsResponse.data || [];
-      const invoices = invoicesResponse.data || [];
-      const attendanceLogs = attendanceLogsResponse.data || [];
+      const invoices = (invoicesResponse.data || []) as unknown as Invoice[];
+      const attendanceLogs = (attendanceLogsResponse.data || []) as unknown as AttendanceLog[];
 
       // 리포트 데이터 생성 (통계문서 FR-09: 핵심 지표 요약, 지역 대비 평가, 이번달 개선점)
       const reportData = {
@@ -524,10 +543,10 @@ export function AnalyticsPage() {
         // 핵심 지표 요약
         summary: {
           total_students: students.length,
-          total_revenue: invoices.reduce((sum: number, inv: any) => sum + (inv.amount_paid || 0), 0),
+          total_revenue: invoices.reduce((sum: number, inv: Invoice) => sum + ((inv as Invoice & { amount_paid?: number }).amount_paid || 0), 0),
           total_invoices: invoices.length,
           attendance_rate: attendanceLogs.length > 0
-            ? Math.round((attendanceLogs.filter((log: any) => log.status === 'present').length / attendanceLogs.length) * 100)
+            ? Math.round((attendanceLogs.filter((log: AttendanceLog) => log.status === 'present').length / attendanceLogs.length) * 100)
             : 0,
         },
         // 지역 대비 평가
@@ -543,7 +562,7 @@ export function AnalyticsPage() {
       };
     },
     onSuccess: (data) => {
-      showAlert('성공', `월간 경영 리포트가 생성되었습니다. (${data.report_id})\n\n핵심 지표:\n- 학생 수: ${data.summary.total_students}명\n- 매출: ${new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(data.summary.total_revenue)}\n- 출석률: ${data.summary.attendance_rate}%`);
+      showAlert('성공', `월간 경영 리포트가 생성되었습니다. (${data.report_id})\n\n핵심 지표:\n- 학생 수: ${data.summary.total_students}명\n- 매출: ${new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(Number(data.summary.total_revenue))}\n- 출석률: ${data.summary.attendance_rate}%`);
       // TODO: 리포트 다운로드 링크 제공
     },
     onError: (error: Error) => {
@@ -602,7 +621,7 @@ export function AnalyticsPage() {
             }}>
               {/* 학생 수 카드 */}
               <Card padding="md" variant="default" style={{ cursor: 'pointer' }} onClick={() => setSelectedMetric('students')}>
-                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                   학생 수
                 </div>
                 <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-xs)' }}>
@@ -617,7 +636,7 @@ export function AnalyticsPage() {
 
               {/* 매출 카드 - 통계문서 3.1: 매출 / 지역순위 */}
               <Card padding="md" variant="default" style={{ cursor: 'pointer' }} onClick={() => setSelectedMetric('revenue')}>
-                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                   매출
                 </div>
                 <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-xs)' }}>
@@ -632,7 +651,7 @@ export function AnalyticsPage() {
 
               {/* 출석률 카드 - 통계문서 3.1: 출석률 / 지역순위 */}
               <Card padding="md" variant="default" style={{ cursor: 'pointer' }} onClick={() => setSelectedMetric('attendance')}>
-                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                   출석률
                 </div>
                 <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-xs)' }}>
@@ -647,7 +666,7 @@ export function AnalyticsPage() {
 
               {/* 성장률 카드 - 통계문서 3.1: 성장률 / 지역순위 */}
               <Card padding="md" variant="default" style={{ cursor: 'pointer' }} onClick={() => setSelectedMetric('growth')}>
-                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                   성장률
                 </div>
                 <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-xs)' }}>
@@ -684,7 +703,6 @@ export function AnalyticsPage() {
                         padding: 'var(--spacing-lg)',
                         backgroundColor: 'var(--color-background-secondary)',
                         borderRadius: 'var(--border-radius-md)',
-                        fontSize: 'var(--font-size-base)',
                         lineHeight: 'var(--line-height-relaxed)',
                         fontWeight: index === 0 ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)',
                       }}
@@ -714,7 +732,7 @@ export function AnalyticsPage() {
                       display: 'flex',
                       alignItems: 'flex-end',
                       gap: 'var(--spacing-md)',
-                      height: '200px',
+                      height: 'var(--height-chart)',
                       padding: 'var(--spacing-md)',
                       backgroundColor: 'var(--color-background-secondary)',
                       borderRadius: 'var(--border-radius-md)',
@@ -726,7 +744,7 @@ export function AnalyticsPage() {
                           height: `${Math.min(100, (regionalStats.value / Math.max(regionalStats.top10Percent, regionalStats.average, regionalStats.value, 1)) * 100)}%`,
                           backgroundColor: 'var(--color-primary)',
                           borderRadius: 'var(--border-radius-sm)',
-                          minHeight: '20px',
+                          minHeight: 'var(--height-input-min)',
                         }} />
                         <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
                           우리 학원
@@ -742,7 +760,7 @@ export function AnalyticsPage() {
                           height: `${Math.min(100, (regionalStats.average / Math.max(regionalStats.top10Percent, regionalStats.average, regionalStats.value, 1)) * 100)}%`,
                           backgroundColor: 'var(--color-info)',
                           borderRadius: 'var(--border-radius-sm)',
-                          minHeight: '20px',
+                          minHeight: 'var(--height-input-min)',
                         }} />
                         <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
                           지역 평균
@@ -758,7 +776,7 @@ export function AnalyticsPage() {
                           height: `${Math.min(100, (regionalStats.top10Percent / Math.max(regionalStats.top10Percent, regionalStats.average, regionalStats.value, 1)) * 100)}%`,
                           backgroundColor: 'var(--color-success)',
                           borderRadius: 'var(--border-radius-sm)',
-                          minHeight: '20px',
+                          minHeight: 'var(--height-input-min)',
                         }} />
                         <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
                           상위 10% 평균
@@ -785,7 +803,7 @@ export function AnalyticsPage() {
                         <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
                           {regionalStats.region}
                         </div>
-                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                        <div style={{ color: 'var(--color-text-secondary)' }}>
                           상위 {regionalStats.percentile}%
                         </div>
                       </div>
@@ -796,7 +814,7 @@ export function AnalyticsPage() {
                       flexWrap: isMobile ? 'wrap' : 'nowrap',
                     }}>
                       <div style={{ flex: isMobile ? '1 1 100%' : '1' }}>
-                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                        <div style={{ color: 'var(--color-text-secondary)' }}>
                           우리 학원
                         </div>
                         <div style={{ fontSize: isMobile ? 'var(--font-size-lg)' : 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }}>
@@ -804,7 +822,7 @@ export function AnalyticsPage() {
                         </div>
                       </div>
                       <div style={{ flex: isMobile ? '1 1 100%' : '1' }}>
-                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                        <div style={{ color: 'var(--color-text-secondary)' }}>
                           지역 평균
                         </div>
                         <div style={{ fontSize: isMobile ? 'var(--font-size-lg)' : 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }}>
@@ -812,7 +830,7 @@ export function AnalyticsPage() {
                         </div>
                       </div>
                       <div style={{ flex: isMobile ? '1 1 100%' : '1' }}>
-                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                        <div style={{ color: 'var(--color-text-secondary)' }}>
                           변화율
                         </div>
                         <div style={{ fontSize: isMobile ? 'var(--font-size-lg)' : 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-success)' }}>
@@ -869,9 +887,13 @@ function HeatmapCard({
 }) {
   const mode = useResponsiveMode(); // 유아이 문서 6-0: 반응형 브레이크포인트 표준 준수
   const isMobile = mode === 'xs' || mode === 'sm';
+  // [불변 규칙] Zero-Trust: industryType은 Context에서 가져와야 함 (하드코딩 금지)
+  const context = getApiContext();
+  const industryType = context?.industryType || 'academy'; // Context에서 가져오되, 없으면 fallback
+
   // 히트맵 데이터 조회 (최근 30일 데이터)
   const { data: heatmapData, isLoading: isLoadingHeatmap } = useQuery({
-    queryKey: ['regional-heatmap', tenantId, heatmapType, locationInfo.sigungu_code],
+    queryKey: ['regional-heatmap', tenantId, heatmapType, locationInfo.sigungu_code, industryType],
     queryFn: async () => {
       if (!tenantId || !locationInfo.sigungu_code) return null;
 
@@ -882,9 +904,14 @@ function HeatmapCard({
 
       try {
         // 구 단위 지역 통계 조회 (히트맵용)
-        const response = await apiClient.get<any>('daily_region_metrics', {
+        interface HeatmapMetric {
+          date_kst: string;
+          active_members_avg?: number;
+          revenue_avg?: number;
+        }
+        const response = await apiClient.get<HeatmapMetric>('daily_region_metrics', {
           filters: {
-            industry_type: 'academy',
+            industry_type: industryType,
             region_level: 'gu_gun',
             region_code: locationInfo.sigungu_code,
             date_kst: { gte: dateFrom, lte: dateTo },
@@ -900,19 +927,19 @@ function HeatmapCard({
         for (const metric of metrics) {
           let value = 0;
           if (heatmapType === 'students') {
-            value = Number(metric.active_members_avg) || 0;
+            value = Number((metric as HeatmapMetric).active_members_avg) || 0;
           } else if (heatmapType === 'attendance') {
             // 출석률은 daily_region_metrics에 별도 컬럼이 없으므로
             // active_members 기반으로 추정 (실제 구현 시 별도 출석률 집계 필요)
-            value = Number(metric.active_members_avg) || 0;
+            value = Number((metric as HeatmapMetric).active_members_avg) || 0;
           } else if (heatmapType === 'growth') {
             // 성장률은 전일 대비 계산 필요 (현재는 revenue 기반으로 표시)
             // 실제 구현 시 전일 대비 증감률 계산 필요
-            value = Number(metric.revenue_avg) || 0;
+            value = Number((metric as HeatmapMetric).revenue_avg) || 0;
           }
 
           heatmapValues.push({
-            date: metric.date_kst,
+            date: (metric as HeatmapMetric).date_kst,
             value: Math.round(value),
           });
         }
@@ -942,7 +969,7 @@ function HeatmapCard({
 
     for (let i = 34; i >= 0; i--) {
       const date = today.clone().subtract(i, 'days').format('YYYY-MM-DD');
-      const metric = heatmapData.find((m: any) => m.date === date);
+      const metric = heatmapData.find((m: { date: string }) => m.date === date);
       gridData.push({
         date,
         value: metric ? metric.value : 0,
@@ -1010,7 +1037,7 @@ function HeatmapCard({
               gridTemplateColumns: 'repeat(7, 1fr)',
               gap: 'var(--spacing-xs)',
               width: '100%',
-              maxWidth: isMobile ? '100%' : '700px',
+              maxWidth: isMobile ? '100%' : 'var(--width-content-max)',
               margin: '0 auto',
             }}>
               {heatmapGridData.map((item, index) => {
@@ -1023,7 +1050,7 @@ function HeatmapCard({
                     key={item.date}
                     title={`${item.date}: ${item.value}`}
                     style={{
-                      aspectRatio: '1',
+                      aspectRatio: 'var(--aspect-ratio-square)',
                       backgroundColor: getHeatmapColor(item.value, maxValue),
                       borderRadius: 'var(--border-radius-sm)',
                       display: 'flex',
@@ -1031,17 +1058,17 @@ function HeatmapCard({
                       justifyContent: 'center',
                       fontSize: 'var(--font-size-xs)',
                       color: item.value > maxValue * 0.5 ? 'var(--color-white)' : 'var(--color-text-secondary)',
-                      opacity: isWeekend ? 0.7 : 1,
+                      opacity: isWeekend ? 'var(--opacity-secondary)' : 'var(--opacity-full)',
                       cursor: 'pointer',
                       transition: 'opacity var(--transition-base), transform var(--transition-base)',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.opacity = '1';
-                      e.currentTarget.style.transform = 'scale(1.1)';
+                      e.currentTarget.style.opacity = 'var(--opacity-full)';
+                      e.currentTarget.style.transform = 'var(--transform-scale-hover)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = isWeekend ? '0.7' : '1';
-                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.opacity = isWeekend ? 'var(--opacity-secondary)' : 'var(--opacity-full)';
+                      e.currentTarget.style.transform = 'var(--transform-scale-normal)';
                     }}
                   >
                     {item.value > 0 ? Math.round(item.value) : ''}
@@ -1063,15 +1090,15 @@ function HeatmapCard({
               <span>낮음</span>
               <div style={{
                 display: 'flex',
-                gap: '2px',
+                gap: 'var(--spacing-xxs)',
                 alignItems: 'center',
               }}>
                 {[0, 0.2, 0.4, 0.6, 0.8, 1].map((intensity) => (
                   <div
                     key={intensity}
                     style={{
-                      width: '12px',
-                      height: '12px',
+                      width: 'var(--font-size-xs)',
+                      height: 'var(--font-size-xs)',
                       backgroundColor: getHeatmapColor(intensity * maxValue, maxValue),
                       borderRadius: 'var(--border-radius-sm)',
                     }}

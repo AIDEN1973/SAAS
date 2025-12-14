@@ -43,7 +43,7 @@ export const Card: React.FC<CardProps> = ({
   const variantStyles: Record<'default' | 'elevated' | 'outlined', React.CSSProperties> = {
     default: {
       backgroundColor: 'var(--color-white)',
-      border: '1px solid var(--color-gray-200)',
+      border: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
       boxShadow: 'none',
     },
     elevated: {
@@ -53,7 +53,7 @@ export const Card: React.FC<CardProps> = ({
     },
     outlined: {
       backgroundColor: 'var(--color-white)',
-      border: '1px solid var(--color-gray-200)',
+      border: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
       boxShadow: 'none',
     },
   };
@@ -64,7 +64,7 @@ export const Card: React.FC<CardProps> = ({
     ...variantStyles[variant],
     ...(onClick && {
       cursor: 'pointer',
-      transition: 'all 0.2s ease',
+      transition: 'var(--transition-all)', // styles.css 준수: transition 토큰 사용
     }),
     ...style,
   };
@@ -72,7 +72,7 @@ export const Card: React.FC<CardProps> = ({
   const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
     if (onClick) {
       e.currentTarget.style.boxShadow = 'none';
-      e.currentTarget.style.transform = 'translateY(-2px)';
+      e.currentTarget.style.transform = 'var(--transform-lift-hover)'; // styles.css 준수: transform 토큰 사용
     }
     onMouseEnter?.(e);
   };
@@ -80,7 +80,7 @@ export const Card: React.FC<CardProps> = ({
   const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
     if (onClick) {
       e.currentTarget.style.boxShadow = 'none';
-      e.currentTarget.style.transform = 'translateY(0)';
+      e.currentTarget.style.transform = 'var(--transform-scale-normal)'; // styles.css 준수: transform 토큰 사용
     }
     onMouseLeave?.(e);
   };

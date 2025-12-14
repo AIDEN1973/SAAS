@@ -55,9 +55,9 @@ const layoutSchema = z.object({
     fields: z.array(z.string()).optional(),
   })).optional(),
   responsive: z.object({
-    mobile: z.any().optional(),
-    tablet: z.any().optional(),
-    desktop: z.any().optional(),
+    mobile: z.unknown().optional(),
+    tablet: z.unknown().optional(),
+    desktop: z.unknown().optional(),
   }).optional(),
 });
 
@@ -69,16 +69,16 @@ const layoutSchema = z.object({
 const conditionRuleSchema = z.object({
   field: z.string().min(1),
   op: z.enum(['==', '!=', 'eq', 'ne', 'in', 'not_in', 'exists', 'not_exists', 'gt', 'gte', 'lt', 'lte', '>', '>=', '<', '<=']),  // SDUI v1.1: 비교 연산자
-  value: z.any().optional(),  // exists/not_exists의 경우 불필요
+  value: z.unknown().optional(),  // exists/not_exists의 경우 불필요
   // SDUI v1.1: then/else 구조
   then: z.object({
     hide: z.boolean().optional(),
     disable: z.boolean().optional(),
     require: z.boolean().optional(),
-    setValue: z.any().optional(),
+    setValue: z.unknown().optional(),
     setOptions: z.object({
       type: z.enum(['static', 'api']),
-      options: z.array(z.any()).optional(),
+      options: z.array(z.unknown()).optional(),
       endpoint: z.string().optional(),
     }).optional(),
     switchComponent: z.object({
@@ -89,10 +89,10 @@ const conditionRuleSchema = z.object({
     hide: z.boolean().optional(),
     disable: z.boolean().optional(),
     require: z.boolean().optional(),
-    setValue: z.any().optional(),
+    setValue: z.unknown().optional(),
     setOptions: z.object({
       type: z.enum(['static', 'api']),
-      options: z.array(z.any()).optional(),
+      options: z.array(z.unknown()).optional(),
       endpoint: z.string().optional(),
     }).optional(),
     switchComponent: z.object({
@@ -132,10 +132,10 @@ const multiConditionRuleSchema = z.object({
     hide: z.boolean().optional(),
     disable: z.boolean().optional(),
     require: z.boolean().optional(),
-    setValue: z.any().optional(),
+    setValue: z.unknown().optional(),
     setOptions: z.object({
       type: z.enum(['static', 'api']),
-      options: z.array(z.any()).optional(),
+      options: z.array(z.unknown()).optional(),
       endpoint: z.string().optional(),
     }).optional(),
     switchComponent: z.object({
@@ -146,10 +146,10 @@ const multiConditionRuleSchema = z.object({
     hide: z.boolean().optional(),
     disable: z.boolean().optional(),
     require: z.boolean().optional(),
-    setValue: z.any().optional(),
+    setValue: z.unknown().optional(),
     setOptions: z.object({
       type: z.enum(['static', 'api']),
-      options: z.array(z.any()).optional(),
+      options: z.array(z.unknown()).optional(),
       endpoint: z.string().optional(),
     }).optional(),
     switchComponent: z.object({
@@ -188,7 +188,7 @@ const formFieldSchema = z.object({
     labelKey: z.string().optional(),  // SDUI v1.1
     label: z.string().optional(),  // 하위 호환성
   })).optional(),
-  defaultValue: z.any().optional(),
+  defaultValue: z.unknown().optional(),
   condition: conditionRuleSchema.optional(),  // 단일 조건 (하위 호환)
   conditions: multiConditionRuleSchema.optional(),  // 복수 조건 (AND/OR)
   // SDUI v1.1: Custom Widget 지원
@@ -352,7 +352,7 @@ export function validateSchema(schema: unknown): {
   errors?: z.ZodError;
 } {
   // 스키마 타입 확인 (type 필드가 있는 경우)
-  const schemaObj = schema as any;
+  const schemaObj = schema as Record<string, unknown>;
   const schemaType = schemaObj?.type;
 
   // type이 'form'인 경우 Form Schema만 검증

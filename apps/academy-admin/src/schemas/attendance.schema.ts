@@ -109,7 +109,6 @@ export function createAttendanceFormSchema(
         },
       ],
       submit: {
-        labelKey: 'ATTENDANCE.FORM.SUBMIT',
         label: '저장',
         variant: 'solid',
         color: 'primary',

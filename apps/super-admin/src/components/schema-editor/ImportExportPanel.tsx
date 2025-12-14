@@ -1,9 +1,9 @@
 /**
  * ImportExportPanel Component
- * 
+ *
  * [불변 규칙] JSON/YAML Import/Export
  * [불변 규칙] Import 시 검증 필수
- * 
+ *
  * 기술문서: docu/스키마에디터.txt 14. Schema Editor 기능
  */
 
@@ -72,13 +72,13 @@ export function ImportExportPanel({ schema, onImport }: ImportExportPanelProps) 
           </label>
           <textarea
             value={importText}
-            onChange={(e) => setImportText(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setImportText(e.target.value)}
             placeholder="JSON 스키마를 붙여넣으세요..."
             style={{
               width: '100%',
-              minHeight: '200px',
+              minHeight: 'var(--height-chart)',
               padding: 'var(--spacing-sm)',
-              border: '1px solid var(--color-gray-200)',
+              border: 'var(--border-width-thin) solid var(--color-gray-200)',
               borderRadius: 'var(--border-radius-md)',
               fontFamily: 'monospace',
               fontSize: 'var(--font-size-sm)',

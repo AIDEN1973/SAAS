@@ -25,6 +25,8 @@ export function applyThemeToCSS(tokens: ThemeTokens): void {
     root.style.setProperty('--color-primary-dark', colorTokens.primary.dark);
     // Primary-50 (배경색용)은 light 색상의 투명도 버전으로 생성
     root.style.setProperty('--color-primary-50', hexToRgba(colorTokens.primary.light, 0.1));
+    // Primary-100 (선택된 항목 배경색용)은 light 색상의 투명도 버전으로 생성
+    root.style.setProperty('--color-primary-100', hexToRgba(colorTokens.primary.light, 0.2));
   }
 
   // Secondary 색상
@@ -33,6 +35,7 @@ export function applyThemeToCSS(tokens: ThemeTokens): void {
     root.style.setProperty('--color-secondary-light', colorTokens.secondary.light);
     root.style.setProperty('--color-secondary-dark', colorTokens.secondary.dark);
     root.style.setProperty('--color-secondary-50', hexToRgba(colorTokens.secondary.light, 0.1));
+    root.style.setProperty('--color-secondary-100', hexToRgba(colorTokens.secondary.light, 0.2));
   }
 
   // Success 색상
@@ -99,10 +102,12 @@ export function resetTheme(): void {
     '--color-primary-light',
     '--color-primary-dark',
     '--color-primary-50',
+    '--color-primary-100',
     '--color-secondary',
     '--color-secondary-light',
     '--color-secondary-dark',
     '--color-secondary-50',
+    '--color-secondary-100',
     '--color-success',
     '--color-success-light',
     '--color-success-dark',

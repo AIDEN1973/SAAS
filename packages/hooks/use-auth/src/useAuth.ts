@@ -5,7 +5,8 @@
  * [불변 규칙] api-sdk를 통해서만 데이터 요청
  * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
  *
- * [예외] 인증 관리는 Supabase Auth API를 직접 사용하는 것이 일반적임
+ * ⚠️ 예외: 인증 관리는 Supabase Auth API를 직접 사용하는 것이 일반적입니다.
+ * supabase.auth.getSession() 등은 인증 관련이므로 createClient() 직접 사용이 필요합니다.
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -222,7 +223,13 @@ export function useUserRole() {
         tenant_id: tenantId,
       });
 
-      const response = await apiClient.get<any>('user_tenant_roles', {
+      interface UserTenantRole {
+        id: string;
+        user_id: string;
+        tenant_id: string;
+        role: string;
+      }
+      const response = await apiClient.get<UserTenantRole[]>('user_tenant_roles', {
         filters: {
           user_id: session.user.id,
           tenant_id: tenantId,
@@ -234,7 +241,7 @@ export function useUserRole() {
         error: response.error,
         data: response.data,
         dataLength: response.data?.length,
-        role: response.data?.[0]?.role,
+        role: (response.data?.[0] as UserTenantRole | undefined)?.role,
       });
 
       if (response.error) {
@@ -243,7 +250,7 @@ export function useUserRole() {
         return null;
       }
 
-      const role = response.data?.[0]?.role || null;
+      const role = (response.data?.[0] as UserTenantRole | undefined)?.role || null;
       console.log('[useUserRole] Returning role:', role);
       return role;
     },

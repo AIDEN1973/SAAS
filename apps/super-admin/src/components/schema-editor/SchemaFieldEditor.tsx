@@ -124,7 +124,7 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
           <Input
             label="필드 이름 (name)"
             value={editingField.name}
-            onChange={(e) => setEditingField({ ...editingField, name: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingField({ ...editingField, name: e.target.value })}
             helperText="데이터베이스에 저장될 필드의 이름입니다. 영문 소문자와 언더스코어(_)만 사용하세요. (예: student_name, email_address)"
             required
           />
@@ -135,7 +135,7 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
             </label>
             <Select
               value={editingField.kind}
-              onChange={(value) => {
+              onChange={(value: string | string[]) => {
                 const newKind = String(value) as FormFieldSchema['kind'];
                 const updated: FormFieldSchema = {
                   ...editingField,
@@ -161,7 +161,7 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
           <Input
             label="라벨 (label)"
             value={editingField.ui?.label || ''}
-            onChange={(e) => setEditingField({
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingField({
               ...editingField,
               ui: { ...editingField.ui, label: e.target.value },
             })}
@@ -171,7 +171,7 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
           <Input
             label="플레이스홀더 (placeholder)"
             value={editingField.ui?.placeholder || ''}
-            onChange={(e) => setEditingField({
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingField({
               ...editingField,
               ui: { ...editingField.ui, placeholder: e.target.value },
             })}
@@ -182,7 +182,7 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
             type="number"
             label="열 너비 (colSpan, 1-12)"
             value={editingField.ui?.colSpan || 1}
-            onChange={(e) => setEditingField({
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingField({
               ...editingField,
               ui: { ...editingField.ui, colSpan: parseInt(e.target.value) || 1 },
             })}
@@ -195,7 +195,7 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
             <Input
               label="커스텀 컴포넌트 타입"
               value={editingField.customComponentType || ''}
-              onChange={(e) => setEditingField({
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingField({
                 ...editingField,
                 customComponentType: e.target.value,
               })}
@@ -218,7 +218,7 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
                     <Input
                       placeholder="값 (value)"
                       value={opt.value}
-                      onChange={(e) => {
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                         const newOptions = [...(editingField.options || [])];
                         newOptions[idx] = { ...opt, value: e.target.value };
                         setEditingField({ ...editingField, options: newOptions });
@@ -227,7 +227,7 @@ export function SchemaFieldEditor({ fields, onChange, onFieldSelect }: SchemaFie
                     <Input
                       placeholder="라벨 (label)"
                       value={opt.label || ''}
-                      onChange={(e) => {
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                         const newOptions = [...(editingField.options || [])];
                         newOptions[idx] = { ...opt, label: e.target.value };
                         setEditingField({ ...editingField, options: newOptions });

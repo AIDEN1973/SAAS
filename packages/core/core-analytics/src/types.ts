@@ -1,6 +1,6 @@
 /**
  * Core Analytics Types
- * 
+ *
  * ?계 ?이?라??(?벤??기반 집계)
  * [불변 규칙] Core Layer는 Industry 모듈에 의존?? ?음
  */
@@ -11,7 +11,7 @@ export interface AnalyticsEvent {
   user_id?: string;
   event_type: string;
   occurred_at: string;  // timestamptz (UTC)
-  payload?: Record<string, any>;
+  payload?: Record<string, unknown>;
   store_id?: string;
   region_id?: string;
   industry_type?: string;
@@ -37,7 +37,7 @@ export interface MonthlyRevenue {
 export interface RecordEventInput {
   event_type: string;
   user_id?: string;
-  payload?: Record<string, any>;
+  payload?: Record<string, unknown>;
   store_id?: string;
   region_id?: string;
   industry_type?: string;

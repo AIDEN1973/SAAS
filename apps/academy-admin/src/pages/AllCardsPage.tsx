@@ -20,6 +20,8 @@ import { apiClient, getApiContext } from '@api-sdk/core';
 import { useClasses } from '@hooks/use-class';
 import type { DayOfWeek } from '@services/class-service';
 import { toKST } from '@lib/date-utils';
+import type { Invoice } from '@core/billing';
+import type { AttendanceLog } from '@services/attendance-service';
 
 interface EmergencyCard {
   id: string;
@@ -86,7 +88,7 @@ export function AllCardsPage() {
       if (!tenantId) return [];
       const cards: EmergencyCard[] = [];
       // HomePage와 동일한 로직
-      const failedPaymentsResponse = await apiClient.get<any>('payments', {
+      const failedPaymentsResponse = await apiClient.get<Array<{ id: string; status: string; created_at: string }>>('payments', {
         filters: { status: 'failed' },
         orderBy: { column: 'created_at', ascending: false },
         limit: 10,
@@ -117,7 +119,7 @@ export function AllCardsPage() {
       const cards: AIBriefingCard[] = [];
       try {
         const todayDate = toKST().format('YYYY-MM-DD');
-        const consultationsResponse = await apiClient.get<any>('student_consultations', {
+        const consultationsResponse = await apiClient.get<Array<{ id: string; student_id: string; consultation_date: string }>>('student_consultations', {
           filters: { consultation_date: { gte: todayDate } },
           limit: 10,
         });
@@ -129,18 +131,18 @@ export function AllCardsPage() {
               title: '오늘의 상담 일정',
               summary: `오늘 ${todayConsultations.length}건의 상담이 예정되어 있습니다.`,
               insights: ['상담일지를 작성하여 학생 관리를 강화하세요.'],
-              created_at: new Date().toISOString(),
+              created_at: toKST().toISOString(),
               action_url: '/ai?tab=consultation',
             });
         }
         const currentMonth = toKST().format('YYYY-MM');
-        const invoicesResponse = await apiClient.get<any>('invoices', {
+        const invoicesResponse = await apiClient.get<Invoice>('invoices', {
           filters: { period_start: { gte: `${currentMonth}-01` } },
         });
         if (!invoicesResponse.error && invoicesResponse.data) {
           const invoices = invoicesResponse.data;
-          const totalAmount = invoices.reduce((sum: number, inv: any) => sum + (inv.amount || 0), 0);
-          const paidAmount = invoices.reduce((sum: number, inv: any) => sum + (inv.amount_paid || 0), 0);
+          const totalAmount = invoices.reduce((sum: number, inv: Invoice) => sum + (inv.amount || 0), 0);
+          const paidAmount = invoices.reduce((sum: number, inv: Invoice) => sum + ((inv as Invoice & { amount_paid?: number }).amount_paid || 0), 0);
           const expectedCollectionRate = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
           if (invoices.length > 0) {
             cards.push({
@@ -149,7 +151,7 @@ export function AllCardsPage() {
               title: '이번 달 수납 현황',
               summary: `이번 달 청구서가 자동 발송되었습니다. 예상 수납률은 ${expectedCollectionRate}%입니다.`,
               insights: [expectedCollectionRate >= 90 ? '수납률이 양호합니다.' : '수납률 개선이 필요합니다.'],
-              created_at: new Date().toISOString(),
+              created_at: toKST().toISOString(),
               action_url: '/billing/home',
             });
           }
@@ -163,10 +165,10 @@ export function AllCardsPage() {
     refetchInterval: 300000,
   });
 
-  // 오늘 수업 조회
+  // 오늘 수업 조회 (기술문서 5-2: KST 기준 날짜 처리)
   const todayDayOfWeek = React.useMemo<DayOfWeek>(() => {
-    const today = new Date();
-    const dayOfWeek = today.getDay();
+    const todayKST = toKST();
+    const dayOfWeek = todayKST.day(); // 0(일) ~ 6(토)
     const dayOfWeekMap: Record<number, DayOfWeek> = {
       0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday',
       4: 'thursday', 5: 'friday', 6: 'saturday',
@@ -184,7 +186,7 @@ export function AllCardsPage() {
     queryKey: ['today-attendance-logs', tenantId, todayDate],
     queryFn: async () => {
       if (!tenantId) return [];
-      const response = await apiClient.get<any>('attendance_logs', {
+      const response = await apiClient.get<AttendanceLog[]>('attendance_logs', {
         filters: {
           occurred_at: { gte: `${todayDate}T00:00:00`, lte: `${todayDate}T23:59:59` },
           attendance_type: 'check_in',
@@ -198,7 +200,7 @@ export function AllCardsPage() {
   const todayClasses = React.useMemo<ClassCard[]>(() => {
     if (!todayClassesData || todayClassesData.length === 0) return [];
     return todayClassesData.map((cls) => {
-      const attendanceCount = todayAttendanceLogs?.filter((log: any) =>
+      const attendanceCount = (todayAttendanceLogs as AttendanceLog[] | undefined)?.filter((log: AttendanceLog) =>
         log.class_id === cls.id && log.status === 'present'
       ).length || 0;
       return {
@@ -219,7 +221,7 @@ export function AllCardsPage() {
     queryFn: async () => {
       if (!tenantId) return [];
       const cards: StatsCard[] = [];
-      const studentsResponse = await apiClient.get<any>('persons', { filters: {} });
+      const studentsResponse = await apiClient.get<{ id: string }>('persons', { filters: {} });
       if (!studentsResponse.error && studentsResponse.data) {
         cards.push({
           id: 'stats-students',
@@ -240,17 +242,17 @@ export function AllCardsPage() {
     queryFn: async () => {
       if (!tenantId) return null;
       const currentMonth = toKST().format('YYYY-MM');
-      const invoicesResponse = await apiClient.get<any>('invoices', {
+      const invoicesResponse = await apiClient.get<Invoice>('invoices', {
         filters: { period_start: { gte: `${currentMonth}-01` } },
       });
       if (invoicesResponse.error || !invoicesResponse.data || invoicesResponse.data.length === 0) {
         return null;
       }
       const invoices = invoicesResponse.data;
-      const totalAmount = invoices.reduce((sum: number, inv: any) => sum + (inv.amount || 0), 0);
-      const paidAmount = invoices.reduce((sum: number, inv: any) => sum + (inv.amount_paid || 0), 0);
+      const totalAmount = invoices.reduce((sum: number, inv: Invoice) => sum + (inv.amount || 0), 0);
+      const paidAmount = invoices.reduce((sum: number, inv: Invoice) => sum + ((inv as Invoice & { amount_paid?: number }).amount_paid || 0), 0);
       const expectedCollectionRate = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
-      const unpaidCount = invoices.filter((inv: any) => inv.status === 'pending' || inv.status === 'overdue').length;
+      const unpaidCount = invoices.filter((inv: Invoice) => inv.status === 'pending' || inv.status === 'overdue').length;
       return {
         id: 'billing-summary',
         type: 'billing_summary' as const,
@@ -306,7 +308,7 @@ export function AllCardsPage() {
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
                 {card.title}
               </h3>
-              <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+              <p style={{ color: 'var(--color-text-secondary)' }}>
                 {card.message}
               </p>
             </div>
@@ -322,7 +324,7 @@ export function AllCardsPage() {
               <div style={{ fontSize: 'var(--font-size-xl)' }}>🤖</div>
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>{card.title}</h3>
             </div>
-            <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>{card.summary}</p>
+            <p style={{ color: 'var(--color-text-secondary)' }}>{card.summary}</p>
           </div>
           {card.insights && card.insights.length > 0 && (
             <ul style={{ marginTop: 'var(--spacing-sm)', paddingLeft: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)' }}>
@@ -339,9 +341,9 @@ export function AllCardsPage() {
         <Card key={card.id} padding="md" variant="default" style={{ cursor: 'pointer' }} onClick={() => handleCardClick(card)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--spacing-xs)' }}>
             <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>{card.class_name}</h3>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>{card.start_time}</div>
+            <div style={{ color: 'var(--color-text-secondary)' }}>{card.start_time}</div>
           </div>
-          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+          <div style={{ color: 'var(--color-text-secondary)' }}>
             출석: {card.attendance_count}/{card.student_count}
           </div>
         </Card>
@@ -360,11 +362,11 @@ export function AllCardsPage() {
         <Card key={card.id} padding="md" variant="default" style={{ cursor: 'pointer' }} onClick={() => handleCardClick(card)}>
           <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>{card.title}</h3>
           <div style={{ marginBottom: 'var(--spacing-xs)' }}>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>예상 수납률</div>
+            <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>예상 수납률</div>
             <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>{card.expected_collection_rate}%</div>
           </div>
           {card.unpaid_count > 0 && (
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-error)' }}>미납 {card.unpaid_count}건</div>
+            <div style={{ color: 'var(--color-error)' }}>미납 {card.unpaid_count}건</div>
           )}
         </Card>
       );
@@ -392,7 +394,7 @@ export function AllCardsPage() {
           ) : (
             <Card padding="lg" variant="default">
               <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>
-                <p style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-md)' }}>
+                <p style={{ marginBottom: 'var(--spacing-md)' }}>
                   표시할 카드가 없습니다.
                 </p>
               </div>

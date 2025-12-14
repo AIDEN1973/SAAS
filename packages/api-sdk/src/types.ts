@@ -9,10 +9,10 @@ export interface ApiRequest {
   tenant?: string;  // SDK가 자동으로 삽입
   industry?: string;  // SDK가 자동으로 삽입
   authorization?: string;  // SDK가 자동으로 삽입
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success?: boolean;
   data?: T;
   error?: {

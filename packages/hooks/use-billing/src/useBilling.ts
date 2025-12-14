@@ -60,7 +60,7 @@ export function useBillingHistory(studentId?: string) {
       // TODO: 실제 API 엔드포인트로 교체 필요
       // 현재는 invoices 테이블에서 조회한다고 가정
       // RLS 정책에 의해 현재 사용자의 자녀에 대한 청구서만 조회됨
-      const filters: Record<string, any> = {};
+      const filters: Record<string, unknown> = {};
       if (studentId) {
         filters.student_id = studentId;
       }
@@ -116,7 +116,7 @@ export function useProcessPayment() {
       // Edge Function: fns-payment-process 호출
       const response = await apiClient.post<PaymentResult>(
         'functions/v1/fns-payment-process',
-        input
+        input as unknown as Record<string, unknown>
       );
 
       if (response.error) {

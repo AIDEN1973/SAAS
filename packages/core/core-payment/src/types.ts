@@ -20,7 +20,7 @@ export interface Payment {
   status: PaymentStatus;
   paid_at?: string;
   transaction_id?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -29,14 +29,14 @@ export interface CreatePaymentInput {
   invoice_id: string;
   provider: PaymentProvider;
   amount: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface UpdatePaymentInput {
   status?: PaymentStatus;
   paid_at?: string;
   transaction_id?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface PaymentFilter {

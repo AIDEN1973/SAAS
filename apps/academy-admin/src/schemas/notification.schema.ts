@@ -63,7 +63,6 @@ export const notificationFormSchema: FormSchema = {
       },
     ],
     submit: {
-      labelKey: 'NOTIFICATION.FORM.SUBMIT',
       label: '발송',
       variant: 'solid',
       color: 'primary',

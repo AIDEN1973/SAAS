@@ -100,3 +100,6 @@ export type { FormFieldLayoutProps } from './FormFieldLayout';
 
 export { DatePicker } from './DatePicker';
 export type { DatePickerProps } from './DatePicker';
+
+export { Popover } from './Popover';
+export type { PopoverProps } from './Popover';

@@ -9,6 +9,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ErrorBoundary, Container, Card } from '@ui-core/react';
 import { useChildren } from '@hooks/use-parent';
 import { useAttendanceNotifications } from '@hooks/use-attendance';
+import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 
 export function AttendanceNotificationsPage() {
   const [searchParams] = useSearchParams();
@@ -88,7 +89,7 @@ export function AttendanceNotificationsPage() {
                         fontSize: 'var(--font-size-xs)',
                         color: 'var(--color-text-secondary)'
                       }}>
-                        {new Date(notification.created_at).toLocaleString('ko-KR')}
+                        {toKST(notification.created_at).format('YYYY-MM-DD HH:mm')}
                       </p>
                     </div>
                   </div>

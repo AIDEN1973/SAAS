@@ -8,6 +8,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
+import { toKST } from '@lib/date-utils';
 import type {
   CreateClassInput,
   UpdateClassInput,
@@ -20,6 +21,7 @@ import type {
   ClassTeacher,
   AssignTeacherInput,
 } from '@services/class-service';
+import type { Person } from '@core/party';
 
 /**
  * 반 목록 조회 Hook
@@ -35,7 +37,7 @@ export function useClasses(filter?: ClassFilter) {
       if (!tenantId) return [];
 
       const response = await apiClient.get<Class>('academy_classes', {
-        filters: filter || {},
+        filters: (filter || {}) as Record<string, unknown>,
       });
 
       if (response.error) {
@@ -126,7 +128,7 @@ export function useUpdateClass() {
         throw new Error('Tenant ID is required');
       }
 
-      const response = await apiClient.patch<Class>('academy_classes', classId, input);
+      const response = await apiClient.patch<Class>('academy_classes', classId, input as Record<string, unknown>);
 
       if (response.error) {
         throw new Error(response.error.message);
@@ -223,7 +225,10 @@ export function useTeachers(filter?: TeacherFilter) {
       if (!tenantId) return [];
 
       // persons + academy_teachers 조인하여 조회
-      const response = await apiClient.get<any>('persons', {
+      interface PersonWithAcademyTeachers extends Person {
+        academy_teachers?: Array<Record<string, unknown>>;
+      }
+      const response = await apiClient.get<PersonWithAcademyTeachers[]>('persons', {
         select: `
           *,
           academy_teachers (
@@ -248,15 +253,17 @@ export function useTeachers(filter?: TeacherFilter) {
       }
 
       // 데이터 변환 persons + academy_teachers -> Teacher
-      return (response.data || []).map((person: any) => {
-        const teacherData = person.academy_teachers?.[0] || {};
+      const personsData = response.data || [];
+      let teachers: Teacher[] = personsData.map((person) => {
+        const personWithTeachers = person as unknown as Person & { academy_teachers?: Array<Record<string, unknown>> };
+        const teacherData = personWithTeachers.academy_teachers?.[0] || {};
         return {
-          id: person.id,
-          tenant_id: person.tenant_id,
-          name: person.name,
-          email: person.email,
-          phone: person.phone,
-          address: person.address,
+          id: personWithTeachers.id,
+          tenant_id: personWithTeachers.tenant_id,
+          name: personWithTeachers.name,
+          email: personWithTeachers.email,
+          phone: personWithTeachers.phone,
+          address: personWithTeachers.address,
           employee_id: teacherData.employee_id,
           specialization: teacherData.specialization,
           hire_date: teacherData.hire_date,
@@ -264,12 +271,33 @@ export function useTeachers(filter?: TeacherFilter) {
           profile_image_url: teacherData.profile_image_url,
           bio: teacherData.bio,
           notes: teacherData.notes,
-          created_at: person.created_at,
-          updated_at: person.updated_at,
+          created_at: personWithTeachers.created_at,
+          updated_at: personWithTeachers.updated_at,
           created_by: teacherData.created_by,
           updated_by: teacherData.updated_by,
         } as Teacher;
       });
+
+      // 클라이언트 측 필터링 (useStudents Hook과 동일한 패턴)
+      if (filter?.status) {
+        const statusArray = Array.isArray(filter.status) ? filter.status : [filter.status];
+        teachers = teachers.filter((t) => statusArray.includes(t.status));
+      }
+
+      if (filter?.search) {
+        const searchLower = filter.search.toLowerCase();
+        teachers = teachers.filter((t) =>
+          t.name?.toLowerCase().includes(searchLower)
+        );
+      }
+
+      if (filter?.specialization) {
+        teachers = teachers.filter((t) =>
+          t.specialization?.toLowerCase().includes(filter.specialization!.toLowerCase())
+        );
+      }
+
+      return teachers;
     },
     enabled: !!tenantId,
   });
@@ -287,7 +315,10 @@ export function useTeacher(teacherId: string | null) {
     queryFn: async () => {
       if (!tenantId || !teacherId) return null;
 
-      const response = await apiClient.get<any>('persons', {
+      interface PersonWithAcademyTeachers extends Person {
+        academy_teachers?: Array<Record<string, unknown>>;
+      }
+      const response = await apiClient.get<PersonWithAcademyTeachers[]>('persons', {
         select: `
           *,
           academy_teachers (
@@ -315,14 +346,15 @@ export function useTeacher(teacherId: string | null) {
       const person = response.data?.[0];
       if (!person) return null;
 
-      const teacherData = person.academy_teachers?.[0] || {};
+      const personWithTeachers = person as unknown as Person & { academy_teachers?: Array<Record<string, unknown>> };
+      const teacherData = personWithTeachers.academy_teachers?.[0] || {};
       return {
-        id: person.id,
-        tenant_id: person.tenant_id,
-        name: person.name,
-        email: person.email,
-        phone: person.phone,
-        address: person.address,
+        id: personWithTeachers.id,
+        tenant_id: personWithTeachers.tenant_id,
+        name: personWithTeachers.name,
+        email: personWithTeachers.email,
+        phone: personWithTeachers.phone,
+        address: personWithTeachers.address,
         employee_id: teacherData.employee_id,
         specialization: teacherData.specialization,
         hire_date: teacherData.hire_date,
@@ -330,8 +362,8 @@ export function useTeacher(teacherId: string | null) {
         profile_image_url: teacherData.profile_image_url,
         bio: teacherData.bio,
         notes: teacherData.notes,
-        created_at: person.created_at,
-        updated_at: person.updated_at,
+        created_at: personWithTeachers.created_at,
+        updated_at: personWithTeachers.updated_at,
         created_by: teacherData.created_by,
         updated_by: teacherData.updated_by,
       } as Teacher;
@@ -355,7 +387,7 @@ export function useCreateTeacher() {
       }
 
       // 1. persons 테이블에 생성
-      const personResponse = await apiClient.post<any>('persons', {
+      const personResponse = await apiClient.post<Person>('persons', {
         name: input.name,
         email: input.email,
         phone: input.phone,
@@ -370,7 +402,19 @@ export function useCreateTeacher() {
       const person = personResponse.data!;
 
       // 2. academy_teachers 테이블에 확장 정보 추가
-      const teacherResponse = await apiClient.post<any>('academy_teachers', {
+      interface AcademyTeacher {
+        person_id: string;
+        employee_id?: string;
+        specialization?: string;
+        hire_date?: string;
+        status?: string;
+        profile_image_url?: string;
+        bio?: string;
+        notes?: string;
+        created_by?: string;
+        updated_by?: string;
+      }
+      const teacherResponse = await apiClient.post<AcademyTeacher>('academy_teachers', {
         person_id: person.id,
         employee_id: input.employee_id,
         specialization: input.specialization,
@@ -434,7 +478,7 @@ export function useUpdateTeacher() {
       }
 
       // 1. persons 테이블 업데이트
-      const personUpdate: any = {};
+      const personUpdate: Partial<{ name?: string; email?: string; phone?: string; address?: string }> = {};
       if (input.name !== undefined) personUpdate.name = input.name;
       if (input.email !== undefined) personUpdate.email = input.email;
       if (input.phone !== undefined) personUpdate.phone = input.phone;
@@ -448,7 +492,7 @@ export function useUpdateTeacher() {
       }
 
       // 2. academy_teachers 테이블 업데이트
-      const teacherUpdate: any = {};
+      const teacherUpdate: Partial<Teacher> = {};
       if (input.employee_id !== undefined) teacherUpdate.employee_id = input.employee_id;
       if (input.specialization !== undefined) teacherUpdate.specialization = input.specialization;
       if (input.hire_date !== undefined) teacherUpdate.hire_date = input.hire_date;
@@ -468,9 +512,9 @@ export function useUpdateTeacher() {
           throw new Error(teacherResponse.error.message);
         }
 
-        const academyTeacher = teacherResponse.data?.[0];
-        if (academyTeacher) {
-          const updateResponse = await apiClient.patch('academy_teachers', academyTeacher.person_id, teacherUpdate);
+        const academyTeacher = teacherResponse.data?.[0] as { person_id?: string } | undefined;
+        if (academyTeacher && academyTeacher.person_id) {
+          const updateResponse = await apiClient.patch('academy_teachers', academyTeacher.person_id, teacherUpdate as Record<string, unknown>);
           if (updateResponse.error) {
             throw new Error(updateResponse.error.message);
           }
@@ -478,7 +522,10 @@ export function useUpdateTeacher() {
       }
 
       // 3. 업데이트된 데이터 조회하여 반환
-      const teacherResponse = await apiClient.get<any>('persons', {
+      interface PersonWithAcademyTeachers extends Person {
+        academy_teachers?: Array<Record<string, unknown>>;
+      }
+      const teacherResponse = await apiClient.get<PersonWithAcademyTeachers[]>('persons', {
         select: `
           *,
           academy_teachers (
@@ -508,14 +555,15 @@ export function useUpdateTeacher() {
         throw new Error('Teacher not found');
       }
 
-      const teacherData = person.academy_teachers?.[0] || {};
+      const personWithTeachers = person as unknown as Person & { academy_teachers?: Array<Record<string, unknown>> };
+      const teacherData = personWithTeachers.academy_teachers?.[0] || {};
       return {
-        id: person.id,
-        tenant_id: person.tenant_id,
-        name: person.name,
-        email: person.email,
-        phone: person.phone,
-        address: person.address,
+        id: personWithTeachers.id,
+        tenant_id: personWithTeachers.tenant_id,
+        name: personWithTeachers.name,
+        email: personWithTeachers.email,
+        phone: personWithTeachers.phone,
+        address: personWithTeachers.address,
         employee_id: teacherData.employee_id,
         specialization: teacherData.specialization,
         hire_date: teacherData.hire_date,
@@ -523,8 +571,8 @@ export function useUpdateTeacher() {
         profile_image_url: teacherData.profile_image_url,
         bio: teacherData.bio,
         notes: teacherData.notes,
-        created_at: person.created_at,
-        updated_at: person.updated_at,
+        created_at: personWithTeachers.created_at,
+        updated_at: personWithTeachers.updated_at,
         created_by: teacherData.created_by,
         updated_by: teacherData.updated_by,
       } as Teacher;
@@ -562,8 +610,8 @@ export function useDeleteTeacher() {
         throw new Error(teacherResponse.error.message);
       }
 
-      const academyTeacher = teacherResponse.data?.[0];
-      if (!academyTeacher) {
+      const academyTeacher = teacherResponse.data?.[0] as { person_id?: string } | undefined;
+      if (!academyTeacher || !academyTeacher.person_id) {
         throw new Error('Teacher not found');
       }
 
@@ -625,9 +673,10 @@ export function useAssignTeacher() {
         throw new Error('Tenant ID is required');
       }
 
+      // 기술문서 5-2: KST 기준 날짜 처리
       const response = await apiClient.post<ClassTeacher>('class_teachers', {
         ...input,
-        assigned_at: input.assigned_at || new Date().toISOString().split('T')[0],
+        assigned_at: input.assigned_at || toKST().format('YYYY-MM-DD'),
         is_active: true,
       });
 
@@ -674,11 +723,15 @@ export function useUnassignTeacher() {
         throw new Error('Class teacher assignment not found');
       }
 
-      const assignment = findResponse.data[0];
+      const assignment = findResponse.data[0] as { id?: string } | undefined;
+      if (!assignment || !assignment.id) {
+        throw new Error('Assignment not found');
+      }
 
+      // 기술문서 5-2: KST 기준 날짜 처리
       const response = await apiClient.patch('class_teachers', assignment.id, {
         is_active: false,
-        unassigned_at: new Date().toISOString().split('T')[0],
+        unassigned_at: toKST().format('YYYY-MM-DD'),
       });
 
       if (response.error) {

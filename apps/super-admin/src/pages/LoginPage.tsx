@@ -36,9 +36,11 @@ export function LoginPage() {
   const loginWithOTP = useLoginWithOTP();
   const selectTenant = useSelectTenant();
 
-  const handleEmailLogin = async (data: { email: string; password: string }) => {
+  const handleEmailLogin = async (data: Record<string, unknown>) => {
+    const email = typeof data.email === 'string' ? data.email : '';
+    const password = typeof data.password === 'string' ? data.password : '';
     try {
-      const result = await loginWithEmail.mutateAsync({ email: data.email, password: data.password });
+      const result = await loginWithEmail.mutateAsync({ email, password });
 
       if (result.tenants.length === 0) {
         showAlert(
@@ -90,9 +92,10 @@ export function LoginPage() {
     }
   };
 
-  const handleOTPLogin = async (data: { otp: string }) => {
+  const handleOTPLogin = async (data: Record<string, unknown>) => {
+    const otp = typeof data.otp === 'string' ? data.otp : '';
     try {
-      const result = await loginWithOTP.mutateAsync({ phone, otp: data.otp });
+      const result = await loginWithOTP.mutateAsync({ phone, otp });
 
       if (result.tenants.length === 0) {
         showAlert(
@@ -122,22 +125,42 @@ export function LoginPage() {
   };
 
   return (
-    <Container maxWidth="sm" className="flex items-center justify-center min-h-screen py-8">
-      <Card className="w-full p-6 md:p-8">
-        <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">Super Admin 로그인</h1>
+    <Container maxWidth="sm" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', paddingTop: 'var(--spacing-xl)', paddingBottom: 'var(--spacing-xl)' }}>
+      <Card style={{ width: '100%', padding: 'var(--spacing-lg)' }}>
+        <h1 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)', textAlign: 'center' }}>Super Admin 로그인</h1>
 
         {/* 로그인 방법 선택 */}
-        <div className="mb-6 flex gap-2 border-b">
+        <div style={{ marginBottom: 'var(--spacing-md)', display: 'flex', gap: 'var(--spacing-xs)', borderBottom: `var(--border-width-thin) solid var(--color-gray-200)` }}>
           <button
             onClick={() => {
               setLoginMethod('email');
               setOtpSent(false);
             }}
-            className={`flex-1 py-2 px-4 text-center font-medium transition-colors ${
-              loginMethod === 'email'
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
+            style={{
+              flex: 1,
+              paddingTop: 'var(--spacing-xs)',
+              paddingBottom: 'var(--spacing-xs)',
+              paddingLeft: 'var(--spacing-md)',
+              paddingRight: 'var(--spacing-md)',
+              textAlign: 'center',
+              fontWeight: 'var(--font-weight-medium)',
+              transition: 'color var(--transition-base)',
+              borderBottom: loginMethod === 'email' ? `var(--border-width-base) solid var(--color-primary)` : 'var(--border-width-base) solid transparent',
+              color: loginMethod === 'email' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              if (loginMethod !== 'email') {
+                e.currentTarget.style.color = 'var(--color-text-primary)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (loginMethod !== 'email') {
+                e.currentTarget.style.color = 'var(--color-text-secondary)';
+              }
+            }}
           >
             이메일
           </button>
@@ -146,11 +169,31 @@ export function LoginPage() {
               setLoginMethod('oauth');
               setOtpSent(false);
             }}
-            className={`flex-1 py-2 px-4 text-center font-medium transition-colors ${
-              loginMethod === 'oauth'
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
+            style={{
+              flex: 1,
+              paddingTop: 'var(--spacing-xs)',
+              paddingBottom: 'var(--spacing-xs)',
+              paddingLeft: 'var(--spacing-md)',
+              paddingRight: 'var(--spacing-md)',
+              textAlign: 'center',
+              fontWeight: 'var(--font-weight-medium)',
+              transition: 'color var(--transition-base)',
+              borderBottom: loginMethod === 'oauth' ? `var(--border-width-base) solid var(--color-primary)` : 'var(--border-width-base) solid transparent',
+              color: loginMethod === 'oauth' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              if (loginMethod !== 'oauth') {
+                e.currentTarget.style.color = 'var(--color-text-primary)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (loginMethod !== 'oauth') {
+                e.currentTarget.style.color = 'var(--color-text-secondary)';
+              }
+            }}
           >
             소셜 로그인
           </button>
@@ -159,11 +202,31 @@ export function LoginPage() {
               setLoginMethod('otp');
               setOtpSent(false);
             }}
-            className={`flex-1 py-2 px-4 text-center font-medium transition-colors ${
-              loginMethod === 'otp'
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
+            style={{
+              flex: 1,
+              paddingTop: 'var(--spacing-xs)',
+              paddingBottom: 'var(--spacing-xs)',
+              paddingLeft: 'var(--spacing-md)',
+              paddingRight: 'var(--spacing-md)',
+              textAlign: 'center',
+              fontWeight: 'var(--font-weight-medium)',
+              transition: 'color var(--transition-base)',
+              borderBottom: loginMethod === 'otp' ? `var(--border-width-base) solid var(--color-primary)` : 'var(--border-width-base) solid transparent',
+              color: loginMethod === 'otp' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              if (loginMethod !== 'otp') {
+                e.currentTarget.style.color = 'var(--color-text-primary)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (loginMethod !== 'otp') {
+                e.currentTarget.style.color = 'var(--color-text-secondary)';
+              }
+            }}
           >
             전화번호
           </button>
@@ -183,13 +246,39 @@ export function LoginPage() {
 
         {/* 소셜 로그인 */}
         {loginMethod === 'oauth' && (
-          <div className="space-y-3">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
             <button
               onClick={() => handleOAuthLogin('google')}
-              className="w-full py-3 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-3"
+              style={{
+                width: '100%',
+                paddingTop: 'var(--spacing-sm)',
+                paddingBottom: 'var(--spacing-sm)',
+                paddingLeft: 'var(--spacing-md)',
+                paddingRight: 'var(--spacing-md)',
+                border: `var(--border-width-thin) solid var(--color-gray-300)`,
+                borderRadius: 'var(--border-radius-md)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 'var(--spacing-sm)',
+                background: 'var(--color-white)',
+                cursor: loginWithOAuth.isPending ? 'not-allowed' : 'pointer',
+                opacity: loginWithOAuth.isPending ? 'var(--opacity-disabled)' : 'var(--opacity-full)',
+                transition: 'background-color var(--transition-base)',
+              }}
               disabled={loginWithOAuth.isPending}
+              onMouseEnter={(e) => {
+                if (!loginWithOAuth.isPending) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!loginWithOAuth.isPending) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-white)';
+                }
+              }}
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <svg style={{ width: 'var(--font-size-lg)', height: 'var(--font-size-lg)' }} viewBox="0 0 24 24">
                 <path
                   fill="currentColor"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -211,21 +300,47 @@ export function LoginPage() {
             </button>
             <button
               onClick={() => handleOAuthLogin('kakao')}
-              className="w-full py-3 px-4 border border-yellow-300 bg-yellow-400 rounded-lg hover:bg-yellow-500 transition-colors flex items-center justify-center gap-3"
+              style={{
+                width: '100%',
+                paddingTop: 'var(--spacing-sm)',
+                paddingBottom: 'var(--spacing-sm)',
+                paddingLeft: 'var(--spacing-md)',
+                paddingRight: 'var(--spacing-md)',
+                border: `var(--border-width-thin) solid var(--color-yellow-300)`,
+                borderRadius: 'var(--border-radius-md)',
+                background: 'var(--color-yellow-400)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 'var(--spacing-sm)',
+                cursor: loginWithOAuth.isPending ? 'not-allowed' : 'pointer',
+                opacity: loginWithOAuth.isPending ? 'var(--opacity-disabled)' : 'var(--opacity-full)',
+                transition: 'background-color var(--transition-base)',
+              }}
               disabled={loginWithOAuth.isPending}
+              onMouseEnter={(e) => {
+                if (!loginWithOAuth.isPending) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-yellow-500)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!loginWithOAuth.isPending) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-yellow-400)';
+                }
+              }}
             >
-              <span className="text-gray-900 font-medium">카카오로 로그인</span>
+              <span style={{ color: 'var(--color-gray-900)', fontWeight: 'var(--font-weight-medium)' }}>카카오로 로그인</span>
             </button>
           </div>
         )}
 
         {/* 전화번호/OTP 로그인 */}
         {loginMethod === 'otp' && (
-          <div className="space-y-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
             {!otpSent ? (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                     전화번호
                   </label>
                   <input
@@ -233,13 +348,55 @@ export function LoginPage() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="010-1234-5678"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    style={{
+                      width: '100%',
+                      paddingLeft: 'var(--spacing-md)',
+                      paddingRight: 'var(--spacing-md)',
+                      paddingTop: 'var(--spacing-xs)',
+                      paddingBottom: 'var(--spacing-xs)',
+                      border: `var(--border-width-thin) solid var(--color-gray-300)`,
+                      borderRadius: 'var(--border-radius-md)',
+                      fontSize: 'var(--font-size-base)',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.outline = `var(--border-width-base) solid var(--color-primary)`;
+                      e.currentTarget.style.outlineOffset = 'var(--spacing-xxs)';
+                      e.currentTarget.style.borderColor = 'transparent';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.outline = 'none';
+                      e.currentTarget.style.borderColor = 'var(--color-gray-300)';
+                    }}
                   />
                 </div>
                 <button
                   onClick={handleSendOTP}
                   disabled={!phone || sendOTP.isPending}
-                  className="w-full py-3 px-4 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    width: '100%',
+                    paddingTop: 'var(--spacing-sm)',
+                    paddingBottom: 'var(--spacing-sm)',
+                    paddingLeft: 'var(--spacing-md)',
+                    paddingRight: 'var(--spacing-md)',
+                    background: 'var(--color-primary)',
+                    color: 'var(--color-white)',
+                    borderRadius: 'var(--border-radius-md)',
+                    border: 'none',
+                    cursor: (!phone || sendOTP.isPending) ? 'not-allowed' : 'pointer',
+                    opacity: (!phone || sendOTP.isPending) ? 'var(--opacity-disabled)' : 'var(--opacity-full)',
+                    transition: 'background-color var(--transition-base)',
+                    fontWeight: 'var(--font-weight-medium)',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (phone && !sendOTP.isPending) {
+                      e.currentTarget.style.backgroundColor = 'var(--color-primary-dark)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (phone && !sendOTP.isPending) {
+                      e.currentTarget.style.backgroundColor = 'var(--color-primary)';
+                    }
+                  }}
                 >
                   {sendOTP.isPending ? '전송 중...' : '인증번호 전송'}
                 </button>

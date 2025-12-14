@@ -70,7 +70,6 @@ export const teacherRevenueSplitFormSchema: FormSchema = {
       },
     ],
     submit: {
-      labelKey: 'TEACHER_REVENUE_SPLIT.FORM.SUBMIT',
       label: '저장',
       variant: 'solid',
       color: 'primary',

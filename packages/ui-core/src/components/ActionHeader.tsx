@@ -36,7 +36,7 @@ export const ActionHeader: React.FC<ActionHeaderProps> = ({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: 'var(--spacing-md)',
-        borderBottom: '1px solid var(--color-gray-200)',
+        borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
         flexWrap: isMobile ? 'wrap' : 'nowrap',
         gap: 'var(--spacing-sm)',
       }}

@@ -240,6 +240,7 @@ export class TenancyReferralService {
       .from('referral_usages')
       .update({
         reward_applied: true,
+        // 기술문서 19-1-1: 타임스탬프는 UTC로 저장 (DB 저장 규칙)
         reward_applied_at: new Date().toISOString(),
       })
       .eq('id', usageId)

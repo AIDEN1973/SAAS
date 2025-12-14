@@ -33,6 +33,7 @@ export class MeteringService {
         tenant_id: tenantId,
         metric_type: input.metric_type,
         value: input.value,
+        // 기술문서 19-1-1: 타임스탬프는 UTC로 저장 (DB 저장 규칙)
         recorded_at: input.recorded_at || new Date().toISOString(),
       })
       .select()

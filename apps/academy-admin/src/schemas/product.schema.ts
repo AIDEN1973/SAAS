@@ -71,7 +71,6 @@ export const productFormSchema: FormSchema = {
       },
     ],
     submit: {
-      labelKey: 'PRODUCT.FORM.SUBMIT',
       label: '저장',
       variant: 'solid',
       color: 'primary',

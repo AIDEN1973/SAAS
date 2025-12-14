@@ -1,11 +1,14 @@
 /**
- * 실시간 이벤트 트리거 생성
+ * 실시간 트리거 KST 기준 날짜 처리 수정
  *
- * 아키텍처 문서 3.1.3 섹션 참조
- * Zero-Management: 이벤트 발생 시 자동으로 StudentTaskCard 생성
+ * 기술문서 19-1-2: KST 기준 날짜 처리 규칙 적용
+ * 기존 CURRENT_DATE 사용을 timezone('Asia/Seoul', now())::date로 변경
+ *
+ * 이 마이그레이션은 070_create_realtime_triggers.sql에서 생성된 함수들을
+ * KST 기준으로 수정합니다.
  */
 
--- 결석 이벤트 발생 시 StudentTaskCard 생성 트리거
+-- 결석 이벤트 발생 시 StudentTaskCard 생성 트리거 함수 수정
 CREATE OR REPLACE FUNCTION create_absence_task_card()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -75,13 +78,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER attendance_absence_trigger
-AFTER INSERT ON attendance_logs
-FOR EACH ROW
-WHEN (NEW.status = 'absent')
-EXECUTE FUNCTION create_absence_task_card();
-
--- 상담일지 저장 시 StudentTaskCard 생성 트리거
+-- 상담일지 저장 시 StudentTaskCard 생성 트리거 함수 수정
 CREATE OR REPLACE FUNCTION create_counseling_task_card()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -136,58 +133,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER consultation_task_card_trigger
-AFTER INSERT ON student_consultations
-FOR EACH ROW
-EXECUTE FUNCTION create_counseling_task_card();
-
--- 상담일지 저장 시 AI 자동 요약 생성 트리거 (아키텍처 문서 324줄)
-CREATE OR REPLACE FUNCTION create_consultation_ai_summary()
-RETURNS TRIGGER AS $$
-DECLARE
-  summary_text TEXT;
-BEGIN
-  -- 상담일지 내용이 있는 경우에만 AI 요약 생성
-  IF NEW.notes IS NOT NULL AND LENGTH(TRIM(NEW.notes)) > 0 THEN
-    -- TODO: 실제 AI API 호출로 변경 필요
-    -- 현재는 간단한 요약 생성 (실제로는 AI 엔진 호출)
-    -- AI 요약 생성은 별도 Edge Function 또는 외부 서비스로 처리
-
-    -- AI 요약을 ai_insights 테이블에 저장
-    INSERT INTO ai_insights (
-      tenant_id,
-      insight_type,
-      title,
-      summary,
-      insights,
-      action_url,
-      created_at
-    ) VALUES (
-      NEW.tenant_id,
-      'consultation_summary',
-      '상담일지 요약',
-      LEFT(NEW.notes, 200) || '...', -- 임시 요약 (실제로는 AI 생성)
-      jsonb_build_array(
-        '상담 내용을 바탕으로 학생의 학습 방향을 조정할 수 있습니다.',
-        '다음 상담 시점을 확인하세요.'
-      ),
-      '/students/' || NEW.student_id || '/counsel',
-      NOW()
-    )
-    ON CONFLICT DO NOTHING; -- 중복 방지
-  END IF;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE TRIGGER consultation_ai_summary_trigger
-AFTER INSERT OR UPDATE ON student_consultations
-FOR EACH ROW
-WHEN (NEW.notes IS NOT NULL AND LENGTH(TRIM(NEW.notes)) > 0)
-EXECUTE FUNCTION create_consultation_ai_summary();
-
--- 신규 학생 등록 시 StudentTaskCard 생성 트리거
+-- 신규 학생 등록 시 StudentTaskCard 생성 트리거 함수 수정
 CREATE OR REPLACE FUNCTION create_new_signup_task_card()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -238,14 +184,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER new_student_signup_trigger
-AFTER INSERT ON persons
-FOR EACH ROW
-WHEN (NEW.person_type = 'student' AND NEW.status = 'active')
-EXECUTE FUNCTION create_new_signup_task_card();
-
--- 이탈 위험 감지 시 StudentTaskCard 생성 (AI 위험 점수 90 이상)
--- 이 함수는 AI 엔진에서 직접 호출하거나 별도 트리거로 구현
+-- 이탈 위험 감지 시 StudentTaskCard 생성 함수 수정
 CREATE OR REPLACE FUNCTION create_risk_task_card(
   p_tenant_id UUID,
   p_student_id UUID,
@@ -318,4 +257,3 @@ BEGIN
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-

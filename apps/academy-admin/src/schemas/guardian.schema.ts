@@ -91,7 +91,6 @@ export const guardianFormSchema: FormSchema = {
       },
     ],
     submit: {
-      labelKey: 'GUARDIAN.FORM.SUBMIT',
       label: '저장',
       variant: 'solid',
       color: 'primary',

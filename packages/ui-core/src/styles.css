@@ -120,6 +120,82 @@
   --spacing-3xl: 4rem;     /* 64px */
   --spacing-bottom-action-bar: 5rem;  /* 80px - 모바일 하단 액션 바 높이 */
 
+  /* Layout Width Tokens - calc() 대신 사용 */
+  --width-sidebar: 18.75rem;        /* 300px - 스키마 에디터 사이드바 */
+  --width-drawer: 20rem;             /* 320px - Drawer 기본 너비 */
+  --width-drawer-tablet: 31.25rem;   /* 500px - 태블릿 Drawer 너비 */
+  --width-content-max: 43.75rem;    /* 700px - 콘텐츠 최대 너비 */
+  --width-grid-min: 50rem;           /* 800px - 그리드 최소 너비 */
+  --width-student-info-min: 12.5rem; /* 200px - 학생 정보 최소 너비 */
+  --width-grid-column: 6.25rem;       /* 100px - 그리드 컬럼 너비 */
+  --width-button-min: 7.5rem;         /* 120px - 버튼 최소 너비 */
+  --width-card-min: 18.75rem;         /* 300px - 카드 최소 너비 */
+  --width-modal-sm: 25rem;           /* 400px - 모달 작은 크기 */
+  --width-modal-md: 31.25rem;        /* 500px - 모달 중간 크기 */
+  --width-modal-lg: 43.75rem;        /* 700px - 모달 큰 크기 */
+  --width-modal-xl: 56.25rem;        /* 900px - 모달 매우 큰 크기 */
+
+  /* Layout Height Tokens */
+  --height-chart: 12.5rem;           /* 200px - 차트 높이 */
+  --height-input-min: 1.25rem;       /* 20px - 입력 필드 최소 높이 */
+  --height-button-min: 3.75rem;       /* 60px - 버튼 최소 높이 */
+  --height-row-min: 1.875rem;        /* 30px - 행 최소 높이 */
+  --height-header: 7.5rem;            /* 120px - 헤더 높이 */
+  --height-modal-max: 85vh;          /* 모달 최대 높이 (데스크톱) */
+  --height-modal-max-mobile: 90vh;   /* 모달 최대 높이 (모바일) */
+
+  /* Layout Spacing Tokens */
+  --spacing-xxs: 0.125rem;           /* 2px - 매우 작은 간격 */
+
+  /* Tablet Mode Minimum Values - 태블릿 모드 최소값 (아키텍처 문서 3.3.9) */
+  --tablet-spacing-min: 0.5rem;      /* 8px - 태블릿 모드 최소 간격 */
+  --tablet-font-size-text-min: 1rem;  /* 16px - 태블릿 모드 기본 텍스트 최소 */
+  --tablet-font-size-button-min: 1.125rem; /* 18px - 태블릿 모드 버튼 텍스트 최소 */
+  --tablet-font-size-title-min: 1.5rem; /* 24px - 태블릿 모드 제목 최소 */
+
+  /* Grid Layout Tokens */
+  --width-button-grid-min: 7.5rem;    /* 120px - 버튼 그리드 최소 너비 */
+
+  /* Print Layout Tokens */
+  --print-page-margin: 1cm;            /* 인쇄 페이지 여백 */
+
+  /* Opacity Tokens */
+  --opacity-disabled: 0.5;              /* 비활성화 상태 투명도 */
+  --opacity-loading: 0.6;                /* 로딩 상태 투명도 */
+  --opacity-secondary: 0.7;              /* 보조 요소 투명도 */
+  --opacity-full: 1;                     /* 완전 불투명 */
+
+  /* Touch Target Tokens - 접근성 (WCAG 2.1 AAA) */
+  --touch-target-min: 2.75rem;          /* 44px - 터치 타깃 최소 크기 (접근성) */
+
+  /* Component Size Tokens */
+  --size-checkbox: 1.25rem;              /* 20px - 체크박스/라디오 크기 */
+  --size-switch-width: 2.75rem;         /* 44px - 스위치 너비 (접근성) */
+  --size-switch-height: 1.5rem;         /* 24px - 스위치 높이 */
+  --size-switch-thumb: 1.25rem;         /* 20px - 스위치 썸 크기 */
+  --size-switch-thumb-offset: 0.125rem; /* 2px - 스위치 썸 오프셋 */
+  --size-avatar-xs: 1.5rem;             /* 24px - 아바타 작은 크기 */
+  --size-avatar-sm: 2rem;               /* 32px - 아바타 작은-중간 크기 */
+  --size-avatar-md: 2.5rem;             /* 40px - 아바타 중간 크기 */
+  --size-avatar-lg: 3rem;               /* 48px - 아바타 큰 크기 */
+  --size-avatar-xl: 4rem;                /* 64px - 아바타 매우 큰 크기 */
+  --size-tooltip-max-width: 12.5rem;    /* 200px - 툴팁 최대 너비 */
+  --size-spinner-xs: 1rem;              /* 16px - 스피너 작은 크기 */
+  --size-spinner-sm: 1.25rem;           /* 20px - 스피너 작은-중간 크기 */
+  --size-spinner-md: 1.5rem;            /* 24px - 스피너 중간 크기 */
+  --size-spinner-lg: 2rem;              /* 32px - 스피너 큰 크기 */
+  --size-spinner-xl: 2.5rem;            /* 40px - 스피너 매우 큰 크기 */
+  --spacing-form-indent: 1.75rem;       /* 28px - 폼 필드 에러/헬퍼 텍스트 들여쓰기 */
+  --spacing-switch-indent: 3.25rem;     /* 52px - 스위치 에러/헬퍼 텍스트 들여쓰기 */
+
+  /* Transform Tokens */
+  --transform-scale-hover: scale(1.1);   /* 호버 시 확대 */
+  --transform-scale-normal: scale(1);     /* 기본 크기 */
+  --transform-lift-hover: translateY(-0.125rem); /* 호버 시 상승 */
+
+  /* Aspect Ratio Tokens */
+  --aspect-ratio-square: 1;              /* 정사각형 비율 (1:1) */
+
   /* Typography */
   --font-size-xs: 0.75rem;    /* 12px */
   --font-size-sm: 0.875rem;   /* 14px */
@@ -141,6 +217,7 @@
   --border-width-thin: 1px;
   --border-width-base: 2px;
   --border-width-thick: 4px;
+  --border-width-spinner: 3px;          /* 3px - 스피너 전용 border 두께 */
 
   /* Transform Values */
   --transform-lift: translateY(-2px);
@@ -152,6 +229,9 @@
   --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-transform: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-all: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Focus Ring - 접근성 포커스 링 */
+  --focus-ring-width: 0.125rem; /* 2px - 포커스 링 두께 */
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -226,10 +306,20 @@ body {
   min-height: 100vh;
 }
 
-/* Focus Styles (접근성) */
-*:focus-visible {
+/* Focus Styles (접근성) - 폼 필드는 제외하고 버튼, 링크 등에만 적용 */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid var(--color-primary, #2563eb);
   outline-offset: 2px;
+}
+
+/* 폼 필드는 컴포넌트 자체의 포커스 스타일 사용 (전역 outline 제거) */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
 }
 
 /* Reduced Motion (접근성) */

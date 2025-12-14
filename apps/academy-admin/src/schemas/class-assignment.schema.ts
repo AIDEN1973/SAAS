@@ -45,7 +45,6 @@ export const classAssignmentFormSchema: FormSchema = {
       },
     ],
     submit: {
-      labelKey: 'CLASS_ASSIGNMENT.FORM.SUBMIT',
       label: '배정',
       variant: 'solid',
       color: 'primary',

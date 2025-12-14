@@ -14,6 +14,7 @@ import { partyService } from '@core/party/service';
 import { tagsService } from '@core/tags/service';
 import { configService } from '@core/config/service';
 import { notificationService } from '@core/notification/service';
+import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 import type {
   Student,
   Guardian,
@@ -91,25 +92,26 @@ export class AcademyService {
     }
 
     // 데이터 변환: persons + academy_students → Student
-    let students = (data || []).map((person: any) => {
-      const academyData = person.academy_students?.[0] || {};
+    let students = (data || []).map((person) => {
+      const personWithStudents = person as Person & { academy_students?: Array<Record<string, unknown>> };
+      const academyData = personWithStudents.academy_students?.[0] || {};
       return {
-        id: person.id,
-        tenant_id: person.tenant_id,
+        id: personWithStudents.id,
+        tenant_id: personWithStudents.tenant_id,
         industry_type: 'academy', // 고정값
-        name: person.name,
+        name: personWithStudents.name,
         birth_date: academyData.birth_date,
         gender: academyData.gender,
-        phone: person.phone,
-        email: person.email,
-        address: person.address,
+        phone: personWithStudents.phone,
+        email: personWithStudents.email,
+        address: personWithStudents.address,
         school_name: academyData.school_name,
         grade: academyData.grade,
         status: academyData.status || 'active',
         notes: academyData.notes,
         profile_image_url: academyData.profile_image_url,
-        created_at: person.created_at,
-        updated_at: person.updated_at,
+        created_at: personWithStudents.created_at,
+        updated_at: personWithStudents.updated_at,
         created_by: academyData.created_by,
         updated_by: academyData.updated_by,
       } as Student;
@@ -171,7 +173,7 @@ export class AcademyService {
     ).single();
 
     if (error) {
-      if (error.code === 'PGRST116') {
+      if ((error as { code?: string }).code === 'PGRST116') {
         return null; // Not found
       }
       throw new Error(`Failed to fetch student: ${error.message}`);
@@ -330,7 +332,7 @@ export class AcademyService {
     userId?: string
   ): Promise<Student> {
     // 1. persons 테이블 업데이트 (공통 필드)
-    const personUpdate: any = {};
+    const personUpdate: Partial<Person> = {};
     if (input.name !== undefined) personUpdate.name = input.name;
     if (input.email !== undefined) personUpdate.email = input.email;
     if (input.phone !== undefined) personUpdate.phone = input.phone;
@@ -341,7 +343,7 @@ export class AcademyService {
     }
 
     // 2. academy_students 테이블 업데이트 (학원 전용 필드)
-    const academyUpdate: any = {};
+    const academyUpdate: Partial<Student> = {};
     if (input.birth_date !== undefined) academyUpdate.birth_date = input.birth_date;
     if (input.gender !== undefined) academyUpdate.gender = input.gender;
     if (input.school_name !== undefined) academyUpdate.school_name = input.school_name;
@@ -511,18 +513,19 @@ export class AcademyService {
     consultation: Partial<Omit<StudentConsultation, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at' | 'created_by'>>,
     userId?: string
   ): Promise<StudentConsultation> {
-    const { data, error } = await withTenant(
+    const result = await withTenant(
       this.supabase
         .from('student_consultations')
         .update({
           ...consultation,
+          // 기술문서 19-1-1: 타임스탬프는 UTC로 저장 (DB 저장 규칙)
           updated_at: new Date().toISOString(),
         })
         .eq('id', consultationId)
-        .select()
-        .single() as any,
+        .select(),
       tenantId
-    );
+    ).single();
+    const { data, error } = result as { data: StudentConsultation | null; error: Error | null };
 
     if (error) {
       throw new Error(`Failed to update consultation: ${error.message}`);
@@ -599,17 +602,17 @@ export class AcademyService {
     tenantId: string,
     consultationId: string
   ): Promise<StudentConsultation | null> {
-    const { data, error } = await withTenant(
+    const result = await withTenant(
       this.supabase
         .from('student_consultations')
         .select('*')
-        .eq('id', consultationId)
-        .single() as any,
+        .eq('id', consultationId),
       tenantId
-    );
+    ).single();
+    const { data, error } = result as { data: StudentConsultation | null; error: Error | null };
 
     if (error) {
-      if (error.code === 'PGRST116') {
+      if ((error as { code?: string }).code === 'PGRST116') {
         return null; // Not found
       }
       throw new Error(`Failed to fetch consultation: ${error.message}`);
@@ -626,15 +629,15 @@ export class AcademyService {
     guardianId: string,
     guardian: Partial<Omit<Guardian, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>>
   ): Promise<Guardian> {
-    const { data, error } = await withTenant(
+    const result = await withTenant(
       this.supabase
         .from('guardians')
         .update(guardian)
         .eq('id', guardianId)
-        .select()
-        .single() as any,
+        .select(),
       tenantId
-    );
+    ).single();
+    const { data, error } = result as { data: Guardian | null; error: Error | null };
 
     if (error) {
       throw new Error(`Failed to update guardian: ${error.message}`);
@@ -763,7 +766,7 @@ export class AcademyService {
     ).single();
 
     if (error) {
-      if (error.code === 'PGRST116') {
+      if ((error as { code?: string }).code === 'PGRST116') {
         return null; // Not found
       }
       throw new Error(`Failed to fetch class: ${error.message}`);
@@ -833,7 +836,7 @@ export class AcademyService {
     classId: string,
     input: UpdateClassInput
   ): Promise<Class> {
-    const updateData: any = {};
+    const updateData: Partial<Class> = {};
 
     if (input.name !== undefined) updateData.name = input.name;
     if (input.subject !== undefined) updateData.subject = input.subject;
@@ -847,15 +850,15 @@ export class AcademyService {
     if (input.notes !== undefined) updateData.notes = input.notes;
     if (input.status !== undefined) updateData.status = input.status;
 
-    const { data, error } = await withTenant(
+    const result = await withTenant(
       this.supabase
         .from('academy_classes')
         .update(updateData)
         .eq('id', classId)
-        .select()
-        .single() as any,
+        .select(),
       tenantId
-    );
+    ).single();
+    const { data, error } = result as { data: Class | null; error: Error | null };
 
     if (error) {
       throw new Error(`Failed to update class: ${error.message}`);
@@ -989,8 +992,9 @@ export class AcademyService {
     }
 
     // 데이터 변환: persons + academy_teachers → Teacher
-    return (data || []).map((person: any) => {
-      const teacherData = person.academy_teachers?.[0] || {};
+    let teachers = (data || []).map((person) => {
+      const personWithTeachers = person as Person & { academy_teachers?: Array<Record<string, unknown>> };
+      const teacherData = personWithTeachers.academy_teachers?.[0] || {};
       return {
         id: person.id,
         tenant_id: person.tenant_id,
@@ -1011,6 +1015,29 @@ export class AcademyService {
         updated_by: teacherData.updated_by,
       } as Teacher;
     });
+
+    // 상태 필터 (클라이언트 측 필터링, useStudents와 동일한 패턴)
+    if (filter?.status) {
+      const statusArray = Array.isArray(filter.status) ? filter.status : [filter.status];
+      teachers = teachers.filter((t) => statusArray.includes(t.status));
+    }
+
+    // 이름 검색 (이미 쿼리 레벨에서 처리되지만, 추가 검증)
+    if (filter?.search) {
+      const searchLower = filter.search.toLowerCase();
+      teachers = teachers.filter((t) =>
+        t.name?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // 전문 분야 필터
+    if (filter?.specialization) {
+      teachers = teachers.filter((t) =>
+        t.specialization?.toLowerCase().includes(filter.specialization!.toLowerCase())
+      );
+    }
+
+    return teachers;
   }
 
   /**
@@ -1045,7 +1072,7 @@ export class AcademyService {
     ).single();
 
     if (error) {
-      if (error.code === 'PGRST116') {
+      if ((error as { code?: string }).code === 'PGRST116') {
         return null; // Not found
       }
       throw new Error(`Failed to fetch teacher: ${error.message}`);
@@ -1091,10 +1118,12 @@ export class AcademyService {
     });
 
     // 2. academy_teachers 테이블에 장기 정보 추가
+    // [불변 규칙] INSERT 시에는 row object 내에 tenant_id 필드를 직접 포함합니다.
     const { data, error } = await this.supabase
       .from('academy_teachers')
       .insert({
         person_id: person.id,
+        tenant_id: tenantId,
         hire_date: input.hire_date,
         status: input.status || 'active',
         profile_image_url: input.profile_image_url,
@@ -1143,7 +1172,7 @@ export class AcademyService {
     teacherId: string,
     input: UpdateTeacherInput
   ): Promise<Teacher> {
-    const personUpdate: any = {};
+    const personUpdate: Partial<Person> = {};
     if (input.email !== undefined) personUpdate.email = input.email;
     if (input.phone !== undefined) personUpdate.phone = input.phone;
     if (input.address !== undefined) personUpdate.address = input.address;
@@ -1163,7 +1192,7 @@ export class AcademyService {
     }
 
     // 2. academy_teachers 테이블 업데이트
-    const teacherUpdate: any = {};
+    const teacherUpdate: Partial<Teacher> = {};
     if (input.employee_id !== undefined) teacherUpdate.employee_id = input.employee_id;
     if (input.specialization !== undefined) teacherUpdate.specialization = input.specialization;
     if (input.hire_date !== undefined) teacherUpdate.hire_date = input.hire_date;
@@ -1228,7 +1257,8 @@ export class AcademyService {
         class_id: input.class_id,
         teacher_id: input.teacher_id,
         role: input.role,
-        assigned_at: input.assigned_at || new Date().toISOString().split('T')[0],
+        // 기술문서 5-2: KST 기준 날짜 처리
+        assigned_at: input.assigned_at || toKST().format('YYYY-MM-DD'),
         is_active: true,
       })
       .select()
@@ -1254,7 +1284,8 @@ export class AcademyService {
         .from('class_teachers')
         .update({
           is_active: false,
-          unassigned_at: new Date().toISOString().split('T')[0],
+          // 기술문서 5-2: KST 기준 날짜 처리
+          unassigned_at: toKST().format('YYYY-MM-DD'),
         })
         .eq('class_id', classId)
         .eq('teacher_id', teacherId),
@@ -1311,7 +1342,8 @@ export class AcademyService {
         tenant_id: tenantId,
         student_id: studentId,
         class_id: classId,
-        enrolled_at: enrolledAt || new Date().toISOString().split('T')[0],
+        // 기술문서 5-2: KST 기준 날짜 처리
+        enrolled_at: enrolledAt || toKST().format('YYYY-MM-DD'),
         is_active: true,
       })
       .select()
@@ -1363,17 +1395,17 @@ export class AcademyService {
     leftAt?: string
   ): Promise<void> {
     // 1. student_classes에서 제거
-    const { data: assignment, error: findError } = await withTenant(
+    const result = await withTenant(
       this.supabase
         .from('student_classes')
         .select('id')
         .eq('student_id', studentId)
         .eq('class_id', classId)
         .eq('is_active', true)
-        .limit(1)
-        .single() as any,
+        .limit(1),
       tenantId
-    );
+    ).single();
+    const { data: assignment, error: findError } = result as { data: StudentClass | null; error: Error | null };
 
     if (findError || !assignment) {
       throw new Error('Student class assignment not found');
@@ -1384,7 +1416,8 @@ export class AcademyService {
         .from('student_classes')
         .update({
           is_active: false,
-          left_at: leftAt || new Date().toISOString().split('T')[0],
+          // 기술문서 5-2: KST 기준 날짜 처리
+          left_at: leftAt || toKST().format('YYYY-MM-DD'),
         })
         .eq('id', assignment.id),
       tenantId
@@ -1550,13 +1583,8 @@ export class AcademyService {
                 statusText = '미정';
             }
 
-            // [문서 요구사항] KST 기준 날짜 처리
-            const occurredAtKST = new Date(input.occurred_at).toLocaleString('ko-KR', {
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-            });
+            // 기술문서 5-2: KST 기준 날짜 처리
+            const occurredAtKST = toKST(input.occurred_at).format('MM/DD HH:mm');
 
             const message = `[학원알림] ${student.name} 학생이 ${attendanceTypeText}했습니다.\n시간: ${occurredAtKST}\n상태: ${statusText}`;
 

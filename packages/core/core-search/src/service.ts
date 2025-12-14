@@ -109,7 +109,11 @@ export class SearchService {
       return [];
     }
 
-    return (data || []).map((item: any) => ({
+    interface SearchResultItem {
+      id: string;
+      created_at: string;
+    }
+    return (data || []).map((item: SearchResultItem) => ({
       id: item.id,
       entity_type: entityType,
       relevance: 1, // 기본값, Phase 2+에서 실제 관련도 계산

@@ -60,7 +60,6 @@ export const notificationTemplateFormSchema: FormSchema = {
       },
     ],
     submit: {
-      labelKey: 'NOTIFICATION_TEMPLATE.FORM.SUBMIT',
       label: '저장',
       variant: 'solid',
       color: 'primary',

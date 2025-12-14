@@ -1,9 +1,12 @@
 /**
  * useSchemaRegistry Hook
- * 
+ *
  * [불변 규칙] Zero-Trust: 모든 요청은 @api-sdk/core를 통해 전송
  * [불변 규칙] Schema Registry CRUD 작업
- * 
+ *
+ * ⚠️ 예외: meta.schema_registry는 공통 스키마이므로 tenant_id 컬럼이 없습니다.
+ * RPC 함수를 사용하여 접근하므로 createClient() 직접 사용이 필요합니다.
+ *
  * 기술문서: docu/스키마에디터.txt 17. API 명세
  */
 
@@ -52,7 +55,7 @@ export interface UpdateSchemaInput {
 
 /**
  * 스키마 목록 조회
- * 
+ *
  * [불변 규칙] Super Admin만 조회 가능 (RLS 정책)
  */
 export function useSchemaList(filters?: {
@@ -64,7 +67,7 @@ export function useSchemaList(filters?: {
     queryKey: ['schema-registry', 'list', filters],
     queryFn: async () => {
       const supabase = createClient();
-      
+
       // RPC 함수 사용 (meta 스키마 접근)
       // ⚠️ 중요: Supabase RPC는 모든 매개변수를 명시적으로 전달해야 함
       const { data, error } = await supabase.rpc('get_schema_registry_list', {
@@ -72,7 +75,7 @@ export function useSchemaList(filters?: {
         p_industry_type: filters?.industry_type ?? null,
         p_status: filters?.status ?? null,
       });
-      
+
       if (error) {
         // 상세 오류 정보 로깅
         console.error('[Schema Registry] RPC 호출 실패:', {
@@ -85,7 +88,7 @@ export function useSchemaList(filters?: {
         });
         throw new Error(`Failed to fetch schemas: ${error.message}${error.details ? ` (${error.details})` : ''}${error.hint ? ` Hint: ${error.hint}` : ''}`);
       }
-      
+
       return (data || []) as SchemaRegistryEntry[];
     },
     staleTime: 30 * 1000, // 30초
@@ -100,20 +103,20 @@ export function useSchema(id: string) {
     queryKey: ['schema-registry', id],
     queryFn: async () => {
       const supabase = createClient();
-      
+
       // RPC 함수 사용 (meta 스키마 접근)
       const { data, error } = await supabase.rpc('get_schema_registry', {
         p_id: id,
       });
-      
+
       if (error) {
         throw new Error(`Failed to fetch schema: ${error.message}`);
       }
-      
+
       if (!data || data.length === 0) {
         throw new Error('Schema not found');
       }
-      
+
       return data[0] as SchemaRegistryEntry;
     },
     enabled: !!id,
@@ -122,17 +125,17 @@ export function useSchema(id: string) {
 
 /**
  * Draft 스키마 생성
- * 
+ *
  * [불변 규칙] status는 기본적으로 'draft'로 설정
  * [불변 규칙] Super Admin만 생성 가능 (RLS 정책)
  */
 export function useCreateSchema() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (input: CreateSchemaInput) => {
       const supabase = createClient();
-      
+
       // RPC 함수 사용 (meta 스키마 접근)
       const { data, error } = await supabase.rpc('create_schema_registry', {
         p_entity: input.entity,
@@ -143,15 +146,15 @@ export function useCreateSchema() {
         p_schema_json: input.schema_json,
         p_migration_script: input.migration_script || null,
       });
-      
+
       if (error) {
         throw new Error(`Failed to create schema: ${error.message}`);
       }
-      
+
       if (!data || data.length === 0) {
         throw new Error('Failed to create schema: No data returned');
       }
-      
+
       return data[0] as SchemaRegistryEntry;
     },
     onSuccess: () => {
@@ -162,13 +165,13 @@ export function useCreateSchema() {
 
 /**
  * Draft 스키마 수정
- * 
+ *
  * [불변 규칙] draft만 수정 가능 (RLS 정책)
  * [불변 규칙] Optimistic Locking: updated_at 비교
  */
 export function useUpdateSchema() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, input, expectedUpdatedAt }: {
       id: string;
@@ -176,7 +179,7 @@ export function useUpdateSchema() {
       expectedUpdatedAt?: string; // Optimistic Locking용
     }) => {
       const supabase = createClient();
-      
+
       // RPC 함수 사용 (meta 스키마 접근, Optimistic Locking 지원)
       const { data, error } = await supabase.rpc('update_schema_registry', {
         p_id: id,
@@ -186,7 +189,7 @@ export function useUpdateSchema() {
         p_min_client: input.minClient || null,
         p_expected_updated_at: expectedUpdatedAt || null,
       });
-      
+
       if (error) {
         // Optimistic Locking 충돌 또는 기타 오류
         if (error.message?.includes('modified by another user') || error.message?.includes('Schema was modified')) {
@@ -194,11 +197,11 @@ export function useUpdateSchema() {
         }
         throw new Error(`Failed to update schema: ${error.message}`);
       }
-      
+
       if (!data || data.length === 0) {
         throw new Error('Failed to update schema: No data returned');
       }
-      
+
       return data[0] as SchemaRegistryEntry;
     },
     onSuccess: (_, variables) => {
@@ -210,39 +213,39 @@ export function useUpdateSchema() {
 
 /**
  * 스키마 활성화 (Activate)
- * 
+ *
  * [불변 규칙] 기존 active → deprecated, draft → active
  * [불변 규칙] Super Admin만 활성화 가능 (RLS 정책)
  */
 export function useActivateSchema() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: string) => {
       const supabase = createClient();
-      
+
       // RPC 함수 사용 (meta 스키마 접근, 원자적 트랜잭션)
       const { data, error } = await supabase.rpc('activate_schema_registry', {
         p_id: id,
       });
-      
+
       if (error) {
         throw new Error(`Failed to activate schema: ${error.message}`);
       }
-      
+
       if (!data || data.length === 0) {
         throw new Error('Failed to activate schema: No data returned');
       }
-      
+
       // RPC 결과는 일부 필드만 반환하므로, 전체 스키마를 다시 조회
       const { data: fullSchema, error: fetchError } = await supabase.rpc('get_schema_registry', {
         p_id: id,
       });
-      
+
       if (fetchError || !fullSchema || fullSchema.length === 0) {
         throw new Error(`Failed to fetch activated schema: ${fetchError?.message || 'Schema not found'}`);
       }
-      
+
       return fullSchema[0] as SchemaRegistryEntry;
     },
     onSuccess: () => {
@@ -253,21 +256,21 @@ export function useActivateSchema() {
 
 /**
  * Draft 스키마 삭제
- * 
+ *
  * [불변 규칙] draft만 삭제 가능 (RLS 정책)
  */
 export function useDeleteSchema() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: string) => {
       const supabase = createClient();
-      
+
       // RPC 함수 사용 (meta 스키마 접근)
       const { error } = await supabase.rpc('delete_schema_registry', {
         p_id: id,
       });
-      
+
       if (error) {
         throw new Error(`Failed to delete schema: ${error.message}`);
       }

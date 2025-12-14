@@ -70,7 +70,6 @@ export const bulkNotificationFormSchema: FormSchema = {
       },
     ],
     submit: {
-      labelKey: 'BULK_NOTIFICATION.FORM.SUBMIT',
       label: '발송',
       variant: 'solid',
       color: 'primary',
