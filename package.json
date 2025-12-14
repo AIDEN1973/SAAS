@@ -12,7 +12,8 @@
     "packages/ui-core",
     "packages/schema-engine",
     "packages/api-sdk",
-    "packages/widgets"
+    "packages/widgets",
+    "packages/env-registry"
   ],
   "scripts": {
     "dev": "turbo run dev",

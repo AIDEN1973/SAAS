@@ -1,5 +1,5 @@
 import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js';
-import { envServer } from '@env-registry/server';
+import { envServer } from '@env-registry/core/server';
 
 /**
  * 서버/Edge 용 Supabase 클라이언트 생성
