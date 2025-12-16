@@ -97,7 +97,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         style={{
           padding: 'var(--spacing-xs) var(--spacing-sm)',
           borderRadius: 'var(--border-radius-xl)',
-          border: 'var(--border-width-thin) solid var(--color-gray-300)',
+          border: 'var(--border-width-thin) solid var(--color-text)', // 기본 색상 테두리 적용
           backgroundColor: 'var(--color-white)',
           color: isFirstPage ? 'var(--color-gray-500)' : 'var(--color-text)',
           fontSize: 'var(--font-size-sm)',
@@ -153,7 +153,7 @@ export const Pagination: React.FC<PaginationProps> = ({
               width: 'var(--size-pagination-button)',
               height: 'var(--size-pagination-button)',
               borderRadius: 'var(--border-radius-full)',
-              border: isActive ? 'none' : 'var(--border-width-thin) solid var(--color-gray-300)',
+              border: isActive ? 'none' : 'var(--border-width-thin) solid var(--color-text)', // 활성화된 버튼은 테두리 제거, 비활성화 버튼은 기본 색상 테두리 적용
               backgroundColor: isActive ? 'var(--color-primary)' : 'var(--color-white)',
               color: isActive ? 'var(--color-white)' : 'var(--color-text)',
               fontSize: 'var(--font-size-sm)',
@@ -188,7 +188,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         style={{
           padding: 'var(--spacing-xs) var(--spacing-sm)',
           borderRadius: 'var(--border-radius-xl)',
-          border: 'var(--border-width-thin) solid var(--color-gray-300)',
+          border: 'var(--border-width-thin) solid var(--color-text)', // 기본 색상 테두리 적용
           backgroundColor: 'var(--color-white)',
           color: isLastPage ? 'var(--color-gray-500)' : 'var(--color-text)',
           fontSize: 'var(--font-size-sm)',

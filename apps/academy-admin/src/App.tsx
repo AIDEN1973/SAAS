@@ -4,7 +4,7 @@ import { AppLayout, Button, useModal, useTheme } from '@ui-core/react';
 import type { SidebarItem } from '@ui-core/react';
 import { StudentsHomePage } from './pages/StudentsHomePage';
 import { StudentsListPage } from './pages/StudentsListPage';
-import { StudentDetailPage } from './pages/StudentDetailPage';
+// StudentDetailPage는 StudentsPage의 레이어 메뉴로 통합됨
 import { ClassesPage } from './pages/ClassesPage';
 import { TeachersPage } from './pages/TeachersPage';
 import { AttendancePage } from './pages/AttendancePage';
@@ -170,52 +170,50 @@ function AppContent() {
     const advancedMenuItems: SidebarItem[] = [
       {
         id: 'advanced',
-        label: '고급메뉴',
+        label: '더보기',
         isAdvanced: true,
         icon: (
-          <svg fill="none" viewBox="0 0 24 24">
-            <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 5H3"/>
+            <path d="M15 12H3"/>
+            <path d="M17 19H3"/>
           </svg>
         ),
         children: [
           {
             id: 'classes-advanced',
-            label: '클래스',
+            label: '수업관리',
             path: '/classes',
             icon: (
-              <svg fill="none" viewBox="0 0 24 24">
-                <path d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 .83.18 2 2 0 0 0 .83-.18l8.58-3.9a1 1 0 0 0 0-1.831z"/>
+                <path d="M16 17h6"/>
+                <path d="M19 14v6"/>
+                <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 .825.178"/>
+                <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l2.116-.962"/>
               </svg>
             ),
           },
           {
             id: 'teachers-advanced',
-            label: '강사',
+            label: '강사관리',
             path: '/teachers',
             icon: (
-              <svg fill="none" viewBox="0 0 24 24">
-                <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M13 21h8"/>
+                <path d="m15 5 4 4"/>
+                <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>
               </svg>
             ),
           },
           {
             id: 'billing-advanced',
-            label: '수납',
+            label: '수납관리',
             path: '/billing/home',
             icon: (
-              <svg fill="none" viewBox="0 0 24 24">
-                <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            ),
-          },
-          {
-            id: 'notifications-advanced',
-            label: '문자',
-            path: '/notifications',
-            icon: (
-              <svg fill="none" viewBox="0 0 24 24">
-                <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="20" height="14" x="2" y="5" rx="2"/>
+                <line x1="2" x2="22" y1="10" y2="10"/>
               </svg>
             ),
           },
@@ -227,38 +225,53 @@ function AppContent() {
     const coreMenuItems: SidebarItem[] = [
       {
         id: 'home',
-        label: '홈',
+        label: '대시보드',
         path: '/home',
         icon: (
-          <svg fill="none" viewBox="0 0 24 24">
-            <path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"/>
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/>
+            <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
           </svg>
         ),
       },
       {
         id: 'students',
-        label: '학생',
+        label: '학생관리',
         path: '/students/home',
         icon: (
-          <svg fill="none" viewBox="0 0 24 24">
-            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+            <line x1="9" x2="9.01" y1="9" y2="9"/>
+            <line x1="15" x2="15.01" y1="9" y2="9"/>
           </svg>
         ),
       },
       {
         id: 'attendance',
-        label: '출결',
+        label: '출결관리',
         path: '/attendance',
         icon: (
-          <svg fill="none" viewBox="0 0 24 24">
-            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21.801 10A10 10 0 1 1 17 3.335"/>
+            <path d="m9 11 3 3L22 4"/>
+          </svg>
+        ),
+      },
+      {
+        id: 'notifications',
+        label: '문자발송',
+        path: '/notifications',
+        icon: (
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/>
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
           </svg>
         ),
       },
       {
         id: 'analytics',
-        label: '통계',
+        label: '통계분석',
         path: '/analytics',
         icon: (
           <svg fill="none" viewBox="0 0 24 24">
@@ -270,7 +283,7 @@ function AppContent() {
       },
       {
         id: 'ai',
-        label: '분석',
+        label: '인공지능',
         path: '/ai',
         icon: (
           <svg fill="none" viewBox="0 0 24 24">
@@ -301,11 +314,11 @@ function AppContent() {
     // Staff: 핵심 메뉴 + Advanced 메뉴 (메시지/공지 포함)
     if (role === 'staff') {
       return [
-        ...coreMenuItems.filter(item => ['home', 'students', 'attendance'].includes(item.id)),
+        ...coreMenuItems.filter(item => ['home', 'students', 'attendance', 'notifications'].includes(item.id)),
         ...advancedMenuItems.filter(item => item.id === 'advanced').map(item => ({
           ...item,
           children: item.children?.filter(child =>
-            ['classes-advanced', 'teachers-advanced', 'notifications-advanced'].includes(child.id)
+            ['classes-advanced', 'teachers-advanced'].includes(child.id)
           ),
         })),
       ];
@@ -413,11 +426,12 @@ function AppContent() {
                 <Route path="/students/tasks" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><StudentTasksPage /></RoleBasedRoute>} />
                 <Route path="/students/list" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><StudentsListPage /></RoleBasedRoute>} />
                 <Route path="/students" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><StudentsHomePage /></RoleBasedRoute>} />
-                <Route path="/students/:id" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><StudentDetailPage /></RoleBasedRoute>} />
-                <Route path="/students/:id/counsel" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'counselor', 'staff', 'manager', 'super_admin']}><StudentDetailPage /></RoleBasedRoute>} />
-                <Route path="/students/:id/attendance" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><StudentDetailPage /></RoleBasedRoute>} />
-                <Route path="/students/:id/risk" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'counselor', 'staff', 'manager', 'super_admin']}><StudentDetailPage /></RoleBasedRoute>} />
-                <Route path="/students/:id/welcome" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'staff', 'manager', 'super_admin']}><StudentDetailPage /></RoleBasedRoute>} />
+                {/* StudentDetailPage는 레이어 메뉴로 통합됨 - URL은 StudentsPage로 리다이렉트 */}
+                <Route path="/students/:id" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><StudentsListPage /></RoleBasedRoute>} />
+                <Route path="/students/:id/counsel" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'counselor', 'staff', 'manager', 'super_admin']}><StudentsListPage /></RoleBasedRoute>} />
+                <Route path="/students/:id/attendance" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><StudentsListPage /></RoleBasedRoute>} />
+                <Route path="/students/:id/risk" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'counselor', 'staff', 'manager', 'super_admin']}><StudentsListPage /></RoleBasedRoute>} />
+                <Route path="/students/:id/welcome" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'staff', 'manager', 'super_admin']}><StudentsListPage /></RoleBasedRoute>} />
                 <Route path="/classes" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'staff', 'manager', 'super_admin']}><ClassesPage /></RoleBasedRoute>} />
                 <Route path="/teachers" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'staff', 'manager', 'super_admin']}><TeachersPage /></RoleBasedRoute>} />
                 <Route path="/attendance" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><AttendancePage /></RoleBasedRoute>} />

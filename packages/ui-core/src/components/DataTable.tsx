@@ -189,6 +189,8 @@ export function DataTable<T = unknown>({
           const isExpanded = expandedRows.has(key);
           const visibleColumns = isExpanded ? columns : columns.slice(0, 2);
           const hasMoreColumns = columns.length > 2;
+          const isLastRow = index === paginatedData.length - 1;
+          const isFirstRow = index === 0;
 
           const handleRowClick = () => {
             if (hasMoreColumns) {
@@ -217,7 +219,7 @@ export function DataTable<T = unknown>({
                 flexDirection: 'column',
                 backgroundColor: 'var(--color-white)',
                 borderTop: index === 0 ? 'var(--border-width-thin) solid var(--color-text)' : 'none',
-                borderBottom: 'var(--border-width-thin) solid var(--color-text)',
+                borderBottom: isLastRow ? 'none' : 'var(--border-width-thin) solid var(--color-text)', // 마지막 행은 하단 구분선 제거
                 borderLeft: 'none',
                 borderRight: 'none',
                 cursor: hasMoreColumns || onRowClick ? 'pointer' : 'default',
@@ -258,7 +260,7 @@ export function DataTable<T = unknown>({
                         {/* 컬럼 헤더 (1열) */}
                         <div
                           style={{
-                            fontWeight: 'var(--font-weight-semibold)',
+                            fontWeight: 'var(--font-weight-normal)', // styles.css 준수: 노말 웨이트 적용
                             fontSize: 'var(--font-size-base)',
                             color: 'var(--color-text-secondary)',
                             textTransform: 'uppercase',
@@ -288,17 +290,20 @@ export function DataTable<T = unknown>({
                             fontSize: 'var(--font-size-base)',
                             textAlign: column.align || 'left',
                             lineHeight: 'var(--line-height-tight)',
+                            fontWeight: column.key === 'name' ? 'var(--font-weight-bold)' : 'var(--font-weight-normal)', // styles.css 준수: 이름 열만 볼드 처리
                           }}
                         >
                           {column.render ? column.render(value, row) : String(value ?? '')}
                         </div>
                       </div>
-                      {/* 행간 테두리 (좌우 여백 없이 100% 출력) */}
+                      {/* 행간 테두리 (항목명의 좌우 여백과 동일하게 적용) */}
                       {colIndex < visibleColumns.length - 1 && (
                         <div
                           style={{
-                            width: '100%',
+                            width: 'calc(100% - var(--spacing-md) * 2)', // 좌우 여백을 제외한 너비
                             height: 0,
+                            marginLeft: 'var(--spacing-md)', // 항목명의 좌측 여백과 동일
+                            marginRight: 'var(--spacing-md)', // 항목명의 우측 여백과 동일
                             borderBottom: 'var(--border-width-thin) solid var(--color-table-row-border)',
                           }}
                         />
@@ -322,15 +327,15 @@ export function DataTable<T = unknown>({
         overflowX: 'auto',
         borderTop: 'var(--border-width-thin) solid var(--color-text)', // styles.css 준수: 상단 테두리 (기본 폰트 색상)
         borderBottom: 'var(--border-width-thin) solid var(--color-text)', // styles.css 준수: 하단 테두리 (기본 폰트 색상)
-        borderLeft: 'none', // 좌측 테두리 제거
-        borderRight: 'none', // 우측 테두리 제거
+        borderLeft: 'var(--border-width-thin) solid var(--color-text)', // styles.css 준수: 좌측 테두리
+        borderRight: 'var(--border-width-thin) solid var(--color-text)', // styles.css 준수: 우측 테두리
         backgroundColor: 'var(--color-white)',
         boxShadow: 'var(--shadow-sm)',
         overflow: 'hidden',
         borderTopLeftRadius: 'var(--border-radius-sm)', // styles.css 준수: 헤더 상단 좌측 라운드
         borderTopRightRadius: 'var(--border-radius-sm)', // styles.css 준수: 헤더 상단 우측 라운드
-        borderBottomLeftRadius: 0, // 하단 좌측 라운드 제거
-        borderBottomRightRadius: 0, // 하단 우측 라운드 제거
+        borderBottomLeftRadius: 'var(--border-radius-sm)', // styles.css 준수: 하단 좌측 라운드
+        borderBottomRightRadius: 'var(--border-radius-sm)', // styles.css 준수: 하단 우측 라운드
       }}
     >
       <table
@@ -524,48 +529,75 @@ export function DataTable<T = unknown>({
             paginatedData.map((row, index) => {
               const key = keyExtractor ? keyExtractor(row) : index;
               const isLastRow = index === paginatedData.length - 1;
+              const isFirstRow = index === 0;
               return (
-                <tr
-                  key={key}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  style={{
-                    cursor: onRowClick ? 'pointer' : 'default',
-                    transition: 'var(--transition-all)',
-                    backgroundColor: 'var(--color-white)',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (onRowClick) {
-                      e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--color-white)';
-                  }}
-                >
-                  {columns.map((column, colIndex) => {
-                    const value = (row as Record<string, unknown>)[column.key];
-                    return (
+                <React.Fragment key={key}>
+                  <tr
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    style={{
+                      cursor: onRowClick ? 'pointer' : 'default',
+                      transition: 'var(--transition-all)',
+                      backgroundColor: 'var(--color-white)',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (onRowClick) {
+                        e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--color-white)';
+                    }}
+                  >
+                    {columns.map((column, colIndex) => {
+                      const value = (row as Record<string, unknown>)[column.key];
+                      return (
+                        <td
+                          key={column.key}
+                          style={{
+                            padding: 'var(--spacing-md) var(--spacing-md)', // styles.css 준수: 행 높이 최소화
+                            textAlign: column.align || 'center',
+                            color: 'var(--color-text)',
+                            fontSize: 'var(--font-size-base)', // styles.css 준수: 기본 폰트 사이즈 적용
+                            fontWeight: column.key === 'name' ? 'var(--font-weight-bold)' : 'var(--font-weight-normal)', // styles.css 준수: 이름 열만 볼드 처리
+                            borderBottom: 'none', // 행간 구분선은 별도 tr로 처리
+                            ...(colIndex === 0 && {
+                              paddingLeft: 'var(--spacing-lg)',
+                            }),
+                            ...(colIndex === columns.length - 1 && {
+                              paddingRight: 'var(--spacing-lg)',
+                            }),
+                          }}
+                        >
+                          {column.render ? column.render(value, row) : String(value ?? '')}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  {/* 행간 구분선 (좌우 여백 포함, 마지막 행 제외) */}
+                  {!isLastRow && (
+                    <tr>
                       <td
-                        key={column.key}
+                        colSpan={columns.length}
                         style={{
-                          padding: 'var(--spacing-md) var(--spacing-md)', // styles.css 준수: 행 높이 최소화
-                          textAlign: column.align || 'center',
-                          color: 'var(--color-text)',
-                          fontSize: 'var(--font-size-base)', // styles.css 준수: 기본 폰트 사이즈 적용
-                          borderBottom: isLastRow ? 'none' : 'var(--border-width-thin) solid var(--color-table-row-border)', // styles.css 준수: 마지막 행은 테두리 제거
-                          ...(colIndex === 0 && {
-                            paddingLeft: 'var(--spacing-lg)',
-                          }),
-                          ...(colIndex === columns.length - 1 && {
-                            paddingRight: 'var(--spacing-lg)',
-                          }),
+                          padding: 0,
+                          height: 0,
+                          position: 'relative',
                         }}
                       >
-                        {column.render ? column.render(value, row) : String(value ?? '')}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: 'var(--spacing-lg)',
+                            right: 'var(--spacing-lg)',
+                            bottom: 0,
+                            height: 0,
+                            borderBottom: 'var(--border-width-thin) solid var(--color-table-row-border)',
+                          }}
+                        />
                       </td>
-                    );
-                  })}
-                </tr>
+                    </tr>
+                  )}
+                </React.Fragment>
               );
             })
           )}

@@ -24,6 +24,8 @@ export interface SchemaTableProps {
   apiCall?: (endpoint: string, method: string, body?: unknown) => Promise<unknown>;
   // SDUI v1.1: 필터 파라미터 (선택적)
   filters?: Record<string, unknown>;
+  // 행 클릭 핸들러 (선택적, schema.actions보다 우선순위 높음)
+  onRowClick?: (row: Record<string, unknown>) => void;
 }
 
 /**
@@ -39,6 +41,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   translations = {},
   apiCall,
   filters,
+  onRowClick,
 }) => {
   const { dataSource, columns, rowActions, rowActionHandlers, pagination: paginationConfig } = schema.table;
 
@@ -162,6 +165,12 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
 
   // SDUI v1.1: 행 클릭 핸들러
   const handleRowClick = React.useCallback(async (row: Record<string, unknown>) => {
+    // onRowClick prop이 있으면 우선 사용
+    if (onRowClick) {
+      onRowClick(row);
+      return;
+    }
+    // schema.actions가 있으면 Action Engine 실행
     if (schema.actions && schema.actions.length > 0) {
       const fullContext: ActionContext = {
         selectedRows: [row],
@@ -170,7 +179,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
       };
       await executeActionsForEvent('onRowClick', schema.actions, fullContext);
     }
-  }, [schema.actions, actionContext, translations]);
+  }, [onRowClick, schema.actions, actionContext, translations]);
 
   // 페이지 변경 핸들러 (React Hooks 규칙 준수: 조건부 return 이전에 호출)
   const handlePageChange = React.useCallback((page: number) => {
@@ -207,7 +216,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
         data={paginatedData}
         columns={dataTableColumns}
         keyExtractor={(row: Record<string, unknown>) => (row.id as string) || (row[columns[0]?.key] as string)}
-        onRowClick={rowActions && rowActions.length > 0 ? handleRowClick : undefined}
+        onRowClick={(onRowClick || (rowActions && rowActions.length > 0)) ? handleRowClick : undefined}
         emptyMessage="데이터가 없습니다."
         pagination={undefined}
         itemsPerPage={itemsPerPage}

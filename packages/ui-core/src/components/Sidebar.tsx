@@ -68,10 +68,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       const value = getComputedStyle(document.documentElement)
         .getPropertyValue('--stroke-width-icon-bold-sidebar')
         .trim();
-      // 굵은 선 굵기 사용 (3)
-      return value ? Number(value) : 3;
+      // 굵은 선 굵기 사용 (2 - 기본값과 동일)
+      return value ? Number(value) : 2;
     }
-    return 3;
+    return 2;
   }, []);
 
   // CSS 변수에서 icon size 읽기 (사이드바 아이콘 크기)
@@ -185,16 +185,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // 헤더 로고 좌측 여백 = 헤더 paddingLeft (모바일: var(--spacing-lg), 태블릿 이상: var(--spacing-xl))
     // 사이드바 메뉴 좌측 여백 = nav paddingLeft + 메뉴 아이템 paddingLeft
     // 따라서 메뉴 아이템 paddingLeft는 0으로 설정하여 nav paddingLeft만 사용 (헤더 로고와 동일한 좌측 여백)
-    const paddingLeft = collapsed
-      ? 0 // 축소 시 paddingLeft 제거
-      : level > 0 ? `calc(${level} * var(--spacing-md))` : 0; // 레벨별 들여쓰기만 적용 (기본 paddingLeft 제거하여 헤더 로고와 좌측 여백 일치)
     const isExpanded = expandedItems.has(item.id);
     const hasChildren = item.children && item.children.length > 0;
     const isAdvanced = item.isAdvanced;
     const isHovered = hoveredItemId === item.id;
+    // Advanced 메뉴의 하위 메뉴는 들여쓰기 제거
+    const paddingLeft = collapsed
+      ? 0 // 축소 시 paddingLeft 제거
+      : (isAdvanced && level > 0) ? 0 : (level > 0 ? `calc(${level} * var(--spacing-md))` : 0); // 레벨별 들여쓰기만 적용 (기본 paddingLeft 제거하여 헤더 로고와 좌측 여백 일치), Advanced 메뉴 하위는 들여쓰기 제거
 
     return (
-      <div key={item.id} style={{ marginTop: 'var(--spacing-negative-xs)', marginBottom: 'var(--spacing-negative-xs)' }}>
+      <div key={item.id}>
         <button
           onClick={() => handleItemClick(item)}
           onMouseEnter={() => setHoveredItemId(item.id)}
@@ -212,7 +213,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               : 'var(--spacing-sm)', // 아이콘과 메뉴명 사이 간격 줄이기 (8px)
             backgroundColor: 'transparent', // 배경 효과 제거
             color: 'var(--color-text)', // 기본 텍스트 색상 사용
-            fontWeight: isActive ? 'var(--font-weight-extrabold)' : 'var(--font-weight-medium)', // 선택된 메뉴: 엑스트라 볼드
+            fontWeight: (isActive || (isAdvanced && isExpanded)) ? 'var(--font-weight-extrabold)' : 'var(--font-weight-medium)', // 선택된 메뉴 또는 Advanced 메뉴 펼침 시: 엑스트라 볼드
             fontSize: 'var(--font-size-base)',
             border: 'none',
             cursor: 'pointer',
@@ -221,8 +222,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
           }}
         >
-          {/* 펼치기/접기 아이콘 (Advanced 메뉴 또는 children이 있는 경우, 축소 시 숨김) */}
-          {!collapsed && (isAdvanced || hasChildren) && (
+          {/* 펼치기/접기 아이콘 (children이 있는 경우만 표시, Advanced 메뉴는 제외, 축소 시 숨김) */}
+          {!collapsed && !isAdvanced && hasChildren && (
             <span
               style={{
                 flexShrink: 0,
@@ -254,9 +255,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
             >
               {(() => {
-                const currentStrokeWidth = (isActive || isHovered) ? strokeWidthBold : strokeWidth;
-                const currentStroke = (isActive || isHovered)
-                  ? 'var(--color-primary)' // 롤오버/선택 시 인더스트리 테마 primary 색상
+                const currentStrokeWidth = (isActive || isHovered || (isAdvanced && isExpanded)) ? strokeWidthBold : strokeWidth;
+                const currentStroke = (isActive || isHovered || (isAdvanced && isExpanded))
+                  ? 'var(--color-primary)' // 롤오버/선택 시 또는 Advanced 메뉴 펼침 시 인더스트리 테마 primary 색상
                   : 'var(--color-text)'; // 기본 상태: 기본 텍스트 색상
 
                 // SVG 요소 복제 (strokeWidth는 SVG 자체에는 적용되지 않으므로 제거)
@@ -304,10 +305,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
           {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
         </button>
-        {/* 하위 메뉴 렌더링 (펼쳐진 경우만, 축소 시 숨김) */}
-        {!collapsed && hasChildren && isExpanded && (
-          <div style={{ marginLeft: 'var(--spacing-md)', marginTop: 'var(--spacing-xs)' }}>
-            {item.children!.map((child) => renderItem(child, level + 1))}
+        {/* 하위 메뉴 렌더링 (펼쳐진 경우만, Advanced 메뉴는 축소 상태에서도 표시) */}
+        {hasChildren && isExpanded && (!collapsed || isAdvanced) && (
+          <div style={{ marginLeft: isAdvanced ? 0 : 'var(--spacing-md)', marginTop: 'var(--spacing-xs)' }}>
+            {item.children!.map((child) => renderItem(child, isAdvanced ? level : level + 1))}
           </div>
         )}
       </div>
@@ -346,7 +347,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: 0, // 메뉴명 행간 간격 제거
+          gap: 'calc(var(--spacing-sm) + var(--spacing-negative-xxs))', // 메뉴명 행간 간격 (8px - 2px = 6px)
         }}
       >
         {items.map((item) => renderItem(item))}

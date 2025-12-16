@@ -109,3 +109,9 @@ export type { DatePickerProps } from './DatePicker';
 
 export { Popover } from './Popover';
 export type { PopoverProps } from './Popover';
+
+export { RightLayerMenu } from './RightLayerMenu';
+export type { RightLayerMenuProps } from './RightLayerMenu';
+
+export { RightLayerMenuLayout } from './RightLayerMenuLayout';
+export type { RightLayerMenuLayoutProps } from './RightLayerMenuLayout';
