@@ -230,7 +230,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
       <FormFieldLayout colSpan={colSpan}>
         <Input
           type={inputType}
-          label={label}
+          label={placeholder ? undefined : label}
           placeholder={placeholder}
           error={error}
           disabled={isDisabled}
@@ -247,7 +247,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
       <FormFieldLayout colSpan={colSpan}>
         <Input
           type="number"
-          label={label}
+          label={placeholder ? undefined : label}
           placeholder={placeholder}
           error={error}
           disabled={isDisabled}
@@ -263,7 +263,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
     return (
       <FormFieldLayout colSpan={colSpan}>
         <Textarea
-          label={label}
+          label={placeholder ? undefined : label}
           placeholder={placeholder}
           error={error}
           disabled={isDisabled}
@@ -284,7 +284,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
           rules={finalRules as any}
           render={({ field: f }) => (
             <Select
-              label={label}
+              label={placeholder || label}
               error={error}
               disabled={isDisabled}
               fullWidth

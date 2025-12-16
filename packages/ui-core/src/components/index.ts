@@ -80,6 +80,9 @@ export type { TooltipProps } from './Tooltip';
 export { Pagination } from './Pagination';
 export type { PaginationProps } from './Pagination';
 
+export { IconButtonGroup } from './IconButtonGroup';
+export type { IconButtonGroupProps, IconButtonItem } from './IconButtonGroup';
+
 export { Tabs } from './Tabs';
 export type { TabsProps, TabItem } from './Tabs';
 
@@ -94,6 +97,9 @@ export type { SkeletonProps } from './Skeleton';
 
 export { ActionHeader } from './ActionHeader';
 export type { ActionHeaderProps } from './ActionHeader';
+
+export { PageHeader } from './PageHeader';
+export type { PageHeaderProps } from './PageHeader';
 
 export { FormFieldLayout } from './FormFieldLayout';
 export type { FormFieldLayoutProps } from './FormFieldLayout';

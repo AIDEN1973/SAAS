@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { DataTable, type DataTableColumn } from '@ui-core/react';
+import { DataTable, type DataTableColumn, Pagination } from '@ui-core/react';
 import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 import type { TableSchema } from '../types';
 import { executeActionsForEvent, executeAction, type ActionContext } from '../core/actionEngine';
@@ -40,7 +40,16 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   apiCall,
   filters,
 }) => {
-  const { dataSource, columns, rowActions, rowActionHandlers } = schema.table;
+  const { dataSource, columns, rowActions, rowActionHandlers, pagination: paginationConfig } = schema.table;
+
+  // 페이지네이션 상태 관리
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = paginationConfig?.defaultPageSize || paginationConfig?.pageSize || 10;
+
+  // 필터 변경 시 첫 페이지로 리셋
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
 
   // SDUI v1.1: API 데이터 소스 로드
   const { data, isLoading, error } = useQuery({
@@ -79,7 +88,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
         ? (translations[col.labelKey] || col.labelKey)
         : (col.label || col.key),
       width: col.width !== undefined ? (typeof col.width === 'number' ? String(col.width) : col.width) : undefined,
-      align: (col.type === 'number' ? 'right' : 'left') as 'left' | 'right' | 'center',
+      align: 'center' as 'left' | 'right' | 'center',
       render: (_value: unknown, _row: unknown) => {
         // 타입별 렌더링
         switch (col.type) {
@@ -163,6 +172,27 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
     }
   }, [schema.actions, actionContext, translations]);
 
+  // 페이지 변경 핸들러 (React Hooks 규칙 준수: 조건부 return 이전에 호출)
+  const handlePageChange = React.useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
+
+  // 페이지네이션 계산 (React Hooks 규칙 준수: 조건부 return 이전에 계산)
+  const allData = React.useMemo(() => (data || []) as Record<string, unknown>[], [data]);
+  const totalPages = React.useMemo(() => {
+    if (!paginationConfig) return 1;
+    const pages = Math.ceil(allData.length / itemsPerPage);
+    return pages > 0 ? pages : 1; // 최소 1페이지는 보장
+  }, [allData.length, itemsPerPage, paginationConfig]);
+
+  // 페이지네이션 적용된 데이터 계산
+  const paginatedData = React.useMemo(() => {
+    if (!paginationConfig) return allData;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return allData.slice(startIndex, endIndex);
+  }, [allData, currentPage, itemsPerPage, paginationConfig]);
+
   if (isLoading) {
     return <div className={className}>로딩 중...</div>;
   }
@@ -174,13 +204,32 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   return (
     <div className={className}>
       <DataTable
-        data={(data || []) as Record<string, unknown>[]}
+        data={paginatedData}
         columns={dataTableColumns}
         keyExtractor={(row: Record<string, unknown>) => (row.id as string) || (row[columns[0]?.key] as string)}
         onRowClick={rowActions && rowActions.length > 0 ? handleRowClick : undefined}
         emptyMessage="데이터가 없습니다."
+        pagination={undefined}
+        itemsPerPage={itemsPerPage}
       />
-      {/* TODO: pagination, selection, bulkActions, virtualization 지원 */}
+      {/* 페이지네이션: 테이블 영역 밖에 렌더링 */}
+      {paginationConfig && (
+        <div
+          style={{
+            padding: 'var(--spacing-lg)',
+            display: 'flex',
+            justifyContent: 'center',
+            marginTop: 'var(--spacing-md)',
+          }}
+        >
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        </div>
+      )}
+      {/* TODO: selection, bulkActions, virtualization 지원 */}
     </div>
   );
 };

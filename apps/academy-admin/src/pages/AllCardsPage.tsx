@@ -10,7 +10,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, Container, Card, Button, useModal } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, Button, useModal, PageHeader } from '@ui-core/react';
 import { Grid } from '@ui-core/react';
 import { StudentTaskCard } from '../components/StudentTaskCard';
 import { useStudentTaskCards } from '@hooks/use-student';
@@ -303,7 +303,6 @@ export function AllCardsPage() {
           onClick={() => card.action_url && handleCardClick(card)}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-sm)' }}>
-            <div style={{ color: 'var(--color-error)', fontSize: 'var(--font-size-2xl)' }}>⚠️</div>
             <div style={{ flex: 1 }}>
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
                 {card.title}
@@ -321,7 +320,6 @@ export function AllCardsPage() {
         <Card key={card.id} padding="md" variant="elevated" style={{ cursor: card.action_url ? 'pointer' : 'default' }} onClick={() => card.action_url && handleCardClick(card)}>
           <div style={{ marginBottom: 'var(--spacing-sm)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', marginBottom: 'var(--spacing-xs)' }}>
-              <div style={{ fontSize: 'var(--font-size-xl)' }}>🤖</div>
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>{card.title}</h3>
             </div>
             <p style={{ color: 'var(--color-text-secondary)' }}>{card.summary}</p>
@@ -377,17 +375,16 @@ export function AllCardsPage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
-            <h1 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text)' }}>
-              전체 카드 목록
-            </h1>
+        <PageHeader
+          title="전체 카드 목록"
+          actions={
             <Button variant="outline" onClick={() => navigate('/home')}>
               홈으로 돌아가기
             </Button>
-          </div>
+          }
+        />
 
-          {allCards.length > 0 ? (
+        {allCards.length > 0 ? (
             <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="md">
               {allCards.map((card) => renderCard(card))}
             </Grid>
@@ -399,8 +396,7 @@ export function AllCardsPage() {
                 </p>
               </div>
             </Card>
-          )}
-        </div>
+        )}
       </Container>
     </ErrorBoundary>
   );

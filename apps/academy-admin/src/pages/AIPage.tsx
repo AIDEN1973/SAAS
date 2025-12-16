@@ -33,7 +33,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErrorBoundary, useModal, useResponsiveMode } from '@ui-core/react';
-import { Container, Card, Button, Badge } from '@ui-core/react';
+import { Container, Card, Button, Badge, PageHeader } from '@ui-core/react';
 import { SchemaForm } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -395,21 +395,15 @@ export function AIPage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding={isMobile ? "sm" : "lg"}>
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <h1 style={{
-            fontSize: isMobile ? 'var(--font-size-xl)' : 'var(--font-size-2xl)',
-            fontWeight: 'var(--font-weight-bold)',
-            marginBottom: 'var(--spacing-md)',
-            color: 'var(--color-text)'
-          }}>
-            AI 분석
-          </h1>
+        <PageHeader
+          title="AI 분석"
+        />
 
-          {/* 아키텍처 문서 3.7.1: 빠른 분석 링크 (상세 분석은 별도 페이지에서 제공) */}
-          {/* 아키텍처 문서 2.4: Teacher는 요약만 접근 가능, 상세 분석 버튼은 숨김 */}
-          {!isTeacher && (
-            <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* 아키텍처 문서 3.7.1: 빠른 분석 링크 (상세 분석은 별도 페이지에서 제공) */}
+        {/* 아키텍처 문서 2.4: Teacher는 요약만 접근 가능, 상세 분석 버튼은 숨김 */}
+        {!isTeacher && (
+          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
                   빠른 분석:
                 </span>
@@ -488,30 +482,29 @@ export function AIPage() {
                   {aiInsights.weeklyBriefing && (
                     <div id="weekly-briefing-card">
                       <Card padding="lg" variant="elevated" style={{ marginBottom: 'var(--spacing-md)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
-                        <div style={{ fontSize: 'var(--font-size-xl)' }}>📅</div>
-                        <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
-                          주간 브리핑
-                        </h2>
-                        <Badge variant="outline" color="info">
-                          Phase 1 MVP
-                        </Badge>
-                      </div>
-                      <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
-                        {aiInsights.weeklyBriefing.title || '이번 주 요약'}
-                      </h3>
-                      <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
-                        {aiInsights.weeklyBriefing.summary}
-                      </p>
-                      {aiInsights.weeklyBriefing.details && typeof aiInsights.weeklyBriefing.details === 'object' && (
-                        <div style={{ marginTop: 'var(--spacing-md)', color: 'var(--color-text-secondary)' }}>
-                          {Object.entries(aiInsights.weeklyBriefing.details).map(([key, value]: [string, unknown]) => (
-                            <div key={key} style={{ marginBottom: 'var(--spacing-xs)' }}>
-                              <strong>{key}:</strong> {typeof value === 'string' ? value : JSON.stringify(value)}
-                            </div>
-                          ))}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+                          <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
+                            주간 브리핑
+                          </h2>
+                          <Badge variant="outline" color="info">
+                            Phase 1 MVP
+                          </Badge>
                         </div>
-                      )}
+                        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
+                          {aiInsights.weeklyBriefing.title || '이번 주 요약'}
+                        </h3>
+                        <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
+                          {aiInsights.weeklyBriefing.summary}
+                        </p>
+                        {aiInsights.weeklyBriefing.details && typeof aiInsights.weeklyBriefing.details === 'object' && (
+                          <div style={{ marginTop: 'var(--spacing-md)', color: 'var(--color-text-secondary)' }}>
+                            {Object.entries(aiInsights.weeklyBriefing.details).map(([key, value]: [string, unknown]) => (
+                              <div key={key} style={{ marginBottom: 'var(--spacing-xs)' }}>
+                                <strong>{key}:</strong> {typeof value === 'string' ? value : JSON.stringify(value)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </Card>
                     </div>
                   )}
@@ -520,33 +513,32 @@ export function AIPage() {
                   {aiInsights.attendanceAnomalies && aiInsights.attendanceAnomalies.length > 0 && (
                     <div id="attendance-card">
                       <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)', cursor: 'pointer' }} onClick={() => {
-                      // TODO: 하위 페이지 구현 시 navigate('/ai/attendance-anomalies')
-                      showAlert('알림', '출결 이상 탐지 상세 분석은 준비 중입니다.');
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
-                        <div style={{ fontSize: 'var(--font-size-xl)' }}>⚠️</div>
-                        <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
-                          출결 이상 탐지
-                        </h2>
-                      </div>
-                      <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
-                        {aiInsights.attendanceAnomalies.length}명의 학생에게 출결 이상이 감지되었습니다.
-                      </p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
-                        {aiInsights.attendanceAnomalies.slice(0, 3).map((anomaly: { student_name: string; issue: string }, index: number) => (
-                          <div key={index} style={{ color: 'var(--color-text-secondary)' }}>
-                            • {anomaly.student_name}: {anomaly.issue}
-                          </div>
-                        ))}
-                        {aiInsights.attendanceAnomalies.length > 3 && (
-                          <div style={{ color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
-                            외 {aiInsights.attendanceAnomalies.length - 3}건...
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ marginTop: 'var(--spacing-md)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                        클릭하여 상세 분석 보기 →
-                      </div>
+                        // TODO: 하위 페이지 구현 시 navigate('/ai/attendance-anomalies')
+                        showAlert('알림', '출결 이상 탐지 상세 분석은 준비 중입니다.');
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+                          <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
+                            출결 이상 탐지
+                          </h2>
+                        </div>
+                        <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
+                          {aiInsights.attendanceAnomalies.length}명의 학생에게 출결 이상이 감지되었습니다.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+                          {aiInsights.attendanceAnomalies.slice(0, 3).map((anomaly: { student_name: string; issue: string }, index: number) => (
+                            <div key={index} style={{ color: 'var(--color-text-secondary)' }}>
+                              • {anomaly.student_name}: {anomaly.issue}
+                            </div>
+                          ))}
+                          {aiInsights.attendanceAnomalies.length > 3 && (
+                            <div style={{ color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
+                              외 {aiInsights.attendanceAnomalies.length - 3}건...
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ marginTop: 'var(--spacing-md)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                          클릭하여 상세 분석 보기 →
+                        </div>
                       </Card>
                     </div>
                   )}
@@ -555,38 +547,37 @@ export function AIPage() {
                   {aiInsights.performanceAnalysis && aiInsights.performanceAnalysis.length > 0 && (
                     <div id="performance-card">
                       <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)', cursor: 'pointer' }} onClick={() => {
-                      // TODO: 하위 페이지 구현 시 navigate('/ai/performance')
-                      showAlert('알림', '성과 분석 상세 화면은 준비 중입니다.');
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
-                        <div style={{ fontSize: 'var(--font-size-xl)' }}>📊</div>
-                        <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
-                          반/과목 성과 분석
-                        </h2>
-                      </div>
-                      <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
-                        {aiInsights.performanceAnalysis.length}개 반의 성과를 분석했습니다.
-                      </p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
-                        {aiInsights.performanceAnalysis.slice(0, 3).map((perf: { performance: string; class_name: string; trend: string }, index: number) => (
-                          <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-                            <Badge color={perf.performance === '우수' ? 'success' : perf.performance === '보통' ? 'info' : 'error'}>
-                              {perf.performance}
-                            </Badge>
-                            <span style={{ color: 'var(--color-text-secondary)' }}>
-                              {perf.class_name}: {perf.trend}
-                            </span>
-                          </div>
-                        ))}
-                        {aiInsights.performanceAnalysis.length > 3 && (
-                          <div style={{ color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
-                            외 {aiInsights.performanceAnalysis.length - 3}개 반...
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ marginTop: 'var(--spacing-md)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                        클릭하여 상세 분석 보기 →
-                      </div>
+                        // TODO: 하위 페이지 구현 시 navigate('/ai/performance')
+                        showAlert('알림', '성과 분석 상세 화면은 준비 중입니다.');
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+                          <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
+                            반/과목 성과 분석
+                          </h2>
+                        </div>
+                        <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
+                          {aiInsights.performanceAnalysis.length}개 반의 성과를 분석했습니다.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+                          {aiInsights.performanceAnalysis.slice(0, 3).map((perf: { performance: string; class_name: string; trend: string }, index: number) => (
+                            <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                              <Badge color={perf.performance === '우수' ? 'success' : perf.performance === '보통' ? 'info' : 'error'}>
+                                {perf.performance}
+                              </Badge>
+                              <span style={{ color: 'var(--color-text-secondary)' }}>
+                                {perf.class_name}: {perf.trend}
+                              </span>
+                            </div>
+                          ))}
+                          {aiInsights.performanceAnalysis.length > 3 && (
+                            <div style={{ color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
+                              외 {aiInsights.performanceAnalysis.length - 3}개 반...
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ marginTop: 'var(--spacing-md)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                          클릭하여 상세 분석 보기 →
+                        </div>
                       </Card>
                     </div>
                   )}
@@ -595,34 +586,33 @@ export function AIPage() {
                   {aiInsights.regionalComparison && aiInsights.regionalComparison.length > 0 ? (
                     <div id="regional-card">
                       <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
-                        <div style={{ fontSize: 'var(--font-size-xl)' }}>📍</div>
-                        <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
-                          지역 대비 부족 영역
-                        </h2>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-                        {aiInsights.regionalComparison.map((item: { area: string; status: string; gap: string; recommendation: string }, index: number) => (
-                          <div
-                            key={index}
-                            style={{
-                              padding: 'var(--spacing-md)',
-                              border: `var(--border-width-thin) solid var(--color-border)`,
-                              borderRadius: 'var(--border-radius-md)',
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
-                              <Badge color={item.status === '부족' ? 'error' : 'success'}>
-                                {item.area}
-                              </Badge>
-                              <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{item.gap}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+                          <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
+                            지역 대비 부족 영역
+                          </h2>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+                          {aiInsights.regionalComparison.map((item: { area: string; status: string; gap: string; recommendation: string }, index: number) => (
+                            <div
+                              key={index}
+                              style={{
+                                padding: 'var(--spacing-md)',
+                                border: `var(--border-width-thin) solid var(--color-border)`,
+                                borderRadius: 'var(--border-radius-md)',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
+                                <Badge color={item.status === '부족' ? 'error' : 'success'}>
+                                  {item.area}
+                                </Badge>
+                                <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{item.gap}</span>
+                              </div>
+                              <div style={{ color: 'var(--color-text-secondary)' }}>
+                                {item.recommendation}
+                              </div>
                             </div>
-                            <div style={{ color: 'var(--color-text-secondary)' }}>
-                              {item.recommendation}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
                       </Card>
                     </div>
                   ) : (
@@ -661,7 +651,6 @@ export function AIPage() {
               )}
             </>
           )}
-        </div>
       </Container>
     </ErrorBoundary>
   );
@@ -804,7 +793,7 @@ function ConsultationSummaryTab() {
                       {consultation.ai_summary ? (
                         <div style={{ marginTop: 'var(--spacing-sm)', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)' }}>
                           <p style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
-                            🤖 AI 요약
+                            AI 요약
                           </p>
                           <p style={{ color: 'var(--color-text-secondary)' }}>
                             {consultation.ai_summary}
@@ -817,7 +806,7 @@ function ConsultationSummaryTab() {
                           onClick={() => handleGenerateSummary(consultation.id)}
                           disabled={generateAISummary.isPending}
                         >
-                          {generateAISummary.isPending ? '생성 중...' : '🤖 AI 요약 생성'}
+                          {generateAISummary.isPending ? '생성 중...' : 'AI 요약 생성'}
                         </Button>
                       )}
                     </div>

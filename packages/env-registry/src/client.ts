@@ -27,13 +27,21 @@ function validateEnvClient(): EnvClient {
       // Vite: VITE_* 접두사 사용
       // VITE_ 접두사를 NEXT_PUBLIC_로 매핑 (키 변환)
       // 빈 문자열 체크 (define 옵션으로 주입된 경우 빈 문자열일 수 있음)
-      if (viteEnv.VITE_SUPABASE_URL && viteEnv.VITE_SUPABASE_URL.trim() !== '') {
-        rawEnv.NEXT_PUBLIC_SUPABASE_URL = viteEnv.VITE_SUPABASE_URL;
+      // 잘못된 URL 체크: npferbxuxocbfnfbpcnz는 잘못된 프로젝트 URL이므로 무시
+      // 값이 이미 설정되지 않은 경우에만 설정 (NEXT_PUBLIC_* 우선)
+      // vite.config.ts에서 NEXT_PUBLIC_SUPABASE_URL을 VITE_SUPABASE_URL로 주입했을 수 있으므로,
+      // 잘못된 URL이 아닌 경우 무조건 매핑 (vite.config.ts에서 이미 필터링됨)
+      if (!rawEnv.NEXT_PUBLIC_SUPABASE_URL && viteEnv.VITE_SUPABASE_URL && viteEnv.VITE_SUPABASE_URL.trim() !== '') {
+        // vite.config.ts에서 이미 필터링했으므로, 여기서는 단순히 매핑만 수행
+        // 단, 명시적으로 잘못된 URL인 경우만 제외
+        if (!viteEnv.VITE_SUPABASE_URL.includes('npferbxuxocbfnfbpcnz')) {
+          rawEnv.NEXT_PUBLIC_SUPABASE_URL = viteEnv.VITE_SUPABASE_URL;
+        }
       }
-      if (viteEnv.VITE_SUPABASE_ANON_KEY && viteEnv.VITE_SUPABASE_ANON_KEY.trim() !== '') {
+      if (!rawEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY && viteEnv.VITE_SUPABASE_ANON_KEY && viteEnv.VITE_SUPABASE_ANON_KEY.trim() !== '') {
         rawEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY = viteEnv.VITE_SUPABASE_ANON_KEY;
       }
-      if (viteEnv.VITE_KAKAO_JS_KEY && viteEnv.VITE_KAKAO_JS_KEY.trim() !== '') {
+      if (!rawEnv.NEXT_PUBLIC_KAKAO_JS_KEY && viteEnv.VITE_KAKAO_JS_KEY && viteEnv.VITE_KAKAO_JS_KEY.trim() !== '') {
         rawEnv.NEXT_PUBLIC_KAKAO_JS_KEY = viteEnv.VITE_KAKAO_JS_KEY;
       }
     }
@@ -53,7 +61,8 @@ function validateEnvClient(): EnvClient {
 
     // Vite 환경변수를 NEXT_PUBLIC_로 매핑 (VITE_*가 있는 경우)
     // 프로덕션 빌드에서 import.meta.env가 동적으로 접근되지 않는 경우 대비
-    if (process.env.VITE_SUPABASE_URL && !rawEnv.NEXT_PUBLIC_SUPABASE_URL) {
+    // 잘못된 URL 체크: npferbxuxocbfnfbpcnz는 잘못된 프로젝트 URL이므로 무시
+    if (process.env.VITE_SUPABASE_URL && !rawEnv.NEXT_PUBLIC_SUPABASE_URL && !process.env.VITE_SUPABASE_URL.includes('npferbxuxocbfnfbpcnz')) {
       rawEnv.NEXT_PUBLIC_SUPABASE_URL = process.env.VITE_SUPABASE_URL;
     }
     if (process.env.VITE_SUPABASE_ANON_KEY && !rawEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -84,8 +93,17 @@ function validateEnvClient(): EnvClient {
       // @ts-ignore
       const metaEnv = import.meta.env;
       if (metaEnv) {
-        debugInfo.push(`import.meta.env.VITE_SUPABASE_URL: ${metaEnv.VITE_SUPABASE_URL ? '설정됨' : '미설정'}`);
-        debugInfo.push(`import.meta.env.VITE_SUPABASE_ANON_KEY: ${metaEnv.VITE_SUPABASE_ANON_KEY ? '설정됨' : '미설정'}`);
+        const viteUrl = metaEnv.VITE_SUPABASE_URL;
+        const viteKey = metaEnv.VITE_SUPABASE_ANON_KEY;
+        debugInfo.push(`import.meta.env.VITE_SUPABASE_URL: ${viteUrl ? (viteUrl.includes('npferbxuxocbfnfbpcnz') ? '설정됨 (잘못된 URL)' : '설정됨') : '미설정'}`);
+        if (viteUrl) {
+          debugInfo.push(`  값: ${viteUrl.substring(0, 50)}...`);
+        }
+        debugInfo.push(`import.meta.env.VITE_SUPABASE_ANON_KEY: ${viteKey ? '설정됨' : '미설정'}`);
+        debugInfo.push(`rawEnv.NEXT_PUBLIC_SUPABASE_URL: ${rawEnv.NEXT_PUBLIC_SUPABASE_URL ? '설정됨' : '미설정'}`);
+        if (rawEnv.NEXT_PUBLIC_SUPABASE_URL) {
+          debugInfo.push(`  값: ${rawEnv.NEXT_PUBLIC_SUPABASE_URL.substring(0, 50)}...`);
+        }
       }
     } catch (e) {
       debugInfo.push('import.meta.env 접근 불가');

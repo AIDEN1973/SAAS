@@ -52,6 +52,7 @@ export const Select: React.FC<SelectProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [dropdownWidth, setDropdownWidth] = useState<number | undefined>(undefined);
   const anchorRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -77,41 +78,74 @@ export const Select: React.FC<SelectProps> = ({
 
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
-      padding: 'var(--spacing-xs) var(--spacing-sm)',
+      paddingTop: 'var(--spacing-xs)',
+      paddingBottom: 'var(--spacing-xs)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
+      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (화살표 공간 포함)
     },
     sm: {
-      padding: 'var(--spacing-xs) var(--spacing-sm)',
+      paddingTop: 'var(--spacing-xs)',
+      paddingBottom: 'var(--spacing-xs)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
+      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (화살표 공간 포함)
     },
     md: {
-      padding: 'var(--spacing-sm) var(--spacing-md)',
+      paddingTop: 'var(--spacing-sm)',
+      paddingBottom: 'var(--spacing-sm)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
+      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (화살표 공간 포함)
     },
     lg: {
-      padding: 'var(--spacing-md) var(--spacing-lg)',
+      paddingTop: 'var(--spacing-md)',
+      paddingBottom: 'var(--spacing-md)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
+      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (화살표 공간 포함)
     },
     xl: {
-      padding: 'var(--spacing-lg) var(--spacing-xl)',
+      paddingTop: 'var(--spacing-lg)',
+      paddingBottom: 'var(--spacing-lg)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
+      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (화살표 공간 포함)
     },
   };
 
+  // 선택된 값이 있는지 확인 (스타일용)
+  const selectedLabelsForStyle = React.useMemo(() => {
+    if (multiple && Array.isArray(value)) {
+      return options
+        .filter((opt) => value.includes(String(opt.value)))
+        .map((opt) => opt.label);
+    } else if (!multiple && value !== undefined && value !== null && value !== '') {
+      const option = options.find((opt) => String(opt.value) === String(value));
+      return option ? [option.label] : [];
+    }
+    return [];
+  }, [value, options, multiple]);
+
+  const hasValue = selectedLabelsForStyle.length > 0;
+
   const selectStyle: React.CSSProperties = {
     ...sizeStyles[size],
-    border: `var(--border-width-thin) solid ${error ? 'var(--color-red-500)' : 'var(--color-gray-200)'}`, // styles.css 준수: border-width 토큰 사용
-    borderRadius: 'var(--border-radius-sm)',
-    backgroundColor: disabled ? 'var(--color-gray-100)' : 'var(--color-white)',
-    color: disabled ? 'var(--color-text-tertiary)' : 'var(--color-text)',
+    border: 'none',
+    borderBottom: `var(--border-width-form-bottom) solid transparent`, // styles.css 토큰: 레이아웃 유지를 위해 항상 2px, 색상은 투명
+    borderRadius: 0,
+    backgroundColor: disabled ? 'var(--color-form-disabled-bg)' : 'var(--color-white)', // styles.css 토큰: 폼 필드 배경색
+    color: disabled ? 'var(--color-form-disabled-text)' : 'var(--color-text)', // styles.css 토큰: 폼 필드 텍스트 색상
     outline: 'none',
     width: fullWidth ? '100%' : 'auto',
-    transition: 'var(--transition-all)', // styles.css 준수: transition 토큰 사용
-    fontFamily: 'var(--font-family)',
-    fontSize: 'var(--font-size-base)', // Input과 동일한 폰트 사이즈 (일관성)
-    lineHeight: 'var(--line-height)', // Input과 동일한 line-height (일관성)
-    boxShadow: isOpen ? 'var(--shadow-md)' : 'var(--shadow-sm)',
-    paddingRight: 'var(--spacing-xl)', // 화살표 공간 확보
+    transition: 'var(--transition-all)', // styles.css 토큰: transition
+    fontFamily: 'var(--font-family)', // styles.css 토큰: 폰트 패밀리
+    fontSize: 'var(--font-size-base)', // styles.css 토큰: 폼 필드 폰트 사이즈
+    fontWeight: 'var(--font-weight-normal)', // styles.css 토큰: 폼 필드 폰트 웨이트
+    lineHeight: 'var(--line-height)', // styles.css 토큰: 폼 필드 라인 높이
+    boxShadow: hasValue
+      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)') // 값이 있으면 2px 테두리
+      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)'), // 값이 없으면 1px 테두리
     cursor: disabled ? 'not-allowed' : 'pointer',
     display: 'flex',
     alignItems: 'center',
-    boxSizing: 'border-box', // Input과 동일한 box-sizing (일관성)
-    // 높이는 fontSize * lineHeight + padding-top + padding-bottom + border로 자동 계산됨 (Input과 동일)
+    boxSizing: 'border-box', // styles.css 토큰: 폼 필드 box-sizing
+    // 높이는 fontSize * lineHeight + padding-top + padding-bottom + border로 자동 계산됨
   };
 
   const handleToggle = useCallback(() => {
@@ -120,7 +154,12 @@ export const Select: React.FC<SelectProps> = ({
     if (!isOpen) {
       setFocusedIndex(-1);
     }
-  }, [disabled, isOpen]);
+    // 클릭 시 포커스 스타일 적용 (styles.css 토큰 사용)
+    if (anchorRef.current) {
+      anchorRef.current.style.borderBottomColor = 'transparent'; // styles.css 토큰: 항상 transparent 유지 (레이아웃 고정)
+      anchorRef.current.style.boxShadow = error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)'; // styles.css 토큰: 포커스 시 시각적 2px 테두리
+    }
+  }, [disabled, isOpen, error]);
 
   const handleSelect = useCallback((optionValue: string | number) => {
     if (multiple) {
@@ -189,17 +228,54 @@ export const Select: React.FC<SelectProps> = ({
   }, [disabled, isOpen, focusedIndex, options, handleSelect, handleToggle]);
 
   const handleFocus = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
-    e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-primary)';
-    // styles.css 준수: focus-ring-width 토큰 사용 (2px)
-    e.currentTarget.style.boxShadow = `0 0 0 var(--focus-ring-width) ${error ? 'var(--color-red-50)' : 'var(--color-primary-50)'}`;
+    e.currentTarget.style.borderBottomColor = 'transparent'; // styles.css 토큰: 항상 transparent 유지 (레이아웃 고정)
+    e.currentTarget.style.boxShadow = error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)'; // styles.css 토큰: 포커스 시 항상 시각적 2px 테두리
     onFocus?.(e as unknown as React.FocusEvent<HTMLSelectElement>);
   }, [error, onFocus]);
 
   const handleBlur = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
-    e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-gray-200)';
-    e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+    e.currentTarget.style.borderBottomColor = 'transparent'; // styles.css 토큰: 투명으로 변경
+    // 값이 있으면 2px 유지, 값이 없으면 1px로 복원
+    const currentHasValue = selectedLabelsForStyle.length > 0;
+    e.currentTarget.style.boxShadow = currentHasValue
+      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
+      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)');
     onBlur?.(e as unknown as React.FocusEvent<HTMLSelectElement>);
-  }, [error, onBlur]);
+  }, [error, onBlur, selectedLabelsForStyle]);
+
+  // 라벨을 플레이스홀더로 사용
+  const placeholder = label || '선택하세요';
+
+  // 플레이스홀더에서 키워드를 볼드 처리하는 함수
+  const renderPlaceholderWithBold = React.useCallback((text: string) => {
+    const keywords = ['이름', '학년', '클래스', '재원상태'];
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+
+    keywords.forEach((keyword) => {
+      const index = text.indexOf(keyword, lastIndex);
+      if (index !== -1) {
+        // 키워드 이전 텍스트 추가
+        if (index > lastIndex) {
+          parts.push(text.substring(lastIndex, index));
+        }
+        // 키워드를 볼드 처리
+        parts.push(
+          <strong key={`${keyword}-${index}`} style={{ fontWeight: 'var(--font-weight-extrabold)' }}>
+            {keyword}
+          </strong>
+        );
+        lastIndex = index + keyword.length;
+      }
+    });
+
+    // 남은 텍스트 추가
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : text;
+  }, []);
 
   // 선택된 값의 라벨 찾기
   const selectedLabels = React.useMemo(() => {
@@ -217,8 +293,19 @@ export const Select: React.FC<SelectProps> = ({
   const displayText = multiple
     ? selectedLabels.length > 0
       ? `${selectedLabels.length}개 선택됨`
-      : '선택하세요'
-    : selectedLabels[0] || '선택하세요';
+      : placeholder
+    : selectedLabels[0] || placeholder;
+
+  // 값 변경 시 스타일 업데이트 (값이 있으면 2px, 없으면 1px)
+  useEffect(() => {
+    if (anchorRef.current && !isOpen) {
+      const currentHasValue = selectedLabelsForStyle.length > 0;
+      anchorRef.current.style.borderBottomColor = 'transparent';
+      anchorRef.current.style.boxShadow = currentHasValue
+        ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
+        : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)');
+    }
+  }, [selectedLabelsForStyle, error, isOpen]);
 
   // 포커스된 옵션으로 스크롤
   useEffect(() => {
@@ -228,6 +315,16 @@ export const Select: React.FC<SelectProps> = ({
     }
   }, [isOpen, focusedIndex]);
 
+  // 드롭다운 메뉴 너비를 셀렉트 박스 너비에 맞추기
+  useEffect(() => {
+    if (isOpen && anchorRef.current) {
+      const anchorWidth = anchorRef.current.getBoundingClientRect().width;
+      setDropdownWidth(anchorWidth);
+    } else {
+      setDropdownWidth(undefined);
+    }
+  }, [isOpen]);
+
   return (
     <div
       style={{
@@ -236,17 +333,6 @@ export const Select: React.FC<SelectProps> = ({
         width: fullWidth ? '100%' : 'auto',
       }}
     >
-      {label && (
-        <label
-          style={{
-            fontWeight: 'var(--font-weight-medium)',
-            color: 'var(--color-text)',
-            marginBottom: 'var(--spacing-xs)',
-          }}
-        >
-          {label}
-        </label>
-      )}
       <div
         style={{
           position: 'relative',
@@ -273,25 +359,49 @@ export const Select: React.FC<SelectProps> = ({
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
+              color: (multiple ? selectedLabels.length > 0 : selectedLabels.length > 0) ? 'var(--color-text)' : 'var(--color-text-tertiary)',
+              fontWeight: 'var(--font-weight-normal)', // styles.css 준수: 폰트 웨이트 토큰 사용
             }}
-      >
-            {displayText}
+          >
+            {(multiple ? selectedLabels.length > 0 : selectedLabels.length > 0) ? displayText : renderPlaceholderWithBold(displayText)}
           </span>
         <div
           style={{
             position: 'absolute',
             right: 'var(--spacing-sm)',
             top: '50%',
-              transform: `translateY(-50%) ${isOpen ? 'rotate(180deg)' : ''}`, // translateY만 사용 (transform-center는 translate(-50%, -50%)이므로 부적합)
-              transition: 'transform var(--transition-base)', // styles.css 준수: transition 토큰 사용
+            transform: `translateY(-50%) ${isOpen ? 'rotate(180deg)' : ''}`,
+            transition: 'transform var(--transition-base)', // styles.css 준수: transition 토큰 사용
             pointerEvents: 'none',
-            width: 0,
-            height: 0,
-              borderLeft: `var(--border-width-thick) solid transparent`,
-              borderRight: `var(--border-width-thick) solid transparent`,
-              borderTop: `var(--border-width-thick) solid ${error ? 'var(--color-red-500)' : 'var(--color-gray-500)'}`, // 화살표 높이는 border-width-thick 사용
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 'var(--spacing-md)', // 16px
+            height: 'var(--spacing-md)', // 16px
+          }}
+        >
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{
+              width: 'var(--size-icon-base)',
+              height: 'var(--size-icon-base)',
+              color: error ? 'var(--color-form-border-error)' : 'var(--color-text-tertiary)', // styles.css 토큰: 드롭다운 화살표 색상
+              transition: 'color var(--transition-base), filter var(--transition-base)',
+              filter: isOpen ? `drop-shadow(var(--shadow-icon))` : 'none',
             }}
-          />
+          >
+            <path
+              d="M4.5 6.5L8 10L11.5 6.5"
+              stroke="currentColor"
+              strokeWidth="var(--stroke-width-icon)"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          </svg>
+        </div>
         </div>
 
         {isOpen &&
@@ -302,6 +412,7 @@ export const Select: React.FC<SelectProps> = ({
               onClose={() => setIsOpen(false)}
               anchorEl={anchorRef.current}
               placement="bottom-start"
+              style={dropdownWidth ? { width: `${dropdownWidth}px`, minWidth: `${dropdownWidth}px` } : undefined}
             >
               <div
                 ref={listRef}
@@ -335,9 +446,7 @@ export const Select: React.FC<SelectProps> = ({
                           : 'transparent',
                         color: option.disabled
                           ? 'var(--color-text-tertiary)'
-                          : isSelected
-                          ? 'var(--color-primary-dark)'
-                          : 'var(--color-text)',
+                          : 'var(--color-text)', // 기본 텍스트 색상 사용
                         fontWeight: isSelected ? 'var(--font-weight-medium)' : 'var(--font-weight-normal)',
                         fontSize: 'var(--font-size-base)', // styles.css 준수: 기본 폰트 사이즈
                         transition: 'var(--transition-fast)', // styles.css 준수: transition 토큰 사용
@@ -364,16 +473,18 @@ export const Select: React.FC<SelectProps> = ({
                         >
                           {isSelected && (
                             <svg
-                              width="10"
-                              height="10"
                               viewBox="0 0 10 10"
                               fill="none"
-                              style={{ color: 'var(--color-white)' }}
+                              style={{
+                                width: 'var(--size-icon-sm)',
+                                height: 'var(--size-icon-sm)',
+                                color: 'var(--color-white)'
+                              }}
                             >
                               <path
                                 d="M8 2.5L3.5 7L2 5.5"
                                 stroke="currentColor"
-                                strokeWidth="1.5"
+                                strokeWidth="var(--stroke-width-icon)"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                               />
@@ -404,7 +515,7 @@ export const Select: React.FC<SelectProps> = ({
       {error && (
         <span
           style={{
-            color: 'var(--color-red-500)',
+            color: 'var(--color-form-error)', // styles.css 토큰: 폼 필드 에러 메시지 색상
             marginTop: 'var(--spacing-xs)',
             fontSize: 'var(--font-size-sm)',
           }}

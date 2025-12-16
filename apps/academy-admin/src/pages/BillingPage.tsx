@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer } from '@ui-core/react';
+import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer, PageHeader } from '@ui-core/react';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -336,18 +336,12 @@ export function BillingPage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <h1 style={{
-            fontSize: 'var(--font-size-2xl)',
-            fontWeight: 'var(--font-weight-bold)',
-            marginBottom: 'var(--spacing-md)',
-            color: 'var(--color-text)'
-          }}>
-            수납/청구 관리
-          </h1>
+        <PageHeader
+          title="수납/청구 관리"
+        />
 
-          {/* 빠른 링크 (한 페이지에 하나의 기능 원칙 준수: 청구서 관리만 메인, 나머지는 별도 페이지) */}
-          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+        {/* 빠른 링크 (한 페이지에 하나의 기능 원칙 준수: 청구서 관리만 메인, 나머지는 별도 페이지) */}
+        <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
                 관련 기능:
@@ -545,10 +539,9 @@ export function BillingPage() {
                 매출/정산
               </Button>
             </div>
-          </Card>
+        </Card>
 
-          {/* 결제 관리, 매출/정산은 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙) */}
-        </div>
+        {/* 결제 관리, 매출/정산은 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙) */}
       </Container>
     </ErrorBoundary>
   );

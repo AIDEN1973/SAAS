@@ -62,7 +62,7 @@ export function SignupPage() {
         showAlert(
           '알림',
           '이메일 인증이 필요합니다. 이메일을 확인해주세요.\n\n' +
-          '💡 개발 환경에서는 Supabase Dashboard > Authentication > Settings > Email Auth에서\n' +
+          '개발 환경에서는 Supabase Dashboard > Authentication > Settings > Email Auth에서\n' +
           '"Enable email confirmations"를 비활성화하거나 "Auto Confirm"을 활성화하세요.'
         );
         navigate('/auth/login');

@@ -17,7 +17,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, Container, Card, Button, useModal } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, Button, useModal, PageHeader } from '@ui-core/react';
 import { Grid } from '@ui-core/react';
 import { StudentTaskCard } from '../components/StudentTaskCard';
 import { useStudentTaskCards } from '@hooks/use-student';
@@ -81,7 +81,6 @@ interface BillingSummaryCard {
 type DashboardCard = EmergencyCard | AIBriefingCard | ClassCard | StatsCard | BillingSummaryCard | StudentTaskCardType;
 
 export function HomePage() {
-  console.log('[HomePage] Rendering');
   const navigate = useNavigate();
   const { showAlert } = useModal();
   const context = getApiContext();
@@ -602,7 +601,6 @@ export function HomePage() {
           onClick={() => card.action_url && handleCardClick(card)}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-sm)' }}>
-            <div style={{ color: 'var(--color-error)', fontSize: 'var(--font-size-2xl)' }}>⚠️</div>
             <div style={{ flex: 1 }}>
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
                 {card.title}
@@ -628,7 +626,6 @@ export function HomePage() {
         >
           <div style={{ marginBottom: 'var(--spacing-sm)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', marginBottom: 'var(--spacing-xs)' }}>
-              <div style={{ fontSize: 'var(--font-size-xl)' }}>🤖</div>
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
                 {card.title}
               </h3>
@@ -750,17 +747,11 @@ export function HomePage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <h1 style={{
-            fontSize: 'var(--font-size-2xl)',
-            fontWeight: 'var(--font-weight-bold)',
-            marginBottom: 'var(--spacing-lg)',
-            color: 'var(--color-text)'
-          }}>
-            홈 대시보드
-          </h1>
+        <PageHeader
+          title="홈 대시보드"
+        />
 
-          {/* 카드 그리드 */}
+        {/* 카드 그리드 */}
           {sortedCards.length > 0 ? (
             <>
               <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="md">
@@ -791,8 +782,7 @@ export function HomePage() {
                 </p>
               </div>
             </Card>
-          )}
-        </div>
+        )}
       </Container>
     </ErrorBoundary>
   );

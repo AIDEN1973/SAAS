@@ -9115,11 +9115,16 @@ tenant_id + industry_type 기반 필터
 
 57. 검색 성능 최적화
 
-to_tsvector 저장 컬럼화(materialized vector)
+백엔드 최적화:
+- to_tsvector 저장 컬럼화(materialized vector)
+- title/description 우선 가중치
+- Search log 기반 추천 키워드
 
-title/description 우선 가중치
-
-Search log 기반 추천 키워드
+프론트엔드 최적화:
+- [불변 규칙] SchemaFilter 컴포넌트에서 검색 필드(search, query, keyword 등)는 자동으로 디바운싱(300ms) 적용
+- 검색 필드가 아닌 필터(select, date 등)는 즉시 적용
+- React Query 캐시 최적화: staleTime 30초, gcTime 5분
+- 검색 필드 자동 감지: 필드 이름이 'search', 'query', 'keyword', 'q', 'term'이거나 kind가 'text'이고 이름에 'search'가 포함된 경우
 
 57-1. Full Text Search 외부화 Option (Optional)
 

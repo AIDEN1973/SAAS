@@ -16,6 +16,8 @@
   "dependencies": {
     "@design-system/core": "file:../../packages/design-system",
     "clsx": "^2.0.0",
+    "lucide-react": "^0.561.0",
+    "phosphor-react": "^1.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

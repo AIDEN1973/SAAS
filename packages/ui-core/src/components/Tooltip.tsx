@@ -5,7 +5,8 @@
  * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { clsx } from 'clsx';
 
 export interface TooltipProps {
@@ -14,6 +15,7 @@ export interface TooltipProps {
   position?: 'top' | 'bottom' | 'left' | 'right';
   delay?: number;
   className?: string;
+  useThemeColor?: boolean; // 인더스트리 테마 색상 사용 여부
 }
 
 /**
@@ -27,52 +29,93 @@ export const Tooltip: React.FC<TooltipProps> = ({
   position = 'top',
   delay = 200, // 기본 지연 시간 (ms) - 접근성을 위한 최소값
   className,
+  useThemeColor = false, // 기본값: false (기존 스타일 유지)
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
   const triggerRef = useRef<HTMLDivElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>();
 
-  useEffect(() => {
-    if (isVisible && triggerRef.current && tooltipRef.current) {
+  // 정밀한 위치 계산 함수
+  const calculatePosition = useCallback(() => {
+    if (!tooltipRef.current || !triggerRef.current) return;
+
+    // 여러 프레임에 걸쳐 정확한 크기 측정
+    const measureAndPosition = () => {
+      if (!tooltipRef.current || !triggerRef.current) return;
+
       const triggerRect = triggerRef.current.getBoundingClientRect();
       const tooltipRect = tooltipRef.current.getBoundingClientRect();
+
+      // 툴팁이 아직 렌더링되지 않았거나 크기가 0이면 다시 시도
+      if (tooltipRect.width === 0 || tooltipRect.height === 0) {
+        requestAnimationFrame(measureAndPosition);
+        return;
+      }
 
       let top = 0;
       let left = 0;
 
-      // offset 계산용 (CSS 변수는 JavaScript 계산에서 사용 불가하므로 숫자 사용)
-      // var(--spacing-sm) = 8px
-      const offsetPx = 8;
+      // offset 계산용 - 삼각형과 버튼 사이 간격 (4px)
+      const offsetPx = 4;
 
       switch (position) {
         case 'top':
+          // 버튼의 정확한 중앙점 계산 (픽셀 단위)
+          const triggerCenterX = triggerRect.left + triggerRect.width / 2;
           top = triggerRect.top - tooltipRect.height - offsetPx;
-          left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
+          // 툴팁의 중앙점이 버튼의 중앙점과 정확히 일치하도록 설정
+          left = triggerCenterX;
           break;
         case 'bottom':
+          const triggerCenterXBottom = triggerRect.left + triggerRect.width / 2;
           top = triggerRect.bottom + offsetPx;
-          left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
+          left = triggerCenterXBottom;
           break;
         case 'left':
-          top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
+          const triggerCenterYLeft = triggerRect.top + triggerRect.height / 2;
+          top = triggerCenterYLeft;
           left = triggerRect.left - tooltipRect.width - offsetPx;
           break;
         case 'right':
-          top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
+          const triggerCenterYRight = triggerRect.top + triggerRect.height / 2;
+          top = triggerCenterYRight;
           left = triggerRect.right + offsetPx;
           break;
       }
 
       setTooltipStyle({
-        position: 'fixed',
-        top: `${top}px`,
-        left: `${left}px`,
-        zIndex: 'var(--z-tooltip)',
+        position: 'fixed' as const,
+        top: `${Math.round(top * 100) / 100}px`, // 소수점 둘째 자리까지 정밀도
+        left: `${Math.round(left * 100) / 100}px`,
+        transform: position === 'top' || position === 'bottom' ? 'translateX(-50%)' : 'translateY(-50%)',
+        zIndex: 1070, // var(--z-tooltip) 값
       });
+    };
+
+    // 즉시 한 번 실행하고, 다음 프레임에서도 확인
+    measureAndPosition();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(measureAndPosition);
+    });
+  }, [position]);
+
+  // ref 콜백 - Portal이 마운트될 때 호출됨
+  const tooltipRefCallback = useCallback((node: HTMLDivElement | null) => {
+    tooltipRef.current = node;
+    if (node) {
+      // DOM에 마운트된 후 위치 계산
+      calculatePosition();
     }
-  }, [isVisible, position]);
+  }, [calculatePosition]);
+
+  // isVisible이 변경될 때마다 위치 재계산
+  useLayoutEffect(() => {
+    if (isVisible) {
+      calculatePosition();
+    }
+  }, [isVisible, calculatePosition]);
 
   const handleMouseEnter = () => {
     if (timeoutRef.current) {
@@ -111,24 +154,63 @@ export const Tooltip: React.FC<TooltipProps> = ({
       >
         {children}
       </div>
-      {isVisible && (
-        <div
-          ref={tooltipRef}
-          style={{
-            ...tooltipStyle,
-            maxWidth: 'var(--size-tooltip-max-width)', // styles.css 준수: 툴팁 최대 너비 토큰 사용
-            pointerEvents: 'none',
-            color: 'var(--color-text)',
-            backgroundColor: 'var(--color-white)',
-            padding: 'var(--spacing-sm)',
-            borderRadius: 'var(--border-radius-sm)',
-            boxShadow: 'var(--shadow-lg)',
-            border: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
-          }}
-        >
-          {content}
-        </div>
-      )}
+      {isVisible &&
+        createPortal(
+          <div
+            ref={tooltipRefCallback}
+            style={{
+              ...tooltipStyle,
+              maxWidth: 'var(--size-tooltip-max-width)', // styles.css 준수: 툴팁 최대 너비 토큰 사용
+              pointerEvents: 'none',
+              color: useThemeColor ? 'var(--color-white)' : 'var(--color-text)',
+              backgroundColor: useThemeColor ? 'var(--color-primary)' : 'var(--color-white)',
+              padding: 'var(--spacing-sm)',
+              borderRadius: 'var(--border-radius-sm)',
+              boxShadow: 'var(--shadow-lg)',
+              border: useThemeColor ? 'none' : 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
+              fontSize: 'var(--font-size-sm)', // styles.css 준수: 툴팁 폰트 사이즈
+              whiteSpace: 'nowrap', // 한 줄로 표시
+            }}
+          >
+            {/* 하단 삼각형 (position이 'top'일 때 표시, 버튼 쪽을 가리킴) */}
+            {position === 'top' && (
+              <>
+                {/* 테두리 삼각형 (useThemeColor가 false일 때만) */}
+                {!useThemeColor && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '-5px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '5px solid transparent',
+                      borderRight: '5px solid transparent',
+                      borderTop: '5px solid var(--color-gray-200)',
+                    }}
+                  />
+                )}
+                {/* 배경 삼각형 */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '-4px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 0,
+                    height: 0,
+                    borderLeft: '4px solid transparent',
+                    borderRight: '4px solid transparent',
+                    borderTop: `4px solid ${useThemeColor ? 'var(--color-primary)' : 'var(--color-white)'}`,
+                  }}
+                />
+              </>
+            )}
+            {content}
+          </div>,
+          document.body
+        )}
     </>
   );
 };

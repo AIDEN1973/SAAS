@@ -6,10 +6,11 @@
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary, useModal, useResponsiveMode } from '@ui-core/react';
-import { Container, Grid, Card, Button, Input, Modal, Drawer } from '@ui-core/react';
+import { DataTableActionButtons } from '../components/DataTableActionButtons';
+import { Container, Grid, Card, Button, Input, Modal, Drawer, PageHeader } from '@ui-core/react';
 import { SchemaForm, SchemaFilter, SchemaTable } from '@schema-engine';
 import { useStudents, useStudentTags, useStudentTagsByStudent, useCreateStudent, useBulkCreateStudents } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
@@ -32,13 +33,13 @@ export function StudentsPage() {
   const isDesktop = mode === 'lg' || mode === 'xl';
   const [filter, setFilter] = useState<StudentFilter>({});
 
-  // 아키텍처 문서 408-431줄: 기기별 자동 레이아웃 결정
-  // PC: 테이블 형태, Tablet: 2열 카드, Mobile: 1열 카드
-  const viewMode: 'card' | 'table' = isDesktop ? 'table' : 'card';
+  // [불변 규칙] 모든 환경에서 테이블 구조 유지 (모바일: 1열 세로 배치)
+  // DataTable 컴포넌트가 모바일에서 자동으로 1열 세로 배치로 렌더링
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false); // 아키텍처 문서 3.1.7: 고급 옵션 숨김
 
   // [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+  // SchemaFilter에서 검색 필드 디바운싱이 자동으로 적용됨
   const { data: students, isLoading, error } = useStudents({
     ...filter,
     search: filter.search?.trim() || undefined, // 빈 문자열이면 undefined로 변환
@@ -61,6 +62,7 @@ export function StudentsPage() {
   const effectiveTableSchema = studentTableSchemaData || studentTableSchema;
 
   const handleFilterChange = React.useCallback((filters: Record<string, unknown>) => {
+    // SchemaFilter에서 검색 필드 디바운싱이 자동으로 적용됨
     setFilter((prev) => ({
       search: filters.search ? String(filters.search) : undefined,
       status: filters.status as StudentStatus | StudentStatus[] | undefined,
@@ -83,139 +85,188 @@ export function StudentsPage() {
     });
   };
 
+  // 다운로드 핸들러
+  const handleDownload = React.useCallback(async () => {
+    try {
+      // xlsx 모듈 동적 로드
+      const XLSX = await import('xlsx');
+
+      // 학생 데이터를 엑셀 형식으로 변환
+      const excelData = students?.map((student) => ({
+        이름: student.name,
+        생년월일: student.birth_date || '',
+        성별: student.gender || '',
+        전화번호: student.phone || '',
+        이메일: student.email || '',
+        주소: student.address || '',
+        학교: student.school_name || '',
+        학년: student.grade || '',
+        상태: student.status || '',
+        비고: student.notes || '',
+      })) || [];
+
+      // 워크북 생성
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, '학생 목록');
+
+      // 파일 다운로드
+      const fileName = `학생목록_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+    } catch (error) {
+      showAlert(
+        error instanceof Error ? error.message : '엑셀 다운로드에 실패했습니다.',
+        '오류',
+        'error'
+      );
+    }
+  }, [students, showAlert]);
+
+  // 양식 다운로드 핸들러
+  const handleDownloadTemplate = React.useCallback(async () => {
+    try {
+      // xlsx 모듈 동적 로드
+      const XLSX = await import('xlsx');
+
+      // 빈 양식 데이터 생성 (헤더만 있는 엑셀 파일)
+      const templateData = [{
+        이름: '',
+        생년월일: '',
+        성별: '',
+        전화번호: '',
+        이메일: '',
+        주소: '',
+        학교: '',
+        학년: '',
+        상태: '',
+        비고: '',
+      }];
+
+      // 워크북 생성
+      const worksheet = XLSX.utils.json_to_sheet(templateData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, '학생 양식');
+
+      // 파일 다운로드
+      const fileName = `학생등록양식_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+
+      showAlert('양식 파일 다운로드가 완료되었습니다.', '다운로드 완료', 'success');
+    } catch (error) {
+      showAlert(
+        error instanceof Error ? error.message : '양식 파일 다운로드에 실패했습니다.',
+        '오류',
+        'error'
+      );
+    }
+  }, [showAlert]);
+
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <h1 style={{
-            fontSize: 'var(--font-size-2xl)',
-            fontWeight: 'var(--font-weight-bold)',
-            marginBottom: 'var(--spacing-md)',
-            color: 'var(--color-text)'
-          }}>
-            학생 관리
-          </h1>
+        {/* 타이틀과 액션 버튼을 한 줄로 배치 */}
+        <PageHeader
+          title="학생관리"
+          actions={
+            <DataTableActionButtons
+              align="right"
+              onCreate={() => setShowCreateForm(true)}
+              onUpload={() => fileInputRef.current?.click()}
+              onDownload={handleDownload}
+              onDownloadTemplate={handleDownloadTemplate}
+              uploadDisabled={bulkCreateStudents.isPending}
+              createTooltip="학생등록"
+            />
+          }
+        />
 
-          {/* 검색 및 필터 패널 */}
-          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              {/* SchemaFilter 사용 */}
-              <SchemaFilter
-                schema={effectiveFilterSchema}
-                onFilterChange={handleFilterChange}
-                defaultValues={{
-                  search: filter.search || '',
-                  status: filter.status || '',
-                  grade: filter.grade || '',
-                  class_id: filter.class_id || '',
-                }}
-              />
+        {/* 검색 및 필터 패널 */}
+        {/* SchemaFilter에서 검색 필드 디바운싱이 자동으로 적용됨 */}
+        <SchemaFilter
+          schema={effectiveFilterSchema}
+          onFilterChange={handleFilterChange}
+          defaultValues={{
+            search: filter.search || '',
+            status: filter.status || '',
+            grade: filter.grade || '',
+            class_id: filter.class_id || '',
+          }}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx,.xls"
+          style={{ display: 'none' }}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
 
-              {/* 아키텍처 문서 408-431줄: 기기별 자동 레이아웃 결정으로 사용자 선택 제거 */}
-              {/* PC: 테이블 자동, Tablet/Mobile: 카드 자동 */}
+            try {
+              // xlsx 모듈 동적 로드
+              const XLSX = await import('xlsx');
 
-              {/* 학생 등록 버튼 */}
-              <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-                <Button variant="solid" color="primary" onClick={() => setShowCreateForm(true)}>
-                  학생 등록
-                </Button>
-                {/* 아키텍처 문서 3.1.7: 일괄 등록은 고급 옵션 */}
-                {showAdvancedOptions && (
-                  <Button
-                    variant="outline"
-                    color="primary"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={bulkCreateStudents.isPending}
-                  >
-                    {bulkCreateStudents.isPending ? '등록 중..' : '엑셀 파일 일괄 등록'}
-                  </Button>
-                )}
-                {/* 고급 옵션 토글 버튼 */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-                >
-                  {showAdvancedOptions ? '고급 옵션 숨기기' : '고급 옵션'}
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls"
-                  style={{ display: 'none' }}
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
+              // 엑셀 파일 읽기
+              const arrayBuffer = await file.arrayBuffer();
+              const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+              const sheetName = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[sheetName];
 
-                    try {
-                      // xlsx 모듈 동적 로드
-                      const XLSX = await import('xlsx');
+              // JSON으로 변환
+              const jsonData = XLSX.utils.sheet_to_json(worksheet) as Array<Record<string, unknown>>;
 
-                      // 엑셀 파일 읽기
-                      const arrayBuffer = await file.arrayBuffer();
-                      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                      const sheetName = workbook.SheetNames[0];
-                      const worksheet = workbook.Sheets[sheetName];
+              // CreateStudentInput 형식으로 변환
+              const students: CreateStudentInput[] = jsonData.map((row: Record<string, unknown>) => ({
+                name: String(row['이름'] || row['name'] || ''),
+                birth_date: row['생년월일'] || row['birth_date'] ? String(row['생년월일'] || row['birth_date']) : undefined,
+                gender: (row['성별'] || row['gender'] || undefined) as Gender | undefined,
+                phone: row['전화번호'] || row['phone'] ? String(row['전화번호'] || row['phone']) : undefined,
+                email: row['이메일'] || row['email'] ? String(row['이메일'] || row['email']) : undefined,
+                address: row['주소'] || row['address'] ? String(row['주소'] || row['address']) : undefined,
+                school_name: row['학교'] || row['school_name'] ? String(row['학교'] || row['school_name']) : undefined,
+                grade: row['학년'] || row['grade'] ? String(row['학년'] || row['grade']) : undefined,
+                status: (row['상태'] || row['status'] || 'active') as StudentStatus,
+                notes: row['비고'] || row['notes'] ? String(row['비고'] || row['notes']) : undefined,
+              })).filter((s) => s.name.trim() !== ''); // 이름이 없는 경우 제외
 
-                      // JSON으로 변환
-                      const jsonData = XLSX.utils.sheet_to_json(worksheet) as Array<Record<string, unknown>>;
+              if (students.length === 0) {
+                showAlert('등록할 학생 데이터가 없습니다.', '알림', 'warning');
+                return;
+              }
 
-                      // CreateStudentInput 형식으로 변환
-                      const students: CreateStudentInput[] = jsonData.map((row: Record<string, unknown>) => ({
-                        name: String(row['이름'] || row['name'] || ''),
-                        birth_date: row['생년월일'] || row['birth_date'] ? String(row['생년월일'] || row['birth_date']) : undefined,
-                        gender: (row['성별'] || row['gender'] || undefined) as Gender | undefined,
-                        phone: row['전화번호'] || row['phone'] ? String(row['전화번호'] || row['phone']) : undefined,
-                        email: row['이메일'] || row['email'] ? String(row['이메일'] || row['email']) : undefined,
-                        address: row['주소'] || row['address'] ? String(row['주소'] || row['address']) : undefined,
-                        school_name: row['학교'] || row['school_name'] ? String(row['학교'] || row['school_name']) : undefined,
-                        grade: row['학년'] || row['grade'] ? String(row['학년'] || row['grade']) : undefined,
-                        status: (row['상태'] || row['status'] || 'active') as StudentStatus,
-                        notes: row['비고'] || row['notes'] ? String(row['비고'] || row['notes']) : undefined,
-                      })).filter((s) => s.name.trim() !== ''); // 이름이 없는 경우 제외
+              // 일괄 등록 실행
+              const result = await bulkCreateStudents.mutateAsync(students);
 
-                      if (students.length === 0) {
-                        showAlert('등록할 학생 데이터가 없습니다.', '알림', 'warning');
-                        return;
-                      }
+              if (result.errors && result.errors.length > 0) {
+                showAlert(
+                  `${result.results.length}개 등록 완료, ${result.errors.length}개 실패`,
+                  '일괄 등록 결과',
+                  'warning'
+                );
+              } else {
+                showAlert(
+                  `${result.results.length}개 등록 완료`,
+                  '일괄 등록 완료',
+                  'success'
+                );
+              }
 
-                      // 일괄 등록 실행
-                      const result = await bulkCreateStudents.mutateAsync(students);
+              // 파일 입력 초기화
+              if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+              }
+            } catch (error) {
+              // 에러는 showAlert로 사용자에게 표시
+              showAlert(
+                error instanceof Error ? error.message : '엑셀 일괄 등록에 실패했습니다.',
+                '오류',
+                'error'
+              );
+            }
+          }}
+        />
 
-                      if (result.errors && result.errors.length > 0) {
-                        showAlert(
-                          `${result.results.length}개 등록 완료, ${result.errors.length}개 실패`,
-                          '일괄 등록 결과',
-                          'warning'
-                        );
-                      } else {
-                        showAlert(
-                          `${result.results.length}개 등록 완료`,
-                          '일괄 등록 완료',
-                          'success'
-                        );
-                      }
-
-                      // 파일 입력 초기화
-                      if (fileInputRef.current) {
-                        fileInputRef.current.value = '';
-                      }
-                    } catch (error) {
-                      // 에러는 showAlert로 사용자에게 표시
-                      showAlert(
-                        error instanceof Error ? error.message : '엑셀 일괄 등록에 실패했습니다.',
-                        '오류',
-                        'error'
-                      );
-                    }
-                  }}
-                />
-              </div>
-            </div>
-          </Card>
-
-          {/* 태그 필터 - 아키텍처 문서 3.1.6: 고급 옵션 활성화 시에만 표시 */}
-          {showAdvancedOptions && tags && tags.length > 0 && (
+        {/* 태그 필터 */}
+        {tags && tags.length > 0 && (
             <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap', marginBottom: 'var(--spacing-md)' }}>
               {tags.map((tag: { id: string; name: string; color: string }) => (
                 <Button
@@ -232,10 +283,10 @@ export function StudentsPage() {
                 </Button>
               ))}
             </div>
-          )}
+        )}
 
-          {/* 학생 등록 폼 - 반응형: 모바일/태블릿은 모달/드로어, 데스크톱은 인라인 */}
-          {showCreateForm && (
+        {/* 학생 등록 폼 - 반응형: 모바일/태블릿은 모달/드로어, 데스크톱은 인라인 */}
+        {showCreateForm && (
             <>
               {isMobile || isTablet ? (
                 // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
@@ -266,51 +317,32 @@ export function StudentsPage() {
                   effectiveFormSchema={effectiveFormSchema}
                 />
               )}
-            </>
-          )}
+          </>
+        )}
 
-          {/* 학생 목록 */}
-          {/* 로딩 상태 */}
-          {isLoading && (
-            <Card padding="lg" variant="default">
-              <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                학생 목록을 불러오는 중...
-              </div>
-            </Card>
-          )}
+        {/* 학생 목록 */}
+        {/* 로딩 상태 */}
+        {isLoading && (
+          <Card padding="lg" variant="default">
+            <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+              학생 목록을 불러오는 중...
+            </div>
+          </Card>
+        )}
 
-          {/* 에러 상태 (로딩 완료 후에만 표시) */}
-          {!isLoading && error && (
+        {/* 에러 상태 (로딩 완료 후에만 표시) */}
+        {!isLoading && error && (
             <Card padding="md" variant="outlined">
               <div style={{ color: 'var(--color-error)' }}>
                 오류: {error instanceof Error ? error.message : '학생 목록을 불러오는데 실패했습니다.'}
               </div>
-            </Card>
-          )}
+          </Card>
+        )}
 
-          {/* 학생 목록 (로딩 완료 후, 에러 없을 때만 표시) */}
-          {!isLoading && !error && students && students.length > 0 && (
+        {/* 학생 목록 (로딩 완료 후, 에러 없을 때만 표시) */}
+        {!isLoading && !error && students && students.length > 0 && (
             <>
-              {viewMode === 'card' && (
-                <Grid
-                  columns={{
-                    xs: 1,      // Mobile: 1열 (아키텍처 문서 431줄)
-                    sm: 1,      // Mobile: 1열
-                    md: 2,      // Tablet: 2열 (아키텍처 문서 419줄)
-                    // lg, xl은 viewMode가 'table'이므로 사용되지 않음
-                  }}
-                  gap="md"
-                >
-                  {students.map((student) => (
-                    <StudentCard
-                      key={student.id}
-                      student={student}
-                      onDetailClick={() => navigate(`/students/${student.id}`)}
-                    />
-                  ))}
-                </Grid>
-              )}
-              {viewMode === 'table' && effectiveTableSchema && (
+              {effectiveTableSchema && (
                 <SchemaTable
                   key={`student-table-${JSON.stringify(filter)}`}
                   schema={effectiveTableSchema}
@@ -324,11 +356,11 @@ export function StudentsPage() {
                   }}
                 />
               )}
-            </>
-          )}
+          </>
+        )}
 
-          {/* 빈 상태 (로딩 완료 후, 에러 없을 때, 학생이 없을 때만 표시) */}
-          {!isLoading && !error && students && students.length === 0 && (
+        {/* 빈 상태 (로딩 완료 후, 에러 없을 때, 학생이 없을 때만 표시) */}
+        {!isLoading && !error && students && students.length === 0 && (
             <Card padding="lg" variant="default">
               <div style={{
                 textAlign: 'center',
@@ -345,9 +377,8 @@ export function StudentsPage() {
                   첫 학생 등록하기
                 </Button>
               </div>
-            </Card>
-          )}
-        </div>
+          </Card>
+        )}
       </Container>
     </ErrorBoundary>
   );

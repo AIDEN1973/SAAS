@@ -18,6 +18,7 @@ export interface PopoverProps {
   placement?: 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end';
   offset?: number;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 /**
@@ -33,6 +34,7 @@ export const Popover: React.FC<PopoverProps> = ({
   placement = 'bottom-start',
   offset = 4,
   className,
+  style,
 }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -151,29 +153,36 @@ export const Popover: React.FC<PopoverProps> = ({
 
   if (!isOpen || !anchorEl) return null;
 
+  // style prop에 width가 있으면 minWidth를 설정하지 않음 (셀렉트 박스 너비에 맞추기 위함)
+  // 그렇지 않으면 기본 minWidth 적용
+  const popoverStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: `${position.top}px`,
+    left: `${position.left}px`,
+    zIndex: 'var(--z-popover)',
+    backgroundColor: 'var(--color-white)',
+    borderRadius: 'var(--border-radius-md)',
+    boxShadow: 'var(--shadow-lg)',
+    border: 'var(--border-width-thin) solid var(--color-gray-200)',
+    padding: 'var(--spacing-xs)',
+    // style에 width가 없을 때만 minWidth 적용
+    ...(style?.width ? {} : { minWidth: 'var(--width-card-min)' }), // styles.css 준수: 카드 최소 너비
+    maxWidth: 'var(--width-content-max)', // styles.css 준수: 콘텐츠 최대 너비
+    // overflow와 maxHeight는 자식 컴포넌트에서 처리 (이중 스크롤 방지)
+    overflow: 'visible',
+    // 위치 계산 완료 전까지 숨김 (번쩍이는 현상 방지)
+    opacity: isPositioned ? 1 : 0,
+    visibility: isPositioned ? 'visible' : 'hidden', // visibility로 레이아웃 계산은 유지하되 보이지 않게
+    transition: isPositioned ? 'opacity var(--transition-fast)' : 'none',
+    // style prop을 마지막에 적용하여 width 등이 우선 적용되도록 함
+    ...(style || {}),
+  };
+
   return (
     <div
       ref={popoverRef}
       className={clsx(className)}
-      style={{
-        position: 'fixed',
-        top: `${position.top}px`,
-        left: `${position.left}px`,
-        zIndex: 'var(--z-popover)',
-        backgroundColor: 'var(--color-white)',
-        borderRadius: 'var(--border-radius-md)',
-        boxShadow: 'var(--shadow-lg)',
-        border: 'var(--border-width-thin) solid var(--color-gray-200)',
-        padding: 'var(--spacing-xs)',
-        minWidth: 'var(--width-card-min)', // styles.css 준수: 카드 최소 너비
-        maxWidth: 'var(--width-content-max)', // styles.css 준수: 콘텐츠 최대 너비
-        // overflow와 maxHeight는 자식 컴포넌트에서 처리 (이중 스크롤 방지)
-        overflow: 'visible',
-        // 위치 계산 완료 전까지 숨김 (번쩍이는 현상 방지)
-        opacity: isPositioned ? 1 : 0,
-        visibility: isPositioned ? 'visible' : 'hidden', // visibility로 레이아웃 계산은 유지하되 보이지 않게
-        transition: isPositioned ? 'opacity var(--transition-fast)' : 'none',
-      }}
+      style={popoverStyle}
     >
       {children}
     </div>

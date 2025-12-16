@@ -8,7 +8,7 @@
 
 import React, { useState } from 'react';
 import { ErrorBoundary, useModal, useResponsiveMode } from '@ui-core/react';
-import { Container, Card, Button, Modal, Drawer } from '@ui-core/react';
+import { Container, Card, Button, Modal, Drawer, PageHeader } from '@ui-core/react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
 import { apiClient } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
@@ -87,15 +87,9 @@ export function TeachersPage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-            <h1 style={{
-              fontSize: 'var(--font-size-2xl)',
-              fontWeight: 'var(--font-weight-bold)',
-              color: 'var(--color-text)'
-            }}>
-              강사 관리
-            </h1>
+        <PageHeader
+          title="강사 관리"
+          actions={
             <Button
               variant="solid"
               size="sm"
@@ -103,21 +97,20 @@ export function TeachersPage() {
             >
               강사 등록
             </Button>
-          </div>
+          }
+        />
 
-          {/* 검색 및 필터 패널 */}
-          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-            <SchemaFilter
-              schema={effectiveFilterSchema}
-              onFilterChange={handleFilterChange}
-              defaultValues={{
-                search: filter.search || '',
-                status: filter.status || '',
-              }}
-            />
-          </Card>
+        {/* 검색 및 필터 패널 */}
+        <SchemaFilter
+          schema={effectiveFilterSchema}
+          onFilterChange={handleFilterChange}
+          defaultValues={{
+            search: filter.search || '',
+            status: filter.status || '',
+          }}
+        />
 
-          {/* 강사 등록 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
+        {/* 강사 등록 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
           {showCreateForm && (
             <>
               {isMobile || isTablet ? (
@@ -201,7 +194,6 @@ export function TeachersPage() {
               onClose={() => setEditingTeacherId(null)}
             />
           )}
-        </div>
       </Container>
     </ErrorBoundary>
   );

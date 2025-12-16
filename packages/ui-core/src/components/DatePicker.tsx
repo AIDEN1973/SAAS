@@ -41,6 +41,40 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   disabled,
   ...props
 }) => {
+  // 라벨을 플레이스홀더로 사용
+  const placeholder = label || '날짜를 선택하세요';
+
+  // 플레이스홀더에서 키워드를 볼드 처리하는 함수
+  const renderPlaceholderWithBold = React.useCallback((text: string) => {
+    const keywords = ['이름', '학년', '클래스', '재원상태'];
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+
+    keywords.forEach((keyword) => {
+      const index = text.indexOf(keyword, lastIndex);
+      if (index !== -1) {
+        // 키워드 이전 텍스트 추가
+        if (index > lastIndex) {
+          parts.push(text.substring(lastIndex, index));
+        }
+        // 키워드를 볼드 처리
+        parts.push(
+          <strong key={`${keyword}-${index}`} style={{ fontWeight: 'var(--font-weight-extrabold)' }}>
+            {keyword}
+          </strong>
+        );
+        lastIndex = index + keyword.length;
+      }
+    });
+
+    // 남은 텍스트 추가
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : text;
+  }, []);
+
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -70,42 +104,62 @@ export const DatePicker: React.FC<DatePickerProps> = ({
 
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
-      padding: 'var(--spacing-xs) var(--spacing-sm)',
+      paddingTop: 'var(--spacing-xs)',
+      paddingBottom: 'var(--spacing-xs)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
+      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (아이콘 공간 포함)
     },
     sm: {
-      padding: 'var(--spacing-xs) var(--spacing-sm)',
+      paddingTop: 'var(--spacing-xs)',
+      paddingBottom: 'var(--spacing-xs)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
+      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (아이콘 공간 포함)
     },
     md: {
-      padding: 'var(--spacing-sm) var(--spacing-md)',
+      paddingTop: 'var(--spacing-sm)',
+      paddingBottom: 'var(--spacing-sm)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
+      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (아이콘 공간 포함)
     },
     lg: {
-      padding: 'var(--spacing-md) var(--spacing-lg)',
+      paddingTop: 'var(--spacing-md)',
+      paddingBottom: 'var(--spacing-md)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
+      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (아이콘 공간 포함)
     },
     xl: {
-      padding: 'var(--spacing-lg) var(--spacing-xl)',
+      paddingTop: 'var(--spacing-lg)',
+      paddingBottom: 'var(--spacing-lg)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
+      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (아이콘 공간 포함)
     },
   };
 
+  const hasValue = !!selectedDate;
+
   const inputStyle: React.CSSProperties = {
     ...sizeStyles[size],
-    border: `var(--border-width-thin) solid ${error ? 'var(--color-red-500)' : 'var(--color-gray-200)'}`, // styles.css 준수: border-width 토큰 사용
-    borderRadius: 'var(--border-radius-sm)',
-    backgroundColor: disabled ? 'var(--color-gray-100)' : 'var(--color-white)',
-    color: disabled ? 'var(--color-text-tertiary)' : 'var(--color-text)',
+    border: 'none',
+    borderBottom: `var(--border-width-form-bottom) solid transparent`, // styles.css 토큰: 레이아웃 유지를 위해 항상 2px, 색상은 투명
+    borderRadius: 0,
+    backgroundColor: disabled ? 'var(--color-form-disabled-bg)' : 'var(--color-white)', // styles.css 토큰: 폼 필드 배경색
+    color: disabled ? 'var(--color-form-disabled-text)' : 'var(--color-text)', // styles.css 토큰: 폼 필드 텍스트 색상
     outline: 'none',
     width: fullWidth ? '100%' : 'auto',
-    transition: 'var(--transition-all)', // styles.css 준수: transition 토큰 사용
-    fontFamily: 'var(--font-family)',
-    fontSize: 'var(--font-size-base)', // Input과 동일한 폰트 사이즈 (일관성)
-    lineHeight: 'var(--line-height)', // Input과 동일한 line-height (일관성)
-    boxShadow: isOpen ? 'var(--shadow-md)' : 'var(--shadow-sm)',
-    paddingRight: 'var(--spacing-xl)', // 아이콘 공간 확보 (Select와 동일)
+    transition: 'var(--transition-all)', // styles.css 토큰: transition
+    fontFamily: 'var(--font-family)', // styles.css 토큰: 폰트 패밀리
+    fontSize: 'var(--font-size-base)', // styles.css 토큰: 폼 필드 폰트 사이즈
+    fontWeight: 'var(--font-weight-normal)', // styles.css 토큰: 폼 필드 폰트 웨이트
+    lineHeight: 'var(--line-height)', // styles.css 토큰: 폼 필드 라인 높이
+    boxShadow: hasValue
+      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)') // 값이 있으면 2px 테두리
+      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)'), // 값이 없으면 1px 테두리
     cursor: disabled ? 'not-allowed' : 'pointer',
     display: 'flex',
     alignItems: 'center',
-    boxSizing: 'border-box', // Input과 동일한 box-sizing (일관성)
-    // position: relative는 외부 컨테이너에 설정 (Select와 동일한 구조)
-    // 높이는 fontSize * lineHeight + padding-top + padding-bottom + border로 자동 계산됨 (Input과 동일)
+    boxSizing: 'border-box', // styles.css 토큰: 폼 필드 box-sizing
+    // position: relative는 외부 컨테이너에 설정
+    // 높이는 fontSize * lineHeight + padding-top + padding-bottom + border로 자동 계산됨
   };
 
   const handleToggle = useCallback(() => {
@@ -114,7 +168,12 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     if (!isOpen && selectedDate) {
       setCurrentMonth(new Date(selectedDate));
     }
-  }, [disabled, isOpen, selectedDate]);
+    // 클릭 시 포커스 스타일 적용 (styles.css 토큰 사용)
+    if (anchorRef.current) {
+      anchorRef.current.style.borderBottomColor = 'transparent'; // styles.css 토큰: 항상 transparent 유지 (레이아웃 고정)
+      anchorRef.current.style.boxShadow = error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)'; // styles.css 토큰: 포커스 시 시각적 2px 테두리
+    }
+  }, [disabled, isOpen, selectedDate, error]);
 
   const handleDateSelect = useCallback((date: Date) => {
     const year = date.getFullYear();
@@ -147,17 +206,20 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   }, [selectedDate, onChange]);
 
   const handleFocus = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
-    e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-primary)';
-    // styles.css 준수: focus-ring-width 토큰 사용 (2px)
-    e.currentTarget.style.boxShadow = `0 0 0 var(--focus-ring-width) ${error ? 'var(--color-red-50)' : 'var(--color-primary-50)'}`;
+    e.currentTarget.style.borderBottomColor = 'transparent'; // styles.css 토큰: 항상 transparent 유지 (레이아웃 고정)
+    e.currentTarget.style.boxShadow = error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)'; // styles.css 토큰: 포커스 시 항상 시각적 2px 테두리
     onFocus?.(e as unknown as React.FocusEvent<HTMLInputElement>);
   }, [error, onFocus]);
 
   const handleBlur = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
-    e.currentTarget.style.borderColor = error ? 'var(--color-red-500)' : 'var(--color-gray-200)';
-    e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+    e.currentTarget.style.borderBottomColor = 'transparent'; // styles.css 토큰: 투명으로 변경
+    // 값이 있으면 2px 유지, 값이 없으면 1px로 복원
+    const currentHasValue = !!selectedDate;
+    e.currentTarget.style.boxShadow = currentHasValue
+      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
+      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)');
     onBlur?.(e as unknown as React.FocusEvent<HTMLInputElement>);
-  }, [error, onBlur]);
+  }, [error, onBlur, selectedDate]);
 
   // 달력 그리드 생성
   const calendarDays = useMemo(() => {
@@ -220,6 +282,17 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     );
   }, [selectedDate]);
 
+  // 값 변경 시 스타일 업데이트 (값이 있으면 2px, 없으면 1px)
+  useEffect(() => {
+    if (anchorRef.current && !isOpen) {
+      const currentHasValue = !!selectedDate;
+      anchorRef.current.style.borderBottomColor = 'transparent';
+      anchorRef.current.style.boxShadow = currentHasValue
+        ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
+        : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)');
+    }
+  }, [selectedDate, error, isOpen]);
+
   return (
     <div
       style={{
@@ -228,17 +301,6 @@ export const DatePicker: React.FC<DatePickerProps> = ({
         width: fullWidth ? '100%' : 'auto',
       }}
     >
-      {label && (
-        <label
-          style={{
-            fontWeight: 'var(--font-weight-medium)',
-            color: 'var(--color-text)',
-            marginBottom: 'var(--spacing-xs)',
-          }}
-        >
-          {label}
-        </label>
-      )}
       <div
         style={{
           position: 'relative', // 아이콘 absolute positioning을 위한 relative (Select와 동일)
@@ -264,9 +326,11 @@ export const DatePicker: React.FC<DatePickerProps> = ({
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
+              color: displayValue ? 'var(--color-text)' : 'var(--color-text-tertiary)',
+              fontWeight: 'var(--font-weight-normal)', // styles.css 준수: 폰트 웨이트 토큰 사용
             }}
           >
-            {displayValue || '날짜를 선택하세요'}
+            {displayValue ? displayValue : renderPlaceholderWithBold(placeholder)}
           </span>
           <div
             style={{
@@ -283,23 +347,25 @@ export const DatePicker: React.FC<DatePickerProps> = ({
             }}
           >
             <svg
-              width="16"
-              height="16"
               viewBox="0 0 16 16"
               fill="none"
-              style={{ color: 'var(--color-gray-500)' }}
+              style={{
+                width: 'var(--size-icon-base)',
+                height: 'var(--size-icon-base)',
+                color: 'var(--color-text-tertiary)'
+              }} // 기본 텍스트 색상 토큰 사용
             >
               <path
                 d="M12 2H4C2.89543 2 2 2.89543 2 4V12C2 13.1046 2.89543 14 4 14H12C13.1046 14 14 13.1046 14 12V4C14 2.89543 13.1046 2 12 2Z"
                 stroke="currentColor"
-                strokeWidth="1.5"
+                strokeWidth="var(--stroke-width-icon)"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
               <path
                 d="M11 1V3M5 1V3M2 5H14"
                 stroke="currentColor"
-                strokeWidth="1.5"
+                strokeWidth="var(--stroke-width-icon)"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -315,11 +381,15 @@ export const DatePicker: React.FC<DatePickerProps> = ({
               onClose={() => setIsOpen(false)}
               anchorEl={anchorRef.current}
               placement="bottom-start"
+              style={{
+                width: 'var(--width-calendar)', // styles.css 준수: 달력 너비 토큰 사용
+                maxWidth: 'calc(100vw - var(--spacing-lg) * 2)', // 화면 경계 고려
+              }}
             >
               <div
                 style={{
                   padding: 'var(--spacing-md)',
-                  minWidth: 'var(--width-card-min)', // styles.css 준수: 카드 최소 너비
+                  width: '100%', // 부모 너비에 맞춤
                 }}
               >
                 {/* 달력 헤더 */}
@@ -345,6 +415,10 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                       justifyContent: 'center',
                       color: 'var(--color-text)',
                       transition: 'background-color var(--transition-base)', // styles.css 준수: transition 토큰 사용
+                      width: 'var(--size-checkbox)', // 20px - 적절한 버튼 크기
+                      height: 'var(--size-checkbox)', // 20px - 적절한 버튼 크기
+                      minWidth: 'var(--size-checkbox)', // 접근성
+                      minHeight: 'var(--size-checkbox)', // 접근성
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = 'var(--color-gray-100)';
@@ -353,11 +427,11 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                       e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <svg viewBox="0 0 16 16" fill="none" style={{ width: 'var(--size-icon-sm)', height: 'var(--size-icon-sm)' }}>
                       <path
                         d="M10 12L6 8L10 4"
                         stroke="currentColor"
-                        strokeWidth="2"
+                        strokeWidth="var(--stroke-width-icon)"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
@@ -386,6 +460,10 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                       justifyContent: 'center',
                       color: 'var(--color-text)',
                       transition: 'background-color var(--transition-base)', // styles.css 준수: transition 토큰 사용
+                      width: 'var(--size-checkbox)', // 20px - 적절한 버튼 크기
+                      height: 'var(--size-checkbox)', // 20px - 적절한 버튼 크기
+                      minWidth: 'var(--size-checkbox)', // 접근성
+                      minHeight: 'var(--size-checkbox)', // 접근성
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = 'var(--color-gray-100)';
@@ -394,11 +472,11 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                       e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <svg viewBox="0 0 16 16" fill="none" style={{ width: 'var(--size-icon-sm)', height: 'var(--size-icon-sm)' }}>
                       <path
                         d="M6 4L10 8L6 12"
                         stroke="currentColor"
-                        strokeWidth="2"
+                        strokeWidth="var(--stroke-width-icon)"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
@@ -426,7 +504,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                           ? 'var(--color-primary)'
                           : day === '토'
                           ? 'var(--color-secondary)'
-                          : 'var(--color-text-secondary)',
+                          : 'var(--color-text)', // 기본 텍스트 색상 사용
                         fontSize: 'var(--font-size-sm)',
                         padding: 'var(--spacing-xs)',
                       }}
@@ -566,7 +644,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
       {error && (
         <span
           style={{
-            color: 'var(--color-red-500)',
+            color: 'var(--color-form-error)', // styles.css 토큰: 폼 필드 에러 메시지 색상
             marginTop: 'var(--spacing-xs)',
             fontSize: 'var(--font-size-sm)',
           }}

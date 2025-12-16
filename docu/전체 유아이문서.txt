@@ -284,15 +284,32 @@ Migration Script는 런타임이 아니라 빌드 타임 또는 백엔드 시점
 
 **기본 스타일 수정 위치**:
 - **전역 CSS 변수**: `packages/ui-core/src/styles.css` - 폰트, 간격, 크기, 테두리 반경, 그림자 등 모든 테넌트 공통 스타일
+  - **폼 필드 컴포넌트 디자인 토큰**: `styles.css`의 "폼 필드 컴포넌트 디자인 토큰" 섹션에서 Input, Select, DatePicker, Textarea 등 모든 폼 필드 컴포넌트의 스타일을 통합 관리
+  - **아이콘 관련 토큰**: `--size-icon-sm` (10px), `--size-icon-md` (14px), `--size-icon-base` (16px), `--stroke-width-icon` (1.5), `--stroke-width-icon-bold` (2)
+  - **투명도 토큰**: `--opacity-disabled` (0.5), `--opacity-loading` (0.6), `--opacity-inactive` (0.6), `--opacity-secondary` (0.7), `--opacity-full` (1)
+  - **필터 효과 토큰**: `--filter-icon-glow` (아이콘 발광 효과, 테이블 정렬 아이콘 등)
+  - **테이블 컴포넌트 토큰**: `--color-table-row-border` (#bec9d3, 테이블 행간 테두리 색상), `--letter-spacing-table-header` (0.05em, 테이블 헤더 글자 간격)
+  - **레이아웃 너비 토큰**: `--width-sidebar` (13rem, 사이드바 너비), `--width-sidebar-collapsed` (4.5rem, 사이드바 축소 너비), `--width-drawer` (20rem, Drawer 기본 너비)
+  - **레이아웃 간격 토큰**: `--spacing-content-top` (64px, 바디와 사이드바 동일한 상단 여백), `--spacing-negative-xs` (-4px, 사이드바 메뉴 행간 간격 줄이기용)
+  - **타이포그래피 토큰**: `--letter-spacing-title` (-0.02em, 타이틀 글자 간격)
 - **컴포넌트별 기본 스타일**: `packages/ui-core/src/components/*.tsx` - 각 컴포넌트의 레이아웃, 패딩, 마진, 호버 효과 등
+  - **예외**: 폼 필드 컴포넌트는 개별 파일에서 하드코딩하지 않고, `styles.css`의 디자인 토큰만 사용
+  - **DataTable 컴포넌트**: 정렬 기능 기본 활성화 (sortable 기본값: true), 필터 아이콘 클릭 시 정렬 기능 동작, 모든 스타일은 CSS 변수 사용
 - **테넌트별 색상 변경**: `packages/ui-core/src/utils/applyTheme.ts` - 색상만 동적으로 변경 (기본 스타일은 변경하지 않음)
 
 **기본 스타일 수정 예시**:
 - 버튼 패딩 변경: `packages/ui-core/src/components/Button.tsx`의 `sizeStyles` 수정
 - 테이블 헤더 스타일 변경: `packages/ui-core/src/components/DataTable.tsx`의 인라인 스타일 수정
 - 전역 간격 변경: `packages/ui-core/src/styles.css`의 `--spacing-*` 변수 수정
+- 폼 필드 테두리 스타일 변경: `packages/ui-core/src/styles.css`의 `--border-width-form-bottom`, `--shadow-form-bottom-*` 등 폼 필드 디자인 토큰 수정
 
-→ 상세 가이드: `docu/컴포넌트_기본_스타일_수정_가이드.md` 참조
+**폼 필드 컴포넌트 디자인 토큰 (일관성 관리)**:
+- 모든 폼 필드 컴포넌트(Input, Select, DatePicker, Textarea)는 `styles.css`의 디자인 토큰을 통해 일관성 있게 관리됨
+- 테두리 두께, 색상, 포커스 효과 등 모든 스타일이 CSS 변수로 통합 관리
+- 레이아웃 이동 방지: `border-bottom`은 항상 고정 두께로 유지하고, 시각적 효과는 `box-shadow`로 구현
+- 에러 색상, 비활성화 색상 등도 디자인 토큰으로 통합 관리
+
+→ 상세 가이드: `docu/컴포넌트_기본_스타일_수정_가이드.md` 참조 (폼 필드 컴포넌트 디자인 토큰 상세 가이드 포함)
 
 5. UI Kit Strategy — Customer vs Backoffice
 
@@ -456,6 +473,74 @@ Persistent Sidebar
 5. i18n 지원: 다국어 메시지 지원
 
 → 상세 가이드라인은 `docu/UI_가이드라인_모달_페이지_선택.md` 참조
+
+6-4. PageHeader 컴포넌트 사용 규칙 (Critical)
+
+[불변 규칙] 모든 페이지는 PageHeader 컴포넌트를 사용하여 일관된 헤더 구조를 유지해야 합니다.
+
+위치: `packages/ui-core/src/components/PageHeader.tsx`
+
+기본 사용법:
+
+```tsx
+<Container maxWidth="xl" padding="lg">
+  <PageHeader title="페이지 제목" />
+  {/* 나머지 콘텐츠 */}
+</Container>
+```
+
+Props:
+- `title` (필수): 페이지 타이틀
+- `actions` (선택): 타이틀 옆에 표시할 액션 버튼들
+- `titleSize`: 'xl' | '2xl' | '3xl' (기본값: '3xl')
+- `titleWeight`: 'bold' | 'extrabold' (기본값: 'extrabold')
+- `style`: 추가 스타일 (특수 케이스용)
+
+actions prop 사용 규칙:
+- 단일 Button: 직접 전달 (PageHeader가 자동으로 감싸는 div 제공)
+- 여러 요소: `<div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>`로 감싸서 전달
+
+반응형 처리:
+- 모바일 (xs, sm): 타이틀과 액션이 자동으로 줄바꿈됨
+- 데스크톱 (lg, xl): 한 줄로 배치됨
+
+특수 케이스:
+- 태블릿 모드에서 특별한 폰트 크기 요구사항이 있는 경우 `style` prop 사용 가능
+- 예: AttendancePage에서 태블릿 모드 제목 최소 24px 요구사항 충족
+
+사용 예시:
+
+```tsx
+// 기본 사용 (타이틀만)
+<PageHeader title="학생 관리" />
+
+// 액션 버튼 포함 (단일 버튼)
+<PageHeader
+  title="강사 관리"
+  actions={
+    <Button variant="solid" size="sm" onClick={handleCreate}>
+      강사 등록
+    </Button>
+  }
+/>
+
+// 액션 버튼 포함 (여러 버튼)
+<PageHeader
+  title="반 관리"
+  actions={
+    <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+      <Button variant="outline" size="sm" onClick={handleFilter}>
+        필터
+      </Button>
+      <Button variant="solid" size="sm" onClick={handleCreate}>
+        반 생성
+      </Button>
+    </div>
+  }
+/>
+```
+
+→ 상세 가이드라인은 `docu/컴포넌트 디자인.md`의 "PageHeader 컴포넌트 사용 가이드" 섹션을 참조하세요.
 
 7. 성능 최적화 — Enterprise Version
 7.1 Performance Gates (CI/CD)

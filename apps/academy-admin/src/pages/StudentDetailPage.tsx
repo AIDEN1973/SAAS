@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ErrorBoundary, useModal, useResponsiveMode } from '@ui-core/react';
-import { Container, Card, Button, Input, Select, Textarea, Drawer, BottomActionBar } from '@ui-core/react';
+import { Container, Card, Button, Input, Select, Textarea, Drawer, BottomActionBar, PageHeader } from '@ui-core/react';
 import { SchemaForm, SchemaDetail } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { toKST } from '@lib/date-utils';
@@ -156,15 +156,13 @@ export function StudentDetailPage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-            <h1 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
-              {student.name} 학생 상세
-            </h1>
+        <PageHeader
+          title={`${student.name} 학생 상세`}
+          actions={
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-            <Button variant="outline" onClick={() => navigate('/students/list')}>
-              목록으로
-            </Button>
+              <Button variant="outline" onClick={() => navigate('/students/list')}>
+                목록으로
+              </Button>
               {/* 아키텍처 문서 2.4: Teacher는 수정 제한, Assistant는 읽기 전용 */}
               {!isEditing && userRole !== 'teacher' && userRole !== 'assistant' && (
                 <Button variant="solid" onClick={() => setIsEditing(true)}>
@@ -172,9 +170,10 @@ export function StudentDetailPage() {
                 </Button>
               )}
             </div>
-          </div>
+          }
+        />
 
-          {/* 빠른 링크 (탭 전환: 한 페이지에 하나의 기능 원칙 준수) */}
+        {/* 빠른 링크 (탭 전환: 한 페이지에 하나의 기능 원칙 준수) */}
           {/* 아키텍처 문서 3.1.1: counsel, attendance, risk, welcome은 URL 기반, 나머지는 내부 탭 */}
           <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)', flexWrap: 'wrap' }}>
             <Button
@@ -417,7 +416,6 @@ export function StudentDetailPage() {
 
           {/* 환영 탭 */}
           {activeTab === 'welcome' && <WelcomeTab studentId={id || null} student={student} />}
-        </div>
       </Container>
     </ErrorBoundary>
   );
@@ -676,7 +674,7 @@ function WelcomeTab({ studentId, student }: { studentId: string | null; student:
           marginBottom: 'var(--spacing-md)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-            <span style={{ fontSize: 'var(--font-size-xl)' }}>✓</span>
+            <span style={{ fontSize: 'var(--font-size-xl)' }}>완료</span>
             <span style={{ color: 'var(--color-success)', fontWeight: 'var(--font-weight-semibold)' }}>
               환영 메시지가 이미 발송되었습니다.
             </span>
@@ -1213,7 +1211,7 @@ function ConsultationsTab({
                       onClick={() => onGenerateAISummary(consultation.id)}
                       style={{ fontSize: 'var(--font-size-xs)' }}
                     >
-                      🤖 AI 요약 생성
+                      AI 요약 생성
                     </Button>
                   </div>
                 )}

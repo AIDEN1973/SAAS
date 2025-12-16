@@ -17,7 +17,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, Container, Card, Button, Badge, useModal } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, Button, Badge, useModal, PageHeader } from '@ui-core/react';
 import { Grid } from '@ui-core/react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -183,7 +183,6 @@ export function BillingHomePage() {
           onClick={() => card.action_url && handleCardClick(card)}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-sm)' }}>
-            <div style={{ color: 'var(--color-error)', fontSize: 'var(--font-size-2xl)' }}>⚠️</div>
             <div style={{ flex: 1 }}>
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
                 {card.title}
@@ -283,7 +282,6 @@ export function BillingHomePage() {
           onClick={() => card.action_url && handleCardClick(card)}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-sm)' }}>
-            <div style={{ color: 'var(--color-warning)', fontSize: 'var(--font-size-xl)' }}>🚨</div>
             <div style={{ flex: 1 }}>
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
                 {card.title}
@@ -325,51 +323,41 @@ export function BillingHomePage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 'var(--spacing-lg)'
-          }}>
-            <h1 style={{
-              fontSize: 'var(--font-size-2xl)',
-              fontWeight: 'var(--font-weight-bold)',
-              color: 'var(--color-text)'
-            }}>
-              수납/청구 홈
-            </h1>
+        <PageHeader
+          title="수납/청구 홈"
+          actions={
             <Button
               variant="outline"
               onClick={() => navigate('/billing/list')}
             >
               전체 청구서 보기
             </Button>
-          </div>
+          }
+        />
 
-          {/* 로딩 상태 */}
-          {isLoading && (
-            <Card padding="lg" variant="default">
-              <div style={{
-                textAlign: 'center',
-                color: 'var(--color-text-secondary)',
-                padding: 'var(--spacing-xl)'
-              }}>
-                카드를 불러오는 중...
-              </div>
-            </Card>
-          )}
+        {/* 로딩 상태 */}
+        {isLoading && (
+          <Card padding="lg" variant="default">
+            <div style={{
+              textAlign: 'center',
+              color: 'var(--color-text-secondary)',
+              padding: 'var(--spacing-xl)'
+            }}>
+              카드를 불러오는 중...
+            </div>
+          </Card>
+        )}
 
-          {/* 카드 그리드 */}
-          {sortedCards && sortedCards.length > 0 ? (
-            <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="md">
-              {sortedCards.map((card) => renderCard(card))}
-            </Grid>
-          ) : (
-            <Card padding="lg" variant="default">
-              <div style={{
-                textAlign: 'center',
-                color: 'var(--color-text-secondary)',
+        {/* 카드 그리드 */}
+        {sortedCards && sortedCards.length > 0 ? (
+          <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="md">
+            {sortedCards.map((card) => renderCard(card))}
+          </Grid>
+        ) : (
+          <Card padding="lg" variant="default">
+            <div style={{
+              textAlign: 'center',
+              color: 'var(--color-text-secondary)',
                 padding: 'var(--spacing-xl)'
               }}>
                 <p style={{ marginBottom: 'var(--spacing-md)' }}>
@@ -383,8 +371,7 @@ export function BillingHomePage() {
                 </Button>
               </div>
             </Card>
-          )}
-        </div>
+        )}
       </Container>
     </ErrorBoundary>
   );

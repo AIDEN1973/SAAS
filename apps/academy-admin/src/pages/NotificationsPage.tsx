@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer } from '@ui-core/react';
+import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer, PageHeader } from '@ui-core/react';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -301,18 +301,12 @@ export function NotificationsPage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <h1 style={{
-            fontSize: 'var(--font-size-2xl)',
-            fontWeight: 'var(--font-weight-bold)',
-            marginBottom: 'var(--spacing-md)',
-            color: 'var(--color-text)'
-          }}>
-            메시지/공지
-          </h1>
+        <PageHeader
+          title="메시지/공지"
+        />
 
-          {/* 탭 선택 */}
-          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+        {/* 탭 선택 */}
+        <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
               <Button
                 variant={activeTab === 'history' ? 'solid' : 'outline'}
@@ -759,8 +753,7 @@ export function NotificationsPage() {
                 />
               )}
             </Card>
-          )}
-        </div>
+        )}
       </Container>
     </ErrorBoundary>
   );

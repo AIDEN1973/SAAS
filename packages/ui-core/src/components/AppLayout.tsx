@@ -5,7 +5,7 @@
  * [불변 규칙] 반응형 Mobile에서 Drawer, Desktop에서 Persistent Sidebar
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { clsx } from 'clsx';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 import { Header, HeaderProps } from './Header';
@@ -30,7 +30,21 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 }) => {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
+  const isTablet = mode === 'md';
+  const isDesktop = mode === 'lg' || mode === 'xl';
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isTablet); // 태블릿 모드에서는 자동으로 축소
+
+  // 반응형 모드 변경 시 사이드바 상태 자동 조정
+  useEffect(() => {
+    if (isTablet) {
+      // 태블릿 모드: 자동 축소
+      setSidebarCollapsed(true);
+    } else if (isDesktop) {
+      // 데스크톱 모드: 자동 확장
+      setSidebarCollapsed(false);
+    }
+  }, [isTablet, isDesktop]);
 
   return (
     <div
@@ -48,6 +62,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         <Header
           {...header}
           onMenuClick={isMobile && sidebar ? () => setSidebarOpen(true) : undefined}
+          sidebarCollapsed={!isMobile ? sidebarCollapsed : undefined}
+          onSidebarToggle={!isMobile ? () => setSidebarCollapsed((prev) => !prev) : undefined}
+          showSidebarToggle={isDesktop} // 데스크톱에서만 토글 버튼 표시
         />
       )}
 
@@ -68,6 +85,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
             onItemClick={sidebar.onItemClick}
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
+            collapsed={!isMobile ? sidebarCollapsed : false}
           />
         )}
 

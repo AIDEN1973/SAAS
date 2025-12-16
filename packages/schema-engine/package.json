@@ -31,6 +31,7 @@
   "dependencies": {
     "@ui-core/react": "file:../../packages/ui-core",
     "@design-system/core": "file:../../packages/design-system",
+    "@hooks/use-debounce": "file:../../packages/hooks/use-debounce",
     "zod": "^3.22.4",
     "react-hook-form": "^7.49.0",
     "@tanstack/react-query": "^5.0.0"

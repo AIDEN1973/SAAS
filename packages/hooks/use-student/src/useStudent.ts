@@ -167,6 +167,8 @@ export function useStudents(filter?: StudentFilter) {
       return students;
     },
     enabled: !!tenantId,
+    staleTime: 30 * 1000, // 30초간 캐시 유지 (검색 성능 최적화)
+    gcTime: 5 * 60 * 1000, // 5분간 가비지 컬렉션 방지 (이전 cacheTime)
   });
 }
 

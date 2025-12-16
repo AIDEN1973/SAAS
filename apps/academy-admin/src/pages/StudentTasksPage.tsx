@@ -10,7 +10,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, Container, Card, Button, useModal, useResponsiveMode } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, Button, useModal, useResponsiveMode, PageHeader } from '@ui-core/react';
 import { Grid } from '@ui-core/react';
 import { StudentTaskCard } from '../components/StudentTaskCard';
 import { useStudentTaskCards, useCompleteStudentTaskCard } from '@hooks/use-student';
@@ -38,54 +38,52 @@ export function StudentTasksPage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
-            <h1 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text)' }}>
-              전체 학생 업무
-            </h1>
+        <PageHeader
+          title="전체 학생 업무"
+          actions={
             <Button variant="outline" onClick={() => navigate('/students/home')}>
               학생 관리 홈으로
             </Button>
-          </div>
+          }
+        />
 
-          {isLoading && (
-            <Card padding="lg" variant="default">
-              <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>
-                업무 카드를 불러오는 중...
-              </div>
-            </Card>
-          )}
+        {isLoading && (
+          <Card padding="lg" variant="default">
+            <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>
+              업무 카드를 불러오는 중...
+            </div>
+          </Card>
+        )}
 
-          {error && (
-            <Card padding="md" variant="outlined">
-              <div style={{ color: 'var(--color-error)' }}>
-                오류: {error instanceof Error ? error.message : '업무 카드를 불러오는데 실패했습니다.'}
-              </div>
-            </Card>
-          )}
+        {error && (
+          <Card padding="md" variant="outlined">
+            <div style={{ color: 'var(--color-error)' }}>
+              오류: {error instanceof Error ? error.message : '업무 카드를 불러오는데 실패했습니다.'}
+            </div>
+          </Card>
+        )}
 
-          {cards && cards.length > 0 && (
-            <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="md">
-              {cards.map((card) => (
-                <StudentTaskCard
-                  key={card.id}
-                  card={card}
-                  onAction={handleCardAction}
-                />
-              ))}
-            </Grid>
-          )}
+        {cards && cards.length > 0 && (
+          <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="md">
+            {cards.map((card) => (
+              <StudentTaskCard
+                key={card.id}
+                card={card}
+                onAction={handleCardAction}
+              />
+            ))}
+          </Grid>
+        )}
 
-          {cards && cards.length === 0 && !isLoading && (
-            <Card padding="lg" variant="default">
-              <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>
-                <p style={{ marginBottom: 'var(--spacing-md)' }}>
-                  현재 처리할 학생 업무가 없습니다.
-                </p>
-              </div>
-            </Card>
-          )}
-        </div>
+        {cards && cards.length === 0 && !isLoading && (
+          <Card padding="lg" variant="default">
+            <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>
+              <p style={{ marginBottom: 'var(--spacing-md)' }}>
+                현재 처리할 학생 업무가 없습니다.
+              </p>
+            </div>
+          </Card>
+        )}
       </Container>
     </ErrorBoundary>
   );

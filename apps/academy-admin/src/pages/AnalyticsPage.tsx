@@ -23,7 +23,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { ErrorBoundary, useModal } from '@ui-core/react';
-import { Container, Card, Button, Badge } from '@ui-core/react';
+import { Container, Card, Button, Badge, PageHeader } from '@ui-core/react';
 import { useResponsiveMode } from '@ui-core/react';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useConfig } from '@hooks/use-config';
@@ -409,10 +409,10 @@ export function AnalyticsPage() {
       // 기술문서 5146줄: store_count >= 3 조건 미충족 시 명확한 메시지 표시
       if (comparisonGroup === 'insufficient' || sampleCount < minimumSampleSize) {
         if (!locationInfo.location_code) {
-          insights.push('⚠️ 지역 정보가 설정되지 않아 정확한 지역 비교가 불가능합니다. 설정 화면에서 위치 정보를 입력해주세요.');
+          insights.push('경고: 지역 정보가 설정되지 않아 정확한 지역 비교가 불가능합니다. 설정 화면에서 위치 정보를 입력해주세요.');
         } else {
           // 기술문서 5146줄: "해당 지역의 통계는 매장 수 부족으로 제공되지 않습니다" 출력
-          insights.push(`⚠️ 해당 지역의 통계는 매장 수 부족(현재 ${sampleCount}개, 최소 3개 필요)으로 제공되지 않습니다.`);
+          insights.push(`경고: 해당 지역의 통계는 매장 수 부족(현재 ${sampleCount}개, 최소 3개 필요)으로 제공되지 않습니다.`);
         }
       } else {
         // 정상 비교 수행
@@ -573,17 +573,9 @@ export function AnalyticsPage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding={isMobile ? "sm" : "lg"}>
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: 'var(--spacing-md)' }}>
-            <h1 style={{
-              fontSize: isMobile ? 'var(--font-size-xl)' : 'var(--font-size-2xl)',
-              fontWeight: 'var(--font-weight-bold)',
-              color: 'var(--color-text)',
-              margin: 0,
-            }}>
-              지역 기반 통계
-            </h1>
-            {/* 통계문서 FR-09: 월간 경영 리포트 생성 버튼 */}
+        <PageHeader
+          title="지역 기반 통계"
+          actions={
             <Button
               variant="outline"
               size={isMobile ? "sm" : "md"}
@@ -592,14 +584,15 @@ export function AnalyticsPage() {
             >
               {generateMonthlyReport.isPending ? '생성 중...' : '월간 리포트 생성'}
             </Button>
-          </div>
+          }
+        />
 
-          {/* 통계문서 3.1: 운영 현황 카드 4개 (학생 수, 매출, 출석률, 성장률 / 지역순위) */}
-          {/* 지표 선택 */}
-          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
-              {(Object.keys(selectedMetricLabels) as Array<keyof typeof selectedMetricLabels>).map((metric) => (
-                <Button
+        {/* 통계문서 3.1: 운영 현황 카드 4개 (학생 수, 매출, 출석률, 성장률 / 지역순위) */}
+        {/* 지표 선택 */}
+        <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+          <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
+            {(Object.keys(selectedMetricLabels) as Array<keyof typeof selectedMetricLabels>).map((metric) => (
+              <Button
                   key={metric}
                   variant={selectedMetric === metric ? 'solid' : 'outline'}
                   size="sm"
@@ -861,8 +854,7 @@ export function AnalyticsPage() {
                 데이터를 불러올 수 없습니다.
               </div>
             </Card>
-          )}
-        </div>
+        )}
       </Container>
     </ErrorBoundary>
   );

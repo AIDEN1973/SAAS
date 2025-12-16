@@ -25,8 +25,7 @@ export function createStudentFilterSchema(classes?: Class[]): FilterSchema {
         name: 'search',
         kind: 'text',
         ui: {
-          label: '검색',
-          placeholder: '학생 이름 검색..',
+          placeholder: '이름으로 검색하세요.',
           colSpan: 1,
         },
       },
@@ -34,7 +33,7 @@ export function createStudentFilterSchema(classes?: Class[]): FilterSchema {
         name: 'status',
         kind: 'select',
         ui: {
-          label: '상태',
+          placeholder: '재원상태를 선택하세요.',
           colSpan: 1,
         },
         options: [
@@ -50,7 +49,7 @@ export function createStudentFilterSchema(classes?: Class[]): FilterSchema {
         name: 'grade',
         kind: 'select',
         ui: {
-          label: '학년',
+          placeholder: '학년을 선택하세요.',
           colSpan: 1,
         },
         options: [
@@ -71,7 +70,7 @@ export function createStudentFilterSchema(classes?: Class[]): FilterSchema {
         name: 'class_id',
         kind: 'select',
         ui: {
-          label: '반',
+          placeholder: '클래스를 선택하세요.',
           colSpan: 1,
         },
         options: [

@@ -8,7 +8,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { ErrorBoundary, useModal, useResponsiveMode } from '@ui-core/react';
-import { Container, Card, Button, Modal, Drawer } from '@ui-core/react';
+import { Container, Card, Button, Modal, Drawer, PageHeader } from '@ui-core/react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
 import { apiClient } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
@@ -152,27 +152,9 @@ export function ClassesPage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-            <div>
-              <h1 style={{
-                fontSize: 'var(--font-size-2xl)',
-                fontWeight: 'var(--font-weight-bold)',
-                color: 'var(--color-text)',
-                marginBottom: 'var(--spacing-xs)'
-              }}>
-                반 관리
-              </h1>
-              {/* Today-First 기준: 기본 화면은 "오늘 수업 있는 반" (아키텍처 문서 3.2.1 참조) */}
-              {!showAllClasses && (
-                <p style={{
-                  fontSize: 'var(--font-size-sm)',
-                  color: 'var(--color-text-secondary)'
-                }}>
-                  오늘 수업이 있는 반만 표시됩니다.
-                </p>
-              )}
-            </div>
+        <PageHeader
+          title="반 관리"
+          actions={
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
               <Button
                 variant={showAllClasses ? 'outline' : 'solid'}
@@ -203,20 +185,19 @@ export function ClassesPage() {
                 반 생성
               </Button>
             </div>
-          </div>
+          }
+        />
 
-          {/* 검색 및 필터 패널 */}
-          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-            <SchemaFilter
-              schema={effectiveFilterSchema}
-              onFilterChange={handleFilterChange}
-              defaultValues={{
-                search: filter.search || '',
-                status: filter.status || '',
-                day_of_week: filter.day_of_week || '',
-              }}
-            />
-          </Card>
+        {/* 검색 및 필터 패널 */}
+        <SchemaFilter
+          schema={effectiveFilterSchema}
+          onFilterChange={handleFilterChange}
+          defaultValues={{
+            search: filter.search || '',
+            status: filter.status || '',
+            day_of_week: filter.day_of_week || '',
+          }}
+        />
 
           {/* 반 생성 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
           {showCreateForm && (
@@ -294,8 +275,7 @@ export function ClassesPage() {
               onSave={handleUpdateClass}
               onClose={() => setEditingClassId(null)}
             />
-          )}
-        </div>
+        )}
       </Container>
     </ErrorBoundary>
   );

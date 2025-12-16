@@ -18,6 +18,8 @@ export interface ContainerProps {
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   padding?: SpacingToken;
+  /** 상단 여백 (기본값: 'xl') */
+  paddingTop?: SpacingToken | 'none';
   className?: string;
   style?: React.CSSProperties;
 }
@@ -26,6 +28,7 @@ export const Container: React.FC<ContainerProps> = ({
   children,
   maxWidth = 'xl',
   padding = 'md',
+  paddingTop = 'xl',
   className,
   style,
 }) => {
@@ -54,6 +57,7 @@ export const Container: React.FC<ContainerProps> = ({
 
   // 모바일(xs, sm): 적절한 여백 유지, 태블릿 이상(md+): 지정된 padding 사용 (유아이 문서 6-1 준수)
   const effectivePadding = isMobile ? 'lg' : padding; // md = 16px (모바일 적절한 여백)
+  const effectivePaddingTop = paddingTop === 'none' ? 0 : paddingMap[paddingTop];
 
   return (
     <div
@@ -64,6 +68,7 @@ export const Container: React.FC<ContainerProps> = ({
         maxWidth: maxWidthMap[maxWidth],
         paddingLeft: paddingMap[effectivePadding],
         paddingRight: paddingMap[effectivePadding],
+        paddingTop: effectivePaddingTop,
         transition: 'var(--transition-all)',
         ...style,
       }}

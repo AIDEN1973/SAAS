@@ -55,11 +55,11 @@ export function LoginPage() {
       if (result.tenants.length === 0) {
         // 개발 환경에서 상세 정보 표시
         if (import.meta.env?.DEV) {
-          console.warn('⚠️ 테넌트가 없습니다:', {
+          console.warn('경고: 테넌트가 없습니다:', {
             userId: result.user.id,
             email: result.user.email,
           });
-          console.log('💡 가능한 원인:');
+          console.log('가능한 원인:');
           console.log('   1. 회원가입 시 테넌트가 생성되지 않았을 수 있음');
           console.log('   2. user_tenant_roles에 레코드가 없을 수 있음');
           console.log('   3. RLS 정책 때문에 조회가 안 될 수 있음');
@@ -74,7 +74,7 @@ export function LoginPage() {
           '소속된 테넌트가 없습니다.\n\n' +
           '회원가입을 진행하시거나, 관리자에게 문의해주세요.\n\n' +
           (import.meta.env?.DEV
-            ? '⚠️ 개발 환경: 브라우저 콘솔에서 상세 정보를 확인하세요.'
+            ? '개발 환경: 브라우저 콘솔에서 상세 정보를 확인하세요.'
             : '')
         );
         navigate('/auth/signup');
@@ -125,11 +125,11 @@ export function LoginPage() {
       if (result.tenants.length === 0) {
         // 개발 환경에서 상세 정보 표시
         if (import.meta.env?.DEV) {
-          console.warn('⚠️ 테넌트가 없습니다:', {
+          console.warn('경고: 테넌트가 없습니다:', {
             userId: result.user.id,
             phone: result.user.phone,
           });
-          console.log('💡 가능한 원인:');
+          console.log('가능한 원인:');
           console.log('   1. 회원가입 시 테넌트가 생성되지 않았을 수 있음');
           console.log('   2. user_tenant_roles에 레코드가 없을 수 있음');
           console.log('   3. RLS 정책 때문에 조회가 안 될 수 있음');
@@ -144,7 +144,7 @@ export function LoginPage() {
           '소속된 테넌트가 없습니다.\n\n' +
           '회원가입을 진행하시거나, 관리자에게 문의해주세요.\n\n' +
           (import.meta.env?.DEV
-            ? '⚠️ 개발 환경: 브라우저 콘솔에서 상세 정보를 확인하세요.'
+            ? '개발 환경: 브라우저 콘솔에서 상세 정보를 확인하세요.'
             : '')
         );
         navigate('/auth/signup');

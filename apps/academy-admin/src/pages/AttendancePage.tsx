@@ -16,7 +16,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '@ui-core/react';
-import { Container, Card, Button, Input, Badge, Switch, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid } from '@ui-core/react';
+import { Container, Card, Button, Input, Badge, Switch, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid, PageHeader } from '@ui-core/react';
 import type { TabItem } from '@ui-core/react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
 import { useAttendanceLogs, useCreateAttendanceLog, useDeleteAttendanceLog } from '@hooks/use-attendance';
@@ -830,30 +830,29 @@ export function AttendancePage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          {/* 아키텍처 문서 3.3.9: 태블릿 모드 제목 최소 24px */}
-          <h1 style={{
-            fontSize: isTablet ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)',
-            fontWeight: 'var(--font-weight-bold)',
-            marginBottom: 'var(--spacing-md)',
-            color: 'var(--color-text)'
-          }}>
-            출결 관리
-          </h1>
+        {/* 아키텍처 문서 3.3.9: 태블릿 모드 제목 최소 24px */}
+        <PageHeader
+          title="출결 관리"
+          style={{
+            ...(isTablet && {
+              fontSize: 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))',
+            }),
+          }}
+        />
 
-          {/* 탭 메뉴 */}
-          <Tabs
-            items={tabItems}
-            activeKey={viewMode}
-            onChange={(key) => setViewMode(key as 'today' | 'qr')}
-            style={{ marginBottom: 'var(--spacing-md)' }}
-          />
+        {/* 탭 메뉴 */}
+        <Tabs
+          items={tabItems}
+          activeKey={viewMode}
+          onChange={(key) => setViewMode(key as 'today' | 'qr')}
+          style={{ marginBottom: 'var(--spacing-md)' }}
+        />
 
           {/* 오늘 출결하기 화면 */}
           {viewMode === 'today' && (
             <>
               {/* AttendanceHeader: 반 선택, 날짜 선택, 검색 (아키텍처 문서 3.3.3) - SchemaFilter 사용 */}
-              <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
+              <div style={{ pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
                 <SchemaFilter
                   schema={effectiveHeaderFilterSchema}
                   onFilterChange={(filters: Record<string, unknown>) => {
@@ -867,7 +866,7 @@ export function AttendancePage() {
                     search: searchQuery,
                   }}
                 />
-              </Card>
+              </div>
 
               {/* AttendanceStudentList: 학생 리스트 + 체크박스 UI (아키텍처 문서 3.3.3: Header 다음에 StudentList) */}
               {/* 모바일: Bottom Action Bar를 위한 하단 패딩 추가 */}
@@ -1552,11 +1551,10 @@ export function AttendancePage() {
             </Card>
           )}
 
-          {/* 통계/히트맵/패턴 분석 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8) */}
-            </>
-          )}
+        {/* 통계/히트맵/패턴 분석 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8) */}
+          </>
+        )}
 
-        </div>
       </Container>
     </ErrorBoundary>
   );
