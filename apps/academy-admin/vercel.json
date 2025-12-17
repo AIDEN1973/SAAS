@@ -2,6 +2,12 @@
   "buildCommand": "cd ../.. && npm run build --filter=@app/academy-admin",
   "outputDirectory": "dist",
   "installCommand": "npm install",
-  "framework": "vite"
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
 
