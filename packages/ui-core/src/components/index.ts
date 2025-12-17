@@ -11,7 +11,7 @@ export { Textarea } from './Textarea';
 export type { TextareaProps } from './Textarea';
 
 export { Select } from './Select';
-export type { SelectProps } from './Select';
+export type { SelectProps, SelectOption } from './Select';
 
 export { Container, Grid, SidebarLayout } from './Layout';
 export type { ContainerProps, GridProps, SidebarLayoutProps } from './Layout';

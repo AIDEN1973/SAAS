@@ -70,9 +70,13 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
   const { name, kind, ui, options } = field;
 
   // SDUI v1.1: i18n 키 처리 (Loader 단계에서 바인딩되지 않은 경우)
-  // labelKey가 있으면 translations에서 조회, 없으면 기존 label 사용
-  const label = ui?.labelKey ? (translations[ui.labelKey] || ui.labelKey) : ui?.label;
-  const placeholder = ui?.placeholderKey ? (translations[ui.placeholderKey] || ui.placeholderKey) : ui?.placeholder;
+  // labelKey가 있으면 translations에서 조회, 번역이 없으면 label을 fallback으로 사용
+  const label = ui?.labelKey
+    ? (translations[ui.labelKey] || ui.label || ui.labelKey)
+    : ui?.label;
+  const placeholder = ui?.placeholderKey
+    ? (translations[ui.placeholderKey] || ui.placeholder || ui.placeholderKey)
+    : ui?.placeholder;
   // const description = ui?.descriptionKey ? (translations[ui.descriptionKey] || ui.descriptionKey) : ui?.description; // TODO: 향후 사용 예정
 
   // 1) 조건부 필드 감시
@@ -294,7 +298,10 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               multiple={kind === 'multiselect'}
             >
               {effectiveOptions?.map((opt) => {
-                const translatedLabel = opt.labelKey ? (translations[opt.labelKey] || opt.labelKey) : opt.label;
+                // labelKey가 있으면 translations에서 조회, 번역이 없으면 label을 fallback으로 사용
+                const translatedLabel = opt.labelKey
+                  ? (translations[opt.labelKey] || opt.label || opt.labelKey)
+                  : opt.label;
                 return (
                   <option key={opt.value} value={opt.value}>
                     {translatedLabel}
@@ -324,7 +331,10 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
             render={({ field: f }) => (
               <div>
                 {effectiveOptions?.map((opt) => {
-                  const translatedLabel = opt.labelKey ? (translations[opt.labelKey] || opt.labelKey) : opt.label;
+                  // labelKey가 있으면 translations에서 조회, 번역이 없으면 label을 fallback으로 사용
+                  const translatedLabel = opt.labelKey
+                    ? (translations[opt.labelKey] || opt.label || opt.labelKey)
+                    : opt.label;
                   return (
                     <Radio
                       key={opt.value}

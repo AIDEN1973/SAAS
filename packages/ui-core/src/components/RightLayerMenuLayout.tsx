@@ -49,11 +49,16 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
     const breakpointTabletPx = getCSSVariableAsPx('--breakpoint-tablet', 48 * 16); // 기본값: 48rem = 768px
     const overlayThresholdPx = getCSSVariableAsPx('--width-overlay-threshold', 90 * 16); // 기본값: 90rem = 1440px
 
+    // 1440px 이상인 경우 반드시 push 모드(바디 축소) 사용 보장
+    if (windowWidth >= overlayThresholdPx) {
+      return false; // push 모드 강제
+    }
+
     // 오버레이 모드 전환 조건:
     // 1. 모바일/태블릿 모드일 때는 항상 오버레이 모드
     // 2. 레이어 메뉴를 제외한 바디 너비가 태블릿 브레이크포인트 이하일 때
-    // 3. 전체 화면 너비가 작아서 레이어 메뉴를 push 방식으로 표시하기 어려울 때
-    return isMobile || isTablet || bodyWidthWithoutMenu <= breakpointTabletPx || windowWidth <= overlayThresholdPx;
+    // 3. 전체 화면 너비가 1440px 미만일 때
+    return isMobile || isTablet || bodyWidthWithoutMenu <= breakpointTabletPx;
   }, [isMobile, isTablet]);
 
   // 레이어 메뉴 너비 계산 (CSS 변수에서 실제 픽셀 값 추출)

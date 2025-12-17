@@ -241,6 +241,7 @@
   --letter-spacing-title: -0.02em; /* 타이틀 글자 간격 (헤더, PageHeader 등) */
 
   /* Border Radius - 더 둥근 모던 모서리 */
+  --border-radius-xs: 0.375rem;   /* 6px - Button 등에서 사용 */
   --border-radius-sm: 0.5rem;     /* 8px */
   --border-radius-md: 0.75rem;    /* 12px */
   --border-radius-lg: 1rem;       /* 16px */

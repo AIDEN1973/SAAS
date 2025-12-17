@@ -8,9 +8,37 @@
  * - 양식 다운로드 버튼
  */
 
-import React, { useRef } from 'react';
-import { Plus, Upload, Download, FileText } from 'lucide-react';
+import React from 'react';
+import { Upload, Download, FileText } from 'lucide-react';
+import type { LucideProps } from 'lucide-react';
 import { IconButtonGroup, type IconButtonItem } from '@ui-core/react';
+
+// Plus 아이콘 (커스텀 SVG) - LucideIcon과 호환되도록 forwardRef 사용
+const PlusIcon = React.forwardRef<SVGSVGElement, LucideProps>(
+  ({ size = 24, strokeWidth = 2, className, ...props }, ref) => (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      style={{
+        display: 'block', // 중앙 정렬을 위해 block으로 설정
+      }}
+      {...props}
+    >
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </svg>
+  )
+);
+PlusIcon.displayName = 'PlusIcon';
 
 export interface DataTableActionButtonsProps {
   /** 추가/생성 버튼 클릭 핸들러 */
@@ -75,7 +103,7 @@ export const DataTableActionButtons: React.FC<DataTableActionButtonsProps> = ({
   // 추가 버튼
   if (showCreate && onCreate) {
     items.push({
-      icon: Plus,
+      icon: PlusIcon,
       tooltip: createTooltip,
       variant: createVariant,
       color: createColor,

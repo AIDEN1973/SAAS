@@ -348,6 +348,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           display: 'flex',
           flexDirection: 'column',
           gap: 'calc(var(--spacing-sm) + var(--spacing-negative-xxs))', // 메뉴명 행간 간격 (8px - 2px = 6px)
+          // 메뉴 리스트 첫 번째 메뉴 상단 여백: PageHeader가 없을 때도 동일한 여백 유지 (모바일만)
+          paddingTop: (isMobile && !pageHeaderTitle) ? 'var(--spacing-lg)' : 0,
         }}
       >
         {items.map((item) => renderItem(item))}
@@ -393,9 +395,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: 'var(--spacing-lg)',
+              // 글로벌 헤더와 동일한 패딩: 모바일(xs, sm): 상하 var(--padding-header-vertical), 좌우 var(--spacing-lg)
+              padding: 'var(--padding-header-vertical) var(--spacing-lg)', // 모바일: 상하 패딩 CSS 변수 사용, 좌우 CSS 변수 사용
               borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
               backgroundColor: 'var(--color-gray-50)',
+              minHeight: 'var(--height-header)', // 글로벌 헤더 높이와 동일하게 설정
             }}
           >
             <h2

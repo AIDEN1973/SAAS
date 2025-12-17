@@ -10,7 +10,8 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { ErrorBoundary, useModal, useResponsiveMode } from '@ui-core/react';
 import { DataTableActionButtons } from '../components/DataTableActionButtons';
-import { Container, Grid, Card, Button, Input, Modal, Drawer, PageHeader, RightLayerMenuLayout, Tabs, BottomActionBar, Badge } from '@ui-core/react';
+import { BadgeSelect } from '../components/BadgeSelect';
+import { Container, Grid, Card, Button, Input, Modal, Drawer, PageHeader, RightLayerMenuLayout, Tabs, BottomActionBar, Badge, Select } from '@ui-core/react';
 import { SchemaForm, SchemaFilter, SchemaTable, SchemaDetail } from '@schema-engine';
 import { useStudents, useStudentTags, useStudentTagsByStudent, useCreateStudent, useBulkCreateStudents, useStudent, useGuardians, useConsultations, useStudentClasses, useUpdateStudent, useCreateGuardian, useUpdateGuardian, useDeleteGuardian, useCreateConsultation, useUpdateConsultation, useDeleteConsultation, useGenerateConsultationAISummary, useUpdateStudentTags, useAssignStudentToClass, useUnassignStudentFromClass } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
@@ -54,12 +55,11 @@ export function StudentsPage() {
 
   // URL에서 학생 ID와 탭 정보 읽기
   const urlStudentId = params.id || searchParams.get('student') || null;
-  const urlTab = searchParams.get('tab') as 'info' | 'guardians' | 'consultations' | 'tags' | 'classes' | 'counsel' | 'attendance' | 'risk' | 'welcome' | null;
+  const urlTab = searchParams.get('tab') as 'info' | 'guardians' | 'consultations' | 'tags' | 'classes' | 'attendance' | 'risk' | 'welcome' | null;
 
   // URL 경로에 따라 초기 탭 설정 (StudentDetailPage와 동일한 로직)
-  const getInitialTab = (): 'info' | 'guardians' | 'consultations' | 'tags' | 'classes' | 'counsel' | 'attendance' | 'risk' | 'welcome' => {
+  const getInitialTab = (): 'info' | 'guardians' | 'consultations' | 'tags' | 'classes' | 'attendance' | 'risk' | 'welcome' => {
     const path = location.pathname;
-    if (path.includes('/counsel')) return 'counsel';
     if (path.includes('/attendance')) return 'attendance';
     if (path.includes('/risk')) return 'risk';
     if (path.includes('/welcome')) return 'welcome';
@@ -115,7 +115,7 @@ export function StudentsPage() {
   const { data: userRole } = useUserRole();
 
   // 레이어 메뉴 탭 상태 (URL 기반 초기화)
-  const [layerMenuTab, setLayerMenuTab] = useState<'info' | 'guardians' | 'consultations' | 'tags' | 'classes' | 'counsel' | 'attendance' | 'risk' | 'welcome'>(getInitialTab());
+  const [layerMenuTab, setLayerMenuTab] = useState<'info' | 'guardians' | 'consultations' | 'tags' | 'classes' | 'attendance' | 'risk' | 'welcome'>(getInitialTab());
 
   // 레이어 메뉴 내부 상태
   const [isEditing, setIsEditing] = useState(false);
@@ -180,7 +180,7 @@ export function StudentsPage() {
     }
   };
 
-  const handleTabChange = (newTab: 'info' | 'guardians' | 'consultations' | 'tags' | 'classes' | 'counsel' | 'attendance' | 'risk' | 'welcome') => {
+  const handleTabChange = (newTab: 'info' | 'guardians' | 'consultations' | 'tags' | 'classes' | 'attendance' | 'risk' | 'welcome') => {
     setLayerMenuTab(newTab);
     if (selectedStudentId) {
       // 탭 변경 시 URL 업데이트
@@ -306,7 +306,7 @@ export function StudentsPage() {
         layerMenu={{
           isOpen: !!selectedStudentId,
           onClose: () => handleStudentSelect(null),
-          title: selectedStudentLoading ? '로딩 중...' : selectedStudent ? `${selectedStudent.name} 학생 상세` : '학생 상세',
+          title: selectedStudentLoading ? '로딩 중...' : selectedStudent ? `${selectedStudent.name} 학생 상세정보` : '학생 상세',
           width: isTablet ? 'var(--width-layer-menu-tablet)' : 'var(--width-layer-menu)',
           children: selectedStudentLoading ? (
             <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
@@ -315,20 +315,20 @@ export function StudentsPage() {
           ) : selectedStudent ? (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               {/* 탭 버튼 (StudentDetailPage와 동일한 스타일) */}
-              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)', flexWrap: 'wrap', borderBottom: 'var(--border-width-base) solid var(--color-gray-200)', paddingBottom: 'var(--spacing-sm)' }}>
+              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-lg)', flexWrap: 'wrap', borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', paddingBottom: 'var(--spacing-lg)' }}>
                 <Button
                   variant={layerMenuTab === 'info' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('info')}
                 >
-                  기본 정보
+                  기본정보
                 </Button>
                 <Button
                   variant={layerMenuTab === 'guardians' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('guardians')}
                 >
-                  학부모 관리 ({selectedStudentGuardians?.length || 0})
+                  학부모 정보 ({selectedStudentGuardians?.length || 0})
                 </Button>
                 <Button
                   variant={layerMenuTab === 'consultations' ? 'solid' : 'outline'}
@@ -342,35 +342,28 @@ export function StudentsPage() {
                   size="sm"
                   onClick={() => handleTabChange('tags')}
                 >
-                  태그 관리
+                  태그관리
                 </Button>
                 <Button
                   variant={layerMenuTab === 'classes' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('classes')}
                 >
-                  반 배정 ({selectedStudentClasses?.filter((sc) => sc.is_active).length || 0})
-                </Button>
-                <Button
-                  variant={layerMenuTab === 'counsel' ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => handleTabChange('counsel')}
-                >
-                  상담 기록
+                  반배정 ({selectedStudentClasses?.filter((sc) => sc.is_active).length || 0})
                 </Button>
                 <Button
                   variant={layerMenuTab === 'attendance' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('attendance')}
                 >
-                  출결 기록
+                  출결기록
                 </Button>
                 <Button
                   variant={layerMenuTab === 'risk' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('risk')}
                 >
-                  이탈 위험
+                  이탈위험
                 </Button>
                 <Button
                   variant={layerMenuTab === 'welcome' ? 'solid' : 'outline'}
@@ -513,26 +506,6 @@ export function StudentsPage() {
                       });
                     }}
                     isEditable={userRole !== 'teacher' && userRole !== 'assistant'}
-                  />
-                )}
-                {layerMenuTab === 'counsel' && selectedStudent && (
-                  <CounselTab
-                    studentId={selectedStudentId}
-                    student={selectedStudent}
-                    effectiveConsultationFormSchema={effectiveConsultationFormSchema}
-                    onCreateConsultation={async (data) => {
-                      if (!userId) {
-                        showAlert('사용자 정보를 가져올 수 없습니다. 다시 로그인해주세요.', '오류', 'error');
-                        return;
-                      }
-                      await createConsultation.mutateAsync({
-                        studentId: selectedStudentId!,
-                        consultation: data as Omit<StudentConsultation, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>,
-                        userId
-                      });
-                      setShowConsultationForm(false);
-                      handleTabChange('consultations');
-                    }}
                   />
                 )}
                 {layerMenuTab === 'attendance' && selectedStudent && (
@@ -1315,36 +1288,19 @@ function ConsultationsTab({
     <div>
       {!showForm && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-          <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-            <Button
-              variant={consultationTypeFilter === 'all' ? 'solid' : 'outline'}
-              size="sm"
-              onClick={() => onFilterChange('all')}
-            >
-              전체
-            </Button>
-            <Button
-              variant={consultationTypeFilter === 'counseling' ? 'solid' : 'outline'}
-              size="sm"
-              onClick={() => onFilterChange('counseling')}
-            >
-              상담일지
-            </Button>
-            <Button
-              variant={consultationTypeFilter === 'learning' ? 'solid' : 'outline'}
-              size="sm"
-              onClick={() => onFilterChange('learning')}
-            >
-              학습일지
-            </Button>
-            <Button
-              variant={consultationTypeFilter === 'behavior' ? 'solid' : 'outline'}
-              size="sm"
-              onClick={() => onFilterChange('behavior')}
-            >
-              행동일지
-            </Button>
-          </div>
+          <BadgeSelect
+            value={consultationTypeFilter}
+            onChange={(value) => onFilterChange(value as ConsultationType | 'all')}
+            options={[
+              { value: 'all', label: '전체' },
+              { value: 'counseling', label: '상담일지' },
+              { value: 'learning', label: '학습일지' },
+              { value: 'behavior', label: '행동일지' },
+            ]}
+            size="sm"
+            selectedColor="var(--color-primary-dark)"
+            unselectedColor="var(--color-text)"
+          />
           {isEditable && (
             <Button variant="solid" onClick={onShowForm}>
               상담일지 추가
@@ -1492,7 +1448,26 @@ function ConsultationsTab({
         ))}
         {consultations.length === 0 && !showForm && (
           <Card padding="md" variant="outlined">
-            <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>등록된 상담일지가 없습니다.</p>
+            <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="64"
+                height="64"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--color-gray-400)"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ marginBottom: 'var(--spacing-xs)', display: 'inline-block' }}
+              >
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M8 15h8"/>
+                <path d="M8 9h2"/>
+                <path d="M14 9h2"/>
+              </svg>
+              <p>등록된 상담일지가 없습니다.</p>
+            </div>
           </Card>
         )}
       </div>
@@ -1878,88 +1853,6 @@ function ClassesTab({
         )}
       </div>
     </div>
-  );
-}
-
-// 상담일지 작성 탭 컴포넌트
-function CounselTab({
-  studentId,
-  student,
-  effectiveConsultationFormSchema,
-  onCreateConsultation,
-}: {
-  studentId: string | null;
-  student: Student | null | undefined;
-  effectiveConsultationFormSchema: FormSchema;
-  onCreateConsultation: (data: Record<string, unknown>) => Promise<void>;
-}) {
-  const { showAlert } = useModal();
-  const [showForm, setShowForm] = useState(false);
-
-  if (!studentId || !student) {
-    return (
-      <Card padding="md" variant="default">
-        <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-          학생 정보를 불러올 수 없습니다.
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card padding="md" variant="default">
-      <h3 style={{ marginBottom: 'var(--spacing-md)' }}>상담일지 작성</h3>
-
-      {!showForm ? (
-        <>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
-            {student.name} 학생에 대한 상담일지를 작성하세요.
-          </p>
-          <Button
-            variant="solid"
-            onClick={() => setShowForm(true)}
-          >
-            상담일지 작성하기
-          </Button>
-        </>
-      ) : (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-            <h4 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
-              새 상담일지 작성
-            </h4>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowForm(false)}
-            >
-              취소
-            </Button>
-          </div>
-          <SchemaForm
-            schema={effectiveConsultationFormSchema}
-            onSubmit={async (data) => {
-              try {
-                await onCreateConsultation({
-                  consultation_date: data.consultation_date || toKST().format('YYYY-MM-DD'),
-                  consultation_type: data.consultation_type || 'counseling',
-                  content: data.content || '',
-                  notes: data.notes || undefined,
-                });
-                setShowForm(false);
-                showAlert('상담일지가 작성되었습니다.', '성공', 'success');
-              } catch (error) {
-                showAlert(error instanceof Error ? error.message : '상담일지 작성에 실패했습니다.', '오류', 'error');
-              }
-            }}
-            defaultValues={{
-              consultation_date: toKST().format('YYYY-MM-DD'),
-              consultation_type: 'counseling',
-            }}
-          />
-        </div>
-      )}
-    </Card>
   );
 }
 

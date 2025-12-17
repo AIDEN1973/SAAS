@@ -14,6 +14,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   color?: ColorToken;
   size?: SizeToken;
   fullWidth?: boolean;
+  selected?: boolean;
   children: React.ReactNode;
 }
 
@@ -33,6 +34,7 @@ export const Button: React.FC<ButtonProps> = ({
   color = 'primary',
   size = 'md',
   fullWidth = false,
+  selected = false,
   className,
   children,
   ...props
@@ -82,52 +84,64 @@ export const Button: React.FC<ButtonProps> = ({
     },
   };
 
-  const colorVars = colorMap[color];
+  // 선택된 버튼은 인더스트리 테마(primary) 적용, 기본 버튼은 기본 색상(text) 적용
+  const effectiveColor: ColorToken = selected ? 'primary' : color;
+  const colorVars = colorMap[effectiveColor];
 
-  // Size를 CSS Variables로 매핑
+  // Size를 CSS Variables로 매핑 (세로 패딩 한 포인트 올림)
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
-      padding: 'var(--spacing-xs) var(--spacing-sm)',
+      padding: 'var(--spacing-sm) var(--spacing-xs)',
     },
     sm: {
-      padding: 'var(--spacing-sm) var(--spacing-md)',
+      padding: 'var(--spacing-sm) var(--spacing-sm)',
     },
     md: {
-      padding: 'var(--spacing-sm) var(--spacing-md)',
+      padding: 'var(--spacing-sm) var(--spacing-sm)',
     },
     lg: {
-      padding: 'var(--spacing-md) var(--spacing-lg)',
+      padding: 'var(--spacing-md) var(--spacing-md)',
     },
     xl: {
-      padding: 'var(--spacing-lg) var(--spacing-xl)',
+      padding: 'var(--spacing-lg) var(--spacing-lg)',
     },
   };
 
   const baseStyle: React.CSSProperties = {
-    fontWeight: 'var(--font-weight-semibold)',
-    borderRadius: 'var(--border-radius-sm)',
-    border: 'none',
+    fontWeight: selected ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)',
+    borderRadius: 'var(--border-radius-xs)', // styles.css 준수: border-radius 토큰 사용
+    // 선택된 버튼은 primary 색상 테두리, 미선택 버튼은 투명 테두리로 크기 일치 유지
+    border: selected
+      ? `var(--border-width-thin) solid ${colorVars.main}`
+      : `var(--border-width-thin) solid transparent`,
     cursor: 'pointer',
     transition: 'var(--transition-all)',
     outline: 'none',
+    boxSizing: 'border-box', // 테두리 포함 크기 계산
     ...sizeStyles[size],
     ...(fullWidth && { width: '100%' }),
   };
+
+  // 기본 버튼은 텍스트 기본 색상 사용, 선택된 버튼은 인더스트리 테마 색상 사용
+  const defaultTextColor = selected ? colorVars.main : 'var(--color-text)';
 
   const variantStyles: Record<'solid' | 'outline' | 'ghost', React.CSSProperties> = {
     solid: {
       backgroundColor: colorVars.main,
       color: 'var(--color-white)',
+      // baseStyle에서 테두리 적용됨 (선택: primary 색상, 미선택: 투명)
     },
     outline: {
       backgroundColor: 'var(--color-white)',
-      color: colorVars.main,
-      border: `var(--border-width-thin) solid ${colorVars.main}`, // styles.css 준수: border-width 토큰 사용
+      color: defaultTextColor,
+      // baseStyle에서 테두리 적용됨 (선택: primary 색상, 미선택: 투명)
+      // outline variant는 미선택 시 텍스트 색상 테두리로 오버라이드
+      ...(selected ? {} : { border: `var(--border-width-thin) solid ${defaultTextColor}` }),
     },
     ghost: {
       backgroundColor: 'transparent',
-      color: colorVars.main,
-      border: 'none',
+      color: defaultTextColor,
+      // baseStyle에서 테두리 적용됨 (선택: primary 색상, 미선택: 투명)
     },
   };
 
@@ -149,9 +163,11 @@ export const Button: React.FC<ButtonProps> = ({
           e.currentTarget.style.backgroundColor = colorVars.dark;
           e.currentTarget.style.boxShadow = 'var(--shadow-md)';
         } else if (variant === 'outline') {
-          e.currentTarget.style.backgroundColor = colorVars.bg50;
+          const hoverBgColor = selected ? colorVars.bg50 : 'var(--color-gray-50)';
+          e.currentTarget.style.backgroundColor = hoverBgColor;
         } else if (variant === 'ghost') {
-          e.currentTarget.style.backgroundColor = colorVars.bg50;
+          const hoverBgColor = selected ? colorVars.bg50 : 'var(--color-gray-50)';
+          e.currentTarget.style.backgroundColor = hoverBgColor;
         }
       }}
       onMouseLeave={(e) => {

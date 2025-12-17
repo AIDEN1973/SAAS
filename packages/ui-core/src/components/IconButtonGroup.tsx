@@ -107,6 +107,9 @@ export const IconButtonGroup: React.FC<IconButtonGroupProps> = ({
                 minWidth: 'auto',
                 width: 'var(--size-pagination-button)',
                 height: 'var(--size-pagination-button)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 ...(item.variant === 'outline' && !hasColor && {
                   color: 'var(--color-text)',
                   borderColor: 'var(--color-text)',

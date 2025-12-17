@@ -87,7 +87,6 @@ export const Header: React.FC<HeaderProps> = ({
           ? 'var(--padding-header-vertical) var(--spacing-lg)' // 모바일: 상하 패딩 CSS 변수 사용, 좌우 24px (Container와 동일)
           : 'var(--padding-header-vertical) var(--spacing-xl)', // 태블릿 이상: 상하 패딩 CSS 변수 사용, 좌우 32px
         minHeight: 'var(--height-header)', // styles.css 준수: 헤더 최소 높이 고정 (태블릿/데스크탑 일관성 유지)
-        boxShadow: 'var(--shadow-sm)',
         transition: 'var(--transition-all)',
       }}
     >
