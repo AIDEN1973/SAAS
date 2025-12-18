@@ -67,7 +67,7 @@ packages/hooks/*             # React Query Hooks
 
 packages/lib/*               # 공통 유틸
 
-# UI 컴포넌트는 Atlaskit 사용 (@atlaskit/components)
+# UI 컴포넌트는 ui-core 사용 (@ui-core/react)
 
 특히 packages/env-registry는 모든 앱/서비스에서 환경변수 접근의 유일한 경로입니다.
 
@@ -80,7 +80,7 @@ packages/lib/*               # 공통 유틸
 apps/* → hooks/* → services/* → industry/* → core/* → DB
 
 apps/* → core/*, lib/*
-apps/* → schema-engine (Atlaskit 컴포넌트 간접 사용)
+apps/* → schema-engine (@ui-core/react 컴포넌트 간접 사용)
 
 industry-* → core/*
 
@@ -575,15 +575,15 @@ const mode = useResponsiveMode();
 Breakpoint/모드 값은 위 스펙을 기준으로 쓴다.
 
 반응형 로직은 개별 CSS media query 직접 작성보다
-Atlaskit 컴포넌트는 기본적으로 반응형을 지원하므로, 필요 시 CSS Media Query를 사용합니다.
+ui-core 컴포넌트는 CSS 변수 기반 토큰/스타일을 사용하며, 반응형은 필요 시 CSS Media Query 또는 ui-core의 반응형 유틸/레이아웃 컴포넌트를 사용합니다.
 
 4-2. 테이블/리스트 UI 패턴
 
-휴대폰: Atlaskit DynamicTable (컴팩트 모드) 또는 카드 레이아웃
+휴대폰: ui-core `DataTable` (컴팩트 모드) 또는 카드 레이아웃
 
-태블릿: Atlaskit DynamicTable (컴팩트 모드)
+태블릿: ui-core `DataTable` (컴팩트 모드)
 
-PC: Atlaskit DynamicTable (기본 모드)
+PC: ui-core `DataTable` (기본 모드)
 
 4-3. 알림/경고 모달 규칙 (Critical)
 
@@ -603,13 +603,11 @@ PC: Atlaskit DynamicTable (기본 모드)
 1. 일관된 UX: 모든 알림이 동일한 디자인 시스템 사용
 2. 접근성: 커스텀 모달은 접근성 개선 가능
 3. 모바일 최적화: 모바일에서 네이티브 alert는 부자연스러움
-4. 다크모드: Atlaskit의 기본 다크모드 지원
+4. 다크모드: Theme Engine + ui-core CSS 변수 토큰으로 지원
 5. i18n 지원: 다국어 메시지 지원
 
 사용 예시:
 ```typescript
-import { ModalDialog } from '@atlaskit/modal-dialog';
-
 function MyComponent() {
   const { showAlert, showConfirm } = useModal();
 
@@ -1351,7 +1349,7 @@ SSL 만료 알림 정책:
 
 [불변 규칙] 모바일 환경에서 키패드와 버튼은 터치하기 쉬운 크기와 간격을 유지합니다.
 
-[불변 규칙] 태블릿 환경에서는 Atlaskit DynamicTable의 컴팩트 모드를 사용하여 화면 공간을 효율적으로 활용합니다.
+[불변 규칙] 태블릿 환경에서는 ui-core `DataTable`의 컴팩트 모드를 사용하여 화면 공간을 효율적으로 활용합니다.
 
 [불변 규칙] 모바일 환경에서는 하단 네비게이션 바를 사용하여 주요 기능에 빠르게 접근할 수 있도록 합니다.
 
@@ -1362,9 +1360,9 @@ SSL 만료 알림 정책:
 [불변 규칙] 모바일 환경에서도 웹 접근성 표준(WCAG 2.1 AA)을 준수합니다.
 
 전환 규칙:
-- 화면 너비 < 768px (모바일): Atlaskit DynamicTable (컴팩트 모드) 또는 카드 레이아웃
-- 화면 너비 768px ~ 1024px (태블릿): Atlaskit DynamicTable (컴팩트 모드)
-- 화면 너비 > 1024px (데스크톱): Atlaskit DynamicTable (기본 모드)
+- 화면 너비 < 768px (모바일): ui-core `DataTable` (컴팩트 모드) 또는 카드 레이아웃
+- 화면 너비 768px ~ 1024px (태블릿): ui-core `DataTable` (컴팩트 모드)
+- 화면 너비 > 1024px (데스크톱): ui-core `DataTable` (기본 모드)
 
 버튼 최소 크기:
 - 높이: 최소 44px (iOS HIG 기준)

@@ -22,7 +22,6 @@ import {
   useLoginWithOAuth,
   useLoginWithOTP,
   useSendOTP,
-  useUserTenants,
   useSelectTenant,
 } from '@hooks/use-auth';
 import { loginFormSchema, otpLoginFormSchema } from '../schemas/login.schema';
@@ -43,7 +42,6 @@ export function LoginPage() {
   const loginWithOAuth = useLoginWithOAuth();
   const sendOTP = useSendOTP();
   const loginWithOTP = useLoginWithOTP();
-  const { data: tenants } = useUserTenants();
   const selectTenant = useSelectTenant();
 
   const handleEmailLogin = async (data: Record<string, unknown>) => {

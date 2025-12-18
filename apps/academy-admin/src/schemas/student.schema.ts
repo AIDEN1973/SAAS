@@ -111,7 +111,7 @@ export const studentFormSchema: FormSchema = {
         name: 'notes',
         kind: 'textarea',
         ui: {
-          label: '비고',
+          label: '메모',
           colSpan: 2,
         },
       },
@@ -122,30 +122,10 @@ export const studentFormSchema: FormSchema = {
       color: 'primary',
       size: 'md',
     },
-    // SDUI v1.1: Action Engine 지원
-    actions: [
-      {
-        event: 'onSubmit',
-        type: 'api.call',
-        endpoint: 'students',
-        method: 'POST',
-        body: 'form',
-      },
-      {
-        event: 'onSubmitSuccess',
-        type: 'toast',
-        messageKey: 'STUDENT.CREATE.SUCCESS',
-        message: '학생이 등록되었습니다.',
-        variant: 'success',
-      },
-      {
-        event: 'onSubmitError',
-        type: 'toast',
-        messageKey: 'STUDENT.CREATE.ERROR',
-        message: '학생 등록에 실패했습니다.',
-        variant: 'error',
-      },
-    ],
+    // [불변 규칙] students는 VIEW이므로 직접 INSERT할 수 없습니다.
+    // [불변 규칙] useCreateStudent Hook을 통해 persons + academy_students 테이블에 각각 생성합니다.
+    // actions는 비활성화하고, 상위 컴포넌트의 onSubmit 핸들러에서 처리합니다.
+    actions: [],
   },
 };
 

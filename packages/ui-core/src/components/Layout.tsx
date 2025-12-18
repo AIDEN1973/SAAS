@@ -131,12 +131,14 @@ export const Grid: React.FC<GridProps> = ({
       (mode === 'md' && columns.md !== undefined) ? columns.md :
       (mode === 'sm' && columns.sm !== undefined) ? columns.sm :
       (columns.xs !== undefined) ? columns.xs : 1;
-    gridTemplateColumns = `repeat(${responsiveColumns}, 1fr)`;
+    // minmax(0, 1fr): 콘텐츠 크기와 무관하게 균등 분배 (5:5 정렬)
+    gridTemplateColumns = `repeat(${responsiveColumns}, minmax(0, 1fr))`;
   } else {
     // 일반 columns 사용 (반응형 조정)
     const numColumns = typeof columns === 'number' ? columns : 1;
     const responsiveColumns = (mode === 'xs' || mode === 'sm') ? 1 : mode === 'md' ? Math.min(numColumns, 2) : numColumns;
-    gridTemplateColumns = `repeat(${responsiveColumns}, 1fr)`;
+    // minmax(0, 1fr): 콘텐츠 크기와 무관하게 균등 분배 (5:5 정렬)
+    gridTemplateColumns = `repeat(${responsiveColumns}, minmax(0, 1fr))`;
   }
 
   return (

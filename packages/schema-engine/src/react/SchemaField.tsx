@@ -3,7 +3,7 @@
  *
  * [불변 규칙] React Hook Form과 통합된 Schema Field Renderer
  * [불변 규칙] Condition Rule 기반 동적 UI 렌더링
- * [불변 규칙] Tailwind 클래스를 직접 사용하지 않고, core-ui 컴포넌트만 사용
+ * [불변 규칙] Tailwind 클래스 문자열을 직접 사용하지 않고, ui-core 컴포넌트만 사용
  *
  * 기술문서: docu/스키마엔진.txt 8. Renderer 통합
  */
@@ -19,6 +19,7 @@ import {
 } from 'react-hook-form';
 import { getConditionalActions } from '../core/conditionEvaluator';
 import { buildValidationRules } from '../core/validation';
+import { formatKoreanPhoneNumber } from '../core/formatKoreanPhoneNumber';
 import type { FormFieldSchema, ConditionRule, MultiConditionRule } from '../types';
 import { loadWidget } from '../widgets/registry';
 import {
@@ -44,8 +45,20 @@ export interface SchemaFieldProps {
   translations?: Record<string, string>;
   // SDUI v1.1: 동적 필드 값 설정 (setValue 액션용)
   setValue?: UseFormSetValue<Record<string, unknown>>;
+  /**
+   * SDUI v1.1: API 클라이언트 주입(선택)
+   * - schema-engine은 특정 SDK를 직접 import하지 않습니다.
+   * - 앱에서 `@api-sdk/core`의 `apiClient`를 주입하는 방식으로 사용합니다.
+   */
+  apiClient?: { get: (table: string, options?: any) => Promise<any> };
   // Grid의 실제 컬럼 수 (반응형 처리용)
   gridColumns?: number;
+  /**
+   * 값이 있을 때 인라인 라벨(placeholder를 좌측 라벨로) 표시 여부
+   * - 기본값 true: 수정폼 UX 유지
+   * - 필터/검색 UI에서는 false로 전달하여 placeholder가 값 입력 시 제거되도록 함
+   */
+  showInlineLabelWhenHasValue?: boolean;
 }
 
 /**
@@ -65,7 +78,9 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
   control,
   translations = {},
   setValue: setFormValue,
+  apiClient,
   gridColumns,
+  showInlineLabelWhenHasValue = true,
 }) => {
   const { name, kind, ui, options } = field;
 
@@ -153,9 +168,10 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
       let mounted = true;
       async function loadOptions() {
         try {
-          // ⚠️ 중요: Zero-Trust 원칙 - @api-sdk/core의 apiClient만 사용
-          // apiClient가 없으면 옵션 로드 실패 (fetch fallback 제거)
-          const { apiClient } = await import('@api-sdk/core');
+          // ⚠️ 중요: schema-engine은 SDK를 직접 import하지 않고, 앱에서 apiClient를 주입받아 사용합니다.
+          if (!apiClient) {
+            throw new Error('apiClient is required for setOptions.type="api"');
+          }
           const res = await apiClient.get(endpoint);
           const result = res as { data?: unknown[] } | unknown[];
           const data = (result && typeof result === 'object' && 'data' in result) ? (result as { data?: unknown[] }).data ?? result : (Array.isArray(result) ? result : []);
@@ -220,7 +236,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
 
   // 🍀 4) 각 필드 렌더링에 isDisabled 적용
 
-  // text/email/phone/password → register
+  // text/email/phone/password → Controller 사용 (reset 후 값 반영을 위해)
   if (['text', 'email', 'phone', 'password'].includes(kind)) {
     const inputType =
       kind === 'email'
@@ -232,47 +248,111 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         : 'text';
     return (
       <FormFieldLayout colSpan={colSpan}>
-        <Input
-          type={inputType}
-          label={placeholder ? undefined : label}
-          placeholder={placeholder}
-          error={error}
-          disabled={isDisabled}
-          fullWidth
-          {...register(name, finalRules)}
+        <Controller
+          name={name}
+          control={control}
+          rules={finalRules as any}
+          render={({ field: f }) => (
+            <Input
+              type={inputType}
+              label={placeholder ? undefined : label}
+              placeholder={placeholder}
+              error={error}
+              disabled={isDisabled}
+              fullWidth
+              showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
+              value={(f.value ?? '') as string}
+              onChange={(e) => {
+                if ((import.meta as any).env?.DEV) {
+                  const nativeIsComposing = (e.nativeEvent as any)?.isComposing;
+                  console.log('[IME][SchemaField->Input] change', {
+                    field: name,
+                    kind,
+                    nativeIsComposing,
+                    targetValue: e.target.value,
+                    prevFormValue: f.value,
+                  });
+                }
+                if (kind === 'phone') {
+                  const formatted = formatKoreanPhoneNumber(e.target.value);
+                  f.onChange(formatted);
+                  return;
+                }
+                f.onChange(e);
+              }}
+              onBlur={f.onBlur}
+              name={f.name}
+              ref={f.ref}
+            />
+          )}
         />
       </FormFieldLayout>
     );
   }
 
-  // number → register
+  // number → Controller 사용 (reset 후 값 반영을 위해)
   if (kind === 'number') {
     return (
       <FormFieldLayout colSpan={colSpan}>
-        <Input
-          type="number"
-          label={placeholder ? undefined : label}
-          placeholder={placeholder}
-          error={error}
-          disabled={isDisabled}
-          fullWidth
-          {...register(name, finalRules)}
+        <Controller
+          name={name}
+          control={control}
+          rules={finalRules as any}
+          render={({ field: f }) => (
+            <Input
+              type="number"
+              label={placeholder ? undefined : label}
+              placeholder={placeholder}
+              error={error}
+              disabled={isDisabled}
+              fullWidth
+              showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
+              value={(f.value ?? '') as string}
+              onChange={f.onChange}
+              onBlur={f.onBlur}
+              name={f.name}
+              ref={f.ref}
+            />
+          )}
         />
       </FormFieldLayout>
     );
   }
 
-  // textarea → register
+  // textarea → Controller 사용 (reset 후 값 반영을 위해)
   if (kind === 'textarea') {
     return (
       <FormFieldLayout colSpan={colSpan}>
-        <Textarea
-          label={placeholder ? undefined : label}
-          placeholder={placeholder}
-          error={error}
-          disabled={isDisabled}
-          fullWidth
-          {...register(name, finalRules)}
+        <Controller
+          name={name}
+          control={control}
+          rules={finalRules as any}
+          render={({ field: f }) => (
+            <Textarea
+              label={placeholder ? undefined : label}
+              placeholder={placeholder}
+              error={error}
+              disabled={isDisabled}
+              fullWidth
+              value={(f.value ?? '') as string}
+              onChange={(e) => {
+                if ((import.meta as any).env?.DEV) {
+                  const nativeIsComposing = (e.nativeEvent as any)?.isComposing;
+                  console.log('[IME][SchemaField->Textarea] change', {
+                    field: name,
+                    kind,
+                    nativeIsComposing,
+                    targetValue: e.target.value,
+                    prevFormValue: f.value,
+                  });
+                }
+                f.onChange(e);
+              }}
+              onBlur={f.onBlur}
+              name={f.name}
+              ref={f.ref}
+            />
+          )}
         />
       </FormFieldLayout>
     );
@@ -292,6 +372,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               error={error}
               disabled={isDisabled}
               fullWidth
+              showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
               value={(f.value ?? (kind === 'multiselect' ? [] : '')) as string | number | readonly string[]}
               onChange={f.onChange}
               onBlur={f.onBlur}
@@ -398,6 +479,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               disabled={isDisabled}
               error={error}
               fullWidth
+              showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
             />
           )}
         />
@@ -421,6 +503,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               disabled={isDisabled}
               error={error}
               fullWidth
+              showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
               dateTime={true}
             />
           )}
@@ -558,6 +641,7 @@ const CustomWidgetField: React.FC<{
     placeholderKey: field.ui?.placeholderKey,
     disabled: isDisabled,
     error: errors[field.name]?.message as string | undefined,
+    fullWidth: true, // 모든 입력 필드는 기본적으로 fullWidth
     control,
     rules: finalRules,
     value: undefined, // Controller에서 관리

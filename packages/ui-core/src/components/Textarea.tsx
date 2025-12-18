@@ -28,12 +28,15 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   onBlur,
   placeholder,
   value,
+  onChange,
   ...props
 }, ref) => {
   // 라벨을 플레이스홀더로 사용
   const textareaPlaceholder = placeholder || label;
   const isEmpty = value === undefined || value === null || value === '';
   const hasValue = !isEmpty;
+  const [isFocused, setIsFocused] = React.useState(false);
+  const isComposingRef = React.useRef(false);
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
       paddingTop: 'var(--spacing-xs)',
@@ -82,26 +85,27 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
     fontSize: 'var(--font-size-base)', // styles.css 토큰: 폼 필드 폰트 사이즈
     fontWeight: 'var(--font-weight-normal)', // styles.css 토큰: 폼 필드 폰트 웨이트
     lineHeight: 'var(--line-height)', // styles.css 토큰: 폼 필드 라인 높이
-    boxShadow: hasValue
-      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)') // 값이 있으면 2px 테두리
-      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)'), // 값이 없으면 1px 테두리
+    // 수정모드(값 있음)라도 포커스 아웃 시에는 항상 1px underline 유지 (Input/Select/DatePicker와 일관)
+    boxShadow: isFocused
+      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
+      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)'),
   };
 
   // React Hook Form의 onBlur와 컴포넌트의 포커스 스타일 관리 병합 (styles.css 토큰 사용)
   const handleFocus = React.useCallback((e: React.FocusEvent<HTMLTextAreaElement>) => {
+    setIsFocused(true);
     e.currentTarget.style.borderBottomColor = 'transparent'; // styles.css 토큰: 항상 transparent 유지 (레이아웃 고정)
     e.currentTarget.style.boxShadow = error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)'; // styles.css 토큰: 포커스 시 항상 시각적 2px 테두리
     onFocus?.(e);
   }, [error, onFocus]);
 
   const handleBlur = React.useCallback((e: React.FocusEvent<HTMLTextAreaElement>) => {
+    setIsFocused(false);
     e.currentTarget.style.borderBottomColor = 'transparent'; // styles.css 토큰: 투명으로 변경
-    // 값이 있으면 2px 유지, 값이 없으면 1px로 복원
-    e.currentTarget.style.boxShadow = hasValue
-      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
-      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)');
+    // 포커스 아웃 시에는 값 유무와 무관하게 1px underline로 복원
+    e.currentTarget.style.boxShadow = error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)';
     onBlur?.(e);
-  }, [error, onBlur, hasValue]);
+  }, [error, onBlur]);
 
   return (
     <div
@@ -117,6 +121,42 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
         style={textareaStyle}
         placeholder={textareaPlaceholder}
         value={value}
+        onCompositionStart={(e) => {
+          isComposingRef.current = true;
+          if ((import.meta as any).env?.DEV) {
+            console.log('[IME][Textarea] compositionstart', {
+              name: (props as any)?.name,
+              value,
+              data: (e as unknown as CompositionEvent).data,
+            });
+          }
+          (props as any).onCompositionStart?.(e);
+        }}
+        onCompositionEnd={(e) => {
+          isComposingRef.current = false;
+          if ((import.meta as any).env?.DEV) {
+            console.log('[IME][Textarea] compositionend', {
+              name: (props as any)?.name,
+              value,
+              data: (e as unknown as CompositionEvent).data,
+            });
+          }
+          (props as any).onCompositionEnd?.(e);
+        }}
+        onChange={(e) => {
+          if ((import.meta as any).env?.DEV) {
+            const nativeIsComposing = (e.nativeEvent as any)?.isComposing;
+            console.log('[IME][Textarea] change', {
+              name: (props as any)?.name,
+              isComposingRef: isComposingRef.current,
+              nativeIsComposing,
+              newValue: e.target.value,
+              prevValue: value,
+            });
+          }
+          onChange?.(e);
+          (props as any).onChange?.(e);
+        }}
         onFocus={handleFocus}
         onBlur={handleBlur}
         {...props}
@@ -126,6 +166,8 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
           style={{
             color: 'var(--color-form-error)', // styles.css 토큰: 폼 필드 에러 메시지 색상
             marginTop: 'var(--spacing-xs)',
+            // 요구사항: 에러 메시지를 2pt 작게 표시 (공통 컴포넌트 기준)
+            fontSize: 'calc(var(--font-size-sm) - 2px)',
           }}
         >
           {error}

@@ -26,9 +26,9 @@ export function checkSupabaseUrl(): {
   const supabase = createClient();
 
   // Supabase 클라이언트의 내부 URL 추출
-  // @ts-ignore - 내부 속성 접근
+  // @ts-expect-error - 내부 속성 접근
   const url = supabase.supabaseUrl || '';
-  // @ts-ignore - 내부 속성 접근
+  // @ts-expect-error - 내부 속성 접근
   const anonKey = supabase.supabaseKey || '';
 
   const correctUrl = 'https://xawypsrotrfoyozhrsbb.supabase.co';
@@ -59,8 +59,7 @@ export function checkSupabaseUrl(): {
  * 환경변수에 직접 URL 확인
  */
 export function checkEnvVariables(): void {
-  // @ts-ignore
-  const viteUrl = import.meta.env?.VITE_SUPABASE_URL;
+  const viteUrl = (import.meta.env as unknown as { VITE_SUPABASE_URL?: string } | undefined)?.VITE_SUPABASE_URL;
 
   console.log('현재 환경변수 확인:', {
     'import.meta.env.VITE_SUPABASE_URL': viteUrl || '미설정',

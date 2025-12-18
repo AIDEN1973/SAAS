@@ -17,7 +17,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, Container, Card, Button, Badge, useModal, PageHeader } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, Button, Badge, PageHeader } from '@ui-core/react';
 import { Grid } from '@ui-core/react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -37,7 +37,6 @@ interface BillingHomeCard {
 
 export function BillingHomePage() {
   const navigate = useNavigate();
-  const { showAlert } = useModal();
   const context = getApiContext();
   const tenantId = context.tenantId;
 

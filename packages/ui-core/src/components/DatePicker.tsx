@@ -21,6 +21,12 @@ export interface DatePickerProps extends Omit<React.InputHTMLAttributes<HTMLInpu
   value?: string | Date;
   onChange?: (value: string) => void;
   dateTime?: boolean; // datetime-local 지원
+  /**
+   * 값이 있을 때 좌측에 인라인 라벨(항목명)을 표시할지 여부
+   * - 수정폼(편집 모드): true
+   * - 필터/검색 UI: false
+   */
+  showInlineLabelWhenHasValue?: boolean;
 }
 
 /**
@@ -35,6 +41,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   value,
   onChange,
   dateTime = false,
+  showInlineLabelWhenHasValue = true,
   className,
   onFocus,
   onBlur,
@@ -77,7 +84,13 @@ export const DatePicker: React.FC<DatePickerProps> = ({
 
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [isYearMenuOpen, setIsYearMenuOpen] = useState(false);
+  const [isMonthMenuOpen, setIsMonthMenuOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
+  const yearMenuRef = useRef<HTMLDivElement>(null);
+  const monthMenuRef = useRef<HTMLDivElement>(null);
+  const yearButtonRef = useRef<HTMLButtonElement>(null);
+  const monthButtonRef = useRef<HTMLButtonElement>(null);
 
   // value를 Date 객체로 변환
   const selectedDate = useMemo(() => {
@@ -136,6 +149,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   };
 
   const hasValue = !!selectedDate;
+  const showInlineLabel = showInlineLabelWhenHasValue && hasValue;
 
   const inputStyle: React.CSSProperties = {
     ...sizeStyles[size],
@@ -151,9 +165,11 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     fontSize: 'var(--font-size-base)', // styles.css 토큰: 폼 필드 폰트 사이즈
     fontWeight: 'var(--font-weight-normal)', // styles.css 토큰: 폼 필드 폰트 웨이트
     lineHeight: 'var(--line-height)', // styles.css 토큰: 폼 필드 라인 높이
-    boxShadow: hasValue
-      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)') // 값이 있으면 2px 테두리
-      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)'), // 값이 없으면 1px 테두리
+    // 요구사항: 수정모드(값이 있는 상태)에서도 기본(비포커스) 밑줄은 1px로 유지
+    // 오픈/포커스 상태에서만 2px로 변경
+    boxShadow: isOpen
+      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
+      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)'),
     cursor: disabled ? 'not-allowed' : 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -213,13 +229,12 @@ export const DatePicker: React.FC<DatePickerProps> = ({
 
   const handleBlur = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
     e.currentTarget.style.borderBottomColor = 'transparent'; // styles.css 토큰: 투명으로 변경
-    // 값이 있으면 2px 유지, 값이 없으면 1px로 복원
-    const currentHasValue = !!selectedDate;
-    e.currentTarget.style.boxShadow = currentHasValue
-      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
-      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)');
+    // 요구사항: blur 시에는 값 유무와 관계없이 1px로 복원
+    e.currentTarget.style.boxShadow = error
+      ? 'var(--shadow-form-bottom-default-error)'
+      : 'var(--shadow-form-bottom-default)';
     onBlur?.(e as unknown as React.FocusEvent<HTMLInputElement>);
-  }, [error, onBlur, selectedDate]);
+  }, [error, onBlur]);
 
   // 달력 그리드 생성
   const calendarDays = useMemo(() => {
@@ -264,6 +279,65 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     });
   }, []);
 
+  const handleYearChange = useCallback((year: number) => {
+    setCurrentMonth((prev) => {
+      const newDate = new Date(prev);
+      // day overflow 방지 (예: 1/31 → 2월로 넘어갈 때)
+      newDate.setDate(1);
+      newDate.setFullYear(year);
+      return newDate;
+    });
+  }, []);
+
+  const handleMonthChange = useCallback((monthIndex: number) => {
+    setCurrentMonth((prev) => {
+      const newDate = new Date(prev);
+      // day overflow 방지 (예: 1/31 → 2월로 넘어갈 때)
+      newDate.setDate(1);
+      newDate.setMonth(monthIndex);
+      return newDate;
+    });
+  }, []);
+
+  const yearOptions = useMemo(() => {
+    const currentYear = currentMonth.getFullYear();
+    // 너무 많은 옵션을 만들지 않으면서도 충분히 점프할 수 있도록 현재 연도 기준 ±50년 제공
+    const start = currentYear - 50;
+    const end = currentYear + 50;
+    const years: number[] = [];
+    for (let y = start; y <= end; y += 1) years.push(y);
+    return years;
+  }, [currentMonth]);
+
+  // 달력 Popover가 닫히면 내부 연/월 드롭다운도 함께 닫기
+  useEffect(() => {
+    if (!isOpen) {
+      setIsYearMenuOpen(false);
+      setIsMonthMenuOpen(false);
+    }
+  }, [isOpen]);
+
+  // 커스텀 드롭다운 레이어 외부 클릭 시 닫기
+  useEffect(() => {
+    if (!isYearMenuOpen && !isMonthMenuOpen) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+
+      const inYear =
+        yearMenuRef.current?.contains(target) ||
+        yearButtonRef.current?.contains(target);
+      const inMonth =
+        monthMenuRef.current?.contains(target) ||
+        monthButtonRef.current?.contains(target);
+
+      if (!inYear) setIsYearMenuOpen(false);
+      if (!inMonth) setIsMonthMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [isYearMenuOpen, isMonthMenuOpen]);
+
   const isToday = useCallback((date: Date) => {
     const today = new Date();
     return (
@@ -285,13 +359,13 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   // 값 변경 시 스타일 업데이트 (값이 있으면 2px, 없으면 1px)
   useEffect(() => {
     if (anchorRef.current && !isOpen) {
-      const currentHasValue = !!selectedDate;
       anchorRef.current.style.borderBottomColor = 'transparent';
-      anchorRef.current.style.boxShadow = currentHasValue
-        ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
-        : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)');
+      // 요구사항: 닫힌 상태에서는 값 유무와 관계없이 1px
+      anchorRef.current.style.boxShadow = error
+        ? 'var(--shadow-form-bottom-default-error)'
+        : 'var(--shadow-form-bottom-default)';
     }
-  }, [selectedDate, error, isOpen]);
+  }, [error, isOpen]);
 
   return (
     <div
@@ -320,6 +394,24 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           onBlur={handleBlur}
           {...props}
         >
+          {/* 수정모드(값이 있을 때): 좌측에 인라인 라벨(항목명) 표시 */}
+          {showInlineLabel && label && (
+            <span
+              style={{
+                color: 'var(--color-form-inline-label)',
+                marginRight: 'var(--spacing-form-inline-label-gap)',
+                whiteSpace: 'nowrap',
+                fontSize: 'var(--font-size-base)',
+                fontFamily: 'var(--font-family)',
+                fontWeight: 'var(--font-weight-normal)',
+                lineHeight: 'var(--line-height)',
+                flexShrink: 0,
+                minWidth: 'var(--width-form-inline-label)', // 고정 너비로 결과값 세로 정렬
+              }}
+            >
+              {label}
+            </span>
+          )}
           <span
             style={{
               flex: 1,
@@ -439,12 +531,276 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                   </button>
                   <div
                     style={{
-                      fontWeight: 'var(--font-weight-semibold)',
-                      color: 'var(--color-text)',
-                      fontSize: 'var(--font-size-base)', // styles.css 준수: 기본 폰트 사이즈
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 'var(--spacing-xs)',
+                      flex: 1,
+                      minWidth: 0,
+                      flexWrap: 'nowrap',
                     }}
                   >
-                    {currentMonth.getFullYear()}년 {monthNames[currentMonth.getMonth()]}
+                    {/* 연도 커스텀 드롭다운 */}
+                    <div style={{ position: 'relative', minWidth: '6.5rem' }}>
+                      <button
+                        ref={yearButtonRef}
+                        type="button"
+                        aria-label="연도 선택"
+                        aria-haspopup="listbox"
+                        aria-expanded={isYearMenuOpen}
+                        onClick={() => {
+                          setIsYearMenuOpen((v) => !v);
+                          setIsMonthMenuOpen(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          border: 'var(--border-width-thin) solid var(--color-gray-200)',
+                          borderRadius: 'var(--border-radius-sm)',
+                          backgroundColor: 'var(--color-white)',
+                          color: 'var(--color-text)',
+                          fontSize: 'var(--font-size-sm)',
+                          fontFamily: 'var(--font-family)',
+                          lineHeight: 'var(--line-height)',
+                          padding: 'var(--spacing-xs) calc(var(--spacing-sm) + var(--size-icon-sm) + var(--spacing-xs)) var(--spacing-xs) var(--spacing-sm)',
+                          outline: 'none',
+                          cursor: 'pointer',
+                          transition: 'var(--transition-fast)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 'var(--spacing-xs)',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'var(--color-white)';
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--color-primary)';
+                          e.currentTarget.style.boxShadow = '0 0 0 var(--border-width-thin) var(--color-primary-50)';
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--color-gray-200)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        <span style={{ whiteSpace: 'nowrap' }}>{currentMonth.getFullYear()}년</span>
+                      </button>
+                      <div
+                        style={{
+                          position: 'absolute',
+                          right: 'var(--spacing-sm)',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          pointerEvents: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 'var(--size-icon-sm)',
+                          height: 'var(--size-icon-sm)',
+                          color: 'var(--color-text-tertiary)',
+                        }}
+                      >
+                        <svg viewBox="0 0 16 16" fill="none" style={{ width: 'var(--size-icon-sm)', height: 'var(--size-icon-sm)' }}>
+                          <path
+                            d="M4 6L8 10L12 6"
+                            stroke="currentColor"
+                            strokeWidth="var(--stroke-width-icon)"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+                      {isYearMenuOpen && (
+                        <div
+                          ref={yearMenuRef}
+                          role="listbox"
+                          style={{
+                            position: 'absolute',
+                            top: 'calc(100% + var(--spacing-xs))',
+                            left: 0,
+                            zIndex: 5,
+                            width: '100%',
+                            minWidth: '6.5rem',
+                            maxHeight: '220px',
+                            overflowY: 'auto',
+                            backgroundColor: 'var(--color-white)',
+                            border: 'var(--border-width-thin) solid var(--color-gray-200)',
+                            borderRadius: 'var(--border-radius-sm)',
+                            boxShadow: 'var(--shadow-md)',
+                          }}
+                        >
+                          {yearOptions.map((y) => {
+                            const isActive = y === currentMonth.getFullYear();
+                            return (
+                              <button
+                                key={y}
+                                type="button"
+                                role="option"
+                                aria-selected={isActive}
+                                onClick={() => {
+                                  handleYearChange(y);
+                                  setIsYearMenuOpen(false);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  textAlign: 'left',
+                                  padding: 'var(--spacing-xs) var(--spacing-sm)',
+                                  border: 'none',
+                                  backgroundColor: isActive ? 'var(--color-primary-50)' : 'transparent',
+                                  color: 'var(--color-text)',
+                                  cursor: 'pointer',
+                                  fontSize: 'var(--font-size-sm)',
+                                  fontFamily: 'var(--font-family)',
+                                  lineHeight: 'var(--line-height)',
+                                  transition: 'var(--transition-fast)',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = isActive ? 'var(--color-primary-50)' : 'transparent';
+                                }}
+                              >
+                                {y}년
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 월 커스텀 드롭다운 */}
+                    <div style={{ position: 'relative', minWidth: '5.25rem' }}>
+                      <button
+                        ref={monthButtonRef}
+                        type="button"
+                        aria-label="월 선택"
+                        aria-haspopup="listbox"
+                        aria-expanded={isMonthMenuOpen}
+                        onClick={() => {
+                          setIsMonthMenuOpen((v) => !v);
+                          setIsYearMenuOpen(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          border: 'var(--border-width-thin) solid var(--color-gray-200)',
+                          borderRadius: 'var(--border-radius-sm)',
+                          backgroundColor: 'var(--color-white)',
+                          color: 'var(--color-text)',
+                          fontSize: 'var(--font-size-sm)',
+                          fontFamily: 'var(--font-family)',
+                          lineHeight: 'var(--line-height)',
+                          padding: 'var(--spacing-xs) calc(var(--spacing-sm) + var(--size-icon-sm) + var(--spacing-xs)) var(--spacing-xs) var(--spacing-sm)',
+                          outline: 'none',
+                          cursor: 'pointer',
+                          transition: 'var(--transition-fast)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 'var(--spacing-xs)',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'var(--color-white)';
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--color-primary)';
+                          e.currentTarget.style.boxShadow = '0 0 0 var(--border-width-thin) var(--color-primary-50)';
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--color-gray-200)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        <span style={{ whiteSpace: 'nowrap' }}>{monthNames[currentMonth.getMonth()]}</span>
+                      </button>
+                      <div
+                        style={{
+                          position: 'absolute',
+                          right: 'var(--spacing-sm)',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          pointerEvents: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 'var(--size-icon-sm)',
+                          height: 'var(--size-icon-sm)',
+                          color: 'var(--color-text-tertiary)',
+                        }}
+                      >
+                        <svg viewBox="0 0 16 16" fill="none" style={{ width: 'var(--size-icon-sm)', height: 'var(--size-icon-sm)' }}>
+                          <path
+                            d="M4 6L8 10L12 6"
+                            stroke="currentColor"
+                            strokeWidth="var(--stroke-width-icon)"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+                      {isMonthMenuOpen && (
+                        <div
+                          ref={monthMenuRef}
+                          role="listbox"
+                          style={{
+                            position: 'absolute',
+                            top: 'calc(100% + var(--spacing-xs))',
+                            left: 0,
+                            zIndex: 5,
+                            width: '100%',
+                            minWidth: '5.25rem',
+                            maxHeight: '220px',
+                            overflowY: 'auto',
+                            backgroundColor: 'var(--color-white)',
+                            border: 'var(--border-width-thin) solid var(--color-gray-200)',
+                            borderRadius: 'var(--border-radius-sm)',
+                            boxShadow: 'var(--shadow-md)',
+                          }}
+                        >
+                          {monthNames.map((m, idx) => {
+                            const isActive = idx === currentMonth.getMonth();
+                            return (
+                              <button
+                                key={m}
+                                type="button"
+                                role="option"
+                                aria-selected={isActive}
+                                onClick={() => {
+                                  handleMonthChange(idx);
+                                  setIsMonthMenuOpen(false);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  textAlign: 'left',
+                                  padding: 'var(--spacing-xs) var(--spacing-sm)',
+                                  border: 'none',
+                                  backgroundColor: isActive ? 'var(--color-primary-50)' : 'transparent',
+                                  color: 'var(--color-text)',
+                                  cursor: 'pointer',
+                                  fontSize: 'var(--font-size-sm)',
+                                  fontFamily: 'var(--font-family)',
+                                  lineHeight: 'var(--line-height)',
+                                  transition: 'var(--transition-fast)',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = isActive ? 'var(--color-primary-50)' : 'transparent';
+                                }}
+                              >
+                                {m}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -646,7 +1002,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           style={{
             color: 'var(--color-form-error)', // styles.css 토큰: 폼 필드 에러 메시지 색상
             marginTop: 'var(--spacing-xs)',
-            fontSize: 'var(--font-size-sm)',
+            // 요구사항: 에러 메시지를 2pt 작게 표시 (공통 컴포넌트 기준)
+            fontSize: 'calc(var(--font-size-sm) - 2px)',
           }}
         >
           {error}

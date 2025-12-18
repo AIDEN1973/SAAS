@@ -103,7 +103,7 @@ export function createAttendanceFormSchema(
           name: 'notes',
           kind: 'textarea',
           ui: {
-            label: '비고',
+            label: '메모',
             colSpan: 2,
           },
         },

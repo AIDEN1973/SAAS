@@ -18,17 +18,29 @@ export interface CardProps {
   variant?: 'default' | 'elevated' | 'outlined';
   onMouseEnter?: (e: React.MouseEvent<HTMLDivElement>) => void;
   onMouseLeave?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  /** 카드 내부 타이틀 (타이틀 하단에 구분선 자동 추가) */
+  title?: React.ReactNode;
+  /** 타이틀 위치 (기본값: 'top-left') */
+  titlePosition?: 'top-left' | 'top-right' | 'top-center';
+  /** 타이틀 왼쪽에 표시할 아이콘 (루시드 아이콘) */
+  titleIcon?: React.ReactNode;
+  /** 타이틀 영역 우측에 표시할 컨텐츠 */
+  titleRightContent?: React.ReactNode;
 }
 
 export const Card: React.FC<CardProps> = ({
   children,
-  padding = 'md',
+  padding = 'lg',
   className,
   style,
   onClick,
   variant = 'default',
   onMouseEnter,
   onMouseLeave,
+  title,
+  titlePosition = 'top-left',
+  titleIcon,
+  titleRightContent,
 }) => {
   const paddingMap: Record<SpacingToken, string> = {
     xs: 'var(--spacing-xs)',
@@ -39,6 +51,7 @@ export const Card: React.FC<CardProps> = ({
     '2xl': 'var(--spacing-2xl)',
     '3xl': 'var(--spacing-3xl)',
   };
+  const basePadding = paddingMap[padding];
 
   const variantStyles: Record<'default' | 'elevated' | 'outlined', React.CSSProperties> = {
     default: {
@@ -59,8 +72,14 @@ export const Card: React.FC<CardProps> = ({
   };
 
   const cardStyle: React.CSSProperties = {
-    borderRadius: 'var(--border-radius-sm)',
-    padding: paddingMap[padding],
+    // 요구사항: 카드 라운드 한 단계 축소 (sm -> xs)
+    borderRadius: 'var(--border-radius-xs)',
+    paddingTop: basePadding,
+    paddingRight: basePadding,
+    paddingLeft: basePadding,
+    // 요구사항: 기본보기/수정폼 모두에서 카드 내부 하단 여백을 한 단계 더 확보
+    // (하드코딩 금지: spacing 토큰 사용)
+    paddingBottom: `calc(${basePadding} + var(--spacing-sm))`,
     ...variantStyles[variant],
     ...(onClick && {
       cursor: 'pointer',
@@ -85,6 +104,19 @@ export const Card: React.FC<CardProps> = ({
     onMouseLeave?.(e);
   };
 
+  // 타이틀 위치 스타일 계산
+  const titlePositionStyles: Record<'top-left' | 'top-right' | 'top-center', React.CSSProperties> = {
+    'top-left': {
+      textAlign: 'left',
+    },
+    'top-right': {
+      textAlign: 'right',
+    },
+    'top-center': {
+      textAlign: 'center',
+    },
+  };
+
   return (
     <div
       className={clsx(className)}
@@ -93,6 +125,75 @@ export const Card: React.FC<CardProps> = ({
       onMouseEnter={onClick || onMouseEnter ? handleMouseEnter : undefined}
       onMouseLeave={onClick || onMouseLeave ? handleMouseLeave : undefined}
     >
+      {title && (
+        <>
+          <div
+            style={{
+              marginLeft: `calc(-1 * ${basePadding})`,
+              marginRight: `calc(-1 * ${basePadding})`,
+              marginTop: `calc(-1 * ${basePadding})`,
+              paddingLeft: basePadding,
+              paddingRight: basePadding,
+              paddingTop: basePadding,
+              paddingBottom: basePadding,
+              backgroundColor: 'var(--color-gray-50)',
+              // 버튼 높이 기준으로 최소 높이 설정 (IconButtonGroup, BadgeSelect 등이 사용하는 --size-pagination-button 기준)
+              minHeight: `calc(${basePadding} + var(--size-pagination-button) + ${basePadding})`,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: titleRightContent ? 'space-between' : titlePosition === 'top-right' ? 'flex-end' : titlePosition === 'top-center' ? 'center' : 'flex-start',
+                gap: 'var(--spacing-sm)',
+                // 버튼 높이 기준으로 최소 높이 설정
+                minHeight: 'var(--size-pagination-button)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--spacing-sm)',
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 'var(--font-weight-bold)',
+                  ...titlePositionStyles[titlePosition],
+                }}
+              >
+                {titleIcon && (
+                  <span
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: 'var(--color-text)',
+                    }}
+                  >
+                    {titleIcon}
+                  </span>
+                )}
+                {title}
+              </div>
+              {titleRightContent ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                  {titleRightContent}
+                </div>
+              ) : (
+                // titleRightContent가 없을 때도 버튼 높이만큼 공간 확보
+                <div style={{ width: 0, height: 'var(--size-pagination-button)', minHeight: 'var(--size-pagination-button)' }} />
+              )}
+            </div>
+          </div>
+          <div
+            style={{
+              marginLeft: `calc(-1 * ${basePadding})`,
+              marginRight: `calc(-1 * ${basePadding})`,
+              marginBottom: 'var(--spacing-md)',
+              borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)',
+            }}
+          />
+        </>
+      )}
       {children}
     </div>
   );

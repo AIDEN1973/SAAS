@@ -101,15 +101,8 @@ export function ModalProvider({ children }: { children: ReactNode }) {
         footer={
           <Button
             variant="solid"
-            color={
-              alertModal.type === 'error'
-                ? 'error'
-                : alertModal.type === 'warning'
-                ? 'warning'
-                : alertModal.type === 'success'
-                ? 'success'
-                : 'primary'
-            }
+            // 요구사항: 모달 "확인" 버튼은 인더스트리 테마(primary)로 통일
+            color="primary"
             onClick={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
             fullWidth
           >

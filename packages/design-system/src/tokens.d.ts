@@ -1,8 +1,8 @@
 /**
  * Design Tokens
  *
- * [불�? 규칙] ?�키마에??Tailwind ?�래??문자?�을 직접 ?�용?��? ?�는??
- * [불�? 규칙] 모든 ?��??��? ?�큰 기반?�로 관리된??
+ * [불변 규칙] 스키마에서는 Tailwind 클래스 문자열을 직접 사용하지 않습니다.
+ * [불변 규칙] 모든 스타일은 토큰 기반으로 관리됩니다.
  */
 export type SpacingToken = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
 export type ColorToken = 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info';
@@ -14,7 +14,7 @@ export type BreakpointToken = 'mobile' | 'tablet' | 'desktop';
 export declare const spacing: Record<SpacingToken, string>;
 /**
  * Color Tokens
- * Multi-Tenant Theme Engine?�서 override 가능
+ * Multi-Tenant Theme Engine에서 override 가능
  */
 export declare const colors: {
     primary: {

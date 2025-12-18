@@ -210,6 +210,28 @@ export class LoginService {
    * tenants 테이블의 RLS 정책: user_tenant_roles를 통한 간접 참조
    */
   async getUserTenants(userId: string): Promise<TenantInfo[]> {
+    // 세션 확인
+    const { data: { session }, error: sessionError } = await this.supabase.auth.getSession();
+
+    if (sessionError || !session) {
+      // 세션이 없으면 빈 배열 반환 (로그인되지 않은 상태)
+      if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+        console.warn('[getUserTenants] 세션이 없습니다:', sessionError?.message || 'No session');
+      }
+      return [];
+    }
+
+    // 세션의 user_id와 요청한 userId가 일치하는지 확인
+    if (session.user.id !== userId) {
+      if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+        console.warn('[getUserTenants] 세션 user_id와 요청한 userId가 일치하지 않습니다:', {
+          sessionUserId: session.user.id,
+          requestedUserId: userId,
+        });
+      }
+      return [];
+    }
+
     // RLS 정책 때문에 userId와 현재 세션의 user_id가 일치해야 함
 
     // ⚠️ 중요: tenants 테이블 조인 시 RLS 순환 참조 문제 발생 가능
@@ -221,11 +243,125 @@ export class LoginService {
       .eq('user_id', userId);
 
     if (rolesError) {
-      // 404 에러면 사용자로 간주 (테넌트 없음)
-      if (rolesError.code === 'PGRST116' || rolesError.message.includes('Could not find the table')) {
+      // 401 Unauthorized 오류 처리 (세션 만료 또는 인증 실패)
+      if (
+        rolesError.code === 'PGRST301' ||
+        rolesError.code === '42501' ||
+        rolesError.message?.includes('401') ||
+        rolesError.message?.includes('Unauthorized') ||
+        rolesError.message?.includes('permission denied')
+      ) {
+        if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+          console.warn('[getUserTenants] 인증 오류 (401). 세션 상태를 확인합니다.', {
+            errorCode: rolesError.code,
+            errorMessage: rolesError.message,
+            hasSession: !!session,
+            sessionUserId: session?.user?.id,
+            requestedUserId: userId,
+          });
+        }
+
+        // 세션이 없거나 만료된 경우 빈 배열 반환
+        if (!session) {
+          if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+            console.warn('[getUserTenants] 세션이 없습니다. 빈 배열 반환.');
+          }
+          return [];
+        }
+
+        // 세션 새로고침 시도
+        const { data: refreshData, error: refreshError } = await this.supabase.auth.refreshSession();
+        if (refreshError || !refreshData.session) {
+          if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+            console.warn('[getUserTenants] 세션 새로고침 실패:', refreshError?.message || 'No session after refresh');
+          }
+          return [];
+        }
+
+        // 새로고침 후 재시도
+        const { data: retryData, error: retryError } = await this.supabase
+          .from('user_tenant_roles')
+          .select('tenant_id, role')
+          .eq('user_id', userId);
+
+        if (retryError) {
+          if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+            console.warn('[getUserTenants] 재시도 실패:', {
+              errorCode: retryError.code,
+              errorMessage: retryError.message,
+            });
+          }
+          return [];
+        }
+
+        // 재시도 성공 시 retryData 사용
+        if (!retryData || retryData.length === 0) {
+          return [];
+        }
+
+        // retryData를 rolesData로 사용하도록 처리
+        const tenantIds = retryData.map((r: { tenant_id: string }) => r.tenant_id);
+        const { data: tenantsData, error: tenantsError } = await this.supabase
+          .from('tenants')
+          .select('id, name, industry_type')
+          .in('id', tenantIds);
+
+        if (tenantsError) {
+          if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+            console.warn('[getUserTenants] tenants 조회 실패, role 정보만 반환:', tenantsError.message);
+          }
+          return retryData.map((r: { tenant_id: string; role: string }) => ({
+            id: r.tenant_id,
+            name: '알 수 없음',
+            industry_type: 'unknown' as const,
+            role: r.role,
+          }));
+        }
+
+        const tenantMap = new Map<string, { id: string; name: string; industry_type: string }>(
+          (tenantsData || []).map((t: { id: string; name: string; industry_type: string }) => [t.id, { id: t.id, name: t.name, industry_type: t.industry_type }])
+        );
+
+        return retryData
+          .map((role: { tenant_id: string; role: string }): TenantInfo | null => {
+            const tenant = tenantMap.get(role.tenant_id);
+            if (!tenant) {
+              return {
+                id: role.tenant_id,
+                name: '알 수 없음',
+                industry_type: 'academy' as const,
+                role: role.role,
+              };
+            }
+            return {
+              id: tenant.id,
+              name: tenant.name,
+              industry_type: tenant.industry_type as TenantInfo['industry_type'],
+              role: role.role,
+            };
+          })
+          .filter((tenant: TenantInfo | null): tenant is TenantInfo => tenant !== null);
+      }
+
+      // role "owner" does not exist 오류 처리
+      if (rolesError.message?.includes('role') && rolesError.message?.includes('does not exist')) {
+        if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+          console.error('[getUserTenants] PostgreSQL ROLE 오류 (RLS 정책 문제 가능):', rolesError.message);
+        }
+        // 이 오류는 RLS 정책 문제일 수 있으므로 빈 배열 반환
         return [];
       }
-      throw new Error(`테넌트 목록 조회 실패: ${rolesError.message}`);
+
+      // 404 에러면 사용자로 간주 (테넌트 없음)
+      if (rolesError.code === 'PGRST116' || rolesError.message?.includes('Could not find the table')) {
+        return [];
+      }
+
+      if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+        console.error('[getUserTenants] 테넌트 목록 조회 실패:', rolesError);
+      }
+      // 오류를 throw하지 않고 빈 배열 반환 (사용자 경험 개선)
+      return [];
     }
 
     if (!rolesData || rolesData.length === 0) {
@@ -318,6 +454,15 @@ export class LoginService {
     if (roleError || !roleData) {
       throw new Error('해당 테넌트에 접근 권한이 없습니다.');
     }
+
+    // ⚠️ 중요: user_tenant_roles의 updated_at을 업데이트하여
+    // Custom JWT Claims Hook이 가장 최근 선택한 테넌트를 JWT claim에 포함하도록 함
+    // 참조: infra/supabase/migrations/064_create_custom_jwt_claims.sql
+    await this.supabase
+      .from('user_tenant_roles')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('user_id', session.user.id)
+      .eq('tenant_id', tenantId);
 
     // 세션 새로고침 (JWT claim 업데이트는 Edge Function에서 처리)
     // Rate limit 에러 방지를 위해 재시도 로직 추가

@@ -28,6 +28,12 @@ export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectE
   options?: SelectOption[]; // 새로운 옵션 방식
   multiple?: boolean;
   onChange?: (value: string | string[]) => void;
+  /**
+   * 값이 있을 때 좌측에 인라인 라벨(항목명)을 표시할지 여부
+   * - 수정폼(편집 모드): true
+   * - 필터/검색 UI: false
+   */
+  showInlineLabelWhenHasValue?: boolean;
 }
 
 /**
@@ -45,6 +51,7 @@ export const Select: React.FC<SelectProps> = ({
   multiple = false,
   value,
   onChange,
+  showInlineLabelWhenHasValue = true,
   onFocus,
   onBlur,
   disabled,
@@ -123,6 +130,7 @@ export const Select: React.FC<SelectProps> = ({
   }, [value, options, multiple]);
 
   const hasValue = selectedLabelsForStyle.length > 0;
+  const showInlineLabel = showInlineLabelWhenHasValue && hasValue;
 
   const selectStyle: React.CSSProperties = {
     ...sizeStyles[size],
@@ -138,9 +146,11 @@ export const Select: React.FC<SelectProps> = ({
     fontSize: 'var(--font-size-base)', // styles.css 토큰: 폼 필드 폰트 사이즈
     fontWeight: 'var(--font-weight-normal)', // styles.css 토큰: 폼 필드 폰트 웨이트
     lineHeight: 'var(--line-height)', // styles.css 토큰: 폼 필드 라인 높이
-    boxShadow: hasValue
-      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)') // 값이 있으면 2px 테두리
-      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)'), // 값이 없으면 1px 테두리
+    // 요구사항: 수정모드(값이 있는 상태)에서도 기본(비포커스) 밑줄은 1px로 유지
+    // 오픈/포커스 상태에서만 2px로 변경
+    boxShadow: isOpen
+      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
+      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)'),
     cursor: disabled ? 'not-allowed' : 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -148,8 +158,11 @@ export const Select: React.FC<SelectProps> = ({
     // 높이는 fontSize * lineHeight + padding-top + padding-bottom + border로 자동 계산됨
   };
 
-  const handleToggle = useCallback(() => {
+  const handleToggle = useCallback((e?: React.MouseEvent) => {
     if (disabled) return;
+    if (e) {
+      e.stopPropagation(); // 이벤트 전파 방지 (상위 요소의 클릭 이벤트 트리거 방지)
+    }
     setIsOpen((prev) => !prev);
     if (!isOpen) {
       setFocusedIndex(-1);
@@ -161,7 +174,10 @@ export const Select: React.FC<SelectProps> = ({
     }
   }, [disabled, isOpen, error]);
 
-  const handleSelect = useCallback((optionValue: string | number) => {
+  const handleSelect = useCallback((optionValue: string | number, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation(); // 이벤트 전파 방지 (상위 요소의 클릭 이벤트 트리거 방지)
+    }
     if (multiple) {
       const currentValues = Array.isArray(value) ? value : [];
       const valueStr = String(optionValue);
@@ -235,13 +251,12 @@ export const Select: React.FC<SelectProps> = ({
 
   const handleBlur = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
     e.currentTarget.style.borderBottomColor = 'transparent'; // styles.css 토큰: 투명으로 변경
-    // 값이 있으면 2px 유지, 값이 없으면 1px로 복원
-    const currentHasValue = selectedLabelsForStyle.length > 0;
-    e.currentTarget.style.boxShadow = currentHasValue
-      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
-      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)');
+    // 요구사항: blur 시에는 값 유무와 관계없이 1px로 복원
+    e.currentTarget.style.boxShadow = error
+      ? 'var(--shadow-form-bottom-default-error)'
+      : 'var(--shadow-form-bottom-default)';
     onBlur?.(e as unknown as React.FocusEvent<HTMLSelectElement>);
-  }, [error, onBlur, selectedLabelsForStyle]);
+  }, [error, onBlur]);
 
   // 라벨을 플레이스홀더로 사용
   const placeholder = label || '선택하세요';
@@ -299,13 +314,13 @@ export const Select: React.FC<SelectProps> = ({
   // 값 변경 시 스타일 업데이트 (값이 있으면 2px, 없으면 1px)
   useEffect(() => {
     if (anchorRef.current && !isOpen) {
-      const currentHasValue = selectedLabelsForStyle.length > 0;
       anchorRef.current.style.borderBottomColor = 'transparent';
-      anchorRef.current.style.boxShadow = currentHasValue
-        ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
-        : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)');
+      // 요구사항: 닫힌 상태에서는 값 유무와 관계없이 1px
+      anchorRef.current.style.boxShadow = error
+        ? 'var(--shadow-form-bottom-default-error)'
+        : 'var(--shadow-form-bottom-default)';
     }
-  }, [selectedLabelsForStyle, error, isOpen]);
+  }, [error, isOpen]);
 
   // 포커스된 옵션으로 스크롤
   useEffect(() => {
@@ -348,11 +363,29 @@ export const Select: React.FC<SelectProps> = ({
           tabIndex={disabled ? -1 : 0}
         className={clsx(className)}
         style={selectStyle}
-          onClick={handleToggle}
+          onClick={(e) => handleToggle(e)}
           onKeyDown={handleKeyDown}
           onFocus={handleFocus}
           onBlur={handleBlur}
         >
+          {/* 수정모드(값이 있을 때): 좌측에 인라인 라벨(항목명) 표시 */}
+          {showInlineLabel && label && (
+            <span
+              style={{
+                color: 'var(--color-form-inline-label)',
+                marginRight: 'var(--spacing-form-inline-label-gap)',
+                whiteSpace: 'nowrap',
+                fontSize: 'var(--font-size-base)',
+                fontFamily: 'var(--font-family)',
+                fontWeight: 'var(--font-weight-normal)',
+                lineHeight: 'var(--line-height)',
+                flexShrink: 0,
+                minWidth: 'var(--width-form-inline-label)', // 고정 너비로 결과값 세로 정렬
+              }}
+            >
+              {label}
+            </span>
+          )}
           <span
             style={{
               flex: 1,
@@ -434,7 +467,7 @@ export const Select: React.FC<SelectProps> = ({
                       key={option.value}
                       role="option"
                       aria-selected={isSelected}
-                      onClick={() => !option.disabled && handleSelect(option.value)}
+                      onClick={(e) => !option.disabled && handleSelect(option.value, e)}
                       style={{
                         padding: 'var(--spacing-sm) var(--spacing-md)',
                         borderRadius: 'var(--border-radius-sm)',
@@ -517,7 +550,8 @@ export const Select: React.FC<SelectProps> = ({
           style={{
             color: 'var(--color-form-error)', // styles.css 토큰: 폼 필드 에러 메시지 색상
             marginTop: 'var(--spacing-xs)',
-            fontSize: 'var(--font-size-sm)',
+            // 요구사항: 에러 메시지를 2pt 작게 표시 (공통 컴포넌트 기준)
+            fontSize: 'calc(var(--font-size-sm) - 2px)',
           }}
         >
           {error}

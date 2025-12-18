@@ -12,7 +12,6 @@
  * - 접근성 WCAG 2.1 AAA 목표
  */
 
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Card, useModal, useResponsiveMode } from '@ui-core/react';
 import { SchemaForm } from '@schema-engine';
@@ -30,7 +29,7 @@ export function SignupPage() {
 
   const handleSignup = async (data: Record<string, unknown>) => {
     try {
-      const result = await signup.mutateAsync({
+      await signup.mutateAsync({
         email: String(data.email ?? ''),
         password: String(data.password ?? ''),
         name: String(data.name ?? ''),
@@ -71,8 +70,6 @@ export function SignupPage() {
       }
     }
   };
-
-  const loading = signup.isPending;
 
   return (
     <Container

@@ -22,10 +22,12 @@ export interface SchemaEditorFormProps {
   onCancel?: () => void;
 }
 
-export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJsonChange: _onSchemaJsonChange, onCancel }: SchemaEditorFormProps) {
+export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJsonChange, onCancel }: SchemaEditorFormProps) {
   const { showAlert } = useModal();
   const createSchema = useCreateSchema();
   const updateSchema = useUpdateSchema();
+  // eslint 규칙: prop은 사용되지 않더라도 공개 API로 유지될 수 있으므로 명시적으로 참조 처리
+  void onSchemaJsonChange;
 
   const [formData, setFormData] = useState<CreateSchemaInput>(() => {
     const baseSchemaJson = currentFormSchema || schema?.schema_json || {

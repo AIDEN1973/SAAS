@@ -45,6 +45,7 @@ export function useSchema<T extends SchemaType = 'form'>(
   return useQuery<SchemaByType<T> | null>({
     queryKey: ['schema', entity, type, context.tenantId, context.industryType],
     queryFn: async () => {
+      // schema-registry 요청은 404가 정상이므로 에러를 throw하지 않음
       // [불변 규칙] 기술문서에 명시된 대로 apiClient.get을 통해 Schema Registry 조회
       // ⚠️ 중요: UI/클라이언트는 직접 meta.schema_registry를 조회하지 않고,
       // @api-sdk/core의 서버사이드 API를 통해서만 접근합니다.
@@ -141,5 +142,7 @@ export function useSchema<T extends SchemaType = 'form'>(
     retry: false, // 404 에러는 재시도하지 않음 (스키마가 없을 수 있음)
     retryOnMount: false, // 마운트 시 재시도하지 않음
     refetchOnWindowFocus: false, // 윈도우 포커스 시 재조회하지 않음 (스키마는 자주 변경되지 않음)
+    throwOnError: false, // 404 에러를 throw하지 않음 (fallback 사용)
+    gcTime: 10 * 60 * 1000, // 10분간 캐시 유지 (기존 cacheTime)
   });
 }

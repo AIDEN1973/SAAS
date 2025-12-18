@@ -31,7 +31,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { ErrorBoundary, useModal, useResponsiveMode } from '@ui-core/react';
 import { Container, Card, Button, Badge, PageHeader } from '@ui-core/react';
 import { SchemaForm } from '@schema-engine';
@@ -48,12 +48,10 @@ import { useUserRole } from '@hooks/use-auth';
 
 export function AIPage() {
   const { showAlert } = useModal();
-  const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md';
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab'); // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
@@ -62,8 +60,6 @@ export function AIPage() {
 
   // 한 페이지에 하나의 기능 원칙 준수: 종합 인사이트만 메인으로 표시
   // 나머지 기능은 별도 페이지로 분리 (빠른 링크로 접근)
-  const generateAISummary = useGenerateConsultationAISummary();
-
   // AI 인사이트 조회 - 아키텍처 문서 3.7.1: ai_insights 테이블에서 조회
   const { data: aiInsights, isLoading } = useQuery({
     queryKey: ['ai-insights', tenantId],
@@ -183,7 +179,7 @@ export function AIPage() {
         // 출석률이 70% 미만이거나 결석이 3회 이상인 학생 탐지
         // 최대 10명만 조회하여 성능 최적화
         const anomalyStudentIds = Array.from(studentAttendanceMap.entries())
-          .filter(([_, stats]) => {
+          .filter(([, stats]) => {
             const attendanceRate = stats.total > 0 ? (stats.present / stats.total) * 100 : 0;
             return attendanceRate < 70 || stats.absent >= 3;
           })

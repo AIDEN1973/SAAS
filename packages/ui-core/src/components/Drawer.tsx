@@ -154,16 +154,23 @@ export const Drawer: React.FC<DrawerProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: 'var(--spacing-md)',
-              paddingBottom: 'var(--spacing-md)',
+              // 우측 레이어 메뉴 헤더와 동일한 스타일: 모바일(xs, sm): 상하 var(--padding-header-vertical), 좌우 var(--spacing-lg), 태블릿 이상(md+): 상하 var(--padding-header-vertical), 좌우 var(--spacing-xl)
+              padding: isMobile
+                ? 'var(--padding-header-vertical) var(--spacing-lg)' // 모바일: 상하 패딩 CSS 변수 사용, 좌우 CSS 변수 사용
+                : 'var(--padding-header-vertical) var(--spacing-xl)', // 태블릿 이상: 상하 패딩 CSS 변수 사용, 좌우 CSS 변수 사용
               borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
+              backgroundColor: 'var(--color-gray-50)',
+              minHeight: 'var(--height-header)', // 글로벌 헤더 높이와 동일하게 설정
             }}
           >
             <h2
               style={{
-                fontWeight: 'var(--font-weight-semibold)',
-                color: 'var(--color-text)',
+                fontWeight: 'var(--font-weight-bold)',
+                fontSize: 'var(--font-size-lg)',
                 margin: 0,
+                color: 'var(--color-text)',
+                letterSpacing: 'var(--letter-spacing-title)', // styles.css 준수: 타이틀 글자 간격 토큰 사용
+                flex: 1,
               }}
             >
               {title}

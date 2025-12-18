@@ -85,7 +85,7 @@ export const guardianFormSchema: FormSchema = {
         kind: 'textarea',
         ui: {
           labelKey: 'GUARDIAN.FORM.NOTES.LABEL',
-          label: '비고',
+          label: '메모',
           colSpan: 2,
         },
       },
@@ -96,29 +96,11 @@ export const guardianFormSchema: FormSchema = {
       color: 'primary',
       size: 'md',
     },
-    actions: [
-      {
-        event: 'onSubmit',
-        type: 'api.call',
-        endpoint: 'guardians',
-        method: 'POST',
-        body: 'form',
-      },
-      {
-        event: 'onSubmitSuccess',
-        type: 'toast',
-        messageKey: 'GUARDIAN.SAVE.SUCCESS',
-        message: '학부모 정보가 저장되었습니다.',
-        variant: 'success',
-      },
-      {
-        event: 'onSubmitError',
-        type: 'toast',
-        messageKey: 'GUARDIAN.SAVE.ERROR',
-        message: '학부모 정보 저장에 실패했습니다.',
-        variant: 'error',
-      },
-    ],
+    // [불변 규칙] actions를 명시적으로 비활성화하여 SchemaForm이 자동 API 호출을 하지 않도록 함
+    // StudentsPage에서 handleSubmit을 통해 onCreate/onUpdate를 직접 처리
+    actions: [],
   },
+  // 최상위 actions도 비활성화
+  actions: [],
 };
 

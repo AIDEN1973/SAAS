@@ -15,6 +15,8 @@ export interface ApiRequest {
 export interface ApiResponse<T = unknown> {
   success?: boolean;
   data?: T;
+  /** Supabase select({ count }) 사용 시 반환되는 전체 건수 */
+  count?: number;
   error?: {
     message: string;
     code?: string;

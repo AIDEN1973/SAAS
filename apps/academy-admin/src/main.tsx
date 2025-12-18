@@ -1,18 +1,27 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { setApiContext } from '@api-sdk/core';
 import { ModalProvider } from '@ui-core/react';
 // Atlaskit v21에서는 ThemeProvider가 필요 없습니다. 기본 테마가 자동 적용됩니다.
 import App from './App';
 // 전역 스타일은 @ui-core/react에서 중앙 관리
 import '@ui-core/react/styles';
+// academy-admin 앱 전용 스타일 (스크롤바 숨김 등 pseudo selector 필요 시)
+import './index.css';
 import { checkSupabaseUrl, checkEnvVariables } from './utils/checkSupabaseUrl';
+
+declare global {
+  interface Window {
+    __CRITERION__?: {
+      getFeatureFlagOverride: () => boolean;
+    };
+  }
+}
 
 // Atlaskit Feature Gate 비활성화 (독립 애플리케이션에서 사용 시 필요)
 // Atlaskit을 Atlassian 제품 외부에서 사용할 때 Feature Gate 체크를 우회합니다.
 if (typeof window !== 'undefined') {
-  (window as any).__CRITERION__ = {
+  window.__CRITERION__ = {
     getFeatureFlagOverride: () => false,
   };
 }

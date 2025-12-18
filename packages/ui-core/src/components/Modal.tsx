@@ -156,18 +156,33 @@ export const Modal: React.FC<ModalProps> = ({
             >
               {title}
             </h2>
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={onClose}
+              aria-label="닫기"
               style={{
                 minWidth: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
                 minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                fontSize: 'var(--font-size-2xl)',
+                color: 'var(--color-text-secondary)',
+                fontWeight: 'var(--font-weight-normal)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 1,
               }}
-              aria-label="닫기"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
             >
               ×
-            </Button>
+            </button>
           </div>
         )}
 

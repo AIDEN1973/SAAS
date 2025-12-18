@@ -75,7 +75,7 @@ export const IconButtonGroup: React.FC<IconButtonGroupProps> = ({
       className={className}
       style={{
         display: 'flex',
-        gap: 'var(--spacing-sm)',
+        gap: 'var(--spacing-xs)',
         justifyContent,
         flexWrap: 'wrap',
       }}

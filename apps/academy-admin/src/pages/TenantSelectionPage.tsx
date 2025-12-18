@@ -11,7 +11,7 @@
  * - Design System 토큰 사용
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Card, Button, useModal, useResponsiveMode } from '@ui-core/react';
 import { useUserTenants, useSelectTenant } from '@hooks/use-auth';
@@ -26,14 +26,7 @@ export function TenantSelectionPage() {
   const selectTenant = useSelectTenant();
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
 
-  // 테넌트가 하나면 자동 선택
-  useEffect(() => {
-    if (tenants && tenants.length === 1) {
-      handleSelectTenant(tenants[0].id);
-    }
-  }, [tenants]);
-
-  const handleSelectTenant = async (tenantId: string) => {
+  const handleSelectTenant = useCallback(async (tenantId: string) => {
     try {
       setSelectedTenantId(tenantId);
       await selectTenant.mutateAsync(tenantId);
@@ -43,7 +36,14 @@ export function TenantSelectionPage() {
       showAlert('오류', message);
       setSelectedTenantId(null);
     }
-  };
+  }, [navigate, selectTenant, showAlert]);
+
+  // 테넌트가 하나면 자동 선택
+  useEffect(() => {
+    if (tenants && tenants.length === 1) {
+      handleSelectTenant(tenants[0].id);
+    }
+  }, [tenants, handleSelectTenant]);
 
   if (tenantsLoading) {
     return (

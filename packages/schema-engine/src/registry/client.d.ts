@@ -42,7 +42,7 @@ export declare class SchemaRegistryClient {
      *
      * @deprecated Use SchemaRegistryService.getSchema instead
      */
-    getSchema(entity: string): Promise<UISchema | null>;
+    getSchema(_entity: string): Promise<UISchema | null>;
     /**
      * 스키마 조회 우선순위 로직
      *

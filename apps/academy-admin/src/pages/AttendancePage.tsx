@@ -16,18 +16,18 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '@ui-core/react';
-import { Container, Card, Button, Input, Badge, Switch, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid, PageHeader } from '@ui-core/react';
+import { Container, Card, Button, Input, Badge, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid, PageHeader } from '@ui-core/react';
 import type { TabItem } from '@ui-core/react';
-import { SchemaForm, SchemaFilter } from '@schema-engine';
+import { SchemaFilter } from '@schema-engine';
 import { useAttendanceLogs, useCreateAttendanceLog, useDeleteAttendanceLog } from '@hooks/use-attendance';
 import { useStudents } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
-import { useConfig, useUpdateConfig } from '@hooks/use-config';
+import { useConfig } from '@hooks/use-config';
 import type { AttendanceFilter, AttendanceType, AttendanceStatus, AttendanceLog } from '@services/attendance-service';
 import type { Student, StudentClass } from '@services/student-service';
 import { useResponsiveMode } from '@ui-core/react';
 import type { ColorToken } from '@design-system/core';
-import type { Class, DayOfWeek } from '@services/class-service';
+import type { DayOfWeek } from '@services/class-service';
 import { toKST } from '@lib/date-utils';
 import { createAttendanceFormSchema } from '../schemas/attendance.schema';
 import { createAttendanceFilterSchema, createAttendanceHeaderFilterSchema } from '../schemas/attendance.filter.schema';
@@ -52,7 +52,6 @@ export function AttendancePage() {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
   const isTablet = mode === 'md'; // 아키텍처 문서 3.3.9: 태블릿 모드 감지 (768px ~ 1024px)
-  const isDesktop = mode === 'lg' || mode === 'xl'; // 아키텍처 문서 3.3.9: 데스크톱 모드 (> 1024px)
   const { data: userRole } = useUserRole();
 
   // 역할별 권한 체크 (아키텍처 문서 2.3, 498-507줄)
@@ -89,7 +88,6 @@ export function AttendancePage() {
   // 출결 설정은 환경설정 > 출결 설정으로 이동 (아키텍처 문서 1716줄)
   // const [showSettings, setShowSettings] = useState(false);
   const { data: config } = useConfig();
-  const updateConfig = useUpdateConfig();
 
   // 전역 모달 훅 사용
   const { showAlert, showConfirm } = useModal();
@@ -115,7 +113,7 @@ export function AttendancePage() {
   }, [config]);
 
   // 출결 기록 상태
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  // const [showCreateForm, setShowCreateForm] = useState(false); // (미사용) 출결 기록 수동 생성 UI 도입 시 사용
 
   // 데이터 조회
   const { data: attendanceLogsData, isLoading: isLoadingLogs, error: errorLogs } = useAttendanceLogs(filter);
@@ -322,7 +320,7 @@ export function AttendancePage() {
     });
 
     setStudentAttendanceStates(newStates);
-  }, [aiPredictions, isLoadingPredictions, filteredStudents]);
+  }, [aiPredictions, isLoadingPredictions, filteredStudents, studentAttendanceStates]);
 
   // 선택된 반/날짜 변경 시 상태 초기화
   useEffect(() => {
@@ -334,6 +332,7 @@ export function AttendancePage() {
     () => createAttendanceFilterSchema(students, classes),
     [students, classes]
   );
+  void attendanceFilterSchema;
 
   // 출결 화면 헤더 필터 스키마 생성 (반 선택, 날짜 선택, 검색)
   const attendanceHeaderFilterSchema = useMemo(
@@ -362,6 +361,7 @@ export function AttendancePage() {
       status: filters.status as AttendanceStatus | undefined,
     });
   }, []);
+  void handleFilterChange;
 
   // 출결 생성/삭제
   const createAttendance = useCreateAttendanceLog();
@@ -472,7 +472,7 @@ export function AttendancePage() {
       // [문서 요구사항] 알림 발송은 서버에서 자동 처리됨 (core-notification → 학부모 알림)
       // 클라이언트에서는 알림 발송 로직을 제거하고, 서버에서 설정에 따라 자동 발송
 
-      setShowCreateForm(false);
+      // setShowCreateForm(false); // (미사용) 출결 기록 수동 생성 UI 도입 시 사용
     } catch (error) {
       showAlert(
         `출결 기록 생성 중 오류가 발생했습니다: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -487,6 +487,7 @@ export function AttendancePage() {
     () => createAttendanceFormSchema(students, classes),
     [students, classes]
   );
+  void attendanceSchema;
 
   // QR 스캐너 시작
   const handleStartQRScanner = async () => {
@@ -619,7 +620,7 @@ export function AttendancePage() {
                   <th>반</th>
                   <th>타입</th>
                   <th>상태</th>
-                  <th>비고</th>
+                  <th>메모</th>
                 </tr>
               </thead>
               <tbody>
@@ -668,6 +669,7 @@ export function AttendancePage() {
       );
     }
   };
+  void handlePrintAttendance;
 
   // 출결 기록 삭제 (아키텍처 문서 2.3: Assistant는 수정 권한 없음)
   const handleDeleteAttendance = async (logId: string) => {
@@ -692,6 +694,7 @@ export function AttendancePage() {
       );
     }
   };
+  void handleDeleteAttendance;
 
   // 출결 상태 뱃지 색상
   const getStatusBadgeColor = (status: AttendanceStatus): ColorToken => {
@@ -708,6 +711,7 @@ export function AttendancePage() {
         return 'secondary';
     }
   };
+  void getStatusBadgeColor;
 
   // 출결 타입 뱃지 색상
   const getTypeBadgeColor = (type: AttendanceType): ColorToken => {
@@ -724,6 +728,7 @@ export function AttendancePage() {
         return 'secondary';
     }
   };
+  void getTypeBadgeColor;
 
   // 출결 저장 핸들러
   const handleSaveAttendance = useCallback(async () => {

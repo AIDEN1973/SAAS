@@ -1,6 +1,6 @@
 /**
  * Student Detail Schema
- * 
+ *
  * [불변 규칙] 스키마 엔진 기반 DetailSchema 정의
  */
 
@@ -94,7 +94,7 @@ export const studentDetailSchema: DetailSchema = {
         name: 'notes',
         kind: 'textarea',
         ui: {
-          label: '비고',
+          label: '메모',
           colSpan: 2,
         },
       },

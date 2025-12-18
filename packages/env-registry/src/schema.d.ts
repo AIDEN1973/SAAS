@@ -16,10 +16,10 @@ export declare const envServerSchema: z.ZodObject<{
     CLOUDFLARE_WORKER_ANALYTICS_URL: z.ZodOptional<z.ZodString>;
     KAKAO_REST_API_KEY: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
+    NODE_ENV: "development" | "staging" | "production";
     SUPABASE_URL: string;
     SUPABASE_ANON_KEY: string;
     SERVICE_ROLE_KEY: string;
-    NODE_ENV: "development" | "staging" | "production";
     SUPABASE_READ_REPLICA_URL?: string | undefined;
     PAYMENT_ALIMBANK_API_URL?: string | undefined;
     PAYMENT_ALIMBANK_API_KEY?: string | undefined;
@@ -32,10 +32,10 @@ export declare const envServerSchema: z.ZodObject<{
     CLOUDFLARE_WORKER_ANALYTICS_URL?: string | undefined;
     KAKAO_REST_API_KEY?: string | undefined;
 }, {
+    NODE_ENV: "development" | "staging" | "production";
     SUPABASE_URL: string;
     SUPABASE_ANON_KEY: string;
     SERVICE_ROLE_KEY: string;
-    NODE_ENV: "development" | "staging" | "production";
     SUPABASE_READ_REPLICA_URL?: string | undefined;
     PAYMENT_ALIMBANK_API_URL?: string | undefined;
     PAYMENT_ALIMBANK_API_KEY?: string | undefined;

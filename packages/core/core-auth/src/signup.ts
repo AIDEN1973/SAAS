@@ -87,6 +87,9 @@ export class SignupService {
 
   /**
    * B2B 회원가입 (사용자 + 테넌트 생성)
+   *
+   * [불변 규칙] 회원가입 시 테넌트를 자동으로 생성하고 user_tenant_roles에 연결합니다.
+   * [불변 규칙] RPC 함수 create_tenant_with_onboarding를 사용하여 테넌트 생성 및 초기화를 수행합니다.
    */
   async signupB2B(input: B2BSignupInput): Promise<SignupResult> {
     try {
@@ -98,18 +101,44 @@ export class SignupService {
         phone: input.phone,
       });
 
-      // 2. 테넌트 생성 (향후 구현)
-      // TODO: 테넌트 생성 로직 추가
-      // const tenant = await tenantOnboardingService.createTenant({
-      //   name: input.tenant_name,
-      //   industry_type: input.industry_type,
-      //   owner_id: signupResult.user.id,
-      //   referral_code: input.referral_code,
-      // });
+      // 2. 테넌트 생성 (RPC 함수 사용)
+      // ⚠️ 중요: 사용자 생성 후 세션이 있어야 RPC 함수가 auth.uid()를 사용할 수 있습니다.
+      //          하지만 signUp 직후에는 세션이 없을 수 있으므로 명시적으로 user_id를 전달합니다.
+      const { data: tenantData, error: tenantError } = await this.supabase.rpc(
+        'create_tenant_with_onboarding',
+        {
+          p_name: input.tenant_name,
+          p_industry_type: input.industry_type,
+          p_plan: 'basic',
+          p_owner_user_id: signupResult.user.id,
+          p_referral_code: input.referral_code || null,
+        }
+      );
+
+      if (tenantError) {
+        console.error('[SignupService] 테넌트 생성 실패:', tenantError);
+        // 테넌트 생성 실패해도 사용자는 생성되었으므로 에러를 던지지 않고 경고만
+        // 사용자가 나중에 수동으로 테넌트를 생성할 수 있도록 함
+        console.warn('[SignupService] 테넌트 생성 실패했지만 사용자는 생성되었습니다. 수동으로 테넌트를 생성해주세요.');
+      }
+
+      // 3. 테넌트 정보 파싱
+      let tenant: Tenant | undefined;
+      if (tenantData && tenantData.tenant) {
+        tenant = {
+          id: tenantData.tenant.id,
+          name: tenantData.tenant.name,
+          industry_type: tenantData.tenant.industry_type as IndustryType,
+          plan: tenantData.tenant.plan,
+          status: tenantData.tenant.status,
+          created_at: tenantData.tenant.created_at,
+          updated_at: tenantData.tenant.updated_at,
+        };
+      }
 
       return {
         ...signupResult,
-        // tenant,
+        tenant,
       };
     } catch (error) {
       console.error('[SignupService] signupB2B error:', maskPII(error));

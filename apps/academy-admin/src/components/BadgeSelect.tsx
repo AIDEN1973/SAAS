@@ -47,9 +47,10 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
 
       if (selectElement) {
         selectElement.style.backgroundColor = 'transparent';
-        selectElement.style.borderBottom = 'none'; // CSS 키워드 사용
-        selectElement.style.borderRadius = 'var(--border-radius-lg)'; // styles.css 준수: border-radius 토큰 사용
-        selectElement.style.boxShadow = 'none'; // CSS 키워드 사용
+        selectElement.style.border = 'none'; // 모든 테두리 제거
+        selectElement.style.borderBottom = 'none'; // 하단 테두리 제거
+        selectElement.style.borderRadius = 'var(--border-radius-xs)'; // styles.css 준수: border-radius 토큰 사용 (Button과 동일)
+        selectElement.style.boxShadow = 'none !important'; // 하단 테두리 효과 제거 (중요도 높임)
         // padding은 유지하여 텍스트와 화살표가 겹치지 않도록 함
         // size에 따라 적절한 padding 적용
         if (size === 'xs' || size === 'sm') {
@@ -85,12 +86,60 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
     }
   }, [value, size]);
 
+  // Select 컴포넌트의 스타일이 재적용되는 것을 방지하기 위한 MutationObserver
+  useEffect(() => {
+    if (!selectRef.current) return;
+
+    const selectElement = selectRef.current.querySelector('[role="combobox"]') as HTMLElement;
+    if (!selectElement) return;
+
+    // 스타일을 지속적으로 제거하는 함수
+    const removeBottomBorder = () => {
+      if (selectElement) {
+        selectElement.style.setProperty('border', 'none', 'important');
+        selectElement.style.setProperty('border-bottom', 'none', 'important');
+        selectElement.style.setProperty('box-shadow', 'none', 'important');
+      }
+    };
+
+    // MutationObserver로 스타일 변경 감지
+    const observer = new MutationObserver(() => {
+      requestAnimationFrame(removeBottomBorder);
+    });
+
+    // 초기 스타일 제거
+    removeBottomBorder();
+
+    // 스타일 속성 변경 감지
+    observer.observe(selectElement, {
+      attributes: true,
+      attributeFilter: ['style'],
+    });
+
+    // 짧은 간격으로 몇 번 확인 (Select 컴포넌트가 동적으로 스타일을 변경할 수 있음)
+    const timeouts: NodeJS.Timeout[] = [];
+    for (let i = 0; i < 5; i++) {
+      timeouts.push(setTimeout(removeBottomBorder, i * 50));
+    }
+
+    return () => {
+      observer.disconnect();
+      timeouts.forEach(clearTimeout);
+    };
+  }, [value, size]);
+
   // 드롭다운 열림 상태 감지하여 너비 조정
   useEffect(() => {
     if (!wrapperRef.current) return;
 
       const adjustDropdownWidth = () => {
         if (!wrapperRef.current) return;
+
+        // 다른 Select의 드롭다운이 열렸을 때(또는 본 컴포넌트가 닫혀 있을 때)
+        // 전역 listbox를 잘못 조작하지 않도록, "내 Select가 열려 있는 경우"에만 동작
+        const selectElement = selectRef.current?.querySelector('[role="combobox"]') as HTMLElement | null;
+        const isThisSelectOpen = selectElement?.getAttribute('aria-expanded') === 'true';
+        if (!isThisSelectOpen) return;
 
         const wrapperWidth = wrapperRef.current.getBoundingClientRect().width;
 
@@ -143,26 +192,43 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
         const totalPadding = optionHorizontalPadding + dropdownHorizontalPadding;
 
         // wrapper 너비와 옵션 텍스트 너비 + 패딩 중 더 큰 값 사용
-        // 최소 너비를 보장하기 위해 추가 여유 공간 추가 (20px)
-        const calculatedWidth = Math.max(wrapperWidth, maxWidth + totalPadding + 20);
+        // 최소 너비를 보장하기 위해 추가 여유 공간(= spacing-md)을 더함 (하드코딩 금지)
+        const calculatedWidth = Math.max(wrapperWidth, maxWidth + totalPadding + spacingMd);
 
-        // Popover와 listbox를 찾아서 너비 조정 및 위치 조정
-        const popover = document.querySelector('[role="listbox"]')?.closest('[style*="position: fixed"]') as HTMLElement;
-        const listbox = document.querySelector('[role="listbox"]') as HTMLElement;
+        // [정합성] 전역 listbox를 조작하지 않고, "내 Select"에 대응하는 listbox만 찾아서 조작
+        // - ui-core Select는 포털로 listbox를 렌더링하므로 wrapper 내부에서 직접 찾을 수 없음
+        // - 대신 wrapperRect 기준으로 "가장 가까운 listbox"를 선택 (다른 필터/레이어 메뉴와 충돌 방지)
+        const wrapperRect = wrapperRef.current.getBoundingClientRect();
+        const expectedTop = wrapperRect.bottom + spacingXs;
+        const expectedLeft = wrapperRect.left;
 
-        if (popover && calculatedWidth > 0 && wrapperRef.current) {
+        const listboxes = Array.from(document.querySelectorAll('[role="listbox"]')) as HTMLElement[];
+        const pickClosestListbox = () => {
+          let best: { el: HTMLElement; score: number } | null = null;
+          for (const el of listboxes) {
+            const r = el.getBoundingClientRect();
+            // 너무 멀리 떨어진 listbox는 제외 (다른 Select 가능성)
+            const dx = Math.abs(r.left - expectedLeft);
+            const dy = Math.abs(r.top - expectedTop);
+            const score = dx + dy;
+            if (!best || score < best.score) best = { el, score };
+          }
+          return best?.el || null;
+        };
+
+        const listbox = pickClosestListbox();
+        const popover = listbox?.closest('[style*="position: fixed"]') as HTMLElement | null;
+
+        if (popover && listbox && calculatedWidth > 0) {
           popover.style.width = `${calculatedWidth}px`;
           popover.style.minWidth = `${calculatedWidth}px`;
           popover.style.maxWidth = `${calculatedWidth}px`; // 최대 너비도 설정하여 줄바꿈 방지
 
-          // 드롭다운 레이어 위치를 왼쪽으로 조정 (wrapper 위치 기준)
-          const wrapperRect = wrapperRef.current.getBoundingClientRect();
-          const popoverRect = popover.getBoundingClientRect();
-          const leftOffset = getCSSVariableAsPx('--spacing-xs', 4); // CSS 변수에서 spacing-xs 값 읽기 (기본값 4px)
+          // 드롭다운 레이어 위치를 wrapper 아래에 배치
           const minMargin = getCSSVariableAsPx('--spacing-sm', 8); // 최소 여백 (기본값 8px)
 
-          // wrapper의 left 위치를 기준으로 왼쪽으로 이동
-          let newLeft = wrapperRect.left - leftOffset;
+          // wrapper의 left 위치를 기준으로 정렬
+          let newLeft = wrapperRect.left;
 
           // 화면 경계 체크: 최소 여백 보장
           if (newLeft < minMargin) {
@@ -175,7 +241,11 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
             newLeft = viewportWidth - calculatedWidth - minMargin;
           }
 
+          // wrapper 아래에 배치 (top 위치 설정)
+          const newTop = expectedTop;
+
           popover.style.left = `${newLeft}px`;
+          popover.style.top = `${newTop}px`;
         }
 
         // listbox 내부 옵션들에 whiteSpace: nowrap 적용
@@ -195,23 +265,19 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
     // MutationObserver로 드롭다운 메뉴가 DOM에 추가될 때 감지
     let timeoutId: NodeJS.Timeout | null = null;
     const observer = new MutationObserver(() => {
-      const listbox = document.querySelector('[role="listbox"]');
-      if (listbox) {
-        // 기존 timeout 취소
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
-        // 드롭다운이 열렸을 때 너비 조정 (약간의 지연을 두어 DOM이 완전히 렌더링된 후 실행)
-        timeoutId = setTimeout(() => {
-          requestAnimationFrame(() => {
+      const selectElement = selectRef.current?.querySelector('[role="combobox"]') as HTMLElement | null;
+      const isThisSelectOpen = selectElement?.getAttribute('aria-expanded') === 'true';
+      if (!isThisSelectOpen) return;
+      // DOM 변화는 많으므로, 내 Select가 열려 있을 때만 조정 스케줄
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        requestAnimationFrame(() => {
+          adjustDropdownWidth();
+          setTimeout(() => {
             adjustDropdownWidth();
-            // 추가로 한 번 더 실행하여 확실하게 적용
-            setTimeout(() => {
-              adjustDropdownWidth();
-            }, 50);
-          });
-        }, 10);
-      }
+          }, 50);
+        });
+      }, 10);
     });
 
     // document.body를 관찰하여 드롭다운 메뉴 추가 감지
@@ -221,7 +287,12 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
     });
 
     // 클릭 이벤트로도 너비 조정 (즉시 반응)
-    const handleClick = () => {
+    const handleClick = (e: Event) => {
+      // BadgeSelect 자신의 요소만 처리 (다른 Select 컴포넌트의 클릭은 무시)
+      const target = e.target as HTMLElement;
+      if (!selectRef.current || !selectRef.current.contains(target)) {
+        return;
+      }
       setTimeout(() => {
         requestAnimationFrame(() => {
           adjustDropdownWidth();
@@ -229,8 +300,9 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
       }, 0);
     };
 
-    if (selectRef.current) {
-      selectRef.current.addEventListener('click', handleClick);
+    const selectEl = selectRef.current;
+    if (selectEl) {
+      selectEl.addEventListener('click', handleClick);
     }
 
     return () => {
@@ -238,8 +310,8 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
-      if (selectRef.current) {
-        selectRef.current.removeEventListener('click', handleClick);
+      if (selectEl) {
+        selectEl.removeEventListener('click', handleClick);
       }
     };
   }, [options]);
@@ -254,11 +326,13 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
       className={className}
       style={{
         display: 'inline-flex',
-        borderRadius: 'var(--border-radius-lg)',
+        alignItems: 'center',
+        borderRadius: 'var(--border-radius-xs)',
         backgroundColor,
         overflow: 'visible', // 드롭다운이 보이도록 visible로 변경
-        paddingLeft: 'var(--spacing-sm)', // 좌우 여백만 추가
-        paddingRight: 'var(--spacing-xs)', // 좌우 여백만 추가
+        height: 'var(--size-pagination-button)', // IconButtonGroup과 동일한 높이
+        paddingLeft: 'var(--spacing-sm)',
+        paddingRight: 'var(--spacing-xs)',
         fontSize: 'var(--font-size-sm)',
         fontWeight: 'var(--font-weight-medium)',
       }}

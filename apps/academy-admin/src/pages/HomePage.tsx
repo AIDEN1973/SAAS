@@ -17,7 +17,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, Container, Card, Button, useModal, PageHeader } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, Button, PageHeader } from '@ui-core/react';
 import { Grid } from '@ui-core/react';
 import { StudentTaskCard } from '../components/StudentTaskCard';
 import { useStudentTaskCards } from '@hooks/use-student';
@@ -82,7 +82,6 @@ type DashboardCard = EmergencyCard | AIBriefingCard | ClassCard | StatsCard | Bi
 
 export function HomePage() {
   const navigate = useNavigate();
-  const { showAlert } = useModal();
   const context = getApiContext();
   const tenantId = context.tenantId;
 

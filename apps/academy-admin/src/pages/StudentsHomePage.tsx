@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, Container, Card, Button, useModal, PageHeader } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, Button, PageHeader } from '@ui-core/react';
 import { Grid } from '@ui-core/react';
 import { StudentTaskCard } from '../components/StudentTaskCard';
 import { useStudentTaskCards, useCompleteStudentTaskCard } from '@hooks/use-student';
@@ -17,7 +17,6 @@ import type { StudentTaskCard as StudentTaskCardType } from '@hooks/use-student'
 
 export function StudentsHomePage() {
   const navigate = useNavigate();
-  const { showAlert } = useModal();
   const { data: cardsData, isLoading, error } = useStudentTaskCards();
   const cards = cardsData || [];
   const completeCard = useCompleteStudentTaskCard();

@@ -212,7 +212,6 @@ export function ClassesPage() {
                   width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
                 >
                   <CreateClassForm
-                    teachers={teachers || []}
                     effectiveFormSchema={effectiveFormSchema}
                     onSubmit={handleCreateClass}
                     onCancel={() => setShowCreateForm(false)}
@@ -221,7 +220,6 @@ export function ClassesPage() {
               ) : (
                 // 데스크톱: 인라인 폼 (기존 방식)
                 <CreateClassForm
-                  teachers={teachers || []}
                   effectiveFormSchema={effectiveFormSchema}
                   onSubmit={handleCreateClass}
                   onCancel={() => setShowCreateForm(false)}
@@ -285,12 +283,10 @@ export function ClassesPage() {
  * 반 생성 폼
  */
 function CreateClassForm({
-  teachers,
   effectiveFormSchema,
   onSubmit,
   onCancel,
 }: {
-  teachers: Teacher[];
   effectiveFormSchema: FormSchema;
   onSubmit: (input: CreateClassInput) => void;
   onCancel: () => void;

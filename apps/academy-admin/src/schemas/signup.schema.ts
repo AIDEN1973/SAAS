@@ -6,7 +6,6 @@
  */
 
 import type { FormSchema } from '@schema-engine';
-import type { IndustryType } from '@core/tenancy';
 
 export const signupFormSchema: FormSchema = {
   version: '1.0.0',

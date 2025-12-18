@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AppLayout, Button, useModal, useTheme } from '@ui-core/react';
 import type { SidebarItem } from '@ui-core/react';
@@ -44,103 +43,7 @@ function AppContent() {
   //   });
   // }, [location]);
 
-  // 전체 사이드바 아이템 정의는 getSidebarItemsForRole 함수 내부로 이동
-  // (Advanced 메뉴 구조를 반영하기 위해)
-  const allSidebarItems: SidebarItem[] = [
-      {
-        id: 'home',
-        label: '홈',
-        path: '/home',
-        icon: (
-          <svg fill="none" viewBox="0 0 24 24">
-            <path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"/>
-          </svg>
-        ),
-      },
-    {
-      id: 'students',
-      label: '학생',
-      path: '/students/home',
-      icon: (
-        <svg fill="none" viewBox="0 0 24 24">
-          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
-          <circle cx="12" cy="7" r="4"/>
-        </svg>
-      ),
-    },
-    {
-      id: 'classes',
-      label: '반 관리',
-      path: '/classes',
-      icon: (
-          <svg fill="none" viewBox="0 0 24 24">
-          <path d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'teachers',
-      label: '강사',
-      path: '/teachers',
-      icon: (
-          <svg fill="none" viewBox="0 0 24 24">
-          <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-        </svg>
-      ),
-    },
-    {
-      id: 'attendance',
-      label: '출결',
-      path: '/attendance',
-      icon: (
-        <svg fill="none" viewBox="0 0 24 24">
-          <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
-        </svg>
-      ),
-    },
-    {
-      id: 'billing',
-      label: '수납/청구',
-      path: '/billing/home',
-      icon: (
-          <svg fill="none" viewBox="0 0 24 24">
-          <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'notifications',
-      label: '메시지/공지',
-      path: '/notifications',
-      icon: (
-          <svg fill="none" viewBox="0 0 24 24">
-          <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
-      ),
-    },
-    {
-      id: 'analytics',
-      label: '통계',
-      path: '/analytics',
-      icon: (
-        <svg fill="none" viewBox="0 0 24 24">
-          <path d="M5 21v-6"/>
-          <path d="M12 21V9"/>
-          <path d="M19 21V3"/>
-        </svg>
-      ),
-    },
-    {
-      id: 'ai',
-      label: 'AI',
-      path: '/ai',
-      icon: (
-        <svg fill="none" viewBox="0 0 24 24">
-          <path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/>
-        </svg>
-      ),
-    },
-  ];
+  // NOTE: 사이드바 아이템은 getSidebarItemsForRole()에서 생성합니다.
 
   /**
    * 역할별 사이드바 메뉴 필터링 (아키텍처 문서 2.3, 4.8 참조)

@@ -154,7 +154,7 @@ PITR(Point-in-Time Recovery)은 특정 시점 복원만 가능하며, table-leve
 │  │  ├─ core-coupons/         # 쿠폰/할인 관리
 │  │  ├─ core-tenancy-referral/ # B2B 추천인 코드 제도
 │  │  ├─ core-events/          # 이벤트/프로모션 관리
-│  │  └─ core-ui/               # UI 컴포넌트 (DataTable, TableCardView, SplitTableLayout 등)
+│  │  └─ ui-core/               # UI 컴포넌트 (DataTable, TableCardView, SplitTableLayout 등)
 │  │
 │  ├─ schema-engine/            # SDUI Renderer + Meta-Schema + Versioning + Custom Widget Registry
 │  │
@@ -170,7 +170,7 @@ UI/UX 문서에서는 UI 아키텍처를 개념적으로 다음과 같이 설명
 
 이는 논리적 레이어 구조이며, 실제 패키지 구조와는 다음과 같이 매핑됩니다:
 - schema-engine: packages/schema-engine (독립 패키지)
-- core-ui: packages/core/core-ui (core 패키지 내부)
+- core-ui(개념 레이어): packages/ui-core (실제 패키지)
 - design-system: packages/design-system (독립 패키지)
 - theme-engine: packages/design-system 내부 또는 별도 theme-engine 패키지 (구현 방식에 따라)
 
@@ -3774,7 +3774,7 @@ DataTable, TableCardView, SplitTableLayout 등 기본 컴포넌트는 기존 설
 
 ⚠️ 중요: 이 섹션은 Phase 2 (1~3k 테넌트) 이상에서 도입하는 기능입니다.
 
-// packages/core-ui/MapView.tsx (예시)
+// packages/ui-core/src/... (예시)
 type MapMetricMode =
   | 'store-density'      // 매장 수
   | 'revenue-avg'        // 평균 매출
@@ -5986,7 +5986,7 @@ if (window.kakao && window.kakao.maps) {
 
 15-6-1. MapView 컴포넌트 (core-ui)
 
-// packages/core-ui/MapView.tsx (예시)
+// packages/ui-core/src/... (예시)
 type MapMetricMode =
   | 'store-density'      // 매장 수
   | 'revenue-avg'        // 평균 매출

@@ -38,6 +38,7 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
   const isMobile = mode === 'xs' || mode === 'sm';
   const bodyRef = useRef<HTMLDivElement>(null);
   const [useOverlayMode, setUseOverlayMode] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const overlayModeRef = useRef(false); // 이전 상태를 추적하여 불필요한 업데이트 방지
   const initialBodyWidthRef = useRef<number | null>(null); // 레이어 메뉴가 열리기 전의 바디 너비 저장
 
@@ -71,6 +72,32 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
   const menuWidthPx = useMemo(() => {
     return parseWidthToPx(menuWidth, isMobile, isTablet);
   }, [menuWidth, isMobile, isTablet]);
+
+  // 확장 시 너비는 전체 화면의 60% (토큰 기반, 우측 고정이므로 좌측으로 확장됨)
+  const effectiveMenuWidth = useMemo(() => {
+    if (isMobile) return menuWidth;
+    return isExpanded ? 'var(--width-layer-menu-expanded)' : menuWidth;
+  }, [menuWidth, isExpanded, isMobile]);
+
+  const effectiveMenuWidthPx = useMemo(() => {
+    if (isMobile) return menuWidthPx;
+    // 60vw는 런타임 뷰포트에 의존하므로, 오버레이 강제 상태(isExpanded)에서는 px 계산이
+    // push 모드 판단/바디 margin 계산에 사용되지 않도록(이미 오버레이 강제) 기본값을 반환한다.
+    return menuWidthPx;
+  }, [menuWidthPx, isExpanded, isMobile]);
+
+  // 요구사항: 확장일 때는 오버레이 모드로 강제
+  const effectiveUseOverlayMode = useMemo(() => {
+    if (isMobile || isTablet) return true; // 기존 규칙 유지(모바일/태블릿은 항상 오버레이)
+    return useOverlayMode || isExpanded;
+  }, [isMobile, isTablet, useOverlayMode, isExpanded]);
+
+  // 메뉴가 닫히면 확장 상태 초기화 (다음 오픈 시 일관성)
+  useEffect(() => {
+    if (!layerMenu.isOpen && isExpanded) {
+      setIsExpanded(false);
+    }
+  }, [layerMenu.isOpen, isExpanded]);
 
   // 레이어 메뉴가 열리기 전의 바디 너비 저장
   // 레이어 메뉴가 열리기 직전의 바디 너비를 저장하여, 레이어 메뉴가 열린 후의 예상 바디 너비를 계산
@@ -129,7 +156,7 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
         }
       });
     });
-  }, [layerMenu.isOpen, menuWidthPx, calculateShouldUseOverlay]);
+  }, [layerMenu.isOpen, effectiveMenuWidthPx, calculateShouldUseOverlay]);
 
   // 윈도우 리사이즈 및 바디 너비 변경 감지
   useEffect(() => {
@@ -183,7 +210,7 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
         window.removeEventListener('resize', checkOverlayMode);
       }
     };
-  }, [layerMenu.isOpen, menuWidthPx, calculateShouldUseOverlay]);
+  }, [layerMenu.isOpen, effectiveMenuWidthPx, calculateShouldUseOverlay]);
 
   return (
     <div
@@ -201,7 +228,7 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
         style={{
           flex: 1,
           width: '100%',
-          marginRight: layerMenu.isOpen && !useOverlayMode ? menuWidth : 0, // 오버레이 모드일 때는 margin 제거
+          marginRight: layerMenu.isOpen && !effectiveUseOverlayMode ? effectiveMenuWidth : 0, // 오버레이 모드일 때는 margin 제거
           transition: 'var(--transition-all)',
           overflow: 'hidden',
         }}
@@ -214,10 +241,14 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
         isOpen={layerMenu.isOpen}
         onClose={layerMenu.onClose}
         title={layerMenu.title}
-        width={menuWidth}
+        width={effectiveMenuWidth}
         headerActions={layerMenu.headerActions}
+        // 요구사항: 태블릿/모바일에서는 확장/축소 버튼 숨김
+        expandable={!isMobile && !isTablet}
+        isExpanded={isExpanded}
+        onToggleExpand={() => setIsExpanded((v) => !v)}
         className={layerMenu.className}
-        style={useOverlayMode ? {
+        style={effectiveUseOverlayMode ? {
           // 오버레이 모드일 때는 z-index를 높여서 바디 위에 표시
           zIndex: 'var(--z-modal-backdrop)',
         } : undefined}

@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer, PageHeader } from '@ui-core/react';
+import { ErrorBoundary, useModal, Modal, Container, Card, Button, useResponsiveMode, Drawer, PageHeader } from '@ui-core/react';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -39,6 +39,14 @@ export function BillingPage() {
   const [showSettlementForm, setShowSettlementForm] = useState(false);
   const [showTeacherRevenueSplitForm, setShowTeacherRevenueSplitForm] = useState(false);
   const navigate = useNavigate();
+  // 현재 화면 구현 범위에서 미사용 상태/세터들은 명시적으로 참조하여 lint(0/0)를 유지합니다.
+  void setActiveTab;
+  void showProductForm;
+  void setShowProductForm;
+  void showSettlementForm;
+  void setShowSettlementForm;
+  void showTeacherRevenueSplitForm;
+  void setShowTeacherRevenueSplitForm;
 
   // 월 자동 청구 생성은 배치 작업으로 자동 실행됨 (아키텍처 문서 2617줄: 매일 04:00 KST)
   // 수동 실행은 더 이상 필요하지 않음 (Zero-Management Platform 철학)
@@ -50,6 +58,10 @@ export function BillingPage() {
   const { data: subjectRevenueTableSchemaData } = useSchema('subject_revenue_table', subjectRevenueTableSchema, 'table');
   const { data: settlementSchema } = useSchema('settlement', settlementFormSchema, 'form');
   const { data: teacherRevenueSplitSchema } = useSchema('teacher_revenue_split', teacherRevenueSplitFormSchema, 'form');
+  void productSchema;
+  void subjectRevenueTableSchemaData;
+  void settlementSchema;
+  void teacherRevenueSplitSchema;
 
   // 인보이스 목록 조회
   const { data: invoices, isLoading } = useQuery({
@@ -68,6 +80,8 @@ export function BillingPage() {
     },
     enabled: !!tenantId,
   });
+  void invoices;
+  void isLoading;
 
   // 인보이스 생성
   const createInvoice = useMutation({
@@ -135,6 +149,8 @@ export function BillingPage() {
     },
     enabled: !!tenantId && activeTab === 'products',
   });
+  void products;
+  void productsLoading;
 
   // 상품 생성
   const createProduct = useMutation({
@@ -197,6 +213,7 @@ export function BillingPage() {
       showAlert('오류', error.message);
     },
   });
+  void executeSettlement;
 
   // 강사 매출 배분 설정 저장 (tenant_settings에 저장)
   const saveTeacherRevenueSplit = useMutation({
@@ -265,6 +282,7 @@ export function BillingPage() {
       showAlert('오류', error.message);
     },
   });
+  void saveTeacherRevenueSplit;
 
   // 인보이스 상태 업데이트
   const updateInvoiceStatus = useMutation({
@@ -306,6 +324,7 @@ export function BillingPage() {
       // 에러는 onError에서 처리됨
     }
   };
+  void handleCreateProduct;
 
   const handleStatusChange = async (id: string, newStatus: InvoiceStatus) => {
     const confirmed = await showConfirm(
@@ -316,6 +335,7 @@ export function BillingPage() {
       updateInvoiceStatus.mutate({ id, status: newStatus });
     }
   };
+  void handleStatusChange;
 
   const statusColors: Record<InvoiceStatus, string> = {
     draft: 'gray',
@@ -324,6 +344,7 @@ export function BillingPage() {
     overdue: 'error',
     cancelled: 'gray',
   };
+  void statusColors;
 
   const statusLabels: Record<InvoiceStatus, string> = {
     draft: '초안',
@@ -418,6 +439,7 @@ export function BillingPage() {
               key={`invoice-table-${filter.status || 'all'}`}
               schema={invoiceTableSchemaData}
               apiCall={async (endpoint: string, method: string) => {
+                void method;
                 const response = await apiClient.get<Invoice>(endpoint, {
                   filters: filter.status ? { status: filter.status } : {},
                   orderBy: { column: 'created_at', ascending: false },

@@ -23,7 +23,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { ErrorBoundary, useModal } from '@ui-core/react';
-import { Container, Card, Button, Badge, PageHeader } from '@ui-core/react';
+import { Container, Card, Button, PageHeader } from '@ui-core/react';
 import { useResponsiveMode } from '@ui-core/react';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useConfig } from '@hooks/use-config';
@@ -502,13 +502,6 @@ export function AnalyticsPage() {
     growth: '성장률',
   };
 
-  const metricLabels = {
-    students: '학생 수',
-    revenue: '매출',
-    attendance: '출석률',
-    growth: '성장률',
-  };
-
   // 통계문서 FR-09: 월간 경영 리포트 생성 기능
   const generateMonthlyReport = useMutation({
     mutationFn: async () => {
@@ -516,8 +509,7 @@ export function AnalyticsPage() {
 
       const currentMonth = toKST();
       const currentMonthStr = currentMonth.format('YYYY-MM');
-      const lastMonth = currentMonth.clone().subtract(1, 'month');
-      const lastMonthStr = lastMonth.format('YYYY-MM');
+      // 전월 비교(Phase 2+) 확장 시 lastMonth 계산을 도입
 
       // 핵심 지표 수집
       const [studentsResponse, invoicesResponse, attendanceLogsResponse, regionalStatsResponse] = await Promise.all([
@@ -1032,7 +1024,7 @@ function HeatmapCard({
               maxWidth: isMobile ? '100%' : 'var(--width-content-max)',
               margin: '0 auto',
             }}>
-              {heatmapGridData.map((item, index) => {
+              {heatmapGridData.map((item) => {
                 const date = new Date(item.date);
                 const dayOfWeek = date.getDay(); // 0(일) ~ 6(토)
                 const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;

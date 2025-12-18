@@ -1,0 +1,572 @@
+[
+  {
+    "schemaname": "meta",
+    "tablename": "schema_registry",
+    "policyname": "schema_registry_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(((EXISTS ( SELECT 1\n   FROM information_schema.tables\n  WHERE (((tables.table_schema)::name = 'public'::name) AND ((tables.table_name)::name = 'user_platform_roles'::name)))) AND (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = ANY (ARRAY['super_admin'::text, 'developer'::text, 'qa'::text])))))) OR (NOT (EXISTS ( SELECT 1\n   FROM information_schema.tables\n  WHERE (((tables.table_schema)::name = 'public'::name) AND ((tables.table_name)::name = 'user_platform_roles'::name))))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "meta",
+    "tablename": "schema_registry",
+    "policyname": "schema_registry_write",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(((EXISTS ( SELECT 1\n   FROM information_schema.tables\n  WHERE (((tables.table_schema)::name = 'public'::name) AND ((tables.table_name)::name = 'user_platform_roles'::name)))) AND (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text))))) OR (NOT (EXISTS ( SELECT 1\n   FROM information_schema.tables\n  WHERE (((tables.table_schema)::name = 'public'::name) AND ((tables.table_name)::name = 'user_platform_roles'::name))))))",
+    "with_check_expression": "(((EXISTS ( SELECT 1\n   FROM information_schema.tables\n  WHERE (((tables.table_schema)::name = 'public'::name) AND ((tables.table_name)::name = 'user_platform_roles'::name)))) AND (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text))))) OR (NOT (EXISTS ( SELECT 1\n   FROM information_schema.tables\n  WHERE (((tables.table_schema)::name = 'public'::name) AND ((tables.table_name)::name = 'user_platform_roles'::name))))))"
+  },
+  {
+    "schemaname": "meta",
+    "tablename": "tenant_schema_pins",
+    "policyname": "tenant_schema_pins_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "((tenant_id = ((auth.jwt() ->> 'tenant_id'::text))::uuid) OR ((EXISTS ( SELECT 1\n   FROM information_schema.tables\n  WHERE (((tables.table_schema)::name = 'public'::name) AND ((tables.table_name)::name = 'user_platform_roles'::name)))) AND (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text))))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "meta",
+    "tablename": "tenant_schema_pins",
+    "policyname": "tenant_schema_pins_write",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(((EXISTS ( SELECT 1\n   FROM information_schema.tables\n  WHERE (((tables.table_schema)::name = 'public'::name) AND ((tables.table_name)::name = 'user_platform_roles'::name)))) AND (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text))))) OR (NOT (EXISTS ( SELECT 1\n   FROM information_schema.tables\n  WHERE (((tables.table_schema)::name = 'public'::name) AND ((tables.table_name)::name = 'user_platform_roles'::name))))))",
+    "with_check_expression": "(((EXISTS ( SELECT 1\n   FROM information_schema.tables\n  WHERE (((tables.table_schema)::name = 'public'::name) AND ((tables.table_name)::name = 'user_platform_roles'::name)))) AND (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text))))) OR (NOT (EXISTS ( SELECT 1\n   FROM information_schema.tables\n  WHERE (((tables.table_schema)::name = 'public'::name) AND ((tables.table_name)::name = 'user_platform_roles'::name))))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "academy_classes",
+    "policyname": "tenant_isolation_academy_classes_delete",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "academy_classes",
+    "policyname": "tenant_isolation_academy_classes_insert",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "using_expression": null,
+    "with_check_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "academy_classes",
+    "policyname": "tenant_isolation_academy_classes_select",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "academy_classes",
+    "policyname": "tenant_isolation_academy_classes_update",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "academy_students",
+    "policyname": "tenant_isolation_academy_students_delete",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "academy_students",
+    "policyname": "tenant_isolation_academy_students_insert",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "using_expression": null,
+    "with_check_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "academy_students",
+    "policyname": "tenant_isolation_academy_students_select",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "academy_students",
+    "policyname": "tenant_isolation_academy_students_update",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "academy_teachers",
+    "policyname": "tenant_isolation_academy_teachers_delete",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "academy_teachers",
+    "policyname": "tenant_isolation_academy_teachers_insert",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "using_expression": null,
+    "with_check_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "academy_teachers",
+    "policyname": "tenant_isolation_academy_teachers_select",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "academy_teachers",
+    "policyname": "tenant_isolation_academy_teachers_update",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "ai_insights",
+    "policyname": "ai_insights_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "ai_insights",
+    "policyname": "ai_insights_write",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "attendance_logs",
+    "policyname": "dev_bypass_attendance_logs",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "true",
+    "with_check_expression": "true"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "attendance_logs",
+    "policyname": "tenant_isolation_attendance_logs",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id = ((auth.jwt() ->> 'tenant_id'::text))::uuid)",
+    "with_check_expression": "(tenant_id = ((auth.jwt() ->> 'tenant_id'::text))::uuid)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "class_teachers",
+    "policyname": "tenant_isolation_class_teachers_delete",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "class_teachers",
+    "policyname": "tenant_isolation_class_teachers_insert",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "using_expression": null,
+    "with_check_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "class_teachers",
+    "policyname": "tenant_isolation_class_teachers_select",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "class_teachers",
+    "policyname": "tenant_isolation_class_teachers_update",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "guardians",
+    "policyname": "tenant_isolation_guardians",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id = ((auth.jwt() ->> 'tenant_id'::text))::uuid)",
+    "with_check_expression": "(tenant_id = ((auth.jwt() ->> 'tenant_id'::text))::uuid)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "industry_themes",
+    "policyname": "industry_themes_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "true",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "industry_themes",
+    "policyname": "industry_themes_write",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "invoice_items",
+    "policyname": "invoice_items_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "invoice_items",
+    "policyname": "invoice_items_write",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "invoices",
+    "policyname": "invoices_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "invoices",
+    "policyname": "invoices_write",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "notification_templates",
+    "policyname": "notification_templates_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "notification_templates",
+    "policyname": "notification_templates_write",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE ((user_tenant_roles.user_id = auth.uid()) AND (user_tenant_roles.role = ANY (ARRAY['owner'::text, 'admin'::text, 'sub_admin'::text])))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "notifications",
+    "policyname": "notifications_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "notifications",
+    "policyname": "notifications_write",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "payment_methods",
+    "policyname": "payment_methods_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "payment_methods",
+    "policyname": "payment_methods_write",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE ((user_tenant_roles.user_id = auth.uid()) AND (user_tenant_roles.role = ANY (ARRAY['owner'::text, 'admin'::text, 'sub_admin'::text])))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "payments",
+    "policyname": "payments_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "payments",
+    "policyname": "payments_write",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "persons",
+    "policyname": "tenant_isolation_persons_delete",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "DELETE",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "persons",
+    "policyname": "tenant_isolation_persons_insert",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "INSERT",
+    "using_expression": null,
+    "with_check_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "persons",
+    "policyname": "tenant_isolation_persons_select",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "persons",
+    "policyname": "tenant_isolation_persons_update",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "UPDATE",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "products",
+    "policyname": "products_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "products",
+    "policyname": "products_write",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE ((user_tenant_roles.user_id = auth.uid()) AND (user_tenant_roles.role = ANY (ARRAY['owner'::text, 'admin'::text, 'sub_admin'::text])))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "settlements",
+    "policyname": "settlements_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE ((user_tenant_roles.user_id = auth.uid()) AND (user_tenant_roles.role = ANY (ARRAY['owner'::text, 'admin'::text, 'sub_admin'::text, 'manager'::text])))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "settlements",
+    "policyname": "settlements_write",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE ((user_tenant_roles.user_id = auth.uid()) AND (user_tenant_roles.role = ANY (ARRAY['owner'::text, 'admin'::text])))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "student_classes",
+    "policyname": "tenant_isolation_student_classes",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id = ((auth.jwt() ->> 'tenant_id'::text))::uuid)",
+    "with_check_expression": "(tenant_id = ((auth.jwt() ->> 'tenant_id'::text))::uuid)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "student_consultations",
+    "policyname": "tenant_isolation_student_consultations",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id = ((auth.jwt() ->> 'tenant_id'::text))::uuid)",
+    "with_check_expression": "(tenant_id = ((auth.jwt() ->> 'tenant_id'::text))::uuid)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "student_task_cards",
+    "policyname": "student_task_cards_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "student_task_cards",
+    "policyname": "student_task_cards_write",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "tenant_settings",
+    "policyname": "tenant_isolation_tenant_settings",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))",
+    "with_check_expression": "((tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM user_platform_roles\n  WHERE ((user_platform_roles.user_id = auth.uid()) AND (user_platform_roles.role = 'super_admin'::text)))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "tenant_theme_overrides",
+    "policyname": "tenant_theme_overrides_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE (user_tenant_roles.user_id = auth.uid())))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "tenant_theme_overrides",
+    "policyname": "tenant_theme_overrides_write",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "ALL",
+    "using_expression": "(tenant_id IN ( SELECT user_tenant_roles.tenant_id\n   FROM user_tenant_roles\n  WHERE ((user_tenant_roles.user_id = auth.uid()) AND (user_tenant_roles.role = ANY (ARRAY['owner'::text, 'admin'::text, 'sub_admin'::text])))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "tenants",
+    "policyname": "tenant_isolation_tenants",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(EXISTS ( SELECT 1\n   FROM user_tenant_roles\n  WHERE ((user_tenant_roles.tenant_id = tenants.id) AND (user_tenant_roles.user_id = auth.uid()))))",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_platform_roles",
+    "policyname": "user_platform_roles_read",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(user_id = auth.uid())",
+    "with_check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "user_tenant_roles",
+    "policyname": "user_tenant_roles_isolation",
+    "permissive": "PERMISSIVE",
+    "roles": "{authenticated}",
+    "cmd": "SELECT",
+    "using_expression": "(user_id = auth.uid())",
+    "with_check_expression": null
+  }
+]

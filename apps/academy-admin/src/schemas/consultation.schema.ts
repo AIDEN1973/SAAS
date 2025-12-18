@@ -68,29 +68,7 @@ export const consultationFormSchema: FormSchema = {
       color: 'primary',
       size: 'md',
     },
-    actions: [
-      {
-        event: 'onSubmit',
-        type: 'api.call',
-        endpoint: 'consultations',
-        method: 'POST',
-        body: 'form',
-      },
-      {
-        event: 'onSubmitSuccess',
-        type: 'toast',
-        messageKey: 'CONSULTATION.SAVE.SUCCESS',
-        message: '상담일지가 저장되었습니다.',
-        variant: 'success',
-      },
-      {
-        event: 'onSubmitError',
-        type: 'toast',
-        messageKey: 'CONSULTATION.SAVE.ERROR',
-        message: '상담일지 저장에 실패했습니다.',
-        variant: 'error',
-      },
-    ],
+    // actions 제거: StudentsPage에서 handleSubmit을 통해 직접 처리
   },
 };
 

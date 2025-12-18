@@ -83,6 +83,9 @@ export type { PaginationProps } from './Pagination';
 export { IconButtonGroup } from './IconButtonGroup';
 export type { IconButtonGroupProps, IconButtonItem } from './IconButtonGroup';
 
+export { ActionButtonGroup } from './ActionButtonGroup';
+export type { ActionButtonGroupProps, ActionButtonItem } from './ActionButtonGroup';
+
 export { Tabs } from './Tabs';
 export type { TabsProps, TabItem } from './Tabs';
 

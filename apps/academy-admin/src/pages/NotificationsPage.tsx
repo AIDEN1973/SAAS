@@ -8,7 +8,6 @@
  */
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer, PageHeader } from '@ui-core/react';
 import { SchemaForm, SchemaTable } from '@schema-engine';
@@ -22,20 +21,17 @@ import { notificationTableSchema } from '../schemas/notification.table.schema';
 import { autoNotificationSettingsFormSchema } from '../schemas/auto-notification-settings.schema';
 
 export function NotificationsPage() {
-  const { showAlert, showConfirm } = useModal();
+  const { showAlert } = useModal();
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
   const isTablet = mode === 'md';
-  const navigate = useNavigate();
 
   const [filter, setFilter] = useState<{ channel?: NotificationChannel; status?: NotificationStatus }>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
-  const [showBulkForm, setShowBulkForm] = useState(false);
-  const [showAutoNotificationSettings, setShowAutoNotificationSettings] = useState(false);
   const [activeTab, setActiveTab] = useState<'history' | 'send' | 'templates' | 'bulk' | 'auto-settings'>('history');
 
   // 스키마 조회 (Registry에서 가져오거나 fallback 사용)
@@ -44,29 +40,6 @@ export function NotificationsPage() {
   const { data: bulkSchema } = useSchema('bulk_notification', bulkNotificationFormSchema, 'form');
   const { data: notificationTableSchemaData } = useSchema('notification_table', notificationTableSchema, 'table');
   const { data: autoNotificationSettingsSchema } = useSchema('auto_notification_settings', autoNotificationSettingsFormSchema, 'form');
-
-  // 알림 목록 조회
-  const { data: notifications, isLoading } = useQuery({
-    queryKey: ['notifications', tenantId, filter],
-    queryFn: async () => {
-      const filters: Record<string, unknown> = {};
-      if (filter.channel) filters.channel = filter.channel;
-      if (filter.status) filters.status = filter.status;
-
-      const response = await apiClient.get<Notification>('notifications', {
-        filters,
-        orderBy: { column: 'created_at', ascending: false },
-        limit: 100,
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-
-      return response.data || [];
-    },
-    enabled: !!tenantId,
-  });
 
   // 템플릿 목록 조회
   const { data: templates, isLoading: templatesLoading } = useQuery({
@@ -188,7 +161,7 @@ export function NotificationsPage() {
       }
     },
     onSuccess: () => {
-      setShowAutoNotificationSettings(false);
+      // setShowAutoNotificationSettings(false); // (미사용) 자동 알림 설정 Drawer/Modal 도입 시 사용
       showAlert('성공', '자동 알림 설정이 저장되었습니다.');
     },
     onError: (error: Error) => {
@@ -217,7 +190,7 @@ export function NotificationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications', tenantId] });
-      setShowBulkForm(false);
+      // setShowBulkForm(false); // (미사용) 단체 발송 Drawer/Modal 도입 시 사용
       showAlert('성공', '메시지가 발송되었습니다.');
     },
     onError: (error: Error) => {
@@ -259,19 +232,7 @@ export function NotificationsPage() {
     push: '푸시 알림',
   };
 
-  const statusColors: Record<NotificationStatus, string> = {
-    pending: 'warning',
-    sent: 'info',
-    failed: 'error',
-    delivered: 'success',
-  };
-
-  const statusLabels: Record<NotificationStatus, string> = {
-    pending: '대기중',
-    sent: '발송완료',
-    failed: '실패',
-    delivered: '전달완료',
-  };
+  // statusColors/statusLabels는 SchemaTable 스키마 기반 렌더링으로 대체됨 (미사용)
 
   const handleCreateNotification = async (data: Record<string, unknown>) => {
     try {
@@ -387,6 +348,7 @@ export function NotificationsPage() {
               key={`notification-table-${filter.channel || 'all'}-${filter.status || 'all'}`}
               schema={notificationTableSchemaData}
               apiCall={async (endpoint: string, method: string) => {
+                void method;
                 const filters: Record<string, unknown> = {};
                 if (filter.channel) filters.channel = filter.channel;
                 if (filter.status) filters.status = filter.status;

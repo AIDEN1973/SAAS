@@ -10,7 +10,6 @@ import { createClient } from '@lib/supabase-client';
 import { withTenant } from '@lib/supabase-client/db';
 import { getApiContext } from './context';
 import type { ApiResponse, ApiClientConfig } from './types';
-import type { UISchema } from '@schema-engine';
 
 /**
  * API Client
@@ -33,6 +32,8 @@ export class ApiClient {
       filters?: Record<string, unknown>;
       orderBy?: { column: string; ascending?: boolean };
       limit?: number;
+      range?: { from: number; to: number };
+      count?: 'exact' | 'planned' | 'estimated';
     }
   ): Promise<ApiResponse<T[]>> {
     try {
@@ -50,7 +51,10 @@ export class ApiClient {
       }
 
       // 필터 처리 (withTenant 적용 전에 쿼리 빌드)
-      let baseQuery = this.supabase.from(table).select(options?.select || '*');
+      // count가 필요하면 select({ count }) 사용
+      let baseQuery = this.supabase
+        .from(table)
+        .select(options?.select || '*', options?.count ? { count: options.count } : undefined);
 
       if (options?.filters) {
         const searchFilters = { ...options.filters };
@@ -108,6 +112,11 @@ export class ApiClient {
         baseQuery = baseQuery.limit(options.limit);
       }
 
+      // range (서버 페이지네이션)
+      if (options?.range) {
+        baseQuery = baseQuery.range(options.range.from, options.range.to);
+      }
+
       // [불변 규칙] SELECT 쿼리는 반드시 withTenant()를 사용하여 tenant_id 필터를 강제합니다.
       // 단, 공통 테이블(tenant_id 컬럼이 없는 테이블)은 예외 처리
       // 공통 테이블: industry_themes (tenant_id 없음), schema-registry (meta 스키마)
@@ -115,7 +124,7 @@ export class ApiClient {
       const isCommonTable = table === 'industry_themes' || table.startsWith('schema-registry/');
       const query = isCommonTable ? baseQuery : withTenant(baseQuery, context.tenantId);
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
 
       if (error) {
         // schema-registry 요청의 404 에러는 조용히 처리 (스키마가 없을 수 있음)
@@ -147,6 +156,7 @@ export class ApiClient {
       return {
         success: true,
         data: data as T[],
+        count: count ?? undefined,
         error: undefined,
       };
     } catch (error) {
@@ -175,7 +185,16 @@ export class ApiClient {
     try {
       const context = getApiContext();
 
+      console.group(`🔍 [ApiClient.post] ${table} 테이블 INSERT`);
+      console.log('📋 Context:', {
+        tenantId: context?.tenantId,
+        industryType: context?.industryType,
+      });
+      console.log('📤 입력 데이터 (tenant_id 주입 전):', data);
+
       if (!context?.tenantId) {
+        console.error('❌ tenant_id 없음!');
+        console.groupEnd();
         return {
           success: false,
           error: {
@@ -200,6 +219,8 @@ export class ApiClient {
         (payload as Record<string, unknown>).industry_type = context.industryType;
       }
 
+      console.log('📤 최종 Payload (tenant_id 주입 후):', payload);
+
       const { data: result, error } = await this.supabase
         .from(table)
         .insert(payload)
@@ -207,6 +228,13 @@ export class ApiClient {
         .single();
 
       if (error) {
+        console.error('❌ INSERT 실패:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        console.groupEnd();
         return {
           success: false,
           error: {
@@ -217,12 +245,18 @@ export class ApiClient {
         };
       }
 
+      console.log('✅ INSERT 성공!');
+      console.log('📥 생성된 데이터:', result);
+      console.groupEnd();
+
       return {
         success: true,
         data: result as T,
         error: undefined,
       };
     } catch (error) {
+      console.error('❌ 예외 발생:', error);
+      console.groupEnd();
       return {
         success: false,
         error: {
@@ -256,11 +290,15 @@ export class ApiClient {
         };
       }
 
+      // [불변 규칙] academy_students 테이블은 person_id를 PRIMARY KEY로 사용
+      // 다른 테이블은 id를 PRIMARY KEY로 사용
+      const primaryKey = table === 'academy_students' ? 'person_id' : 'id';
+
       const { data: result, error } = await withTenant(
         this.supabase
           .from(table)
           .update(data)
-          .eq('id', id)
+          .eq(primaryKey, id)
           .select(),
         context.tenantId
       ).single();
@@ -473,7 +511,7 @@ export class ApiClient {
   async loadSchema(
     _entity: string,
     _type: 'form' | 'table' | 'detail' | 'filter' | 'widget' = 'form'
-  ): Promise<UISchema | null> {
+  ): Promise<unknown | null> {
     // ⚠️ 이 메서드는 사용되지 않습니다.
     // useSchema Hook을 사용하세요.
     console.warn('[API SDK] loadSchema is deprecated. Use useSchema Hook instead.');

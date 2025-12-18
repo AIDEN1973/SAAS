@@ -84,8 +84,20 @@ export const Popover: React.FC<PopoverProps> = ({
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
 
-      // 화면 경계 체크: 최소 여백은 spacing-sm (8px) 사용
-      const minMargin = 8; // var(--spacing-sm) = 8px (JavaScript 계산에서는 숫자 사용)
+      // 화면 경계 체크: 최소 여백은 spacing-sm 토큰을 사용 (하드코딩 금지)
+      const readSpacingSmPx = () => {
+        try {
+          const v = getComputedStyle(document.documentElement).getPropertyValue('--spacing-sm').trim();
+          if (!v) return 8;
+          if (v.endsWith('rem')) return parseFloat(v) * 16;
+          if (v.endsWith('px')) return parseFloat(v);
+          const n = Number(v);
+          return Number.isFinite(n) ? n : 8;
+        } catch {
+          return 8;
+        }
+      };
+      const minMargin = readSpacingSmPx();
       if (left + popoverRect.width > viewportWidth) {
         left = viewportWidth - popoverRect.width - minMargin;
       }
@@ -123,11 +135,20 @@ export const Popover: React.FC<PopoverProps> = ({
     if (!isOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      // 다른 Select/Popover 요소를 클릭한 경우는 무시
+      if (target && (target as HTMLElement).closest('[role="listbox"]')) {
+        return;
+      }
+      if (target && (target as HTMLElement).closest('[role="combobox"]')) {
+        return;
+      }
+
       if (
         popoverRef.current &&
-        !popoverRef.current.contains(e.target as Node) &&
+        !popoverRef.current.contains(target) &&
         anchorEl &&
-        !anchorEl.contains(e.target as Node)
+        !anchorEl.contains(target)
       ) {
         onClose();
       }
@@ -178,11 +199,17 @@ export const Popover: React.FC<PopoverProps> = ({
     ...(style || {}),
   };
 
+  const handlePopoverClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // 이벤트 전파 방지 (상위 요소의 클릭 이벤트 트리거 방지)
+  };
+
   return (
     <div
       ref={popoverRef}
       className={clsx(className)}
       style={popoverStyle}
+      onClick={handlePopoverClick}
+      onMouseDown={handlePopoverClick}
     >
       {children}
     </div>

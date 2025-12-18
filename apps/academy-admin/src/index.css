@@ -1,8 +1,24 @@
 /**
  * Academy Admin App-specific Styles
- * 
+ *
  * [불변 규칙] 전역 스타일은 @ui-core/react/styles에서 관리
  * [불변 규칙] 이 파일은 academy-admin 앱에만 필요한 스타일만 포함
- * 
+ *
  * 현재는 비어있으며, 앱별 커스터마이징이 필요한 경우에만 사용
  */
+
+/**
+ * 우측 레이어 메뉴 등: 스크롤은 가능하지만 스크롤바는 숨김
+ * - Firefox: scrollbar-width
+ * - Legacy Edge/IE 계열: -ms-overflow-style
+ * - Webkit(Chrome/Safari): ::-webkit-scrollbar
+ */
+.academyAdmin-hiddenScrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.academyAdmin-hiddenScrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}

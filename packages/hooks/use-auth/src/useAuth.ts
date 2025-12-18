@@ -146,16 +146,20 @@ export function useLogout() {
 
 /**
  * B2B 회원가입 Hook
+ *
+ * [불변 규칙] 회원가입 시 테넌트를 자동으로 생성합니다.
  */
 export function useSignupWithEmail() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: B2BSignupInput): Promise<SignupResult> => {
-      return signupService.signupWithEmail(input);
+      // B2B 회원가입: 사용자 생성 + 테넌트 생성
+      return signupService.signupB2B(input);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auth', 'session'] });
+      queryClient.invalidateQueries({ queryKey: ['auth', 'user-tenants'] });
     },
   });
 }

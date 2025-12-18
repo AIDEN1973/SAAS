@@ -88,22 +88,22 @@ export const Button: React.FC<ButtonProps> = ({
   const effectiveColor: ColorToken = selected ? 'primary' : color;
   const colorVars = colorMap[effectiveColor];
 
-  // Size를 CSS Variables로 매핑 (세로 패딩 한 포인트 올림)
+  // Size를 CSS Variables로 매핑 (세로 패딩 반 포인트 증가)
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
-      padding: 'var(--spacing-sm) var(--spacing-xs)',
+      padding: 'calc(var(--spacing-xs) + var(--spacing-xs) / 2) var(--spacing-xs)',
     },
     sm: {
-      padding: 'var(--spacing-sm) var(--spacing-sm)',
+      padding: 'calc(var(--spacing-xs) + var(--spacing-xs) / 2) var(--spacing-sm)',
     },
     md: {
-      padding: 'var(--spacing-sm) var(--spacing-sm)',
+      padding: 'calc(var(--spacing-xs) + var(--spacing-xs) / 2) var(--spacing-sm)',
     },
     lg: {
-      padding: 'var(--spacing-md) var(--spacing-md)',
+      padding: 'calc(var(--spacing-sm) + var(--spacing-xs) / 2) var(--spacing-md)',
     },
     xl: {
-      padding: 'var(--spacing-lg) var(--spacing-lg)',
+      padding: 'calc(var(--spacing-md) + var(--spacing-xs) / 2) var(--spacing-lg)',
     },
   };
 

@@ -188,6 +188,8 @@ export const SchemaFilter: React.FC<SchemaFilterProps> = ({
             register={register}
             errors={errors}
             control={control}
+            // 필터 UI에서는 값 입력/선택 시 placeholder가 제거되어야 하므로 인라인 라벨 비활성화
+            showInlineLabelWhenHasValue={false}
           />
         ))}
       </Grid>

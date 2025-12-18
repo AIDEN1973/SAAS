@@ -128,9 +128,23 @@ export class AcademyService {
       students = students.filter((s) => s.grade === filter.grade);
     }
 
-    // 태그 필터 (향후 구현 예정, 현재는 필터링 로직 추가 필요)
+    // 태그 필터 - 선택된 태그 중 "하나라도" 가진 학생(OR)
     if (filter?.tag_ids && filter.tag_ids.length > 0) {
-      // TODO: 태그 필터링 로직 추가
+      const { data: assignments, error: tagError } = await withTenant(
+        this.supabase
+          .from('tag_assignments')
+          .select('entity_id')
+          .eq('entity_type', 'student')
+          .in('tag_id', filter.tag_ids),
+        tenantId
+      );
+
+      if (tagError) {
+        throw new Error(`Failed to fetch student tags: ${tagError.message}`);
+      }
+
+      const studentIdsWithTags = new Set((assignments || []).map((a) => (a as { entity_id: string }).entity_id));
+      students = students.filter((s) => studentIdsWithTags.has(s.id));
     }
 
     // 반 필터 (향후 구현 예정, 현재는 필터링 로직 추가 필요)

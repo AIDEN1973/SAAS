@@ -13,8 +13,9 @@
 
 import React from 'react';
 import { useForm, UseFormReturn } from 'react-hook-form';
-import { Grid, Button, Card } from '@ui-core/react';
+import { Grid, Button, Card, ActionButtonGroup } from '@ui-core/react';
 import { useResponsiveMode } from '@ui-core/react';
+import { Trash2, X as XIcon, Save } from 'lucide-react';
 import type { FormSchema } from '../types';
 import { validateSchema } from '../validator';
 import { SchemaField } from './SchemaField';
@@ -29,8 +30,32 @@ export interface SchemaFormProps {
   actionContext?: Partial<ActionContext>;
   // SDUI v1.1: i18n 번역 (선택적)
   translations?: Record<string, string>;
+  /**
+   * SDUI v1.1: API 클라이언트 주입(선택)
+   * - schema-engine은 특정 SDK를 직접 import하지 않습니다.
+   * - 앱에서 `@api-sdk/core`의 `apiClient`를 주입하는 방식으로 사용합니다.
+   */
+  apiClient?: { get: (table: string, options?: any) => Promise<any> };
   // Card padding 제어 (Drawer/Modal 내부에서 사용 시)
   disableCardPadding?: boolean;
+  /** 카드 내부 타이틀 (타이틀 하단에 구분선 자동 추가) */
+  cardTitle?: React.ReactNode;
+  /** 타이틀 위치 (기본값: 'top-left') */
+  cardTitlePosition?: 'top-left' | 'top-right' | 'top-center';
+  /** 타이틀 왼쪽에 표시할 아이콘 (루시드 아이콘) */
+  cardTitleIcon?: React.ReactNode;
+  /** 카드 variant (기본값: 'default') */
+  cardVariant?: 'default' | 'elevated' | 'outlined';
+  /** 카드 style override (레이어 메뉴 등에서 배경/테두리 제거 용도) */
+  cardStyle?: React.CSSProperties;
+  /** 취소 버튼 클릭 핸들러 (취소 버튼 표시 여부 결정) */
+  onCancel?: () => void;
+  /** 취소 버튼 텍스트 (기본값: '취소') */
+  cancelLabel?: string;
+  /** 삭제 버튼 클릭 핸들러 (삭제 버튼 표시 여부 결정) */
+  onDelete?: () => void | Promise<void>;
+  /** 삭제 버튼 텍스트 (기본값: '삭제') */
+  deleteLabel?: string;
 }
 
 /**
@@ -46,7 +71,17 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
   className,
   actionContext,
   translations = {},
+  apiClient,
   disableCardPadding = false,
+  cardTitle,
+  cardTitlePosition = 'top-left',
+  cardTitleIcon,
+  cardVariant = 'default',
+  cardStyle,
+  onCancel,
+  cancelLabel = '취소',
+  onDelete,
+  deleteLabel = '삭제',
 }) => {
   // 1) Schema Validation
   const validation = validateSchema(schema);
@@ -68,9 +103,42 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
 
   const form: UseFormReturn<Record<string, unknown>> = useForm({
     defaultValues: mergedDefaultValues,
+    // [불변 규칙] React Hook Form 기본 모드 사용 (문서 준수)
+    // mode는 기본값 'onSubmit' 사용 (성능 최적화)
   });
 
   const { register, control, handleSubmit, formState: { errors }, reset, setValue, watch } = form;
+
+  // defaultValues가 변경될 때 폼 값 업데이트
+  // [불변 규칙] React Hook Form의 reset을 사용하여 defaultValues 변경 시 폼 값 업데이트
+  // [성능 최적화] 얕은 비교를 사용하여 실제로 변경되었을 때만 reset 호출
+  const prevMergedDefaultValuesRef = React.useRef<Record<string, unknown>>(mergedDefaultValues);
+  React.useEffect(() => {
+    // 얕은 비교: 키 개수와 값 비교 (JSON.stringify보다 효율적)
+    const hasChanged = Object.keys(mergedDefaultValues).some(
+      key => prevMergedDefaultValuesRef.current[key] !== mergedDefaultValues[key]
+    ) || Object.keys(prevMergedDefaultValuesRef.current).some(
+      key => !(key in mergedDefaultValues)
+    );
+
+    if (!hasChanged) {
+      return; // 변경되지 않았으면 건너뜀
+    }
+
+    if ((import.meta as any).env?.DEV) {
+      console.log('[IME][SchemaForm] reset triggered by mergedDefaultValues change', {
+        changedKeys: Object.keys(mergedDefaultValues).filter(
+          (key) => prevMergedDefaultValuesRef.current[key] !== mergedDefaultValues[key]
+        ),
+      });
+    }
+
+    prevMergedDefaultValuesRef.current = mergedDefaultValues;
+    reset(mergedDefaultValues, {
+      keepDefaultValues: false,
+      keepValues: false,
+    });
+  }, [reset, mergedDefaultValues]);
 
   // SDUI v1.1: Action Engine 컨텍스트 구성
   // ⚠️ 중요: watch()는 매번 호출되므로 formData는 최신 값을 반영합니다.
@@ -183,27 +251,23 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
   }, [effectiveLayout?.columnGap, mode]);
 
   // Card padding 계산 (반응형 고려)
-  // 모바일에서도 적절한 padding 보장
+  // 리스트 카드와 동일한 패딩('md') 사용
   const cardPadding = React.useMemo(() => {
     if (disableCardPadding) return undefined;
-    const basePadding = effectiveLayout?.columnGap || 'md';
-    const isMobile = mode === 'xs' || mode === 'sm';
-    // 모바일에서는 최소 'sm' padding 보장
-    if (isMobile) {
-      return basePadding === 'xs' ? 'xs' : 'sm';
-    }
-    return basePadding;
-  }, [effectiveLayout?.columnGap, mode, disableCardPadding]);
+    // 리스트 카드 기준으로 'md' 패딩 사용
+    return 'md';
+  }, [disableCardPadding]);
 
   // Form padding 계산 (disableCardPadding일 때 form에 직접 padding 적용)
   // Drawer/Modal 내부에서 사용될 때도 적절한 여백 보장
   const formPadding = React.useMemo(() => {
     if (!disableCardPadding) return undefined;
 
-    const basePadding = effectiveLayout?.columnGap || 'md';
+    type SpacingKey = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
+    const basePadding: SpacingKey = 'md';
     const isMobile = mode === 'xs' || mode === 'sm';
 
-    const spacingMap: Record<string, string> = {
+    const spacingMap: Record<SpacingKey, string> = {
       xs: 'var(--spacing-xs)',
       sm: 'var(--spacing-sm)',
       md: 'var(--spacing-md)',
@@ -214,17 +278,18 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     };
 
     // 모바일에서는 최소 'sm' padding 보장
-    const effectivePadding = isMobile && basePadding !== 'xs' ? 'sm' : basePadding;
+    const effectivePadding = isMobile ? 'sm' : basePadding;
 
     return spacingMap[effectivePadding] || `var(--spacing-${effectivePadding})`;
   }, [disableCardPadding, effectiveLayout?.columnGap, mode]);
 
   // rowGap 스타일 계산 (반응형 고려)
   const rowGapStyle = React.useMemo(() => {
-    const baseRowGap = effectiveLayout?.rowGap || 'md';
+    type SpacingKey = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
+    const baseRowGap = (effectiveLayout?.rowGap || 'md') as SpacingKey;
     const isMobile = mode === 'xs' || mode === 'sm';
 
-    const spacingMap: Record<string, string> = {
+    const spacingMap: Record<SpacingKey, string> = {
       xs: 'var(--spacing-xs)',
       sm: 'var(--spacing-sm)',
       md: 'var(--spacing-md)',
@@ -246,12 +311,23 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     <Card
       padding={cardPadding}
       className={className}
-      style={disableCardPadding ? { width: '100%', margin: 0, padding: 0 } : undefined}
+      variant={cardVariant}
+      title={cardTitle}
+      titlePosition={cardTitlePosition}
+      titleIcon={cardTitleIcon}
+      style={{
+        ...(disableCardPadding ? {
+          width: 'var(--width-full)',
+          margin: 'var(--spacing-none)',
+          padding: 'var(--spacing-none)',
+        } : undefined),
+        ...(cardStyle || undefined),
+      }}
     >
       <form
         onSubmit={handleSubmit(onFormSubmit)}
         style={disableCardPadding ? {
-          width: '100%',
+          width: 'var(--width-full)',
           padding: formPadding,
         } : undefined}
       >
@@ -271,24 +347,49 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
               control={control}
               translations={translations}
               setValue={setValue}
+              apiClient={apiClient}
               gridColumns={typeof gridColumns === 'number' ? gridColumns : undefined}
             />
           ))}
         </Grid>
-        {formConfig.submit && (
-          <Grid columns={1} gap="md" style={{ marginTop: 'var(--spacing-md)' }}>
-            <Button
-              type="submit"
-              variant={formConfig.submit.variant}
-              color={formConfig.submit.color}
-              size={formConfig.submit.size}
-            >
-              {/* SDUI v1.1: i18n 키 지원 */}
-              {formConfig.submit.labelKey
-                ? (translations[formConfig.submit.labelKey] || formConfig.submit.labelKey)
-                : (formConfig.submit.label || 'Submit')}
-            </Button>
-          </Grid>
+        {(formConfig.submit || onCancel) && (
+          <ActionButtonGroup
+            marginTop="md"
+            gap="sm"
+            iconVariant="small"
+            items={[
+              ...(onDelete && onCancel && formConfig.submit ? [{
+                key: 'delete',
+                label: deleteLabel,
+                icon: <Trash2 />,
+                variant: 'outline' as const,
+                color: 'error' as const,
+                size: formConfig.submit?.size || 'md',
+                onClick: onDelete,
+                type: 'button' as const,
+              }] : []),
+              ...(onCancel ? [{
+                key: 'cancel',
+                label: cancelLabel,
+                icon: <XIcon />,
+                variant: 'outline' as const,
+                size: formConfig.submit?.size || 'md',
+                onClick: onCancel,
+                type: 'button' as const,
+              }] : []),
+              ...(formConfig.submit ? [{
+                key: 'submit',
+                label: formConfig.submit.labelKey
+                  ? (translations[formConfig.submit.labelKey] || formConfig.submit.labelKey)
+                  : (formConfig.submit.label || 'Submit'),
+                icon: <Save />,
+                variant: formConfig.submit.variant,
+                color: formConfig.submit.color,
+                size: formConfig.submit.size,
+                type: 'submit' as const,
+              }] : []),
+            ]}
+          />
         )}
       </form>
     </Card>
@@ -313,6 +414,15 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
   actionContext,
   translations = {},
   disableCardPadding = false,
+  cardTitle,
+  cardTitlePosition = 'top-left',
+  cardTitleIcon,
+  cardVariant = 'default',
+  cardStyle,
+  onCancel,
+  cancelLabel = '취소',
+  onDelete,
+  deleteLabel = '삭제',
 }) => {
   const validation = validateSchema(schema);
   if (!validation.valid) {
@@ -337,6 +447,12 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
   React.useImperativeHandle(formRef, () => form, [form]);
 
   const { register, control, handleSubmit, formState: { errors }, reset, setValue, watch } = form;
+
+  // defaultValues가 변경될 때 폼 값 업데이트
+  // [중요] 마운트 시에도 reset을 호출하여 defaultValues가 확실히 적용되도록 함
+  React.useEffect(() => {
+    reset(mergedDefaultValues);
+  }, [reset, mergedDefaultValues]);
 
   // SDUI v1.1: Action Engine 컨텍스트 구성
   // ⚠️ 중요: watch()는 매번 호출되므로 formData는 최신 값을 반영합니다.
@@ -448,27 +564,23 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
   }, [effectiveLayout?.columnGap, mode]);
 
   // Card padding 계산 (반응형 고려)
-  // 모바일에서도 적절한 padding 보장
+  // 리스트 카드와 동일한 패딩('md') 사용
   const cardPadding = React.useMemo(() => {
     if (disableCardPadding) return undefined;
-    const basePadding = effectiveLayout?.columnGap || 'md';
-    const isMobile = mode === 'xs' || mode === 'sm';
-    // 모바일에서는 최소 'sm' padding 보장
-    if (isMobile) {
-      return basePadding === 'xs' ? 'xs' : 'sm';
-    }
-    return basePadding;
-  }, [effectiveLayout?.columnGap, mode, disableCardPadding]);
+    // 리스트 카드 기준으로 'md' 패딩 사용
+    return 'md';
+  }, [disableCardPadding]);
 
   // Form padding 계산 (disableCardPadding일 때 form에 직접 padding 적용)
   // Drawer/Modal 내부에서 사용될 때도 적절한 여백 보장
   const formPadding = React.useMemo(() => {
     if (!disableCardPadding) return undefined;
 
-    const basePadding = effectiveLayout?.columnGap || 'md';
+    type SpacingKey = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
+    const basePadding: SpacingKey = 'md';
     const isMobile = mode === 'xs' || mode === 'sm';
 
-    const spacingMap: Record<string, string> = {
+    const spacingMap: Record<SpacingKey, string> = {
       xs: 'var(--spacing-xs)',
       sm: 'var(--spacing-sm)',
       md: 'var(--spacing-md)',
@@ -479,17 +591,18 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
     };
 
     // 모바일에서는 최소 'sm' padding 보장
-    const effectivePadding = isMobile && basePadding !== 'xs' ? 'sm' : basePadding;
+    const effectivePadding = isMobile ? 'sm' : basePadding;
 
     return spacingMap[effectivePadding] || `var(--spacing-${effectivePadding})`;
   }, [disableCardPadding, effectiveLayout?.columnGap, mode]);
 
   // rowGap 스타일 계산 (반응형 고려)
   const rowGapStyle = React.useMemo(() => {
-    const baseRowGap = effectiveLayout?.rowGap || 'md';
+    type SpacingKey = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
+    const baseRowGap = (effectiveLayout?.rowGap || 'md') as SpacingKey;
     const isMobile = mode === 'xs' || mode === 'sm';
 
-    const spacingMap: Record<string, string> = {
+    const spacingMap: Record<SpacingKey, string> = {
       xs: 'var(--spacing-xs)',
       sm: 'var(--spacing-sm)',
       md: 'var(--spacing-md)',
@@ -511,12 +624,23 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
     <Card
       padding={cardPadding}
       className={className}
-      style={disableCardPadding ? { width: '100%', margin: 0, padding: 0 } : undefined}
+      variant={cardVariant}
+      title={cardTitle}
+      titlePosition={cardTitlePosition}
+      titleIcon={cardTitleIcon}
+      style={{
+        ...(disableCardPadding ? {
+          width: 'var(--width-full)',
+          margin: 'var(--spacing-none)',
+          padding: 'var(--spacing-none)',
+        } : undefined),
+        ...(cardStyle || undefined),
+      }}
     >
       <form
         onSubmit={handleSubmit(onFormSubmit)}
         style={disableCardPadding ? {
-          width: '100%',
+          width: 'var(--width-full)',
           padding: formPadding,
         } : undefined}
       >
@@ -540,20 +664,43 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
             />
           ))}
         </Grid>
-        {formConfig.submit && (
-          <Grid columns={1} gap="md" style={{ marginTop: 'var(--spacing-md)' }}>
-            <Button
-              type="submit"
-              variant={formConfig.submit.variant}
-              color={formConfig.submit.color}
-              size={formConfig.submit.size}
-            >
-              {/* SDUI v1.1: i18n 키 지원 */}
-              {formConfig.submit.labelKey
-                ? (translations[formConfig.submit.labelKey] || formConfig.submit.labelKey)
-                : (formConfig.submit.label || 'Submit')}
-            </Button>
-          </Grid>
+        {(formConfig.submit || onCancel) && (
+          <ActionButtonGroup
+            marginTop="md"
+            gap="sm"
+            items={[
+              ...(onDelete && onCancel && formConfig.submit ? [{
+                key: 'delete',
+                label: deleteLabel,
+                icon: <Trash2 />,
+                variant: 'outline' as const,
+                color: 'error' as const,
+                size: formConfig.submit?.size || 'md',
+                onClick: onDelete,
+                type: 'button' as const,
+              }] : []),
+              ...(onCancel ? [{
+                key: 'cancel',
+                label: cancelLabel,
+                icon: <XIcon />,
+                variant: 'outline' as const,
+                size: formConfig.submit?.size || 'md',
+                onClick: onCancel,
+                type: 'button' as const,
+              }] : []),
+              ...(formConfig.submit ? [{
+                key: 'submit',
+                label: formConfig.submit.labelKey
+                  ? (translations[formConfig.submit.labelKey] || formConfig.submit.labelKey)
+                  : (formConfig.submit.label || 'Submit'),
+                icon: <Save />,
+                variant: formConfig.submit.variant,
+                color: formConfig.submit.color,
+                size: formConfig.submit.size,
+                type: 'submit' as const,
+              }] : []),
+            ]}
+          />
         )}
       </form>
     </Card>

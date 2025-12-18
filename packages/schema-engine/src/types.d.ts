@@ -52,7 +52,9 @@ export type LayoutType = 'grid' | 'section' | 'tabs' | 'stepper' | 'drawer' | 'm
  */
 export interface LayoutSchema {
     type?: LayoutType;
-    columns?: number;
+    columns?: number | 'auto-fit' | 'auto-fill';
+    columnTemplate?: string;
+    minColumnWidth?: string;
     columnGap?: SpacingToken;
     rowGap?: SpacingToken;
     tabs?: Array<{
@@ -242,6 +244,7 @@ export interface TableColumnSchema {
  * Table Schema
  *
  * SDUI v1.1: dataSource, rowActions, bulkActions 지원
+ * SDUI v1.2: rowActionHandlers 추가 (Action Engine 연결)
  */
 export interface TableSchema extends BaseSchema {
     type: 'table';
@@ -253,6 +256,9 @@ export interface TableSchema extends BaseSchema {
         };
         columns: TableColumnSchema[];
         rowActions?: string[];
+        rowActionHandlers?: {
+            [actionKey: string]: ActionDefinition;
+        };
         bulkActions?: string[];
         pagination?: {
             pageSizeOptions?: number[];
@@ -302,6 +308,7 @@ export interface WidgetSchema extends BaseSchema {
             method?: 'GET' | 'POST';
         };
         config?: Record<string, unknown>;
+        refreshInterval?: number;
     };
 }
 /**

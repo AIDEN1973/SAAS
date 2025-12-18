@@ -5,11 +5,12 @@
  * [불변 규칙] 반응형: Mobile에서는 햄버거 메뉴, Desktop에서는 전체 메뉴 표시
  */
 
-import React, { useMemo } from 'react';
+import React, { useState } from 'react';
 import { clsx } from 'clsx';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 import { Button } from './Button';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ArrowLeftFromLine, ArrowRightFromLine } from 'lucide-react';
+import { useIconSize, useIconStrokeWidth } from '../hooks/useIconSize';
 
 export interface HeaderProps {
   title?: string;
@@ -34,35 +35,12 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
+  const [isSidebarToggleHovered, setIsSidebarToggleHovered] = useState(false);
 
-  // CSS 변수에서 strokeWidth 읽기 (하드코딩 제거)
-  const strokeWidth = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      const value = getComputedStyle(document.documentElement)
-        .getPropertyValue('--stroke-width-icon')
-        .trim();
-      return value ? Number(value) : 1.5;
-    }
-    return 1.5;
-  }, []);
-
-  // CSS 변수에서 icon size 읽기
-  const iconSize = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      const value = getComputedStyle(document.documentElement)
-        .getPropertyValue('--size-icon-base')
-        .trim();
-      if (value.endsWith('rem')) {
-        const remValue = parseFloat(value);
-        return remValue * 16;
-      }
-      if (value.endsWith('px')) {
-        return parseFloat(value);
-      }
-      return value ? Number(value) : 16;
-    }
-    return 16;
-  }, []);
+  const iconSize = useIconSize('--size-icon-base', 16);
+  // 요구사항: 기본 1px, 롤오버 2px (CSS 변수 기반, 하드코딩 금지)
+  const strokeWidthBase = useIconStrokeWidth('--stroke-width-icon-thin', 1);
+  const strokeWidthHover = useIconStrokeWidth('--stroke-width-icon-medium', 2);
 
   const isTablet = mode === 'md';
   const isDesktop = mode === 'lg' || mode === 'xl';
@@ -115,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={strokeWidth * 1.67} // SVG는 약간 더 두껍게 (시각적 강조)
+                strokeWidth={strokeWidthBase * 1.67} // SVG는 약간 더 두껍게 (시각적 강조)
                 d="M4 6h16M4 12h16M4 18h16"
               />
             </svg>
@@ -148,25 +126,31 @@ export const Header: React.FC<HeaderProps> = ({
             variant="ghost"
             size="sm"
             onClick={onSidebarToggle}
+            onMouseEnter={() => setIsSidebarToggleHovered(true)}
+            onMouseLeave={() => setIsSidebarToggleHovered(false)}
             style={{
-              padding: 'var(--spacing-sm)',
+              // 요구사항: 아이콘 외부 감싸는 버튼 비지(여백) 제거
+              padding: 0,
               borderRadius: 'var(--border-radius-sm)',
-              minWidth: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
-              minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+              minWidth: 'auto',
+              minHeight: 'auto',
+              width: 'auto',
+              height: 'auto',
+              lineHeight: 0,
             }}
           >
             {sidebarCollapsed ? (
-              <PanelLeftOpen
+              <ArrowRightFromLine
                 size={iconSize}
-                strokeWidth={strokeWidth}
+                strokeWidth={isSidebarToggleHovered ? strokeWidthHover : strokeWidthBase}
                 style={{
                   color: 'currentColor',
                 }}
               />
             ) : (
-              <PanelLeftClose
+              <ArrowLeftFromLine
                 size={iconSize}
-                strokeWidth={strokeWidth}
+                strokeWidth={isSidebarToggleHovered ? strokeWidthHover : strokeWidthBase}
                 style={{
                   color: 'currentColor',
                 }}

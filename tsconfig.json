@@ -50,6 +50,8 @@
       "@design-system/core": ["./packages/design-system/src"],
       "@schema-engine": ["./packages/schema-engine/src"],
       "@schema-engine/*": ["./packages/schema-engine/src/*"],
+      "@schema-engine/core": ["./packages/schema-engine/src"],
+      "@schema-engine/core/*": ["./packages/schema-engine/src/*"],
       "@schema/engine": ["./packages/schema-engine/src"],
       "@schema/engine/*": ["./packages/schema-engine/src/*"],
       "@api-sdk/core": ["./packages/api-sdk/src"],

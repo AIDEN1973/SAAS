@@ -26,11 +26,11 @@
 1. 아키텍처
 
 🔹 디자인 시스템 종속성 방향
-schema-engine  →  @atlaskit/components  →  @atlaskit/theme
+schema-engine  →  @ui-core/react  →  (design-system/theme-engine 토큰)  →  CSS 변수(styles.css)
 
 ⚠️ 중요: 기술문서 PART 1 및 UI 문서에 명시된 의존성 방향을 준수합니다.
-- schema-engine은 Atlaskit 컴포넌트를 사용하며, Tailwind 클래스를 직접 사용하지 않습니다.
-- schema-engine은 Atlaskit 컴포넌트를 직접 import하지 않고, 컴포넌트 매핑 레이어를 통해 사용합니다.
+- schema-engine은 `@ui-core/react` 컴포넌트를 사용하며, Tailwind 클래스 문자열을 직접 사용하지 않습니다.
+- schema-engine은 UI 토큰을 CSS 변수로 소비하며(예: `var(--spacing-md)`), 하드코딩된 px 값을 금지합니다.
 - 스키마는 논리적 구조만 정의하고, 컴포넌트 선택과 스타일은 Schema Engine이 담당합니다.
 
 🔹 Condition Rule 실행 위치 명확화
@@ -499,7 +499,7 @@ Version Pinning:
 - **Tailwind 클래스 문자열 사용 금지 검증** (중요)
   - 스키마에서 Tailwind 클래스를 직접 사용하면 안 됩니다.
   - 레이아웃은 props 기반으로 전달: `{ columns: 2, columnGap: "md" }`
-  - Schema Engine이 내부적으로 Atlaskit 컴포넌트를 사용하여 렌더링합니다.
+  - Schema Engine이 내부적으로 `@ui-core/react` 컴포넌트를 사용하여 렌더링합니다.
 - **ConditionRule 상호 충돌 검증**
   - 단일 조건(condition) + 복수 조건(conditions) 동시 존재 → 오류
 - **선행 필드 존재성 검증** (필수)
@@ -769,16 +769,9 @@ import {
 import { getConditionalActions } from '../core/conditionEvaluator';
 import { buildValidationRules } from '../core/validation';
 import type { FormFieldSchema } from '../types';
-import TextField from '@atlaskit/textfield';
-import Select from '@atlaskit/select';
-import Checkbox from '@atlaskit/checkbox';
-import DatePicker from '@atlaskit/datetime-picker';
-import TextArea from '@atlaskit/textarea';
-import RadioGroup from '@atlaskit/radio';
-import { Card } from '@atlaskit/card';
-import { Box } from '@atlaskit/primitives';
+import { Input, Select, Checkbox, DatePicker, Textarea, RadioGroup, Card, Grid } from '@ui-core/react';
 import { loadWidget } from '../widgets/registry';
-// ⚠️ 중요: Schema Engine은 Atlaskit 컴포넌트를 직접 import하여 사용합니다.
+// ⚠️ 중요: Schema Engine은 `@ui-core/react`를 import하여 사용합니다.
 // 컴포넌트 매핑은 field.kind에 따라 자동으로 수행됩니다.
 
 export interface SchemaFieldProps {
@@ -810,7 +803,7 @@ function SchemaFieldComponent({
   const placeholder = ui?.placeholderKey ? (translations[ui.placeholderKey] || ui.placeholderKey) : ui?.placeholder;
   const description = ui?.descriptionKey ? (translations[ui.descriptionKey] || ui.descriptionKey) : ui?.description;
   const tooltip = ui?.tooltipKey ? (translations[ui.tooltipKey] || ui.tooltipKey) : ui?.tooltip;
-  // ⚠️ 참고: description/tooltip은 Atlaskit 컴포넌트의 기본 prop으로 지원됩니다.
+  // ⚠️ 참고: description/tooltip은 ui-core 컴포넌트의 표준 prop으로 지원됩니다.
 
   // 1) 조건부 필드 감시
   // 단일 조건 또는 복수 조건에서 참조하는 모든 필드를 감시
@@ -935,12 +928,12 @@ function SchemaFieldComponent({
 
   const error = errors[name]?.message as string | undefined;
 
-  // ⚠️ 중요: Tailwind 클래스를 직접 사용하지 않고, props 기반으로 Atlaskit 컴포넌트에 전달
+  // ⚠️ 중요: Tailwind 클래스 문자열을 직접 사용하지 않고, props 기반으로 ui-core 컴포넌트에 전달
   // 스키마는 논리적 구조만 정의하고, 컴포넌트 선택과 스타일은 Schema Engine이 담당합니다.
-  // 기술문서 UI 문서 2.3 "schema-engine ↔ Atlaskit 통신 방식" 참조
+  // 기술문서 UI 문서 2.3 "schema-engine ↔ ui-core 통신 방식" 참조
   // Renderer는 layout의 구조적 전달만 수행하고 스타일을 직접 다루지 않아야 합니다.
   // ⚠️ 보완: Renderer는 스타일 로직을 가져서는 안 됩니다.
-  // → Atlaskit의 Box 또는 Grid를 사용하여 레이아웃 구성
+  // → ui-core의 Grid/Card 등을 사용하여 레이아웃 구성
   const colSpan = ui?.colSpan ?? 12;
 
   // 🍀 4) 각 필드 렌더링에 isDisabled 적용
@@ -1473,7 +1466,7 @@ export function StudentsPage() {
 
 ✅ 레이아웃 props 기반
 - Tailwind 클래스 직접 사용 금지
-- Atlaskit의 Box, Grid 등 레이아웃 컴포넌트 사용
+- ui-core의 Grid, Card 등 레이아웃 컴포넌트 사용
 - Renderer는 스타일 로직을 가져서는 안 됨
 
 13. 성능 최적화 (CTO 관점)
@@ -1589,6 +1582,31 @@ function MyForm() {
   return <SchemaForm schema={schema} defaultValues={defaultValues} />;
 }
 ```
+
+**SchemaForm Props (v1.1 추가)**:
+- `cardTitle?: React.ReactNode`: 카드 내부 타이틀 (타이틀 하단에 구분선 자동 추가)
+- `cardTitlePosition?: 'top-left' | 'top-right' | 'top-center'`: 타이틀 위치 (기본값: 'top-left')
+- `cardTitleIcon?: React.ReactNode`: 타이틀 왼쪽에 표시할 아이콘 (루시드 아이콘)
+- `onCancel?: () => void`: 취소 버튼 클릭 핸들러 (취소 버튼 표시 여부 결정)
+- `cancelLabel?: string`: 취소 버튼 텍스트 (기본값: '취소')
+
+**사용 예시**:
+```typescript
+<SchemaForm
+  schema={formSchema}
+  defaultValues={defaultValues}
+  cardTitle="상담일지 등록"
+  cardTitlePosition="top-left"
+  cardTitleIcon={<FileText size={16} strokeWidth={1.5} />}
+  onCancel={() => setIsOpen(false)}
+  cancelLabel="취소"
+/>
+```
+
+**주의사항**:
+- `cardTitle`이 있으면 자동으로 타이틀 영역 배경색(`var(--color-gray-50)`)과 구분선이 추가됩니다.
+- `onCancel`이 있으면 취소 버튼이 저장 버튼 왼쪽에 표시됩니다.
+- 타이틀 아이콘은 CSS 변수(`--size-icon-base`, `--stroke-width-icon`)를 사용하여 크기와 선 두께를 설정해야 합니다.
 
 3. Condition Rule 평가 결과 캐싱
 - 동일한 watchedValues에 대한 평가 결과 캐싱
@@ -1933,6 +1951,26 @@ export interface TableSchema extends BaseSchema {
     virtualization?: boolean;
   };
 }
+```
+
+⚠️ 중요: SchemaTable `filters` prop 전달 규칙 (페이지네이션 리셋 버그 방지)
+
+- SchemaTable은 내부적으로 "filters가 변경되면 1페이지로 리셋"을 수행합니다.
+- 이 동작은 `filters` 객체의 **참조(Referential Equality)** 에 의존하므로,
+  렌더마다 새 객체 리터럴을 생성하여 전달하면 페이지가 매번 1로 리셋되어 **2페이지로 전환이 불가능**해질 수 있습니다.
+
+✅ 권장 패턴:
+- `filters`는 `useMemo`로 안정화해서 전달합니다. (값이 실제로 바뀔 때만 객체가 바뀌도록)
+
+예:
+```tsx
+const tableFilters = useMemo(() => ({
+  ...(filter.status && { status: filter.status }),
+  ...(filter.grade && { grade: filter.grade }),
+  ...(filter.search && { search: filter.search }),
+}), [filter.status, filter.grade, filter.search]);
+
+<SchemaTable filters={tableFilters} ... />
 ```
 
 ⚠️ 중요: rowActionHandlers 사용 예시 (SDUI v1.2)

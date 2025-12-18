@@ -4,6 +4,7 @@
 
 export {
   useStudents,
+  useStudentsPaged,
   useStudent,
   useCreateStudent,
   useBulkCreateStudents,

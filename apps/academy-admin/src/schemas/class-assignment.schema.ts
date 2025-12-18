@@ -50,29 +50,6 @@ export const classAssignmentFormSchema: FormSchema = {
       color: 'primary',
       size: 'md',
     },
-    actions: [
-      {
-        event: 'onSubmit',
-        type: 'api.call',
-        endpoint: 'class_assignments',
-        method: 'POST',
-        body: 'form',
-      },
-      {
-        event: 'onSubmitSuccess',
-        type: 'toast',
-        messageKey: 'CLASS_ASSIGNMENT.SUCCESS',
-        message: '반 배정이 완료되었습니다.',
-        variant: 'success',
-      },
-      {
-        event: 'onSubmitError',
-        type: 'toast',
-        messageKey: 'CLASS_ASSIGNMENT.ERROR',
-        message: '반 배정에 실패했습니다.',
-        variant: 'error',
-      },
-    ],
   },
 };
 

@@ -89,7 +89,7 @@ export const teacherFormSchema: FormSchema = {
         name: 'notes',
         kind: 'textarea',
         ui: {
-          label: '비고',
+          label: '메모',
           colSpan: 2,
         },
       },

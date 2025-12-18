@@ -101,7 +101,7 @@ export default defineConfig(({ mode }) => {
   // process.env에서 잘못된 값이 있는지 확인 및 무시
   // .env.local 파일의 값만 사용하도록 강제
   const envLocalPath = path.join(envDir, '.env.local');
-  let envLocal: Record<string, string> = {};
+  const envLocal: Record<string, string> = {};
 
   if (existsSync(envLocalPath)) {
     const envLocalContent = readFileSync(envLocalPath, 'utf-8');

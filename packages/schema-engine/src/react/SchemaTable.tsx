@@ -20,6 +20,17 @@ export interface SchemaTableProps {
   actionContext?: Partial<ActionContext>;
   // SDUI v1.1: i18n 번역 (선택적)
   translations?: Record<string, string>;
+  // 외부에서 데이터를 주입하는 경우 (API 호출을 건너뜀)
+  data?: Record<string, unknown>[];
+  /**
+   * 서버 페이지네이션 모드에서 전체 건수
+   * - data는 "현재 페이지 데이터"만 주입
+   */
+  totalCount?: number;
+  /** 서버 페이지네이션 모드에서 현재 페이지(1-base) */
+  page?: number;
+  /** 서버 페이지네이션 모드에서 페이지 변경 콜백 */
+  onPageChange?: (page: number) => void;
   // API 호출 함수 (선택적, 없으면 @api-sdk/core의 apiClient 사용)
   apiCall?: (endpoint: string, method: string, body?: unknown) => Promise<unknown>;
   // SDUI v1.1: 필터 파라미터 (선택적)
@@ -39,6 +50,10 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   className,
   actionContext,
   translations = {},
+  data: injectedData,
+  totalCount,
+  page,
+  onPageChange,
   apiCall,
   filters,
   onRowClick,
@@ -48,13 +63,15 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   // 페이지네이션 상태 관리
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = paginationConfig?.defaultPageSize || paginationConfig?.pageSize || 10;
+  const effectivePage = page ?? currentPage;
 
   // 필터 변경 시 첫 페이지로 리셋
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [filters]);
+    onPageChange?.(1);
+  }, [filters, onPageChange]);
 
-  // SDUI v1.1: API 데이터 소스 로드
+  // SDUI v1.1: API 데이터 소스 로드 (data가 주입되면 스킵)
   const { data, isLoading, error } = useQuery({
     queryKey: ['schema-table', schema.entity, dataSource.endpoint, filters],
     queryFn: async () => {
@@ -62,8 +79,9 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
         throw new Error('Only API data source is supported');
       }
 
-      // ⚠️ 중요: Zero-Trust 원칙 - apiCall prop이 필수입니다.
-      // apiCall이 없으면 @api-sdk/core의 apiClient를 사용해야 합니다.
+      // ⚠️ 중요: Zero-Trust 원칙
+      // - 외부에서 data를 주입하는 경우: 네트워크 호출이 없으므로 예외(이 컴포넌트는 렌더러 역할만 수행)
+      // - API 데이터 소스를 직접 호출하는 경우: apiCall prop 사용을 권장하며, 없으면 @api-sdk/core의 apiClient(GET)로 fallback
       if (!apiCall) {
         // apiCall이 없으면 apiClient를 사용
         const { apiClient } = await import('@api-sdk/core');
@@ -80,7 +98,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
 
       return await apiCall(dataSource.endpoint, dataSource.method || 'GET');
     },
-    enabled: !!dataSource.endpoint,
+    enabled: !!dataSource.endpoint && !injectedData,
   });
 
   // SDUI v1.1: DataTable 컬럼 변환
@@ -184,29 +202,42 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   // 페이지 변경 핸들러 (React Hooks 규칙 준수: 조건부 return 이전에 호출)
   const handlePageChange = React.useCallback((page: number) => {
     setCurrentPage(page);
-  }, []);
+    onPageChange?.(page);
+  }, [onPageChange]);
 
   // 페이지네이션 계산 (React Hooks 규칙 준수: 조건부 return 이전에 계산)
-  const allData = React.useMemo(() => (data || []) as Record<string, unknown>[], [data]);
+  const allData = React.useMemo(() => {
+    if (injectedData) return injectedData;
+    if (Array.isArray(data)) return data as Record<string, unknown>[];
+    // apiClient.get() 응답 형태 방어 (예: { data: [...] })
+    if (data && typeof data === 'object' && 'data' in (data as Record<string, unknown>)) {
+      const inner = (data as { data?: unknown }).data;
+      return Array.isArray(inner) ? (inner as Record<string, unknown>[]) : [];
+    }
+    return [];
+  }, [data, injectedData]);
   const totalPages = React.useMemo(() => {
     if (!paginationConfig) return 1;
-    const pages = Math.ceil(allData.length / itemsPerPage);
+    const basis = typeof totalCount === 'number' ? totalCount : allData.length;
+    const pages = Math.ceil(basis / itemsPerPage);
     return pages > 0 ? pages : 1; // 최소 1페이지는 보장
-  }, [allData.length, itemsPerPage, paginationConfig]);
+  }, [allData.length, itemsPerPage, paginationConfig, totalCount]);
 
   // 페이지네이션 적용된 데이터 계산
   const paginatedData = React.useMemo(() => {
     if (!paginationConfig) return allData;
-    const startIndex = (currentPage - 1) * itemsPerPage;
+    // 서버 페이지네이션 모드: injectedData가 이미 해당 페이지 데이터임
+    if (typeof totalCount === 'number') return allData;
+    const startIndex = (effectivePage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return allData.slice(startIndex, endIndex);
-  }, [allData, currentPage, itemsPerPage, paginationConfig]);
+  }, [allData, effectivePage, itemsPerPage, paginationConfig, totalCount]);
 
-  if (isLoading) {
+  if (!injectedData && isLoading) {
     return <div className={className}>로딩 중...</div>;
   }
 
-  if (error) {
+  if (!injectedData && error) {
     return <div className={className}>에러: {error instanceof Error ? error.message : String(error)}</div>;
   }
 
@@ -232,7 +263,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
           }}
         >
           <Pagination
-            currentPage={currentPage}
+            currentPage={effectivePage}
             totalPages={totalPages}
             onPageChange={handlePageChange}
           />
