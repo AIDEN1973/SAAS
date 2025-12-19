@@ -5,7 +5,7 @@
  * [불변 규칙] 모든 스타일은 design-system 토큰을 사용한다.
  */
 
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { clsx } from 'clsx';
 
@@ -37,6 +37,30 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>();
 
+  // CSS 변수에서 값을 px로 변환하는 헬퍼 함수
+  const getCssVarPx = useCallback((varName: string, defaultValue: number): number => {
+    if (typeof window !== 'undefined') {
+      const value = getComputedStyle(document.documentElement)
+        .getPropertyValue(varName)
+        .trim();
+      if (value.endsWith('rem')) {
+        return parseFloat(value) * 16; // rem을 px로 변환
+      } else if (value.endsWith('px')) {
+        return parseFloat(value);
+      } else if (value) {
+        return Number(value);
+      }
+    }
+    return defaultValue;
+  }, []);
+
+  // offset 계산용 - CSS 변수에서 읽기 (하드코딩 제거)
+  const offsetPx = useMemo(() => getCssVarPx('--spacing-tooltip-offset', 4), [getCssVarPx]);
+
+  // 화살표 크기 - CSS 변수에서 읽기 (하드코딩 제거)
+  const arrowSize = useMemo(() => getCssVarPx('--size-tooltip-arrow', 5), [getCssVarPx]);
+  const arrowInnerSize = useMemo(() => getCssVarPx('--size-tooltip-arrow-inner', 4), [getCssVarPx]);
+
   // 정밀한 위치 계산 함수
   const calculatePosition = useCallback(() => {
     if (!tooltipRef.current || !triggerRef.current) return;
@@ -56,9 +80,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
       let top = 0;
       let left = 0;
-
-      // offset 계산용 - 삼각형과 버튼 사이 간격 (4px)
-      const offsetPx = 4;
 
       switch (position) {
         case 'top':
@@ -90,7 +111,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
         top: `${Math.round(top * 100) / 100}px`, // 소수점 둘째 자리까지 정밀도
         left: `${Math.round(left * 100) / 100}px`,
         transform: position === 'top' || position === 'bottom' ? 'translateX(-50%)' : 'translateY(-50%)',
-        zIndex: 1070, // var(--z-tooltip) 값
+        zIndex: 'var(--z-tooltip)', // styles.css 준수: z-index 토큰 사용
       });
     };
 
@@ -99,7 +120,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
     requestAnimationFrame(() => {
       requestAnimationFrame(measureAndPosition);
     });
-  }, [position]);
+  }, [position, offsetPx]);
 
   // ref 콜백 - Portal이 마운트될 때 호출됨
   const tooltipRefCallback = useCallback((node: HTMLDivElement | null) => {
@@ -160,6 +181,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
             ref={tooltipRefCallback}
             style={{
               ...tooltipStyle,
+              position: 'fixed', // tooltipStyle에서 이미 설정되지만 명시적으로 유지
               maxWidth: 'var(--size-tooltip-max-width)', // styles.css 준수: 툴팁 최대 너비 토큰 사용
               pointerEvents: 'none',
               color: useThemeColor ? 'var(--color-white)' : 'var(--color-text)',
@@ -170,6 +192,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
               border: useThemeColor ? 'none' : 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
               fontSize: 'var(--font-size-sm)', // styles.css 준수: 툴팁 폰트 사이즈
               whiteSpace: 'nowrap', // 한 줄로 표시
+              overflow: 'visible', // 화살표가 잘리지 않도록
             }}
           >
             {/* 하단 삼각형 (position이 'top'일 때 표시, 버튼 쪽을 가리킴) */}
@@ -180,14 +203,21 @@ export const Tooltip: React.FC<TooltipProps> = ({
                   <div
                     style={{
                       position: 'absolute',
-                      bottom: '-5px',
+                      bottom: -arrowSize,
                       left: '50%',
                       transform: 'translateX(-50%)',
                       width: 0,
                       height: 0,
-                      borderLeft: '5px solid transparent',
-                      borderRight: '5px solid transparent',
-                      borderTop: '5px solid var(--color-gray-200)',
+                      borderLeftWidth: arrowSize,
+                      borderLeftStyle: 'solid',
+                      borderLeftColor: 'transparent',
+                      borderRightWidth: arrowSize,
+                      borderRightStyle: 'solid',
+                      borderRightColor: 'transparent',
+                      borderTopWidth: arrowSize,
+                      borderTopStyle: 'solid',
+                      borderTopColor: 'var(--color-gray-200)',
+                      zIndex: -1,
                     }}
                   />
                 )}
@@ -195,14 +225,70 @@ export const Tooltip: React.FC<TooltipProps> = ({
                 <div
                   style={{
                     position: 'absolute',
-                    bottom: '-4px',
+                    bottom: -arrowInnerSize,
                     left: '50%',
                     transform: 'translateX(-50%)',
                     width: 0,
                     height: 0,
-                    borderLeft: '4px solid transparent',
-                    borderRight: '4px solid transparent',
-                    borderTop: `4px solid ${useThemeColor ? 'var(--color-primary)' : 'var(--color-white)'}`,
+                    borderLeftWidth: arrowInnerSize,
+                    borderLeftStyle: 'solid',
+                    borderLeftColor: 'transparent',
+                    borderRightWidth: arrowInnerSize,
+                    borderRightStyle: 'solid',
+                    borderRightColor: 'transparent',
+                    borderTopWidth: arrowInnerSize,
+                    borderTopStyle: 'solid',
+                    borderTopColor: useThemeColor ? 'var(--color-primary)' : 'var(--color-white)',
+                    zIndex: 1,
+                  }}
+                />
+              </>
+            )}
+            {/* 왼쪽 삼각형 (position이 'right'일 때 표시, 아이콘 쪽을 가리킴) */}
+            {position === 'right' && (
+              <>
+                {/* 테두리 삼각형 (useThemeColor가 false일 때만) */}
+                {!useThemeColor && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: -arrowSize,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: 0,
+                      height: 0,
+                      borderTopWidth: arrowSize,
+                      borderTopStyle: 'solid',
+                      borderTopColor: 'transparent',
+                      borderBottomWidth: arrowSize,
+                      borderBottomStyle: 'solid',
+                      borderBottomColor: 'transparent',
+                      borderRightWidth: arrowSize,
+                      borderRightStyle: 'solid',
+                      borderRightColor: 'var(--color-gray-200)',
+                      zIndex: -1,
+                    }}
+                  />
+                )}
+                {/* 배경 삼각형 */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: -arrowInnerSize,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: 0,
+                    height: 0,
+                    borderTopWidth: arrowInnerSize,
+                    borderTopStyle: 'solid',
+                    borderTopColor: 'transparent',
+                    borderBottomWidth: arrowInnerSize,
+                    borderBottomStyle: 'solid',
+                    borderBottomColor: 'transparent',
+                    borderRightWidth: arrowInnerSize,
+                    borderRightStyle: 'solid',
+                    borderRightColor: useThemeColor ? 'var(--color-primary)' : 'var(--color-white)',
+                    zIndex: 1,
                   }}
                 />
               </>

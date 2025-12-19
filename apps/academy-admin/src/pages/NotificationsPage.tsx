@@ -228,8 +228,6 @@ export function NotificationsPage() {
   const channelLabels: Record<NotificationChannel, string> = {
     sms: 'SMS',
     kakao: '카카오 알림톡',
-    email: '이메일',
-    push: '푸시 알림',
   };
 
   // statusColors/statusLabels는 SchemaTable 스키마 기반 렌더링으로 대체됨 (미사용)
@@ -320,7 +318,7 @@ export function NotificationsPage() {
               >
                 전체 채널
               </Button>
-              {(['sms', 'kakao', 'email', 'push'] as NotificationChannel[]).map((channel) => (
+              {(['sms', 'kakao'] as NotificationChannel[]).map((channel) => (
                 <Button
                   key={channel}
                   variant={filter.channel === channel ? 'solid' : 'outline'}

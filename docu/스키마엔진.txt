@@ -33,6 +33,14 @@ schema-engine  →  @ui-core/react  →  (design-system/theme-engine 토큰)  �
 - schema-engine은 UI 토큰을 CSS 변수로 소비하며(예: `var(--spacing-md)`), 하드코딩된 px 값을 금지합니다.
 - 스키마는 논리적 구조만 정의하고, 컴포넌트 선택과 스타일은 Schema Engine이 담당합니다.
 
+⚠️ 중요: 하드코딩 금지 규칙 확장
+- 하드코딩된 px/rem/em 단위 값 금지 (예: `16px`, `1rem` → `var(--spacing-md)` 사용)
+- 하드코딩된 opacity 값 금지 (예: `opacity: 0.5` → `opacity: 'var(--opacity-disabled)'` 사용)
+- 하드코딩된 border 값 금지 (예: `1px solid` → `var(--border-width-thin) solid` 사용)
+- 하드코딩된 아이콘 크기 금지 (예: `size={16}` → `useIconSize()` 훅 사용)
+- 예외: 레이아웃용 특수 값(`width: 0`, `minWidth: 0`)은 허용
+- 예외: CSS 속성 값(`display: 'flex'`, `flex: 1`)은 하드코딩이 아님
+
 🔹 Condition Rule 실행 위치 명확화
 
 실행은 Renderer(SchemaField) 레벨
@@ -1612,6 +1620,36 @@ function MyForm() {
 - 동일한 watchedValues에 대한 평가 결과 캐싱
 - ⚠️ 주의: 메모리 사용량 증가 가능성
 
+4. 동적 스키마 생성 메모이제이션
+- 동적으로 생성되는 스키마(예: createStudentFilterSchema)는 useMemo로 메모이제이션
+- 의존성 배열에 실제 의존하는 값만 포함
+
+예시:
+```typescript
+// ✅ 스키마를 메모이제이션하여 중복 호출 방지
+const studentFilterSchema = useMemo(() => createStudentFilterSchema(classes || []), [classes]);
+const { data: studentFilterSchemaData } = useSchema('student_filter', studentFilterSchema, 'filter');
+const effectiveFilterSchema: FilterSchema = studentFilterSchemaData || studentFilterSchema;
+```
+
+5. SchemaTable key prop 최적화
+- SchemaTable에 불필요한 key prop을 전달하지 않음
+- key prop은 컴포넌트 재마운트를 유발하여 내부 상태(예: 페이지네이션)가 초기화될 수 있음
+
+❌ 금지 예시:
+<SchemaTable
+  key={JSON.stringify(tableFilters)}  // ❌ 불필요한 key prop
+  schema={effectiveTableSchema}
+  data={students}
+/>
+
+✅ 허용 예시:
+<SchemaTable
+  schema={effectiveTableSchema}
+  data={students}
+  filters={tableFilters}  // ✅ filters prop으로 전달 (메모이제이션된 값)
+/>
+
 14. Schema Registry 마이그레이션 정책
 
 ⚠️ 중요: 실제 운영 환경에서 스키마 버전 업그레이드 시
@@ -1961,6 +1999,38 @@ export interface TableSchema extends BaseSchema {
 
 ✅ 권장 패턴:
 - `filters`는 `useMemo`로 안정화해서 전달합니다. (값이 실제로 바뀔 때만 객체가 바뀌도록)
+
+⚠️ 중요: SchemaTable `key` prop 사용 금지
+
+- SchemaTable에 불필요한 `key` prop을 전달하지 않습니다.
+- `key` prop은 컴포넌트 재마운트를 유발하여 내부 상태(페이지네이션, 정렬 등)가 초기화됩니다.
+- `filters` prop 변경 시 자동으로 페이지가 리셋되므로, 별도의 `key` prop은 불필요합니다.
+
+❌ 금지 예시:
+```typescript
+<SchemaTable
+  key={JSON.stringify(tableFilters)}  // ❌ 불필요한 key prop
+  schema={effectiveTableSchema}
+  data={students}
+  filters={tableFilters}
+/>
+```
+
+✅ 허용 예시:
+```typescript
+// filters는 useMemo로 메모이제이션
+const tableFilters = useMemo(() => ({
+  ...(filter.status && { status: filter.status }),
+  ...(filter.grade && { grade: filter.grade }),
+  ...(filter.search && { search: filter.search }),
+}), [filter.grade, filter.search, filter.status]);
+
+<SchemaTable
+  schema={effectiveTableSchema}
+  data={students}
+  filters={tableFilters}  // ✅ filters prop으로 전달 (메모이제이션된 값)
+/>
+```
 
 예:
 ```tsx

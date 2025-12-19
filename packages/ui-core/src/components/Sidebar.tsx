@@ -11,6 +11,7 @@ import { CaretRight, X } from 'phosphor-react';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 import { Button } from './Button';
 import { PageHeader } from './PageHeader';
+import { Tooltip } from './Tooltip';
 
 export interface SidebarItem {
   id: string;
@@ -261,7 +262,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   : 'var(--color-text)'; // 기본 상태: 기본 텍스트 색상
 
                 // SVG 요소 복제 (strokeWidth는 SVG 자체에는 적용되지 않으므로 제거)
-                return React.cloneElement(item.icon as React.ReactElement<any>, {
+                const iconElement = React.cloneElement(item.icon as React.ReactElement<any>, {
                   ...(item.icon.props || {}),
                   // SVG 자체에는 strokeWidth를 전달하지 않음 (자식 요소에만 적용)
                   strokeLinecap: 'round', // 선 끝 모양 통일 (SVG 전체에 적용)
@@ -300,6 +301,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     return child;
                   }),
                 });
+
+                // 축소 모드일 때만 툴팁 표시
+                if (collapsed) {
+                  return (
+                    <Tooltip content={item.label} position="right">
+                      {iconElement}
+                    </Tooltip>
+                  );
+                }
+
+                return iconElement;
               })()}
             </span>
           )}

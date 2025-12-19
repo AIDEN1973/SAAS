@@ -289,6 +289,32 @@ export function useCreateAttendanceLog() {
 }
 
 /**
+ * 출결 로그 수정 Hook
+ * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ */
+export function useUpdateAttendanceLog() {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ logId, input }: { logId: string; input: Partial<CreateAttendanceLogInput> }) => {
+      const response = await apiClient.patch<AttendanceLog>('attendance_logs', logId, input as unknown as Record<string, unknown>);
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      return response.data!;
+    },
+    onSuccess: () => {
+      // 출결 로그 목록 쿼리 무효화
+      queryClient.invalidateQueries({ queryKey: ['attendance-logs', tenantId] });
+    },
+  });
+}
+
+/**
  * 출결 로그 삭제 Hook
  * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
  */

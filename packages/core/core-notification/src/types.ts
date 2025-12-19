@@ -1,11 +1,11 @@
 /**
  * Core Notification Types
  *
- * 메시지 알림 (SMS, 카카오 알림, 이메일, Push)
+ * 메시지 알림 (SMS, 카카오 알림톡)
  * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
  */
 
-export type NotificationChannel = 'sms' | 'kakao' | 'email' | 'push';
+export type NotificationChannel = 'sms' | 'kakao';
 
 export type NotificationStatus = 'pending' | 'sent' | 'failed' | 'delivered';
 
@@ -13,7 +13,7 @@ export interface Notification {
   id: string;
   tenant_id: string;
   channel: NotificationChannel;
-  recipient: string;  // 전화번호, 이메일 등
+  recipient: string;  // 전화번호
   template_id?: string;
   content: string;
   status: NotificationStatus;

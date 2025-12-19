@@ -328,7 +328,11 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
         onSubmit={handleSubmit(onFormSubmit)}
         style={disableCardPadding ? {
           width: 'var(--width-full)',
-          padding: formPadding,
+          paddingTop: formPadding,
+          paddingLeft: formPadding,
+          paddingRight: formPadding,
+          // paddingBottom은 제거하여 외부 Card의 paddingBottom만 사용 (학부모 정보 수정 카드와 동일한 하단 여백)
+          paddingBottom: 0,
         } : undefined}
       >
         <Grid
@@ -382,7 +386,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
                 label: formConfig.submit.labelKey
                   ? (translations[formConfig.submit.labelKey] || formConfig.submit.labelKey)
                   : (formConfig.submit.label || 'Submit'),
-                icon: <Save />,
+                icon: (formConfig.submit as any).icon || <Save />,
                 variant: formConfig.submit.variant,
                 color: formConfig.submit.color,
                 size: formConfig.submit.size,
@@ -641,7 +645,11 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
         onSubmit={handleSubmit(onFormSubmit)}
         style={disableCardPadding ? {
           width: 'var(--width-full)',
-          padding: formPadding,
+          paddingTop: formPadding,
+          paddingLeft: formPadding,
+          paddingRight: formPadding,
+          // paddingBottom은 제거하여 외부 Card의 paddingBottom만 사용 (학부모 정보 수정 카드와 동일한 하단 여백)
+          paddingBottom: 0,
         } : undefined}
       >
         <Grid
@@ -693,7 +701,7 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
                 label: formConfig.submit.labelKey
                   ? (translations[formConfig.submit.labelKey] || formConfig.submit.labelKey)
                   : (formConfig.submit.label || 'Submit'),
-                icon: <Save />,
+                icon: (formConfig.submit as any).icon || <Save />,
                 variant: formConfig.submit.variant,
                 color: formConfig.submit.color,
                 size: formConfig.submit.size,

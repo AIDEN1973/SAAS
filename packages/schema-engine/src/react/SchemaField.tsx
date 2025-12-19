@@ -334,6 +334,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               error={error}
               disabled={isDisabled}
               fullWidth
+              rows={(ui as any)?.rows} // ui.rows 속성 지원 (textarea 행 수 설정)
               value={(f.value ?? '') as string}
               onChange={(e) => {
                 if ((import.meta as any).env?.DEV) {

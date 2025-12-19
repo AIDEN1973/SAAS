@@ -4330,12 +4330,11 @@ async function retryPaymentRequest(paymentId: string, reason: string) {
 
 10. 알림뱅킹 장애 대비 Fallback 처리:
 
-[불변 규칙] 알림뱅킹 서비스 장애 시 자동으로 대체 채널(SMS, 이메일)로 전환하거나, 장애 복구 후 재시도 큐에 추가합니다.
+[불변 규칙] 알림뱅킹 서비스 장애 시 자동으로 대체 채널(SMS)로 전환하거나, 장애 복구 후 재시도 큐에 추가합니다.
 
 Fallback 전략:
 - 1차: 알림뱅킹 API 호출
 - 2차 (장애 시): SMS 발송 (core-notification 모듈)
-- 3차 (SMS 실패 시): 이메일 발송
 - 최종 (모든 채널 실패): 재시도 큐에 추가 (최대 24시간 보관)
 
 Fallback 처리 로직:
@@ -4344,7 +4343,6 @@ async function sendNotificationWithFallback(userId: string, message: string) {
   const channels = [
     { name: 'alimbank', fn: () => sendAlimbankNotification(userId, message) },
     { name: 'sms', fn: () => sendSMS(userId, message) },
-    { name: 'email', fn: () => sendEmail(userId, message) },
   ];
 
   for (const channel of channels) {

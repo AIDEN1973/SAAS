@@ -148,7 +148,7 @@ DECLARE
   summary_text TEXT;
 BEGIN
   -- 상담일지 내용이 있는 경우에만 AI 요약 생성
-  IF NEW.notes IS NOT NULL AND LENGTH(TRIM(NEW.notes)) > 0 THEN
+  IF NEW.content IS NOT NULL AND LENGTH(TRIM(NEW.content)) > 0 THEN
     -- TODO: 실제 AI API 호출로 변경 필요
     -- 현재는 간단한 요약 생성 (실제로는 AI 엔진 호출)
     -- AI 요약 생성은 별도 Edge Function 또는 외부 서비스로 처리
@@ -166,7 +166,7 @@ BEGIN
       NEW.tenant_id,
       'consultation_summary',
       '상담일지 요약',
-      LEFT(NEW.notes, 200) || '...', -- 임시 요약 (실제로는 AI 생성)
+      LEFT(NEW.content, 200) || '...', -- 임시 요약 (실제로는 AI 생성)
       jsonb_build_array(
         '상담 내용을 바탕으로 학생의 학습 방향을 조정할 수 있습니다.',
         '다음 상담 시점을 확인하세요.'
@@ -184,7 +184,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER consultation_ai_summary_trigger
 AFTER INSERT OR UPDATE ON student_consultations
 FOR EACH ROW
-WHEN (NEW.notes IS NOT NULL AND LENGTH(TRIM(NEW.notes)) > 0)
+WHEN (NEW.content IS NOT NULL AND LENGTH(TRIM(NEW.content)) > 0)
 EXECUTE FUNCTION create_consultation_ai_summary();
 
 -- 신규 학생 등록 시 StudentTaskCard 생성 트리거
@@ -194,7 +194,7 @@ DECLARE
   expires_at TIMESTAMPTZ;
 BEGIN
   -- 학생 타입인 경우에만 처리
-  IF NEW.person_type = 'student' AND NEW.status = 'active' THEN
+  IF NEW.person_type = 'student' THEN
     -- 만료일: 7일 후 자정 (아키텍처 문서 803줄)
     -- 기술문서 19-1-2: KST 기준 날짜 처리 (timezone('Asia/Seoul', now())::date 사용)
     expires_at := ((timezone('Asia/Seoul', now())::date + INTERVAL '7 days')::DATE + TIME '23:59:59')::timestamptz;
@@ -241,7 +241,7 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER new_student_signup_trigger
 AFTER INSERT ON persons
 FOR EACH ROW
-WHEN (NEW.person_type = 'student' AND NEW.status = 'active')
+WHEN (NEW.person_type = 'student')
 EXECUTE FUNCTION create_new_signup_task_card();
 
 -- 이탈 위험 감지 시 StudentTaskCard 생성 (AI 위험 점수 90 이상)

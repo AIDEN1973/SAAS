@@ -6,6 +6,7 @@
  * [불변 규칙] api-sdk를 통해서만 데이터 요청
  */
 
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import type { ApiResponse } from '@api-sdk/core';
@@ -245,8 +246,14 @@ export function useStudentsPaged(params: {
   const tenantId = context.tenantId;
   const { filter, page, pageSize } = params;
 
+  // 필터를 직렬화하여 쿼리 키 안정화 (객체 참조가 아닌 값 기반 비교)
+  const filterKey = React.useMemo(() => {
+    if (!filter) return '';
+    return JSON.stringify(filter, Object.keys(filter).sort());
+  }, [filter]);
+
   return useQuery({
-    queryKey: ['students-paged', tenantId, filter, page, pageSize],
+    queryKey: ['students-paged', tenantId, filterKey, page, pageSize],
     queryFn: async () => {
       let restrictedStudentIds: string[] | undefined;
 
@@ -259,17 +266,24 @@ export function useStudentsPaged(params: {
         return next;
       };
 
+      // 필터 조건별 API 호출을 병렬로 실행하여 성능 최적화
+      const filterPromises: Promise<string[] | undefined>[] = [];
+
       // tag_ids → tag_assignments로 학생 ID 제한
       if (filter?.tag_ids && filter.tag_ids.length > 0) {
-        const assignmentsResponse = await apiClient.get<TagAssignment>('tag_assignments', {
-          filters: { entity_type: 'student', tag_id: filter.tag_ids },
-          limit: 5000,
-        });
-
-        if (assignmentsResponse.error) throw new Error(assignmentsResponse.error.message);
-        const assignments = assignmentsResponse.data || [];
-        if (assignments.length === 0) return { students: [], totalCount: 0 };
-        restrictedStudentIds = [...new Set(assignments.map((a) => a.entity_id))];
+        filterPromises.push(
+          apiClient.get<TagAssignment>('tag_assignments', {
+            filters: { entity_type: 'student', tag_id: filter.tag_ids },
+            limit: 5000,
+          }).then((assignmentsResponse) => {
+            if (assignmentsResponse.error) throw new Error(assignmentsResponse.error.message);
+            const assignments = assignmentsResponse.data || [];
+            if (assignments.length === 0) return [];
+            return [...new Set(assignments.map((a) => a.entity_id))];
+          })
+        );
+      } else {
+        filterPromises.push(Promise.resolve(undefined));
       }
 
       // status/grade → academy_students에서 person_id 제한
@@ -279,32 +293,49 @@ export function useStudentsPaged(params: {
         if (filter?.grade) academyFilters.grade = filter.grade;
         if (filter?.status) academyFilters.status = filter.status;
 
-        const academyIdsResponse = await apiClient.get<AcademyStudentIdRow>('academy_students', {
-          select: 'person_id',
-          filters: academyFilters,
-          limit: 5000,
-        });
-        if (academyIdsResponse.error) throw new Error(academyIdsResponse.error.message);
-
-        const idsFromAcademy = [...new Set((academyIdsResponse.data || []).map((r) => r.person_id))];
-        if (idsFromAcademy.length === 0) return { students: [], totalCount: 0 };
-        restrictedStudentIds = intersect(restrictedStudentIds, idsFromAcademy);
-        if (restrictedStudentIds && restrictedStudentIds.length === 0) return { students: [], totalCount: 0 };
+        filterPromises.push(
+          apiClient.get<AcademyStudentIdRow>('academy_students', {
+            select: 'person_id',
+            filters: academyFilters,
+            limit: 5000,
+          }).then((academyIdsResponse) => {
+            if (academyIdsResponse.error) throw new Error(academyIdsResponse.error.message);
+            const idsFromAcademy = [...new Set((academyIdsResponse.data || []).map((r) => r.person_id))];
+            return idsFromAcademy.length === 0 ? [] : idsFromAcademy;
+          })
+        );
+      } else {
+        filterPromises.push(Promise.resolve(undefined));
       }
 
       // class_id → student_classes에서 student_id 제한
       if (filter?.class_id) {
-        const studentClassesResponse = await apiClient.get<StudentClass>('student_classes', {
-          filters: { class_id: filter.class_id, is_active: true },
-          limit: 5000,
-        });
-        if (studentClassesResponse.error) throw new Error(studentClassesResponse.error.message);
-
-        const idsInClass = [...new Set((studentClassesResponse.data || []).map((sc: StudentClass) => sc.student_id))];
-        if (idsInClass.length === 0) return { students: [], totalCount: 0 };
-        restrictedStudentIds = intersect(restrictedStudentIds, idsInClass);
-        if (restrictedStudentIds && restrictedStudentIds.length === 0) return { students: [], totalCount: 0 };
+        filterPromises.push(
+          apiClient.get<StudentClass>('student_classes', {
+            filters: { class_id: filter.class_id, is_active: true },
+            limit: 5000,
+          }).then((studentClassesResponse) => {
+            if (studentClassesResponse.error) throw new Error(studentClassesResponse.error.message);
+            const idsInClass = [...new Set((studentClassesResponse.data || []).map((sc: StudentClass) => sc.student_id))];
+            return idsInClass.length === 0 ? [] : idsInClass;
+          })
+        );
+      } else {
+        filterPromises.push(Promise.resolve(undefined));
       }
+
+      // 모든 필터 조건을 병렬로 실행
+      const [tagIds, academyIds, classIds] = await Promise.all(filterPromises);
+
+      // 빈 결과가 있으면 즉시 반환
+      if (tagIds && tagIds.length === 0) return { students: [], totalCount: 0 };
+      if (academyIds && academyIds.length === 0) return { students: [], totalCount: 0 };
+      if (classIds && classIds.length === 0) return { students: [], totalCount: 0 };
+
+      // 교집합 계산
+      restrictedStudentIds = intersect(tagIds, academyIds);
+      restrictedStudentIds = intersect(restrictedStudentIds, classIds);
+      if (restrictedStudentIds && restrictedStudentIds.length === 0) return { students: [], totalCount: 0 };
 
       interface PersonWithAcademyStudents extends Person {
         academy_students?: Array<Record<string, unknown>>;
@@ -349,29 +380,34 @@ export function useStudentsPaged(params: {
       const studentIds = personsData.map((p: Person) => p.id);
 
       // 학부모(주 보호자) / 대표반 정보는 "현재 페이지" 학생만 조회 (성능 최적화)
-      const guardiansResponse = studentIds.length > 0
-        ? await apiClient.get<Guardian>('guardians', { filters: { student_id: studentIds, is_primary: true } })
-        : ({ data: [] } as { data: Guardian[] });
-      const guardiansMap = new Map();
+      // 병렬 API 호출로 로딩 속도 개선
+      const [guardiansResponse, studentClassesResponse] = await Promise.all([
+        studentIds.length > 0
+          ? apiClient.get<Guardian>('guardians', { filters: { student_id: studentIds, is_primary: true } })
+          : Promise.resolve({ data: [] } as { data: Guardian[] }),
+        studentIds.length > 0
+          ? apiClient.get<StudentClass>('student_classes', { filters: { student_id: studentIds, is_active: true } })
+          : Promise.resolve({ data: [] } as { data: StudentClass[] }),
+      ]);
+
+      // Map 생성 최적화: 한 번의 순회로 처리
+      const guardiansMap = new Map<string, string>();
       if (!(guardiansResponse as any).error && (guardiansResponse as any).data) {
         (guardiansResponse as any).data.forEach((g: Guardian) => {
           if (!guardiansMap.has(g.student_id)) guardiansMap.set(g.student_id, g.name);
         });
       }
 
-      const studentClassesResponse = studentIds.length > 0
-        ? await apiClient.get<StudentClass>('student_classes', { filters: { student_id: studentIds, is_active: true } })
-        : ({ data: [] } as { data: StudentClass[] });
-      const studentClassMap = new Map();
+      const studentClassMap = new Map<string, string>();
       if (!(studentClassesResponse as any).error && (studentClassesResponse as any).data) {
         const classIds = [...new Set((studentClassesResponse as any).data.map((sc: StudentClass) => sc.class_id))];
         if (classIds.length > 0) {
           const classesResponse = await apiClient.get<Class>('academy_classes', { filters: { id: classIds } });
           if (!(classesResponse as any).error && (classesResponse as any).data) {
-            const classMap = new Map((classesResponse as any).data.map((c: Class) => [c.id, c.name]));
+            const classMap = new Map<string, string>((classesResponse as any).data.map((c: Class) => [c.id, c.name]));
             (studentClassesResponse as any).data.forEach((sc: StudentClass) => {
               if (!studentClassMap.has(sc.student_id) && classMap.has(sc.class_id)) {
-                studentClassMap.set(sc.student_id, classMap.get(sc.class_id));
+                studentClassMap.set(sc.student_id, classMap.get(sc.class_id)!);
               }
             });
           }
@@ -407,8 +443,10 @@ export function useStudentsPaged(params: {
       return { students, totalCount };
     },
     enabled: !!tenantId && page > 0 && pageSize > 0,
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000, // 30초간 캐시 유지
+    gcTime: 5 * 60 * 1000, // 5분간 가비지 컬렉션 방지
+    placeholderData: (previousData) => previousData, // 페이지 전환 시 이전 데이터 유지하여 부드러운 UX (React Query v5)
+    refetchOnWindowFocus: false, // 윈도우 포커스 시 자동 리패치 비활성화 (성능 최적화)
   });
 }
 
@@ -1159,8 +1197,8 @@ export function useDeleteConsultation() {
  * 상담기록 AI 요약 생성 Hook
  * [요구사항] 상담기록 AI 요약 버튼 추가
  *
- * [불변 규칙] Phase 1에서는 플레이스홀더로 구현
- * 실제 AI 연동은 Edge Function 또는 외부 AI 서비스를 통해 구현 예정
+ * [불변 규칙] Edge Function을 통해 AI 요약 생성
+ * [불변 규칙] Zero-Trust: JWT는 사용자 세션에서 가져옴
  */
 export function useGenerateConsultationAISummary() {
   const queryClient = useQueryClient();
@@ -1175,40 +1213,43 @@ export function useGenerateConsultationAISummary() {
       consultationId: string;
       studentId: string;
     }) => {
-      // [불변 규칙] api-sdk를 통해서만 데이터 요청
-      // 1. 상담기록 조회
-      const consultationResponse = await apiClient.get<StudentConsultation>('student_consultations', {
-        filters: { id: consultationId },
-        limit: 1,
-      });
+      // [불변 규칙] Edge Function 호출
+      // StudentsPage.tsx의 student-risk-analysis 호출 패턴과 동일하게 구현
+      const { createClient } = await import('@lib/supabase-client');
+      const supabase = createClient();
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
-      if (consultationResponse.error || !consultationResponse.data || consultationResponse.data.length === 0) {
-        throw new Error('상담기록을 찾을 수 없습니다.');
+      if (sessionError || !sessionData.session) {
+        throw new Error('인증이 필요합니다. 로그인해주세요.');
       }
 
-      const consultation = consultationResponse.data[0];
-
-      // 2. PII 마스킹 적용 (아키텍처 문서 3.1.5, 898-950줄: 상담일지 요약 시 개인정보 마스킹 규칙)
-      // TODO: 실제 AI 서비스 연동 시 PII 마스킹된 content를 전달해야 함
-      // 현재는 플레이스홀더이지만, 향후 실제 AI 연동 시 마스킹 로직 적용 필요
-      // import { maskPII } from '@core/pii-utils';
-      // const maskedContent = maskPII(consultation.content);
-
-      // 2. AI 요약 생성 (Phase 1: 플레이스홀더)
-      // TODO: 실제 AI 서비스 연동 (Edge Function 또는 외부 AI API)
-      // 주의: 실제 AI 연동 시 consultation.content를 그대로 전달하지 말고 PII 마스킹 적용 필수
-      const placeholderSummary = `[AI 요약] ${consultation.content.substring(0, 100)}... (요약 기능은 곧 제공될 예정입니다.)`;
-
-      // 3. ai_summary 업데이트
-      const updateResponse = await apiClient.patch('student_consultations', consultationId, {
-        ai_summary: placeholderSummary,
-      });
-
-      if (updateResponse.error) {
-        throw new Error(updateResponse.error.message);
+      // Supabase URL 가져오기
+      const { envClient } = await import('@env-registry/core/client');
+      const supabaseUrl = envClient.NEXT_PUBLIC_SUPABASE_URL;
+      if (!supabaseUrl) {
+        throw new Error('Supabase 설정이 완료되지 않았습니다.');
       }
 
-      return placeholderSummary;
+      // Edge Function 호출
+      // [불변 규칙] Zero-Trust: JWT에서 tenant_id를 추출하므로 실제 사용자 세션의 JWT 토큰을 전달
+      const response = await fetch(`${supabaseUrl}/functions/v1/consultation-ai-summary`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionData.session.access_token}`, // 사용자 JWT (tenant_id 포함)
+        },
+        body: JSON.stringify({
+          consultation_id: consultationId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: '알 수 없는 오류가 발생했습니다.' }));
+        throw new Error(errorData.error || `AI 요약 생성 실패: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.ai_summary;
     },
     onSuccess: (_, variables) => {
       // 상담기록 목록 쿼리 무효화하여 AI 요약 반영

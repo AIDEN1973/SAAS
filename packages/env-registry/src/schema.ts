@@ -30,6 +30,9 @@ export const envServerSchema = z.object({
 
   // Kakao Maps API (Phase 2+ 지도기능용 서버/Edge Function 사용)
   KAKAO_REST_API_KEY: z.string().min(1).optional(),
+
+  // OpenAI API (AI 분석 기능용)
+  OPENAI_API_KEY: z.string().min(1).optional(),
 });
 
 // 클라이언트 사용 스키마(NEXT_PUBLIC_*는 빌드 타임에 추출 값만)

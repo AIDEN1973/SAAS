@@ -40,7 +40,6 @@ export const notificationTemplateFormSchema: FormSchema = {
         options: [
           { value: 'sms', label: 'SMS' },
           { value: 'kakao', label: '카카오 알림톡' },
-          { value: 'email', label: '이메일' },
         ],
         validation: {
           required: true,

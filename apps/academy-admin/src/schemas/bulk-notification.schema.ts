@@ -28,7 +28,6 @@ export const bulkNotificationFormSchema: FormSchema = {
         options: [
           { value: 'sms', label: 'SMS' },
           { value: 'kakao', label: '카카오 알림톡' },
-          { value: 'email', label: '이메일' },
         ],
         validation: {
           required: true,
@@ -48,7 +47,7 @@ export const bulkNotificationFormSchema: FormSchema = {
         kind: 'textarea',
         ui: {
           label: '수신자 목록',
-          placeholder: '전화번호 또는 이메일을 한 줄에 하나씩 입력하세요',
+          placeholder: '전화번호를 한 줄에 하나씩 입력하세요',
           description: '각 수신자를 한 줄에 하나씩 입력하세요',
           colSpan: 2,
         },

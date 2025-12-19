@@ -691,6 +691,19 @@ return withTenant(
   tenantId,
 );
 
+[불변 규칙] 파일명 생성 시 날짜 형식은 반드시 KST 기준을 사용합니다.
+
+❌ 금지 예시:
+const fileName = `학생목록_${new Date().toISOString().split('T')[0]}.xlsx`;  // UTC 기준 날짜
+
+✅ 허용 예시:
+import { toKST } from '@lib/date-utils';
+const fileName = `학생목록_${toKST().format('YYYY-MM-DD')}.xlsx`;  // KST 기준 날짜
+
+이유:
+- 사용자 경험: 파일명의 날짜가 사용자의 로컬 시간대와 일치해야 함
+- 일관성: 모든 날짜 표시가 KST 기준으로 통일
+
 6. 에러 처리 & 로깅 & PII 규칙
 6-1. 에러 타입 표준
 export class AppError extends Error {
@@ -776,6 +789,8 @@ export const maskPII = (data: any): any => {
 
 [불변 규칙] Cursor는 logger.debug / logger.info / logger.warn 등에 사용자 객체(user) 전체를 그대로 전달하거나 PII 포함 문자열을 직접 전달해서는 안 되며, 반드시 maskPII()를 적용한 값만 전달해야 한다.
 
+[불변 규칙] 개발 환경(import.meta.env?.DEV)에서도 PII 마스킹을 적용해야 합니다. 개발 환경의 로그도 보안 위험에 노출될 수 있습니다.
+
 ❌ 금지 예시:
 console.log(user.email);
 logger.info('User phone:', user.phone);
@@ -783,12 +798,32 @@ audit.meta = { name: user.name };
 logger.debug(user.email);  // logger 라이브러리 직접 전달 금지
 logger.warn(JSON.stringify(user));  // 객체 전체 직렬화 금지
 
+// 개발 환경에서도 PII 마스킹 없이 로깅 금지
+if (import.meta.env?.DEV) {
+  console.log('student prop:', {
+    name: student?.name,
+    phone: student?.phone,
+    email: student?.email,
+  });
+}
+
 ✅ 허용 예시:
 console.log('User email:', maskPII(user.email));
 logger.info('User phone:', maskPII(user.phone));
 audit.meta = { name: maskPII(user.name) };
 logger.debug('User email:', maskPII(user.email));  // logger에도 maskPII 적용
 logger.warn('User data:', maskPII(user));  // 객체도 maskPII 적용 후 전달
+
+// 개발 환경에서도 PII 마스킹 적용
+if (import.meta.env?.DEV) {
+  import('@core/pii-utils').then(({ maskPII }) => {
+    console.log('student prop:', maskPII({
+      name: student?.name,
+      phone: student?.phone,
+      email: student?.email,
+    }));
+  });
+}
 
 7. 보안 / 키 관리 / Edge Function 규칙
 7-1. Service Role Key
@@ -879,7 +914,7 @@ Ordering Guarantee (Late event drop)
 
 [불변 규칙] 결제 취소는 원거래와 연결하여 처리하며, 재요청은 멱등성 키를 재사용하여 중복 결제를 방지합니다.
 
-[불변 규칙] 알림뱅킹 서비스 장애 시 자동으로 대체 채널(SMS, 이메일)로 전환하거나, 장애 복구 후 재시도 큐에 추가합니다.
+[불변 규칙] 알림뱅킹 서비스 장애 시 자동으로 대체 채널(SMS)로 전환하거나, 장애 복구 후 재시도 큐에 추가합니다.
 
 → 상세 내용은 기술문서 PART 3의 14-2-1-1 "결제/알림뱅킹 운영 정책" 섹션 참조
 

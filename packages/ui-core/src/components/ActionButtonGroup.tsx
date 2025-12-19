@@ -105,9 +105,12 @@ export const ActionButtonGroup: React.FC<ActionButtonGroupProps> = ({
     const finalStrokeWidth = iconVariant === 'small' ? Math.max(strokeWidth - 0.5, 1) : strokeWidth;
     // lucide-react 아이콘은 ReactElement이며 size/strokeWidth props를 받음
     if (React.isValidElement(icon)) {
+      // 아이콘에 이미 size prop이 있으면 그것을 우선 사용 (사용자 지정 크기)
+      const existingSize = (icon as React.ReactElement<any>).props?.size;
+      const existingStrokeWidth = (icon as React.ReactElement<any>).props?.strokeWidth;
       return React.cloneElement(icon as React.ReactElement<any>, {
-        size: finalIconSize,
-        strokeWidth: finalStrokeWidth,
+        size: existingSize !== undefined ? existingSize : finalIconSize,
+        strokeWidth: existingStrokeWidth !== undefined ? existingStrokeWidth : finalStrokeWidth,
       });
     }
     return icon;

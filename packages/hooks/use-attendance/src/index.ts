@@ -7,6 +7,7 @@ export {
   useQRAttendance,
   useAttendanceLogs,
   useCreateAttendanceLog,
+  useUpdateAttendanceLog,
   useDeleteAttendanceLog,
 } from './useAttendance';
 

@@ -65,11 +65,28 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   const itemsPerPage = paginationConfig?.defaultPageSize || paginationConfig?.pageSize || 10;
   const effectivePage = page ?? currentPage;
 
-  // 필터 변경 시 첫 페이지로 리셋
+  // 필터 직렬화하여 안정적으로 비교 (객체 참조가 아닌 값 비교)
+  const filtersKey = React.useMemo(() => {
+    if (!filters) return '';
+    return JSON.stringify(filters, Object.keys(filters).sort());
+  }, [filters]);
+
+  // onPageChange를 ref로 저장하여 의존성 문제 방지
+  const onPageChangeRef = React.useRef(onPageChange);
   React.useEffect(() => {
-    setCurrentPage(1);
-    onPageChange?.(1);
-  }, [filters, onPageChange]);
+    onPageChangeRef.current = onPageChange;
+  }, [onPageChange]);
+
+  // 필터 변경 시 첫 페이지로 리셋 (filtersKey가 변경될 때만)
+  const prevFiltersKeyRef = React.useRef<string>(filtersKey);
+  React.useEffect(() => {
+    // 필터가 실제로 변경되었을 때만 페이지 리셋 (초기 마운트 제외)
+    if (prevFiltersKeyRef.current !== filtersKey && prevFiltersKeyRef.current !== '') {
+      setCurrentPage(1);
+      onPageChangeRef.current?.(1);
+    }
+    prevFiltersKeyRef.current = filtersKey;
+  }, [filtersKey]);
 
   // SDUI v1.1: API 데이터 소스 로드 (data가 주입되면 스킵)
   const { data, isLoading, error } = useQuery({

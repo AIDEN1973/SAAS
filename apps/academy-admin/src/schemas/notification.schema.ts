@@ -29,8 +29,6 @@ export const notificationFormSchema: FormSchema = {
         options: [
           { value: 'sms', label: 'SMS' },
           { value: 'kakao', label: '카카오 알림톡' },
-          { value: 'email', label: '이메일' },
-          { value: 'push', label: '푸시 알림' },
         ],
         validation: {
           required: true,
@@ -41,7 +39,7 @@ export const notificationFormSchema: FormSchema = {
         kind: 'text',
         ui: {
           label: '수신자',
-          placeholder: '전화번호 또는 이메일을 입력하세요',
+          placeholder: '전화번호를 입력하세요',
           colSpan: 1,
         },
         validation: {

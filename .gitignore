@@ -47,3 +47,7 @@ yarn-error.log*
 # OS
 Thumbs.db
 
+# Supabase - Service Role Key 포함 파일 (보안)
+**/migrations/*_complete.sql
+**/migrations/079_create_cron_jobs_complete.sql
+

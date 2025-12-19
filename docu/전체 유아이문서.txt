@@ -188,6 +188,46 @@ Industry Mismatch:
 
 → 모든 오류 처리는 Zero-Trust 원칙을 준수하며, UI는 오류 메시지만 표시하고 권한 결정은 하지 않음
 
+**Edge Function 호출 규칙**:
+
+⚠️ 중요: Edge Function 호출도 반드시 `@api-sdk/core`를 통해서만 수행해야 합니다.
+
+- UI는 절대 직접 `fetch`로 Edge Function을 호출하지 않음
+- `apiClient.post()` 또는 `apiClient.get()`을 사용하여 Edge Function 호출
+- Edge Function 엔드포인트는 `functions/v1/{function-name}` 형식으로 지정
+- `apiClient`는 자동으로 tenant_id, industry_type, JWT 토큰을 포함하여 요청
+
+예시:
+```typescript
+// ✅ 올바른 방법: @api-sdk/core 사용
+import { apiClient } from '@api-sdk/core';
+
+const response = await apiClient.post<ResponseType>(
+  'functions/v1/student-risk-analysis',
+  {
+    student_id: studentId,
+  } as Record<string, unknown>
+);
+
+if (response.error) {
+  throw new Error(response.error.message || '요청에 실패했습니다.');
+}
+
+return response.data;
+```
+
+❌ 금지:
+```typescript
+// ❌ 잘못된 방법: fetch 직접 사용
+const response = await fetch(`${supabaseUrl}/functions/v1/student-risk-analysis`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+  },
+  body: JSON.stringify({ student_id: studentId }),
+});
+```
+
 2.3 schema-engine ↔ core-ui 통신 방식 (강력한 정교화)
 ❌ 스키마에서 Tailwind 문자열 사용 금지
 ✔ props 기반 layout 전달
@@ -543,6 +583,137 @@ actions prop 사용 규칙:
 → 상세 가이드라인은 `docu/컴포넌트 디자인.md`의 "PageHeader 컴포넌트 사용 가이드" 섹션을 참조하세요.
 
 7. 성능 최적화 — Enterprise Version
+
+7.0. React 성능 최적화 패턴
+
+⚠️ 중요: useEffect 의존성 배열 최적화
+
+useEffect에서 상태를 업데이트하는 경우, 의존성 배열에 해당 상태를 포함하면 불필요한 재실행이 발생할 수 있습니다.
+
+**문제 상황**:
+```typescript
+useEffect(() => {
+  const measure = () => {
+    setShowTagListToggle(isWrapped);  // 상태 업데이트
+    setIsTagListExpanded(false);      // 상태 업데이트
+  };
+  // ...
+}, [tags, showTagListToggle, isTagListExpanded]);  // ❌ 문제: 상태가 의존성에 포함됨
+```
+
+**해결 방법: 함수형 업데이트 사용**:
+```typescript
+useEffect(() => {
+  const measure = () => {
+    // ✅ 함수형 업데이트로 이전 값과 비교하여 불필요한 상태 업데이트 방지
+    setShowTagListToggle((prev) => prev !== isWrapped ? isWrapped : prev);
+    setIsTagListExpanded((prev) => prev !== false ? false : prev);
+  };
+  // ...
+}, [tags]);  // ✅ 의존성 배열에서 상태 제거
+```
+
+**규칙**:
+- useEffect 내부에서 상태를 업데이트하는 경우, 함수형 업데이트를 사용
+- 의존성 배열에서 업데이트되는 상태는 제거 (같은 값이면 리렌더링이 발생하지 않으므로 무한 루프 위험 없음)
+- 하지만 의존성 배열에 포함하면 불필요한 재실행이 발생할 수 있으므로 제거
+
+⚠️ 중요: useState lazy initialization 패턴
+
+초기값 계산이 비용이 큰 경우 또는 함수 호출이 필요한 경우, lazy initialization을 사용하여 성능을 최적화합니다.
+
+**문제 상황**:
+```typescript
+const getInitialTab = useCallback((): LayerMenuTab => {
+  const path = location.pathname;
+  // 복잡한 로직...
+  return urlTab || 'info';
+}, [location.pathname, urlTab]);
+
+// ❌ 문제: 매 렌더마다 getInitialTab()이 실행됨 (초기 렌더링에서만 필요)
+const [layerMenuTab, setLayerMenuTab] = useState<LayerMenuTab>(getInitialTab());
+```
+
+**해결 방법: lazy initialization 사용**:
+```typescript
+const getInitialTab = useCallback((): LayerMenuTab => {
+  const path = location.pathname;
+  // 복잡한 로직...
+  return urlTab || 'info';
+}, [location.pathname, urlTab]);
+
+// ✅ lazy initialization: 초기 렌더링에서만 함수 실행
+const [layerMenuTab, setLayerMenuTab] = useState<LayerMenuTab>(() => getInitialTab());
+```
+
+**규칙**:
+- 초기값이 함수 호출 결과인 경우, lazy initialization 사용
+- 초기값 계산이 비용이 큰 경우, lazy initialization 사용
+- useState(() => ...) 패턴으로 초기 렌더링에서만 함수 실행
+
+⚠️ 중요: 스키마 메모이제이션 패턴
+
+동적으로 생성되는 스키마(예: createStudentFilterSchema)는 useMemo로 메모이제이션하여 중복 호출을 방지합니다.
+
+**문제 상황**:
+```typescript
+// ❌ 문제: 매 렌더마다 createStudentFilterSchema가 호출됨
+const { data: studentFilterSchemaData } = useSchema('student_filter', createStudentFilterSchema(classes || []), 'filter');
+const effectiveFilterSchema: FilterSchema = studentFilterSchemaData || createStudentFilterSchema(classes || []);
+```
+
+**해결 방법: useMemo로 메모이제이션**:
+```typescript
+// ✅ 스키마를 메모이제이션하여 중복 호출 방지
+const studentFilterSchema = useMemo(() => createStudentFilterSchema(classes || []), [classes]);
+const { data: studentFilterSchemaData } = useSchema('student_filter', studentFilterSchema, 'filter');
+const effectiveFilterSchema: FilterSchema = studentFilterSchemaData || studentFilterSchema;
+```
+
+**규칙**:
+- 동적으로 생성되는 스키마는 useMemo로 메모이제이션
+- 의존성 배열에 실제 의존하는 값만 포함 (예: classes)
+- useSchema와 fallback에서 동일한 메모이제이션된 스키마 재사용
+
+⚠️ 중요: 타입 안정성 패턴
+
+React Query나 상태 관리에서 타입이 다른 데이터를 통합 처리할 때는 명시적 타입 정의가 필요합니다.
+
+**문제 상황**:
+```typescript
+const riskAnalysis = newRiskAnalysis || savedRiskAnalysis;  // ❌ 타입 불일치 가능
+const riskScore = riskAnalysis.risk_score;  // ❌ 타입 오류
+```
+
+**해결 방법: 타입 통합 및 null 체크**:
+```typescript
+// ✅ 타입 통합 처리
+const riskAnalysis = (newRiskAnalysis || savedRiskAnalysis) as {
+  risk_score: number;
+  risk_level?: 'low' | 'medium' | 'high';
+  reasons?: string[];
+  recommended_actions?: string[];
+  analyzed_at?: string;
+  factors?: string[];
+  recommendations?: string[];
+} | null | undefined;
+
+// ✅ null 체크 추가
+if (!riskAnalysis || riskAnalysis.risk_score === undefined) {
+  return null;
+}
+
+// ✅ 안전한 속성 접근
+const riskScore = riskAnalysis.risk_score;
+const reasons = riskAnalysis.reasons || riskAnalysis.factors || [];
+const recommendedActions = riskAnalysis.recommended_actions || riskAnalysis.recommendations || [];
+```
+
+**규칙**:
+- 타입이 다른 데이터를 통합할 때는 명시적 타입 정의 사용
+- null/undefined 체크를 먼저 수행
+- 옵셔널 속성은 fallback 값 제공
+
 7.1 Performance Gates (CI/CD)
 
 Bundle Analyzer 자동 실행
