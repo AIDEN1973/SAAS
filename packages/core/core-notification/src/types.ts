@@ -3,9 +3,10 @@
  *
  * 메시지 알림 (SMS, 카카오 알림톡)
  * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
+ * [SSOT-3] 저장/실행용 channel 코드는 'sms' | 'kakao_at'이며, UI 표시명(알림톡 등)은 별도 매핑한다.
  */
 
-export type NotificationChannel = 'sms' | 'kakao';
+export type NotificationChannel = 'sms' | 'kakao_at';
 
 export type NotificationStatus = 'pending' | 'sent' | 'failed' | 'delivered';
 

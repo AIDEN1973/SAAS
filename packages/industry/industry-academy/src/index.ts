@@ -13,6 +13,13 @@
 // 타입만 export (클라이언트에도 사용 가능, 서버 코드는 포함되지 않음)
 export * from './types';
 
+// Industry Adapter export (Label 변환용, 클라이언트에서 사용 가능)
+export * from './adapter';
+
+// ⚠️ 주의: Seed Service는 index.ts에서 export하지 않습니다.
+// 서버에서만 사용: import { academySeedService } from '@industry/academy/seed'
+// 클라이언트 번들에 포함되지 않도록 별도 경로로 export
+
 // 서버 사용 코드는 이 index.ts에서 export하지 않습니다.
 // 서버에서는 직접 import: import { academyService } from '@industry/academy/service'
 // 또는: import { academyService } from '@industry/academy/dist/service' (빌드 후)

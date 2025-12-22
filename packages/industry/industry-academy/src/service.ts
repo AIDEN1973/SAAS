@@ -569,7 +569,7 @@ export class AcademyService {
   }
 
   /**
-   * 상담기록 AI 요약 생성
+   * 서버가 상담기록 AI 요약 생성
    *
    * [불변 규칙] Phase 1에서는 Supabase Edge Function으로 구현
    * 향후 AI 기능은 Edge Function 또는 외부 AI API로 구현
@@ -592,14 +592,14 @@ export class AcademyService {
     // const maskedContent = maskPII(consultation.content);
     // 주의: 실제 AI 연동 시 consultation.content를 그대로 전달하지 말고 PII 마스킹 적용 필수
 
-    // 2. AI 요약 생성 (Phase 1: Supabase)
+    // 2. 서버가 AI 요약 생성 (Phase 1: Supabase)
     // TODO: 향후 AI 연동 구현
     // - Edge Function 호출: fns-ai-summarize-consultation
     // - 또는 외부 AI API 직접 호출
     // - 실제 AI 연동 시 마스킹된 content를 전달해야 함
     const aiSummary = `[AI 요약] ${consultation.content.substring(0, 100)}... (요약 기능은 향후 구현 예정입니다)`;
 
-    // 3. 상담기록에 AI 요약 추가
+    // 3. 상담기록에 서버가 생성한 AI 요약 추가
     await this.updateConsultation(
       tenantId,
       consultationId,
@@ -1560,7 +1560,12 @@ export class AcademyService {
     try {
       const config = await configService.getConfig(tenantId);
       const autoNotification = config?.attendance?.auto_notification ?? false;
-      const notificationChannel = config?.attendance?.notification_channel ?? 'sms';
+      // SSOT-3: 'kakao' 저장 금지, 'kakao_at'로 정규화
+      let notificationChannel = config?.attendance?.notification_channel ?? 'sms';
+      if ((notificationChannel as string) === 'kakao') {
+        console.warn(`[Academy Service] Legacy channel 'kakao' detected, normalizing to 'kakao_at'`);
+        notificationChannel = 'kakao_at';
+      }
 
       // 자동 알림이 설정되어 있고, 결석이 아닌 경우에만 알림 발송
       if (autoNotification && input.status !== 'absent') {
@@ -1604,7 +1609,7 @@ export class AcademyService {
 
             // 알림 발송
             await notificationService.createNotification(tenantId, {
-              channel: notificationChannel === 'kakao' ? 'kakao' : 'sms',
+              channel: notificationChannel === 'kakao_at' ? 'kakao_at' : 'sms',  // SSOT-3: 'kakao' 저장 금지, 'kakao_at'만 사용
               recipient: primaryGuardian.phone,
               content: message,
             });
@@ -1643,6 +1648,9 @@ export class AcademyService {
       const industryType = tenant.data?.industry_type || store.data?.[0]?.industry_type || 'academy';
 
       // 이벤트 타입 설정 (attendance.check_in 또는 attendance.check_out)
+      // ⚠️ 참고: analytics.events.event_type은 자동화 카탈로그의 event_type과 다른 도메인 값입니다.
+      // analytics.events.event_type은 시스템 이벤트 타입(예: 'attendance.check_in', 'attendance.check_out')이며,
+      // 자동화 카탈로그의 event_type은 자동화 시나리오 키(예: 'overdue_outstanding_over_limit', 'payment_due_reminder')입니다.
       const eventType = input.attendance_type === 'check_in'
         ? 'attendance.check_in'
         : input.attendance_type === 'check_out'

@@ -6,8 +6,8 @@
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'public' 
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
     AND table_name = 'user_tenant_roles'
   ) THEN
     -- 테이블이 없으면 재생성
@@ -15,12 +15,12 @@ BEGIN
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
       tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-      role text NOT NULL CHECK (role IN ('owner', 'admin', 'sub_admin', 'teacher', 'assistant', 'counselor', 'parent', 'staff')),
+      role text NOT NULL CHECK (role IN ('owner', 'admin', 'sub_admin', 'teacher', 'assistant', 'counselor', 'parent', 'staff')),  -- ⚠️ 레거시: instructor/guardian 누락. 최신 SSOT는 000_create_core_tables.sql 참조
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now(),
       UNIQUE(user_id, tenant_id)
     );
-    
+
     -- 인덱스 생성
     CREATE INDEX idx_user_tenant_roles_user ON public.user_tenant_roles(user_id);
     CREATE INDEX idx_user_tenant_roles_tenant ON public.user_tenant_roles(tenant_id);
@@ -62,19 +62,19 @@ ANALYZE public.user_tenant_roles;
 NOTIFY pgrst, 'reload schema';
 
 -- 11. 최종 확인: 테이블 및 권한 확인
-SELECT 
+SELECT
   schemaname,
   tablename,
   tableowner
 FROM pg_tables
-WHERE schemaname = 'public' 
+WHERE schemaname = 'public'
   AND tablename = 'user_tenant_roles';
 
-SELECT 
+SELECT
   grantee,
   privilege_type
 FROM information_schema.role_table_grants
-WHERE table_schema = 'public' 
+WHERE table_schema = 'public'
   AND table_name = 'user_tenant_roles'
   AND grantee IN ('authenticated', 'anon')
 ORDER BY grantee, privilege_type;

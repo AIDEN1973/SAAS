@@ -12,27 +12,13 @@ import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary, Container, Card, Button, PageHeader } from '@ui-core/react';
 import { Grid } from '@ui-core/react';
 import { StudentTaskCard } from '../components/StudentTaskCard';
-import { useStudentTaskCards, useCompleteStudentTaskCard } from '@hooks/use-student';
-import type { StudentTaskCard as StudentTaskCardType } from '@hooks/use-student';
+import { useStudentTaskCards, useStudentTaskCardAction } from '@hooks/use-student';
 
 export function StudentsHomePage() {
   const navigate = useNavigate();
   const { data: cardsData, isLoading, error } = useStudentTaskCards();
   const cards = cardsData || [];
-  const completeCard = useCompleteStudentTaskCard();
-
-  const handleCardAction = async (card: StudentTaskCardType) => {
-    try {
-      // 카드 처리 완료 처리 (아키텍처 문서 713줄: 각 카드를 누르면 필요한 화면으로 자동 이동)
-      await completeCard.mutateAsync(card.id);
-      // 액션 URL로 이동 (아키텍처 문서 751-760줄: task_type에 따른 action_url 자동 생성 규칙)
-      navigate(card.action_url);
-    } catch (error) {
-      // 에러가 있어도 액션 URL로 이동 (사용자 경험 우선)
-      // console.error는 개발 환경에서만 사용 (프로덕션에서는 제거)
-      navigate(card.action_url);
-    }
-  };
+  const getCardActionUrl = useStudentTaskCardAction();
 
   const handleViewAllStudents = () => {
     navigate('/students/list');
@@ -85,7 +71,13 @@ export function StudentsHomePage() {
                 <StudentTaskCard
                   key={card.id}
                   card={card}
-                  onAction={handleCardAction}
+                  onAction={(card) => {
+                    // 정본 규칙: 컴포넌트 레벨에서 navigate 호출 (Hook 내부 호출 금지)
+                    const actionUrl = getCardActionUrl(card);
+                    if (actionUrl) {
+                      navigate(actionUrl);
+                    }
+                  }}
                 />
               ))}
             </Grid>
@@ -112,7 +104,7 @@ export function StudentsHomePage() {
               padding: 'var(--spacing-xl)'
             }}>
                 <p style={{ marginBottom: 'var(--spacing-md)' }}>
-                  오늘 처리할 학생 업무가 없습니다.
+                  오늘 발생한 학생 업무가 없습니다.
                 </p>
                 <Button
                   variant="outline"

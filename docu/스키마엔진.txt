@@ -5,6 +5,16 @@
 ⚠️ 이 문서는 Academy · Salon · Nail · Gym · Real-Estate 등
 여러 업종 SaaS를 하나의 Monorepo + 하나의 Supabase 프로젝트에서 운영하는 것을 기준으로 작성되었음.
 
+**⚠️ 중요: 실제 패키지 경로는 R1.1(rules.md)만 정본**
+
+본 문서에서 언급하는 개념적 레이어 표기(예: `/core-platform`, `/ui-core`, `/industry-*`)는 개념적 설명이며,
+실제 Monorepo 디렉터리 구조와 네이밍 규칙은 **R1.1(rules.md)을 정본으로 따릅니다**.
+
+구현 시에는 아키텍처 문서의 매핑 규칙을 참조하세요:
+- `/core-platform` (개념) → `packages/core/*` (실제)
+- `/ui-core` (개념) → `packages/ui-core` (실제)
+- `/industry-*` (개념) → `packages/industry/industry-*` (실제)
+
 📌 버전 정보
 - Schema Engine v2.0: Form 중심 기본 구현
 - Schema Engine v2.1: SDUI v1.1 엔터프라이즈 확장판 (Form/Table/Detail/Filter/Widget, Action Engine, i18n, Custom Widget)
@@ -67,14 +77,39 @@ schema-engine  →  @ui-core/react  →  (design-system/theme-engine 토큰)  �
 - schema-engine/react는 스키마의 존재 여부만 확인합니다.
 - Renderer는 업종별 UI 차이를 해석할 수 없으며, 오직 JSON 스키마만 해석합니다.
 
-⚠️ 중요: industry_type 결정 주체 (Zero-Trust 보안)
-- industry_type은 반드시 Supabase auth metadata 또는 tenant_settings 테이블에서 가져와야 합니다.
+⚠️ 중요: industry_type 결정 주체 (Zero-Trust 보안, SSOT-2)
+- industry_type의 1차 소스는 public.tenants.industry_type입니다.
+- auth metadata나 tenant_settings는 보조(캐시/대체)로만 사용하며, tenants 값과 불일치 시 tenants를 승으로 합니다.
 - UI/프론트엔드에서 직접 결정하거나 조작할 수 없습니다.
 - @api-sdk/core의 getApiContext()는 미들웨어나 인증 시스템에서 주입된 industry_type을 반환합니다.
-- industry_type 결정 소스:
-  1. tenant_settings 테이블: SELECT industry_type FROM tenant_settings WHERE tenant_id = current_tenant
-  2. auth.users.raw_user_meta_data.industry_type (대체 소스)
+- industry_type 결정 소스 (우선순위):
+  1. public.tenants.industry_type (1차 소스, SSOT)
+  2. auth.users.raw_user_meta_data.industry_type (보조, 캐시/대체용)
+  3. tenant_settings는 industry_type 저장소로 사용하지 않음
 - 이는 Zero-Trust 원칙에 따라 프론트엔드에서 industry_type을 조작할 수 없도록 보장합니다.
+
+### SDUI Industry Separation Rule
+
+- SDUI Schema는 Core 기준으로 정의된다.
+- 업종별 화면 차이는 Schema Override로만 허용된다.
+- 업종 전용 UI 컴포넌트 신규 생성은 금지된다.
+
+**허용 구조:**
+```
+Core SDUI Schema
+ └─ Industry Schema Override (academy | salon | nail | ...)
+```
+
+**금지 구조:**
+- 업종별 SDUI Schema Engine ❌
+- 업종별 UI 컴포넌트 신규 생성 ❌
+- 업종별 하드코딩 UI 로직 ❌
+
+**업종별 차이 허용 범위:**
+- Schema Override를 통한 필드 추가/제거
+- Label / Copy / i18n 키 변환
+- Layout 조정 (colSpan 등)
+- Custom Widget 등록 (Industry Adapter 레벨)
 
 2~3. 타입 정의
 
@@ -257,8 +292,8 @@ CREATE TABLE meta.schema_registry (
   entity text NOT NULL,              -- 'student', 'invoice', 'schedule' 등
   industry_type text,                -- 'academy', 'salon' 등 (nullable = 공통)
   version text NOT NULL,             -- '2.0.1' (Semver)
-  min_supported_client text,         -- '1.12.0' (하위 호환성)
-  min_client text,                   -- '1.12.0' (SDUI v1.1: minClient가 우선, min_supported_client는 하위 호환성)
+  min_supported_client text NOT NULL, -- '1.12.0' (정본, 필수)
+  min_client text,                    -- '1.12.0' (레거시 입력 허용, 저장 시 min_supported_client로 정규화)
   schema_json jsonb NOT NULL,        -- 실제 스키마 정의
   migration_script text,             -- Migration Script (nullable)
   status text NOT NULL DEFAULT 'draft', -- 'draft', 'active', 'deprecated'
@@ -288,6 +323,30 @@ RLS 정책:
 예시 (Platform 관리자 전용 접근):
 ```sql
 ALTER TABLE meta.schema_registry ENABLE ROW LEVEL SECURITY;
+
+⚠️ 중요: Platform RBAC vs Tenant RBAC 분리 규칙 (보안 불변 규칙, 모든 문서 공통):
+
+**meta.schema_registry는 Platform 권한(user_platform_roles)으로만 통제되어야 합니다.**
+- ✅ **허용**: `user_platform_roles.role = 'super_admin'` 또는 `'developer'` 또는 `'qa'`
+- ❌ **금지**: `user_tenant_roles` 기반 접근 (테넌트 권한으로는 절대 접근 불가)
+- ⚠️ 중요: 이 규칙은 "한 문서의 예시"가 아니라, **전 구간 공통 SSOT 블록(= 보안 불변 규칙)**입니다.
+
+**계약 테스트 체크리스트 (Contract Test, 필수):**
+
+다음 테스트 케이스는 CI/CD 파이프라인에 포함되어야 하며, 모든 테스트가 통과해야 합니다:
+
+| 테스트 케이스 | 기대 결과 | 설명 |
+|------------|---------|------|
+| `user_tenant_roles`만 가진 사용자가 `meta.schema_registry` SELECT 시도 | 403 Forbidden 또는 빈 결과셋 | ⚠️ 정본 규칙: `meta.schema_registry`는 `user_platform_roles`만 접근 가능, 테넌트 권한으로는 절대 접근 불가 |
+| `user_tenant_roles`만 가진 사용자가 `meta.schema_registry` INSERT 시도 | 403 Forbidden | ⚠️ 정본 규칙: `meta.schema_registry`는 `user_platform_roles`만 접근 가능, 테넌트 권한으로는 절대 접근 불가 |
+| `user_tenant_roles`만 가진 사용자가 `meta.schema_registry` UPDATE 시도 | 403 Forbidden | ⚠️ 정본 규칙: `meta.schema_registry`는 `user_platform_roles`만 접근 가능, 테넌트 권한으로는 절대 접근 불가 |
+| `user_tenant_roles`만 가진 사용자가 `meta.schema_registry` DELETE 시도 | 403 Forbidden | ⚠️ 정본 규칙: `meta.schema_registry`는 `user_platform_roles`만 접근 가능, 테넌트 권한으로는 절대 접근 불가 |
+| `user_platform_roles.role = 'super_admin'` 사용자가 SELECT | 성공 (데이터 반환) | Platform 권한 허용 |
+| `user_platform_roles.role = 'developer'` 사용자가 SELECT | 성공 (데이터 반환) | Platform 권한 허용 |
+| `user_platform_roles.role = 'qa'` 사용자가 SELECT | 성공 (데이터 반환) | Platform 권한 허용 |
+| `user_platform_roles.role = 'super_admin'` 사용자가 INSERT/UPDATE/DELETE | 성공 | Platform 권한 허용 |
+
+⚠️ 중요: 이 테스트들은 RLS 정책이 올바르게 작동하는지 검증하며, 보안 사고를 사전에 방지합니다.
 
 CREATE POLICY schema_registry_read ON meta.schema_registry
 FOR SELECT TO authenticated
@@ -331,8 +390,10 @@ USING (
     SELECT 1 FROM user_platform_roles
     WHERE user_id = auth.uid() AND role = 'super_admin'
   )
-  -- 참고: user_platform_roles 테이블이 아직 없는 경우 임시로 user_tenant_roles를 사용할 수 있으나,
-  -- 프로덕션 환경에서는 반드시 user_platform_roles로 전환해야 합니다.
+  -- ✅ 정본: user_platform_roles 존재 전제 (fallback 로직 금지)
+  -- ❌ 금지: user_platform_roles 테이블이 없을 경우 fallback 로직 사용 (보안 취약점)
+  -- ⚠️ 중요: 마이그레이션 순서 보장 필수 - user_platform_roles 테이블 생성 → RLS 정책 적용
+  -- 참고: 전체 기술문서의 "Platform RBAC vs Tenant RBAC 분리 규칙" 섹션 참조
 )
 WITH CHECK (
   -- ⚠️ 중요: INSERT/UPDATE에 대한 조건 (PostgreSQL RLS 필수)
@@ -375,7 +436,7 @@ const schema = await schemaRegistryService.getSchema('student', {
   tenantId: context.tenantId,
   industryType: context.industryType,
   clientVersion: '1.0.0',
-  fallbackSchema: studentFormSchema,  // 로컬 fallback
+  fallbackSchema: studentFormSchema,  // ⚠️ 운영 정책: 개발/테스트 환경에서만 허용, 운영 환경에서는 Schema Registry 조회 실패 시 에러 처리 필수
 });
 ```
 
@@ -403,13 +464,16 @@ export function useSchema(entity: string, fallbackSchema?: FormSchema) {
       );
 
       if (response.error || !response.data) {
-        // ⚠️ 중요: fallbackSchema는 트러블슈팅용입니다.
-        // 스키마 부재 시 앱이 죽지 않도록 fallback을 유지해야 합니다.
+        // ⚠️ 운영 정책: Schema Registry 조회 실패 시 처리 방식
+        // - 운영 환경(Production): 에러 처리 필수 (Fail-Closed, fail-open 방지)
+        // - 개발/테스트 환경: fallbackSchema 허용 (개발 편의성)
+        // ⚠️ 중요: 운영 환경에서는 fallbackSchema를 사용하지 않으며, Schema Registry 조회 실패 시 명확한 에러를 반환해야 합니다.
+        // 개발/테스트 환경에서만 fallbackSchema를 사용하여 앱이 죽지 않도록 할 수 있습니다.
         //
         // ⚠️ 필수 규칙: fallbackSchema는 entity + industry 조합으로 개별 제공되어야 합니다.
         // - academy/studentFormSchema
         // - salon/customerFormSchema
-        // - realestate/contractFormSchema
+        // - real_estate/contractFormSchema (⚠️ 중요: 업종 키는 언더스코어 형식 'real_estate' 사용, 'realestate' 사용 금지)
         // 각각 별도로 존재해야 하며, 업종별로 구분된 fallback 스키마를 제공해야 합니다.
         return fallbackSchema || null;
       }
@@ -436,8 +500,8 @@ const entry = await schemaRegistryService.registerSchema({
   entity: 'student',
   industry_type: 'academy',
   version: '2.0.0',
-  minClient: '1.0.0',  // SDUI v1.1: minClient가 우선
-  // minSupportedClient: '1.0.0',  // 하위 호환성 (선택)
+  minSupportedClient: '1.0.0',  // 정본 (필수)
+  // minClient: '1.0.0',  // 레거시 입력 허용 시 저장 시 minSupportedClient로 정규화
   schema_json: studentFormSchema,
   status: 'draft',
 });
@@ -461,9 +525,12 @@ await schemaRegistryService.pinSchemaVersion({
 
 활성 스키마 결정:
 - `status = 'active'`인 스키마만 사용
-- `minClient` (또는 `min_supported_client`) 버전 체크 필수
-- `minClient`가 있으면 우선 사용, 없으면 `min_supported_client` 사용 (하위 호환성)
-- 클라이언트 버전이 `minClient` (또는 `min_supported_client`) 미만이면 업데이트 유도
+- ⚠️ 중요: 필드명 SSOT
+  - Schema JSON (문서/레지스트리 정본): `minSupportedClient` (camelCase)
+  - DB 컬럼 정본: `min_supported_client` (snake_case)
+  - 하위호환 alias: `minClient`/`min_client`는 "읽기만 허용(Deprecated)"로 두고, 저장 시 정규화해서 `minSupportedClient`로 변환
+- 버전 체크 우선순위: `minSupportedClient` (정본, Schema JSON) / `min_supported_client` (정본, DB 컬럼) → `minClient`/`min_client` (레거시, 읽기만 허용)
+- 클라이언트 버전이 체크 기준 미만이면 업데이트 유도
 
 Version Pinning:
 - 특정 테넌트가 특정 스키마 버전을 고정해야 하는 경우
@@ -1389,7 +1456,7 @@ import { useSchema } from '@hooks/use-schema';
 import { studentFormSchema } from '../schemas/student.schema'; // Fallback
 
 export function StudentsPage() {
-  // Schema Registry에서 스키마 조회 (Fallback: 로컬 스키마)
+  // Schema Registry에서 스키마 조회 (⚠️ 운영 정책: Fallback은 개발/테스트 환경에서만 허용, 운영 환경에서는 Schema Registry 조회 실패 시 에러 처리 필수)
   const { data: schema, isLoading: schemaLoading } = useSchema('student', studentFormSchema);
 
   // schema가 없으면 fallback 사용
@@ -1460,7 +1527,7 @@ export function StudentsPage() {
 ✅ Fallback 스키마 지원
 - Registry 조회 실패 시 로컬 스키마 사용
 - 점진적 마이그레이션 가능
-- ⚠️ 중요: fallbackSchema는 트러블슈팅용입니다.
+- ⚠️ 운영 정책: fallbackSchema는 개발/테스트 환경에서만 허용되며, 운영 환경에서는 Schema Registry 조회 실패 시 에러 처리 필수 (fail-open 방지)
   - 스키마 부재 시 앱이 죽지 않도록 fallback을 유지해야 합니다.
 
 ✅ Zero-Trust UI 준수
@@ -1797,7 +1864,7 @@ export interface ActionDefinition {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   body?: 'form' | 'selectedRows' | Record<string, any>;
   // navigate
-  to?: string;
+  to?: string;  // ⚠️ 중요: navigate는 사용자 명시적 액션(클릭/선택)에서만 허용, 자동화/AI 흐름에서는 금지
   // openDrawer / openModal
   schemaKey?: string;  // 열 스키마 키
   // setValue
@@ -1935,8 +2002,8 @@ export type SchemaType = 'form' | 'table' | 'detail' | 'filter' | 'widget';
 
 export interface BaseSchema {
   version: string;  // "2.1.0"
-  minClient?: string;  // "1.10.0" 이하 클라이언트는 차단 (SDUI v1.1)
-  minSupportedClient?: string;  // 하위 호환성
+  minSupportedClient: string;  // 정본 (필수): "1.10.0" 이하 클라이언트는 차단
+  minClient?: string;  // 레거시 입력 허용 (Deprecated, 저장 시 minSupportedClient로 정규화)
   type: SchemaType;
   entity: string;  // "student" | "class" | "teacher" ...
   tenantScoped?: boolean;  // 기본 true, false인 경우 system-global
@@ -2083,7 +2150,7 @@ TableSchema에서 rowActions의 'edit' 클릭 시 Action Engine으로 연결하�
 }
 ```
 
-→ 상세 가이드라인은 `docu/UI_가이드라인_모달_페이지_선택.md` 참조
+→ 상세 가이드라인은 `docu/전체 유아이문서.txt`의 "6-2. 모달 vs 페이지 선택 기준" 섹션 참조
 
 16.3 DetailSchema
 

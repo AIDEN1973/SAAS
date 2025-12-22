@@ -21,8 +21,8 @@ export type SchemaType = 'form' | 'table' | 'detail' | 'filter' | 'widget';
  */
 export interface SchemaVersion {
   version: string;
-  minClient?: string;  // SDUI v1.1: minClient가 우선
-  minSupportedClient?: string;  // 하위 호환성: minClient가 없으면 사용
+  minClient?: string;  // 레거시 입력 허용: minSupportedClient가 정본
+  minSupportedClient?: string;  // 정본 (필수): 우선순위 1
   entity: string;
 }
 
@@ -207,7 +207,7 @@ export interface FormFieldSchema {
     validate?: (value: unknown) => boolean | string;
     // ⚠️ 중요: validate 함수는 Schema Registry(JSONB)에 저장될 수 없으므로,
     // Registry 기반 운영 시 validate는 사용할 수 없고 pattern 또는 min/max 등 정형 Validation만 허용됩니다.
-    // validate 함수는 fallbackSchema(로컬 스키마) 전용입니다.
+    // validate 함수는 fallbackSchema(개발/테스트 환경 전용) 전용입니다. 운영 환경에서는 Schema Registry 조회 실패 시 에러 처리 필수입니다.
   };
 }
 

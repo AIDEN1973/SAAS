@@ -14,7 +14,7 @@
 import { colors, spacing, sizes, breakpoints, type SpacingToken, type ColorToken, type SizeToken } from './tokens';
 
 export type ThemeMode = 'light' | 'dark' | 'auto';
-export type IndustryType = 'academy' | 'salon' | 'realestate' | 'gym' | 'ngo';
+export type IndustryType = 'academy' | 'salon' | 'real_estate' | 'gym' | 'ngo';  // 정본: real_estate (언더스코어 필수)
 
 export interface ThemeTokens {
   colors: typeof colors;

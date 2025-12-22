@@ -33,6 +33,10 @@ export const envServerSchema = z.object({
 
   // OpenAI API (AI 분석 기능용)
   OPENAI_API_KEY: z.string().min(1).optional(),
+
+  // AI 기능 플랫폼 전체 온오프 (env-registry/server에서만 읽음, 기본값: true)
+  // SSOT: 프론트 자동화 문서 "글로벌 헤더 AI 토글 — UX/정책 SSOT" 섹션 참조
+  PLATFORM_AI_ENABLED: z.string().transform((val) => val === 'true' || val === '1').optional().default('true'),
 });
 
 // 클라이언트 사용 스키마(NEXT_PUBLIC_*는 빌드 타임에 추출 값만)
@@ -49,7 +53,7 @@ export const envClientSchema = z.object({
 export const envCommonSchema = z.object({
   APP_NAME: z.string().min(1).optional(),
   APP_VERSION: z.string().min(1).optional(),
-  INDUSTRY_MODE: z.enum(['academy', 'salon', 'realestate', 'gym', 'ngo']).optional(),
+  INDUSTRY_MODE: z.enum(['academy', 'salon', 'real_estate', 'gym', 'ngo']).optional(),  // 정본: real_estate (언더스코어 필수)
   // 서버/Edge에서 사용하는 공개 값
 });
 

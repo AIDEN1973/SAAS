@@ -1,0 +1,21 @@
+{
+  "name": "@hooks/use-month-end-adaptation",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lib/date-utils": "file:../../lib/date-utils"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "typescript": "^5.3.3"
+  }
+}
+

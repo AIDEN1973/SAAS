@@ -9,14 +9,12 @@ DROP POLICY IF EXISTS tenant_isolation_tenant_settings ON public.tenant_settings
 -- 새로운 RLS 정책 생성
 -- SELECT: 테넌트 소속 사용자는 모두 조회 가능, 수퍼어드민은 모든 테넌트 조회 가능
 -- INSERT/UPDATE: 테넌트 소속 사용자는 모두 저장 가능, 수퍼어드민은 모든 테넌트 저장 가능
+-- [불변 규칙] JWT claim 기반 RLS 사용 (PgBouncer Transaction Pooling 호환)
 CREATE POLICY tenant_isolation_tenant_settings ON public.tenant_settings
 FOR ALL TO authenticated
 USING (
   -- 테넌트 소속 사용자이거나 수퍼어드민인 경우
-  tenant_id IN (
-    SELECT tenant_id FROM public.user_tenant_roles
-    WHERE user_id = auth.uid()
-  )
+  tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
   OR EXISTS (
     SELECT 1 FROM public.user_platform_roles
     WHERE user_id = auth.uid() AND role = 'super_admin'
@@ -24,10 +22,7 @@ USING (
 )
 WITH CHECK (
   -- 테넌트 소속 사용자이거나 수퍼어드민인 경우
-  tenant_id IN (
-    SELECT tenant_id FROM public.user_tenant_roles
-    WHERE user_id = auth.uid()
-  )
+  tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
   OR EXISTS (
     SELECT 1 FROM public.user_platform_roles
     WHERE user_id = auth.uid() AND role = 'super_admin'

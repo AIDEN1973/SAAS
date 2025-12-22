@@ -62,6 +62,112 @@ export function useConfig() {
 }
 
 /**
+ * 테넌트 설정에서 중첩된 경로의 값 조회 Hook
+ *
+ * 프론트엔드 래퍼 함수: 서버/Edge Function의 getTenantSettingByPath와 동일한 기능을 제공합니다.
+ * SSOT-1: tenant_settings는 KV 구조이며, config는 컬럼이 아니라 key='config' row의 value(JSONB)입니다.
+ * 내부 동작: 1) tenant_settings에서 tenant_id + key='config' row의 value(JSONB) 획득, 2) value(JSONB)에서 경로 추출
+ *
+ * @param path 점으로 구분된 경로 (예: 'auto_notification.overdue_outstanding_over_limit.enabled')
+ * @returns 설정 값 또는 null (Policy가 없으면 null 반환, Fail Closed)
+ */
+export function useTenantSettingByPath(path: string) {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+
+  return useQuery({
+    queryKey: ['config', tenantId, 'path', path],
+    queryFn: async () => {
+      if (!tenantId) {
+        return null;
+      }
+
+      // 전체 config 조회
+      const response = await apiClient.get<{ key: string; value: TenantConfig }>('tenant_settings', {
+        filters: { key: 'config' },
+      });
+
+      if (response.error) {
+        if (response.error.code === 'PGRST116' || response.error.code === 'PGRST205') {
+          return null; // Fail Closed
+        }
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to fetch config:', response.error);
+        }
+        return null; // Fail Closed
+      }
+
+      if (!response.data || response.data.length === 0) {
+        return null; // Fail Closed
+      }
+
+      const configRecord = response.data.find((item) => item.key === 'config');
+      if (!configRecord || !configRecord.value) {
+        return null; // Fail Closed
+      }
+
+      // 경로 추출
+      const keys = path.split('.');
+      let current: unknown = configRecord.value;
+
+      // 디버깅: 전체 config와 경로 추출 과정 로그
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[useTenantSettingByPath] 경로: ${path}`, {
+          fullConfig: configRecord.value,
+          keys,
+          autoNotificationKeys: configRecord.value && typeof configRecord.value === 'object' && 'auto_notification' in configRecord.value
+            ? Object.keys((configRecord.value as Record<string, unknown>).auto_notification as Record<string, unknown> || {})
+            : [],
+        });
+      }
+
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        if (current && typeof current === 'object' && key in current) {
+          current = (current as Record<string, unknown>)[key];
+          // 디버깅: 각 단계별 로그
+          if (process.env.NODE_ENV === 'development' && i < keys.length - 1) {
+            console.log(`[useTenantSettingByPath] 경로 단계 ${i + 1}/${keys.length}: ${key}`, {
+              found: true,
+              value: current,
+              type: typeof current,
+              availableKeys: current && typeof current === 'object' ? Object.keys(current as Record<string, unknown>) : [],
+            });
+          }
+        } else {
+          // 디버깅: 경로를 찾지 못한 경우
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`[useTenantSettingByPath] 경로를 찾지 못함: ${path}`, {
+              currentKey: key,
+              currentValue: current,
+              currentType: typeof current,
+              isObject: current && typeof current === 'object',
+              hasKey: current && typeof current === 'object' && key in current,
+              availableKeys: current && typeof current === 'object' ? Object.keys(current as Record<string, unknown>) : [],
+              step: `${i + 1}/${keys.length}`,
+              pathSoFar: keys.slice(0, i).join('.'),
+            });
+          }
+          return null; // Fail Closed
+        }
+      }
+
+      // 디버깅: 최종 결과
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[useTenantSettingByPath] 최종 결과: ${path}`, {
+          value: current,
+          type: typeof current,
+        });
+      }
+
+      return current;
+    },
+    enabled: !!tenantId && !!path,
+    staleTime: 5 * 60 * 1000, // 5분
+  });
+}
+
+/**
  * 테넌트 설정 업데이트 Hook
  */
 export function useUpdateConfig() {
@@ -92,10 +198,20 @@ export function useUpdateConfig() {
         }
       }
 
+      // SSOT-3: 'kakao' 저장 금지, 'kakao_at'로 정규화
+      const normalizedInput = { ...input };
+      if ((normalizedInput.attendance?.notification_channel as string) === 'kakao') {
+        console.warn('[useConfig] Legacy channel "kakao" detected, normalizing to "kakao_at"');
+        normalizedInput.attendance = {
+          ...normalizedInput.attendance,
+          notification_channel: 'kakao_at',
+        };
+      }
+
       // 설정 병합
       const mergedConfig: TenantConfig = {
         ...existingConfig,
-        ...input,
+        ...normalizedInput,
       };
 
       let result: TenantConfig;

@@ -5,9 +5,21 @@
  * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
  */
 
-export type TenantRole = 'owner' | 'admin' | 'sub_admin' | 'manager' | 'staff' | 'teacher' | 'assistant' | 'counselor' | 'parent' | 'super_admin';
+export type TenantRole =
+  | 'owner'
+  | 'admin'
+  | 'sub_admin'
+  | 'manager'
+  | 'staff'
+  | 'instructor'  // 업종 중립 정본 키 (academy: 강사, salon: 스타일리스트 등)
+  | 'teacher'  // backward compatibility (deprecated, use instructor)
+  | 'assistant'
+  | 'counselor'
+  | 'guardian'  // 업종 중립 정본 키 (academy: 학부모, salon: 고객 등)
+  | 'parent'  // backward compatibility (deprecated, use guardian)
+  | 'super_admin';
 
-export type IndustryType = 'academy' | 'salon' | 'realestate' | 'gym' | 'ngo';
+export type IndustryType = 'academy' | 'salon' | 'real_estate' | 'gym' | 'ngo';  // 정본: real_estate (언더스코어 필수)
 
 export type TenantPlan = 'basic' | 'premium' | 'enterprise';
 

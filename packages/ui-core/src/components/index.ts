@@ -68,6 +68,9 @@ export type { RadioProps } from './Radio';
 export { Switch } from './Switch';
 export type { SwitchProps } from './Switch';
 
+export { AIToggle } from './AIToggle';
+export type { AIToggleProps } from './AIToggle';
+
 export { Toast } from './Toast';
 export type { ToastProps } from './Toast';
 
@@ -118,3 +121,6 @@ export type { RightLayerMenuProps } from './RightLayerMenu';
 
 export { RightLayerMenuLayout } from './RightLayerMenuLayout';
 export type { RightLayerMenuLayoutProps } from './RightLayerMenuLayout';
+
+export { ContextRecommendationBanner } from './ContextRecommendationBanner';
+export type { ContextRecommendationBannerProps, ContextRecommendation } from './ContextRecommendationBanner';

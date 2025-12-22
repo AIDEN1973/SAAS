@@ -1,6 +1,5 @@
 -- persons 테이블 RLS 정책 수정
--- [문제] JWT claim 기반 RLS가 개발 환경에서 작동하지 않음
--- [해결] user_tenant_roles 기반 RLS로 변경하고 수퍼어드민도 접근 가능하도록 수정
+-- [불변 규칙] JWT claim 기반 RLS 사용 (PgBouncer Transaction Pooling 호환)
 
 -- 기존 정책 삭제
 DROP POLICY IF EXISTS "Tenant can read their persons" ON public.persons;
@@ -9,16 +8,18 @@ DROP POLICY IF EXISTS "Tenant can update their persons" ON public.persons;
 DROP POLICY IF EXISTS "Tenant can delete their persons" ON public.persons;
 DROP POLICY IF EXISTS "Dev: Allow all authenticated users" ON public.persons;
 DROP POLICY IF EXISTS tenant_isolation_persons ON public.persons;
+DROP POLICY IF EXISTS tenant_isolation_persons_select ON public.persons;
+DROP POLICY IF EXISTS tenant_isolation_persons_insert ON public.persons;
+DROP POLICY IF EXISTS tenant_isolation_persons_update ON public.persons;
+DROP POLICY IF EXISTS tenant_isolation_persons_delete ON public.persons;
 
 -- 새로운 RLS 정책 생성
 -- SELECT: 테넌트 소속 사용자는 자신의 테넌트 데이터 조회 가능, 수퍼어드민은 모든 테넌트 조회 가능
+-- [불변 규칙] JWT claim 기반 RLS 사용 (PgBouncer Transaction Pooling 호환)
 CREATE POLICY tenant_isolation_persons_select ON public.persons
 FOR SELECT TO authenticated
 USING (
-  tenant_id IN (
-    SELECT tenant_id FROM public.user_tenant_roles
-    WHERE user_id = auth.uid()
-  )
+  tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
   OR EXISTS (
     SELECT 1 FROM public.user_platform_roles
     WHERE user_id = auth.uid() AND role = 'super_admin'
@@ -29,10 +30,7 @@ USING (
 CREATE POLICY tenant_isolation_persons_insert ON public.persons
 FOR INSERT TO authenticated
 WITH CHECK (
-  tenant_id IN (
-    SELECT tenant_id FROM public.user_tenant_roles
-    WHERE user_id = auth.uid()
-  )
+  tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
   OR EXISTS (
     SELECT 1 FROM public.user_platform_roles
     WHERE user_id = auth.uid() AND role = 'super_admin'
@@ -43,20 +41,14 @@ WITH CHECK (
 CREATE POLICY tenant_isolation_persons_update ON public.persons
 FOR UPDATE TO authenticated
 USING (
-  tenant_id IN (
-    SELECT tenant_id FROM public.user_tenant_roles
-    WHERE user_id = auth.uid()
-  )
+  tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
   OR EXISTS (
     SELECT 1 FROM public.user_platform_roles
     WHERE user_id = auth.uid() AND role = 'super_admin'
   )
 )
 WITH CHECK (
-  tenant_id IN (
-    SELECT tenant_id FROM public.user_tenant_roles
-    WHERE user_id = auth.uid()
-  )
+  tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
   OR EXISTS (
     SELECT 1 FROM public.user_platform_roles
     WHERE user_id = auth.uid() AND role = 'super_admin'
@@ -67,10 +59,7 @@ WITH CHECK (
 CREATE POLICY tenant_isolation_persons_delete ON public.persons
 FOR DELETE TO authenticated
 USING (
-  tenant_id IN (
-    SELECT tenant_id FROM public.user_tenant_roles
-    WHERE user_id = auth.uid()
-  )
+  tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
   OR EXISTS (
     SELECT 1 FROM public.user_platform_roles
     WHERE user_id = auth.uid() AND role = 'super_admin'

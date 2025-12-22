@@ -32,6 +32,8 @@ export class TenantOnboardingService {
    * 5. 추천인 코드 처리 (선택)
    *
    * ⚠️ 주의: 업종별 seed 데이터는 Industry Layer에서 별도로 처리합니다.
+   * ⚠️ 중요: 이 메서드를 직접 호출하는 경우, 호출 후 업종별 seed를 별도로 실행해야 합니다.
+   *          예: academy 업종인 경우 `academySeedService.seedTenantData(tenant.id, input.owner_user_id)` 호출 필요
    */
   async createTenant(input: CreateTenantInput): Promise<TenantOnboardingResult> {
     // 1. 테넌트 생성
@@ -86,6 +88,10 @@ export class TenantOnboardingService {
    * 테넌트 기본 설정 초기화
    *
    * [불변 규칙] INSERT 시에는 tenant_id를 row object에 직접 포함합니다.
+   * ⚠️ SSOT-2: industry_type은 tenants 테이블이 1차 소스이며, tenant_settings에 저장하지 않음
+   * 아래 'industry' 키는 하위 호환성을 위한 것이며, 실제 industry_type 결정은 tenants 테이블에서 수행
+   *
+   * ⚠️ Automation Config First: 자동화 기본 정책(Default Policy)도 함께 초기화
    */
   private async initializeTenantSettings(
     tenantId: string,
@@ -106,9 +112,75 @@ export class TenantOnboardingService {
       {
         tenant_id: tenantId,
         key: 'industry',
-        value: { industry_type: industryType },
+        value: { industry_type: industryType },  // ⚠️ 하위 호환성용, SSOT는 tenants.industry_type
       },
     ];
+
+    // 자동화 기본 정책(Default Policy) 설정
+    // ⚠️ 중요: 모든 자동화는 기본적으로 비활성화(enabled: false)이며, 사용자가 UI에서 활성화할 수 있음
+    const automationDefaultPolicy = {
+      auto_notification: {
+        // financial_health (10)
+        payment_due_reminder: { enabled: false, channel: 'sms', days_before_first: 3, days_before_second: 1 },
+        invoice_partial_balance: { enabled: false, channel: 'sms' },
+        recurring_payment_failed: { enabled: false, channel: 'sms' },
+        revenue_target_under: { enabled: false, monthly_target: 0 },
+        collection_rate_drop: { enabled: false, threshold: 3 },
+        overdue_outstanding_over_limit: { enabled: false, channel: 'sms', limit_amount: 1000000 },
+        revenue_required_per_day: { enabled: false, monthly_target: 0 },
+        top_overdue_customers_digest: { enabled: false },
+        refund_spike: { enabled: false, threshold: 2 },
+        monthly_business_report: { enabled: false, report_day: 1 },
+        // capacity_optimization (6)
+        class_fill_rate_low_persistent: { enabled: false, threshold: 50, persistent_days: 7 },
+        ai_suggest_class_merge: { enabled: false },
+        time_slot_fill_rate_low: { enabled: false, threshold: 50 },
+        high_fill_rate_expand_candidate: { enabled: false, threshold: 80 },
+        unused_class_persistent: { enabled: false, persistent_days: 7 },
+        weekly_ops_summary: { enabled: false, report_day_of_week: 1 }, // 월요일
+        // customer_retention (8)
+        class_reminder_today: { enabled: false, channel: 'sms', minutes_before: 30 },
+        class_schedule_tomorrow: { enabled: false, channel: 'sms', notification_time: '20:00' },
+        consultation_reminder: { enabled: false, channel: 'sms', hours_before_first: 24, hours_before_second: 2 },
+        absence_first_day: { enabled: false, channel: 'sms' },
+        churn_increase: { enabled: false, threshold: 2 },
+        ai_suggest_churn_focus: { enabled: false },
+        attendance_rate_drop_weekly: { enabled: false, threshold: 10 },
+        risk_students_weekly_kpi: { enabled: false },
+        // growth_marketing (6)
+        new_member_drop: { enabled: false, threshold: 20 },
+        inquiry_conversion_drop: { enabled: false, threshold: 3 },
+        birthday_greeting: { enabled: false, channel: 'sms', require_approval: true },
+        enrollment_anniversary: { enabled: false, channel: 'sms', require_approval: true },
+        regional_underperformance: { enabled: false, threshold: 3 },
+        regional_rank_drop: { enabled: false, threshold: 3 },
+        // safety_compliance (7)
+        class_change_or_cancel: { enabled: false, channel: 'sms' },
+        checkin_reminder: { enabled: false, channel: 'sms', minutes_before: 30 },
+        checkout_missing_alert: { enabled: false, channel: 'sms', grace_period_minutes: 10 },
+        announcement_urgent: { enabled: false, channel: 'sms', require_approval: true },
+        announcement_digest: { enabled: false, channel: 'sms', require_approval: true, digest_period: 'weekly' },
+        consultation_summary_ready: { enabled: false, channel: 'sms', min_length: 50, require_approval: true },
+        attendance_pattern_anomaly: {
+          enabled: false,
+          channel: 'sms',
+          threshold: 3,
+          priority: 75,
+          ttl_days: 7,
+          throttle: { daily_limit: 20, student_limit: 5 },
+          require_approval: true,
+        },
+        // workforce_ops (2)
+        teacher_workload_imbalance: { enabled: false, threshold: 3 },
+        staff_absence_schedule_risk: { enabled: false },
+      },
+    };
+
+    defaultSettings.push({
+      tenant_id: tenantId,
+      key: 'config',
+      value: automationDefaultPolicy as any,
+    });
 
     const { error } = await this.supabase
       .from('tenant_settings')
@@ -132,7 +204,7 @@ export class TenantOnboardingService {
     const features = [
       {
         tenant_id: tenantId,
-        feature_key: 'attendance',
+        feature_key: 'attendance',  // SSOT: RPC 함수와 일치 (create_tenant_with_onboarding)
         enabled: true,
         quota: null, // 무제한
       },

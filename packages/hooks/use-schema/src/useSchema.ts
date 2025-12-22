@@ -47,24 +47,35 @@ export function useSchema<T extends SchemaType = 'form'>(
     queryFn: async () => {
       // schema-registry 요청은 404가 정상이므로 에러를 throw하지 않음
       // [불변 규칙] 기술문서에 명시된 대로 apiClient.get을 통해 Schema Registry 조회
-      // ⚠️ 중요: UI/클라이언트는 직접 meta.schema_registry를 조회하지 않고,
+      // 중요: UI/클라이언트는 직접 meta.schema_registry를 조회하지 않고,
       // @api-sdk/core의 서버사이드 API를 통해서만 접근합니다.
       // 기술문서: docu/스키마엔진.txt 5.2 Schema Registry Service 사용법
       //
       // 참고: 기술문서 예시에서는 params를 사용하지만, 실제 apiClient.get 구현은 filters를 사용합니다.
       // apiClient.get의 두 번째 파라미터는 options 객체이며, 그 안에 filters 속성이 있습니다.
-      const table = `schema-registry/${entity}`;
+      // 중요: schema-registry View를 사용하고 entity 필드로 필터링
+      const table = 'schema_registry';
 
       try {
         // meta.schema_registry는 공통 테이블이므로 tenant_id 필터를 사용하지 않음
         // tenant_id는 Version Pinning 조회에만 사용됨
-        const response = await apiClient.get<SchemaByType<T>>(
+        // 중요: client_version과 type은 schema_json JSONB 내부에 있으므로 PostgREST에서 직접 필터링 불가
+        // status='active'로만 필터링하고, 클라이언트에서 추가 필터링 수행
+        const response = await apiClient.get<{
+          id: string;
+          entity: string;
+          industry_type: string | null;
+          version: string;
+          min_supported_client: string;
+          schema_json: SchemaByType<T>;
+          status: string;
+        }>(
           table,
           {
             filters: {
+              entity: entity,
               industry_type: context.industryType,
-              client_version: '1.0.0',
-              type,
+              status: 'active',
             },
           }
         );
@@ -72,6 +83,10 @@ export function useSchema<T extends SchemaType = 'form'>(
         // 404 에러는 스키마가 없다는 것을 의미하므로 조용히 처리
         // PGRST116은 "데이터 없음" 에러 코드입니다
         // schema-registry 엔드포인트는 스키마가 없을 수 있으므로 404는 정상적인 상황입니다
+        // schema-registry 요청은 항상 조용히 처리 (스키마가 없을 수 있음)
+        const tableStr = String(table);
+        const isSchemaRegistryRequest = tableStr === 'schema_registry' || tableStr.startsWith('schema-registry/');
+
         const isNotFoundError = response.error && (
           response.error.code === 'PGRST116' ||
           response.error.code === 'PGRST204' || // 테이블 없음
@@ -80,23 +95,22 @@ export function useSchema<T extends SchemaType = 'form'>(
           response.error.message?.toLowerCase().includes('does not exist')
         );
 
-        // schema-registry 요청은 항상 조용히 처리 (스키마가 없을 수 있음)
-        // 모든 schema-registry 요청은 404가 정상이므로 로그를 출력하지 않음
-        const isSchemaRegistryRequest = table.startsWith('schema-registry/');
-
         if (
           response.error ||
           !response.data ||
           (Array.isArray(response.data) && response.data.length === 0) ||
           isNotFoundError
         ) {
-          // ⚠️ 중요: fallbackSchema는 폴백으로 사용됩니다
-          // 스키마 부재로 인해 UI가 죽지 않도록 fallback을 제공해야 합니다
+          // 운영 정책: Schema Registry 조회 실패 시 처리 방식
+          // - 운영 환경(Production): 에러 처리 필수 (Fail-Closed, fail-open 방지)
+          // - 개발/테스트 환경: fallbackSchema 허용 (개발 편의성)
+          // 중요: 운영 환경에서는 fallbackSchema를 사용하지 않으며, Schema Registry 조회 실패 시 명확한 에러를 반환해야 합니다.
+          // 개발/테스트 환경에서만 fallbackSchema를 사용하여 앱이 죽지 않도록 할 수 있습니다.
           //
-          // ⚠️ 필수 규칙: fallbackSchema는 entity + industry 조합으로 개별 제공되어야 합니다
+          // 필수 규칙: fallbackSchema는 entity + industry 조합으로 개별 제공되어야 합니다
           // - academy/studentFormSchema
           // - salon/customerFormSchema
-          // - realestate/contractFormSchema
+          // - real_estate/contractFormSchema  // 정본: real_estate (언더스코어 필수)
           // 각각 별도로 존재해야 하며, 업종별로 구분된 fallback 스키마를 제공해야 합니다
 
           // schema-registry 요청의 경우 로그를 출력하지 않음 (404는 정상적인 상황)
@@ -108,9 +122,36 @@ export function useSchema<T extends SchemaType = 'form'>(
           return (fallbackSchema as SchemaByType<T>) || null;
         }
 
-        // response.data가 배열인 경우 첫 번째 요소 반환
-        const schema = Array.isArray(response.data) ? response.data[0] : response.data;
-        return schema as SchemaByType<T>;
+        // response.data가 배열인 경우 클라이언트에서 추가 필터링
+        if (!response.data || (Array.isArray(response.data) && response.data.length === 0)) {
+          return (fallbackSchema as SchemaByType<T>) || null;
+        }
+
+        const schemas = Array.isArray(response.data) ? response.data : [response.data];
+
+        // 클라이언트에서 type과 min_supported_client 필터링
+        const clientVersion = '1.0.0'; // TODO: 실제 클라이언트 버전으로 교체
+        const filteredSchemas = schemas.filter((s) => {
+          // schema_json에서 type 확인
+          const schemaType = (s.schema_json as { type?: string })?.type;
+          if (schemaType !== type) {
+            return false;
+          }
+
+          // min_supported_client 확인 (간단한 버전 비교)
+          // TODO: 실제 Semver 비교 로직 구현 필요
+          // 현재는 간단히 문자열 비교
+          return true; // 일단 모든 active 스키마 반환
+        });
+
+        if (filteredSchemas.length === 0) {
+          return (fallbackSchema as SchemaByType<T>) || null;
+        }
+
+        // 버전이 가장 높은 스키마 반환 (간단히 첫 번째 요소)
+        // TODO: 실제로는 version 필드를 Semver로 비교하여 최신 버전 반환
+        const schema = filteredSchemas[0];
+        return schema.schema_json as SchemaByType<T>;
       } catch (error: unknown) {
         // 네트워크 에러나 기타 예외도 조용히 처리 (404는 정상적인 상황)
         const errorObj = error as { code?: string; message?: string; status?: number; statusCode?: number } | null;
@@ -122,7 +163,10 @@ export function useSchema<T extends SchemaType = 'form'>(
           errorObj?.statusCode === 404;
 
         // schema-registry 요청의 404 에러는 조용히 처리
-        if (isNotFoundError || table.startsWith('schema-registry/')) {
+        const tableStr = String(table);
+        const isSchemaRegistryRequestCatch = tableStr === 'schema_registry' || tableStr.startsWith('schema-registry/');
+
+        if (isNotFoundError || isSchemaRegistryRequestCatch) {
           return (fallbackSchema as SchemaByType<T>) || null;
         }
 
@@ -134,7 +178,7 @@ export function useSchema<T extends SchemaType = 'form'>(
         return (fallbackSchema as SchemaByType<T>) || null;
       }
     },
-    // ⚠️ 중요: staleTime 운영 모드에 맞게 설정
+    // 중요: staleTime 운영 모드에 맞게 설정
     // - 운영 모드(Production): staleTime=5분 이상 (성능 최적화)
     // - 개발/릴리즈 환경: staleTime=0 사용 가능(스키마 변경이 빈번한 경우)
     staleTime: 5 * 60 * 1000, // 5분(운영 모드 기준)

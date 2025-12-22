@@ -42,7 +42,7 @@ export const autoNotificationSettingsFormSchema: FormSchema = {
         kind: 'checkbox',
         ui: {
           label: '청구 생성 알림 발송',
-          description: '청구서 생성 시 학부모에게 자동으로 알림을 발송합니다.',
+          description: '청구서 생성 시 서버가 학부모에게 알림을 발송합니다.',
           colSpan: 1,
         },
       },
@@ -64,7 +64,7 @@ export const autoNotificationSettingsFormSchema: FormSchema = {
         },
         options: [
           { value: 'sms', label: 'SMS' },
-          { value: 'kakao', label: '카카오 알림톡' },
+          { value: 'kakao_at', label: '카카오 알림톡' },  // SSOT-3: 저장/실행용 코드는 'kakao_at', UI 표시명은 '카카오 알림톡'
         ],
         validation: {
           required: true,

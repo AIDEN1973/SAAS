@@ -12,7 +12,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { useModal } from '@ui-core/react';
-import { useStudentsPaged, useStudentTags, useStudentTagsByStudent, useCreateStudent, useBulkCreateStudents, useStudent, useGuardians, useConsultations, useStudentClasses, useUpdateStudent, useDeleteStudent, useCreateGuardian, useUpdateGuardian, useDeleteGuardian, useCreateConsultation, useUpdateConsultation, useDeleteConsultation, useGenerateConsultationAISummary, useUpdateStudentTags, useAssignStudentToClass, useUnassignStudentFromClass } from '@hooks/use-student';
+import { useStudentsPaged, useStudentTags, useStudentTagsByStudent, useCreateStudent, useBulkCreateStudents, useStudent, useGuardians, fetchGuardians, useConsultations, useStudentClasses, useUpdateStudent, useDeleteStudent, useCreateGuardian, useUpdateGuardian, useDeleteGuardian, useCreateConsultation, useUpdateConsultation, useDeleteConsultation, useGenerateConsultationAISummary, useUpdateStudentTags, useAssignStudentToClass, useUnassignStudentFromClass } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
 import { useSession, useUserRole } from '@hooks/use-auth';
 import { useSchema } from '@hooks/use-schema';

@@ -70,26 +70,26 @@ export const Modal: React.FC<ModalProps> = ({
 
   const sizeMap: Record<'sm' | 'md' | 'lg' | 'xl' | 'full', React.CSSProperties> = {
     sm: {
-      width: isMobile ? '90%' : 'var(--width-modal-sm)', // styles.css 준수: 모달 크기 토큰 사용
-      maxWidth: '90vw',
+      width: isMobile ? 'var(--width-modal-mobile-sm-md)' : 'var(--width-modal-sm)', // styles.css 준수: 모달 크기 토큰 사용
+      maxWidth: 'var(--width-modal-max-sm-md)', // styles.css 준수: 모달 최대 너비 토큰 사용
     },
     md: {
-      width: isMobile ? '90%' : 'var(--width-modal-md)', // styles.css 준수: 모달 크기 토큰 사용
-      maxWidth: '90vw',
+      width: isMobile ? 'var(--width-modal-mobile-sm-md)' : 'var(--width-modal-md)', // styles.css 준수: 모달 크기 토큰 사용
+      maxWidth: 'var(--width-modal-max-sm-md)', // styles.css 준수: 모달 최대 너비 토큰 사용
     },
     lg: {
-      width: isMobile ? '95%' : 'var(--width-modal-lg)', // styles.css 준수: 모달 크기 토큰 사용
-      maxWidth: '95vw',
+      width: isMobile ? 'var(--width-modal-mobile-lg-xl)' : 'var(--width-modal-lg)', // styles.css 준수: 모달 크기 토큰 사용
+      maxWidth: 'var(--width-modal-max-lg-xl)', // styles.css 준수: 모달 최대 너비 토큰 사용
     },
     xl: {
-      width: isMobile ? '95%' : 'var(--width-modal-xl)', // styles.css 준수: 모달 크기 토큰 사용
-      maxWidth: '95vw',
+      width: isMobile ? 'var(--width-modal-mobile-lg-xl)' : 'var(--width-modal-xl)', // styles.css 준수: 모달 크기 토큰 사용
+      maxWidth: 'var(--width-modal-max-lg-xl)', // styles.css 준수: 모달 최대 너비 토큰 사용
     },
     full: {
-      width: '100%',
-      height: '100%',
-      maxWidth: '100vw',
-      maxHeight: '100vh',
+      width: 'var(--width-full)', // styles.css 준수: 전체 너비 토큰 사용
+      height: 'var(--height-full)', // styles.css 준수: 전체 높이 토큰 사용
+      maxWidth: 'var(--width-viewport)', // styles.css 준수: 뷰포트 전체 너비 토큰 사용
+      maxHeight: 'var(--height-viewport)', // styles.css 준수: 뷰포트 전체 높이 토큰 사용
     },
   };
 
@@ -172,7 +172,7 @@ export const Modal: React.FC<ModalProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                lineHeight: 1,
+                lineHeight: 'var(--line-height-tight)', // styles.css 준수: 타이틀과 버튼 수평 정렬용 토큰 사용
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';

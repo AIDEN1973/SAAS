@@ -9,6 +9,7 @@
  */
 
 import { createClient } from '@lib/supabase-client';
+import { withTenant } from '@lib/supabase-client/db';
 import { maskPII } from '@core/pii-utils';
 import type { LoginInput, OAuthLoginInput, OTPLoginInput, LoginResult, TenantSelectionResult, TenantInfo } from './types';
 
@@ -237,6 +238,16 @@ export class LoginService {
     // ⚠️ 중요: tenants 테이블 조인 시 RLS 순환 참조 문제 발생 가능
     // tenants RLS 정책이 user_tenant_roles를 참조하므로 조인 대신 별도 조회
     // 1단계: user_tenant_roles 조회
+    // ⚠️ 중요: 로그인 직후 세션이 생성되었지만, RLS 정책이 적용되려면 세션이 완전히 활성화되어야 함
+    // 세션을 명시적으로 새로고침하여 RLS 정책이 제대로 적용되도록 함
+    const { data: { session: refreshedSession } } = await this.supabase.auth.refreshSession();
+    if (!refreshedSession) {
+      if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+        console.warn('[getUserTenants] 세션 새로고침 실패');
+      }
+      return [];
+    }
+
     const { data: rolesData, error: rolesError } = await this.supabase
       .from('user_tenant_roles')
       .select('tenant_id, role')
@@ -307,15 +318,9 @@ export class LoginService {
           .in('id', tenantIds);
 
         if (tenantsError) {
-          if (typeof window !== 'undefined' && import.meta.env?.DEV) {
-            console.warn('[getUserTenants] tenants 조회 실패, role 정보만 반환:', tenantsError.message);
-          }
-          return retryData.map((r: { tenant_id: string; role: string }) => ({
-            id: r.tenant_id,
-            name: '알 수 없음',
-            industry_type: 'unknown' as const,
-            role: r.role,
-          }));
+          // Core Auth는 industry_type을 결정하지 않음
+          // tenants 조회 실패 시 에러 throw
+          throw new Error(`Failed to fetch tenant information: ${tenantsError.message}`);
         }
 
         const tenantMap = new Map<string, { id: string; name: string; industry_type: string }>(
@@ -325,13 +330,10 @@ export class LoginService {
         return retryData
           .map((role: { tenant_id: string; role: string }): TenantInfo | null => {
             const tenant = tenantMap.get(role.tenant_id);
-            if (!tenant) {
-              return {
-                id: role.tenant_id,
-                name: '알 수 없음',
-                industry_type: 'academy' as const,
-                role: role.role,
-              };
+            if (!tenant || !tenant.industry_type) {
+              // Core Auth는 industry_type을 결정하지 않음
+              // tenant 정보가 없거나 industry_type이 없으면 에러 throw
+              throw new Error(`Tenant industry_type is required for tenant_id: ${role.tenant_id}`);
             }
             return {
               id: tenant.id,
@@ -358,13 +360,42 @@ export class LoginService {
       }
 
       if (typeof window !== 'undefined' && import.meta.env?.DEV) {
-        console.error('[getUserTenants] 테넌트 목록 조회 실패:', rolesError);
+        console.error('[getUserTenants] 테넌트 목록 조회 실패:', {
+          error: rolesError,
+          errorCode: rolesError.code,
+          errorMessage: rolesError.message,
+          userId,
+          hasSession: !!refreshedSession,
+          sessionUserId: refreshedSession?.user?.id,
+        });
+        console.log('[getUserTenants] 디버깅 정보:');
+        console.log('  1. user_tenant_roles 테이블에 레코드가 있는지 확인:');
+        console.log('     SELECT * FROM user_tenant_roles WHERE user_id = \'' + userId + '\';');
+        console.log('  2. RLS 정책 확인:');
+        console.log('     SELECT * FROM pg_policies WHERE tablename = \'user_tenant_roles\';');
+        console.log('  3. 세션 확인:');
+        console.log('     auth.uid() = \'' + refreshedSession?.user?.id + '\'');
       }
       // 오류를 throw하지 않고 빈 배열 반환 (사용자 경험 개선)
       return [];
     }
 
     if (!rolesData || rolesData.length === 0) {
+      if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+        console.warn('[getUserTenants] user_tenant_roles에 레코드가 없습니다:', {
+          userId,
+          sessionUserId: refreshedSession?.user?.id,
+          hasSession: !!refreshedSession,
+        });
+        console.log('[getUserTenants] 가능한 원인:');
+        console.log('  1. 회원가입 시 테넌트가 생성되지 않았을 수 있음');
+        console.log('  2. user_tenant_roles에 레코드가 없을 수 있음');
+        console.log('  3. RLS 정책 때문에 조회가 안 될 수 있음');
+        console.log('  → Supabase Dashboard에서 확인:');
+        console.log('     - Authentication > Users: 사용자 확인');
+        console.log('     - Table Editor > user_tenant_roles: 테넌트 관계 확인');
+        console.log('     - Table Editor > tenants: 테넌트 확인');
+      }
       return [];
     }
 
@@ -380,13 +411,9 @@ export class LoginService {
       .in('id', tenantIds);
 
     if (tenantsError) {
-      // tenants 조회 실패 시 role 정보만 반환
-      return rolesData.map((r: { tenant_id: string; role: string }) => ({
-        id: r.tenant_id,
-        name: '알 수 없음',
-        industry_type: 'unknown' as const,
-        role: r.role,
-      }));
+      // SSOT-2: industry_type의 1차 소스는 public.tenants.industry_type입니다.
+      // Core Auth는 tenants 테이블에서 industry_type을 조회하며, 조회 실패 시 에러 throw
+      throw new Error(`Failed to fetch tenant information: ${tenantsError.message}`);
     }
 
     // 3단계: 결과 병합
@@ -397,14 +424,10 @@ export class LoginService {
     return rolesData
       .map((role: { tenant_id: string; role: string }): TenantInfo | null => {
         const tenant = tenantMap.get(role.tenant_id);
-        if (!tenant) {
-          // tenant 정보가 없으면 role 정보만 반환
-          return {
-            id: role.tenant_id,
-            name: '알 수 없음',
-            industry_type: 'academy' as const, // 기본값
-            role: role.role,
-          };
+        if (!tenant || !tenant.industry_type) {
+          // SSOT-2: industry_type의 1차 소스는 public.tenants.industry_type입니다.
+          // tenant 정보가 없거나 industry_type이 없으면 에러 throw
+          throw new Error(`Tenant industry_type is required for tenant_id: ${role.tenant_id}`);
         }
 
         return {
@@ -444,12 +467,13 @@ export class LoginService {
     // 사용자가 해당 테넌트에 접근 권한이 있는지 확인
     // ⚠️ 참고: user_tenant_roles는 user_id와 tenant_id 조합으로 조회하므로
     // withTenant() 대신 직접 필터링 (user_id는 세션에서 가져옴)
-    const { data: roleData, error: roleError } = await this.supabase
+    const { data: roleData, error: roleError } = await withTenant(
+      this.supabase
       .from('user_tenant_roles')
       .select('role')
-      .eq('user_id', session.user.id)
-      .eq('tenant_id', tenantId)
-      .single();
+        .eq('user_id', session.user.id),
+      tenantId
+    ).single();
 
     if (roleError || !roleData) {
       throw new Error('해당 테넌트에 접근 권한이 없습니다.');
@@ -458,11 +482,13 @@ export class LoginService {
     // ⚠️ 중요: user_tenant_roles의 updated_at을 업데이트하여
     // Custom JWT Claims Hook이 가장 최근 선택한 테넌트를 JWT claim에 포함하도록 함
     // 참조: infra/supabase/migrations/064_create_custom_jwt_claims.sql
-    await this.supabase
+    await withTenant(
+      this.supabase
       .from('user_tenant_roles')
       .update({ updated_at: new Date().toISOString() })
-      .eq('user_id', session.user.id)
-      .eq('tenant_id', tenantId);
+        .eq('user_id', session.user.id),
+      tenantId
+    );
 
     // 세션 새로고침 (JWT claim 업데이트는 Edge Function에서 처리)
     // Rate limit 에러 방지를 위해 재시도 로직 추가

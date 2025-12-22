@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import { AppLayout, Button, useModal, useTheme } from '@ui-core/react';
+import { AppLayout, Button, useModal, useTheme, AIToggle } from '@ui-core/react';
 import type { SidebarItem } from '@ui-core/react';
 import { StudentsHomePage } from './pages/StudentsHomePage';
 import { StudentsListPage } from './pages/StudentsListPage';
@@ -18,6 +18,7 @@ import { StudentTasksPage } from './pages/StudentTasksPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
 import { TenantSelectionPage } from './pages/TenantSelectionPage';
+import { AutomationSettingsPage } from './pages/AutomationSettingsPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleBasedRoute } from './components/RoleBasedRoute';
 import { useLogout, useUserRole } from '@hooks/use-auth';
@@ -117,6 +118,17 @@ function AppContent() {
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect width="20" height="14" x="2" y="5" rx="2"/>
                 <line x1="2" x2="22" y1="10" y2="10"/>
+              </svg>
+            ),
+          },
+          {
+            id: 'automation-settings-advanced',
+            label: '자동화 설정',
+            path: '/settings/automation',
+            icon: (
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                <circle cx="12" cy="12" r="3"/>
               </svg>
             ),
           },
@@ -307,13 +319,16 @@ function AppContent() {
               header={{
                 title: '디어쌤 학원관리',
                 rightContent: (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleLogout}
-                  >
-                    로그아웃
-                  </Button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+                    <AIToggle />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleLogout}
+                    >
+                      로그아웃
+                    </Button>
+                  </div>
                 ),
               }}
               sidebar={{
@@ -344,6 +359,7 @@ function AppContent() {
                 <Route path="/notifications" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'staff', 'manager', 'super_admin']}><NotificationsPage /></RoleBasedRoute>} />
                 <Route path="/analytics" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><AnalyticsPage /></RoleBasedRoute>} />
                 <Route path="/ai" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'counselor', 'staff', 'manager', 'super_admin']}><AIPage /></RoleBasedRoute>} />
+                <Route path="/settings/automation" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'super_admin']}><AutomationSettingsPage /></RoleBasedRoute>} />
                 <Route
                   path="/super-admin"
                   element={

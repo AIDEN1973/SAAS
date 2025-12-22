@@ -9,6 +9,7 @@
  */
 
 import { createServerClient } from '@lib/supabase-client/server';
+import { withTenant } from '@lib/supabase-client/db';
 import type { UISchema } from '@schema-engine';
 import { SchemaRegistryClient, type SchemaRegistryEntry } from '@schema-engine';
 
@@ -220,16 +221,16 @@ export class SchemaRegistryService {
     entity: string,
     industryType: string | null
   ): Promise<{ pinned_version: string } | null> {
-    // ⚠️ 참고: meta.tenant_schema_pins는 tenant_id로 필터링하지만,
-    // withTenant()는 일반 테이블용이므로 직접 필터링 사용
-    // (meta 스키마는 RLS 정책이 다를 수 있음)
-    const { data, error } = await this.supabase
+    // ⚠️ 참고: meta.tenant_schema_pins는 tenant_id로 필터링
+    // (meta 스키마는 RLS 정책이 다를 수 있지만, 규칙에 따라 withTenant() 사용)
+    const { data, error } = await withTenant(
+      this.supabase
       .from('meta.tenant_schema_pins')
       .select('pinned_version')
-      .eq('tenant_id', tenantId)
       .eq('entity', entity)
-      .eq('industry_type', industryType || null)
-      .single();
+        .eq('industry_type', industryType || null),
+      tenantId
+    ).single();
 
     if (error) {
       if (error.code === 'PGRST116') {
@@ -275,15 +276,16 @@ export class SchemaRegistryService {
     entity: string,
     industryType: string | null
   ): Promise<void> {
-    // ⚠️ 참고: meta.tenant_schema_pins는 tenant_id로 필터링하지만,
-    // withTenant()는 일반 테이블용이므로 직접 필터링 사용
-    // (meta 스키마는 RLS 정책이 다를 수 있음)
-    const { error } = await this.supabase
+    // ⚠️ 참고: meta.tenant_schema_pins는 tenant_id로 필터링
+    // (meta 스키마는 RLS 정책이 다를 수 있지만, 규칙에 따라 withTenant() 사용)
+    const { error } = await withTenant(
+      this.supabase
       .from('meta.tenant_schema_pins')
       .delete()
-      .eq('tenant_id', tenantId)
       .eq('entity', entity)
-      .eq('industry_type', industryType || null);
+        .eq('industry_type', industryType || null),
+      tenantId
+    );
 
     if (error) {
       throw new Error(`Failed to unpin schema version: ${error.message}`);

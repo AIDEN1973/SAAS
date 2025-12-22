@@ -21,8 +21,9 @@ import { ErrorBoundary, Container, Card, Button, Badge, PageHeader } from '@ui-c
 import { Grid } from '@ui-core/react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
+import { fetchBillingHistory } from '@hooks/use-billing';
 import { toKST } from '@lib/date-utils';
-import type { Invoice } from '@core/billing';
+import type { BillingHistoryItem } from '@hooks/use-billing';
 
 interface BillingHomeCard {
   id: string;
@@ -50,13 +51,12 @@ export function BillingHomePage() {
       const currentMonth = toKST().format('YYYY-MM');
 
       // 이번 달 청구서 조회
-      const invoicesResponse = await apiClient.get<Invoice[]>('invoices', {
-        filters: {
-          period_start: { gte: `${currentMonth}-01` },
-        },
+      // 정본 규칙: fetchBillingHistory 함수 사용 (Hook의 queryFn 로직 재사용)
+      const invoices = await fetchBillingHistory(tenantId, {
+        period_start: { gte: `${currentMonth}-01` },
       });
 
-      const hasInvoicesThisMonth = !invoicesResponse.error && invoicesResponse.data && invoicesResponse.data.length > 0;
+      const hasInvoicesThisMonth = invoices && invoices.length > 0;
 
       if (!hasInvoicesThisMonth) {
         // "준비 중" 상태 처리 (아키텍처 문서 3.4.1 참조)
@@ -72,7 +72,6 @@ export function BillingHomePage() {
         ];
       }
 
-      const invoices = (invoicesResponse.data || []) as unknown as Invoice[];
 
       // 1. 결제수단 미등록 체크 (TODO: payment_methods 테이블 구현 후 활성화)
       // const paymentMethodsResponse = await apiClient.get<any>('payment_methods', {});
@@ -89,9 +88,9 @@ export function BillingHomePage() {
 
       // 2. 긴급 알림 (미납 7일 이상)
       // 기술문서 5-2: KST 기준 날짜 처리
-      const overdueInvoices = invoices.filter((inv: Invoice) => {
+      const overdueInvoices = invoices.filter((inv: BillingHistoryItem) => {
         if (inv.status !== 'overdue') return false;
-        const dueDateKST = toKST(inv.due_date);
+        const dueDateKST = toKST(inv.period_end);
         const nowKST = toKST();
         const daysOverdue = nowKST.diff(dueDateKST, 'days');
         return daysOverdue >= 7;
@@ -109,8 +108,8 @@ export function BillingHomePage() {
       }
 
       // 3. 이번달 예상 수납률
-      const totalAmount = invoices.reduce((sum: number, inv: Invoice) => sum + (inv.amount || 0), 0);
-      const paidAmount = invoices.reduce((sum: number, inv: Invoice) => sum + ((inv as Invoice & { amount_paid?: number }).amount_paid || 0), 0);
+      const totalAmount = invoices.reduce((sum: number, inv: BillingHistoryItem) => sum + (inv.amount || 0), 0);
+      const paidAmount = invoices.reduce((sum: number, inv: BillingHistoryItem) => sum + (inv.amount_paid || 0), 0);
       const expectedCollectionRate = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
 
       cards.push({
@@ -123,7 +122,7 @@ export function BillingHomePage() {
       });
 
       // 4. 자동 청구 진행 현황
-      const autoBillingInvoices = invoices.filter((inv: Invoice & { auto_billing_enabled?: boolean }) => inv.auto_billing_enabled);
+      const autoBillingInvoices = invoices.filter((inv: BillingHistoryItem & { auto_billing_enabled?: boolean }) => inv.auto_billing_enabled);
       const autoBillingProgress = invoices.length > 0
         ? Math.round((autoBillingInvoices.length / invoices.length) * 100)
         : 0;
@@ -139,7 +138,7 @@ export function BillingHomePage() {
       });
 
       // 5. 결제 현황 요약
-      const paymentCount = invoices.filter((inv: Invoice) => inv.status === 'paid').length;
+      const paymentCount = invoices.filter((inv: BillingHistoryItem) => inv.status === 'paid').length;
       cards.push({
         id: 'payment-summary',
         type: 'payment_summary',

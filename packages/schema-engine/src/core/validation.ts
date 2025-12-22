@@ -1,9 +1,9 @@
 /**
  * Validation Rules Builder
- * 
+ *
  * [불변 규칙] React Hook Form의 validation rules를 스키마에서 생성합니다.
  * [불변 규칙] 동적 required는 정적 required보다 우선합니다.
- * 
+ *
  * 기술문서: docu/스키마엔진.txt 8. Renderer 통합
  */
 
@@ -12,7 +12,7 @@ import type { RegisterOptions } from 'react-hook-form';
 
 /**
  * FormFieldSchema에서 React Hook Form validation rules 생성
- * 
+ *
  * @param field - FormFieldSchema
  * @returns React Hook Form RegisterOptions
  */
@@ -78,7 +78,7 @@ export function buildValidationRules(
   }
 
   // Registry 기반 스키마에는 함수는 undefined입니다.
-  // validate 함수는 fallbackSchema(로컬 TypeScript 파일)에서만 사용 가능합니다.
+  // validate 함수는 fallbackSchema(개발/테스트 환경 전용)에서만 사용 가능합니다. 운영 환경에서는 Schema Registry 조회 실패 시 에러 처리 필수입니다.
   if (field.validation?.validate) {
     // Registry 기반 스키마에 validate가 존재하면 경고 (이론적으로는 불가능하지만 방어 코드)
     if (typeof field.validation.validate === 'function') {
@@ -87,7 +87,7 @@ export function buildValidationRules(
     } else {
       console.warn(
         `[Schema Engine] Field "${field.name}": validate 함수는 Registry 기반 스키마에는 사용할 수 없습니다. ` +
-        `fallbackSchema(로컬 TypeScript 파일)에서만 사용 가능합니다.`
+        `fallbackSchema는 개발/테스트 환경에서만 허용되며, 운영 환경에서는 Schema Registry 조회 실패 시 에러 처리 필수입니다.`
       );
     }
   }

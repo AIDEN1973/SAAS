@@ -13,26 +13,14 @@ import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary, Container, Card, Button, useModal, PageHeader } from '@ui-core/react';
 import { Grid } from '@ui-core/react';
 import { StudentTaskCard } from '../components/StudentTaskCard';
-import { useStudentTaskCards, useCompleteStudentTaskCard } from '@hooks/use-student';
-import type { StudentTaskCard as StudentTaskCardType } from '@hooks/use-student';
+import { useStudentTaskCards, useStudentTaskCardAction } from '@hooks/use-student';
 
 export function StudentTasksPage() {
   const navigate = useNavigate();
   const { showAlert } = useModal();
   const { data: cardsData, isLoading, error } = useStudentTaskCards();
   const cards = cardsData || [];
-  const completeTaskCard = useCompleteStudentTaskCard();
-
-  const handleCardAction = async (card: StudentTaskCardType) => {
-    try {
-      await completeTaskCard.mutateAsync(card.id);
-      if (card.action_url) {
-        navigate(card.action_url);
-      }
-    } catch (error) {
-      showAlert('오류', error instanceof Error ? error.message : '업무 카드 처리에 실패했습니다.');
-    }
-  };
+  const getCardActionUrl = useStudentTaskCardAction();
 
   return (
     <ErrorBoundary>
@@ -68,7 +56,13 @@ export function StudentTasksPage() {
               <StudentTaskCard
                 key={card.id}
                 card={card}
-                onAction={handleCardAction}
+                onAction={(card) => {
+                  // 정본 규칙: 컴포넌트 레벨에서 navigate 호출 (Hook 내부 호출 금지)
+                  const actionUrl = getCardActionUrl(card);
+                  if (actionUrl) {
+                    navigate(actionUrl);
+                  }
+                }}
               />
             ))}
           </Grid>
@@ -78,7 +72,7 @@ export function StudentTasksPage() {
           <Card padding="lg" variant="default">
             <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>
               <p style={{ marginBottom: 'var(--spacing-md)' }}>
-                현재 처리할 학생 업무가 없습니다.
+                현재 발생한 학생 업무가 없습니다.
               </p>
             </div>
           </Card>

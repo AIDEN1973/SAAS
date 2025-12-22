@@ -5,7 +5,13 @@
  * [불변 규칙] Core Layer는 Industry 모듈에 의존하지 않음
  */
 
-export type EntityType = 'student' | 'customer' | 'property' | 'donor' | 'other';
+export type EntityType =
+  | 'learner'  // 업종 중립 정본 키 (academy: 학생, salon: 고객 등)
+  | 'student'  // backward compatibility (deprecated, use learner)
+  | 'customer'
+  | 'property'
+  | 'donor'
+  | 'other';
 
 export interface Tag {
   id: string;

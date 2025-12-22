@@ -10,7 +10,7 @@ CREATE TABLE public.user_tenant_roles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  role text NOT NULL CHECK (role IN ('owner', 'admin', 'sub_admin', 'teacher', 'assistant', 'counselor', 'parent', 'staff')),
+  role text NOT NULL CHECK (role IN ('owner', 'admin', 'sub_admin', 'teacher', 'assistant', 'counselor', 'parent', 'staff')),  -- ⚠️ 레거시: instructor/guardian 누락. 최신 SSOT는 000_create_core_tables.sql 참조
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(user_id, tenant_id)  -- 한 사용자는 한 테넌트에 하나의 역할만
@@ -43,12 +43,12 @@ ANALYZE public.user_tenant_roles;
 NOTIFY pgrst, 'reload schema';
 
 -- 10. 테이블 생성 확인
-SELECT 
+SELECT
   schemaname,
   tablename,
   tableowner
 FROM pg_tables
-WHERE schemaname = 'public' 
+WHERE schemaname = 'public'
   AND tablename = 'user_tenant_roles';
 
 

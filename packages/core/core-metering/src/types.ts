@@ -1,11 +1,16 @@
 /**
  * Core Metering Types
- * 
+ *
  * ?용??계측 (출결 건수, 문자발송 ?? ?성 모듈 ?? ?용??????
  * [불변 규칙] Core Layer는 Industry 모듈에 의존?? ?음
  */
 
-export type MetricType = 'attendance_count' | 'sms_count' | 'active_modules' | 'user_count';
+export type MetricType =
+  | 'presence_count'  // 업종 중립 정본 키 (academy: 출결, salon: 방문 등)
+  | 'attendance_count'  // backward compatibility (deprecated, use presence_count)
+  | 'sms_count'
+  | 'active_modules'
+  | 'user_count';
 
 export interface UsageMetric {
   id: string;

@@ -25,6 +25,7 @@ function excludeServerCode(): Plugin {
       // 서버 전용 모듈을 빈 모듈로 대체
       if (
         id.includes('/server') ||
+        id === '@env-registry/server' ||
         id === '@env-registry/core/server' ||
         id === '@lib/supabase-client/server' ||
         id === '@core/schema-registry' ||
@@ -37,9 +38,11 @@ function excludeServerCode(): Plugin {
         id.includes('core-tags/src/service') ||
         id.includes('core-party/src/service') ||
         id.includes('industry-academy/src/service') ||
+        id.includes('industry-academy/src/seed') ||
         id === '@core/tags/service' ||
         id === '@core/party/service' ||
         id === '@industry/academy/service' ||
+        id === '@industry/academy/seed' ||
         id.startsWith('@services/')
       ) {
         // 클라이언트 빌드에서는 빈 모듈 반환
@@ -81,7 +84,7 @@ function excludeServerCode(): Plugin {
         id.includes('class-service') ||
         (id.includes('core-tags') && id.includes('/service')) ||
         (id.includes('core-party') && id.includes('/service')) ||
-        (id.includes('industry-academy') && id.includes('/service'))
+        (id.includes('industry-academy') && (id.includes('/service') || id.includes('/seed')))
       ) {
         return 'export default {};';
       }
@@ -193,7 +196,9 @@ export default defineConfig(({ mode }) => {
     exclude: [
       // 서버 전용 코드는 클라이언트 번들에서 제외
       '@lib/supabase-client/server',
+      '@env-registry/server',
       '@env-registry/core/server',
+      '@industry/academy/seed',
     ],
     include: [
       // xlsx 패키지를 명시적으로 포함
@@ -212,6 +217,11 @@ export default defineConfig(({ mode }) => {
       { find: '@lib/supabase-client/server', replacement: path.resolve(__dirname, '../../packages/lib/supabase-client/src/server.ts') },
       { find: '@lib/supabase-client/db', replacement: path.resolve(__dirname, '../../packages/lib/supabase-client/src/db.ts') },
       { find: '@lib/supabase-client', replacement: path.resolve(__dirname, '../../packages/lib/supabase-client/src') },
+      { find: '@env-registry/server', replacement: path.resolve(__dirname, '../../packages/env-registry/src/server.ts') },
+      { find: '@env-registry/client', replacement: path.resolve(__dirname, '../../packages/env-registry/src/client.ts') },
+      { find: '@env-registry/common', replacement: path.resolve(__dirname, '../../packages/env-registry/src/common.ts') },
+      { find: '@env-registry', replacement: path.resolve(__dirname, '../../packages/env-registry/src') },
+      // 하위 호환성을 위한 deprecated 경로 (점진적 제거 예정)
       { find: '@env-registry/core/server', replacement: path.resolve(__dirname, '../../packages/env-registry/src/server.ts') },
       { find: '@env-registry/core', replacement: path.resolve(__dirname, '../../packages/env-registry/src') },
       { find: '@core/auth', replacement: path.resolve(__dirname, '../../packages/core/core-auth/src') },
@@ -247,6 +257,7 @@ export default defineConfig(({ mode }) => {
     rollupOptions: {
       // 서버 전용 코드를 external로 처리하여 클라이언트 번들에서 제외
       external: [
+        '@env-registry/server',
         '@env-registry/core/server',
         '@lib/supabase-client/server',
         '@services/student-service',

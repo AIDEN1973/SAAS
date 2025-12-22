@@ -18,6 +18,11 @@ export interface CardProps {
   variant?: 'default' | 'elevated' | 'outlined';
   onMouseEnter?: (e: React.MouseEvent<HTMLDivElement>) => void;
   onMouseLeave?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
+  tabIndex?: number;
+  'aria-label'?: string;
+  /** 롤오버 효과 비활성화 (transform 효과 제거) */
+  disableHoverEffect?: boolean;
   /** 카드 내부 타이틀 (타이틀 하단에 구분선 자동 추가) */
   title?: React.ReactNode;
   /** 타이틀 위치 (기본값: 'top-left') */
@@ -37,6 +42,10 @@ export const Card: React.FC<CardProps> = ({
   variant = 'default',
   onMouseEnter,
   onMouseLeave,
+  onKeyDown,
+  tabIndex,
+  'aria-label': ariaLabel,
+  disableHoverEffect = false,
   title,
   titlePosition = 'top-left',
   titleIcon,
@@ -81,15 +90,20 @@ export const Card: React.FC<CardProps> = ({
     // (하드코딩 금지: spacing 토큰 사용)
     paddingBottom: `calc(${basePadding} + var(--spacing-sm))`,
     ...variantStyles[variant],
-    ...(onClick && {
+    ...(onClick && !disableHoverEffect && {
       cursor: 'pointer',
       transition: 'var(--transition-all)', // styles.css 준수: transition 토큰 사용
+    }),
+    ...(onClick && disableHoverEffect && {
+      cursor: 'pointer',
+      transition: 'none', // 롤오버 효과 비활성화 시 transition 제거
+      transform: 'none', // 롤오버 효과 비활성화 시 transform 제거
     }),
     ...style,
   };
 
   const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (onClick) {
+    if (onClick && !disableHoverEffect) {
       e.currentTarget.style.boxShadow = 'none';
       e.currentTarget.style.transform = 'var(--transform-lift-hover)'; // styles.css 준수: transform 토큰 사용
     }
@@ -97,7 +111,7 @@ export const Card: React.FC<CardProps> = ({
   };
 
   const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (onClick) {
+    if (onClick && !disableHoverEffect) {
       e.currentTarget.style.boxShadow = 'none';
       e.currentTarget.style.transform = 'var(--transform-scale-normal)'; // styles.css 준수: transform 토큰 사용
     }
@@ -122,8 +136,23 @@ export const Card: React.FC<CardProps> = ({
       className={clsx(className)}
       style={cardStyle}
       onClick={onClick}
-      onMouseEnter={onClick || onMouseEnter ? handleMouseEnter : undefined}
-      onMouseLeave={onClick || onMouseLeave ? handleMouseLeave : undefined}
+      onMouseEnter={
+        disableHoverEffect
+          ? onMouseEnter
+          : onClick || onMouseEnter
+          ? handleMouseEnter
+          : undefined
+      }
+      onMouseLeave={
+        disableHoverEffect
+          ? onMouseLeave
+          : onClick || onMouseLeave
+          ? handleMouseLeave
+          : undefined
+      }
+      onKeyDown={onKeyDown}
+      tabIndex={tabIndex}
+      aria-label={ariaLabel}
     >
       {title && (
         <>

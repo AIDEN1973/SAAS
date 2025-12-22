@@ -25,16 +25,16 @@ import type { Tag, TagAssignment } from '@core/tags';
 import type { Person } from '@core/party';
 
 /**
- * 학생 목록 조회 Hook
- * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ * 학생 목록 조회 함수 (Hook의 queryFn 로직을 재사용)
+ * [불변 규칙] useQuery 내부에서도 이 함수를 사용하여 일관성 유지
+ *
+ * 주의: 이 함수는 복잡한 필터링 로직을 포함하므로, 간단한 persons 조회가 필요한 경우
+ * fetchPersons 함수를 사용하세요.
  */
-export function useStudents(filter?: StudentFilter) {
-  const context = getApiContext();
-  const tenantId = context.tenantId;
-
-  return useQuery({
-    queryKey: ['students', tenantId, filter],
-    queryFn: async () => {
+export async function fetchStudents(
+  tenantId: string,
+  filter?: StudentFilter
+): Promise<Student[]> {
       // 필터가 있으면 먼저 "ID 집합"을 좁혀서 persons 조회 정확도를 보장
       // (특히 status/grade는 academy_students에 있으므로, 최신 100명 제한에서 누락되는 문제 방지)
       let restrictedStudentIds: string[] | undefined;
@@ -224,11 +224,59 @@ export function useStudents(filter?: StudentFilter) {
       // 태그 필터는 상단에서 restrictedStudentIds로 1차 제한 처리 (여기서는 재필터링 불필요)
 
       return students;
-    },
+}
+
+/**
+ * 학생 목록 조회 Hook
+ * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ */
+export function useStudents(filter?: StudentFilter) {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+
+  return useQuery({
+    queryKey: ['students', tenantId, filter],
+    queryFn: () => fetchStudents(tenantId!, filter),
     enabled: !!tenantId,
     staleTime: 30 * 1000, // 30초간 캐시 유지 (검색 성능 최적화)
     gcTime: 5 * 60 * 1000, // 5분간 가비지 컬렉션 방지 (이전 cacheTime)
   });
+}
+
+/**
+ * 간단한 persons 조회 함수 (useQuery 내부에서 사용)
+ * [불변 규칙] useQuery 내부에서도 이 함수를 사용하여 일관성 유지
+ *
+ * 주의: 이 함수는 복잡한 필터링 없이 persons 테이블만 조회합니다.
+ * 학생 정보가 필요한 경우 fetchStudents를 사용하세요.
+ */
+export async function fetchPersons(
+  tenantId: string,
+  filter?: { person_type?: string; id?: string | string[]; created_at?: { lte?: string } }
+): Promise<Person[]> {
+  if (!tenantId) return [];
+
+  const filters: Record<string, unknown> = {};
+  if (filter?.person_type) {
+    filters.person_type = filter.person_type;
+  }
+  if (filter?.id) {
+    filters.id = filter.id;
+  }
+  if (filter?.created_at) {
+    filters.created_at = filter.created_at;
+  }
+
+  const response = await apiClient.get<Person>('persons', {
+    filters,
+    limit: 5000,
+  });
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  return (response.data || []) as Person[];
 }
 
 /**
@@ -891,7 +939,9 @@ export function useUpdateStudent() {
     },
     onSuccess: (data) => {
       // 학생 목록 및 상세 쿼리 무효화
+      // students-paged 쿼리도 무효화하여 테이블에 즉시 반영되도록 함
       queryClient.invalidateQueries({ queryKey: ['students', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['students-paged', tenantId] });
       queryClient.invalidateQueries({
         queryKey: ['student', tenantId, data.id],
       });
@@ -952,6 +1002,36 @@ export function useDeleteStudent() {
 }
 
 /**
+ * 보호자 목록 조회 함수 (Hook의 queryFn 로직을 재사용)
+ * [불변 규칙] useQuery 내부에서도 이 함수를 사용하여 일관성 유지
+ */
+export async function fetchGuardians(
+  tenantId: string,
+  filter?: { student_id?: string | string[]; is_primary?: boolean }
+): Promise<Guardian[]> {
+  if (!tenantId) return [];
+
+  const filters: Record<string, unknown> = {};
+  if (filter?.student_id) {
+    filters.student_id = filter.student_id;
+  }
+  if (filter?.is_primary !== undefined) {
+    filters.is_primary = filter.is_primary;
+  }
+
+  const response = await apiClient.get<Guardian>('guardians', {
+    filters,
+    orderBy: { column: 'is_primary', ascending: false },
+  });
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  return (response.data || []) as Guardian[];
+}
+
+/**
  * 보호자 목록 조회 Hook
  * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
  */
@@ -961,20 +1041,7 @@ export function useGuardians(studentId: string | null) {
 
   return useQuery({
     queryKey: ['guardians', tenantId, studentId],
-    queryFn: async () => {
-      if (!studentId) return [];
-
-      const response = await apiClient.get('guardians', {
-        filters: { student_id: studentId },
-        orderBy: { column: 'is_primary', ascending: false },
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-
-      return response.data || [];
-    },
+    queryFn: () => fetchGuardians(tenantId!, studentId ? { student_id: studentId } : undefined),
     enabled: !!tenantId && !!studentId,
   });
 }
@@ -1011,7 +1078,9 @@ export function useStudentTags() {
       return sorted.map((tag: Tag) => ({
         id: tag.id,
         name: tag.name,
-        color: tag.color || '#3b82f6',
+        // 정본 규칙: 하드코딩 금지, CSS 변수 사용
+        // tag.color이 없으면 CSS 변수 문자열을 반환 (런타임에 CSS 변수 값으로 해석됨)
+        color: tag.color || 'var(--color-primary)',
       }));
     },
     enabled: !!tenantId,
@@ -1061,12 +1130,43 @@ export function useStudentTagsByStudent(studentId: string | null) {
         return {
           id: tagData.id,
           name: tagData.name,
-          color: tagData.color || '#3b82f6',
+          // 정본 규칙: 하드코딩 금지, CSS 변수 사용
+          // tag.color이 없으면 CSS 변수 문자열을 반환 (런타임에 CSS 변수 값으로 해석됨)
+          color: tagData.color || 'var(--color-primary)',
         };
       });
     },
     enabled: !!tenantId && !!studentId,
   });
+}
+
+/**
+ * 상담기록 목록 조회 함수 (Hook의 queryFn 로직을 재사용)
+ * [불변 규칙] useQuery 내부에서도 이 함수를 사용하여 일관성 유지
+ */
+export async function fetchConsultations(
+  tenantId: string,
+  filter?: { student_id?: string; consultation_date?: { gte?: string; lte?: string } }
+): Promise<StudentConsultation[]> {
+  const filters: Record<string, unknown> = {};
+  if (filter?.student_id) {
+    filters.student_id = filter.student_id;
+  }
+  if (filter?.consultation_date) {
+    filters.consultation_date = filter.consultation_date;
+  }
+
+  const response = await apiClient.get<StudentConsultation>('student_consultations', {
+    filters,
+    orderBy: { column: 'consultation_date', ascending: false },
+    limit: 100,
+  });
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  return (response.data || []) as StudentConsultation[];
 }
 
 /**
@@ -1079,20 +1179,7 @@ export function useConsultations(studentId: string | null) {
 
   return useQuery({
     queryKey: ['consultations', tenantId, studentId],
-    queryFn: async () => {
-      if (!studentId) return [];
-
-      const response = await apiClient.get('student_consultations', {
-        filters: { student_id: studentId },
-        orderBy: { column: 'consultation_date', ascending: false },
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-
-      return response.data || [];
-    },
+    queryFn: () => fetchConsultations(tenantId!, studentId ? { student_id: studentId } : undefined),
     enabled: !!tenantId && !!studentId,
   });
 }
@@ -1194,10 +1281,10 @@ export function useDeleteConsultation() {
 }
 
 /**
- * 상담기록 AI 요약 생성 Hook
+ * 서버가 상담기록 AI 요약 생성하는 Hook
  * [요구사항] 상담기록 AI 요약 버튼 추가
  *
- * [불변 규칙] Edge Function을 통해 AI 요약 생성
+ * [불변 규칙] Edge Function을 통해 서버가 AI 요약 생성
  * [불변 규칙] Zero-Trust: JWT는 사용자 세션에서 가져옴
  */
 export function useGenerateConsultationAISummary() {
@@ -1224,7 +1311,7 @@ export function useGenerateConsultationAISummary() {
       }
 
       // Supabase URL 가져오기
-      const { envClient } = await import('@env-registry/core/client');
+      const { envClient } = await import('@env-registry/client');
       const supabaseUrl = envClient.NEXT_PUBLIC_SUPABASE_URL;
       if (!supabaseUrl) {
         throw new Error('Supabase 설정이 완료되지 않았습니다.');
@@ -1245,7 +1332,7 @@ export function useGenerateConsultationAISummary() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: '알 수 없는 오류가 발생했습니다.' }));
-        throw new Error(errorData.error || `AI 요약 생성 실패: ${response.status}`);
+        throw new Error(errorData.error || `서버가 AI 요약 생성 실패: ${response.status}`);
       }
 
       const data = await response.json();
@@ -1274,8 +1361,8 @@ export function useCreateGuardian() {
       studentId: string;
       guardian: Omit<Guardian, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>;
     }) => {
-      console.group('🔍 [useCreateGuardian] 학부모 생성 디버깅');
-      console.log('📋 입력 데이터:', {
+      console.group('[useCreateGuardian] 학부모 생성 디버깅');
+      console.log('입력 데이터:', {
         studentId,
         guardian,
         contextTenantId: tenantId,
@@ -1297,12 +1384,12 @@ export function useCreateGuardian() {
       });
 
       if (response.error) {
-        console.error('❌ 학부모 생성 실패:', response.error);
+        console.error('학부모 생성 실패:', response.error);
         console.groupEnd();
         throw new Error(response.error.message);
       }
 
-      console.log('✅ 학부모 생성 성공!');
+      console.log('학부모 생성 성공!');
       console.log('   생성된 guardian ID:', response.data?.id);
       console.log('   tenant_id:', response.data?.tenant_id);
       console.log('   student_id:', response.data?.student_id);

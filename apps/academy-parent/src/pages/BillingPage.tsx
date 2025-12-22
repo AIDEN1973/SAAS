@@ -16,7 +16,7 @@ export function BillingPage() {
   const childId = searchParams.get('child_id');
   const { data: children } = useChildren();
   const [selectedChildId, setSelectedChildId] = useState<string | null>(childId || (children && children.length > 0 ? children[0].id : null));
-  const { data: billingHistoryData, isLoading } = useBillingHistory(selectedChildId || undefined);
+  const { data: billingHistoryData, isLoading } = useBillingHistory(selectedChildId ? { student_id: selectedChildId } : undefined);
   const billingHistory = billingHistoryData || [];
 
   return (

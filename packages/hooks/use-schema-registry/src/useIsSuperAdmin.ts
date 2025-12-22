@@ -5,7 +5,7 @@
  * [불변 규칙] UI는 권한을 추론하지 않고, API 응답만 확인
  * [불변 규칙] user_platform_roles 테이블에서 super_admin 역할 확인
  *
- * ⚠️ 예외: user_platform_roles는 플랫폼 레벨 테이블이므로 tenant_id 컬럼이 없습니다.
+ * 예외: user_platform_roles는 플랫폼 레벨 테이블이므로 tenant_id 컬럼이 없습니다.
  * 따라서 withTenant()를 사용하지 않으며, user_id로만 필터링합니다.
  *
  * 기술문서: docu/스키마에디터.txt 3. 보안 모델
@@ -48,7 +48,7 @@ export function useIsSuperAdmin() {
 
       // user_platform_roles 테이블에서 super_admin 역할 확인
       // RLS 정책에 의해 권한이 없으면 조회 실패
-      // ⚠️ 중요: user_id로 필터링하여 자신의 역할만 조회 (RLS 정책과 일치)
+      // 중요: user_id로 필터링하여 자신의 역할만 조회 (RLS 정책과 일치)
       console.log('[useIsSuperAdmin] user_platform_roles 테이블 조회 시작...');
       console.log('[useIsSuperAdmin] 쿼리 파라미터:', {
         user_id: user.id,

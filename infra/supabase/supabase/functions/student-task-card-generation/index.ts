@@ -9,6 +9,9 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { shouldUseAI, getTenantSettingByPath } from '../_shared/policy-utils.ts';
+import { withTenant } from '../_shared/withTenant.ts';
+import { envServer } from '../_shared/env-registry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,26 +24,14 @@ serve(async (req) => {
   }
 
   try {
-    // 환경변수 검증
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl) {
-      throw new Error('SUPABASE_URL 환경변수가 설정되지 않았습니다.');
-    }
-    if (!supabaseServiceKey) {
-      throw new Error('SUPABASE_SERVICE_ROLE_KEY 환경변수가 설정되지 않았습니다.');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // [불변 규칙] Edge Functions도 env-registry를 통해 환경변수 접근
+    const supabase = createClient(envServer.SUPABASE_URL, envServer.SERVICE_ROLE_KEY);
 
     // 기술문서 19-1-2: KST 기준 날짜 처리
-    // Edge Functions는 Deno 환경이므로 수동으로 KST 변환 수행
-    const now = new Date();
-    const kstOffset = 9 * 60;
-    const kstTime = new Date(now.getTime() + (kstOffset * 60 * 1000));
-    const today = kstTime.toISOString().slice(0, 10); // YYYY-MM-DD
-    const yesterday = new Date(kstTime.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    // [불변 규칙] 파일명 생성 시 날짜 형식은 반드시 KST 기준을 사용합니다.
+    const kstTime = toKST();
+    const today = toKSTDate(); // YYYY-MM-DD
+    const yesterday = toKSTDate(new Date(kstTime.getTime() - 24 * 60 * 60 * 1000));
 
     console.log(`[StudentTaskCard] Starting batch generation for ${today}`);
 
@@ -77,16 +68,22 @@ serve(async (req) => {
 
     for (const tenant of tenants) {
       try {
+        // ⚠️ 중요: AI 기능 활성화 여부 확인 (SSOT 기준, Fail Closed)
+        // Automation Config First 원칙: 기본값 하드코딩 금지, Policy가 없으면 실행하지 않음
+        const effectiveAIEnabled = await shouldUseAI(supabase, tenant.id);
+
         // 결석 3일 이상 학생 확인
         const threeDaysAgo = new Date(kstTime.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-        const { data: absentStudents, error: absentError } = await supabase
+        const { data: absentStudents, error: absentError } = await withTenant(
+          supabase
           .from('attendance_logs')
           .select('student_id, occurred_at')
-          .eq('tenant_id', tenant.id)
           .eq('status', 'absent')
           .gte('occurred_at', `${threeDaysAgo}T00:00:00`)
-          .lte('occurred_at', `${yesterday}T23:59:59`);
+            .lte('occurred_at', `${yesterday}T23:59:59`),
+          tenant.id
+        );
 
         if (!absentError && absentStudents) {
           // 학생별 결석 일수 집계
@@ -97,24 +94,19 @@ serve(async (req) => {
           });
 
           // 3일 이상 결석한 학생에 대해 카드 생성
-          const cardsToCreate: Array<{ tenant_id: string; student_id: string; task_type: string; priority: number; title: string; description: string; action_url: string; expires_at: string; absence_days?: number; last_attendance_date?: string }> = [];
+          // ⚠️ v3.3 정본 규칙: 멱등성/중복방지 - 반드시 UPSERT 사용 (프론트 자동화 문서 2.3 섹션 참조)
           for (const [studentId, count] of absentCounts.entries()) {
             if (count >= 3) {
-              // 오늘 이미 생성된 카드 확인
-              const { data: existing } = await supabase
+              const expiresAt = new Date(kstTime.getTime() + 3 * 24 * 60 * 60 * 1000);
+              expiresAt.setHours(23, 59, 59, 999);
+
+              // 정본 포맷: dedup_key = "{tenantId}:{trigger}:{targetType}:{targetId}:{window}"
+              const dedupKey = `${tenant.id}:absence:student:${studentId}:${today}`;
+
+              // ⚠️ 중요: 멱등성/중복방지 - 반드시 UPSERT 사용 (DB 제약으로 Race condition 방지)
+              const { error: upsertError } = await supabase
                 .from('student_task_cards')
-                .select('id')
-                .eq('tenant_id', tenant.id)
-                .eq('student_id', studentId)
-                .eq('task_type', 'absence')
-                .gte('created_at', `${today}T00:00:00`)
-                .single();
-
-              if (!existing) {
-                const expiresAt = new Date(kstTime.getTime() + 3 * 24 * 60 * 60 * 1000);
-                expiresAt.setHours(23, 59, 59, 999);
-
-                cardsToCreate.push({
+                .upsert({
                   tenant_id: tenant.id,
                   student_id: studentId,
                   task_type: 'absence',
@@ -125,19 +117,19 @@ serve(async (req) => {
                   expires_at: expiresAt.toISOString(),
                   absence_days: count,
                   parent_contact_needed: true,
-                } as any); // 타입 확장: 실제 테이블에는 parent_contact_needed 필드가 있음
+                  dedup_key: dedupKey,
+                  status: 'pending',
+                } as any, {
+                  // onConflict 생략: Supabase가 unique index (tenant_id, dedup_key)를 자동 감지
+                  ignoreDuplicates: false, // 기존 카드가 있으면 업데이트
+                });
+
+              if (!upsertError) {
+                totalGenerated += 1;
+                console.log(`[StudentTaskCard] Upserted absence card for student ${studentId} (tenant ${tenant.id})`);
+              } else {
+                console.error(`[StudentTaskCard] Failed to upsert absence card for student ${studentId}:`, upsertError);
               }
-            }
-          }
-
-          if (cardsToCreate.length > 0) {
-            const { error: insertError } = await supabase
-              .from('student_task_cards')
-              .insert(cardsToCreate);
-
-            if (!insertError) {
-              totalGenerated += cardsToCreate.length;
-              console.log(`[StudentTaskCard] Generated ${cardsToCreate.length} absence cards for tenant ${tenant.id}`);
             }
           }
         }
@@ -145,55 +137,111 @@ serve(async (req) => {
         // 신규 등록 학생 확인 (최근 7일 이내)
         const sevenDaysAgo = new Date(kstTime.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-        const { data: newStudents, error: newStudentsError } = await supabase
+        const { data: newStudents, error: newStudentsError } = await withTenant(
+          supabase
           .from('persons')
           .select('id, created_at')
-          .eq('tenant_id', tenant.id)
           .eq('person_type', 'student')
           .gte('created_at', `${sevenDaysAgo}T00:00:00`)
-          .lte('created_at', `${today}T23:59:59`);
+            .lte('created_at', `${today}T23:59:59`),
+          tenant.id
+        );
 
         if (!newStudentsError && newStudents) {
-          const welcomeCards: Array<{ tenant_id: string; student_id: string; task_type: string; priority: number; title: string; description: string; action_url: string; expires_at: string; signup_date?: string }> = [];
+          // ⚠️ v3.3 정본 규칙: 멱등성/중복방지 - 반드시 UPSERT 사용 (프론트 자동화 문서 2.3 섹션 참조)
           for (const student of newStudents) {
-            // 오늘 이미 생성된 카드 확인
-            const { data: existing } = await supabase
-              .from('student_task_cards')
-              .select('id')
-              .eq('tenant_id', tenant.id)
-              .eq('student_id', student.id)
-              .eq('task_type', 'new_signup')
-              .single();
+            const expiresAt = new Date(kstTime.getTime() + 7 * 24 * 60 * 60 * 1000);
+            expiresAt.setHours(23, 59, 59, 999);
 
-            if (!existing) {
-              const expiresAt = new Date(kstTime.getTime() + 7 * 24 * 60 * 60 * 1000);
-              expiresAt.setHours(23, 59, 59, 999);
+            // 정본 포맷: dedup_key = "{tenantId}:{trigger}:{targetType}:{targetId}:{window}"
+            const dedupKey = `${tenant.id}:new_signup:student:${student.id}:${today}`;
 
-              welcomeCards.push({
+            // ⚠️ 중요: 멱등성/중복방지 - 반드시 UPSERT 사용 (DB 제약으로 Race condition 방지)
+            const { error: upsertError } = await supabase
+              .from('task_cards')
+              .upsert({
                 tenant_id: tenant.id,
                 student_id: student.id,
+                entity_id: student.id,  // entity_id = student_id (entity_type='student')
+                entity_type: 'student', // entity_type
                 task_type: 'new_signup',
                 priority: 30,
                 title: '신규 등록 학생 환영',
                 description: '신규 등록 학생을 환영하고 초기 설정을 완료하세요.',
                 action_url: `/students/${student.id}/welcome`,
                 expires_at: expiresAt.toISOString(),
-                signup_date: student.created_at,
-                initial_setup_needed: true,
-              } as any); // 타입 확장: 실제 테이블에는 initial_setup_needed 필드가 있음
+                dedup_key: dedupKey,
+                status: 'pending',
+                metadata: {
+                  signup_date: student.created_at,
+                  initial_setup_needed: true,
+                },
+              } as any, {
+                onConflict: 'tenant_id,dedup_key', // 정본: 프론트 상황 신호 수집 문서 2.3 섹션 참조
+                ignoreDuplicates: false, // 기존 카드가 있으면 업데이트
+              });
+
+            if (!upsertError) {
+              totalGenerated += 1;
+              console.log(`[StudentTaskCard] Upserted new_signup card for student ${student.id} (tenant ${tenant.id})`);
+            } else {
+              console.error(`[StudentTaskCard] Failed to upsert new_signup card for student ${student.id}:`, upsertError);
             }
           }
+        }
 
-          if (welcomeCards.length > 0) {
-            const { error: insertError } = await supabase
+        // 날씨 기반 StudentTaskCard 생성 (프론트 자동화 문서 1.2.3 섹션 참조)
+        // ⚠️ 정본 규칙: 프론트는 날씨 상황 신호만 수집, 서버가 StudentTaskCard 생성
+        // ⚠️ 중요: AI 기능이 활성화된 경우에만 생성
+        try {
+          // TODO: 실제 날씨 API 연동 필요 (예: OpenWeatherMap, 기상청 API)
+          // 현재는 구조만 구현 (실제 날씨 API는 Phase 3에서 구현)
+          // const weatherResponse = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}`);
+          // const weather = await weatherResponse.json();
+
+          // 예시: heavy rain 감지 시 StudentTaskCard 생성
+          // 실제 구현 시에는 날씨 API에서 받은 데이터를 사용
+          // ⚠️ 중요: AI 기능이 활성화된 경우에만 생성
+          const shouldCreateWeatherCard = effectiveAIEnabled && false; // TODO: 날씨 API 연동 후 실제 조건으로 변경
+
+          if (shouldCreateWeatherCard) {
+            const expiresAt = new Date(kstTime.getTime() + 24 * 60 * 60 * 1000);
+            expiresAt.setHours(23, 59, 59, 999);
+
+            // 정본 포맷: dedup_key = "{tenantId}:{trigger}:{targetType}:{targetId}:{window}"
+            const dedupKey = `${tenant.id}:weather:global:heavy_rain:${today}`;
+
+            // ⚠️ 중요: 멱등성/중복방지 - 반드시 UPSERT 사용 (DB 제약으로 Race condition 방지)
+            const { error: upsertError } = await supabase
               .from('student_task_cards')
-              .insert(welcomeCards);
+              .upsert({
+                tenant_id: tenant.id,
+                task_type: 'ai_suggested',
+                source: 'weather',
+                priority: 60,
+                title: '하원 안전 안내',
+                description: '오늘은 비가 많이 옵니다. 하원 시 안전에 주의하세요.',
+                suggested_action: {
+                  type: 'send_notification',
+                  template: 'weather_safety',
+                },
+                dedup_key: dedupKey,
+                expires_at: expiresAt.toISOString(),
+                status: 'pending',
+              } as any, {
+                // onConflict 생략: Supabase가 unique index (tenant_id, dedup_key)를 자동 감지
+                ignoreDuplicates: false, // 기존 카드가 있으면 업데이트
+              });
 
-            if (!insertError) {
-              totalGenerated += welcomeCards.length;
-              console.log(`[StudentTaskCard] Generated ${welcomeCards.length} welcome cards for tenant ${tenant.id}`);
+            if (!upsertError) {
+              totalGenerated += 1;
+              console.log(`[StudentTaskCard] Upserted weather card for tenant ${tenant.id}`);
+            } else {
+              console.error(`[StudentTaskCard] Failed to upsert weather card for tenant ${tenant.id}:`, upsertError);
             }
           }
+        } catch (error) {
+          console.error(`[StudentTaskCard] Error processing weather card for tenant ${tenant.id}:`, error);
         }
 
       } catch (error) {
@@ -228,3 +276,4 @@ serve(async (req) => {
 
 
 
+                                                                                                                                                                                                                                                                                                                                                                                                               

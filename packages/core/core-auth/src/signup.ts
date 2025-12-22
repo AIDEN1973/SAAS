@@ -122,7 +122,16 @@ export class SignupService {
         console.warn('[SignupService] 테넌트 생성 실패했지만 사용자는 생성되었습니다. 수동으로 테넌트를 생성해주세요.');
       }
 
-      // 3. 테넌트 정보 파싱
+      // 3. 업종별 초기 데이터 시드 (Industry Layer)
+      // ⚠️ 중요: 업종별 seed는 Industry Layer에서 처리합니다.
+      if (tenantData && tenantData.tenant && input.industry_type === 'academy') {
+        // Industry Layer 의존성 제거 (Core Layer는 Industry 모듈에 의존하지 않음)
+        // Seed 데이터는 별도 마이그레이션 또는 초기화 스크립트에서 처리
+        // 업종별 seed는 DB 마이그레이션 또는 별도 초기화 프로세스에서 처리됩니다
+        console.log('[SignupService] Tenant created successfully. Seed data should be handled by migrations.');
+      }
+
+      // 4. 테넌트 정보 파싱
       let tenant: Tenant | undefined;
       if (tenantData && tenantData.tenant) {
         tenant = {

@@ -1,0 +1,22 @@
+{
+  "name": "@hooks/use-ai-suggestion",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.0.0",
+    "@api-sdk/core": "file:../../api-sdk"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "typescript": "^5.3.3"
+  }
+}
+

@@ -9,6 +9,9 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { withTenant } from '../_shared/withTenant.ts';
+import { envServer } from '../_shared/env-registry.ts';
+import { toKSTDate, toKSTMonth, toKST } from '../_shared/date-utils.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,29 +25,16 @@ serve(async (req) => {
   }
 
   try {
-    // 환경변수 검증
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl) {
-      throw new Error('SUPABASE_URL 환경변수가 설정되지 않았습니다.');
-    }
-    if (!supabaseServiceKey) {
-      throw new Error('SUPABASE_SERVICE_ROLE_KEY 환경변수가 설정되지 않았습니다.');
-    }
-
+    // [불변 규칙] Edge Functions도 env-registry를 통해 환경변수 접근
     // Supabase 클라이언트 생성 (Service Role 사용)
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(envServer.SUPABASE_URL, envServer.SERVICE_ROLE_KEY);
 
     // 기술문서 19-1-2: KST 기준 날짜 처리
-    // Edge Functions는 Deno 환경이므로 수동으로 KST 변환 수행
-    const now = new Date();
-    const kstOffset = 9 * 60; // KST는 UTC+9
-    const kstTime = new Date(now.getTime() + (kstOffset * 60 * 1000));
-    const currentMonth = kstTime.toISOString().slice(0, 7); // YYYY-MM
+    // [불변 규칙] 파일명 생성 시 날짜 형식은 반드시 KST 기준을 사용합니다.
+    const kstTime = toKST();
+    const currentMonth = toKSTMonth(); // YYYY-MM
     const periodStart = `${currentMonth}-01`;
-    const periodEnd = new Date(kstTime.getFullYear(), kstTime.getMonth() + 1, 0)
-      .toISOString().slice(0, 10); // 월말 날짜
+    const periodEnd = toKSTDate(new Date(kstTime.getFullYear(), kstTime.getMonth() + 1, 0)); // 월말 날짜
 
     console.log(`[Auto Billing] Starting batch for period: ${periodStart} to ${periodEnd}`);
 
@@ -73,12 +63,14 @@ serve(async (req) => {
     for (const tenant of tenants) {
       try {
         // 해당 테넌트의 활성 학생 조회 (persons 테이블에서 student 타입)
-        const { data: students, error: studentsError } = await supabase
+        const { data: students, error: studentsError } = await withTenant(
+          supabase
           .from('persons')
           .select('id')
-          .eq('tenant_id', tenant.id)
           .eq('person_type', 'student')
-          .eq('status', 'active');
+            .eq('status', 'active'),
+          tenant.id
+        );
 
         if (studentsError) {
           console.error(`[Auto Billing] Failed to fetch students for tenant ${tenant.id}:`, studentsError);
@@ -92,12 +84,14 @@ serve(async (req) => {
         }
 
         // 이미 생성된 청구서 확인
-        const { data: existingInvoices, error: invoicesError } = await supabase
+        const { data: existingInvoices, error: invoicesError } = await withTenant(
+          supabase
           .from('invoices')
           .select('payer_id')
-          .eq('tenant_id', tenant.id)
           .gte('period_start', periodStart)
-          .lte('period_start', periodEnd);
+            .lte('period_start', periodEnd),
+          tenant.id
+        );
 
         if (invoicesError) {
           console.error(`[Auto Billing] Failed to check existing invoices for tenant ${tenant.id}:`, invoicesError);

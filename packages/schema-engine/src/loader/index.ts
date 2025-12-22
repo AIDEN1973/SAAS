@@ -104,13 +104,15 @@ export async function loadSchema(options: SchemaLoadOptions): Promise<SchemaLoad
     });
 
     // 4. Client Version Check
-    if (clientVersion && schema.minClient) {
-      const [schemaMajor, schemaMinor] = schema.minClient.split('.').map(Number);
+    if (clientVersion && (schema.minSupportedClient || schema.minClient)) {
+      // 정본 필드 우선, 레거시 fallback
+      const minClientVersion = schema.minSupportedClient || schema.minClient || '0.0.0';
+      const [schemaMajor, schemaMinor] = minClientVersion.split('.').map(Number);
       const [clientMajor, clientMinor] = clientVersion.split('.').map(Number);
 
       if (schemaMajor > clientMajor || (schemaMajor === clientMajor && schemaMinor > clientMinor)) {
         throw new SchemaLoadError(
-          `Client version ${clientVersion} is not compatible with schema version ${schema.version} (minClient: ${schema.minClient})`,
+          `Client version ${clientVersion} is not compatible with schema version ${schema.version} (minSupportedClient: ${schema.minSupportedClient || schema.minClient})`,
           'ClientUpdateRequired',
           tenantId,
           entity,

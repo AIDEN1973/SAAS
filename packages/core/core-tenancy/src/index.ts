@@ -15,3 +15,4 @@ export * from './types';
 // 서버 사용 코드는 index.ts에서 export하지 않습니다.
 // 서버에서는 직접 import: import { tenancyService } from '@core/tenancy/service'
 // 서버에서는 직접 import: import { tenantOnboardingService } from '@core/tenancy/onboarding'
+// 서버에서는 직접 import: import { tenantFeatureService } from '@core/tenancy/service'

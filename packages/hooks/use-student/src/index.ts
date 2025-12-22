@@ -4,6 +4,8 @@
 
 export {
   useStudents,
+  fetchStudents,
+  fetchPersons,
   useStudentsPaged,
   useStudent,
   useCreateStudent,
@@ -11,6 +13,7 @@ export {
   useUpdateStudent,
   useDeleteStudent,
   useGuardians,
+  fetchGuardians,
   useCreateGuardian,
   useUpdateGuardian,
   useDeleteGuardian,
@@ -18,6 +21,7 @@ export {
   useStudentTagsByStudent,
   useUpdateStudentTags,
   useConsultations,
+  fetchConsultations,
   useCreateConsultation,
   useUpdateConsultation,
   useDeleteConsultation,
@@ -30,6 +34,10 @@ export {
 export {
   useStudentTaskCards,
   useCompleteStudentTaskCard,
+  useRequestApprovalStudentTaskCard,
+  useApproveAndExecuteStudentTaskCard,
 } from './useStudentTaskCard';
 
-export type { StudentTaskCard } from './useStudentTaskCard';
+export { useStudentTaskCardAction } from './useStudentTaskCardAction';
+
+export type { StudentTaskCard, TaskCard } from './useStudentTaskCard';

@@ -14,12 +14,12 @@ import { FormSchema, SchemaVersion } from './types';
 /**
  * Schema Version Validator
  *
- * SDUI v1.1: minClient 사용 (minSupportedClient는 하위 호환)
+ * 정본 규칙: minSupportedClient가 정본 (필수), minClient는 레거시 입력 허용
  */
 const schemaVersionBase = z.object({
   version: z.string().regex(/^\d+\.\d+\.\d+$/),
-  minClient: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),  // SDUI v1.1
-  minSupportedClient: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),  // 하위 호환
+  minClient: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),  // 레거시 입력 허용
+  minSupportedClient: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),  // 정본 (필수)
   entity: z.string().min(1),
 });
 
@@ -378,7 +378,7 @@ export function validateSchema(schema: unknown): {
       // ⚠️ 중요: validate 함수는 Registry 기반 스키마에서 사용 불가
       // Registry에 저장되는 스키마는 JSONB이므로 함수를 직렬화할 수 없음
       if (field.validation?.validate && typeof field.validation.validate === 'function') {
-        validateFunctionFields.push(`필드 "${field.name}": validate 함수는 Registry 기반 스키마에서 사용할 수 없습니다. fallbackSchema(로컬 TypeScript 파일) 전용입니다.`);
+        validateFunctionFields.push(`필드 "${field.name}": validate 함수는 Registry 기반 스키마에서 사용할 수 없습니다. fallbackSchema는 개발/테스트 환경에서만 허용되며, 운영 환경에서는 Schema Registry 조회 실패 시 에러 처리 필수입니다.`);
       }
 
       // 단일 조건 검사
@@ -524,7 +524,7 @@ export function validateSchema(schema: unknown): {
       // ⚠️ 중요: validate 함수는 Registry 기반 스키마에서 사용 불가
       // Registry에 저장되는 스키마는 JSONB이므로 함수를 직렬화할 수 없음
       if (field.validation?.validate && typeof field.validation.validate === 'function') {
-        validateFunctionFields.push(`필드 "${field.name}": validate 함수는 Registry 기반 스키마에서 사용할 수 없습니다. fallbackSchema(로컬 TypeScript 파일) 전용입니다.`);
+        validateFunctionFields.push(`필드 "${field.name}": validate 함수는 Registry 기반 스키마에서 사용할 수 없습니다. fallbackSchema는 개발/테스트 환경에서만 허용되며, 운영 환경에서는 Schema Registry 조회 실패 시 에러 처리 필수입니다.`);
       }
 
       // 단일 조건 검사
@@ -639,7 +639,7 @@ export function validateSchema(schema: unknown): {
 /**
  * Schema Version 체크
  *
- * SDUI v1.1: minClient를 사용하여 클라이언트 버전 호환성 체크
+ * 정본 규칙: minSupportedClient를 우선 사용하여 클라이언트 버전 호환성 체크 (minClient는 레거시 fallback)
  */
 export function checkSchemaVersion(
   schema: SchemaVersion,
@@ -649,17 +649,17 @@ export function checkSchemaVersion(
   requiresUpdate?: boolean;
   requiresMigration?: boolean;
 } {
-  // SDUI v1.1: minClient를 사용하여 클라이언트 버전을 비교
-  const minClientVersion = schema.minClient || schema.minSupportedClient;
+  // 정본 규칙: minSupportedClient를 우선 사용하여 클라이언트 버전을 비교 (minClient는 레거시 fallback)
+  const minClientVersion = schema.minSupportedClient || schema.minClient;
   if (!minClientVersion) {
-    // minClient가 없으면 호환 가능하다고 간주 (하위 호환성)
+    // minSupportedClient가 없으면 호환 가능하다고 간주 (하위 호환성)
     return { compatible: true };
   }
 
   const [minClientMajor, minClientMinor] = minClientVersion.split('.').map(Number);
   const [clientMajor, clientMinor] = clientVersion.split('.').map(Number);
 
-  // 클라이언트 버전이 minClient보다 낮으면 업데이트 필요
+  // 클라이언트 버전이 minSupportedClient보다 낮으면 업데이트 필요
   if (clientMajor < minClientMajor || (clientMajor === minClientMajor && clientMinor < minClientMinor)) {
     return {
       compatible: false,

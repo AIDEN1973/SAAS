@@ -5,7 +5,7 @@
  * [불변 규칙] api-sdk를 통해서만 데이터 요청
  * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
  *
- * ⚠️ 예외: 인증 관리는 Supabase Auth API를 직접 사용하는 것이 일반적입니다.
+ * 예외: 인증 관리는 Supabase Auth API를 직접 사용하는 것이 일반적입니다.
  * supabase.auth.getSession() 등은 인증 관련이므로 createClient() 직접 사용이 필요합니다.
  */
 

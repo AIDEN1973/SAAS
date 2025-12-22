@@ -54,6 +54,9 @@ FUNCTIONS=(
   "daily-statistics-update"
   "overdue-notification-scheduler"
   "student-risk-analysis"
+  "execute-student-task"
+  "auto-message-suggestion"
+  "consultation-ai-summary"
 )
 
 SUCCESS_COUNT=0

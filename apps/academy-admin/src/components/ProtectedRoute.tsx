@@ -89,7 +89,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         // 실제로는 세션 새로고침이 필요하지 않을 수 있음
         setApiContext({
           tenantId: tenants[0].id,
-          industryType: tenants[0].industry_type as 'academy' | 'salon' | 'realestate' | 'gym' | 'ngo',
+          industryType: tenants[0].industry_type as 'academy' | 'salon' | 'real_estate' | 'gym' | 'ngo',  // 정본: real_estate
         });
         setCurrentTenantId(tenants[0].id); // state도 업데이트하여 리렌더링 트리거
         setTenantSelected(true);
@@ -104,7 +104,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           console.warn('Rate limit 도달: Context만 설정하고 계속 진행합니다.');
           setApiContext({
             tenantId: tenants[0].id,
-            industryType: tenants[0].industry_type as 'academy' | 'salon' | 'realestate' | 'gym' | 'ngo',
+            industryType: tenants[0].industry_type as 'academy' | 'salon' | 'real_estate' | 'gym' | 'ngo',  // 정본: real_estate
           });
           setCurrentTenantId(tenants[0].id); // state도 업데이트
           setTenantSelected(true);

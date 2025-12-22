@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ErrorBoundary, useIconSize, useIconStrokeWidth, useModal, useResponsiveMode, IconButtonGroup, Input, Badge, ActionButtonGroup } from '@ui-core/react';
 import { DataTableActionButtons, PlusIcon } from '../components/DataTableActionButtons';
 import { MessageSquare, FileText, User, Users, BookOpen, Calendar, AlertTriangle, Tag as TagIcon, ChevronDown, ChevronUp, Trash2, Pencil, X as XIcon, Save, AlertCircle, CheckCircle2, Lightbulb, RefreshCcw } from 'lucide-react';
@@ -17,12 +17,13 @@ import { SchemaForm, SchemaFormWithMethods, SchemaFilter, SchemaTable } from '@s
 import type { UseFormReturn } from 'react-hook-form';
 import { registerWidget } from '@schema-engine';
 import { useStudentPage } from './hooks/useStudentPage';
-import { useStudentTags, useStudentClasses } from '@hooks/use-student';
+import { useStudentTags, useStudentClasses, useCompleteStudentTaskCard, useStudentTaskCards, useGuardians } from '@hooks/use-student';
 import { useConsultations } from '@hooks/use-student';
 import { useAttendanceLogs, useCreateAttendanceLog, useUpdateAttendanceLog } from '@hooks/use-attendance';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
+import { useIndustryTranslations } from '@hooks/use-industry-translations';
 import { toKST } from '@lib/date-utils';
 import type { StudentFilter, StudentStatus, Student, CreateStudentInput, Gender, ConsultationType, Guardian, StudentConsultation } from '@services/student-service';
 import type { AttendanceLog, CreateAttendanceLogInput } from '@services/attendance-service';
@@ -541,7 +542,7 @@ export function StudentsPage() {
                   <div
                     style={{
                       padding: 'var(--spacing-xs) var(--spacing-sm)',
-                      fontSize: 'var(--font-size-sm)',
+                      fontSize: 'var(--font-size-xs)',
                       fontWeight: 'var(--font-weight-bold)',
                       fontFamily: 'var(--font-family)',
                       lineHeight: 'var(--line-height)',
@@ -885,8 +886,8 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
     if (import.meta.env?.DEV) {
       // PII 마스킹 유틸리티 import
       import('@core/pii-utils').then(({ maskPII }) => {
-        console.group('🔍 [StudentInfoTab] 디버깅 정보');
-        console.log('📋 student prop:', maskPII({
+        console.group('[StudentInfoTab] 디버깅 정보');
+        console.log('student prop:', maskPII({
           id: student?.id,
           name: student?.name,
           birth_date: student?.birth_date,
@@ -899,7 +900,7 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
           status: student?.status,
           notes: student?.notes,
         }));
-        console.log('✏️ isEditing:', isEditing);
+        console.log('isEditing:', isEditing);
         console.groupEnd();
       });
     }
@@ -925,7 +926,7 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
     // [PII 보안] PII 필드는 마스킹하여 로깅
     if (import.meta.env?.DEV) {
       import('@core/pii-utils').then(({ maskPII }) => {
-        console.log('📝 [StudentInfoTab] formDefaultValues 계산:', maskPII(values));
+        console.log('[StudentInfoTab] formDefaultValues 계산:', maskPII(values));
       });
     }
 
@@ -1165,6 +1166,9 @@ function GuardiansTab({
   const isMobile = mode === 'xs' || mode === 'sm';
   const [relationshipFilter, setRelationshipFilter] = useState<'all' | 'parent' | 'guardian' | 'other'>('all');
 
+  // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter를 통한 translations 생성
+  const guardianTranslations = useIndustryTranslations(effectiveGuardianFormSchema);
+
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       // 주 보호자 처리:
@@ -1238,6 +1242,7 @@ function GuardiansTab({
               // 최상위 actions도 비활성화
               actions: [],
             }}
+            translations={guardianTranslations}
             onSubmit={handleSubmit}
             defaultValues={editingGuardian ? {
               name: editingGuardian.name,
@@ -1500,6 +1505,9 @@ function ConsultationsTab({
   const isTablet = mode === 'md';
   const formRef = useRef<HTMLDivElement>(null);
 
+  // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter를 통한 translations 생성
+  const consultationTranslations = useIndustryTranslations(effectiveConsultationFormSchema);
+
   // 빈 상태 아이콘 크기 계산 (CSS 변수 사용, 기본 크기의 4배)
   const baseIconSize = useIconSize();
   const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
@@ -1558,6 +1566,7 @@ function ConsultationsTab({
           />
           <SchemaForm
             schema={effectiveConsultationFormSchema}
+            translations={consultationTranslations}
             onSubmit={handleSubmit}
             defaultValues={editingConsultation ? {
               consultation_date: editingConsultation.consultation_date,
@@ -1785,6 +1794,8 @@ interface TagsTabProps {
 }
 
 function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable = true, tagFormSchema }: TagsTabProps) {
+  // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter를 통한 translations 생성
+  const tagTranslations = useIndustryTranslations(tagFormSchema);
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
   const isTablet = mode === 'md';
@@ -2233,6 +2244,7 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
             // 등록 모드: 태그 생성 폼
             <SchemaFormWithMethods
               schema={tagFormSchema}
+              translations={tagTranslations}
               onSubmit={handleCreateTag}
               onCancel={() => {
                 setShowForm(false);
@@ -2385,6 +2397,8 @@ function ClassesTab({
   onUpdate,
   isEditable = true,
 }: ClassesTabProps) {
+  // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter를 통한 translations 생성
+  const classAssignmentTranslations = useIndustryTranslations(effectiveClassAssignmentFormSchema);
   const { showAlert, showConfirm } = useModal();
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
@@ -2557,6 +2571,7 @@ function ClassesTab({
                 ],
               },
             }}
+            translations={classAssignmentTranslations}
             onSubmit={editingClassId ? handleUpdate : handleAssign}
             defaultValues={{
               class_id: editingClassId || '',
@@ -3526,12 +3541,13 @@ function RiskAnalysisTab({
       if (!tenantId || !studentId) return null;
 
       // [불변 규칙] Zero-Trust: @api-sdk/core를 통해서만 Edge Function 호출
-      // apiClient.post()는 자동으로 tenant_id, industry_type, JWT 토큰을 포함하여 요청
-      const response = await apiClient.post<{ risk_score?: number; factors?: string[]; recommendations?: string[] }>(
-        'functions/v1/student-risk-analysis',
+      // apiClient.invokeFunction()은 자동으로 JWT 토큰을 포함하여 요청
+      // Edge Function은 JWT에서 tenant_id를 추출합니다 (요청 본문에서 받지 않음)
+      const response = await apiClient.invokeFunction<{ risk_score?: number; factors?: string[]; recommendations?: string[] }>(
+        'student-risk-analysis',
         {
           student_id: studentId,
-        } as Record<string, unknown>
+        }
       );
 
       if (response.error) {
@@ -3826,6 +3842,9 @@ function MessageSendTab({
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const [searchParams] = useSearchParams();
+  const completeTaskCard = useCompleteStudentTaskCard(true); // 실제 작업 완료 시 삭제
+  const { data: studentTaskCards } = useStudentTaskCards();
 
   // [불변 규칙] 기존 스키마 재사용
   const { data: schema } = useSchema('notification', notificationFormSchema, 'form');
@@ -3877,24 +3896,8 @@ function MessageSendTab({
   }, [selectedChannel]);
 
   // 보호자 목록 조회
-  const { data: guardians, isLoading: guardiansLoading } = useQuery({
-    queryKey: ['guardians', tenantId, studentId],
-    queryFn: async (): Promise<Guardian[]> => {
-      if (!tenantId || !studentId) return [];
-
-      const response = await apiClient.get<Guardian[]>('guardians', {
-        filters: { student_id: studentId },
-      });
-
-      if (response.error || !response.data) {
-        return [];
-      }
-
-      // apiClient.get은 배열을 반환
-      return (Array.isArray(response.data) ? response.data : [response.data]) as unknown as Guardian[];
-    },
-    enabled: !!tenantId && !!studentId,
-  });
+  // 정본 규칙: useGuardians Hook 사용
+  const { data: guardians, isLoading: guardiansLoading } = useGuardians(studentId);
 
   // 보호자 관계별 그룹화 및 관계명 매핑
   const getRelationshipLabel = (relationship: string): string => {
@@ -4127,6 +4130,33 @@ function MessageSendTab({
 
       // 전체 성공
       queryClient.invalidateQueries({ queryKey: ['notifications', tenantId] });
+
+      // 알림 발송 성공 시 관련 StudentTaskCard 완료 처리
+      // URL에서 cardId를 추출하거나, student_id로 new_signup 타입 카드를 찾아 완료 처리
+      const cardId = searchParams.get('cardId');
+      if (cardId) {
+        // URL에 cardId가 있으면 해당 카드 완료 처리
+        try {
+          await completeTaskCard.mutateAsync(cardId);
+        } catch (error) {
+          // 카드 완료 처리 실패는 무시 (알림 발송은 성공했으므로)
+          console.error('Failed to complete task card:', error);
+        }
+      } else if (studentId && studentTaskCards) {
+        // cardId가 없으면 student_id로 new_signup 타입 카드 찾기
+        const newSignupCard = studentTaskCards.find(
+          (card) => card.student_id === studentId && card.task_type === 'new_signup' && card.status !== 'executed'
+        );
+        if (newSignupCard) {
+          try {
+            await completeTaskCard.mutateAsync(newSignupCard.id);
+          } catch (error) {
+            // 카드 완료 처리 실패는 무시 (알림 발송은 성공했으므로)
+            console.error('Failed to complete task card:', error);
+          }
+        }
+      }
+
       // [일관성] useModal 시그니처 준수: showAlert(message, title, type)
       showAlert(MESSAGE_CONSTANTS.SEND_SUCCESS_MESSAGE, MESSAGE_CONSTANTS.SEND_SUCCESS_TITLE, 'success');
 

@@ -26,11 +26,14 @@
     "type-check": "turbo run type-check",
     "clean": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "setup:env": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-env.ps1"
+    "setup:env": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-env.ps1",
+    "check:shared-catalog": "tsx scripts/check-shared-catalog.ts"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
+    "glob": "^10.3.10",
     "prettier": "^3.1.0",
+    "tsx": "^4.7.0",
     "turbo": "^1.11.0",
     "typescript": "^5.3.3"
   },

@@ -18,6 +18,10 @@ export interface I18nBindingOptions {
   translations?: I18nTranslations;  // 정적 번역 맵
   // SDUI v1.1: Supabase Translation Table 연동 (선택적)
   loadFromDB?: boolean;  // DB에서 번역 로드 여부
+  // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter 통합
+  industryAdapter?: {
+    getLabelFromI18n: (i18nKey: string) => string;  // i18n 키 → 업종 Label 변환 함수
+  };
 }
 
 /**
@@ -94,7 +98,7 @@ export async function bindI18n(
   schema: BaseSchema,
   options: I18nBindingOptions
 ): Promise<BaseSchema> {
-  const { translations = {}, locale, tenantId, loadFromDB = false } = options;
+  const { translations = {}, locale, tenantId, loadFromDB = false, industryAdapter } = options;
 
   // SDUI v1.1: Supabase Translation Table에서 번역 로드
   let dbTranslations: I18nTranslations = {};
@@ -102,12 +106,22 @@ export async function bindI18n(
     dbTranslations = await loadTranslationsFromDB(tenantId, locale);
   }
 
+  // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter 통합
+  // Industry Adapter가 있으면 labelKey를 업종별 Label로 변환
+  let industryTranslations: I18nTranslations = {};
+  if (industryAdapter) {
+    // 스키마에서 사용된 모든 labelKey를 수집하여 Industry Adapter로 변환
+    // (실제 변환은 bindFieldI18n에서 수행)
+    industryTranslations = {}; // 빈 객체로 시작, bindFieldI18n에서 동적으로 변환
+  }
+
   // 정적 번역이 DB 번역보다 우선순위 높음 (override 가능)
-  const allTranslations = { ...dbTranslations, ...translations };
+  // Industry Adapter 변환은 가장 높은 우선순위
+  const allTranslations = { ...dbTranslations, ...translations, ...industryTranslations };
 
   // 스키마 타입에 따라 처리
   if (schema.type === 'form' && 'form' in schema) {
-    return bindFormSchemaI18n(schema as FormSchema, allTranslations);
+    return bindFormSchemaI18n(schema as FormSchema, allTranslations, industryAdapter);
   }
 
   // TODO: table, detail, filter, widget 스키마도 처리
@@ -120,15 +134,16 @@ export async function bindI18n(
  */
 function bindFormSchemaI18n(
   schema: FormSchema,
-  translations: I18nTranslations
+  translations: I18nTranslations,
+  industryAdapter?: { getLabelFromI18n: (i18nKey: string) => string }
 ): FormSchema {
   const boundSchema = { ...schema };
 
   if (boundSchema.form) {
     boundSchema.form = {
       ...boundSchema.form,
-      fields: boundSchema.form.fields.map((field) => bindFieldI18n(field, translations)),
-      submit: boundSchema.form.submit ? bindSubmitI18n(boundSchema.form.submit, translations) : undefined,
+      fields: boundSchema.form.fields.map((field) => bindFieldI18n(field, translations, industryAdapter)),
+      submit: boundSchema.form.submit ? bindSubmitI18n(boundSchema.form.submit, translations, industryAdapter) : undefined,
     };
   }
 
@@ -137,38 +152,43 @@ function bindFormSchemaI18n(
 
 /**
  * Field i18n 바인딩
+ * Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter 통합
  */
 function bindFieldI18n(
   field: FormFieldSchema,
-  translations: I18nTranslations
+  translations: I18nTranslations,
+  industryAdapter?: { getLabelFromI18n: (i18nKey: string) => string }
 ): FormFieldSchema {
   const boundField = { ...field };
 
   if (boundField.ui) {
+    // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter 우선 사용
+    // labelKey가 있으면 Industry Adapter로 변환, 없으면 translations에서 조회, 둘 다 없으면 기존 label 유지
+    const getLabel = (labelKey?: string, fallbackLabel?: string): string | undefined => {
+      if (!labelKey) return fallbackLabel;
+      if (industryAdapter) {
+        return industryAdapter.getLabelFromI18n(labelKey);
+      }
+      return translations[labelKey] || fallbackLabel || labelKey;
+    };
+
     boundField.ui = {
       ...boundField.ui,
-      // labelKey가 있으면 label로 변환 (없으면 기존 label 유지)
-      label: boundField.ui.labelKey
-        ? translations[boundField.ui.labelKey] || boundField.ui.labelKey
-        : boundField.ui.label,
-      placeholder: boundField.ui.placeholderKey
-        ? translations[boundField.ui.placeholderKey] || boundField.ui.placeholderKey
-        : boundField.ui.placeholder,
-      description: boundField.ui.descriptionKey
-        ? translations[boundField.ui.descriptionKey] || boundField.ui.descriptionKey
-        : boundField.ui.description,
-      tooltip: boundField.ui.tooltipKey
-        ? translations[boundField.ui.tooltipKey] || boundField.ui.tooltipKey
-        : boundField.ui.tooltip,
+      label: getLabel(boundField.ui.labelKey, boundField.ui.label),
+      placeholder: getLabel(boundField.ui.placeholderKey, boundField.ui.placeholder),
+      description: getLabel(boundField.ui.descriptionKey, boundField.ui.description),
+      tooltip: getLabel(boundField.ui.tooltipKey, boundField.ui.tooltip),
     };
   }
 
-  // options i18n 바인딩
+  // options i18n 바인딩 (Industry Adapter 통합)
   if (boundField.options) {
     boundField.options = boundField.options.map((opt) => ({
       ...opt,
       label: opt.labelKey
-        ? translations[opt.labelKey] || opt.labelKey
+        ? (industryAdapter
+            ? industryAdapter.getLabelFromI18n(opt.labelKey)
+            : translations[opt.labelKey] || opt.labelKey)
         : opt.label || opt.value,
     }));
   }
@@ -195,15 +215,20 @@ function bindFieldI18n(
 
 /**
  * Submit 버튼 i18n 바인딩
+ * Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter 통합
  */
 function bindSubmitI18n(
   submit: { labelKey?: string; label?: string; [key: string]: unknown },
-  translations: I18nTranslations
+  translations: I18nTranslations,
+  industryAdapter?: { getLabelFromI18n: (i18nKey: string) => string }
 ): { label: string; [key: string]: unknown } {
+  const label = submit.labelKey
+    ? (industryAdapter
+        ? industryAdapter.getLabelFromI18n(submit.labelKey)
+        : translations[submit.labelKey] || submit.labelKey)
+    : submit.label || 'Submit';
   return {
     ...submit,
-    label: submit.labelKey
-      ? translations[submit.labelKey] || submit.labelKey
-      : submit.label || 'Submit',
+    label,
   };
 }

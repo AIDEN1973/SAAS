@@ -6,7 +6,7 @@
 -- [해결] 권한 확인 및 RLS 정책 재검증
 --
 -- [불변 규칙] user_tenant_roles는 auth.uid() 기반 RLS 사용
--- [불변 규칙] tenants 테이블의 RLS 정책이 user_tenant_roles를 참조할 때 순환 참조 방지
+-- [불변 규칙] tenants 테이블의 RLS 정책은 JWT claim 기반 사용 (PgBouncer Transaction Pooling 호환)
 
 -- ============================================================================
 -- 1. user_tenant_roles 테이블 권한 재확인
@@ -32,26 +32,23 @@ JWT claim 기반이 아닌 auth.uid() 기반으로 순환 참조를 방지합니
 -- ============================================================================
 -- 3. tenants 테이블 RLS 정책 확인
 -- ============================================================================
--- tenants 테이블의 RLS 정책이 user_tenant_roles를 올바르게 참조하는지 확인
--- [중요] role "owner" 오류는 RLS 정책에서 PostgreSQL ROLE을 참조하려고 할 때 발생
---        하지만 우리는 user_tenant_roles.role 컬럼을 참조하므로 문제 없어야 함
---        혹시 모를 문제를 방지하기 위해 정책을 재생성
+-- [불변 규칙] JWT claim 기반 RLS 사용 (PgBouncer Transaction Pooling 호환)
+-- tenants 테이블의 RLS 정책을 JWT claim 기반으로 수정
 
 DROP POLICY IF EXISTS tenant_isolation_tenants ON public.tenants;
 
 CREATE POLICY tenant_isolation_tenants ON public.tenants
 FOR SELECT TO authenticated
 USING (
-  EXISTS (
-    SELECT 1 FROM public.user_tenant_roles
-    WHERE user_tenant_roles.tenant_id = tenants.id
-      AND user_tenant_roles.user_id = auth.uid()
+  id = (auth.jwt() ->> 'tenant_id')::uuid
+  OR EXISTS (
+    SELECT 1 FROM public.user_platform_roles
+    WHERE user_id = auth.uid() AND role = 'super_admin'
   )
 );
 
 COMMENT ON POLICY tenant_isolation_tenants ON public.tenants IS
-'테넌트 소속 사용자는 자신의 테넌트만 조회 가능합니다.
-user_tenant_roles를 참조하여 테넌트 소속을 확인합니다.';
+'테넌트 격리: JWT claim 기반 RLS (PgBouncer Transaction Pooling 호환)';
 
 -- ============================================================================
 -- 4. 테이블 통계 업데이트

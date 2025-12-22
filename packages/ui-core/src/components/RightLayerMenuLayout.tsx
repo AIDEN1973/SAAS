@@ -47,8 +47,9 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
     bodyWidthWithoutMenu: number,
     windowWidth: number
   ): boolean => {
-    const breakpointTabletPx = getCSSVariableAsPx('--breakpoint-tablet', 48 * 16); // 기본값: 48rem = 768px
-    const overlayThresholdPx = getCSSVariableAsPx('--width-overlay-threshold', 90 * 16); // 기본값: 90rem = 1440px
+    // ⚠️ 중요: 하드코딩 금지, CSS 변수 사용 (fallback은 계산된 값)
+    const breakpointTabletPx = getCSSVariableAsPx('--breakpoint-tablet', 48 * 16); // 기본값: 48rem = 768px (fallback)
+    const overlayThresholdPx = getCSSVariableAsPx('--width-overlay-threshold', 90 * 16); // 기본값: 90rem = 1440px (fallback)
 
     // 1440px 이상인 경우 반드시 push 모드(바디 축소) 사용 보장
     if (windowWidth >= overlayThresholdPx) {

@@ -4,6 +4,7 @@
 
 export {
   useClasses,
+  fetchClasses,
   useClass,
   useCreateClass,
   useUpdateClass,

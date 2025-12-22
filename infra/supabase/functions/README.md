@@ -22,7 +22,7 @@ Zero-Management Platform을 위한 자동화 배치 작업들입니다.
 
 ### 3. AI 브리핑 카드 생성 (ai-briefing-generation)
 - **스케줄**: 매일 07:00 KST
-- **기능**: 오늘의 AI 인사이트 및 요약 카드 자동 생성
+- **기능**: 오늘의 AI 인사이트 및 요약 카드 생성 (서버가 생성하며 AI 호출 포함)
 - **아키텍처 문서**: 3.7.1 섹션 (3911줄)
 
 ### 4. 일일 통계 업데이트 (daily-statistics-update)
@@ -37,13 +37,13 @@ Zero-Management Platform을 위한 자동화 배치 작업들입니다.
 
 ### 6. 학생 이탈 위험 분석 (student-risk-analysis)
 - **스케줄**: 실시간 호출 (프론트엔드에서 요청 시)
-- **기능**: ChatGPT API를 사용하여 학생의 출결·상담 패턴을 종합 분석하여 이탈 위험도 평가
+- **기능**: 서버가 ChatGPT API를 호출하여 학생의 출결·상담 패턴을 종합 분석하여 이탈 위험도 평가
 - **아키텍처 문서**: 3.7.3 섹션
 - **Zero-Trust 준수**: JWT에서 tenant_id 추출 (요청 본문에서 받지 않음)
 
 ### 7. 상담일지 AI 요약 생성 (consultation-ai-summary)
 - **스케줄**: 실시간 호출 (프론트엔드에서 요청 시)
-- **기능**: ChatGPT API를 사용하여 상담일지 내용을 요약
+- **기능**: 서버가 ChatGPT API를 호출하여 상담일지 내용을 요약
 - **아키텍처 문서**: 3.1.5, 3.7.1 섹션
 - **Zero-Trust 준수**: JWT에서 tenant_id 추출 (요청 본문에서 받지 않음)
 - **PII 마스킹**: 상담일지 요약 시 개인정보 마스킹 필수 (아키텍처 문서 3.1.5, 898-950줄)
@@ -238,7 +238,7 @@ WHERE jobname IN (
 - 결석 이벤트 → StudentTaskCard 생성
 - 상담일지 저장 → StudentTaskCard 생성
 - 신규 학생 등록 → StudentTaskCard 생성
-- 상담일지 저장 → AI 자동 요약 생성 (아키텍처 문서 324줄)
+- 상담일지 저장 → 서버가 AI 요약 생성 (아키텍처 문서 324줄)
 
 **072_create_payment_notification_triggers.sql:**
 - 결제 완료 → 결제 완료 알림 발송 (아키텍처 문서 2451줄, 영수증은 알림뱅킹에서 자동 발송)

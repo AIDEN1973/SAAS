@@ -32,8 +32,8 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
   const [formData, setFormData] = useState<CreateSchemaInput>(() => {
     const baseSchemaJson = currentFormSchema || schema?.schema_json || {
       version: '1.0.0',
-      minClient: '1.0.0',  // SDUI v1.1: minClient 우선
-      minSupportedClient: '1.0.0',  // 하위 호환성
+      minClient: '1.0.0',  // 레거시 입력 허용: minSupportedClient가 정본, minClient는 레거시 (저장 시 minSupportedClient로 정규화)
+      minSupportedClient: '1.0.0',  // 정본 (필수)
       entity: '',
       type: 'form',
       form: {
@@ -50,8 +50,8 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
       entity: schema?.entity || '',
       industry_type: schema?.industry_type || null,
       version: schema?.version || '1.0.0',
-      minClient: schema?.min_client || schema?.min_supported_client || '1.0.0',  // SDUI v1.1: minClient 우선
-      minSupportedClient: schema?.min_supported_client || '1.0.0',  // 하위 호환성
+      minClient: schema?.min_client || null,  // 레거시 입력 허용: minSupportedClient가 정본
+      minSupportedClient: schema?.min_supported_client || schema?.min_client || '1.0.0',  // 정본 (우선순위 1)
       schema_json: baseSchemaJson,
       migration_script: schema?.migration_script || null,
       status: 'draft',
@@ -80,13 +80,13 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
       const schemaJsonToSave = currentFormSchema || formData.schema_json;
 
       // entity, version 등 기본 정보 업데이트
-      // SDUI v1.1: minClient 우선, minSupportedClient는 하위 호환성
+      // 정본 규칙: minSupportedClient가 정본 (필수), minClient는 레거시 입력 허용 (저장 시 minSupportedClient로 정규화)
       const finalSchemaJson: UISchema = {
         ...schemaJsonToSave,
         entity: formData.entity,
         version: formData.version,
-        minClient: formData.minClient || formData.minSupportedClient,  // SDUI v1.1: minClient 우선
-        minSupportedClient: formData.minSupportedClient,  // 하위 호환성
+        minClient: formData.minClient || undefined,  // 레거시 입력 허용: 저장 시 minSupportedClient로 정규화
+        minSupportedClient: formData.minSupportedClient || formData.minClient || '1.0.0',  // 정본 (우선순위 1)
       };
 
       // Client-Side Validation
@@ -103,8 +103,8 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
           input: {
             schema_json: finalSchemaJson,
             migration_script: formData.migration_script,
-            minClient: formData.minClient || formData.minSupportedClient,  // SDUI v1.1: minClient 우선
-            minSupportedClient: formData.minSupportedClient,  // 하위 호환성
+            minClient: formData.minClient || undefined,  // 레거시 입력 허용: 저장 시 minSupportedClient로 정규화
+            minSupportedClient: formData.minSupportedClient || formData.minClient || '1.0.0',  // 정본 (우선순위 1)
           },
           expectedUpdatedAt: schema.updated_at, // Optimistic Locking
         });
@@ -152,7 +152,7 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
             <option value="">공통 (null)</option>
             <option value="academy">학원 (academy)</option>
             <option value="salon">미용실 (salon)</option>
-            <option value="realestate">부동산 (realestate)</option>
+            <option value="real_estate">부동산 (real_estate)</option>  {/* 정본: 언더스코어 필수 */}
             <option value="gym">체육관 (gym)</option>
             <option value="ngo">NGO</option>
           </Select>
@@ -171,19 +171,19 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
         />
 
         <Input
-          label="최소 클라이언트 버전 (minClient)"
+          label="최소 클라이언트 버전 (minClient, 레거시)"
           value={formData.minClient || formData.minSupportedClient || ''}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFieldChange('minClient', e.target.value || null)}
           placeholder="1.0.0"
-          helperText="SDUI v1.1: 이 스키마를 사용하려면 클라이언트 앱이 이 버전 이상이어야 합니다. minClient가 우선 사용되며, 보통 스키마 버전과 동일하게 설정합니다."
+          helperText="레거시 필드: minSupportedClient가 정본입니다. 이 필드는 레거시 입력 허용용이며, 저장 시 min_supported_client로 정규화됩니다."
           required
         />
         <Input
-          label="최소 지원 클라이언트 버전 (minSupportedClient, 하위 호환성)"
+          label="최소 지원 클라이언트 버전 (minSupportedClient, 정본 필수)"
           value={formData.minSupportedClient}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFieldChange('minSupportedClient', e.target.value)}
           placeholder="1.0.0"
-          helperText="하위 호환성: minClient가 없을 때 사용됩니다. 일반적으로 minClient와 동일한 값을 설정합니다."
+          helperText="정본 필드 (필수): 이 스키마를 사용하려면 클라이언트 앱이 이 버전 이상이어야 합니다. minClient는 레거시 입력 허용용이며, 저장 시 이 값으로 정규화됩니다."
         />
 
         <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginTop: 'var(--spacing-md)' }}>
@@ -205,4 +205,3 @@ export function SchemaEditorForm({ schema, currentFormSchema, onSave, onSchemaJs
     </Card>
   );
 }
-

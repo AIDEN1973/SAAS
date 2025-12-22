@@ -1,13 +1,13 @@
 /**
- * 중앙 ?�경변??관�??�스??
+ * 중앙 환경변수 관리 레지스트리
  *
- * ?�용�?
- * - ?�버/Edge: import { envServer } from '@env-registry/core/server'
- * - ?�라?�언?? import { envClient } from '@env-registry/core/client'
- * - 공통: import { envCommon } from '@env-registry/core/common'
+ * 사용법:
+ * - 서버/Edge: import { envServer } from '@env-registry/server'
+ * - 클라이언트: import { envClient } from '@env-registry/client'
+ * - 공통: import { envCommon } from '@env-registry/common'
  *
- * ?�️ 주의: ??index.ts?�서???�버 ?�용 코드�?export?��? ?�습?�다.
- * ?�라?�언?�에??'@env-registry/core'�?import?�도 ?�버 코드가 번들???�함?��? ?�습?�다.
+ * ⚠️ 주의: 이 index.ts에서는 서버 전용 코드를 export하지 않습니다.
+ * 클라이언트에서 '@env-registry'를 import해도 서버 코드가 번들에 포함되지 않습니다.
  */
 export { envClient } from './client';
 export type { EnvClient } from './schema';

@@ -60,3 +60,13 @@ export const envServer = validateEnvServer();
 
 // 안전한 타입으로 접근
 // 사용 예: envServer.SUPABASE_URL, envServer.SERVICE_ROLE_KEY
+
+/**
+ * 플랫폼 AI 기능 온오프 확인
+ * SSOT: 프론트 자동화 문서 "글로벌 헤더 AI 토글 — UX/정책 SSOT" 섹션 참조
+ *
+ * @returns 플랫폼 AI 기능이 활성화되어 있으면 true, 아니면 false
+ */
+export function getPlatformAIEnabled(): boolean {
+  return envServer.PLATFORM_AI_ENABLED ?? true; // 기본값: true (활성화)
+}

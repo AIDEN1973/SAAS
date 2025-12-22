@@ -4,6 +4,7 @@
 
 export {
   useConfig,
+  useTenantSettingByPath,
   useUpdateConfig,
 } from './useConfig';
 

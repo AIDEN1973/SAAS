@@ -6,6 +6,7 @@ export {
   useAttendanceNotifications,
   useQRAttendance,
   useAttendanceLogs,
+  fetchAttendanceLogs,
   useCreateAttendanceLog,
   useUpdateAttendanceLog,
   useDeleteAttendanceLog,

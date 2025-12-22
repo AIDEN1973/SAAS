@@ -5,13 +5,15 @@
 ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
 
 -- 테넌트 소속 사용자는 자신의 테넌트만 조회 가능
+-- [불변 규칙] JWT claim 기반 RLS 사용 (PgBouncer Transaction Pooling 호환)
 DROP POLICY IF EXISTS tenant_isolation_tenants ON public.tenants;
 CREATE POLICY tenant_isolation_tenants ON public.tenants
 FOR SELECT TO authenticated
 USING (
-  id IN (
-    SELECT tenant_id FROM public.user_tenant_roles
-    WHERE user_id = auth.uid()
+  id = (auth.jwt() ->> 'tenant_id')::uuid
+  OR EXISTS (
+    SELECT 1 FROM public.user_platform_roles
+    WHERE user_id = auth.uid() AND role = 'super_admin'
   )
 );
 
@@ -44,16 +46,18 @@ DROP POLICY IF EXISTS tenant_isolation_tenant_settings ON public.tenant_settings
 CREATE POLICY tenant_isolation_tenant_settings ON public.tenant_settings
 FOR ALL TO authenticated
 USING (
-  tenant_id IN (
-    SELECT tenant_id FROM public.user_tenant_roles
-    WHERE user_id = auth.uid()
+  tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
+  OR EXISTS (
+    SELECT 1 FROM public.user_platform_roles
+    WHERE user_id = auth.uid() AND role = 'super_admin'
   )
 )
 WITH CHECK (
-  tenant_id IN (
-    SELECT tenant_id FROM public.user_tenant_roles
-    WHERE user_id = auth.uid()
-    AND role IN ('owner', 'admin', 'sub_admin')
+  (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
+   AND ((auth.jwt() ->> 'role'::text) IN ('owner', 'admin', 'sub_admin')))
+  OR EXISTS (
+    SELECT 1 FROM public.user_platform_roles
+    WHERE user_id = auth.uid() AND role = 'super_admin'
   )
 );
 
@@ -64,16 +68,18 @@ DROP POLICY IF EXISTS tenant_isolation_tenant_features ON public.tenant_features
 CREATE POLICY tenant_isolation_tenant_features ON public.tenant_features
 FOR ALL TO authenticated
 USING (
-  tenant_id IN (
-    SELECT tenant_id FROM public.user_tenant_roles
-    WHERE user_id = auth.uid()
+  tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
+  OR EXISTS (
+    SELECT 1 FROM public.user_platform_roles
+    WHERE user_id = auth.uid() AND role = 'super_admin'
   )
 )
 WITH CHECK (
-  tenant_id IN (
-    SELECT tenant_id FROM public.user_tenant_roles
-    WHERE user_id = auth.uid()
-    AND role IN ('owner', 'admin')
+  (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
+   AND ((auth.jwt() ->> 'role'::text) IN ('owner', 'admin')))
+  OR EXISTS (
+    SELECT 1 FROM public.user_platform_roles
+    WHERE user_id = auth.uid() AND role = 'super_admin'
   )
 );
 

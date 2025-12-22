@@ -119,16 +119,16 @@ export class ApiClient {
 
       // [불변 규칙] SELECT 쿼리는 반드시 withTenant()를 사용하여 tenant_id 필터를 강제합니다.
       // 단, 공통 테이블(tenant_id 컬럼이 없는 테이블)은 예외 처리
-      // 공통 테이블: industry_themes (tenant_id 없음), schema-registry (meta 스키마)
+      // 공통 테이블: industry_themes (tenant_id 없음), schema_registry (meta 스키마 View)
       // tenant_theme_overrides는 tenant_id가 primary key이지만, filters에 이미 명시되어 있으므로 withTenant 사용
-      const isCommonTable = table === 'industry_themes' || table.startsWith('schema-registry/');
+      const isCommonTable = table === 'industry_themes' || table === 'schema_registry' || table.startsWith('schema-registry/');
       const query = isCommonTable ? baseQuery : withTenant(baseQuery, context.tenantId);
 
       const { data, error, count } = await query;
 
       if (error) {
         // schema-registry 요청의 404 에러는 조용히 처리 (스키마가 없을 수 있음)
-        const isSchemaRegistryRequest = table.startsWith('schema-registry/');
+        const isSchemaRegistryRequest = table === 'schema_registry' || table.startsWith('schema-registry/');
         const isNotFoundError = error.code === 'PGRST116' ||
           error.code === 'PGRST204' ||
           error.message?.toLowerCase().includes('404') ||
@@ -427,6 +427,67 @@ export class ApiClient {
   }
 
   /**
+   * Edge Function 호출
+   *
+   * [불변 규칙] Zero-Trust: JWT 토큰이 자동으로 포함됩니다
+   * [불변 규칙] Edge Function은 JWT에서 tenant_id를 추출합니다 (요청 본문에서 받지 않음)
+   *
+   * @param functionName Edge Function 이름 (예: 'student-risk-analysis')
+   * @param body 요청 본문 (선택사항)
+   */
+  async invokeFunction<T = unknown>(
+    functionName: string,
+    body?: Record<string, unknown>
+  ): Promise<ApiResponse<T>> {
+    try {
+      const context = getApiContext();
+
+      if (!context?.tenantId) {
+        return {
+          success: false,
+          error: {
+            message: 'Tenant ID is required',
+            code: 'TENANT_ID_REQUIRED',
+          },
+          data: undefined,
+        };
+      }
+
+      // Edge Function 호출
+      // [불변 규칙] JWT 토큰은 supabase client에 자동으로 포함됩니다
+      const { data, error } = await this.supabase.functions.invoke<T>(functionName, {
+        body: body || {},
+      });
+
+      if (error) {
+        return {
+          success: false,
+          error: {
+            message: error.message || 'Edge Function 호출에 실패했습니다.',
+            code: error.name || 'EDGE_FUNCTION_ERROR',
+          },
+          data: undefined,
+        };
+      }
+
+      return {
+        success: true,
+        data: data as T,
+        error: undefined,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'UNKNOWN_ERROR',
+        },
+        data: undefined,
+      };
+    }
+  }
+
+  /**
    * 커스텀 엔드포인트 호출 (Edge Function 또는 RPC 함수)
    */
   async callCustom<T = unknown>(
@@ -446,6 +507,12 @@ export class ApiClient {
           },
           data: undefined,
         };
+      }
+
+      // Edge Function 경로인지 확인 (functions/v1/로 시작)
+      if (endpoint.startsWith('functions/v1/')) {
+        const functionName = endpoint.replace('functions/v1/', '');
+        return this.invokeFunction<T>(functionName, body as Record<string, unknown>);
       }
 
       // 일반적인 경우는 기존 메서드를 사용

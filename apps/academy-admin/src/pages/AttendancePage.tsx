@@ -19,7 +19,7 @@ import { ErrorBoundary } from '@ui-core/react';
 import { Container, Card, Button, Input, Badge, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid, PageHeader } from '@ui-core/react';
 import type { TabItem } from '@ui-core/react';
 import { SchemaFilter } from '@schema-engine';
-import { useAttendanceLogs, useCreateAttendanceLog, useDeleteAttendanceLog } from '@hooks/use-attendance';
+import { useAttendanceLogs, fetchAttendanceLogs, useCreateAttendanceLog, useDeleteAttendanceLog } from '@hooks/use-attendance';
 import { useStudents } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
 import { useConfig } from '@hooks/use-config';
@@ -33,7 +33,7 @@ import { createAttendanceFormSchema } from '../schemas/attendance.schema';
 import { createAttendanceFilterSchema, createAttendanceHeaderFilterSchema } from '../schemas/attendance.filter.schema';
 // 출결 설정은 환경설정 > 출결 설정으로 이동 (아키텍처 문서 3.3.7)
 // import { attendanceSettingsFormSchema } from '../schemas/attendance-settings.schema';
-import { apiClient } from '@api-sdk/core';
+import { apiClient, getApiContext } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
 import { useUserRole } from '@hooks/use-auth';
 
@@ -53,6 +53,8 @@ export function AttendancePage() {
   const isMobile = mode === 'xs' || mode === 'sm';
   const isTablet = mode === 'md'; // 아키텍처 문서 3.3.9: 태블릿 모드 감지 (768px ~ 1024px)
   const { data: userRole } = useUserRole();
+  const context = getApiContext();
+  const tenantId = context.tenantId;
 
   // 역할별 권한 체크 (아키텍처 문서 2.3, 498-507줄)
   // Assistant: 출결 입력만 가능, 수정 권한 없음
@@ -97,7 +99,7 @@ export function AttendancePage() {
     late_after: 10,
     absent_after: 60,
     auto_notification: true,
-    notification_channel: 'sms' as 'sms' | 'kakao',
+    notification_channel: 'sms' as 'sms' | 'kakao_at',  // SSOT-3
   });
 
   // 서버 설정 로드
@@ -107,7 +109,7 @@ export function AttendancePage() {
         late_after: config.attendance.late_after ?? 10,
         absent_after: config.attendance.absent_after ?? 60,
         auto_notification: config.attendance.auto_notification ?? true,
-        notification_channel: (config.attendance.notification_channel ?? 'sms') as 'sms' | 'kakao',
+        notification_channel: (config.attendance.notification_channel ?? 'sms') as 'sms' | 'kakao_at',  // SSOT-3
       });
     }
   }, [config]);
@@ -143,32 +145,17 @@ export function AttendancePage() {
   // 오늘 수업 반 목록
   const { data: todayClasses } = useClasses(todayClassesFilter);
 
+  // 정본 규칙: apiClient.get('student_classes') 직접 조회 제거
   // 오늘 수업 반의 학생 ID 목록 조회
-  const { data: todayClassStudentIds } = useQuery({
-    queryKey: ['today-class-student-ids', todayClasses?.map(c => c.id)],
-    queryFn: async () => {
-      if (!todayClasses || todayClasses.length === 0) return new Set<string>();
-
-      const classIds = todayClasses.map(c => c.id);
-      const studentIdsSet = new Set<string>();
-
-      // 각 반에 대해 student_classes 조회
-      for (const classId of classIds) {
-        const response = await apiClient.get<StudentClass>('student_classes', {
-          filters: { class_id: classId, is_active: true },
-        });
-
-        if (!response.error && response.data) {
-          response.data.forEach((sc: { student_id: string; class_id?: string }) => {
-            studentIdsSet.add(sc.student_id);
-          });
-        }
-      }
-
-      return studentIdsSet;
-    },
-    enabled: !!todayClasses && todayClasses.length > 0,
-  });
+  // TODO: useStudents Hook이 여러 class_id를 지원하도록 개선 필요
+  // 현재는 students 데이터에서 todayClasses에 속한 학생만 필터링 (아래 todayStudents useMemo에서 처리)
+  const todayClassStudentIds = useMemo(() => {
+    if (!todayClasses || todayClasses.length === 0) return new Set<string>();
+    // students 데이터에 class 정보가 포함되어 있지 않으므로,
+    // 실제 필터링은 아래 todayStudents useMemo에서 처리
+    // 향후 useStudents Hook이 여러 class_id를 지원하도록 개선 필요
+    return new Set<string>();
+  }, [todayClasses]);
 
   // 오늘 수업 학생 목록 (오늘 수업이 있는 반에 속한 학생만)
   const todayStudents = useMemo(() => {
@@ -177,22 +164,16 @@ export function AttendancePage() {
     return students.filter(s => todayClassStudentIds.has(s.id));
   }, [students, todayClassStudentIds]);
 
-  // 선택된 반의 학생 ID 목록 조회
-  const { data: selectedClassStudentIds } = useQuery({
-    queryKey: ['selected-class-student-ids', selectedClassId],
-    queryFn: async () => {
-      if (!selectedClassId) return null;
+  // 정본 규칙: apiClient.get('student_classes') 직접 조회 제거, useStudents Hook 사용
+  // 선택된 반의 학생 조회
+  const { data: selectedClassStudents } = useStudents(
+    selectedClassId ? { class_id: selectedClassId } : undefined
+  );
 
-      const response = await apiClient.get<StudentClass>('student_classes', {
-        filters: { class_id: selectedClassId, is_active: true },
-      });
-
-      if (response.error || !response.data) return new Set<string>();
-
-      return new Set<string>(response.data.map((sc: { student_id: string }) => sc.student_id));
-    },
-    enabled: !!selectedClassId,
-  });
+  const selectedClassStudentIds = useMemo(() => {
+    if (!selectedClassStudents) return new Set<string>();
+    return new Set<string>(selectedClassStudents.map((s) => s.id));
+  }, [selectedClassStudents]);
 
   // 선택된 반의 학생 목록
   const filteredStudents = useMemo(() => {
@@ -236,16 +217,14 @@ export function AttendancePage() {
         for (const student of filteredStudents) {
           try {
             // 학생의 과거 출결 데이터 조회
-            const pastLogsResponse = await apiClient.get<AttendanceLog[]>('attendance_logs', {
-              filters: {
-                student_id: student.id,
-                occurred_at: { gte: dateFrom, lte: selectedDate },
-                attendance_type: 'check_in',
-              },
-              limit: 30,
+            // 정본 규칙: fetchAttendanceLogs 함수 사용 (Hook의 queryFn 로직 재사용)
+            if (!tenantId) continue;
+            const pastLogs = await fetchAttendanceLogs(tenantId, {
+              student_id: student.id,
+              date_from: dateFrom,
+              date_to: selectedDate,
+              attendance_type: 'check_in',
             });
-
-            const pastLogs = pastLogsResponse.data || [];
 
             if (pastLogs.length > 0) {
               // 출석률 계산

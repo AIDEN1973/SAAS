@@ -7,9 +7,9 @@
  * [요구사항] 자동 알림(등원/하원, 청구 생성, 미납 알림), 수동 메시지, 단체문자, 템플릿 관리, 예약 발송, 발송 내역 조회
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer, PageHeader } from '@ui-core/react';
+import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer, PageHeader, useIconSize, useIconStrokeWidth } from '@ui-core/react';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -19,6 +19,10 @@ import { notificationTemplateFormSchema } from '../schemas/notification-template
 import { bulkNotificationFormSchema } from '../schemas/bulk-notification.schema';
 import { notificationTableSchema } from '../schemas/notification.table.schema';
 import { autoNotificationSettingsFormSchema } from '../schemas/auto-notification-settings.schema';
+import { useStudentTaskCards } from '@hooks/use-student';
+import { useUpdateConfig } from '@hooks/use-config';
+import { fetchNotificationTemplates } from '@hooks/use-notification-templates';
+import { Sparkles } from 'lucide-react';
 
 export function NotificationsPage() {
   const { showAlert } = useModal();
@@ -28,11 +32,29 @@ export function NotificationsPage() {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
   const isTablet = mode === 'md';
+  const iconSize = useIconSize('--size-icon-base', 20);
+  const iconStrokeWidth = useIconStrokeWidth('--stroke-width-icon', 1.5);
 
   const [filter, setFilter] = useState<{ channel?: NotificationChannel; status?: NotificationStatus }>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [activeTab, setActiveTab] = useState<'history' | 'send' | 'templates' | 'bulk' | 'auto-settings'>('history');
+  const [aiDraftValues, setAiDraftValues] = useState<Record<string, unknown> | null>(null);
+
+  // AI 메시지 초안 제안 조회 (StudentTaskCard에서 task_type: 'ai_suggested', suggested_action.type: 'send_message' 필터링)
+  // 아키텍처 문서 3.5.1: AI 자동 초안 제안 모델
+  // 프론트 자동화 문서 2.2: StudentTaskCard (task_type: 'ai_suggested') 사용
+  const { data: studentTaskCards } = useStudentTaskCards();
+  const messageDraftSuggestions = useMemo(() => {
+    if (!studentTaskCards || !Array.isArray(studentTaskCards)) return [];
+    return studentTaskCards.filter(
+      (card) =>
+        card.task_type === 'ai_suggested' &&
+        (card.status === 'pending' || !card.status) && // status가 없으면 pending으로 간주
+        card.suggested_action?.type === 'send_message' &&
+        card.suggested_action?.payload?.message // 메시지 내용이 있는 경우만
+    );
+  }, [studentTaskCards]);
 
   // 스키마 조회 (Registry에서 가져오거나 fallback 사용)
   const { data: schema } = useSchema('notification', notificationFormSchema, 'form');
@@ -47,25 +69,8 @@ export function NotificationsPage() {
     queryFn: async () => {
       if (!tenantId) return [];
 
-      try {
-        const response = await apiClient.get<Array<{ id: string; name: string; channel: string; content: string; created_at: string }>>('notification_templates', {
-          filters: {},
-          orderBy: { column: 'created_at', ascending: false },
-        });
-
-        if (response.error) {
-          // 테이블이 아직 생성되지 않았을 수 있으므로 빈 배열 반환
-          if (response.error.message?.includes('does not exist') || response.error.message?.includes('relation')) {
-            return [];
-          }
-          throw new Error(response.error.message);
-        }
-
-        return response.data || [];
-      } catch (error) {
-        // 테이블이 없으면 빈 배열 반환
-      return [];
-      }
+      // 정본 규칙: fetchNotificationTemplates 함수 사용 (Hook의 queryFn 로직 재사용)
+      return await fetchNotificationTemplates(tenantId, {});
     },
     enabled: !!tenantId && activeTab === 'templates', // 템플릿 탭 활성화 시에만 조회
   });
@@ -105,60 +110,34 @@ export function NotificationsPage() {
   });
 
   // 자동 알림 설정 저장 (tenant_settings에 저장)
+  // SSOT-1: tenant_settings는 KV 구조이며, config는 컬럼이 아니라 key='config' row의 value(JSONB)입니다.
+  // 정본 규칙: apiClient.get('tenant_settings') 직접 호출 금지, useUpdateConfig Hook 사용
+  const updateConfig = useUpdateConfig();
   const saveAutoNotificationSettings = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
       if (!tenantId) throw new Error('Tenant ID is required');
 
-      // tenant_settings의 notification 섹션 업데이트
-      // [불변 규칙] Zero-Trust: tenant_id는 apiClient가 자동으로 주입하므로 filters에서 제거
-      const settingsResponse = await apiClient.get<Array<{ id: string; settings?: Record<string, unknown> }>>('tenant_settings', {
-        limit: 1,
-      });
-
-      let settingsId: string | null = null;
-      let currentSettings: Record<string, unknown> = {};
-
-      if (!settingsResponse.error && settingsResponse.data && Array.isArray(settingsResponse.data) && settingsResponse.data.length > 0) {
-        const firstItem = (settingsResponse.data[0] as unknown) as { id: string; settings?: Record<string, unknown> };
-        settingsId = firstItem.id;
-        currentSettings = firstItem.settings || {};
+      // SSOT-3: 'kakao' 저장 금지, 'kakao_at'로 정규화
+      let notificationChannel = data.notification_channel || 'sms';
+      if (notificationChannel === 'kakao') {
+        console.warn('[NotificationsPage] Legacy channel "kakao" detected, normalizing to "kakao_at"');
+        notificationChannel = 'kakao_at';
       }
 
-      const updatedSettings = {
-        ...currentSettings,
+      // 정본 규칙: useUpdateConfig Hook 사용
+      const updateInput = {
         notification: {
           auto_notification: {
             check_in: data.check_in_notification || false,
             check_out: data.check_out_notification || false,
             invoice_created: data.invoice_created_notification || false,
             overdue: data.overdue_notification || false,
-            channel: data.notification_channel || 'sms',
+            channel: notificationChannel,
           },
         },
       };
 
-      if (settingsId) {
-        const updateResponse = await apiClient.patch('tenant_settings', settingsId, {
-          settings: updatedSettings,
-        });
-
-        if (updateResponse.error) {
-          throw new Error(updateResponse.error.message);
-      }
-
-        return updateResponse.data;
-      } else {
-        // [불변 규칙] Zero-Trust: tenant_id는 RLS 정책에 의해 자동으로 설정되므로 제거
-        const createResponse = await apiClient.post<{ id: string; settings?: Record<string, unknown> }>('tenant_settings', {
-          settings: updatedSettings,
-        });
-
-        if (createResponse.error) {
-          throw new Error(createResponse.error.message);
-        }
-
-        return createResponse.data;
-      }
+      return await updateConfig.mutateAsync(updateInput);
     },
     onSuccess: () => {
       // setShowAutoNotificationSettings(false); // (미사용) 자동 알림 설정 Drawer/Modal 도입 시 사용
@@ -227,7 +206,7 @@ export function NotificationsPage() {
 
   const channelLabels: Record<NotificationChannel, string> = {
     sms: 'SMS',
-    kakao: '카카오 알림톡',
+    kakao_at: '카카오 알림톡',  // SSOT-3: 저장/실행용 코드는 'kakao_at', UI 표시명은 '카카오 알림톡'
   };
 
   // statusColors/statusLabels는 SchemaTable 스키마 기반 렌더링으로 대체됨 (미사용)
@@ -236,8 +215,28 @@ export function NotificationsPage() {
     try {
       await createNotification.mutateAsync(data);
       // 성공 시 모달 닫기는 onSuccess에서 처리됨
+      setAiDraftValues(null); // AI 초안 값 초기화
     } catch (error) {
       // 에러는 onError에서 처리됨
+    }
+  };
+
+  // AI 초안 적용 핸들러
+  // 아키텍처 문서 3.5.1: AI 자동 초안 제안 모델
+  // StudentTaskCard의 suggested_action.payload에서 message만 추출하여 폼에 적용
+  // recipient는 guardian_id 배열이므로 사용자가 직접 입력하도록 함
+  const handleApplyAIDraft = (suggestion: (typeof messageDraftSuggestions)[number]) => {
+    const payload = suggestion.suggested_action?.payload as Record<string, unknown> | undefined;
+    if (payload && payload.message) {
+      const draftValues: Record<string, unknown> = {
+        content: String(payload.message || ''),
+        channel: (payload.channel as NotificationChannel) || 'sms', // payload에 channel이 있으면 사용, 없으면 기본값 'sms'
+        recipient: '', // recipient_ids는 guardian ID 배열이므로 사용자가 직접 입력하도록 함
+      };
+      setAiDraftValues(draftValues);
+      setShowCreateForm(true);
+    } else {
+      showAlert('알림', 'AI 초안에 메시지 내용이 없습니다.');
     }
   };
 
@@ -318,7 +317,7 @@ export function NotificationsPage() {
               >
                 전체 채널
               </Button>
-              {(['sms', 'kakao'] as NotificationChannel[]).map((channel) => (
+              {(['sms', 'kakao_at'] as NotificationChannel[]).map((channel) => (
                 <Button
                   key={channel}
                   variant={filter.channel === channel ? 'solid' : 'outline'}
@@ -376,7 +375,10 @@ export function NotificationsPage() {
               {isMobile || isTablet ? (
                 <Drawer
                   isOpen={showCreateForm}
-                  onClose={() => setShowCreateForm(false)}
+                  onClose={() => {
+                    setShowCreateForm(false);
+                    setAiDraftValues(null);
+                  }}
                   title="새 메시지 발송"
                   position={isMobile ? 'bottom' : 'right'}
                   width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
@@ -384,7 +386,7 @@ export function NotificationsPage() {
                   <SchemaForm
                     schema={schema}
                     onSubmit={handleCreateNotification}
-                    defaultValues={{}}
+                    defaultValues={aiDraftValues || {}}
                     actionContext={{
                       apiCall: async (endpoint: string, method: string, body?: unknown) => {
                         if (method === 'POST') {
@@ -409,14 +411,17 @@ export function NotificationsPage() {
               ) : (
                 <Modal
                   isOpen={showCreateForm}
-                  onClose={() => setShowCreateForm(false)}
+                  onClose={() => {
+                    setShowCreateForm(false);
+                    setAiDraftValues(null);
+                  }}
                   title="새 메시지 발송"
                   size="md"
                 >
                   <SchemaForm
                     schema={schema}
                     onSubmit={handleCreateNotification}
-                    defaultValues={{}}
+                    defaultValues={aiDraftValues || {}}
                     actionContext={{
                       apiCall: async (endpoint: string, method: string, body?: unknown) => {
                         if (method === 'POST') {
@@ -446,30 +451,113 @@ export function NotificationsPage() {
 
           {/* 메시지 발송 탭 */}
           {activeTab === 'send' && (
-            <Card padding="lg" variant="default">
-              <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
-                <Button
-                  variant="solid"
-                  onClick={() => setShowCreateForm(true)}
-                >
-                  새 메시지 발송
-                </Button>
-              </div>
+            <>
+              {/* AI 초안 제안 배너 (아키텍처 문서 3.5.1: AI 자동 초안 제안 모델) */}
+              {messageDraftSuggestions.length > 0 && (
+                <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', borderLeft: 'var(--border-width-thick) solid var(--color-info)' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-md)' }}>
+                    <Sparkles size={iconSize} strokeWidth={iconStrokeWidth} style={{ color: 'var(--color-info)', flexShrink: 0, marginTop: 'var(--spacing-xs)' }} />
+                    <div style={{ flex: 1 }}>
+                      <h4 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
+                        AI 메시지 초안 제안
+                      </h4>
+                      <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-sm)' }}>
+                        AI가 상황을 감지하여 메시지 초안을 준비했습니다. 초안을 적용하여 발송하시겠습니까?
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+                        {messageDraftSuggestions.slice(0, 3).map((suggestion) => (
+                          <Card
+                            key={suggestion.id}
+                            padding="sm"
+                            variant="outlined"
+                            tabIndex={0}
+                            aria-label={`${suggestion.title} - ${suggestion.description} 초안 적용`}
+                            style={{
+                              cursor: 'pointer',
+                              transition: 'var(--transition-all)',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                            onKeyDown={(e: React.KeyboardEvent) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleApplyAIDraft(suggestion);
+                              }
+                            }}
+                            onClick={() => handleApplyAIDraft(suggestion)}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--spacing-sm)' }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
+                                  {suggestion.title}
+                                </div>
+                                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                                  {suggestion.description}
+                                </div>
+                                {suggestion.source && (
+                                  <Badge variant="soft" color="info" style={{ fontSize: 'var(--font-size-xs)' }}>
+                                    {suggestion.source === 'attendance' ? '출결' :
+                                     suggestion.source === 'weather' ? '날씨' :
+                                     suggestion.source === 'billing' ? '청구' :
+                                     suggestion.source === 'behavior' ? '행동' :
+                                     suggestion.source === 'proactive_analysis' ? 'AI 분석' :
+                                     'AI 업무 카드'}
+                                  </Badge>
+                                )}
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleApplyAIDraft(suggestion);
+                                }}
+                              >
+                                적용
+                              </Button>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              <Card padding="lg" variant="default">
+                <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
+                  <Button
+                    variant="solid"
+                    onClick={() => {
+                      setAiDraftValues(null);
+                      setShowCreateForm(true);
+                    }}
+                  >
+                    새 메시지 발송
+                  </Button>
+                </div>
               {schema && (
                 <>
-                  {isMobile || isTablet ? (
-                    <Drawer
-                      isOpen={showCreateForm}
-                      onClose={() => setShowCreateForm(false)}
-                      title="새 메시지 발송"
-                      position={isMobile ? 'bottom' : 'right'}
-                      width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
-                    >
-                      <SchemaForm
-                        schema={schema}
-                        onSubmit={handleCreateNotification}
-                        defaultValues={{}}
-                        actionContext={{
+              {isMobile || isTablet ? (
+                <Drawer
+                  isOpen={showCreateForm}
+                  onClose={() => {
+                    setShowCreateForm(false);
+                    setAiDraftValues(null);
+                  }}
+                  title="새 메시지 발송"
+                  position={isMobile ? 'bottom' : 'right'}
+                  width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+                >
+                  <SchemaForm
+                    schema={schema}
+                    onSubmit={handleCreateNotification}
+                    defaultValues={aiDraftValues || {}}
+                    actionContext={{
                           apiCall: async (endpoint: string, method: string, body?: unknown) => {
                             if (method === 'POST') {
                               const response = await apiClient.post(endpoint, body as Record<string, unknown>);
@@ -500,7 +588,7 @@ export function NotificationsPage() {
                       <SchemaForm
                         schema={schema}
                         onSubmit={handleCreateNotification}
-                        defaultValues={{}}
+                        defaultValues={aiDraftValues || {}}
                         actionContext={{
                           apiCall: async (endpoint: string, method: string, body?: unknown) => {
                             if (method === 'POST') {
@@ -526,6 +614,7 @@ export function NotificationsPage() {
                 </>
               )}
             </Card>
+            </>
           )}
 
           {/* 템플릿 관리 탭 */}

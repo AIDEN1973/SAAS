@@ -83,14 +83,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         .trim();
       if (value.endsWith('rem')) {
         const remValue = parseFloat(value);
-        return remValue * 16; // rem을 px로 변환
+        // ⚠️ 중요: 하드코딩 금지, CSS 변수 사용
+        const baseFontSize = typeof window !== 'undefined'
+          ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
+          : 16;
+        return remValue * baseFontSize; // rem을 px로 변환
       } else if (value.endsWith('px')) {
         return parseFloat(value);
       } else if (value) {
         return Number(value);
       }
     }
-    return 16; // 기본값: 16px (--size-icon-sidebar 기본값)
+    return 16; // fallback (CSS 변수를 읽을 수 없는 경우만)
   }, []);
 
   // CSS 변수에서 닫기 버튼 아이콘 크기 읽기
@@ -101,14 +105,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         .trim();
       if (value.endsWith('rem')) {
         const remValue = parseFloat(value);
-        return remValue * 16; // rem을 px로 변환
+        // ⚠️ 중요: 하드코딩 금지, CSS 변수 사용
+        const baseFontSize = typeof window !== 'undefined'
+          ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
+          : 16;
+        return remValue * baseFontSize; // rem을 px로 변환
       } else if (value.endsWith('px')) {
         return parseFloat(value);
       } else if (value) {
         return Number(value);
       }
     }
-    return 20; // 기본값: 20px (--size-icon-sidebar-close 기본값)
+    return 20; // fallback (CSS 변수를 읽을 수 없는 경우만)
   }, []);
 
   const handleItemClick = (item: SidebarItem) => {

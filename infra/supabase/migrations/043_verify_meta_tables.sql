@@ -1,9 +1,9 @@
 /**
  * meta 스키마 테이블 생성 확인 및 수정
- * 
+ *
  * [불변 규칙] meta.schema_registry와 meta.tenant_schema_pins 테이블이 제대로 생성되었는지 확인
  * [불변 규칙] 기술문서 docu/스키마엔진.txt 4. Schema Registry (DB + RLS) 준수
- * 
+ *
  * 기술문서: docu/스키마엔진.txt 4. Schema Registry (DB + RLS)
  */
 
@@ -22,8 +22,8 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'meta' 
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'meta'
     AND table_name = 'schema_registry'
   ) THEN
     -- 테이블 생성
@@ -43,27 +43,27 @@ BEGIN
       deprecated_at timestamptz,
       UNIQUE(entity, industry_type, version)
     );
-    
+
     -- 인덱스 생성
     CREATE INDEX idx_schema_registry_entity ON meta.schema_registry(entity, industry_type, status);
     CREATE INDEX idx_schema_registry_version ON meta.schema_registry(entity, industry_type, version DESC);
-    
+
     -- RLS 활성화
     ALTER TABLE meta.schema_registry ENABLE ROW LEVEL SECURITY;
-    
+
     RAISE NOTICE 'meta.schema_registry 테이블 생성 완료';
   ELSE
     RAISE NOTICE 'meta.schema_registry 테이블 이미 존재';
-    
+
     -- min_client 컬럼이 없으면 추가
     IF NOT EXISTS (
-      SELECT 1 FROM information_schema.columns 
-      WHERE table_schema = 'meta' 
-      AND table_name = 'schema_registry' 
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'meta'
+      AND table_name = 'schema_registry'
       AND column_name = 'min_client'
     ) THEN
       ALTER TABLE meta.schema_registry ADD COLUMN min_client text;
-      COMMENT ON COLUMN meta.schema_registry.min_client IS 'SDUI v1.1: minClient가 우선, min_supported_client는 하위 호환성';
+      COMMENT ON COLUMN meta.schema_registry.min_client IS '레거시 입력 허용: min_supported_client가 정본, 저장 시 min_supported_client로 정규화';
       RAISE NOTICE 'min_client 컬럼 추가 완료';
     END IF;
   END IF;
@@ -73,20 +73,20 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'meta' 
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'meta'
     AND table_name = 'tenant_schema_pins'
   ) THEN
     -- tenants 테이블이 존재하는지 확인
     IF NOT EXISTS (
-      SELECT 1 FROM information_schema.tables 
-      WHERE table_schema = 'public' 
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public'
       AND table_name = 'tenants'
     ) THEN
       RAISE WARNING 'tenants 테이블이 없어 tenant_schema_pins 테이블을 생성할 수 없습니다.';
       RETURN;
     END IF;
-    
+
     -- 테이블 생성
     CREATE TABLE meta.tenant_schema_pins (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -99,14 +99,14 @@ BEGIN
       pinned_by uuid REFERENCES auth.users(id),
       UNIQUE(tenant_id, entity, industry_type)
     );
-    
+
     -- 인덱스 생성
     CREATE INDEX idx_tenant_schema_pins_tenant ON meta.tenant_schema_pins(tenant_id, entity);
     CREATE INDEX idx_tenant_schema_pins_version ON meta.tenant_schema_pins(entity, industry_type, pinned_version);
-    
+
     -- RLS 활성화
     ALTER TABLE meta.tenant_schema_pins ENABLE ROW LEVEL SECURITY;
-    
+
     RAISE NOTICE 'meta.tenant_schema_pins 테이블 생성 완료';
   ELSE
     RAISE NOTICE 'meta.tenant_schema_pins 테이블 이미 존재';
@@ -127,21 +127,21 @@ DECLARE
   v_tenant_schema_pins_exists boolean;
 BEGIN
   SELECT EXISTS (
-    SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'meta' 
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'meta'
     AND table_name = 'schema_registry'
   ) INTO v_schema_registry_exists;
-  
+
   SELECT EXISTS (
-    SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'meta' 
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'meta'
     AND table_name = 'tenant_schema_pins'
   ) INTO v_tenant_schema_pins_exists;
-  
+
   RAISE NOTICE '=== 테이블 생성 확인 ===';
   RAISE NOTICE 'meta.schema_registry: %', CASE WHEN v_schema_registry_exists THEN '✅ 존재' ELSE '❌ 없음' END;
   RAISE NOTICE 'meta.tenant_schema_pins: %', CASE WHEN v_tenant_schema_pins_exists THEN '✅ 존재' ELSE '❌ 없음' END;
-  
+
   IF NOT v_schema_registry_exists OR NOT v_tenant_schema_pins_exists THEN
     RAISE WARNING '일부 테이블이 생성되지 않았습니다. 마이그레이션을 다시 확인하세요.';
   END IF;

@@ -6,7 +6,8 @@
 CREATE TABLE IF NOT EXISTS public.tenants (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
-  industry_type text NOT NULL CHECK (industry_type IN ('academy', 'salon', 'realestate', 'gym', 'ngo')),
+  industry_type text NOT NULL CHECK (industry_type IN ('academy', 'salon', 'real_estate', 'gym', 'ngo')),  -- 정본: real_estate (언더스코어 필수)
+  -- ⚠️ 참고: 문서 예시에서 'nail' 업종이 언급되지만, 실제 DB 제약조건에 포함 여부는 마이그레이션 파일을 SSOT로 확인하세요.
   plan text NOT NULL DEFAULT 'basic' CHECK (plan IN ('basic', 'premium', 'enterprise')),
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'closed', 'deleting')),
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -21,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public.user_tenant_roles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  role text NOT NULL CHECK (role IN ('owner', 'admin', 'sub_admin', 'teacher', 'assistant', 'counselor', 'parent', 'staff')),
+  role text NOT NULL CHECK (role IN ('owner', 'admin', 'sub_admin', 'instructor', 'teacher', 'assistant', 'counselor', 'guardian', 'parent', 'staff')),  -- instructor/guardian은 정본 키, teacher/parent는 backward compatibility
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(user_id, tenant_id)  -- 한 사용자는 한 테넌트에 하나의 역할만

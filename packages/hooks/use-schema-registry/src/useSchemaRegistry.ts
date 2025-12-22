@@ -4,7 +4,7 @@
  * [불변 규칙] Zero-Trust: 모든 요청은 @api-sdk/core를 통해 전송
  * [불변 규칙] Schema Registry CRUD 작업
  *
- * ⚠️ 예외: meta.schema_registry는 공통 스키마이므로 tenant_id 컬럼이 없습니다.
+ * 예외: meta.schema_registry는 공통 스키마이므로 tenant_id 컬럼이 없습니다.
  * RPC 함수를 사용하여 접근하므로 createClient() 직접 사용이 필요합니다.
  *
  * 기술문서: docu/스키마에디터.txt 17. API 명세
@@ -22,7 +22,7 @@ export interface SchemaRegistryEntry {
   status: 'draft' | 'active' | 'deprecated';
   schema_json: UISchema;
   min_supported_client: string;
-  min_client?: string | null; // SDUI v1.1: minClient 추가
+  min_client?: string | null; // 레거시 입력 허용: minSupportedClient가 정본
   migration_script: string | null;
   registered_by: string | null; // RPC 함수는 registered_by 사용
   registered_at: string; // RPC 함수는 registered_at 사용
@@ -39,8 +39,8 @@ export interface CreateSchemaInput {
   entity: string;
   industry_type?: string | null;
   version: string;
-  minSupportedClient: string;
-  minClient?: string | null; // SDUI v1.1: minClient 추가
+  minSupportedClient: string; // 정본 (필수)
+  minClient?: string | null; // 레거시 입력 허용: minSupportedClient가 정본
   schema_json: UISchema;
   migration_script?: string | null;
   status?: 'draft' | 'active' | 'deprecated';
@@ -49,8 +49,8 @@ export interface CreateSchemaInput {
 export interface UpdateSchemaInput {
   schema_json: UISchema;
   migration_script?: string | null;
-  minSupportedClient?: string;
-  minClient?: string | null; // SDUI v1.1: minClient 추가
+  minSupportedClient?: string; // 정본 (우선순위 1)
+  minClient?: string | null; // 레거시 입력 허용: minSupportedClient가 정본
 }
 
 /**
@@ -69,7 +69,7 @@ export function useSchemaList(filters?: {
       const supabase = createClient();
 
       // RPC 함수 사용 (meta 스키마 접근)
-      // ⚠️ 중요: Supabase RPC는 모든 매개변수를 명시적으로 전달해야 함
+      // 중요: Supabase RPC는 모든 매개변수를 명시적으로 전달해야 함
       const { data, error } = await supabase.rpc('get_schema_registry_list', {
         p_entity: filters?.entity ?? null,
         p_industry_type: filters?.industry_type ?? null,

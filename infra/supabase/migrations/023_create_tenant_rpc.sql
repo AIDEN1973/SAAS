@@ -25,11 +25,13 @@ BEGIN
   RETURNING id INTO v_tenant_id;
 
   -- 2. 테넌트 기본 설정 초기화
+  -- ⚠️ SSOT-2: industry_type은 tenants 테이블이 1차 소스이며, tenant_settings에 저장하지 않음
+  -- 아래 'industry' 키는 하위 호환성을 위한 것이며, 실제 industry_type 결정은 tenants 테이블에서 수행
   INSERT INTO public.tenant_settings (tenant_id, key, value)
   VALUES
     (v_tenant_id, 'timezone', '{"timezone": "Asia/Seoul"}'),
     (v_tenant_id, 'locale', '{"locale": "ko-KR"}'),
-    (v_tenant_id, 'industry', jsonb_build_object('industry_type', p_industry_type));
+    (v_tenant_id, 'industry', jsonb_build_object('industry_type', p_industry_type));  -- ⚠️ 하위 호환성용, SSOT는 tenants.industry_type
 
   -- 3. 테넌트 기능 설정 초기화
   INSERT INTO public.tenant_features (tenant_id, feature_key, enabled, quota)

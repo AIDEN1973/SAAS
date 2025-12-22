@@ -1,5 +1,5 @@
 /**
- * 미납 알림 자동 발송 배치 작업
+ * 미납 알림 발송 배치 작업 (서버가 발송)
  *
  * 아키텍처 문서 3.4.3 섹션 참조
  * 스케줄: 매일 09:00 KST (Supabase cron 설정 필요)
@@ -9,6 +9,10 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getTenantSettingByPath } from '../_shared/policy-utils.ts';
+import { assertAutomationEventType } from '../_shared/automation-event-catalog.ts';
+import { withTenant } from '../_shared/withTenant.ts';
+import { envServer } from '../_shared/env-registry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,25 +25,13 @@ serve(async (req) => {
   }
 
   try {
-    // 환경변수 검증
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl) {
-      throw new Error('SUPABASE_URL 환경변수가 설정되지 않았습니다.');
-    }
-    if (!supabaseServiceKey) {
-      throw new Error('SUPABASE_SERVICE_ROLE_KEY 환경변수가 설정되지 않았습니다.');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // [불변 규칙] Edge Functions도 env-registry를 통해 환경변수 접근
+    const supabase = createClient(envServer.SUPABASE_URL, envServer.SERVICE_ROLE_KEY);
 
     // 기술문서 19-1-2: KST 기준 날짜 처리
-    // Edge Functions는 Deno 환경이므로 수동으로 KST 변환 수행
-    const now = new Date();
-    const kstOffset = 9 * 60;
-    const kstTime = new Date(now.getTime() + (kstOffset * 60 * 1000));
-    const today = kstTime.toISOString().slice(0, 10);
+    // [불변 규칙] 파일명 생성 시 날짜 형식은 반드시 KST 기준을 사용합니다.
+    const kstTime = toKST();
+    const today = toKSTDate();
 
     console.log(`[Overdue Notification] Starting batch for ${today}`);
 
@@ -62,25 +54,57 @@ serve(async (req) => {
 
     let totalSent = 0;
 
+    // ⚠️ 중요: event_type 검증 (SSOT 강제, Fail-Closed)
+    const eventType = 'overdue_outstanding_over_limit';
+    assertAutomationEventType(eventType); // 카탈로그에 없는 event_type이면 즉시 에러
+
+    // ⚠️ 주의: notifications.event_type은 "notifications 테이블용 도메인 이벤트 타입"이며,
+    // 자동화 정책 경로의 event_type(예: overdue_outstanding_over_limit)과 다릅니다.
+    const NOTIFICATIONS_EVENT_TYPE_OVERDUE = 'overdue' as const;
+
     for (const tenant of tenants) {
       try {
-        // 자동 미납 알림 설정 확인
-        const { data: settings } = await supabase
-          .from('tenant_settings')
-          .select('settings')
-          .eq('tenant_id', tenant.id)
-          .single();
 
-        const autoOverdueNotification = settings?.settings?.notification?.auto_notification?.overdue ?? false;
-        const notificationChannel = settings?.settings?.notification?.auto_notification?.channel ?? 'sms';
-
-        if (!autoOverdueNotification) {
-          console.log(`[Overdue Notification] Auto notification disabled for tenant ${tenant.id}`);
+        // ⚠️ 중요: 미납 알림 발송 Policy 확인 (서버가 발송, Fail Closed)
+        // 신규 경로 우선, 없으면 레거시 경로 제한적 fallback
+        const autoOverdueNotificationPolicy = await getTenantSettingByPath(
+          supabase,
+          tenant.id,
+          `auto_notification.${eventType}.enabled`,
+          'auto_notification.overdue.enabled' // 레거시 경로 fallback
+        );
+        if (!autoOverdueNotificationPolicy || autoOverdueNotificationPolicy !== true) {
+          // Policy가 없거나 비활성화되어 있으면 실행하지 않음 (Fail Closed)
+          console.log(`[Overdue Notification] Auto notification disabled for tenant ${tenant.id}, skipping`);
           continue;
         }
 
+        // ⚠️ 중요: 미납 알림 채널 Policy 조회 (Fail Closed)
+        // 신규 경로 우선, 없으면 레거시 경로 제한적 fallback
+        const notificationChannelPolicy = await getTenantSettingByPath(
+          supabase,
+          tenant.id,
+          `auto_notification.${eventType}.channel`,
+          'auto_notification.overdue.channel' // 레거시 경로 fallback
+        );
+        // SSOT-3: 'kakao' 저장 금지, 'kakao_at'로 정규화
+        let notificationChannel: string;
+        if (notificationChannelPolicy && typeof notificationChannelPolicy === 'string') {
+          notificationChannel = notificationChannelPolicy;
+        } else {
+          // Policy가 없으면 실행하지 않음 (Fail Closed)
+          console.log(`[Overdue Notification] Notification channel policy not found for tenant ${tenant.id}, skipping`);
+          continue;
+        }
+        if (notificationChannel === 'kakao') {
+          console.warn(`[Overdue Notification] Legacy channel 'kakao' detected for tenant ${tenant.id}, normalizing to 'kakao_at'`);
+          notificationChannel = 'kakao_at';
+        }
+        // Policy에서 조회한 값만 사용 (정규화 후)
+
         // 기한이 지난 미납 청구서 조회
-        const { data: overdueInvoices, error: invoicesError } = await supabase
+        const { data: overdueInvoices, error: invoicesError } = await withTenant(
+          supabase
           .from('invoices')
           .select(`
             id,
@@ -91,9 +115,10 @@ serve(async (req) => {
             invoice_number,
             persons!invoices_payer_id_fkey(id, name)
           `)
-          .eq('tenant_id', tenant.id)
           .in('status', ['pending', 'overdue'])
-          .lt('due_date', today);
+            .lt('due_date', today),
+          tenant.id
+        );
 
         if (invoicesError) {
           console.error(`[Overdue Notification] Failed to fetch invoices for tenant ${tenant.id}:`, invoicesError);
@@ -107,27 +132,31 @@ serve(async (req) => {
         // 각 미납 청구서에 대해 알림 발송
         for (const invoice of overdueInvoices) {
           // 이미 오늘 발송된 알림이 있는지 확인
-          const { data: existingNotification } = await supabase
+          const { data: existingNotification } = await withTenant(
+            supabase
             .from('notifications')
             .select('id')
-            .eq('tenant_id', tenant.id)
-            .eq('event_type', 'overdue')
+            .eq('event_type', NOTIFICATIONS_EVENT_TYPE_OVERDUE)
             .eq('template_data->>invoice_id', invoice.id)
             .gte('created_at', `${today}T00:00:00`)
-            .limit(1);
+              .limit(1),
+            tenant.id
+          );
 
           if (existingNotification && existingNotification.length > 0) {
             continue; // 이미 오늘 발송됨
           }
 
           // 학부모 정보 조회
-          const { data: guardians } = await supabase
+          const { data: guardians } = await withTenant(
+            supabase
             .from('guardians')
             .select('id, phone, is_primary')
             .eq('student_id', invoice.payer_id)
-            .eq('tenant_id', tenant.id)
             .order('is_primary', { ascending: false })
-            .limit(1);
+              .limit(1),
+            tenant.id
+          );
 
           if (!guardians || guardians.length === 0) {
             continue;
@@ -146,7 +175,7 @@ serve(async (req) => {
               recipient_type: 'guardian',
               recipient_id: guardian.id,
               channel: notificationChannel,
-              event_type: 'overdue',
+              event_type: NOTIFICATIONS_EVENT_TYPE_OVERDUE,
               template_key: 'billing_overdue_academy_v1',
               template_data: {
                 student_name: invoice.persons?.name || '학생',
@@ -157,7 +186,7 @@ serve(async (req) => {
                 invoice_id: invoice.id,
               },
               status: 'pending',
-              scheduled_at: kstTime.toISOString(),
+              scheduled_at: toKST().toISOString(),
             });
 
           if (!notificationError) {

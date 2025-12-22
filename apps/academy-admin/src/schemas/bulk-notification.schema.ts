@@ -27,7 +27,7 @@ export const bulkNotificationFormSchema: FormSchema = {
         },
         options: [
           { value: 'sms', label: 'SMS' },
-          { value: 'kakao', label: '카카오 알림톡' },
+          { value: 'kakao_at', label: '카카오 알림톡' },  // SSOT-3: 저장/실행용 코드는 'kakao_at', UI 표시명은 '카카오 알림톡'
         ],
         validation: {
           required: true,

@@ -106,7 +106,7 @@ export const signupFormSchema: FormSchema = {
         options: [
           { label: '학원', value: 'academy' },
           { label: '미용실', value: 'salon' },
-          { label: '부동산', value: 'realestate' },
+          { label: '부동산', value: 'real_estate' },  // 정본: real_estate (언더스코어 필수)
           { label: '헬스장', value: 'gym' },
           { label: '비영리단체', value: 'ngo' },
         ],

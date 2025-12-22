@@ -14,6 +14,20 @@ import type {
   TenantRole,
 } from './types';
 
+/**
+ * 테넌트 기능 타입 정의
+ * SSOT: 프론트 자동화 문서 "글로벌 헤더 AI 토글 — UX/정책 SSOT" 섹션 참조
+ */
+export interface TenantFeature {
+  id: string;
+  tenant_id: string;
+  feature_key: string;
+  enabled: boolean;
+  quota: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export class TenancyService {
   private supabase = createServerClient();
 
@@ -162,6 +176,93 @@ export class TenancyService {
 }
 
 /**
+ * 테넌트 기능 서비스
+ * SSOT: 프론트 자동화 문서 "글로벌 헤더 AI 토글 — UX/정책 SSOT" 섹션 참조
+ */
+export class TenantFeatureService {
+  private supabase = createServerClient();
+
+  /**
+   * 테넌트의 특정 기능 조회
+   * @param tenantId 테넌트 ID
+   * @param featureKey 기능 키 (예: 'ai')
+   * @returns 기능 정보 또는 null
+   */
+  async getTenantFeature(tenantId: string, featureKey: string): Promise<TenantFeature | null> {
+    const { data, error } = await withTenant(
+      this.supabase
+        .from('tenant_features')
+        .select('*')
+        .eq('feature_key', featureKey),
+      tenantId
+    ).single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // 레코드가 없으면 null 반환 (기본값: enabled = true)
+        return null;
+      }
+      throw new Error(`Failed to fetch tenant feature: ${error.message}`);
+    }
+
+    return data as TenantFeature;
+  }
+
+  /**
+   * 테넌트 기능 업데이트
+   * @param tenantId 테넌트 ID
+   * @param featureKey 기능 키
+   * @param enabled 활성화 여부
+   */
+  async updateTenantFeature(
+    tenantId: string,
+    featureKey: string,
+    enabled: boolean
+  ): Promise<TenantFeature> {
+    // 먼저 기존 레코드 확인
+    const existing = await this.getTenantFeature(tenantId, featureKey);
+
+    if (existing) {
+      // 업데이트
+      const { data, error } = await withTenant(
+        this.supabase
+          .from('tenant_features')
+          .update({ enabled, updated_at: new Date().toISOString() })
+          .eq('feature_key', featureKey)
+          .select(),
+        tenantId
+      ).single();
+
+      if (error) {
+        throw new Error(`Failed to update tenant feature: ${error.message}`);
+      }
+
+      return data as TenantFeature;
+    } else {
+      // 새로 생성
+      const { data, error } = await withTenant(
+        this.supabase
+          .from('tenant_features')
+          .insert({
+            feature_key: featureKey,
+            enabled,
+            quota: null,
+          })
+          .select(),
+        tenantId
+      ).single();
+
+      if (error) {
+        throw new Error(`Failed to create tenant feature: ${error.message}`);
+      }
+
+      return data as TenantFeature;
+    }
+  }
+}
+
+/**
  * Default Service Instance
  */
 export const tenancyService = new TenancyService();
+export const tenantFeatureService = new TenantFeatureService();

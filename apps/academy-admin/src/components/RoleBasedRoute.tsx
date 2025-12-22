@@ -66,6 +66,19 @@ const roleRouteRules: Record<TenantRole, string[]> = {
     // /billing/** 접근 금지
     // /analytics/** 접근 금지 (요약만 제공)
   ],
+  instructor: [
+    '/home',
+    '/attendance/**',
+    '/students/home', // 학생 홈 접근 가능
+    '/students/list', // 학생 목록 접근 가능 (읽기 전용)
+    '/students/:id', // 학생 상세 접근 가능 (수정 제한)
+    '/students/:id/counsel', // 상담일지 작성 접근 가능
+    '/students/:id/attendance', // 출결 조회 접근 가능
+    '/ai/insights/summary', // AI 요약 접근 가능 (상세 분석 제한)
+    '/classes', // 반 목록 접근 가능
+    // /billing/** 접근 금지
+    // /analytics/** 접근 금지 (요약만 제공)
+  ],
   assistant: [
     '/home',
     '/attendance/**',
@@ -83,6 +96,7 @@ const roleRouteRules: Record<TenantRole, string[]> = {
     '/attendance/**',
   ],
   parent: [], // 학부모는 academy-parent 앱 사용
+  guardian: [], // 학부모는 academy-parent 앱 사용
   staff: [
     '/home',
     '/students/**',
@@ -179,9 +193,11 @@ export function RoleBasedRoute({ children, allowedRoles, fallbackPath = '/home' 
       owner: '/home',
       sub_admin: '/home',
       teacher: '/attendance',
+      instructor: '/attendance',
       assistant: '/attendance',
       counselor: '/students/home',
       parent: '/home',
+      guardian: '/home',
       staff: '/home',
       manager: '/home',
       super_admin: '/home',
@@ -208,9 +224,11 @@ export function RoleBasedRoute({ children, allowedRoles, fallbackPath = '/home' 
       owner: '/home',
       sub_admin: '/home',
       teacher: '/attendance',
+      instructor: '/attendance',
       assistant: '/attendance',
       counselor: '/students/home',
       parent: '/home',
+      guardian: '/home',
       staff: '/home',
       manager: '/home',
       super_admin: '/home',

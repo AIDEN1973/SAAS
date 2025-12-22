@@ -13,7 +13,9 @@ function excludeServerCode(): Plugin {
         id === '@env-registry/core/server' ||
         id === '@lib/supabase-client/server' ||
         id === '@core/schema-registry' ||
-        id.includes('core-schema-registry')
+        id.includes('core-schema-registry') ||
+        id === '@industry/academy/seed' ||
+        id.includes('industry-academy/src/seed')
       ) {
         // 클라이언트 빌드에서는 빈 모듈 반환
         return { id: 'data:text/javascript,export default {}', external: true };
@@ -25,7 +27,8 @@ function excludeServerCode(): Plugin {
       if (
         id.includes('/server.ts') ||
         id.includes('/server.js') ||
-        id.includes('core-schema-registry')
+        id.includes('core-schema-registry') ||
+        (id.includes('industry-academy') && id.includes('/seed'))
       ) {
         return 'export default {};';
       }
@@ -108,8 +111,8 @@ export default defineConfig(({ mode }) => {
       // NEXT_PUBLIC_* 값도 VITE_*로 주입하여 env-registry에서 접근 가능하도록 함
       define,
       plugins: [react(), excludeServerCode()],
-  resolve: {
-    alias: [
+      resolve: {
+        alias: [
       { find: '@ui-core/react/styles', replacement: path.resolve(__dirname, '../../packages/ui-core/src/styles.css') },
       { find: '@ui-core/react', replacement: path.resolve(__dirname, '../../packages/ui-core/src') },
       { find: '@lib/supabase-client/server', replacement: path.resolve(__dirname, '../../packages/lib/supabase-client/src/server.ts') },
@@ -144,17 +147,17 @@ export default defineConfig(({ mode }) => {
       { find: '@api-sdk', replacement: path.resolve(__dirname, '../../packages/api-sdk/src') },
       { find: '@services', replacement: path.resolve(__dirname, '../../packages/services') },
       { find: '@hooks', replacement: path.resolve(__dirname, '../../packages/hooks') },
-      { find: '@core', replacement: path.resolve(__dirname, '../../packages/core') },
-    ],
-  },
-  optimizeDeps: {
-    exclude: [
-      // 서버 전용 코드는 클라이언트 번들에서 제외
-      '@lib/supabase-client/server',
-      '@env-registry/core/server',
-      '@core/schema-registry',
-    ],
-  },
+        { find: '@core', replacement: path.resolve(__dirname, '../../packages/core') },
+        ],
+      },
+      optimizeDeps: {
+        exclude: [
+          // 서버 전용 코드는 클라이언트 번들에서 제외
+          '@lib/supabase-client/server',
+          '@env-registry/core/server',
+          '@core/schema-registry',
+        ],
+      },
       server: {
         port: 3002,
       },
@@ -168,4 +171,3 @@ export default defineConfig(({ mode }) => {
     });
   }
 });
-

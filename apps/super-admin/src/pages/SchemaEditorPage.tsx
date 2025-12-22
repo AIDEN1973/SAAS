@@ -42,8 +42,8 @@ export function SchemaEditorPage() {
     if (isCreating) {
       return {
         version: '1.0.0',
-        minClient: '1.0.0',  // SDUI v1.1: minClient 우선
-        minSupportedClient: '1.0.0',  // 하위 호환성
+        minClient: '1.0.0',  // 레거시 입력 허용: minSupportedClient가 정본
+        minSupportedClient: '1.0.0',  // 정본 (필수)
         entity: '',
         type: 'form',
         form: {

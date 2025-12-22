@@ -6,17 +6,17 @@
  * - 학생 출결 이상 탐지 (실시간 감지 및 업데이트 - 아키텍처 문서 4097줄, Phase 1부터 적용)
  * - 반/과목 성과 분석
  * - 지역 대비 부족 영역 분석
- * - 월간 운영 리포트 자동 생성
+ * - 서버가 월간 운영 리포트 생성 (AI 호출 포함)
  * - 주간 브리핑 (매주 월요일 07:00 - 아키텍처 문서 3581줄, Phase 1)
  *
  * [Phase 2+ 범위] 아키텍처 문서 3582줄:
- * - Daily briefing (매일 07:00 자동 생성)
+ * - Daily briefing (서버가 매일 07:00 생성, AI 호출 포함)
  * - 고급 인사이트 실시간 감지
  *
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] SDUI 스키마 기반 화면 자동 생성 (아키텍처 문서 352줄: AI 인사이트는 30% SDUI)
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
- * [요구사항] 상담일지 자동 요약, 출결 이상 탐지, 반/과목 성과 분석, 지역 대비 부족 영역 분석, 월간 운영 리포트 자동 생성
+ * [요구사항] 서버가 상담일지 AI 요약 생성, 출결 이상 탐지, 반/과목 성과 분석, 지역 대비 부족 영역 분석, 서버가 월간 운영 리포트 생성 (AI 호출 포함)
  *
  * [문서 준수]
  * - 아키텍처 문서: 3.7.1 (AI 브리핑 카드, AI-First Workflow, 요약 카드 중심)
@@ -38,11 +38,16 @@ import { SchemaForm } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { toKST } from '@lib/date-utils';
-import { useStudents, useGenerateConsultationAISummary } from '@hooks/use-student';
-import type { Invoice } from '@core/billing';
+import { useStudents, useGenerateConsultationAISummary, fetchConsultations, fetchPersons } from '@hooks/use-student';
+import { fetchAttendanceLogs } from '@hooks/use-attendance';
+import { fetchBillingHistory } from '@hooks/use-billing';
+import { fetchAIInsights } from '@hooks/use-ai-insights';
+import { fetchClasses } from '@hooks/use-class';
+import type { BillingHistoryItem } from '@hooks/use-billing';
 import type { AttendanceLog } from '@services/attendance-service';
 import type { Student, StudentConsultation } from '@services/student-service';
 import type { Class } from '@services/class-service';
+import type { Person } from '@core/party';
 import { studentSelectFormSchema } from '../schemas/student-select.schema';
 import { useUserRole } from '@hooks/use-auth';
 
@@ -89,33 +94,26 @@ export function AIPage() {
         action_url?: string;
         details?: Record<string, unknown>;
       }
-      const weeklyBriefingResponse = await apiClient.get<WeeklyBriefingInsight>('ai_insights', {
-        filters: {
-          insight_type: 'weekly_briefing', // Phase 1: 주간 브리핑
-          created_at: { gte: `${thisWeekMonday}T00:00:00` },
-          status: 'active',
-        },
-        orderBy: { column: 'created_at', ascending: false },
-        limit: 1,
+      // 정본 규칙: fetchAIInsights 함수 사용 (Hook의 queryFn 로직 재사용)
+      const weeklyBriefingInsights = await fetchAIInsights(tenantId, {
+        insight_type: 'weekly_briefing', // Phase 1: 주간 브리핑
+        created_at: { gte: `${thisWeekMonday}T00:00:00` },
+        status: 'active',
       });
 
       // weekly_briefing이 없으면 daily_briefing으로 fallback (Phase 2+ 호환성)
       let weeklyBriefing: WeeklyBriefingInsight | null = null;
-      if (!weeklyBriefingResponse.error && weeklyBriefingResponse.data && weeklyBriefingResponse.data.length > 0) {
-        weeklyBriefing = weeklyBriefingResponse.data[0];
+      if (weeklyBriefingInsights && weeklyBriefingInsights.length > 0) {
+        weeklyBriefing = weeklyBriefingInsights[0] as WeeklyBriefingInsight;
       } else {
         // Phase 2+ 호환: daily_briefing 조회 (이번 주 월요일 이후)
-        const dailyBriefingResponse = await apiClient.get<WeeklyBriefingInsight>('ai_insights', {
-          filters: {
-            insight_type: 'daily_briefing',
-            created_at: { gte: `${thisWeekMonday}T00:00:00` },
-            status: 'active',
-          },
-          orderBy: { column: 'created_at', ascending: false },
-          limit: 1,
+        const dailyBriefingInsights = await fetchAIInsights(tenantId, {
+          insight_type: 'daily_briefing',
+          created_at: { gte: `${thisWeekMonday}T00:00:00` },
+          status: 'active',
         });
-        if (!dailyBriefingResponse.error && dailyBriefingResponse.data && dailyBriefingResponse.data.length > 0) {
-          weeklyBriefing = dailyBriefingResponse.data[0];
+        if (dailyBriefingInsights && dailyBriefingInsights.length > 0) {
+          weeklyBriefing = dailyBriefingInsights[0] as WeeklyBriefingInsight;
         }
       }
 
@@ -127,36 +125,28 @@ export function AIPage() {
         metadata?: { student_name?: string };
         details?: { recommendation?: string };
       }
-      const attendanceAnomalyResponse = await apiClient.get<AttendanceAnomalyInsight>('ai_insights', {
-        filters: {
-          insight_type: 'attendance_anomaly',
-          created_at: { gte: `${todayDate}T00:00:00` },
-          status: 'active',
-        },
-        orderBy: { column: 'created_at', ascending: false },
-        limit: 10,
+      // 정본 규칙: fetchAIInsights 함수 사용 (Hook의 queryFn 로직 재사용)
+      const attendanceAnomalyInsights = await fetchAIInsights(tenantId, {
+        insight_type: 'attendance_anomaly',
+        created_at: { gte: `${todayDate}T00:00:00` },
+        status: 'active',
       });
 
       const attendanceAnomalies: Array<{ student_id: string; student_name: string; issue: string; recommendation: string }> = [];
-      if (!attendanceAnomalyResponse.error && attendanceAnomalyResponse.data) {
-        attendanceAnomalies.push(...(attendanceAnomalyResponse.data || []).map((insight: AttendanceAnomalyInsight) => ({
+      if (attendanceAnomalyInsights && attendanceAnomalyInsights.length > 0) {
+        attendanceAnomalies.push(...attendanceAnomalyInsights.map((insight) => ({
           student_id: insight.related_entity_id || '',
-          student_name: insight.metadata?.student_name || '알 수 없음',
-          issue: insight.summary,
-          recommendation: insight.details?.recommendation || '학생의 출석 패턴을 분석하고 상담을 진행하세요.',
+          student_name: (insight.metadata?.student_name as string) || '알 수 없음',
+          issue: insight.summary || '',
+          recommendation: (insight.details?.recommendation as string) || '학생의 출석 패턴을 분석하고 상담을 진행하세요.',
         })));
       }
 
       // ai_insights 테이블에 데이터가 없는 경우 fallback: 출결 데이터 기반 간단한 분석
+      // 정본 규칙: fetchAttendanceLogs 함수 사용 (Hook의 queryFn 로직 재사용)
       let attendanceLogs: AttendanceLog[] = [];
       if (attendanceAnomalies.length === 0) {
-        const attendanceLogsResponse = await apiClient.get<AttendanceLog>('attendance_logs', {
-          filters: {},
-          orderBy: { column: 'occurred_at', ascending: false },
-          limit: 100,
-        });
-
-        attendanceLogs = attendanceLogsResponse.data || [];
+        attendanceLogs = await fetchAttendanceLogs(tenantId, {});
 
         // 학생별 출결 패턴 분석
         const studentAttendanceMap = new Map<string, { present: number; absent: number; late: number; total: number }>();
@@ -187,13 +177,13 @@ export function AIPage() {
           .map(([studentId]) => studentId);
 
         // 학생 정보 일괄 조회
+        // 정본 규칙: fetchPersons 함수 사용 (Hook의 queryFn 로직 재사용)
         if (anomalyStudentIds.length > 0) {
-          const studentsResponse = await apiClient.get<Student[]>('persons', {
-            filters: { id: { in: anomalyStudentIds } },
+          const persons = await fetchPersons(tenantId, {
+            id: anomalyStudentIds, // 배열을 직접 전달하면 ApiClient가 자동으로 .in() 처리
+            person_type: 'student',
           });
-
-          const students = (studentsResponse.data as unknown) as Student[] || [];
-          const studentMap = new Map(students.map((s: Student) => [s.id, s]));
+          const studentMap = new Map(persons.map((p: Person) => [p.id, p as unknown as Student]));
 
           for (const studentId of anomalyStudentIds) {
             const stats = studentAttendanceMap.get(studentId)!;
@@ -223,24 +213,21 @@ export function AIPage() {
         metadata?: { class_name?: string };
         details?: { performance?: string; trend?: string; recommendation?: string };
       }
-      const performanceAnalysisResponse = await apiClient.get<PerformanceAnalysisInsight>('ai_insights', {
-        filters: {
-          insight_type: 'performance_analysis',
-          created_at: { gte: `${todayDate}T00:00:00` },
-          status: 'active',
-        },
-        orderBy: { column: 'created_at', ascending: false },
-        limit: 10,
+      // 정본 규칙: fetchAIInsights 함수 사용 (Hook의 queryFn 로직 재사용)
+      const performanceAnalysisInsights = await fetchAIInsights(tenantId, {
+        insight_type: 'performance_analysis',
+        created_at: { gte: `${todayDate}T00:00:00` },
+        status: 'active',
       });
 
       let performanceAnalysis: Array<{ class_id: string; class_name: string; performance: string; trend: string; recommendation: string }> = [];
-      if (!performanceAnalysisResponse.error && performanceAnalysisResponse.data) {
-        performanceAnalysis = (performanceAnalysisResponse.data || []).map((insight: PerformanceAnalysisInsight) => ({
+      if (performanceAnalysisInsights && performanceAnalysisInsights.length > 0) {
+        performanceAnalysis = performanceAnalysisInsights.map((insight) => ({
           class_id: insight.related_entity_id || '',
-          class_name: insight.metadata?.class_name || '알 수 없음',
-          performance: insight.details?.performance || '보통',
-          trend: insight.details?.trend || '0%',
-          recommendation: insight.details?.recommendation || '출석률 개선을 위해 노력하세요.',
+          class_name: (insight.metadata?.class_name as string) || '알 수 없음',
+          performance: (insight.details?.performance as string) || '보통',
+          trend: (insight.details?.trend as string) || '0%',
+          recommendation: (insight.details?.recommendation as string) || '출석률 개선을 위해 노력하세요.',
         }));
       }
 
@@ -252,13 +239,9 @@ export function AIPage() {
         const classes = (classesResponse.data as unknown) as Class[] || [];
 
         // attendanceLogs가 비어있으면 다시 조회
+        // 정본 규칙: fetchAttendanceLogs 함수 사용 (Hook의 queryFn 로직 재사용)
         if (attendanceLogs.length === 0) {
-          const attendanceLogsResponse = await apiClient.get<AttendanceLog>('attendance_logs', {
-            filters: {},
-            orderBy: { column: 'occurred_at', ascending: false },
-            limit: 100,
-          });
-          attendanceLogs = attendanceLogsResponse.data || [];
+          attendanceLogs = await fetchAttendanceLogs(tenantId, {});
         }
 
         performanceAnalysis = classes.map((cls: Class) => {
@@ -288,23 +271,20 @@ export function AIPage() {
         summary: string;
         details?: { recommendation?: string };
       }
-      const regionalComparisonResponse = await apiClient.get<RegionalComparisonInsight>('ai_insights', {
-        filters: {
-          insight_type: 'regional_comparison',
-          created_at: { gte: `${todayDate}T00:00:00` },
-          status: 'active',
-        },
-        orderBy: { column: 'created_at', ascending: false },
-        limit: 10,
+      // 정본 규칙: fetchAIInsights 함수 사용 (Hook의 queryFn 로직 재사용)
+      const regionalComparisonInsights = await fetchAIInsights(tenantId, {
+        insight_type: 'regional_comparison',
+        created_at: { gte: `${todayDate}T00:00:00` },
+        status: 'active',
       });
 
       let regionalComparison: Array<{ area: string; status: string; gap: string; recommendation: string }> = [];
-      if (!regionalComparisonResponse.error && regionalComparisonResponse.data) {
-        regionalComparison = (regionalComparisonResponse.data || []).map((insight: RegionalComparisonInsight) => ({
-          area: insight.metadata?.area || '알 수 없음',
-          status: insight.metadata?.status || '보통',
-          gap: insight.summary,
-          recommendation: insight.details?.recommendation || '지역 평균과 비교하여 개선이 필요합니다.',
+      if (regionalComparisonInsights && regionalComparisonInsights.length > 0) {
+        regionalComparison = regionalComparisonInsights.map((insight) => ({
+          area: (insight.metadata?.area as string) || '알 수 없음',
+          status: (insight.metadata?.status as string) || '보통',
+          gap: insight.summary || '',
+          recommendation: (insight.details?.recommendation as string) || '지역 평균과 비교하여 개선이 필요합니다.',
         }));
       }
 
@@ -340,34 +320,28 @@ export function AIPage() {
 
       // TODO: Edge Function으로 리포트 생성 요청
       // 현재는 간단한 리포트 데이터 수집
+      // 정본 규칙: fetch 함수 사용 (Hook의 queryFn 로직 재사용)
       const currentMonth = toKST().format('YYYY-MM');
 
-      const invoicesResponse = await apiClient.get<Invoice>('invoices', {
-        filters: {
-          period_start: { gte: `${currentMonth}-01` },
-        },
+      const invoices = await fetchBillingHistory(tenantId, {
+        period_start: { gte: `${currentMonth}-01` },
       });
 
-      const studentsResponse = await apiClient.get<Student>('persons', {
-        filters: {},
+      // 정본 규칙: fetchPersons 함수 사용 (Hook의 queryFn 로직 재사용)
+      const students = await fetchPersons(tenantId, {
+        person_type: 'student',
       });
 
-      const attendanceLogsResponse = await apiClient.get<AttendanceLog>('attendance_logs', {
-        filters: {
-          occurred_at: { gte: `${currentMonth}-01T00:00:00` },
-        },
+      const attendanceLogs = await fetchAttendanceLogs(tenantId, {
+        date_from: `${currentMonth}-01T00:00:00`,
       });
-
-      const invoices = invoicesResponse.data || [];
-      const students = studentsResponse.data || [];
-      const attendanceLogs = attendanceLogsResponse.data || [];
 
       // 리포트 데이터 생성
       const reportData = {
         month: currentMonth,
         total_students: students.length,
         total_invoices: invoices.length,
-        total_revenue: invoices.reduce((sum: number, inv: Invoice) => sum + ((inv as Invoice & { amount_paid?: number }).amount_paid || 0), 0),
+        total_revenue: invoices.reduce((sum: number, inv: BillingHistoryItem) => sum + (inv.amount_paid || 0), 0),
         total_attendance: attendanceLogs.filter((log: AttendanceLog) => log.status === 'present').length,
         generated_at: toKST().toISOString(),
       };
@@ -471,7 +445,7 @@ export function AIPage() {
             </Card>
           ) : (
             <>
-              {/* 아키텍처 문서 3.7.1: 기본 화면에서는 AI가 자동 생성한 "요약 카드" 중심으로 표시 */}
+              {/* 아키텍처 문서 3.7.1: 기본 화면에서는 서버가 생성한 "요약 카드" 중심으로 표시 (일부 타입에서만 AI 호출 발생) */}
               {aiInsights && (
                 <>
                   {/* Phase 1 MVP: 주간 브리핑 카드 (아키텍처 문서 3581줄: 매주 월요일 07:00 생성) */}
@@ -672,21 +646,16 @@ function ConsultationSummaryTab() {
     queryFn: async () => {
       if (!selectedStudentId) return [];
 
-      const response = await apiClient.get<StudentConsultation>('student_consultations', {
-        filters: { student_id: selectedStudentId },
-        orderBy: { column: 'consultation_date', ascending: false },
+      // 정본 규칙: fetchConsultations 함수 사용 (Hook의 queryFn 로직 재사용)
+      if (!tenantId) return [];
+      return await fetchConsultations(tenantId, {
+        student_id: selectedStudentId,
       });
-
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-
-      return response.data || [];
     },
     enabled: !!tenantId && !!selectedStudentId,
   });
 
-  // AI 요약 생성
+  // 서버가 AI 요약 생성
   const generateAISummary = useGenerateConsultationAISummary();
 
   const handleGenerateSummary = async (consultationId: string) => {

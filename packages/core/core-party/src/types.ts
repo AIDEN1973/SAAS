@@ -1,11 +1,19 @@
 /**
  * Core Party Types
- * 
+ *
  * ?원/고객 공통 모델 (persons ?이?기반)
  * [불변 규칙] Core Layer는 Industry 모듈에 의존?? ?음
  */
 
-export type PersonType = 'student' | 'customer' | 'member' | 'resident' | 'donor' | 'teacher';
+export type PersonType =
+  | 'learner'  // 업종 중립 정본 키 (academy: 학생, salon: 고객 등)
+  | 'student'  // backward compatibility (deprecated, use learner)
+  | 'customer'
+  | 'member'
+  | 'resident'
+  | 'donor'
+  | 'instructor'  // 업종 중립 정본 키 (academy: 강사, salon: 스타일리스트 등)
+  | 'teacher';  // backward compatibility (deprecated, use instructor)
 
 export interface Person {
   id: string;

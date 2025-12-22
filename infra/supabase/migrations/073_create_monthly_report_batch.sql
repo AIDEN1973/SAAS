@@ -14,7 +14,7 @@
 -- Schedule: 0 14 28-31 * * (UTC 기준, 매월 말일)
 
 COMMENT ON FUNCTION create_risk_task_card IS
-'이탈 위험 감지 시 StudentTaskCard 생성 함수. AI 엔진에서 위험 점수 90 이상 감지 시 호출됨.';
+'이탈 위험 감지 시 TaskCard 생성 함수 (정본). AI 엔진에서 위험 점수 90 이상 감지 시 호출됨. StudentTaskCard는 학생용 별칭 (= TaskCard where entity_type=''student'')';
 
 -- 월말 리포트 생성은 별도 Edge Function으로 구현 필요
 -- 리포트 내용:

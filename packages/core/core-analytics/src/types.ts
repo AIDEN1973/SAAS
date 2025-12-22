@@ -22,9 +22,10 @@ export interface DailyMetrics {
   tenant_id: string;
   date: string;  // date (KST 기?)
   total_revenue?: number;
-  total_attendance?: number;
+  total_presence?: number;  // 업종 중립 정본 키 (academy: 출결, salon: 방문 등)
+  total_attendance?: number;  // backward compatibility (deprecated, use total_presence)
   no_show_count?: number;
-  new_students?: number;
+  new_active_persons?: number;  // 업종 중립: academy는 new_students로, salon은 new_customers로 해석
 }
 
 export interface MonthlyRevenue {

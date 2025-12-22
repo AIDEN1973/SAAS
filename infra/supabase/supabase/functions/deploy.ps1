@@ -28,7 +28,20 @@ $functions = @(
     "ai-briefing-generation",
     "daily-statistics-update",
     "overdue-notification-scheduler",
-    "student-risk-analysis"
+    "student-risk-analysis",
+    "execute-student-task",
+    "auto-message-suggestion",
+    "consultation-ai-summary",
+    "consultation-summary-worker",
+    "daily-automation-digest",
+    "financial-automation-batch",
+    "customer-retention-automation",
+    "capacity-optimization-automation",
+    "growth-marketing-automation",
+    "safety-compliance-automation",
+    "workforce-ops-automation",
+    "monthly-business-report",
+    "payment-webhook-handler"
 )
 
 $successCount = 0
@@ -36,9 +49,9 @@ $failedCount = 0
 
 foreach ($func in $functions) {
     Write-Host "📦 배포 중: $func" -ForegroundColor Yellow
-    
-    $result = supabase functions deploy $func --project-ref $ProjectRef --use-api
-    
+
+    supabase functions deploy $func --project-ref $ProjectRef --use-api --yes
+
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✅ $func 배포 성공" -ForegroundColor Green
         $successCount++

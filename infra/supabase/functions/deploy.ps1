@@ -47,7 +47,15 @@ $functions = @(
     "ai-briefing-generation",
     "daily-statistics-update",
     "overdue-notification-scheduler",
-    "student-risk-analysis"
+    "student-risk-analysis",
+    "execute-student-task",
+    "auto-message-suggestion",
+    "consultation-ai-summary",
+    "workforce-ops-automation",
+    "capacity-optimization-automation",
+    "growth-marketing-automation",
+    "customer-retention-automation",
+    "financial-automation-batch"
 )
 
 $successCount = 0

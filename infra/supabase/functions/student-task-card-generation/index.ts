@@ -9,6 +9,11 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getTenantSettingByPath } from '../_shared/policy-utils.ts';
+import { withTenant } from '../_shared/withTenant.ts';
+import { envServer } from '../_shared/env-registry.ts';
+import { toKSTDate, toKST } from '../_shared/date-utils.ts';
+import { createTaskCardWithDedup } from '../_shared/create-task-card-with-dedup.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,34 +26,22 @@ serve(async (req) => {
   }
 
   try {
-    // 환경변수 검증
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl) {
-      throw new Error('SUPABASE_URL 환경변수가 설정되지 않았습니다.');
-    }
-    if (!supabaseServiceKey) {
-      throw new Error('SUPABASE_SERVICE_ROLE_KEY 환경변수가 설정되지 않았습니다.');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // [불변 규칙] Edge Functions도 env-registry를 통해 환경변수 접근
+    const supabase = createClient(envServer.SUPABASE_URL, envServer.SERVICE_ROLE_KEY);
 
     // 기술문서 19-1-2: KST 기준 날짜 처리
-    // Edge Functions는 Deno 환경이므로 수동으로 KST 변환 수행
-    const now = new Date();
-    const kstOffset = 9 * 60;
-    const kstTime = new Date(now.getTime() + (kstOffset * 60 * 1000));
-    const today = kstTime.toISOString().slice(0, 10); // YYYY-MM-DD
-    const yesterday = new Date(kstTime.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    // [불변 규칙] 파일명 생성 시 날짜 형식은 반드시 KST 기준을 사용합니다.
+    const kstTime = toKST();
+    const today = toKSTDate(); // YYYY-MM-DD
+    const yesterday = toKSTDate(new Date(kstTime.getTime() - 24 * 60 * 60 * 1000));
 
     console.log(`[StudentTaskCard] Starting batch generation for ${today}`);
 
-    // 만료된 카드 정리
+    // 만료된 카드 정리 (정본)
     const { error: deleteError } = await supabase
-      .from('student_task_cards')
+      .from('task_cards')
       .delete()
-      .lt('expires_at', kstTime.toISOString());
+      .lt('expires_at', toKST().toISOString());
 
     if (deleteError) {
       console.error('[StudentTaskCard] Failed to delete expired cards:', deleteError);
@@ -77,121 +70,300 @@ serve(async (req) => {
 
     for (const tenant of tenants) {
       try {
-        // 결석 3일 이상 학생 확인
-        const threeDaysAgo = new Date(kstTime.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        // ⚠️ 중요: 이상 패턴 감지 Policy 확인 (Fail Closed, 업종 중립: 출결 이상 → 이상 패턴)
+        // SSOT 경로 우선: auto_notification.attendance_pattern_anomaly.enabled
+        // 레거시 fallback: 신규 경로가 없고 기존 값이 있을 때만 제한적 fallback (읽기만 허용, 쓰기 금지)
+        const anomalyDetectionPolicy = await getTenantSettingByPath(
+          supabase,
+          tenant.id,
+          'auto_notification.attendance_pattern_anomaly.enabled',
+          'attendance.anomaly_detection.enabled' // 레거시 fallback
+        );
+        if (!anomalyDetectionPolicy) {
+          // Policy가 없으면 실행하지 않음 (Fail Closed)
+          console.log(`[StudentTaskCard] Anomaly detection policy not found for tenant ${tenant.id}, skipping`);
+          continue;
+        }
+        if (anomalyDetectionPolicy !== true) {
+          // Policy가 비활성화되어 있으면 실행하지 않음
+          console.log(`[StudentTaskCard] Anomaly detection disabled for tenant ${tenant.id}, skipping`);
+          continue;
+        }
 
-        const { data: absentStudents, error: absentError } = await supabase
+        // ⚠️ 중요: 이상 패턴 감지 임계값 Policy 조회 (Fail Closed, 업종 중립)
+        const absenceThresholdPolicy = await getTenantSettingByPath(
+          supabase,
+          tenant.id,
+          'attendance.absence_threshold_days'
+        );
+        if (!absenceThresholdPolicy || typeof absenceThresholdPolicy !== 'number') {
+          // Policy가 없으면 실행하지 않음 (Fail Closed)
+          console.log(`[StudentTaskCard] Anomaly threshold policy not found for tenant ${tenant.id}, skipping`);
+          continue;
+        }
+        const thresholdDays = absenceThresholdPolicy; // Policy에서 조회한 값만 사용
+
+        // 이상 패턴 임계값 이상 대상 확인 (업종 중립: 학생 → 대상)
+        const thresholdDaysAgo = toKSTDate(new Date(kstTime.getTime() - thresholdDays * 24 * 60 * 60 * 1000));
+
+        const { data: absentRecords, error: absentError } = await withTenant(
+          supabase
           .from('attendance_logs')
           .select('student_id, occurred_at')
-          .eq('tenant_id', tenant.id)
           .eq('status', 'absent')
-          .gte('occurred_at', `${threeDaysAgo}T00:00:00`)
-          .lte('occurred_at', `${yesterday}T23:59:59`);
+          .gte('occurred_at', `${thresholdDaysAgo}T00:00:00`)
+            .lte('occurred_at', `${yesterday}T23:59:59`),
+          tenant.id
+        );
 
-        if (!absentError && absentStudents) {
-          // 학생별 결석 일수 집계
+        if (!absentError && absentRecords) {
+          // 대상별 미참석 일수 집계 (업종 중립: 학생 → 대상, 결석 → 미참석)
           const absentCounts = new Map<string, number>();
-          absentStudents.forEach((log: { student_id: string; occurred_at: string }) => {
+          absentRecords.forEach((log: { student_id: string; occurred_at: string }) => {
             const count = absentCounts.get(log.student_id) || 0;
             absentCounts.set(log.student_id, count + 1);
           });
 
-          // 3일 이상 결석한 학생에 대해 카드 생성
-          const cardsToCreate: Array<{ tenant_id: string; student_id: string; task_type: string; priority: number; title: string; description: string; action_url: string; expires_at: string; absence_days?: number; last_attendance_date?: string }> = [];
+          // 임계값 이상 미참석한 대상에 대해 카드 생성 (업종 중립)
+          // ⚠️ 중요: v3.3 정본 규칙 - UPSERT 사용 (프론트 자동화 문서 2.3 섹션 참조)
           for (const [studentId, count] of absentCounts.entries()) {
-            if (count >= 3) {
-              // 오늘 이미 생성된 카드 확인
-              const { data: existing } = await supabase
-                .from('student_task_cards')
-                .select('id')
-                .eq('tenant_id', tenant.id)
-                .eq('student_id', studentId)
-                .eq('task_type', 'absence')
-                .gte('created_at', `${today}T00:00:00`)
-                .single();
+            if (count >= thresholdDays) {
+              // ⚠️ 중요: 자동 실행 자기 억제 메커니즘 체크 (프론트 자동화 문서 2.5.2 섹션 참조)
+              const actionType = 'create_absence_task';
+              const todayStart = new Date(kstTime);
+              todayStart.setHours(0, 0, 0, 0);
+              const todayEnd = new Date(kstTime);
+              todayEnd.setHours(23, 59, 59, 999);
 
-              if (!existing) {
-                const expiresAt = new Date(kstTime.getTime() + 3 * 24 * 60 * 60 * 1000);
-                expiresAt.setHours(23, 59, 59, 999);
+              const { data: safetyState, error: safetyError } = await withTenant(
+                supabase
+                .from('automation_safety_state')
+                .select('*')
+                .eq('action_type', actionType)
+                .gte('window_start', todayStart.toISOString())
+                  .lte('window_end', todayEnd.toISOString()),
+                tenant.id
+              ).single();
 
-                cardsToCreate.push({
-                  tenant_id: tenant.id,
-                  student_id: studentId,
-                  task_type: 'absence',
-                  priority: 60 + count * 10, // 결석 일수에 따라 우선순위 증가
-                  title: `${count}일 연속 결석`,
-                  description: `학생이 ${count}일 연속 결석했습니다. 학부모 연락이 필요합니다.`,
-                  action_url: `/students/${studentId}/attendance`,
-                  expires_at: expiresAt.toISOString(),
-                  absence_days: count,
-                  parent_contact_needed: true,
-                } as any); // 타입 확장: 실제 테이블에는 parent_contact_needed 필드가 있음
+              if (safetyError && safetyError.code !== 'PGRST116') {
+                console.error(`[StudentTaskCard] Failed to check automation safety for tenant ${tenant.id}:`, safetyError);
               }
+
+              // 안전성 체크
+              if (safetyState) {
+                if (safetyState.state === 'paused') {
+                  console.warn(`[StudentTaskCard] Skipping absence task generation for tenant ${tenant.id} due to paused state.`);
+                  continue;
+                }
+
+                if (safetyState.executed_count >= safetyState.max_allowed) {
+                  await supabase
+                    .from('automation_safety_state')
+                    .update({ state: 'paused' })
+                    .eq('id', safetyState.id);
+                  console.warn(`[StudentTaskCard] Skipping absence task generation for tenant ${tenant.id} due to safety limits.`);
+                  continue;
+                }
+
+                // 실행 카운트 증가
+                await supabase
+                  .from('automation_safety_state')
+                  .update({
+                    executed_count: safetyState.executed_count + 1,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', safetyState.id);
+            } else {
+              // 초기 상태 생성
+              // ⚠️ 중요: max_allowed는 Policy에서 조회 (Fail Closed)
+              // SSOT 경로 우선: auto_notification.attendance_pattern_anomaly.throttle.student_limit
+              // 레거시 fallback: 신규 경로가 없고 기존 값이 있을 때만 제한적 fallback (읽기만 허용, 쓰기 금지)
+              const taskGenerationLimitPolicy = await getTenantSettingByPath(
+                supabase,
+                tenant.id,
+                'auto_notification.attendance_pattern_anomaly.throttle.student_limit',
+                'auto_task_generation.student_limit' // 레거시 fallback
+              );
+              if (!taskGenerationLimitPolicy || typeof taskGenerationLimitPolicy !== 'number') {
+                // Policy가 없으면 실행하지 않음 (Fail Closed)
+                console.log(`[StudentTaskCard] Task generation limit policy not found for tenant ${tenant.id}, skipping`);
+                continue;
+              }
+              const maxAllowed = taskGenerationLimitPolicy; // Policy에서 조회한 값만 사용
+
+              await supabase.from('automation_safety_state').insert({
+                tenant_id: tenant.id,
+                action_type: actionType,
+                window_start: todayStart.toISOString(),
+                window_end: todayEnd.toISOString(),
+                max_allowed: maxAllowed,
+                state: 'normal',
+              });
             }
-          }
 
-          if (cardsToCreate.length > 0) {
-            const { error: insertError } = await supabase
-              .from('student_task_cards')
-              .insert(cardsToCreate);
+              const expiresAt = new Date(kstTime.getTime() + 3 * 24 * 60 * 60 * 1000);
+              expiresAt.setHours(23, 59, 59, 999);
 
-            if (!insertError) {
-              totalGenerated += cardsToCreate.length;
-              console.log(`[StudentTaskCard] Generated ${cardsToCreate.length} absence cards for tenant ${tenant.id}`);
+              // 정본 포맷: dedup_key = "{tenantId}:{trigger}:{entityType}:{entityId}:{window}"
+              const dedupKey = `${tenant.id}:absence:student:${studentId}:${today}`;
+
+              // ⚠️ 정본 규칙: 부분 유니크 인덱스 사용 시 Supabase client upsert() 직접 사용 불가
+              // RPC 함수 create_task_card_with_dedup_v1 사용 (프론트 자동화 문서 2.3 섹션 참조)
+              const result = await createTaskCardWithDedup(supabase, {
+                tenant_id: tenant.id,
+                student_id: studentId,
+                entity_id: studentId,  // entity_id = student_id (entity_type='student')
+                entity_type: 'student', // entity_type
+                task_type: 'absence',
+                source: 'attendance', // v3.3: source 필드 추가
+                priority: 60 + count * 10, // 미참석 일수에 따라 우선순위 증가 (0-100 스케일, 업종 중립)
+                title: `${count}일 연속 미참석`, // 업종 중립: 결석 → 미참석
+                description: `대상이 ${count}일 연속 미참석했습니다. 보호자 연락이 필요합니다.`, // 업종 중립: 학생 → 대상, 학부모 → 보호자
+                action_url: `/students/${studentId}/attendance`,
+                expires_at: expiresAt.toISOString(),
+                dedup_key: dedupKey, // v3.3: dedup_key 필드 추가
+                status: 'pending', // v3.3: status 필드 추가
+                suggested_action: { // v3.3: suggested_action 필드 추가
+                  type: 'contact_guardian', // 업종 중립: contact_parents → contact_guardian
+                  payload: { student_id: studentId, reason: '3_day_absence' },
+                },
+                metadata: {
+                  absence_days: count,
+                  guardian_contact_needed: true, // 업종 중립: parent → guardian
+                },
+              });
+
+              if (result) {
+                totalGenerated += 1;
+                console.log(`[StudentTaskCard] Created/updated absence card for student ${studentId} (tenant ${tenant.id})`);
+              } else {
+                console.error(`[StudentTaskCard] Failed to create absence card for student ${studentId}`);
+              }
             }
           }
         }
 
-        // 신규 등록 학생 확인 (최근 7일 이내)
-        const sevenDaysAgo = new Date(kstTime.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        // 신규 등록 대상 확인 (최근 7일 이내, 업종 중립: 학생 → 대상)
+        const sevenDaysAgo = toKSTDate(new Date(kstTime.getTime() - 7 * 24 * 60 * 60 * 1000));
 
-        const { data: newStudents, error: newStudentsError } = await supabase
+        const { data: newStudents, error: newStudentsError } = await withTenant(
+          supabase
           .from('persons')
           .select('id, created_at')
-          .eq('tenant_id', tenant.id)
           .eq('person_type', 'student')
           .gte('created_at', `${sevenDaysAgo}T00:00:00`)
-          .lte('created_at', `${today}T23:59:59`);
+            .lte('created_at', `${today}T23:59:59`),
+          tenant.id
+        );
 
         if (!newStudentsError && newStudents) {
-          const welcomeCards: Array<{ tenant_id: string; student_id: string; task_type: string; priority: number; title: string; description: string; action_url: string; expires_at: string; signup_date?: string }> = [];
+          // ⚠️ 중요: v3.3 정본 규칙 - UPSERT 사용 (프론트 자동화 문서 2.3 섹션 참조)
           for (const student of newStudents) {
-            // 오늘 이미 생성된 카드 확인
-            const { data: existing } = await supabase
-              .from('student_task_cards')
-              .select('id')
-              .eq('tenant_id', tenant.id)
-              .eq('student_id', student.id)
-              .eq('task_type', 'new_signup')
-              .single();
+            // ⚠️ 중요: 자동 실행 자기 억제 메커니즘 체크 (프론트 자동화 문서 2.5.2 섹션 참조)
+            const actionType = 'create_new_signup_task';
+            const todayStart = new Date(kstTime);
+            todayStart.setHours(0, 0, 0, 0);
+            const todayEnd = new Date(kstTime);
+            todayEnd.setHours(23, 59, 59, 999);
 
-            if (!existing) {
-              const expiresAt = new Date(kstTime.getTime() + 7 * 24 * 60 * 60 * 1000);
-              expiresAt.setHours(23, 59, 59, 999);
+            const { data: safetyState, error: safetyError } = await withTenant(
+              supabase
+              .from('automation_safety_state')
+              .select('*')
+              .eq('action_type', actionType)
+              .gte('window_start', todayStart.toISOString())
+                .lte('window_end', todayEnd.toISOString()),
+              tenant.id
+            ).single();
 
-              welcomeCards.push({
+            if (safetyError && safetyError.code !== 'PGRST116') {
+              console.error(`[StudentTaskCard] Failed to check automation safety for tenant ${tenant.id}:`, safetyError);
+            }
+
+            // 안전성 체크
+            if (safetyState) {
+              if (safetyState.state === 'paused') {
+                console.warn(`[StudentTaskCard] Skipping new signup task generation for tenant ${tenant.id} due to paused state.`);
+                continue;
+              }
+
+              if (safetyState.executed_count >= safetyState.max_allowed) {
+                await supabase
+                  .from('automation_safety_state')
+                  .update({ state: 'paused' })
+                  .eq('id', safetyState.id);
+                console.warn(`[StudentTaskCard] Skipping new signup task generation for tenant ${tenant.id} due to safety limits.`);
+                continue;
+              }
+
+              // 실행 카운트 증가
+              await supabase
+                .from('automation_safety_state')
+                .update({
+                  executed_count: safetyState.executed_count + 1,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', safetyState.id);
+            } else {
+              // 초기 상태 생성
+              // ⚠️ 중요: max_allowed는 Policy에서 조회 (Fail Closed)
+              // SSOT 경로 우선: auto_notification.attendance_pattern_anomaly.throttle.student_limit
+              // 레거시 fallback: 신규 경로가 없고 기존 값이 있을 때만 제한적 fallback (읽기만 허용, 쓰기 금지)
+              const taskGenerationLimitPolicy = await getTenantSettingByPath(
+                supabase,
+                tenant.id,
+                'auto_notification.attendance_pattern_anomaly.throttle.student_limit',
+                'auto_task_generation.student_limit' // 레거시 fallback
+              );
+              if (!taskGenerationLimitPolicy || typeof taskGenerationLimitPolicy !== 'number') {
+                // Policy가 없으면 실행하지 않음 (Fail Closed)
+                console.log(`[StudentTaskCard] Task generation limit policy not found for tenant ${tenant.id}, skipping`);
+                continue;
+              }
+              const maxAllowed = taskGenerationLimitPolicy; // Policy에서 조회한 값만 사용
+
+              await supabase.from('automation_safety_state').insert({
                 tenant_id: tenant.id,
-                student_id: student.id,
-                task_type: 'new_signup',
-                priority: 30,
-                title: '신규 등록 학생 환영',
-                description: '신규 등록 학생을 환영하고 초기 설정을 완료하세요.',
-                action_url: `/students/${student.id}/welcome`,
-                expires_at: expiresAt.toISOString(),
+                action_type: actionType,
+                window_start: todayStart.toISOString(),
+                window_end: todayEnd.toISOString(),
+                max_allowed: maxAllowed,
+                state: 'normal',
+              });
+            }
+
+            const expiresAt = new Date(kstTime.getTime() + 7 * 24 * 60 * 60 * 1000);
+            expiresAt.setHours(23, 59, 59, 999);
+
+            // 정본 포맷: dedup_key = "{tenantId}:{trigger}:{entityType}:{entityId}:{window}"
+            const dedupKey = `${tenant.id}:new_signup:student:${student.id}:${today}`;
+
+            // ⚠️ 정본 규칙: 부분 유니크 인덱스 사용 시 Supabase client upsert() 직접 사용 불가
+            // RPC 함수 create_task_card_with_dedup_v1 사용 (프론트 자동화 문서 2.3 섹션 참조)
+            const result = await createTaskCardWithDedup(supabase, {
+              tenant_id: tenant.id,
+              student_id: student.id,
+              entity_id: student.id,  // entity_id = student_id (entity_type='student')
+              entity_type: 'student', // entity_type
+              task_type: 'new_signup',
+              priority: 30, // 0-100 스케일
+              title: '신규 등록 대상 환영', // 업종 중립: 학생 → 대상
+              description: '신규 등록 대상을 환영하고 초기 설정을 완료하세요.', // 업종 중립: 학생 → 대상
+              action_url: `/students/${student.id}/welcome`,
+              expires_at: expiresAt.toISOString(),
+              dedup_key: dedupKey, // v3.3: dedup_key 필드 추가
+              status: 'pending', // v3.3: status 필드 추가
+              metadata: {
                 signup_date: student.created_at,
                 initial_setup_needed: true,
-              } as any); // 타입 확장: 실제 테이블에는 initial_setup_needed 필드가 있음
-            }
-          }
+              },
+            });
 
-          if (welcomeCards.length > 0) {
-            const { error: insertError } = await supabase
-              .from('student_task_cards')
-              .insert(welcomeCards);
-
-            if (!insertError) {
-              totalGenerated += welcomeCards.length;
-              console.log(`[StudentTaskCard] Generated ${welcomeCards.length} welcome cards for tenant ${tenant.id}`);
+            if (result) {
+              totalGenerated += 1;
+              console.log(`[StudentTaskCard] Created/updated welcome card for student ${student.id} (tenant ${tenant.id})`);
+            } else {
+              console.error(`[StudentTaskCard] Failed to create welcome card for student ${student.id}`);
             }
           }
         }
@@ -218,13 +390,3 @@ serve(async (req) => {
       }),
       {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
-  }
-});
-
-
-
-
-

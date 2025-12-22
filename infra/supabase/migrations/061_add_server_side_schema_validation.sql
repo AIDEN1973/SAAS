@@ -1,13 +1,13 @@
 /**
  * Server-Side Schema Validation 추가
- * 
+ *
  * [불변 규칙] 기술문서 docu/스키마에디터.txt 6.2 Server-Side Validation 준수
  * 모든 저장 요청에서 반드시 재검증하여:
  * - 스키마 위조 방지
  * - 보안 공격 방지 (XSS, Injection)
  * - Anti-Pattern 방지
  * - active/deprecated 수정 시도 차단
- * 
+ *
  * 기술문서: docu/스키마에디터.txt 6. Meta-Schema Validation — Dual Validation 구조
  */
 
@@ -40,71 +40,71 @@ BEGIN
   IF NOT (p_schema_json ? 'entity') THEN
     RETURN 'Schema must have "entity" field';
   END IF;
-  
+
   IF NOT (p_schema_json ? 'version') THEN
     RETURN 'Schema must have "version" field';
   END IF;
-  
+
   IF NOT (p_schema_json ? 'type') THEN
     RETURN 'Schema must have "type" field';
   END IF;
-  
+
   -- 필수 필드 값 추출
   v_entity := p_schema_json->>'entity';
   v_version := p_schema_json->>'version';
   v_type := p_schema_json->>'type';
   v_min_client := p_schema_json->>'minClient';
   v_min_supported_client := p_schema_json->>'minSupportedClient';
-  
+
   -- entity 검증
   IF v_entity IS NULL OR length(trim(v_entity)) = 0 THEN
     RETURN 'Schema "entity" must not be empty';
   END IF;
-  
+
   -- version 검증 (Semver)
   IF NOT public.validate_semver(v_version) THEN
     RETURN 'Schema "version" must be in Semver format (e.g., 1.0.0)';
   END IF;
-  
+
   -- type 검증
   IF v_type NOT IN ('form', 'table', 'detail', 'filter', 'widget') THEN
     RETURN 'Schema "type" must be one of: form, table, detail, filter, widget';
   END IF;
-  
-  -- minClient 검증 (SDUI v1.1: minClient 우선)
+
+  -- minClient 검증 (레거시 입력 허용)
   IF v_min_client IS NOT NULL AND NOT public.validate_semver(v_min_client) THEN
     RETURN 'Schema "minClient" must be in Semver format (e.g., 1.0.0)';
   END IF;
-  
-  -- minSupportedClient 검증 (하위 호환성)
+
+  -- minSupportedClient 검증 (정본 필드)
   IF v_min_supported_client IS NOT NULL AND NOT public.validate_semver(v_min_supported_client) THEN
     RETURN 'Schema "minSupportedClient" must be in Semver format (e.g., 1.0.0)';
   END IF;
-  
-  -- minClient 또는 minSupportedClient 중 하나는 필수
-  IF v_min_client IS NULL AND v_min_supported_client IS NULL THEN
-    RETURN 'Schema must have either "minClient" or "minSupportedClient"';
+
+  -- minSupportedClient는 필수 (정본 규칙)
+  IF v_min_supported_client IS NULL THEN
+    RETURN 'Schema must have "minSupportedClient" (required)';
   END IF;
-  
+
   -- type별 필수 구조 검증
   IF v_type = 'form' THEN
     IF NOT (p_schema_json ? 'form') THEN
       RETURN 'Form schema must have "form" field';
     END IF;
-    
+
     IF NOT (p_schema_json->'form' ? 'fields') THEN
       RETURN 'Form schema must have "form.fields" array';
     END IF;
-    
+
     IF jsonb_typeof(p_schema_json->'form'->'fields') != 'array' THEN
       RETURN 'Form schema "form.fields" must be an array';
     END IF;
   END IF;
-  
+
   -- Anti-Pattern 검증: Tailwind class 삽입 방지
   -- JSONB에서 문자열 값에 Tailwind class 패턴이 포함되어 있는지 확인
   -- (기본적인 패턴만 검사, 더 정교한 검증은 Edge Function에서 수행)
-  
+
   -- 성공
   RETURN NULL;
 END;
@@ -121,27 +121,27 @@ DECLARE
 BEGIN
   -- JSONB를 텍스트로 변환하여 위험한 패턴 검사
   v_schema_text := p_schema_json::text;
-  
+
   -- script 태그 검사
   IF v_schema_text ~* '<script' THEN
     RETURN 'Schema contains forbidden script tag (XSS prevention)';
   END IF;
-  
+
   -- onclick 등 이벤트 핸들러 검사
   IF v_schema_text ~* 'on\w+\s*=' THEN
     RETURN 'Schema contains forbidden event handlers (e.g., onclick, onerror)';
   END IF;
-  
+
   -- javascript: 프로토콜 검사
   IF v_schema_text ~* 'javascript:' THEN
     RETURN 'Schema contains forbidden javascript: protocol';
   END IF;
-  
+
   -- SQL Injection 패턴 검사 (기본적인 패턴만)
   IF v_schema_text ~* ';\s*(drop|delete|truncate|alter|create|insert|update)\s+' THEN
     RETURN 'Schema contains potentially dangerous SQL patterns';
   END IF;
-  
+
   -- 성공
   RETURN NULL;
 END;
@@ -165,37 +165,37 @@ BEGIN
   IF NOT public.validate_semver(p_version) THEN
     RETURN 'Version must be in Semver format (e.g., 1.0.0)';
   END IF;
-  
+
   IF p_min_client IS NOT NULL AND NOT public.validate_semver(p_min_client) THEN
     RETURN 'minClient must be in Semver format (e.g., 1.0.0)';
   END IF;
-  
+
   IF p_min_supported_client IS NOT NULL AND NOT public.validate_semver(p_min_supported_client) THEN
     RETURN 'minSupportedClient must be in Semver format (e.g., 1.0.0)';
   END IF;
-  
+
   -- 2. Schema JSON 구조 검증
   v_error := public.validate_schema_json_structure(p_schema_json);
   IF v_error IS NOT NULL THEN
     RETURN v_error;
   END IF;
-  
+
   -- 3. Schema JSON 보안 검증
   v_error := public.validate_schema_json_security(p_schema_json);
   IF v_error IS NOT NULL THEN
     RETURN v_error;
   END IF;
-  
+
   -- 4. version 일치 확인
   IF (p_schema_json->>'version') != p_version THEN
     RETURN 'Schema JSON version must match parameter version';
   END IF;
-  
-  -- 5. minClient 일치 확인 (SDUI v1.1)
-  IF p_min_client IS NOT NULL AND (p_schema_json->>'minClient') != p_min_client THEN
-    RETURN 'Schema JSON minClient must match parameter minClient';
+
+  -- 5. minSupportedClient 일치 확인 (정본 규칙)
+  IF p_min_supported_client IS NOT NULL AND (p_schema_json->>'minSupportedClient') != p_min_supported_client THEN
+    RETURN 'Schema JSON minSupportedClient must match parameter minSupportedClient';
   END IF;
-  
+
   -- 성공
   RETURN NULL;
 END;
@@ -243,7 +243,7 @@ BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Access denied. User not authenticated.';
   END IF;
-  
+
   IF NOT public.check_platform_role(auth.uid(), ARRAY['super_admin']) THEN
     RAISE EXCEPTION 'Access denied. Only super_admin can create schema registry.';
   END IF;
@@ -255,7 +255,7 @@ BEGIN
     p_min_client,
     p_min_supported_client
   );
-  
+
   IF v_validation_error IS NOT NULL THEN
     RAISE EXCEPTION 'Schema validation failed: %', v_validation_error;
   END IF;
@@ -327,7 +327,7 @@ BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Access denied. User not authenticated.';
   END IF;
-  
+
   IF NOT public.check_platform_role(auth.uid(), ARRAY['super_admin']) THEN
     RAISE EXCEPTION 'Access denied. Only super_admin can update schema registry.';
   END IF;
@@ -349,9 +349,9 @@ BEGIN
     RAISE EXCEPTION 'Only draft schemas can be updated.';
   END IF;
 
-  -- 최종 minClient/minSupportedClient 결정 (SDUI v1.1: minClient 우선)
+  -- 최종 minClient/minSupportedClient 결정 (정본 규칙: minSupportedClient 우선)
+  v_final_min_supported_client := COALESCE(p_min_supported_client, v_final_min_supported_client, p_min_client, v_final_min_client);
   v_final_min_client := COALESCE(p_min_client, v_final_min_client);
-  v_final_min_supported_client := COALESCE(p_min_supported_client, v_final_min_supported_client, v_final_min_client);
 
   -- Server-Side Validation (기술문서 6.2 준수)
   v_validation_error := public.validate_schema_registry(
@@ -360,13 +360,13 @@ BEGIN
     v_final_min_client,
     v_final_min_supported_client
   );
-  
+
   IF v_validation_error IS NOT NULL THEN
     RAISE EXCEPTION 'Schema validation failed: %', v_validation_error;
   END IF;
 
   UPDATE meta.schema_registry
-  SET 
+  SET
     schema_json = p_schema_json,
     migration_script = COALESCE(p_migration_script, migration_script),
     min_supported_client = v_final_min_supported_client,
@@ -374,8 +374,8 @@ BEGIN
   WHERE id = p_id
   RETURNING * INTO v_result;
 
-  RETURN QUERY 
-  SELECT 
+  RETURN QUERY
+  SELECT
     sr.id,
     sr.entity,
     sr.industry_type,

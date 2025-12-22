@@ -14,52 +14,74 @@ export class ConfigService {
 
   /**
    * 테넌트 설정 조회
+   *
+   * SSOT-1: tenant_settings는 KV 구조이며, config는 컬럼이 아니라 key='config' row의 value(JSONB)입니다.
+   * 내부 동작: 1) tenant_settings에서 tenant_id + key='config' row의 value(JSONB) 획득, 2) value(JSONB) 반환
    */
   async getConfig(tenantId: string): Promise<TenantConfig | null> {
     const { data, error } = await withTenant(
       this.supabase
         .from('tenant_settings')
-        .select('settings'),
+        .select('value')
+        .eq('key', 'config'),
       tenantId
     ).single();
 
     if (error) {
       if (error.code === 'PGRST116') {
-        return null; // Not found
+        return null; // Not found (Fail Closed)
       }
       throw new Error(`Failed to fetch config: ${error.message}`);
     }
 
-    return (data?.settings as TenantConfig) || null;
+    return (data?.value as TenantConfig) || null;
   }
 
   /**
    * 테넌트 설정 업데이트
+   *
+   * SSOT-1: tenant_settings는 KV 구조이며, config는 컬럼이 아니라 key='config' row의 value(JSONB)입니다.
+   * SSOT-3: 'kakao' 저장 금지, 'kakao_at'로 정규화
    */
   async updateConfig(
     tenantId: string,
     input: UpdateConfigInput
   ): Promise<TenantConfig> {
+    // SSOT-3: 'kakao' 저장 금지, 'kakao_at'로 정규화
+    const normalizedInput = { ...input };
+    if ((normalizedInput.attendance?.notification_channel as string) === 'kakao') {
+      console.warn('[ConfigService] Legacy channel "kakao" detected, normalizing to "kakao_at"');
+      normalizedInput.attendance = {
+        ...normalizedInput.attendance,
+        notification_channel: 'kakao_at',
+      };
+    }
+
     // 기존 설정 조회
     const existing = await this.getConfig(tenantId);
-    const merged = { ...existing, ...input };
+    const merged = { ...existing, ...normalizedInput };
 
-    const { data, error } = await this.supabase
-      .from('tenant_settings')
-      .upsert({
-        tenant_id: tenantId,
-        settings: merged,
-        // 기술문서 19-1-1: 타임스탬프는 UTC로 저장 (DB 저장 규칙)
-        updated_at: new Date().toISOString(),
-      })
-      .select('settings')
-      .single();
+    // SSOT-1: key='config' row의 value(JSONB) 업데이트
+    const { data, error } = await withTenant(
+      this.supabase
+        .from('tenant_settings')
+        .upsert({
+          tenant_id: tenantId,
+          key: 'config',
+          value: merged,
+          // 기술문서 19-1-1: 타임스탬프는 UTC로 저장 (DB 저장 규칙)
+          updated_at: new Date().toISOString(),
+        })
+        .select('value')
+        .eq('key', 'config'),
+      tenantId
+    ).single();
 
     if (error) {
       throw new Error(`Failed to update config: ${error.message}`);
     }
 
-    return data.settings as TenantConfig;
+    return (data?.value as TenantConfig) || merged;
   }
 
   /**

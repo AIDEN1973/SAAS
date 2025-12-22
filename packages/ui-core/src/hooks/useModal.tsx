@@ -115,7 +115,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
             whiteSpace: 'pre-line',
             fontSize: 'var(--font-size-base)',
             color: 'var(--color-text)',
-            lineHeight: '1.6',
+            lineHeight: 'var(--line-height-relaxed)', // styles.css 준수: 모달 메시지용 line-height 토큰 사용
           }}
         >
           {alertModal.message}
@@ -154,7 +154,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
             whiteSpace: 'pre-line',
             fontSize: 'var(--font-size-base)',
             color: 'var(--color-text)',
-            lineHeight: '1.6',
+            lineHeight: 'var(--line-height-relaxed)', // styles.css 준수: 모달 메시지용 line-height 토큰 사용
           }}
         >
           {confirmModal.message}

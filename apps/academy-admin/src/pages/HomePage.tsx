@@ -15,75 +15,39 @@
  * 6. Billing Summary
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, Container, Card, Button, PageHeader } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, Button, PageHeader, ContextRecommendationBanner } from '@ui-core/react';
 import { Grid } from '@ui-core/react';
-import { StudentTaskCard } from '../components/StudentTaskCard';
-import { useStudentTaskCards } from '@hooks/use-student';
-import type { StudentTaskCard as StudentTaskCardType } from '@hooks/use-student';
+import { useStudentTaskCards, fetchConsultations, fetchPersons } from '@hooks/use-student';
+import type { DashboardCard, EmergencyCard, AIBriefingCard, ClassCard, StatsCard, BillingSummaryCard } from '../types/dashboardCard';
+import { useAdaptiveNavigation } from '@hooks/use-adaptive-navigation';
+import { useMonthEndAdaptation } from '@hooks/use-month-end-adaptation';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useClasses } from '@hooks/use-class';
+import { useAttendanceLogs, fetchAttendanceLogs } from '@hooks/use-attendance';
+import { fetchBillingHistory } from '@hooks/use-billing';
+import { fetchAIInsights } from '@hooks/use-ai-insights';
+import { fetchPayments } from '@hooks/use-payments';
 import type { DayOfWeek } from '@services/class-service';
 import { toKST } from '@lib/date-utils';
-import type { Invoice } from '@core/billing';
+import type { BillingHistoryItem } from '@hooks/use-billing';
 import type { AttendanceLog } from '@services/attendance-service';
 import type { StudentConsultation } from '@services/student-service';
-
-interface EmergencyCard {
-  id: string;
-  type: 'emergency';
-  title: string;
-  message: string;
-  priority: number;
-  action_url?: string;
-}
-
-interface AIBriefingCard {
-  id: string;
-  type: 'ai_briefing';
-  title: string;
-  summary: string;
-  insights: string[];
-  created_at: string;
-  action_url?: string; // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
-}
-
-interface ClassCard {
-  id: string;
-  type: 'class';
-  class_name: string;
-  start_time: string;
-  student_count: number;
-  attendance_count: number;
-  action_url: string;
-}
-
-interface StatsCard {
-  id: string;
-  type: 'stats';
-  title: string;
-  value: string;
-  trend?: string;
-  action_url?: string;
-}
-
-interface BillingSummaryCard {
-  id: string;
-  type: 'billing_summary';
-  title: string;
-  expected_collection_rate: number;
-  unpaid_count: number;
-  action_url: string;
-}
-
-type DashboardCard = EmergencyCard | AIBriefingCard | ClassCard | StatsCard | BillingSummaryCard | StudentTaskCardType;
+import { renderCard } from '../utils/dashboardCardRenderer';
 
 export function HomePage() {
   const navigate = useNavigate();
   const context = getApiContext();
   const tenantId = context.tenantId;
+
+  // Context Signals (상황 신호 수집 및 UI 조정)
+  // 프론트 자동화 문서 1.2.1 섹션 참조: 자동 화면 전환 금지, 상황 신호 수집만 수행
+  const adaptiveNav = useAdaptiveNavigation();
+
+  // 월말 적응 (청구 카드 priority 가중치 조정)
+  const { shouldPrioritizeBilling } = useMonthEndAdaptation();
 
   // Student Task Cards 조회
   const { data: studentTaskCards } = useStudentTaskCards();
@@ -98,14 +62,13 @@ export function HomePage() {
       const cards: EmergencyCard[] = [];
 
       // 1. 결제 실패 2회 이상 체크 (아키텍처 문서 4747줄 참조)
-      const failedPaymentsResponse = await apiClient.get<{ id: string; status: string; created_at: string }>('payments', {
-        filters: { status: 'failed' },
-        orderBy: { column: 'created_at', ascending: false },
-        limit: 10,
+      // 정본 규칙: fetchPayments 함수 사용 (Hook의 queryFn 로직 재사용)
+      const failedPayments = await fetchPayments(tenantId, {
+        status: 'failed',
       });
 
-      if (!failedPaymentsResponse.error && failedPaymentsResponse.data) {
-        const failedCount = failedPaymentsResponse.data.length;
+      if (failedPayments && failedPayments.length > 0) {
+        const failedCount = failedPayments.length;
         if (failedCount >= 2) {
           cards.push({
             id: 'payment-failed-emergency',
@@ -120,16 +83,14 @@ export function HomePage() {
 
       // 2. 출결 오류 이벤트가 10분 이내 발생 체크 (아키텍처 문서 4747줄 참조)
       // 기술문서 5-2: KST 기준 날짜 처리
+      // 정본 규칙: fetchAttendanceLogs 함수 사용 (Hook의 queryFn 로직 재사용)
       const tenMinutesAgo = toKST().subtract(10, 'minute').toISOString();
-      const attendanceErrorsResponse = await apiClient.get<AttendanceLog>('attendance_logs', {
-        filters: {
-          occurred_at: { gte: tenMinutesAgo },
-          status: 'error', // 출결 오류 상태 (실제 테이블 구조에 맞게 조정 필요)
-        },
-        limit: 1,
+      const attendanceErrors = await fetchAttendanceLogs(tenantId, {
+        date_from: tenMinutesAgo,
+        // TODO: 출결 오류 상태 필터링 (실제 테이블 구조에 맞게 조정 필요)
       });
 
-      if (!attendanceErrorsResponse.error && attendanceErrorsResponse.data && attendanceErrorsResponse.data.length > 0) {
+      if (attendanceErrors && attendanceErrors.length > 0) {
         cards.push({
           id: 'attendance-error-emergency',
           type: 'emergency',
@@ -140,32 +101,9 @@ export function HomePage() {
         });
       }
 
-      // 3. AI 위험 점수 90 이상 체크 (아키텍처 문서 4747줄 참조)
-      // TODO: ai_insights 테이블이 생성되면 실제 조회로 변경
-      // 현재는 student_task_cards에서 risk 타입 카드로 대체 확인
-      const riskTaskCardsResponse = await apiClient.get<Array<{ id: string; task_type: string; priority?: number; student_id?: string }>>('student_task_cards', {
-        filters: {
-          task_type: 'risk',
-        },
-        limit: 1,
-      });
-
-      if (!riskTaskCardsResponse.error && riskTaskCardsResponse.data && riskTaskCardsResponse.data.length > 0) {
-        // risk 타입 카드가 있고 priority가 90 이상인 경우
-        type RiskTaskCard = { id: string; task_type: string; priority?: number; student_id?: string };
-        const riskCards = riskTaskCardsResponse.data as unknown as RiskTaskCard[];
-        const riskCard = riskCards[0];
-        if (riskCard && riskCard.priority && riskCard.priority >= 90 && riskCard.student_id) {
-          cards.push({
-            id: 'ai-risk-emergency',
-            type: 'emergency',
-            title: 'AI 위험 감지',
-            message: '높은 위험 점수를 가진 학생이 감지되었습니다.',
-            priority: 3,
-            action_url: `/students/${riskCard.student_id}/risk`,
-          });
-        }
-      }
+      // 3. AI 위험 점수 90 이상 체크는 studentTaskCards에서 파생 (정본 규칙: task_cards 직접 조회 제거)
+      // 정본 규칙: Emergency 쿼리 내부에서 apiClient.get('task_cards') 직접 조회 금지
+      // studentTaskCards에서 risk 타입 카드를 파생하여 사용 (라인 138 이후 useMemo에서 처리)
 
       // 4. 시스템 오류 체크 (추가)
       // TODO: 시스템 오류 로그 테이블이 생성되면 실제 조회로 변경
@@ -175,6 +113,34 @@ export function HomePage() {
     enabled: !!tenantId,
     refetchInterval: 60000, // 1분마다 갱신
   });
+
+  // 정본 규칙: Emergency 쿼리 내부에서 task_cards 직접 조회 제거
+  // studentTaskCards에서 risk 카드를 파생하여 Emergency 카드에 합성
+  const enhancedEmergencyCards = useMemo(() => {
+    if (!emergencyCards || !studentTaskCards) return emergencyCards || [];
+
+    // studentTaskCards에서 priority >= 90인 risk 타입 카드 찾기
+    const highRiskCard = studentTaskCards.find(
+      (card) => card.task_type === 'risk' && card.priority >= 90 && card.action_url
+    );
+
+    if (highRiskCard) {
+      // AI risk emergency 카드를 맨 앞에 추가 (slice에 잘리지 않도록)
+      const aiRiskEmergency: EmergencyCard = {
+        id: 'ai-risk-emergency',
+        type: 'emergency',
+        title: 'AI 위험 감지',
+        message: '높은 위험 점수를 가진 학생이 감지되었습니다.',
+        priority: 3,
+        action_url: highRiskCard.action_url, // 정본: 서버에서 제공된 action_url 사용
+      };
+
+      // 맨 앞에 추가 (unshift 대신 새 배열 생성)
+      return [aiRiskEmergency, ...emergencyCards];
+    }
+
+    return emergencyCards;
+  }, [emergencyCards, studentTaskCards]);
 
   // AI Briefing Cards 조회
   // 아키텍처 문서 3.7.1 섹션 참조: AI 브리핑 카드
@@ -186,23 +152,18 @@ export function HomePage() {
       const cards: AIBriefingCard[] = [];
 
       try {
-        // AI 브리핑 카드는 배치 작업에서 자동 생성됨 (아키텍처 문서 3911줄: 매일 07:00 자동 생성)
+        // AI 브리핑 카드는 배치 작업에서 서버가 생성함 (아키텍처 문서 3911줄: 매일 07:00 생성, AI 호출 포함)
         // ai_insights 테이블에서 오늘 날짜의 브리핑 카드 조회
+        // 정본 규칙: fetchAIInsights 함수 사용 (Hook의 queryFn 로직 재사용)
         const todayDate = toKST().format('YYYY-MM-DD');
-        const aiInsightsResponse = await apiClient.get<Array<{ id: string; title: string; summary: string; insights: string | string[]; created_at: string; action_url?: string }>>('ai_insights', {
-          filters: {
-            insight_type: 'daily_briefing',
-            created_at: { gte: `${todayDate}T00:00:00`, lte: `${todayDate}T23:59:59` },
-          },
-          orderBy: { column: 'created_at', ascending: false },
-          limit: 2, // 최대 2개 (아키텍처 문서 4644줄)
+        const aiInsights = await fetchAIInsights(tenantId, {
+          insight_type: 'daily_briefing',
+          created_at: { gte: `${todayDate}T00:00:00`, lte: `${todayDate}T23:59:59` },
         });
 
-        if (!aiInsightsResponse.error && aiInsightsResponse.data && aiInsightsResponse.data.length > 0) {
+        if (aiInsights && aiInsights.length > 0) {
           // ai_insights 테이블에서 조회한 데이터를 AIBriefingCard 형식으로 변환
-          type AIInsightItem = { id: string; title: string; summary: string; insights: string | string[]; created_at: string; action_url?: string };
-          const insightsData = aiInsightsResponse.data as unknown as AIInsightItem[];
-          const insights = insightsData.map((insight) => ({
+          const insights = aiInsights.map((insight) => ({
             id: insight.id,
             type: 'ai_briefing' as const,
             title: insight.title,
@@ -217,15 +178,10 @@ export function HomePage() {
 
         // ai_insights 테이블에 데이터가 없는 경우 (배치 작업 전 또는 실패 시) fallback 로직
         // 주의: 이는 임시 fallback이며, 정상적으로는 배치 작업에서 생성된 카드를 사용해야 함
-        // todayDate는 위에서 이미 선언됨 (187줄)
-        const consultationsResponse = await apiClient.get<StudentConsultation[]>('student_consultations', {
-          filters: {
-            consultation_date: { gte: todayDate },
-          },
-          limit: 10,
+        // 정본 규칙: fetchConsultations 함수 사용 (Hook의 queryFn 로직 재사용)
+        const todayConsultations = await fetchConsultations(tenantId, {
+          consultation_date: { gte: todayDate },
         });
-
-        const todayConsultations = consultationsResponse.data || [];
         if (todayConsultations.length > 0) {
           cards.push({
             id: 'briefing-consultations',
@@ -242,17 +198,15 @@ export function HomePage() {
         }
 
         // 2. 이번 달 청구서 상태 확인
+        // 정본 규칙: fetchBillingHistory 함수 사용 (Hook의 queryFn 로직 재사용)
         const currentMonth = toKST().format('YYYY-MM');
-        const invoicesResponse = await apiClient.get<Invoice[]>('invoices', {
-          filters: {
-            period_start: { gte: `${currentMonth}-01` },
-          },
+        const invoices = await fetchBillingHistory(tenantId, {
+          period_start: { gte: `${currentMonth}-01` },
         });
 
-        if (!invoicesResponse.error && invoicesResponse.data) {
-          const invoices = (invoicesResponse.data as unknown) as Invoice[];
-          const totalAmount = invoices.reduce((sum: number, inv: Invoice) => sum + (inv.amount || 0), 0);
-          const paidAmount = invoices.reduce((sum: number, inv: Invoice) => sum + ((inv as Invoice & { amount_paid?: number }).amount_paid || 0), 0);
+        if (invoices && invoices.length > 0) {
+          const totalAmount = invoices.reduce((sum: number, inv: BillingHistoryItem) => sum + (inv.amount || 0), 0);
+          const paidAmount = invoices.reduce((sum: number, inv: BillingHistoryItem) => sum + (inv.amount_paid || 0), 0);
           const expectedCollectionRate = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
 
           if (invoices.length > 0) {
@@ -273,16 +227,13 @@ export function HomePage() {
         }
 
         // 3. 출결 이상 패턴 확인 (최근 7일)
+        // 정본 규칙: fetchAttendanceLogs 함수 사용 (Hook의 queryFn 로직 재사용)
         const sevenDaysAgo = toKST().subtract(7, 'days').format('YYYY-MM-DD');
-        const attendanceLogsResponse = await apiClient.get<AttendanceLog[]>('attendance_logs', {
-          filters: {
-            occurred_at: { gte: `${sevenDaysAgo}T00:00:00` },
-          },
-          limit: 100,
+        const logs = await fetchAttendanceLogs(tenantId, {
+          date_from: `${sevenDaysAgo}T00:00:00`,
         });
 
-        if (!attendanceLogsResponse.error && attendanceLogsResponse.data) {
-          const logs = (attendanceLogsResponse.data as unknown) as AttendanceLog[];
+        if (logs && logs.length > 0) {
           const absentCount = logs.filter((log: AttendanceLog) => log.status === 'absent').length;
           const lateCount = logs.filter((log: AttendanceLog) => log.status === 'late').length;
 
@@ -302,29 +253,9 @@ export function HomePage() {
           }
         }
 
-        // 4. 이탈 위험 학생 확인
-        const riskTaskCardsResponse = await apiClient.get<Array<{ id: string; task_type: string }>>('student_task_cards', {
-          filters: {
-            task_type: 'risk',
-          },
-          limit: 5,
-        });
-
-        if (!riskTaskCardsResponse.error && riskTaskCardsResponse.data && riskTaskCardsResponse.data.length > 0) {
-          const riskCount = riskTaskCardsResponse.data.length;
-          cards.push({
-            id: 'briefing-risk',
-            type: 'ai_briefing',
-            title: '이탈 위험 학생 알림',
-            summary: `${riskCount}명의 학생이 이탈 위험 단계입니다.`,
-            insights: [
-              '이탈 위험 학생들에게 즉시 상담을 진행하세요.',
-              '학생의 학습 동기를 높이기 위한 방안을 모색하세요.',
-            ],
-            created_at: toKST().toISOString(),
-            action_url: '/students/home', // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
-          });
-        }
+        // 4. 이탈 위험 학생 확인은 studentTaskCards에서 파생 (정본 규칙: task_cards 직접 조회 제거)
+        // 정본 규칙: AI Briefing 쿼리 내부에서 apiClient.get('task_cards') 직접 조회 금지
+        // studentTaskCards에서 risk 타입 카드를 파생하여 사용 (라인 299 이후 useMemo에서 처리)
       } catch (error) {
         console.error('Failed to generate AI briefing cards:', error);
         // 에러 발생 시 빈 배열 반환
@@ -362,22 +293,11 @@ export function HomePage() {
   // 오늘 날짜의 출석 데이터 조회
   const todayDate = React.useMemo(() => toKST().format('YYYY-MM-DD'), []);
 
-  const { data: todayAttendanceLogs } = useQuery({
-    queryKey: ['today-attendance-logs', tenantId, todayDate],
-    queryFn: async () => {
-      if (!tenantId) return [];
-
-      const response = await apiClient.get<AttendanceLog[]>('attendance_logs', {
-        filters: {
-          occurred_at: { gte: `${todayDate}T00:00:00`, lte: `${todayDate}T23:59:59` },
-          attendance_type: 'check_in',
-        },
-      });
-
-      if (response.error) return [];
-      return (response.data || []) as unknown as AttendanceLog[];
-    },
-    enabled: !!tenantId,
+  // 정본 규칙: apiClient.get('attendance_logs') 직접 조회 제거, useAttendanceLogs Hook 사용
+  const { data: todayAttendanceLogs } = useAttendanceLogs({
+    date_from: `${todayDate}T00:00:00`,
+    date_to: `${todayDate}T23:59:59`,
+    attendance_type: 'check_in',
   });
 
   // 오늘 수업의 출석 데이터 조회 및 ClassCard 변환
@@ -413,11 +333,12 @@ export function HomePage() {
       const cards: StatsCard[] = [];
 
       // 1. 학생 수 통계
-      const studentsResponse = await apiClient.get<Array<{ id: string }>>('persons', {
-        filters: {},
+      // 정본 규칙: fetchPersons 함수 사용 (Hook의 queryFn 로직 재사용)
+      const students = await fetchPersons(tenantId, {
+        person_type: 'student',
       });
-      if (!studentsResponse.error && studentsResponse.data) {
-        const studentCount = studentsResponse.data.length;
+      if (students && students.length > 0) {
+        const studentCount = students.length;
         cards.push({
           id: 'stats-students',
           type: 'stats',
@@ -428,16 +349,15 @@ export function HomePage() {
       }
 
       // 2. 이번 달 매출 통계
+      // 정본 규칙: fetchBillingHistory 함수 사용 (Hook의 queryFn 로직 재사용)
       const currentMonth = toKST().format('YYYY-MM');
-      const invoicesResponse = await apiClient.get<Invoice[]>('invoices', {
-        filters: {
-          period_start: { gte: `${currentMonth}-01` },
-        },
+      const invoices = await fetchBillingHistory(tenantId, {
+        period_start: { gte: `${currentMonth}-01` },
       });
-      if (!invoicesResponse.error && invoicesResponse.data) {
-        const invoices = (invoicesResponse.data as unknown) as Invoice[];
-        const totalRevenue = invoices.reduce((sum: number, inv: Invoice) => {
-          return sum + ((inv as Invoice & { amount_paid?: number }).amount_paid || 0);
+
+      if (invoices && invoices.length > 0) {
+        const totalRevenue = invoices.reduce((sum: number, inv: BillingHistoryItem) => {
+          return sum + (inv.amount_paid || 0);
         }, 0);
         cards.push({
           id: 'stats-revenue',
@@ -463,21 +383,18 @@ export function HomePage() {
       const currentMonth = toKST().format('YYYY-MM');
 
       // 이번 달 청구서 조회
-      const invoicesResponse = await apiClient.get<Invoice[]>('invoices', {
-        filters: {
-          period_start: { gte: `${currentMonth}-01` },
-        },
+      // 정본 규칙: fetchBillingHistory 함수 사용 (Hook의 queryFn 로직 재사용)
+      const invoices = await fetchBillingHistory(tenantId, {
+        period_start: { gte: `${currentMonth}-01` },
       });
 
-      if (invoicesResponse.error || !invoicesResponse.data || invoicesResponse.data.length === 0) {
+      if (!invoices || invoices.length === 0) {
         return null;
       }
-
-      const invoices = (invoicesResponse.data as unknown) as Invoice[];
-      const totalAmount = invoices.reduce((sum: number, inv: Invoice) => sum + (inv.amount || 0), 0);
-      const paidAmount = invoices.reduce((sum: number, inv: Invoice) => sum + ((inv as Invoice & { amount_paid?: number }).amount_paid || 0), 0);
+      const totalAmount = invoices.reduce((sum: number, inv: BillingHistoryItem) => sum + (inv.amount || 0), 0);
+      const paidAmount = invoices.reduce((sum: number, inv: BillingHistoryItem) => sum + (inv.amount_paid || 0), 0);
       const expectedCollectionRate = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
-      const unpaidCount = invoices.filter((inv: Invoice) => inv.status === 'pending' || inv.status === 'overdue').length;
+      const unpaidCount = invoices.filter((inv: BillingHistoryItem) => inv.status === 'pending' || inv.status === 'overdue').length;
 
       return {
         id: 'billing-summary',
@@ -486,11 +403,48 @@ export function HomePage() {
         expected_collection_rate: expectedCollectionRate,
         unpaid_count: unpaidCount,
         action_url: '/billing/home',
-      };
+        priority: 50, // 기본 우선순위 (월말 가중치 적용 전)
+      } as BillingSummaryCard;
     },
     enabled: !!tenantId,
     refetchInterval: 300000, // 5분마다 갱신
   });
+
+  // 정본 규칙: AI Briefing 쿼리 내부에서 task_cards 직접 조회 제거
+  // studentTaskCards에서 risk 카드를 파생하여 AI Briefing 카드에 합성
+  const enhancedAiBriefingCards = useMemo(() => {
+    if (!aiBriefingCards || !studentTaskCards) return aiBriefingCards || [];
+
+    // studentTaskCards에서 risk 타입 카드 찾기
+    const riskCards = studentTaskCards.filter((card) => card.task_type === 'risk' && card.action_url);
+    const riskCount = riskCards.length;
+
+    if (riskCount > 0) {
+      // 첫 번째 risk 카드의 action_url 사용 (서버에서 제공된 값)
+      const firstRiskCard = riskCards[0];
+      const riskActionUrl = firstRiskCard?.action_url;
+
+      if (riskActionUrl) {
+        // 이탈 위험 학생 알림 카드를 추가
+        const riskBriefingCard: AIBriefingCard = {
+          id: 'briefing-risk',
+          type: 'ai_briefing',
+          title: '이탈 위험 학생 알림',
+          summary: `${riskCount}명의 학생이 이탈 위험 단계입니다.`,
+          insights: [
+            '이탈 위험 학생들에게 즉시 상담을 진행하세요.',
+            '학생의 학습 동기를 높이기 위한 방안을 모색하세요.',
+          ],
+          created_at: toKST().toISOString(),
+          action_url: riskActionUrl, // 정본: 서버에서 제공된 action_url 사용
+        };
+
+        return [...aiBriefingCards, riskBriefingCard];
+      }
+    }
+
+    return aiBriefingCards;
+  }, [aiBriefingCards, studentTaskCards]);
 
   // 카드 우선순위 정렬 (아키텍처 문서 3.7.1 섹션 참조)
   // 아키텍처 문서 4630줄 참조: 카드 개수 제한 규칙 (최대 8개, 그룹별 제한)
@@ -501,21 +455,24 @@ export function HomePage() {
     const groupLimits = {
       EMERGENCY: 3,
       AI_BRIEFING: 2,
-      STUDENT_TASKS: 3,
+      TASKS: 3, // 정본: STUDENT_TASKS → TASKS (업종 중립)
       CLASSES: 2,
       BILLING: 2,
       STATS: 1,
     };
 
     // 1. Emergency Cards (최우선, 항상 최상단, 최대 3개)
-    if (emergencyCards && emergencyCards.length > 0) {
+    // 정본 규칙: enhancedEmergencyCards 사용 (risk emergency가 맨 앞에 있어서 항상 포함됨)
+    if (enhancedEmergencyCards && enhancedEmergencyCards.length > 0) {
       // Emergency 카드는 그룹 내부 정렬 없이 그대로 추가하되, 최대 3개만
-      cards.push(...emergencyCards.slice(0, groupLimits.EMERGENCY));
+      // risk emergency가 맨 앞에 있어서 slice(0, 3)에도 항상 포함됨
+      cards.push(...enhancedEmergencyCards.slice(0, groupLimits.EMERGENCY));
     }
 
     // 2. AI Briefing Cards (생성 시간 기준 내림차순 정렬, 최대 2개)
-    if (aiBriefingCards && aiBriefingCards.length > 0) {
-      const sortedBriefing = [...aiBriefingCards].sort((a, b) => {
+    // 정본 규칙: enhancedAiBriefingCards 사용
+    if (enhancedAiBriefingCards && enhancedAiBriefingCards.length > 0) {
+      const sortedBriefing = [...enhancedAiBriefingCards].sort((a, b) => {
         const dateA = new Date(a.created_at).getTime();
         const dateB = new Date(b.created_at).getTime();
         return dateB - dateA; // 최신 우선
@@ -531,7 +488,7 @@ export function HomePage() {
         const priorityB = typeof b === 'object' && 'priority' in b ? Number(b.priority) || 0 : 0;
         return priorityB - priorityA;
       });
-      cards.push(...(sortedTasks.slice(0, groupLimits.STUDENT_TASKS) as unknown as DashboardCard[]));
+      cards.push(...(sortedTasks.slice(0, groupLimits.TASKS) as unknown as DashboardCard[]));
     }
 
     // 4. Today Classes (수업 시작 시간 기준 오름차순 정렬, 최대 2개)
@@ -552,11 +509,22 @@ export function HomePage() {
 
     // 6. Billing Summary (최대 2개, Billing 그룹에 포함)
     // 아키텍처 문서 4647줄 참조: BILLING 그룹 최대 2개
+    // 정본 규칙: 그룹 순서는 불변, 월말에는 priority만 +2 (내부 정렬만 변동)
+    // 프론트 자동화 문서 1.2.2 섹션 참조: 월말 priority 가중치 조정
     if (billingSummary) {
-      cards.push(billingSummary);
+      // 월말에는 priority 가중치만 조정 (그룹 순서 불변)
+      const adjustedBilling = {
+        ...billingSummary,
+        priority: (billingSummary.priority || 50) + (shouldPrioritizeBilling ? 2 : 0), // 정본: 0-100 스케일, 월말 +2 (프론트 자동화 문서 367줄, 559줄 참조)
+      };
+      cards.push(adjustedBilling);
       // BILLING 그룹에 추가 카드가 있을 수 있으므로, 최대 2개까지 허용
       // 현재는 billingSummary만 있지만, 향후 다른 Billing 카드가 추가될 수 있음
     }
+
+    // 정본 규칙: 그룹 내부 priority 가중치 적용 (월말 등)
+    // Billing 카드의 priority가 조정되었으므로, Billing 그룹 내부 정렬만 변동
+    // 전체 그룹 순서는 불변: EMERGENCY > AI_BRIEFING > TASKS > CLASSES > BILLING > STATS
 
     // 전체 카드 최대 8개 제한 (아키텍처 문서 4639줄 참조)
     const maxCards = 8;
@@ -566,180 +534,21 @@ export function HomePage() {
     }
 
     return cards;
-  }, [emergencyCards, aiBriefingCards, studentTaskCards, todayClasses, statsCards, billingSummary]);
+  }, [enhancedEmergencyCards, enhancedAiBriefingCards, studentTaskCards, todayClasses, statsCards, billingSummary, shouldPrioritizeBilling]);
 
-  const handleCardClick = (card: DashboardCard) => {
-    if ('action_url' in card && card.action_url) {
-      navigate(card.action_url);
-    }
-  };
-
-  const renderCard = (card: DashboardCard) => {
-    // Student Task Card
-    if ('task_type' in card) {
-      return (
-        <StudentTaskCard
-          key={card.id}
-          card={card as StudentTaskCardType}
-          onAction={(c) => navigate(c.action_url)}
-        />
-      );
-    }
-
-    // Emergency Card
-    if (card.type === 'emergency') {
-      return (
-        <Card
-          key={card.id}
-          padding="md"
-          variant="elevated"
-          style={{
-            borderLeft: `var(--border-width-thick) solid var(--color-error)`,
-            cursor: card.action_url ? 'pointer' : 'default',
-          }}
-          onClick={() => card.action_url && handleCardClick(card)}
-        >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-sm)' }}>
-            <div style={{ flex: 1 }}>
-              <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
-                {card.title}
-              </h3>
-              <p style={{ color: 'var(--color-text-secondary)' }}>
-                {card.message}
-              </p>
-            </div>
-          </div>
-        </Card>
-      );
-    }
-
-    // AI Briefing Card
-    if (card.type === 'ai_briefing') {
-      return (
-        <Card
-          key={card.id}
-          padding="md"
-          variant="elevated"
-          style={{ cursor: card.action_url ? 'pointer' : 'default' }}
-          onClick={() => card.action_url && handleCardClick(card)}
-        >
-          <div style={{ marginBottom: 'var(--spacing-sm)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', marginBottom: 'var(--spacing-xs)' }}>
-              <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
-                {card.title}
-              </h3>
-            </div>
-            <p style={{ color: 'var(--color-text-secondary)' }}>
-              {card.summary}
-            </p>
-          </div>
-          {card.insights && card.insights.length > 0 && (
-            <ul style={{ marginTop: 'var(--spacing-sm)', paddingLeft: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)' }}>
-              {card.insights.slice(0, 3).map((insight, idx) => (
-                <li key={idx} style={{ marginBottom: 'var(--spacing-xs)' }}>{insight}</li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      );
-    }
-
-    // Class Card
-    if (card.type === 'class') {
-      return (
-        <Card
-          key={card.id}
-          padding="md"
-          variant="default"
-          style={{ cursor: 'pointer' }}
-          onClick={() => handleCardClick(card)}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--spacing-xs)' }}>
-            <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
-              {card.class_name}
-            </h3>
-            <div style={{ color: 'var(--color-text-secondary)' }}>
-              {card.start_time}
-            </div>
-          </div>
-          <div style={{ color: 'var(--color-text-secondary)' }}>
-            출석: {card.attendance_count}/{card.student_count}
-          </div>
-        </Card>
-      );
-    }
-
-    // Stats Card
-    if (card.type === 'stats') {
-      return (
-        <Card
-          key={card.id}
-          padding="md"
-          variant="default"
-          style={{ cursor: card.action_url ? 'pointer' : 'default' }}
-          onClick={() => card.action_url && handleCardClick(card)}
-        >
-          <h3 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
-            {card.title}
-          </h3>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--spacing-xs)' }}>
-            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
-              {card.value}
-            </div>
-            {card.trend && (
-              <div style={{ color: card.trend.startsWith('+') ? 'var(--color-success)' : 'var(--color-error)' }}>
-                {card.trend}
-              </div>
-            )}
-          </div>
-        </Card>
-      );
-    }
-
-    // Billing Summary Card
-    if (card.type === 'billing_summary') {
-      return (
-        <Card
-          key={card.id}
-          padding="md"
-          variant="default"
-          style={{ cursor: 'pointer' }}
-          onClick={() => handleCardClick(card)}
-        >
-          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
-            {card.title}
-          </h3>
-          <div style={{ marginBottom: 'var(--spacing-xs)' }}>
-            <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-              예상 수납률
-            </div>
-            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
-              {card.expected_collection_rate}%
-            </div>
-          </div>
-          {card.unpaid_count > 0 && (
-            <div style={{ color: 'var(--color-error)' }}>
-              미납 {card.unpaid_count}건
-            </div>
-          )}
-        </Card>
-      );
-    }
-
-    return null;
-  };
 
   // 전체 카드 수 계산 (제한 전)
+  // 정본 규칙: enhancedEmergencyCards, enhancedAiBriefingCards 기준으로 계산 (합성된 카드 수 반영)
   const totalCardsCount = React.useMemo(() => {
     let count = 0;
-    if (emergencyCards) count += emergencyCards.length;
-    if (aiBriefingCards) count += aiBriefingCards.length;
+    if (enhancedEmergencyCards) count += enhancedEmergencyCards.length;
+    if (enhancedAiBriefingCards) count += enhancedAiBriefingCards.length;
     if (studentTaskCards) count += studentTaskCards.length;
     if (todayClasses) count += todayClasses.length;
     if (statsCards) count += statsCards.length;
     if (billingSummary) count += 1;
     return count;
-  }, [emergencyCards, aiBriefingCards, studentTaskCards, todayClasses, statsCards, billingSummary]);
+  }, [enhancedEmergencyCards, enhancedAiBriefingCards, studentTaskCards, todayClasses, statsCards, billingSummary]);
 
   const hasMoreCards = totalCardsCount > sortedCards.length;
 
@@ -750,11 +559,23 @@ export function HomePage() {
           title="홈 대시보드"
         />
 
+        {/* Context Recommendation Banner (프론트 자동화 문서 1.3.1 섹션 참조) */}
+        {adaptiveNav.currentRecommendation && (
+          <ContextRecommendationBanner
+            recommendation={adaptiveNav.currentRecommendation}
+            onNavigate={() => {
+              // 정본 규칙: 사용자 클릭 시에만 이동 (자동 이동 없음)
+              navigate(adaptiveNav.currentRecommendation!.action.target);
+            }}
+            onDismiss={adaptiveNav.dismissRecommendation}
+          />
+        )}
+
         {/* 카드 그리드 */}
           {sortedCards.length > 0 ? (
             <>
               <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="md">
-                {sortedCards.map((card) => renderCard(card))}
+                {sortedCards.map((card) => renderCard(card, navigate))}
               </Grid>
               {hasMoreCards && (
                 <div style={{ marginTop: 'var(--spacing-lg)', textAlign: 'center' }}>
@@ -786,4 +607,3 @@ export function HomePage() {
     </ErrorBoundary>
   );
 }
-

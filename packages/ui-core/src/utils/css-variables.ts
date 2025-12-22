@@ -27,7 +27,11 @@ export function getCSSVariableAsPx(cssVarName: string, fallbackPx: number): numb
   // rem 값을 픽셀으로 변환
   const remMatch = cssValue.match(/(\d+\.?\d*)rem/);
   if (remMatch) {
-    return parseFloat(remMatch[1]) * 16; // 1rem = 16px
+    // ⚠️ 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
+    const baseFontSize = typeof window !== 'undefined'
+      ? parseFloat(getComputedStyle(root).getPropertyValue('--font-size-base').trim()) || 16
+      : 16;
+    return parseFloat(remMatch[1]) * baseFontSize; // 1rem = baseFontSize
   }
 
   // px 값이 직접 주어진 경우
@@ -85,8 +89,9 @@ export function parseWidthToPx(
     if (typeof window !== 'undefined') {
       return window.innerWidth;
     }
-    // SSR 폴백: 기본 레이어 메뉴 너비
-    return getCSSVariableAsPx('--width-layer-menu', 37.5 * 16);
+    // SSR 폴백: 기본 레이어 메뉴 너비 (하드코딩 최소화)
+    const baseFontSize = 16; // SSR에서는 기본값 사용
+    return getCSSVariableAsPx('--width-layer-menu', 37.5 * baseFontSize);
   }
 
   // 직접 픽셀 값이 주어진 경우
@@ -98,7 +103,11 @@ export function parseWidthToPx(
   // 직접 rem 값이 주어진 경우
   const directRemMatch = cssVarString.match(/(\d+\.?\d*)rem/);
   if (directRemMatch) {
-    return parseFloat(directRemMatch[1]) * 16;
+    // ⚠️ 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
+    const baseFontSize = typeof window !== 'undefined'
+      ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
+      : 16;
+    return parseFloat(directRemMatch[1]) * baseFontSize;
   }
 
   // CSS 변수 추출
@@ -107,10 +116,14 @@ export function parseWidthToPx(
     if (varMatch) {
       const varName = varMatch[1].trim();
 
-      // 알려진 CSS 변수에 대한 폴백 값
+      // 알려진 CSS 변수에 대한 폴백 값 (하드코딩 최소화, CSS 변수 우선 사용)
+      // ⚠️ 중요: fallback 값은 CSS 변수를 읽을 수 없는 경우에만 사용
+      const baseFontSize = typeof window !== 'undefined'
+        ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
+        : 16;
       const fallbackMap: Record<string, number> = {
-        '--width-layer-menu': 37.5 * 16, // 600px
-        '--width-layer-menu-tablet': 31.25 * 16, // 500px
+        '--width-layer-menu': 37.5 * baseFontSize, // 600px (baseFontSize 기준)
+        '--width-layer-menu-tablet': 31.25 * baseFontSize, // 500px (baseFontSize 기준)
       };
 
       // 알려진 CSS 변수가 아니면 기본 레이어 메뉴 너비 사용 (하드코딩 제거)
@@ -118,13 +131,9 @@ export function parseWidthToPx(
     }
   }
 
-  // 기본값: 반응형 모드에 따라
-  if (isMobile) {
-    return typeof window !== 'undefined' ? window.innerWidth : 37.5 * 16;
-  }
-  if (isTablet) {
-    return getCSSVariableAsPx('--width-layer-menu-tablet', 31.25 * 16);
-  }
-  return getCSSVariableAsPx('--width-layer-menu', 37.5 * 16);
+  // 기본값: 반환 (CSS 변수를 읽을 수 없는 경우)
+  const baseFontSize = typeof window !== 'undefined'
+    ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
+    : 16;
+  return getCSSVariableAsPx('--width-layer-menu', 37.5 * baseFontSize);
 }
-

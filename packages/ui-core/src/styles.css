@@ -11,6 +11,7 @@
   --font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
   --line-height: 1.5;
   --line-height-tight: 1; /* 타이틀과 버튼 수평 정렬을 위한 특수 값 (PageHeader 등) */
+  --line-height-relaxed: 1.6; /* 모달 메시지 등 읽기 편한 텍스트용 (하드코딩 금지 규칙 준수) */
   --font-weight-normal: 400;
   --font-weight-medium: 400;
   --font-weight-semibold: 600;
@@ -152,6 +153,10 @@
   --width-modal-md: 31.25rem;        /* 500px - 모달 중간 크기 */
   --width-modal-lg: 43.75rem;        /* 700px - 모달 큰 크기 */
   --width-modal-xl: 56.25rem;        /* 900px - 모달 매우 큰 크기 */
+  --width-modal-max-sm-md: 90vw;     /* 모달 최대 너비 (sm, md 크기) */
+  --width-modal-max-lg-xl: 95vw;    /* 모달 최대 너비 (lg, xl 크기) */
+  --width-modal-mobile-sm-md: 90%;   /* 모달 모바일 너비 (sm, md 크기) - 하드코딩 금지 규칙 준수 */
+  --width-modal-mobile-lg-xl: 95%;   /* 모달 모바일 너비 (lg, xl 크기) - 하드코딩 금지 규칙 준수 */
 
   /* Layout Height Tokens */
   --height-chart: 12.5rem;           /* 200px - 차트 높이 */
@@ -171,9 +176,11 @@
 
   /* Layout Width Tokens */
   --width-full: 100%;                /* 100% - 전체 너비 (하드코딩 금지 규칙 준수) */
+  --width-viewport: 100vw;           /* 100vw - 뷰포트 전체 너비 (하드코딩 금지 규칙 준수) */
 
   /* Layout Height Tokens */
   --height-full: 100%;               /* 100% - 전체 높이 (하드코딩 금지 규칙 준수) */
+  --height-viewport: 100vh;          /* 100vh - 뷰포트 전체 높이 (하드코딩 금지 규칙 준수) */
 
   /* Tablet Mode Minimum Values - 태블릿 모드 최소값 (아키텍처 문서 3.3.9) */
   --tablet-spacing-min: 0.5rem;      /* 8px - 태블릿 모드 최소 간격 */

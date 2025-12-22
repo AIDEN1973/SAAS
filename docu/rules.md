@@ -66,6 +66,62 @@ packages/services/*          # Service Layer (Industry Layer 래핑)
 packages/hooks/*             # React Query Hooks
 
 packages/lib/*               # 공통 유틸
+  └── date-utils/            # KST 타임존 헬퍼
+  └── supabase-client/       # Supabase 클라이언트 유틸리티
+
+**lib 공통 유틸리티 전체 목록 (업종 독립):**
+
+| 패키지 | 경로 | 주요 함수 | 용도 | 업종 독립성 |
+|--------|------|----------|------|------------|
+| date-utils | `packages/lib/date-utils` | `toKST`, `getTodayKST`, `getDateRangeKST` | KST 타임존 헬퍼 | ✅ |
+| supabase-client | `packages/lib/supabase-client` | `createClient`, `createServerClient`, `withTenant` | Supabase 클라이언트 유틸리티 | ✅ |
+
+**date-utils 사용법:**
+```typescript
+import { toKST, getTodayKST } from '@lib/date-utils';
+
+// KST 기준 현재 시간
+const nowKst = toKST();
+
+// KST 기준 오늘 날짜 문자열
+const today = getTodayKST(); // 'YYYY-MM-DD'
+```
+
+**supabase-client 사용법:**
+```typescript
+// 클라이언트
+import { createClient } from '@lib/supabase-client';
+
+// 서버/Edge
+import { createServerClient } from '@lib/supabase-client/server';
+
+// 멀티테넌트
+import { withTenant } from '@lib/supabase-client/db';
+```
+
+**불변 규칙:**
+- 모든 시간은 DB에는 UTC로 저장하되, 비즈니스 로직·표시·집계는 KST 기준으로 처리합니다.
+- UI·리포트·로그·알람: 항상 KST로 변환해서 표시합니다.
+- `toISOString().split('T')[0]` 또는 `toISOString().slice(0, 10)` 직접 사용 금지 (KST 변환 필수).
+
+---
+
+## [SSOT] Layer Classification Rules (Cursor Must Follow)
+
+**⚠️ 중요: Cursor는 아래 분류 규칙을 반드시 따라야 합니다.**
+
+| 분류 | 경로 매핑 | 판단 규칙 |
+|------|----------|----------|
+| **UI Core Component** | `packages/ui-core/*` | 시각/레이아웃/인터랙션 프리미티브. 비즈니스 규칙 없음. 네트워크/DB 호출 직접 금지. |
+| **Shared Feature** | `apps/*/features/*` (앱 내부) 또는 `packages/schema-engine/*` | 여러 페이지에서 재사용되는 사용자 플로우/기능. UI + 상태 + 정책 + 로딩/에러 포함 가능. (데이터 접근은 Hook/Service로 위임) |
+| **Shared Hook** | `packages/hooks/*` | Feature를 UI에서 쓰기 위한 React Query/상태 캡슐화. UI 렌더링 금지. 내부에서 navigate() 같은 라우팅 직접 실행 금지. |
+| **Service/UseCase** | `packages/services/*` + `@industry/*/service` | 도메인 로직/데이터 접근 캡슐화. UI/Router 의존 금지. React 컴포넌트에서 직접 DB 호출 금지 원칙의 실행 주체. |
+| **Domain/Service** | `packages/industry/*` (업종별) + `packages/core/*` (업종 공통) | 비즈니스 로직. 업종별 도메인: `packages/industry/*`. 업종 공통 도메인: `packages/core/*`. |
+| **Cross-cutting Concern** | `packages/lib/*` + `packages/api-sdk/*` + `packages/env-registry/*` + `packages/core/core-config/*` + `packages/ui-core/src/components/ErrorBoundary.tsx` | 로깅/정책/권한/추적/에러처리/PII 등 전 영역에 적용되는 공통 규칙과 유틸. |
+
+**용어 통일 규칙:**
+- 항상 같은 단어를 같은 철자로 반복: "UI Core Component / Shared Feature / Shared Hook / Service/UseCase / Domain/Service / Cross-cutting Concern"
+- 파일 상단에 레이어 태그 추가 권장: `// LAYER: UI_CORE_COMPONENT`, `// LAYER: SHARED_HOOK` 등
 
 # UI 컴포넌트는 ui-core 사용 (@ui-core/react)
 
@@ -73,7 +129,7 @@ packages/lib/*               # 공통 유틸
 
 1-2. 의존성 방향 (중요)
 
-[불변 규칙] Industry Layer는 Phase 1 (MVP)부터 적용됩니다.
+[불변 규칙] Industry Layer는 상용화 단계부터 적용됩니다.
 
 허용 방향
 
@@ -118,7 +174,15 @@ React 컴포넌트 → DB 쿼리/SQL 직접 작성 금지
 
 [불변 규칙] 외부 라이브러리 사용 시 멀티테넌트 격리와 Zero-Trust 아키텍처를 우선 고려합니다.
 
-[불변 규칙] 자체 구현 권장 모듈: core-calendar, core-community, core-search (Phase 1은 PostgreSQL FTS)
+[불변 규칙] 자체 구현 권장 모듈: core-calendar, core-community, core-search (상용화 단계는 PostgreSQL FTS)
+
+## Automation & AI Engine Rule (SSOT)
+
+- Automation Engine과 AI Engine은 반드시 core 레이어에만 존재해야 한다.
+- industry 레이어에서는 Adapter 또는 Schema Override만 허용된다.
+- 업종별 Automation/AI 엔진 구현은 금지된다.
+
+본 규칙은 Automation & AI Industry-Neutral Rule(SSOT)을 따른다.
 
 1-2-3. B2B 추천인 코드 제도 규칙 (Critical)
 
@@ -207,22 +271,31 @@ packages/env-registry/src/resolve.ts에서 Edge/App/Node 환경을 자동 감지
 - 로컬 개발: process.env (dotenv 로드 후)
 - 브라우저: 사용 불가 (resolveEnv() 호출 시 에러 발생)
 
-⚠️ 주의: Edge Function 번들에 env-registry 패키지를 포함할 때 번들 사이즈와 cold start 영향이 있을 수 있습니다. Phase 2+에서 실제 성능 측정 후 최적화를 검토합니다.
+⚠️ 주의: Edge Function 번들에 env-registry 패키지를 포함할 때 번들 사이즈와 cold start 영향이 있을 수 있습니다. 상용화 단계에서 실제 성능 측정 후 최적화를 검토합니다.
 
-필수 환경변수 (Phase 1):
+필수 환경변수 (상용화 단계):
 - SUPABASE_URL
 - SUPABASE_ANON_KEY
 - SERVICE_ROLE_KEY
 - NODE_ENV
 
-선택 환경변수 (Phase 2+):
+선택 환경변수 (상용화 단계):
 - PAYMENT_WEBHOOK_ROLE_KEY
 - BILLING_BATCH_ROLE_KEY
 - ANALYTICS_ROLE_KEY
 - CUSTOM_DOMAIN_VERIFY_SECRET
-- NEXT_PUBLIC_KAKAO_JS_KEY (Phase 2+ 지도 기능용, JavaScript SDK)
-- KAKAO_REST_API_KEY (Phase 2+ 지도 기능용, 서버/Edge Function 전용)
+- NEXT_PUBLIC_KAKAO_JS_KEY (상용화 단계 지도 기능용, JavaScript SDK)
+- KAKAO_REST_API_KEY (상용화 단계 지도 기능용, 서버/Edge Function 전용)
+- PLATFORM_AI_ENABLED (AI 기능 플랫폼 전체 온오프, env-registry/server에서만 읽음, 배포 환경에서 반드시 명시적으로 설정 필요, 누락 시 false로 간주하여 실행하지 않음)
 - AWS_LAMBDA_*, CLOUDFLARE_WORKER_* 등
+
+**⚠️ AI 기능 온오프 환경변수:**
+- `PLATFORM_AI_ENABLED`: 플랫폼 전체 AI 기능 온오프 (env-registry/server에서만 읽음)
+  - 배포 환경에서 반드시 명시적으로 설정되어야 함
+  - 누락 시 false로 간주하여 실행하지 않음 (Fail Closed)
+- 테넌트별 AI 온오프는 `tenant_features(feature_key='ai').enabled`로 관리 (SSOT)
+- 최종 유효값: `effective_ai_enabled = PLATFORM_AI_ENABLED && tenant_features['ai'].enabled`
+- 상세 규칙은 프론트 상황 신호 수집 문서 "글로벌 헤더 AI 토글 — UX/정책 SSOT" 섹션 참조
 
 환경변수 검증:
 
@@ -246,7 +319,7 @@ Missing 변수 에러는 누락된 필수 환경변수 목록을 명확히 표�
 
 Optional 환경변수 사용 시점 체크 (Lazy Validation):
 
-Phase 1에서 알림뱅킹은 필수 기능이지만, 스키마에서는 optional로 정의되어 있습니다.
+상용화 단계에서 알림뱅킹은 필수 기능이지만, 스키마에서는 optional로 정의되어 있습니다.
 
 실제 payment-alimbank, analytics, custom-domain 모듈에서 사용 시점에 requireEnv() 유틸을 사용하여 강하게 체크합니다:
 
@@ -274,15 +347,15 @@ packages/env-registry는 다음 3단계로 분리되어 있습니다:
 - 🔵 common-env (common.ts): 서버/Edge 전용 공개 값 (APP_NAME, APP_VERSION, INDUSTRY_MODE 등)
   - envCommon은 서버/Edge에서만 사용하며, 클라이언트에서 필요한 값은 NEXT_PUBLIC_*로 envClient에 포함
 
-테넌트별 환경변수 (Phase 3+):
+테넌트별 환경변수 (선택적 구현, 실제 필요 시):
 
-Phase 3+에서 테넌트별 Secret Storage를 도입할 수 있습니다.
+선택적 구현으로 테넌트별 Secret Storage를 도입할 수 있습니다 (실제 필요 시).
 
 - Larger SaaS 고객이 자체 PG 계약을 사용하는 경우
 - Industry Layer에 따라 키가 달라지는 경우
 - 테넌트별 Custom Domain Key 관리가 필요한 경우
 
-→ Phase 1-2에서는 전역 환경변수만 사용하며, Phase 3+에서 테넌트별 Secret Storage를 검토합니다.
+→ 상용화 단계에서는 전역 환경변수만 사용하며, 테넌트별 Secret Storage는 선택적 구현(실제 필요 시)으로 검토합니다.
 
 ESLint 규칙:
 
@@ -428,15 +501,26 @@ ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation_students ON public.students
 FOR ALL TO authenticated
 USING (
-  tenant_id = (auth.jwt() -> 'tenant_id')::uuid
+  tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
 )
 WITH CHECK (
-  tenant_id = (auth.jwt() -> 'tenant_id')::uuid
+  tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
 );
 
 → JWT claim에서 tenant_id를 직접 읽어 RLS 정책 적용
 → PgBouncer Transaction Pooling과 완벽 호환
 → Supabase JWT 생성 시 tenant_id를 claim에 포함해야 함
+
+**❌ 잘못된 패턴 (금지):**
+```sql
+-- ❌ 금지: 중복 괄호와 불필요한 ::text 캐스팅
+tenant_id = ((auth.jwt() ->> 'tenant_id'::text))::uuid
+```
+
+**잘못된 패턴의 문제점:**
+- 중복 괄호 `((...))`는 불필요하며 가독성을 해칩니다
+- `'tenant_id'::text` 캐스팅은 불필요합니다 (JSON 연산자 `->>` 는 이미 text를 반환)
+- 올바른 패턴: `(auth.jwt() ->> 'tenant_id')::uuid` (단일 괄호, ::text 없음)
 
 옵션 2: 세션 변수 기반 RLS (Session Pooling 또는 전용 커넥션 전용) - ⚠️ Deprecated:
 
@@ -451,21 +535,28 @@ WITH CHECK (
   tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid
 );
 
-→ ⚠️ 주의: 이 방식은 PgBouncer Transaction Pooling과 호환되지 않습니다. Session Pooling 또는 전용 커넥션을 사용하는 경우에만 유효합니다.
+⚠️ 레거시 예시: JWT claim 기반 RLS 사용 권장. 이 방식은 PgBouncer Transaction Pooling과 호환되지 않습니다. Session Pooling 또는 전용 커넥션을 사용하는 경우에만 유효합니다.
 
 [불변 규칙] Cursor는 새로운 SQL 생성 시 OPTION 2 (current_setting 기반 RLS)를 절대 사용하지 않는다.
 
-[불변 규칙] RLS 정책 이름은 반드시 tenant_isolation_<table> 형식을 따라야 한다.
+[불변 규칙] RLS 정책 이름은 기본적으로 tenant_isolation_<table> 형식을 따라야 한다.
 
-Cursor는 다른 형식의 정책 이름(예: rls_tenant_<table>, policy_<table>_tenant 등)을 생성하면 안 된다.
+**정본 네이밍 규칙:**
 
-정책 이름 형식:
+1. **테넌트 격리 정책 (기본, 필수)**: `tenant_isolation_<table>` 형식 사용
+   - 예: `tenant_isolation_students`, `tenant_isolation_invoices`
+   - ❌ 금지: `rls_tenant_users`, `policy_users_tenant`, `tenant_users_policy` 등
 
-tenant_isolation_<table> (예: tenant_isolation_students)
+2. **예외: read/write 분리 정책 (레거시 허용)**:
+   - 기존 운영 DB에 `products_read`, `products_write`, `student_task_cards_read` 같은 네이밍이 존재하는 경우, 레거시로 유지 가능
+   - 정본: `task_cards_read`, `task_cards_write` (정본)
+   - 레거시: `student_task_cards_read`, `student_task_cards_write` (하위 호환, 일몰 예정)
+   - 신규 생성 정책은 가능하면 `tenant_isolation_<table>` 형식 사용 권장
+   - read/write 분리가 필요한 경우: `tenant_isolation_<table>_read`, `tenant_isolation_<table>_write` 형식 사용
 
-❌ 금지: rls_tenant_users, policy_users_tenant, tenant_users_policy 등
-
-✅ 허용: tenant_isolation_students, tenant_isolation_invoices 등
+**Cursor 생성 규칙:**
+- 신규 정책 생성 시: `tenant_isolation_<table>` 형식 사용
+- 기존 레거시 정책 수정 시: 기존 네이밍 유지 (마이그레이션 없이)
 
 2-4. Edge Function에서 테넌트 설정 패턴 - ⚠️ Deprecated
 
@@ -475,12 +566,13 @@ tenant_isolation_<table> (예: tenant_isolation_students)
 
 [불변 규칙] Transaction Pooling 모드에서는 세션 변수가 트랜잭션 종료 후 유지되지 않으므로, set_config 기반 RLS는 보안 상 안전하게 동작하지 않을 가능성이 매우 높습니다.
 
-[불변 규칙] 모든 RLS 정책은 반드시 JWT claim 기반(auth.jwt() -> 'tenant_id')으로 구현해야 합니다.
+[불변 규칙] 모든 RLS 정책은 반드시 JWT claim 기반(auth.jwt() ->> 'tenant_id')으로 구현해야 합니다.
 
 ⚠️ Deprecated: Edge Function에서 set_config 사용은 더 이상 권장하지 않습니다.
 
 ❌ 금지 예시:
 ```sql
+-- ⚠️ 레거시 예시: Transaction Pooling에서는 작동하지 않음
 -- Edge Function에서 set_config 사용 (더 이상 사용하지 않음)
 SELECT set_config('app.current_tenant_id', :tenant_id::text, true);
 ```
@@ -623,7 +715,7 @@ function MyComponent() {
 }
 ```
 
-참고: 상세 가이드라인은 `docu/UI_가이드라인_모달_페이지_선택.md` 참조
+참고: 상세 가이드라인은 `docu/전체 유아이문서.txt`의 "6-2. 모달 vs 페이지 선택 기준" 섹션 참조
 
 5. 시간 & 타임존(KST) 규칙
 5-1. 저장/표시 원칙
@@ -847,13 +939,13 @@ const supabase = createClient(
 ❌ 금지 예시:
 import { env } from '@lib/env';  // 구 버전 래퍼 - 사용 금지
 
-7-2. Role 분리 (Phase 2+ 전용)
+7-2. Role 분리 (상용화 단계)
 
-⚠️ 중요: 이 규칙은 Phase 2 (1~3k 테넌트) 이상에서 적용합니다.
+⚠️ 중요: 이 규칙은 상용화 단계에서 적용합니다.
 
-MVP/Phase 1에서는 단일 Service Role Key를 사용합니다.
+상용화 단계에서 Role 분리 구현 예정 (환경변수 스키마 정의 완료, Edge Function에서 실제 사용 미구현).
 
-기능별 Role 예시 (Phase 2+):
+기능별 Role 예시 (상용화 단계):
 
 payment_webhook_role
 
@@ -866,11 +958,11 @@ public_gateway_role
 Cursor는 Edge Function 예제 생성 시,
 해당 기능에 맞는 최소 권한 Role만 사용하도록 가정해야 한다.
 
-→ MVP에서는 단일 Service Role Key를 사용하고, Phase 2+에서 Role 분리를 도입합니다.
+→ 상용화 단계에서 Role 분리를 도입 예정 (현재는 SERVICE_ROLE_KEY 사용 중).
 
 7-3. Webhook 보안 패턴
 
-기본 (Phase 1 필수):
+기본 (상용화 단계 필수):
 
 const sig = req.headers['x-signature'];
 const ts  = req.headers['x-timestamp']; // ISO / epoch
@@ -884,13 +976,13 @@ idempotency-key 기반 멱등성 인덱스 항상 포함.
 
 PG/알림뱅킹 관련 재시도는 지수 백오프 패턴 사용.
 
-고급 (Phase 2+ 선택적):
+고급 (상용화 단계 선택적):
 
 Ordering Guarantee (Late event drop)
 
 상태 전이 규칙 검증
 
-→ MVP에서는 멱등성 처리만 필수이며, Ordering Guarantee는 Phase 2+에서 실제 필요성이 확인된 후 도입합니다.
+→ 상용화 단계에서는 멱등성 처리를 기본으로 하며, Ordering Guarantee는 실제 필요성이 확인된 후 도입합니다.
 
 7-4. 결제/알림뱅킹 운영 정책 (핀테크 수준 필수)
 
@@ -929,11 +1021,9 @@ Edge Function은 짧은 요청/응답, Webhook, Public Gateway 검증 용도만.
 
 → 상세 제약사항은 기술문서 PART 3의 15-4-3 "Supabase Edge Function 제약사항 상세" 섹션 참조
 
-Phase 1 (MVP):
+상용화 단계:
 - Supabase Edge Function + 간단한 집계 가능
 - 짧은 요청/응답, Webhook, Public Gateway 검증 용도
-
-Phase 2+:
 - 대규모 Analytics·Batch 작업 코드는 AWS Lambda·Cloudflare Workers 필수
 - Supabase cron은 트리거 용도로만 사용하고, 실제 heavy 작업은 외부 Worker에 둔다
 
@@ -945,35 +1035,35 @@ Cursor는:
 
 8-2. Analytics 집계 패턴
 
-Phase 1 (MVP):
+상용화 단계:
 - Supabase Edge Function + 간단한 집계 가능
-- analytics.daily_metrics, analytics.monthly_revenue 테이블까지만 구현
-
-Phase 2+:
+- analytics.daily_store_metrics, analytics.daily_region_metrics 테이블 구현 (정본)
 - 대규모 Analytics·Batch 작업은 AWS Lambda·Cloudflare Workers 필수
 - Supabase cron은 트리거 용도로만 사용
 
 원시 이벤트 테이블: analytics.events (RANGE 파티션)
 
-집계 테이블:
+집계 테이블 (정본):
 
-analytics.daily_metrics
+analytics.daily_store_metrics (매장 단위 일별 KPI)
 
-analytics.monthly_revenue
+analytics.daily_region_metrics (지역 단위 집계 KPI)
+
+⚠️ 중요: analytics.daily_metrics, analytics.monthly_revenue는 구버전/폐기된 네이밍이며 더 이상 사용하지 않습니다. 정본은 analytics.daily_store_metrics, analytics.daily_region_metrics만 사용합니다.
 
 모든 집계는 KST 기준 date/year/month 사용.
 
-8-3. 지역 통계 및 벤치마킹 (Phase 1 기본 / Phase 2+ 고급)
+8-3. 지역 통계 및 벤치마킹 (상용화 단계)
 
-⚠️ 중요: 기본 지역 통계는 Phase 1 (MVP)에 포함되며, 고급 기능은 Phase 2+에서 도입합니다.
+⚠️ 중요: 기본 지역 통계와 고급 기능은 상용화 단계에서 모두 구현 예정 (테이블 스키마 정의 완료, core_stores/core_regions 및 analytics.daily_store_metrics/daily_region_metrics 테이블 생성 마이그레이션 필요).
 
-Phase 1 (MVP) 기본 기능:
+상용화 단계 기본 기능:
 - 지역순위 (학생 수, 매출, 출석률 기준)
 - 지역 평균 대비 비교 차트
 - 행정동 기준 기본 히트맵
 - 기본 AI 인사이트 (3종)
 
-Phase 2+ 고급 기능:
+상용화 단계 고급 기능:
 - 고급 히트맵 (다중 지표, 시계열)
 - 다중 지역 비교
 - AI 인사이트 고도화
@@ -981,10 +1071,10 @@ Phase 2+ 고급 기능:
 
 지역 통계 관련 테이블:
 
-- core_regions: 지역 마스터 데이터 (동/구/시/전국 계층) (Phase 1+)
-- core_stores: 매장 정보 (region_id, latitude, longitude 포함) (Phase 1+)
-- analytics.daily_store_metrics: 매장 단위 일별 KPI (Phase 1+)
-- analytics.daily_region_metrics: 지역 단위 집계 KPI (Phase 1+)
+- core_regions: 지역 마스터 데이터 (동/구/시/전국 계층) (상용화 단계)
+- core_stores: 매장 정보 (region_id, latitude, longitude 포함) (상용화 단계)
+- analytics.daily_store_metrics: 매장 단위 일별 KPI (상용화 단계)
+- analytics.daily_region_metrics: 지역 단위 집계 KPI (상용화 단계)
 
 [불변 규칙] core_stores 테이블 쿼리는 반드시 withTenant()를 사용해야 합니다.
 
@@ -1072,19 +1162,19 @@ export async function findTenantByDomain(domain: string): Promise<{ id: uuid, te
 findTenantByDomain(host: string, path: string)  // 추가 파라미터 금지
 findTenantByDomain(domain: string): Promise<{ id, tenant_id, status, address, name }>  // 추가 반환 필드 금지
 
-9-2. Public Gateway Token 보안 (Phase 1 필수)
+9-2. Public Gateway Token 보안 (상용화 단계 필수)
 
-Phase 1 (MVP):
+상용화 단계:
 - Signed token 기반 invoice 접근 (HMAC-SHA256)
 - 만료 시간: 10분 (KST 기준)
 - jti(jwt id) 포함
 - 재사용 방지는 짧은 만료 시간(10분)으로 현실적으로 커버
 
-Phase 2+ (고도화):
+상용화 단계 (고도화):
 - Edge KV / audit.public_tokens 기반 재사용 방지
 - Rate-limit (invoice_id당 1분당 10회, IP당 1분당 30회)
 
-→ MVP에서는 서명 검증 + exp(만료) + jti만 적용합니다.
+→ 상용화 단계에서는 서명 검증 + exp(만료) + jti를 적용합니다.
 
 10. 테스트 / 더미 데이터 / 이모지 규칙
 10-1. 더미 데이터 생성 금지
@@ -1145,13 +1235,13 @@ Edge Function tenant 설정:
 
 SELECT set_config('app.current_tenant_id', :tenant_id::text, true);
 
-⚠️ 중요: app.current_tenant_id / set_config 기반 RLS 패턴은 과거 코드에만 남아 있을 수 있는 레거시입니다.
+⚠️ 레거시 예시: 더 이상 사용하지 않음, JWT claim 기반 RLS 사용 권장. app.current_tenant_id / set_config 기반 RLS 패턴은 과거 코드에만 남아 있을 수 있는 레거시입니다.
 
 Cursor는:
 - 기존 SQL에서 이 패턴을 '이름 변경/기능 변경'하지 않고 그대로 보존하되,
 - 기존 SQL을 리팩터링하는 PR에서도 Cursor는 app.current_tenant_id 관련 코드를 삭제·수정·교체하지 않습니다.
 - 새로운 코드/SQL을 생성할 때는 이 패턴을 절대 사용하지 않고,
-  오직 JWT claim 기반 RLS(auth.jwt() -> 'tenant_id')만 사용해야 합니다.
+  오직 JWT claim 기반 RLS(auth.jwt() ->> 'tenant_id')만 사용해야 합니다.
 
 → 상세 내용은 2-4, 2-5 섹션 참조
 
@@ -1176,9 +1266,9 @@ Service Role 키는 항상 @env-registry/server의 envServer를 통해 주입 (e
 
 프론트엔드 코드에서 Service Role Key 사용 금지
 
-12. 지역 통계 및 지도 기능 규칙 (Phase 1 기본 / Phase 2+ 고급)
+12. 지역 통계 및 지도 기능 규칙 (상용화 단계)
 
-⚠️ 중요: 기본 지역 통계는 Phase 1 (MVP)에 포함되며, 고급 기능은 Phase 2+에서 도입합니다.
+⚠️ 중요: 기본 지역 통계와 고급 기능은 상용화 단계에서 모두 구현 예정 (테이블 스키마 정의 완료, core_stores/core_regions 및 analytics.daily_store_metrics/daily_region_metrics 테이블 생성 마이그레이션 필요).
 
 12-1. Kakao Maps API 사용 규칙
 
@@ -1303,10 +1393,10 @@ const benchmarks = await supabase
 
 | 단계 | 분리 방식 | 전환 기준 (명확한 수치) | 설명 |
 |------|----------|----------------------|------|
-| Phase 1 | industry_type 컬럼 단일 테이블 | 테넌트 수 < 5,000<br>테이블 크기 < 50GB<br>단일 업종 row 수 < 1천만 | 기본 구조. 모든 업종이 public 스키마의 동일 테이블에 공존 |
-| Phase 2 | industry_type 기반 파티셔닝 | 특정 업종 row 수 ≥ 1천만<br>또는 특정 업종 테이블 크기 ≥ 50GB<br>또는 특정 업종 QPS가 전체의 30% 초과 | SELECT 경로 차별화 용도. 예: `students_academy PARTITION OF students FOR VALUES IN ('academy')` |
-| Phase 2+ | 업종별 prefix 테이블 (선택적) | 업종 전용 도메인 테이블 필요 시<br>(Core Party 테이블과는 별개) | 업종 전용 도메인 테이블만. 예: `academy_classes`, `salon_customers` (Core Party 테이블과는 별개) |
-| Phase 3+ | 업종별 스키마 분리 | 테넌트 수 ≥ 20k<br>또는 Core 테이블(students/invoices) 단일 파티션 ≥ 200GB<br>또는 특정 업종 조회량이 전체의 50% 초과 | 조회량 편중 시. 예: `academy.students`, `salon.customers` |
+| 상용화 단계 | industry_type 컬럼 단일 테이블 | 테넌트 수 < 5,000<br>테이블 크기 < 50GB<br>단일 업종 row 수 < 1천만 | 기본 구조. 모든 업종이 public 스키마의 동일 테이블에 공존 |
+| 상용화 단계 | industry_type 기반 파티셔닝 | 특정 업종 row 수 ≥ 1천만<br>또는 특정 업종 테이블 크기 ≥ 50GB<br>또는 특정 업종 QPS가 전체의 30% 초과 | SELECT 경로 차별화 용도. 예: `students_academy PARTITION OF students FOR VALUES IN ('academy')` |
+| 상용화 단계 | 업종별 prefix 테이블 (선택적) | 업종 전용 도메인 테이블 필요 시<br>(Core Party 테이블과는 별개) | 업종 전용 도메인 테이블만. 예: `academy_classes`, `salon_customers` (Core Party 테이블과는 별개) |
+| 선택적 구현 | 업종별 스키마 분리 | 테넌트 수 ≥ 20k<br>또는 Core 테이블(students/invoices) 단일 파티션 ≥ 200GB<br>또는 특정 업종 조회량이 전체의 50% 초과 | 조회량 편중 시. 예: `academy.students`, `salon.customers` |
 
 ⚠️ 중요: 위 기준 중 하나라도 도달하면 해당 업종만 선택적으로 분리합니다. 전체 구조를 변경하지 않고 필요한 업종만 분리하는 것이 핵심 원칙입니다.
 
@@ -1314,9 +1404,9 @@ const benchmarks = await supabase
 
 → 상세 내용은 기술문서 PART 1의 3-3 "스키마 분리" 섹션 참조
 
-14. Hot Tenant 샤딩 트리거 기준 규칙 (Phase 4+ 전용)
+14. Hot Tenant 샤딩 트리거 기준 규칙 (초과 성장 시나리오, 현재 불필요)
 
-⚠️ 중요: 이 규칙은 Phase 4 (수십만 테넌트) 이상에서만 검토하는 초고급 기능입니다.
+⚠️ 중요: 이 규칙은 초과 성장 시나리오(수십만 테넌트)에서도 대규모 팀이 필요하며, 1인 개발사에서는 구현이 비현실적입니다.
 
 [불변 규칙] 다음 기준 중 3개 이상을 동시에 만족하면 Hot Tenant 샤딩을 검토합니다:
 
@@ -1341,7 +1431,7 @@ const benchmarks = await supabase
    - 5분 이동평균 대비 300% 증가가 3회 이상 발생
    - 또는 일일 트래픽이 전일 대비 200% 증가
 
-⚠️ 중요: 위 기준 중 3개 이상을 동시에 만족하고, Read Replica로 트래픽 분산, 파티셔닝, 업종별 분리 전략으로 해결되지 않는 경우에만 Hot Tenant 샤딩을 검토합니다.
+⚠️ 중요: 위 기준 중 3개 이상을 동시에 만족하고, Read Replica로 트래픽 분산, 파티셔닝, 업종별 분리 전략으로 해결되지 않는 경우에만 Hot Tenant 샤딩을 검토합니다. 다만, 초과 성장 시나리오에서도 대규모 팀이 필요하므로 현재 불필요합니다.
 
 → 상세 내용은 기술문서 PART 1의 5-5-1 "Hot Tenant 수직 분리 절차" 섹션 참조
 

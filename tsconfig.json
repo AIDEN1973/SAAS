@@ -16,6 +16,12 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
+      "@env-registry/*": ["./packages/env-registry/src/*"],
+      "@env-registry": ["./packages/env-registry/src"],
+      "@env-registry/server": ["./packages/env-registry/src/server"],
+      "@env-registry/client": ["./packages/env-registry/src/client"],
+      "@env-registry/common": ["./packages/env-registry/src/common"],
+      // 하위 호환성을 위한 deprecated 경로 (점진적 제거 예정)
       "@env-registry/core/*": ["./packages/env-registry/src/*"],
       "@env-registry/core": ["./packages/env-registry/src"],
       "@env-registry/core/server": ["./packages/env-registry/src/server"],
@@ -69,6 +75,6 @@
       "@payments/*": ["./packages/payments/*/src"]
     }
   },
-  "exclude": ["node_modules", "dist", "build", ".next", "infra"]
+  "exclude": ["node_modules", "dist", "build", ".next", "infra", "templates"]
 }
 

@@ -92,6 +92,9 @@ export function SemanticDiffViewer({ oldSchema, newSchema }: SemanticDiffViewerP
             {oldSchema.entity !== newSchema.entity && (
               <div>entity: {oldSchema.entity} → {newSchema.entity}</div>
             )}
+            {/* NOTE(Super Admin Only):
+                This UI compares schema differences across industry_type for administrative inspection.
+                It is not used for tenant inference in end-user apps and does not violate Zero-Trust UI rules. */}
             {oldSchema.industry_type !== newSchema.industry_type && (
               <div>industry_type: {oldSchema.industry_type || 'null'} → {newSchema.industry_type || 'null'}</div>
             )}
