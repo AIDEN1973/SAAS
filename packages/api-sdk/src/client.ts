@@ -10,6 +10,7 @@ import { createClient } from '@lib/supabase-client';
 import { withTenant } from '@lib/supabase-client/db';
 import { getApiContext } from './context';
 import type { ApiResponse, ApiClientConfig } from './types';
+import type { PostgrestFilterBuilder } from '@supabase/postgrest-js';
 
 /**
  * API Client
@@ -52,9 +53,19 @@ export class ApiClient {
 
       // 필터 처리 (withTenant 적용 전에 쿼리 빌드)
       // count가 필요하면 select({ count }) 사용
-      let baseQuery = this.supabase
-        .from(table)
-        .select(options?.select || '*', options?.count ? { count: options.count } : undefined);
+      // 스키마 접두사 처리 (예: analytics.daily_store_metrics)
+      let baseQuery: PostgrestFilterBuilder<any, any, any, any, any, any, any>;
+      if (table.includes('.')) {
+        const [schema, tableName] = table.split('.');
+        baseQuery = this.supabase
+          .schema(schema)
+          .from(tableName)
+          .select(options?.select || '*', options?.count ? { count: options.count } : undefined);
+      } else {
+        baseQuery = this.supabase
+          .from(table)
+          .select(options?.select || '*', options?.count ? { count: options.count } : undefined);
+      }
 
       if (options?.filters) {
         const searchFilters = { ...options.filters };
@@ -121,7 +132,8 @@ export class ApiClient {
       // 단, 공통 테이블(tenant_id 컬럼이 없는 테이블)은 예외 처리
       // 공통 테이블: industry_themes (tenant_id 없음), schema_registry (meta 스키마 View)
       // tenant_theme_overrides는 tenant_id가 primary key이지만, filters에 이미 명시되어 있으므로 withTenant 사용
-      const isCommonTable = table === 'industry_themes' || table === 'schema_registry' || table.startsWith('schema-registry/');
+      // daily_region_metrics는 RLS 정책이 있어서 withTenant를 사용하지 않음 (익명 집계 테이블)
+      const isCommonTable = table === 'industry_themes' || table === 'schema_registry' || table.startsWith('schema-registry/') || table === 'daily_region_metrics';
       const query = isCommonTable ? baseQuery : withTenant(baseQuery, context.tenantId);
 
       const { data, error, count } = await query;
@@ -221,11 +233,16 @@ export class ApiClient {
 
       console.log('📤 최종 Payload (tenant_id 주입 후):', payload);
 
-      const { data: result, error } = await this.supabase
-        .from(table)
-        .insert(payload)
-        .select()
-        .single();
+      // 스키마 접두사 처리
+      let insertQuery;
+      if (table.includes('.')) {
+        const [schema, tableName] = table.split('.');
+        insertQuery = this.supabase.schema(schema).from(tableName).insert(payload).select().single();
+      } else {
+        insertQuery = this.supabase.from(table).insert(payload).select().single();
+      }
+
+      const { data: result, error } = await insertQuery;
 
       if (error) {
         console.error('❌ INSERT 실패:', {
@@ -294,12 +311,17 @@ export class ApiClient {
       // 다른 테이블은 id를 PRIMARY KEY로 사용
       const primaryKey = table === 'academy_students' ? 'person_id' : 'id';
 
+      // 스키마 접두사 처리
+      let updateQuery;
+      if (table.includes('.')) {
+        const [schema, tableName] = table.split('.');
+        updateQuery = this.supabase.schema(schema).from(tableName).update(data).eq(primaryKey, id).select();
+      } else {
+        updateQuery = this.supabase.from(table).update(data).eq(primaryKey, id).select();
+      }
+
       const { data: result, error } = await withTenant(
-        this.supabase
-          .from(table)
-          .update(data)
-          .eq(primaryKey, id)
-          .select(),
+        updateQuery,
         context.tenantId
       ).single();
 
@@ -352,11 +374,17 @@ export class ApiClient {
         };
       }
 
+      // 스키마 접두사 처리
+      let deleteQuery;
+      if (table.includes('.')) {
+        const [schema, tableName] = table.split('.');
+        deleteQuery = this.supabase.schema(schema).from(tableName).delete().eq('id', id);
+      } else {
+        deleteQuery = this.supabase.from(table).delete().eq('id', id);
+      }
+
       const { error } = await withTenant(
-        this.supabase
-          .from(table)
-          .delete()
-          .eq('id', id),
+        deleteQuery,
         context.tenantId
       );
 
@@ -399,6 +427,18 @@ export class ApiClient {
       const { data, error } = await this.supabase.rpc(functionName, params || {});
 
       if (error) {
+        // ✅ 더 자세한 에러 정보 로깅 (디버깅용)
+        console.error('[ApiClient.callRPC] RPC 호출 실패:', {
+          function: functionName,
+          params,
+          error: {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+          },
+        });
+
         return {
           success: false,
           error: {

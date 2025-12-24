@@ -42,20 +42,23 @@ Write-Host "작업 디렉토리: $(Get-Location)" -ForegroundColor Cyan
 Write-Host ""
 
 $functions = @(
-    "auto-billing-generation",
-    "student-task-card-generation",
     "ai-briefing-generation",
-    "daily-statistics-update",
-    "overdue-notification-scheduler",
-    "student-risk-analysis",
-    "execute-student-task",
-    "auto-message-suggestion",
-    "consultation-ai-summary",
-    "workforce-ops-automation",
+    "auto-billing-generation",
     "capacity-optimization-automation",
-    "growth-marketing-automation",
+    "consultation-ai-summary",
     "customer-retention-automation",
-    "financial-automation-batch"
+    "daily-statistics-update",
+    "execute-student-task",
+    "financial-automation-batch",
+    "growth-marketing-automation",
+    "monthly-business-report",
+    "overdue-notification-scheduler",
+    "payment-webhook-handler",
+    "plan-upgrade",
+    "safety-compliance-automation",
+    "student-risk-analysis",
+    "student-task-card-generation",
+    "workforce-ops-automation"
 )
 
 $successCount = 0

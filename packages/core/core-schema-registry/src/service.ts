@@ -52,6 +52,11 @@ export class SchemaRegistryService {
    * [불변 규칙] Super Admin만 등록 가능 (RLS 정책)
    */
   async registerSchema(input: RegisterSchemaInput): Promise<SchemaRegistryEntry> {
+    // 런타임 검증: minSupportedClient는 필수이며 빈 문자열이 아니어야 함
+    if (!input.minSupportedClient || input.minSupportedClient.trim() === '') {
+      throw new Error('minSupportedClient is required and cannot be empty');
+    }
+
     const { data, error } = await this.supabase
       .from('meta.schema_registry')
       .insert({

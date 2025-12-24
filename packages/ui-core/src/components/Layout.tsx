@@ -125,12 +125,19 @@ export const Grid: React.FC<GridProps> = ({
     }
   } else if (typeof columns === 'object' && columns !== null) {
     // 반응형 객체인 경우
-    const responsiveColumns =
-      (mode === 'xl' && columns.xl !== undefined) ? columns.xl :
-      (mode === 'lg' && columns.lg !== undefined) ? columns.lg :
-      (mode === 'md' && columns.md !== undefined) ? columns.md :
-      (mode === 'sm' && columns.sm !== undefined) ? columns.sm :
-      (columns.xs !== undefined) ? columns.xs : 1;
+    // 데스크탑 모드(lg, xl)에서는 더 큰 값이 정의되지 않았을 때 작은 값 사용 (fallback)
+    let responsiveColumns: number;
+    if (mode === 'xl') {
+      responsiveColumns = columns.xl ?? columns.lg ?? columns.md ?? columns.sm ?? columns.xs ?? 1;
+    } else if (mode === 'lg') {
+      responsiveColumns = columns.lg ?? columns.md ?? columns.sm ?? columns.xs ?? 1;
+    } else if (mode === 'md') {
+      responsiveColumns = columns.md ?? columns.sm ?? columns.xs ?? 1;
+    } else if (mode === 'sm') {
+      responsiveColumns = columns.sm ?? columns.xs ?? 1;
+    } else {
+      responsiveColumns = columns.xs ?? 1;
+    }
     // minmax(0, 1fr): 콘텐츠 크기와 무관하게 균등 분배 (5:5 정렬)
     gridTemplateColumns = `repeat(${responsiveColumns}, minmax(0, 1fr))`;
   } else {

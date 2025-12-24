@@ -41,8 +41,11 @@ export interface StatsCard {
   type: 'stats';
   title: string;
   value: string;
+  unit?: string;
   trend?: string;
   action_url?: string;
+  /** 그래프 데이터 키 (daily_store_metrics 테이블의 필드명) */
+  chartDataKey?: 'student_count' | 'revenue' | 'attendance_rate' | 'new_enrollments' | 'late_rate' | 'absent_rate' | 'active_student_count' | 'inactive_student_count' | 'avg_students_per_class' | 'avg_capacity_rate' | 'arpu';
 }
 
 export interface BillingSummaryCard {

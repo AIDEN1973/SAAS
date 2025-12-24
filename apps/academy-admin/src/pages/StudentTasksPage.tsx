@@ -11,9 +11,9 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary, Container, Card, Button, useModal, PageHeader } from '@ui-core/react';
-import { Grid } from '@ui-core/react';
 import { StudentTaskCard } from '../components/StudentTaskCard';
 import { useStudentTaskCards, useStudentTaskCardAction } from '@hooks/use-student';
+import { CardGridLayout } from '../components/CardGridLayout';
 
 export function StudentTasksPage() {
   const navigate = useNavigate();
@@ -51,8 +51,8 @@ export function StudentTasksPage() {
         )}
 
         {cards && cards.length > 0 && (
-          <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="md">
-            {cards.map((card) => (
+          <CardGridLayout
+            cards={cards.map((card) => (
               <StudentTaskCard
                 key={card.id}
                 card={card}
@@ -65,7 +65,10 @@ export function StudentTasksPage() {
                 }}
               />
             ))}
-          </Grid>
+            desktopColumns={3}
+            tabletColumns={2}
+            mobileColumns={1}
+          />
         )}
 
         {cards && cards.length === 0 && !isLoading && (

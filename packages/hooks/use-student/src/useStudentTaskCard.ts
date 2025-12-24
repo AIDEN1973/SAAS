@@ -10,6 +10,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 
+// React Query 시간 설정 상수 (하드코딩 금지)
+const REFETCH_INTERVAL_ONE_MINUTE = 60000; // 1분
+
 // TaskCard 타입 정의 (정본, 업종 중립)
 // 프론트 자동화 문서 2.2 섹션 참조
 export interface TaskCard {
@@ -34,6 +37,8 @@ export interface TaskCard {
   created_at: string;
   created_by?: string;
   metadata?: Record<string, unknown>; // TaskCard (task_type: 'ai_suggested') 관련 추가 데이터 (선택적)
+  snoozed_at?: string; // 카드 숨김 시각 (리마인드 기능)
+  remind_at?: string; // 리마인드 시각 (리마인드 기능)
 
   // 레거시 필드 (하위 호환성 유지)
   student_name?: string;
@@ -101,6 +106,16 @@ export function useStudentTaskCards() {
           return false;
         }
 
+        // 숨겨진 카드 필터링 (리마인드 기능)
+        // snoozed_at이 있고 remind_at이 아직 오지 않은 카드는 숨김
+        if (card.snoozed_at && card.remind_at) {
+          const remindAt = new Date(card.remind_at);
+          // remind_at이 아직 오지 않았으면 카드 숨김
+          if (remindAt > now) {
+            return false;
+          }
+        }
+
         const expiresAt = new Date(card.expires_at);
         const cardCreatedAt = new Date(card.created_at);
 
@@ -116,7 +131,7 @@ export function useStudentTaskCards() {
       return cards as StudentTaskCard[];
     },
     enabled: !!tenantId,
-    refetchInterval: 60000, // 1분마다 자동 갱신
+    refetchInterval: REFETCH_INTERVAL_ONE_MINUTE,
   });
 }
 
@@ -224,6 +239,64 @@ export function useApproveAndExecuteStudentTaskCard() {
           task_id: taskId,
         }
       );
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      return response.data;
+    },
+    onSuccess: () => {
+      // 학생 업무 카드 목록 갱신
+      queryClient.invalidateQueries({ queryKey: ['student-task-cards', tenantId] });
+    },
+  });
+}
+
+/**
+ * StudentTaskCard 숨기기 및 리마인드 Hook
+ *
+ * 카드를 숨기고 지정된 시간에 다시 표시
+ */
+export function useSnoozeStudentTaskCard() {
+  const queryClient = useQueryClient();
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+
+  return useMutation({
+    mutationFn: async ({ taskId, remindAt }: { taskId: string; remindAt: string }) => {
+      // 카드를 숨기고 리마인드 시간 설정
+      const response = await apiClient.patch('task_cards', taskId, {
+        snoozed_at: new Date().toISOString(),
+        remind_at: remindAt,
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      return response.data;
+    },
+    onSuccess: () => {
+      // 학생 업무 카드 목록 갱신
+      queryClient.invalidateQueries({ queryKey: ['student-task-cards', tenantId] });
+    },
+  });
+}
+
+/**
+ * StudentTaskCard 삭제 Hook
+ *
+ * 카드를 완전히 삭제
+ */
+export function useDeleteStudentTaskCard() {
+  const queryClient = useQueryClient();
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+
+  return useMutation({
+    mutationFn: async (cardId: string) => {
+      const response = await apiClient.delete('task_cards', cardId);
 
       if (response.error) {
         throw new Error(response.error.message);

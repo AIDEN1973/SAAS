@@ -89,7 +89,7 @@ export function AISuggestionCard({
       padding="md"
       variant="elevated"
       style={{
-        borderLeft: `4px solid var(--color-${getPriorityVariant(suggestion.priority)})`,
+        borderLeft: `var(--border-width-thick) solid var(--color-${getPriorityVariant(suggestion.priority)})`,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-sm)' }}>
@@ -110,8 +110,8 @@ export function AISuggestionCard({
             </Badge>
             <h3
               style={{
-                fontSize: 'var(--font-size-lg)',
-                fontWeight: 'var(--font-weight-semibold)',
+                fontSize: 'var(--font-size-xl)',
+                fontWeight: 'var(--font-weight-bold)',
                 flex: 1,
               }}
             >
@@ -126,7 +126,7 @@ export function AISuggestionCard({
           {suggestion.context_data?.reason && (
             <p
               style={{
-                fontSize: 'var(--font-size-sm)',
+                fontSize: 'var(--font-size-base)',
                 color: 'var(--color-text-tertiary)',
                 marginBottom: 'var(--spacing-sm)',
               }}
@@ -157,7 +157,7 @@ export function AISuggestionCard({
                       backgroundColor: 'var(--color-background-secondary)',
                     }}
                   >
-                    <p style={{ whiteSpace: 'pre-wrap', fontSize: 'var(--font-size-sm)' }}>
+                    <p style={{ whiteSpace: 'pre-wrap', fontSize: 'var(--font-size-base)' }}>
                       {typeof suggestion.suggested_action.payload.message === 'string'
                         ? suggestion.suggested_action.payload.message
                         : JSON.stringify(suggestion.suggested_action.payload.message, null, 2)}

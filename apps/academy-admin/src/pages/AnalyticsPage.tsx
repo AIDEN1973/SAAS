@@ -25,8 +25,10 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { ErrorBoundary, useModal } from '@ui-core/react';
 import { Container, Card, Button, PageHeader } from '@ui-core/react';
 import { useResponsiveMode } from '@ui-core/react';
+import { RegionalMetricCard } from '../components/analytics-cards/RegionalMetricCard';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useConfig } from '@hooks/use-config';
+import { CardGridLayout } from '../components/CardGridLayout';
 import { fetchAttendanceLogs } from '@hooks/use-attendance';
 import { fetchBillingHistory } from '@hooks/use-billing';
 import { fetchPersons } from '@hooks/use-student';
@@ -744,72 +746,41 @@ export function AnalyticsPage() {
 
           {/* 통계문서 3.1: 운영 현황 카드 4개를 동시에 표시 (학생 수 / 지역순위, 매출 / 지역순위, 출석률 / 지역순위, 성장률 / 지역순위) */}
           {!isLoading && regionalStats && (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-              gap: 'var(--spacing-md)',
-              marginBottom: 'var(--spacing-md)',
-            }}>
-              {/* 학생 수 카드 */}
-              <Card padding="md" variant="default" style={{ cursor: 'pointer' }} onClick={() => setSelectedMetric('students')}>
-                <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                  학생 수
-                </div>
-                <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-xs)' }}>
-                  {regionalStats.value}
-                </div>
-                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                  {regionalStats.comparisonGroup !== 'insufficient' && regionalStats.sampleCount >= 3
-                    ? `${regionalStats.region} 상위 ${regionalStats.percentile}%`
-                    : '지역순위 계산 불가'}
-                </div>
-              </Card>
-
-              {/* 매출 카드 - 통계문서 3.1: 매출 / 지역순위 */}
-              <Card padding="md" variant="default" style={{ cursor: 'pointer' }} onClick={() => setSelectedMetric('revenue')}>
-                <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                  매출
-                </div>
-                <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-xs)' }}>
-                  {selectedMetric === 'revenue' ? regionalStats.value.toLocaleString() : '클릭하여 확인'}
-                </div>
-                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                  {selectedMetric === 'revenue' && regionalStats.comparisonGroup !== 'insufficient' && regionalStats.sampleCount >= 3
-                    ? `${regionalStats.region} 상위 ${regionalStats.percentile}%`
-                    : selectedMetric === 'revenue' ? '지역순위 계산 불가' : '지표 선택 필요'}
-                </div>
-              </Card>
-
-              {/* 출석률 카드 - 통계문서 3.1: 출석률 / 지역순위 */}
-              <Card padding="md" variant="default" style={{ cursor: 'pointer' }} onClick={() => setSelectedMetric('attendance')}>
-                <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                  출석률
-                </div>
-                <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-xs)' }}>
-                  {selectedMetric === 'attendance' ? `${regionalStats.value}%` : '클릭하여 확인'}
-                </div>
-                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                  {selectedMetric === 'attendance' && regionalStats.comparisonGroup !== 'insufficient' && regionalStats.sampleCount >= 3
-                    ? `${regionalStats.region} 상위 ${regionalStats.percentile}%`
-                    : selectedMetric === 'attendance' ? '지역순위 계산 불가' : '지표 선택 필요'}
-                </div>
-              </Card>
-
-              {/* 성장률 카드 - 통계문서 3.1: 성장률 / 지역순위 */}
-              <Card padding="md" variant="default" style={{ cursor: 'pointer' }} onClick={() => setSelectedMetric('growth')}>
-                <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                  성장률
-                </div>
-                <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-xs)' }}>
-                  {selectedMetric === 'growth' ? `${regionalStats.value}%` : '클릭하여 확인'}
-                </div>
-                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                  {selectedMetric === 'growth' && regionalStats.comparisonGroup !== 'insufficient' && regionalStats.sampleCount >= 3
-                    ? `${regionalStats.region} 상위 ${regionalStats.percentile}%`
-                    : selectedMetric === 'growth' ? '지역순위 계산 불가' : '지표 선택 필요'}
-                </div>
-              </Card>
-            </div>
+            <CardGridLayout
+              cards={[
+                <RegionalMetricCard
+                  key="students"
+                  metric="students"
+                  regionalStats={regionalStats}
+                  selectedMetric={selectedMetric}
+                  onSelect={setSelectedMetric}
+                />,
+                <RegionalMetricCard
+                  key="revenue"
+                  metric="revenue"
+                  regionalStats={regionalStats}
+                  selectedMetric={selectedMetric}
+                  onSelect={setSelectedMetric}
+                />,
+                <RegionalMetricCard
+                  key="attendance"
+                  metric="attendance"
+                  regionalStats={regionalStats}
+                  selectedMetric={selectedMetric}
+                  onSelect={setSelectedMetric}
+                />,
+                <RegionalMetricCard
+                  key="growth"
+                  metric="growth"
+                  regionalStats={regionalStats}
+                  selectedMetric={selectedMetric}
+                  onSelect={setSelectedMetric}
+                />,
+              ]}
+              desktopColumns={3}
+              tabletColumns={2}
+              mobileColumns={1}
+            />
           )}
 
           {/* 지역 순위 카드 */}

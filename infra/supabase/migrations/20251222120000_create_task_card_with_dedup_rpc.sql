@@ -9,23 +9,42 @@ CREATE OR REPLACE FUNCTION create_task_card_with_dedup_v1(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER -- 서버 권한으로 실행 (RLS 우회 필요)
-SET search_path = public
 AS $$
 DECLARE
+  jwt_claims_json jsonb;
+  jwt_tenant_text text;
+  jwt_tenant_id uuid;
   v_tenant_id uuid;
   v_dedup_key text;
   v_status text;
   v_result jsonb;
   v_card_id uuid;
 BEGIN
+  -- ✅ P0-SEC-3: set_config로 search_path 고정
+  PERFORM set_config('search_path', 'public, pg_temp', true);
+
+  -- ✅ P0-SEC-1: request.jwt.claims 안전 파싱
+  jwt_claims_json := nullif(current_setting('request.jwt.claims', true), '')::jsonb;
+  jwt_tenant_text := jwt_claims_json ->> 'tenant_id';
+
+  IF jwt_tenant_text IS NULL OR jwt_tenant_text = '' THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = 'P0001';
+  END IF;
+
+  jwt_tenant_id := jwt_tenant_text::uuid;
+
   -- 필수 필드 추출
   v_tenant_id := (p_card->>'tenant_id')::uuid;
   v_dedup_key := p_card->>'dedup_key';
   v_status := COALESCE(p_card->>'status', 'pending');
 
-  -- 필수 필드 검증
+  -- ✅ SECURITY DEFINER 안전장치: tenant_id 검증
   IF v_tenant_id IS NULL THEN
-    RAISE EXCEPTION 'tenant_id is required';
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = 'P0001';
+  END IF;
+
+  IF jwt_tenant_id <> v_tenant_id THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = 'P0001';
   END IF;
 
   -- ⚠️ 정본 규칙: status가 'pending'이 아니면 디듀프 대상이 아니므로 일반 INSERT

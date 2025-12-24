@@ -88,13 +88,23 @@ export const Popover: React.FC<PopoverProps> = ({
       const readSpacingSmPx = () => {
         try {
           const v = getComputedStyle(document.documentElement).getPropertyValue('--spacing-sm').trim();
-          if (!v) return 8;
-          if (v.endsWith('rem')) return parseFloat(v) * 16;
+          // ⚠️ 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
+          const baseFontSize = typeof window !== 'undefined'
+            ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
+            : 16;
+          if (!v) return baseFontSize * 0.5; // 기본값: baseFontSize * 0.5 = 8px
+          if (v.endsWith('rem')) {
+            return parseFloat(v) * baseFontSize;
+          }
           if (v.endsWith('px')) return parseFloat(v);
           const n = Number(v);
-          return Number.isFinite(n) ? n : 8;
+          return Number.isFinite(n) ? n : baseFontSize * 0.5; // 기본값: baseFontSize * 0.5 = 8px
         } catch {
-          return 8;
+          // ⚠️ 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
+          const baseFontSize = typeof window !== 'undefined'
+            ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
+            : 16;
+          return baseFontSize * 0.5; // 기본값: baseFontSize * 0.5 = 8px
         }
       };
       const minMargin = readSpacingSmPx();

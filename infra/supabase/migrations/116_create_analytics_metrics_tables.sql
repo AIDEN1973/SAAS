@@ -70,6 +70,7 @@ ALTER TABLE analytics.daily_store_metrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analytics.daily_region_metrics ENABLE ROW LEVEL SECURITY;
 
 -- analytics.daily_store_metrics RLS 정책 (JWT claim 기반, 자기 매장 전용 KPI)
+DROP POLICY IF EXISTS tenant_isolation_daily_store_metrics ON analytics.daily_store_metrics;
 CREATE POLICY tenant_isolation_daily_store_metrics ON analytics.daily_store_metrics
 FOR ALL TO authenticated
 USING (
@@ -81,6 +82,7 @@ WITH CHECK (
 
 -- analytics.daily_region_metrics RLS 정책 (집계·익명화된 region-level 통계, 자기 업종 + 자기 지역의 통계만)
 -- ⚠️ 중요: 이 테이블은 tenant_id 컬럼을 사용하지 않으며, region_code + industry_type으로 필터링
+DROP POLICY IF EXISTS industry_region_filter_daily_region_metrics ON analytics.daily_region_metrics;
 CREATE POLICY industry_region_filter_daily_region_metrics ON analytics.daily_region_metrics
 FOR SELECT TO authenticated
 USING (
@@ -99,12 +101,14 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- daily_store_metrics updated_at 트리거
+DROP TRIGGER IF EXISTS trigger_update_daily_store_metrics_updated_at ON analytics.daily_store_metrics;
 CREATE TRIGGER trigger_update_daily_store_metrics_updated_at
   BEFORE UPDATE ON analytics.daily_store_metrics
   FOR EACH ROW
   EXECUTE FUNCTION update_analytics_metrics_updated_at();
 
 -- daily_region_metrics updated_at 트리거
+DROP TRIGGER IF EXISTS trigger_update_daily_region_metrics_updated_at ON analytics.daily_region_metrics;
 CREATE TRIGGER trigger_update_daily_region_metrics_updated_at
   BEFORE UPDATE ON analytics.daily_region_metrics
   FOR EACH ROW
@@ -177,6 +181,87 @@ BEGIN
   END IF;
 END $$;
 
+-- daily_store_metrics 테이블에 추가 컬럼 추가
+DO $$
+BEGIN
+  -- late_rate (지각률)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'analytics'
+      AND table_name = 'daily_store_metrics'
+      AND column_name = 'late_rate'
+  ) THEN
+    ALTER TABLE analytics.daily_store_metrics
+    ADD COLUMN late_rate numeric(5, 2) NOT NULL DEFAULT 0;
+  END IF;
+
+  -- absent_rate (결석률)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'analytics'
+      AND table_name = 'daily_store_metrics'
+      AND column_name = 'absent_rate'
+  ) THEN
+    ALTER TABLE analytics.daily_store_metrics
+    ADD COLUMN absent_rate numeric(5, 2) NOT NULL DEFAULT 0;
+  END IF;
+
+  -- active_student_count (활성 학생 수)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'analytics'
+      AND table_name = 'daily_store_metrics'
+      AND column_name = 'active_student_count'
+  ) THEN
+    ALTER TABLE analytics.daily_store_metrics
+    ADD COLUMN active_student_count integer NOT NULL DEFAULT 0;
+  END IF;
+
+  -- inactive_student_count (비활성 학생 수)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'analytics'
+      AND table_name = 'daily_store_metrics'
+      AND column_name = 'inactive_student_count'
+  ) THEN
+    ALTER TABLE analytics.daily_store_metrics
+    ADD COLUMN inactive_student_count integer NOT NULL DEFAULT 0;
+  END IF;
+
+  -- avg_students_per_class (반당 평균 인원)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'analytics'
+      AND table_name = 'daily_store_metrics'
+      AND column_name = 'avg_students_per_class'
+  ) THEN
+    ALTER TABLE analytics.daily_store_metrics
+    ADD COLUMN avg_students_per_class numeric(5, 2) NOT NULL DEFAULT 0;
+  END IF;
+
+  -- avg_capacity_rate (평균 정원률)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'analytics'
+      AND table_name = 'daily_store_metrics'
+      AND column_name = 'avg_capacity_rate'
+  ) THEN
+    ALTER TABLE analytics.daily_store_metrics
+    ADD COLUMN avg_capacity_rate numeric(5, 2) NOT NULL DEFAULT 0;
+  END IF;
+
+  -- arpu (학생 1인당 평균 매출)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'analytics'
+      AND table_name = 'daily_store_metrics'
+      AND column_name = 'arpu'
+  ) THEN
+    ALTER TABLE analytics.daily_store_metrics
+    ADD COLUMN arpu numeric(12, 2) NOT NULL DEFAULT 0;
+  END IF;
+END $$;
+
 -- 컬럼 코멘트 추가
 COMMENT ON COLUMN analytics.daily_region_metrics.avg_attendance_rate IS '출석률 평균 (0-100, 통계문서 245줄)';
 COMMENT ON COLUMN analytics.daily_region_metrics.attendance_rate_p25 IS '출석률 25분위수';
@@ -185,4 +270,82 @@ COMMENT ON COLUMN analytics.daily_region_metrics.student_growth_rate_avg IS '학
 COMMENT ON COLUMN analytics.daily_region_metrics.revenue_growth_rate_avg IS '매출 성장률 평균 (%, 통계문서 FR-04)';
 COMMENT ON COLUMN analytics.daily_region_metrics.student_growth_rate_p75 IS '학생 성장률 75분위수 (상위 10% 근사값)';
 COMMENT ON COLUMN analytics.daily_region_metrics.revenue_growth_rate_p75 IS '매출 성장률 75분위수 (상위 10% 근사값)';
+COMMENT ON COLUMN analytics.daily_store_metrics.late_rate IS '지각률 (0-100)';
+COMMENT ON COLUMN analytics.daily_store_metrics.absent_rate IS '결석률 (0-100)';
+COMMENT ON COLUMN analytics.daily_store_metrics.active_student_count IS '활성 학생 수';
+COMMENT ON COLUMN analytics.daily_store_metrics.inactive_student_count IS '비활성 학생 수';
+COMMENT ON COLUMN analytics.daily_store_metrics.avg_students_per_class IS '반당 평균 인원';
+COMMENT ON COLUMN analytics.daily_store_metrics.avg_capacity_rate IS '평균 정원률 (0-100)';
+COMMENT ON COLUMN analytics.daily_store_metrics.arpu IS '학생 1인당 평균 매출';
+
+-- ============================================================================
+-- PostgREST 노출을 위한 public VIEW 생성
+-- ============================================================================
+-- [불변 규칙] PostgREST가 analytics 스키마를 노출하지 않는 경우를 대비한 public View
+-- [불변 규칙] analytics.daily_store_metrics를 public.daily_store_metrics View로 노출
+-- [불변 규칙] RLS 정책은 underlying table(analytics.daily_store_metrics)의 RLS에 의해 보호됨
+
+-- daily_store_metrics VIEW 생성 (analytics.daily_store_metrics 노출)
+DROP VIEW IF EXISTS public.daily_store_metrics;
+CREATE OR REPLACE VIEW public.daily_store_metrics AS
+SELECT
+  id,
+  tenant_id,
+  store_id,
+  student_count,
+  revenue,
+  attendance_rate,
+  new_enrollments,
+  late_rate,
+  absent_rate,
+  active_student_count,
+  inactive_student_count,
+  avg_students_per_class,
+  avg_capacity_rate,
+  arpu,
+  date_kst,
+  created_at,
+  updated_at
+FROM analytics.daily_store_metrics;
+
+-- VIEW 권한 설정
+GRANT SELECT ON public.daily_store_metrics TO authenticated;
+GRANT SELECT ON public.daily_store_metrics TO anon;  -- RLS 정책에 따라 실제 접근은 제한됨
+
+-- VIEW COMMENT
+COMMENT ON VIEW public.daily_store_metrics IS
+'daily_store_metrics View (PostgREST 노출용). underlying table은 analytics.daily_store_metrics입니다. RLS 정책은 underlying table에 의해 보호됩니다.';
+
+-- daily_region_metrics VIEW 생성 (analytics.daily_region_metrics 노출)
+-- 테이블이 존재하고 필요한 컬럼이 있는지 확인 후 VIEW 생성
+DO $$
+DECLARE
+  v_columns text;
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'analytics'
+    AND table_name = 'daily_region_metrics'
+  ) THEN
+      -- 존재하는 컬럼만 동적으로 선택
+      SELECT string_agg(column_name, ', ' ORDER BY ordinal_position)
+      INTO v_columns
+      FROM information_schema.columns
+      WHERE table_schema = 'analytics'
+      AND table_name = 'daily_region_metrics';
+
+    IF v_columns IS NOT NULL THEN
+      DROP VIEW IF EXISTS public.daily_region_metrics;
+      EXECUTE format('CREATE VIEW public.daily_region_metrics AS SELECT %s FROM analytics.daily_region_metrics', v_columns);
+    END IF;
+  END IF;
+END $$;
+
+-- VIEW 권한 설정
+GRANT SELECT ON public.daily_region_metrics TO authenticated;
+GRANT SELECT ON public.daily_region_metrics TO anon;  -- RLS 정책에 따라 실제 접근은 제한됨
+
+-- VIEW COMMENT
+COMMENT ON VIEW public.daily_region_metrics IS
+'daily_region_metrics View (PostgREST 노출용). underlying table은 analytics.daily_region_metrics입니다. RLS 정책은 underlying table에 의해 보호됩니다.';
 

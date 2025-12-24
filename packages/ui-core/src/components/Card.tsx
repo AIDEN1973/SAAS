@@ -45,7 +45,7 @@ export const Card: React.FC<CardProps> = ({
   onKeyDown,
   tabIndex,
   'aria-label': ariaLabel,
-  disableHoverEffect = false,
+  disableHoverEffect = true, // 기본값을 true로 변경: 롤오버 효과 제거
   title,
   titlePosition = 'top-left',
   titleIcon,
@@ -185,7 +185,7 @@ export const Card: React.FC<CardProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 'var(--spacing-sm)',
-                  fontSize: 'var(--font-size-lg)',
+                  fontSize: 'var(--font-size-xl)',
                   fontWeight: 'var(--font-weight-bold)',
                   ...titlePositionStyles[titlePosition],
                 }}

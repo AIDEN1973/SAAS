@@ -55,10 +55,14 @@ export const IconButtonGroup: React.FC<IconButtonGroupProps> = ({
       const value = getComputedStyle(document.documentElement)
         .getPropertyValue('--size-icon-base')
         .trim();
-      // rem 단위를 px로 변환 (기본값 16px = 1rem)
+      // rem 단위를 px로 변환 (CSS 변수에서 기본 폰트 크기 읽기)
       if (value.endsWith('rem')) {
         const remValue = parseFloat(value);
-        return remValue * 16; // 기본 폰트 크기 16px 가정
+        // ⚠️ 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
+        const baseFontSize = typeof window !== 'undefined'
+          ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
+          : 16;
+        return remValue * baseFontSize;
       }
       // px 단위인 경우
       if (value.endsWith('px')) {

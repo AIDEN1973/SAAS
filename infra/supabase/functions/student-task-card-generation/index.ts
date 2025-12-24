@@ -249,7 +249,7 @@ serve(async (req) => {
         const { data: newStudents, error: newStudentsError } = await withTenant(
           supabase
           .from('persons')
-          .select('id, created_at')
+          .select('id, created_at, name')
           .eq('person_type', 'student')
           .gte('created_at', `${sevenDaysAgo}T00:00:00`)
             .lte('created_at', `${today}T23:59:59`),
@@ -347,8 +347,8 @@ serve(async (req) => {
               entity_type: 'student', // entity_type
               task_type: 'new_signup',
               priority: 30, // 0-100 스케일
-              title: '신규 등록 대상 환영', // 업종 중립: 학생 → 대상
-              description: '신규 등록 대상을 환영하고 초기 설정을 완료하세요.', // 업종 중립: 학생 → 대상
+              title: `${student.name} 학생 신규 등록`,
+              description: '환영 메시지를 발송해 보세요.',
               action_url: `/students/${student.id}/welcome`,
               expires_at: expiresAt.toISOString(),
               dedup_key: dedupKey, // v3.3: dedup_key 필드 추가

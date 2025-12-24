@@ -3,11 +3,14 @@
  *
  * [불변 규칙] HomePage와 AllCardsPage에서 공통 사용
  * [불변 규칙] SSOT 원칙 준수: 렌더링 로직은 이 컴포넌트에만 존재
+ * [불변 규칙] UI Core Component (NotificationCardLayout) 사용
  */
 
 import React from 'react';
-import { Card } from '@ui-core/react';
+import { Receipt } from 'lucide-react';
+import { NotificationCardLayout } from '@ui-core/react';
 import type { BillingSummaryCard as BillingSummaryCardType } from '../../types/dashboardCard';
+import { EMPTY_CARD_ID_PREFIX, DEFAULT_VALUES, CARD_LABELS } from '../../constants/dashboard-cards';
 
 export interface BillingSummaryCardProps {
   card: BillingSummaryCardType;
@@ -15,31 +18,24 @@ export interface BillingSummaryCardProps {
 }
 
 export function BillingSummaryCard({ card, onAction }: BillingSummaryCardProps) {
+  // 빈 카드 여부 확인 (ID가 empty-로 시작하는 경우)
+  const isEmpty = card.id.startsWith(EMPTY_CARD_ID_PREFIX);
+
   return (
-    <Card
+    <NotificationCardLayout
       key={card.id}
-      padding="md"
-      variant="default"
-      style={{ cursor: 'pointer' }}
-      onClick={() => onAction?.(card)}
+      title={card.title}
+      value={card.expected_collection_rate}
+      unit="%"
+      isEmpty={isEmpty}
+      onClick={() => !isEmpty && onAction?.(card)}
+      icon={<Receipt style={{ width: '100%', height: '100%' }} />}
     >
-      <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
-        {card.title}
-      </h3>
-      <div style={{ marginBottom: 'var(--spacing-xs)' }}>
-        <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-          예상 수납률
-        </div>
-        <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
-          {card.expected_collection_rate}%
-        </div>
-      </div>
-      {card.unpaid_count > 0 && (
-        <div style={{ color: 'var(--color-error)' }}>
-          미납 {card.unpaid_count}건
+      {card.unpaid_count > DEFAULT_VALUES.ZERO && (
+        <div style={{ color: 'var(--color-error)', marginTop: 'var(--spacing-sm)' }}>
+          {CARD_LABELS.UNPAID_PREFIX} {card.unpaid_count}{CARD_LABELS.UNPAID_SUFFIX}
         </div>
       )}
-    </Card>
+    </NotificationCardLayout>
   );
 }
-

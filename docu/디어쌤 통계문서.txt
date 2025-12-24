@@ -51,9 +51,12 @@
 학생 수	현재 재원생 수
 신규 등록	이번 달 등록한 학생 수
 퇴원/휴원	이탈 학생 수
+활성 학생 수	status='active'인 학생 수
+비활성 학생 수	status='inactive'인 학생 수
 출석률	전체 출석 기록 기반
 지각률/결석률	출결 데이터 기반
 반당 평균 인원	반-정원 대비 운영 효율
+평균 정원률	(현재 인원 / 정원) × 100
 ✔ FR-03. 매출 지표 수집/산출
 
 알림뱅킹/카드/간편결제 기반 실제 매출 정보를 집계한다.
@@ -247,7 +250,7 @@ date_kst	KST 기준 날짜
 
 📌 analytics.daily_store_metrics (정본)
 
-| tenant_id | store_id | student_count | revenue | attendance_rate | new_enrollments | date_kst | … |
+| tenant_id | store_id | student_count | revenue | attendance_rate | new_enrollments | late_rate | absent_rate | active_student_count | inactive_student_count | avg_students_per_class | avg_capacity_rate | arpu | date_kst | … |
 
 📌 ranking_snapshot
 

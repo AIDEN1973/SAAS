@@ -59,17 +59,18 @@ serve(async (req) => {
 
     for (const tenant of tenants) {
       try {
-        // 학생 수 통계
-        const { data: students, error: studentsError } = await withTenant(
+        // 학생 수 통계 (전체, 활성, 비활성)
+        const { data: allStudents, error: allStudentsError } = await withTenant(
           supabase
           .from('persons')
-          .select('id', { count: 'exact', head: true })
-          .eq('person_type', 'student')
-            .eq('status', 'active'),
+          .select('id, status', { count: 'exact' })
+          .eq('person_type', 'student'),
           tenant.id
         );
 
-        const studentCount = studentsError ? 0 : (students?.length || 0);
+        const studentCount = allStudentsError ? 0 : (allStudents?.length || 0);
+        const activeStudentCount = allStudentsError ? 0 : (allStudents?.filter((s: { status: string }) => s.status === 'active').length || 0);
+        const inactiveStudentCount = allStudentsError ? 0 : (allStudents?.filter((s: { status: string }) => s.status === 'inactive').length || 0);
 
         // 출석 통계
         const { data: attendanceLogs, error: attendanceError } = await withTenant(
@@ -82,7 +83,13 @@ serve(async (req) => {
         );
 
         const attendanceCount = attendanceError ? 0 : (attendanceLogs?.filter((log: { status: string }) => log.status === 'present').length || 0);
+        const lateCount = attendanceError ? 0 : (attendanceLogs?.filter((log: { status: string }) => log.status === 'late').length || 0);
         const absentCount = attendanceError ? 0 : (attendanceLogs?.filter((log: { status: string }) => log.status === 'absent').length || 0);
+
+        // 출석률, 지각률, 결석률 계산
+        const attendanceRate = studentCount > 0 ? (attendanceCount / studentCount) * 100 : 0;
+        const lateRate = studentCount > 0 ? (lateCount / studentCount) * 100 : 0;
+        const absentRate = studentCount > 0 ? (absentCount / studentCount) * 100 : 0;
 
         // 매출 통계
         const { data: invoices, error: invoicesError } = await withTenant(
@@ -98,6 +105,27 @@ serve(async (req) => {
           ? 0
           : (invoices?.reduce((sum: number, inv: { amount_paid?: number }) => sum + (inv.amount_paid || 0), 0) || 0);
 
+        // 반 통계 조회
+        const { data: classes, error: classesError } = await withTenant(
+          supabase
+          .from('classes')
+          .select('current_count, capacity')
+          .eq('status', 'active'),
+          tenant.id
+        );
+
+        let avgStudentsPerClass = 0;
+        let avgCapacityRate = 0;
+        if (!classesError && classes && classes.length > 0) {
+          const totalStudentsInClasses = classes.reduce((sum: number, cls: { current_count?: number }) => sum + (cls.current_count || 0), 0);
+          const totalCapacity = classes.reduce((sum: number, cls: { capacity?: number }) => sum + (cls.capacity || 0), 0);
+          avgStudentsPerClass = classes.length > 0 ? totalStudentsInClasses / classes.length : 0;
+          avgCapacityRate = totalCapacity > 0 ? (totalStudentsInClasses / totalCapacity) * 100 : 0;
+        }
+
+        // ARPU 계산 (학생 1인당 평균 매출)
+        const arpu = studentCount > 0 ? revenue / studentCount : 0;
+
         // 통계 업데이트 (analytics.daily_store_metrics 테이블 사용, 정본)
         // ⚠️ 참고: analytics.daily_metrics는 구버전/폐기된 네이밍입니다.
         const { error: upsertError } = await supabase
@@ -106,10 +134,16 @@ serve(async (req) => {
             tenant_id: tenant.id,
             date_kst: dateKst,
             student_count: studentCount,
-            attendance_count: attendanceCount,
-            absent_count: absentCount,
             revenue: revenue,
-            industry_type: tenant.industry_type,
+            attendance_rate: attendanceRate,
+            new_enrollments: 0, // 신규 등록 수는 별도 계산 필요 (현재는 0)
+            late_rate: lateRate,
+            absent_rate: absentRate,
+            active_student_count: activeStudentCount,
+            inactive_student_count: inactiveStudentCount,
+            avg_students_per_class: avgStudentsPerClass,
+            avg_capacity_rate: avgCapacityRate,
+            arpu: arpu,
             updated_at: toKST().toISOString(),
           }, {
             onConflict: 'tenant_id,date_kst',

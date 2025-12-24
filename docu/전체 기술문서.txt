@@ -116,8 +116,9 @@ AI 기능은 다음 2계층으로 구성된다.
 - 코드에서 설정 읽기:
   - 서버/Edge Function: getTenantSettingByPath(supabase, tenantId, path, legacyPath?) 형식 사용
     - 예: await getTenantSettingByPath(supabase, tenantId, "auto_notification.overdue_outstanding_over_limit.enabled")
-    - 시그니처: (supabase: SupabaseClient, tenantId: string, path: string, legacyPath?: string) => Promise<T | null>
-    - 반환 타입: T | null (Policy가 없으면 null, 있으면 직접 값 T 반환, .value 접근 불필요)
+    - 시그니처: (supabase: SupabaseClient, tenantId: string, path: string, legacyPath?: string) => Promise<unknown>
+    - 반환 타입: `unknown` (실제 구현 타입) → 사용 시 타입 캐스팅 필요 (예: `as boolean`, `as number`)
+    - 반환 값 의미: Policy가 없으면 `null`, 있으면 직접 값 `T` 반환 (`.value` 접근 불필요)
     - 프론트엔드 Hook useTenantSettingByPath: UseQueryResult<unknown, Error> 반환 (React Query의 useQuery 반환 객체)
       - 사용 예시: const { data: enabledValue } = useTenantSettingByPath("auto_notification.overdue.enabled");
       - data 속성: T | null (Policy가 없으면 null, 있으면 직접 값 T, .value 접근 불필요)
@@ -2124,7 +2125,7 @@ CREATE TABLE profiles (
   created_at timestamptz
 );
 
-테넌트별 폼 설정은 tenant_settings.profile_schema에 JSON Schema로 저장:
+테넌트별 폼 설정은 tenant_settings KV 구조에서 key='profile_schema' row의 value(JSONB)에 JSON Schema로 저장:
 
 {
   "schema": {
@@ -2776,9 +2777,11 @@ Hot Tenant 라우팅 레이어는 Edge Middleware 또는 Server Gateway(API Laye
 저장 방식 옵션:
 
 옵션 1: PostgreSQL 테이블 (권장, 상용화 단계)
-- 테이블: `meta.schema_registry`
+- 테이블: `meta.schema_registry` (실제 테이블)
+- VIEW: `public.schema_registry` (PostgREST 노출용, underlying table은 `meta.schema_registry`)
 - 장점: Supabase와 통합, 트랜잭션 보장, RLS 적용 가능
 - 단점: Git 연동이 수동
+- ⚠️ 중요: `public.schema_registry`는 VIEW이므로, RLS 정책은 underlying table(`meta.schema_registry`)의 RLS에 의해 보호됨
 
 옵션 2: Git-managed JSON 파일 (상용화 단계 권장)
 - 저장 위치: `infra/schemas/{industry_type}/{entity}/{version}.json`
@@ -2851,6 +2854,13 @@ CREATE TRIGGER trigger_normalize_min_client
   FOR EACH ROW
   EXECUTE FUNCTION normalize_min_client();
 ```
+
+⚠️ 중요: 마이그레이션 파일 일관성
+- 정본 마이그레이션: `infra/supabase/migrations/039_create_schema_registry.sql` (20줄)에서 `min_supported_client text NOT NULL`로 정의됨
+- ⚠️ 코드 수정 필요: `infra/supabase/migrations/043_verify_meta_tables.sql` (35줄)에서 `min_supported_client text,` (nullable)로 생성되고 있어 불일치
+  - 수정 필요: `min_supported_client text NOT NULL,`로 변경
+- ⚠️ 코드 수정 필요: `packages/core/core-schema-registry/src/service.ts` (61줄)에서 `input.minSupportedClient`가 null/undefined인 경우 에러 처리 또는 기본값 설정 필요
+  - 문서 스펙에 따르면 `min_supported_client`는 필수(NOT NULL)이므로, 서비스 레벨에서도 검증 필요
 
 5-7. Schema Registry 등록 시점 Validation
 
@@ -5300,10 +5310,14 @@ KPI 값 표시 규칙:
 외부 런타임(Lambda/Cloudflare Workers) 집계 (매일 04:00 KST, Supabase cron은 트리거만 수행)
 ↓
 analytics.daily_store_metrics (매장 단위 일별 KPI, 정본)
+- 주요 컬럼: tenant_id, store_id, student_count, revenue, attendance_rate, new_enrollments, late_rate, absent_rate, active_student_count, inactive_student_count, avg_students_per_class, avg_capacity_rate, arpu, date_kst
 analytics.daily_region_metrics (지역 단위 집계 KPI, 정본)
 ⚠️ 중요: analytics.daily_metrics, analytics.monthly_revenue는 구버전/폐기된 네이밍이며 더 이상 사용하지 않습니다. 정본은 analytics.daily_store_metrics, analytics.daily_region_metrics만 사용합니다.
 ↓
 뷰(Materialized View)
+- public.daily_store_metrics: PostgREST 노출을 위한 VIEW (underlying table: analytics.daily_store_metrics)
+- public.daily_region_metrics: PostgREST 노출을 위한 VIEW (underlying table: analytics.daily_region_metrics)
+- RLS 정책은 underlying table의 RLS에 의해 보호됨
 ↓
 대시보드
 
@@ -5332,6 +5346,7 @@ analytics.events 테이블 구조:
 2. 일별 집계 (배치):
    - 매일 04:00 KST에 외부 Worker(Lambda/Cloudflare Workers)가 전날 데이터 집계
    - analytics.events에서 event_date_kst 기준으로 그룹핑하여 analytics.daily_store_metrics에 upsert (정본)
+   - 집계 지표: student_count, revenue, attendance_rate, new_enrollments, late_rate, absent_rate, active_student_count, inactive_student_count, avg_students_per_class, avg_capacity_rate, arpu
    - 지역별 집계는 analytics.daily_region_metrics에 upsert (정본)
    - 업종별 KPI는 Industry Layer의 Mapper를 사용하여 계산
 

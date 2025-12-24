@@ -44,7 +44,11 @@ export const Tooltip: React.FC<TooltipProps> = ({
         .getPropertyValue(varName)
         .trim();
       if (value.endsWith('rem')) {
-        return parseFloat(value) * 16; // rem을 px로 변환
+        // ⚠️ 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
+        const baseFontSize = typeof window !== 'undefined'
+          ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
+          : 16;
+        return parseFloat(value) * baseFontSize; // rem을 px로 변환
       } else if (value.endsWith('px')) {
         return parseFloat(value);
       } else if (value) {

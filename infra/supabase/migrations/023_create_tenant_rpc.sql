@@ -12,13 +12,14 @@ CREATE OR REPLACE FUNCTION create_tenant_with_onboarding(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER -- 서버 권한으로 실행
-SET search_path = public -- 스키마 경로 명시 (PostgREST 스키마 캐시 문제 해결)
 AS $$
 DECLARE
   v_tenant_id uuid;
   v_tenant jsonb;
   v_user_tenant_role jsonb;
 BEGIN
+  -- ✅ P0-SEC-3: set_config로 search_path 고정
+  PERFORM set_config('search_path', 'public, pg_temp', true);
   -- 1. 테넌트 생성
   INSERT INTO public.tenants (name, industry_type, plan, status)
   VALUES (p_name, p_industry_type, p_plan, 'active')

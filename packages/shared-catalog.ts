@@ -3,7 +3,7 @@
  *
  * [불변 규칙] 이 카탈로그에 없는 공통화 요소는 사용하지 않습니다.
  * [불변 규칙] 카탈로그 수정 시 관련 문서와 동기화 필수
- * [불변 규칙] 새 공통 로직 추가 시 반드시 이 카탈로그에 항목 추가
+ * [불변 규칙] 새 공통 로직(Hook/Feature/Adapter/Component) 추가 시 반드시 이 카탈로그에 항목 추가
  *
  * 목적: "처음부터 어디를 써야 하지?"를 자동으로 안내
  *
@@ -36,6 +36,7 @@ export interface SharedCatalog {
   hooks: Record<string, CatalogItem>;
   features: Record<string, CatalogItem>;
   adapters: Record<string, CatalogItem>;
+  components: Record<string, CatalogItem>; // UI Core Component (공통 레이아웃/프리미티브)
 }
 
 export const sharedCatalog: SharedCatalog = {
@@ -439,6 +440,46 @@ export const sharedCatalog: SharedCatalog = {
         hook: 'use-student-task-cards',
       },
     },
+    'use-consultation-stats': {
+      path: '@hooks/use-student',
+      import: 'import { useConsultationStats, fetchConsultationStats } from "@hooks/use-student"',
+      useWhen: '상담 통계 조회가 필요한 페이지 (이번 달 상담 건수, 대기 중인 상담 건수, 긴급 상담 건수)',
+      input: 'useConsultationStats(): 없음 (tenantId는 Context에서 자동 가져옴), fetchConsultationStats(tenantId: string): useQuery 내부에서 사용',
+      output: 'useConsultationStats(): ConsultationStats, fetchConsultationStats(): Promise<ConsultationStats>',
+      extensionPoints: [],
+      doNot: [
+        '직접 apiClient.callRPC("consultation_stats") 호출',
+        'useQuery로 consultation_stats RPC 직접 조회',
+        'tenantId를 직접 전달 (Context에서 자동 가져옴)',
+      ],
+      examples: [
+        'const { data: consultationStats } = useConsultationStats();',
+        'const stats = await fetchConsultationStats(tenantId);',
+      ],
+      related: {
+        hook: 'use-student',
+      },
+    },
+    'use-recent-activity': {
+      path: '@hooks/use-student',
+      import: 'import { useRecentActivity, fetchRecentActivity } from "@hooks/use-student"',
+      useWhen: '최근 활동 조회가 필요한 페이지 (최근 등록된 학생, 최근 상담 기록, 최근 출결 이벤트, 최근 태그 추가/변경)',
+      input: 'useRecentActivity(): 없음 (tenantId는 Context에서 자동 가져옴), fetchRecentActivity(tenantId: string): useQuery 내부에서 사용',
+      output: 'useRecentActivity(): RecentActivity, fetchRecentActivity(): Promise<RecentActivity>',
+      extensionPoints: [],
+      doNot: [
+        '직접 apiClient.get("persons") / apiClient.get("student_consultations") / apiClient.get("attendance_logs") / apiClient.get("tag_assignments") 호출',
+        'useQuery로 최근 활동 데이터 직접 조회',
+        'tenantId를 직접 전달 (Context에서 자동 가져옴)',
+      ],
+      examples: [
+        'const { data: recentActivity } = useRecentActivity();',
+        'const activity = await fetchRecentActivity(tenantId);',
+      ],
+      related: {
+        hook: 'use-student',
+      },
+    },
   },
   features: {
     'task-card-item': {
@@ -482,6 +523,32 @@ export const sharedCatalog: SharedCatalog = {
       },
     },
   },
+  components: {
+    'notification-card-layout': {
+      path: '@ui-core/react',
+      import: 'import { NotificationCardLayout } from "@ui-core/react"',
+      useWhen: '알림 카드 및 통계 카드를 구현할 때 - EmergencyCard, AIBriefingCard, StudentTaskCard, StatsCard 등 모든 카드가 동일한 레이아웃을 사용',
+      input: '{ header?: ReactNode; title: ReactNode; description?: ReactNode; meta?: ReactNode; actions?: ReactNode; children?: ReactNode; backgroundColor?: string; isEmpty?: boolean; onClick?: () => void; variant?: "default" | "elevated" | "outlined"; borderLeftColor?: string; maxTitleLines?: number; maxDescriptionLines?: number; icon?: ReactNode; value?: ReactNode; unit?: ReactNode; trend?: ReactNode; layoutMode?: "notification" | "stats" | "auto" }',
+      output: 'React.ReactNode (알림 카드 및 통계 카드 레이아웃)',
+      extensionPoints: ['header', 'title', 'description', 'meta', 'actions', 'children', 'backgroundColor', 'borderLeftColor', 'maxTitleLines', 'maxDescriptionLines', 'icon', 'value', 'unit', 'trend', 'layoutMode'],
+      doNot: [
+        'Card 컴포넌트를 직접 사용하여 알림 카드 레이아웃 구현',
+        '알림 카드 레이아웃 로직 중복 구현',
+        '하드코딩된 레이아웃 구조 사용',
+        'EmergencyCard, AIBriefingCard 등에서 개별 레이아웃 코드 작성',
+        'StatsCardLayout 사용 (NotificationCardLayout로 통일됨)',
+      ],
+      examples: [
+        'import { NotificationCardLayout } from "@ui-core/react";',
+        '<NotificationCardLayout header={header} title={card.title} description={card.message} />',
+        '<NotificationCardLayout header={header} title={card.title} description={card.summary} variant="elevated">{insightsContent}</NotificationCardLayout>',
+        '<NotificationCardLayout title="전체 학생 수" value={150} unit="명" trend="+10%" icon={<Users />} />',
+      ],
+      related: {
+        feature: 'task-card-item',
+      },
+    },
+  },
 } as const;
 
 /**
@@ -491,12 +558,12 @@ export const sharedCatalog: SharedCatalog = {
  * @returns 검색 결과 배열
  */
 export function searchCatalog(keyword: string): Array<{
-  category: 'hooks' | 'features' | 'adapters';
+  category: 'hooks' | 'features' | 'adapters' | 'components';
   key: string;
   item: CatalogItem;
 }> {
   const results: Array<{
-    category: 'hooks' | 'features' | 'adapters';
+    category: 'hooks' | 'features' | 'adapters' | 'components';
     key: string;
     item: CatalogItem;
   }> = [];
@@ -536,6 +603,17 @@ export function searchCatalog(keyword: string): Array<{
     }
   });
 
+  // components 검색
+  Object.entries(sharedCatalog.components).forEach(([key, item]) => {
+    if (
+      key.toLowerCase().includes(lowerKeyword) ||
+      item.useWhen.toLowerCase().includes(lowerKeyword) ||
+      item.path.toLowerCase().includes(lowerKeyword)
+    ) {
+      results.push({ category: 'components', key, item });
+    }
+  });
+
   return results;
 }
 
@@ -564,6 +642,15 @@ export function isRegisteredFeature(featureKey: string): featureKey is keyof typ
  */
 export function isRegisteredAdapter(adapterKey: string): adapterKey is keyof typeof sharedCatalog.adapters {
   return adapterKey in sharedCatalog.adapters;
+}
+
+/**
+ * Component가 Shared Catalog에 등록되어 있는지 확인하는 가드 함수
+ * @param componentKey 검증할 Component 키 (예: 'notification-card-layout')
+ * @returns componentKey가 유효한 Component인지 여부
+ */
+export function isRegisteredComponent(componentKey: string): componentKey is keyof typeof sharedCatalog.components {
+  return componentKey in sharedCatalog.components;
 }
 
 /**
@@ -626,3 +713,19 @@ export function assertRegisteredAdapter(adapterKey: string): asserts adapterKey 
   }
 }
 
+/**
+ * Component가 Shared Catalog에 등록되어 있는지 검증하는 assert 함수 (Fail-Closed)
+ *
+ * @param componentKey 검증할 Component 키 (예: 'notification-card-layout')
+ * @throws Error componentKey가 유효한 Component가 아닌 경우
+ */
+export function assertRegisteredComponent(componentKey: string): asserts componentKey is keyof typeof sharedCatalog.components {
+  if (!isRegisteredComponent(componentKey)) {
+    const availableComponents = Object.keys(sharedCatalog.components).join(', ');
+    throw new Error(
+      `Component "${componentKey}" is not registered in shared-catalog.ts. ` +
+      `Please add it to packages/shared-catalog.ts before using. ` +
+      `Available components: ${availableComponents}`
+    );
+  }
+}

@@ -26,6 +26,7 @@ import { toKST } from '@lib/date-utils';
 import type { BillingHistoryItem } from '@hooks/use-billing';
 import type { AttendanceLog } from '@services/attendance-service';
 import { renderCard } from '../utils/dashboardCardRenderer';
+import { CardGridLayout } from '../components/CardGridLayout';
 
 export function AllCardsPage() {
   const navigate = useNavigate();
@@ -240,9 +241,12 @@ export function AllCardsPage() {
         />
 
         {allCards.length > 0 ? (
-            <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="md">
-              {allCards.map((card) => renderCard(card, navigate, { maxInsights: 0 }))}
-            </Grid>
+            <CardGridLayout
+              cards={allCards.map((card) => renderCard(card, navigate, { maxInsights: 0 }))}
+              desktopColumns={3}
+              tabletColumns={2}
+              mobileColumns={1}
+            />
           ) : (
             <Card padding="lg" variant="default">
               <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>

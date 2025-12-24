@@ -140,8 +140,9 @@ Enterprise Edition — Zero-Trust · Schema-Driven · Multi-Tenant · Backoffice
 - 코드에서 설정 읽기:
   - 서버/Edge Function: getTenantSettingByPath(supabase, tenantId, path, legacyPath?) 형식 사용
     - 예: await getTenantSettingByPath(supabase, tenantId, "auto_notification.overdue_outstanding_over_limit.enabled")
-    - 시그니처: (supabase: SupabaseClient, tenantId: string, path: string, legacyPath?: string) => Promise<T | null>
-    - 반환 타입: T | null (Policy가 없으면 null, 있으면 직접 값 T 반환, .value 접근 불필요)
+    - 시그니처: (supabase: SupabaseClient, tenantId: string, path: string, legacyPath?: string) => Promise<unknown>
+    - 반환 타입: `unknown` (실제 구현 타입) → 사용 시 타입 캐스팅 필요 (예: `as boolean`, `as number`)
+    - 반환 값 의미: Policy가 없으면 `null`, 있으면 직접 값 `T` 반환 (`.value` 접근 불필요)
     - 프론트엔드 Hook useTenantSettingByPath: UseQueryResult<unknown, Error> 반환 (React Query의 useQuery 반환 객체)
       - 사용 예시: const { data: enabledValue } = useTenantSettingByPath("auto_notification.overdue.enabled");
       - data 속성: T | null (Policy가 없으면 null, 있으면 직접 값 T, .value 접근 불필요)

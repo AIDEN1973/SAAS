@@ -283,6 +283,11 @@ export interface FormFieldSchema {
 
 저장 위치: `meta.schema_registry` 테이블
 
+⚠️ 중요: `public.schema_registry`는 VIEW입니다 (실제 테이블은 `meta.schema_registry`).
+- PostgREST 노출용 VIEW로 생성됨 (마이그레이션: `infra/supabase/migrations/118_create_schema_registry_view.sql`)
+- RLS 정책은 underlying table(`meta.schema_registry`)의 RLS에 의해 보호됨
+- 코드에서는 `meta.schema_registry`를 직접 참조하거나, VIEW를 통해 접근 가능
+
 테이블 구조:
 ```sql
 CREATE SCHEMA IF NOT EXISTS meta;
@@ -307,6 +312,13 @@ CREATE TABLE meta.schema_registry (
 CREATE INDEX idx_schema_registry_entity ON meta.schema_registry(entity, industry_type, status);
 CREATE INDEX idx_schema_registry_version ON meta.schema_registry(entity, industry_type, version DESC);
 ```
+
+⚠️ 중요: 마이그레이션 파일 일관성
+- 정본 마이그레이션: `infra/supabase/migrations/039_create_schema_registry.sql` (20줄)에서 `min_supported_client text NOT NULL`로 정의됨
+- ⚠️ 코드 수정 필요: `infra/supabase/migrations/043_verify_meta_tables.sql` (35줄)에서 `min_supported_client text,` (nullable)로 생성되고 있어 불일치
+  - 수정 필요: `min_supported_client text NOT NULL,`로 변경
+- ⚠️ 코드 수정 필요: `packages/core/core-schema-registry/src/service.ts` (61줄)에서 `input.minSupportedClient`가 null/undefined인 경우 에러 처리 또는 기본값 설정 필요
+  - 문서 스펙에 따르면 `min_supported_client`는 필수(NOT NULL)이므로, 서비스 레벨에서도 검증 필요
 
 RLS 정책:
 ⚠️ 중요: `meta.schema_registry`는 공통 스키마 저장소이므로 `tenant_id` 컬럼이 없습니다.
@@ -436,7 +448,10 @@ const schema = await schemaRegistryService.getSchema('student', {
   tenantId: context.tenantId,
   industryType: context.industryType,
   clientVersion: '1.0.0',
-  fallbackSchema: studentFormSchema,  // ⚠️ 운영 정책: 개발/테스트 환경에서만 허용, 운영 환경에서는 Schema Registry 조회 실패 시 에러 처리 필수
+  // ⚠️ 운영 정책: Fallback 허용 범위
+  // - 개발/테스트 환경: fallbackSchema 허용 (개발 편의성)
+  // - 운영 환경(Production): fallbackSchema 사용 금지, Schema Registry 조회 실패 시 에러 처리 필수 (Fail-Closed)
+  fallbackSchema: process.env.NODE_ENV === 'production' ? undefined : studentFormSchema,
 });
 ```
 
@@ -475,6 +490,17 @@ export function useSchema(entity: string, fallbackSchema?: FormSchema) {
         // - salon/customerFormSchema
         // - real_estate/contractFormSchema (⚠️ 중요: 업종 키는 언더스코어 형식 'real_estate' 사용, 'realestate' 사용 금지)
         // 각각 별도로 존재해야 하며, 업종별로 구분된 fallback 스키마를 제공해야 합니다.
+
+        // ⚠️ 코드 수정 필요: 현재 구현(packages/hooks/use-schema/src/useSchema.ts:122, 127)에는 환경별 분기가 없음
+        // 운영 환경에서도 fallbackSchema를 사용하고 있어 문서 정책과 불일치
+        // 아래 환경별 분기 로직을 추가해야 함:
+        // 환경별 분기 처리
+        if (import.meta.env.PROD || process.env.NODE_ENV === 'production') {
+          // 운영 환경: 에러 처리 필수 (Fail-Closed)
+          throw new Error(`Schema Registry 조회 실패: ${entity} (tenant: ${context.tenantId}, industry: ${context.industryType})`);
+        }
+
+        // 개발/테스트 환경: fallbackSchema 허용 (운영 환경에서는 위에서 에러 throw하므로 이 코드는 개발/테스트 환경에서만 실행됨)
         return fallbackSchema || null;
       }
 
@@ -1529,6 +1555,7 @@ export function StudentsPage() {
 - 점진적 마이그레이션 가능
 - ⚠️ 운영 정책: fallbackSchema는 개발/테스트 환경에서만 허용되며, 운영 환경에서는 Schema Registry 조회 실패 시 에러 처리 필수 (fail-open 방지)
   - 스키마 부재 시 앱이 죽지 않도록 fallback을 유지해야 합니다.
+- ⚠️ 코드 수정 필요: `packages/hooks/use-schema/src/useSchema.ts`에서 운영 환경에서도 fallbackSchema를 사용하고 있어, 환경별 분기 로직 추가 필요
 
 ✅ Zero-Trust UI 준수
 - schema-engine은 tenant_id / industry_type을 모름

@@ -119,11 +119,25 @@ export function useSchema<T extends SchemaType = 'form'>(
             console.log(`[useSchema] Schema not found in registry, using fallback: ${entity} (${type})`);
           }
 
+          // 환경별 분기 처리
+          if (import.meta.env.PROD || import.meta.env.MODE === 'production') {
+            // 운영 환경: 에러 처리 필수 (Fail-Closed)
+            throw new Error(`Schema Registry 조회 실패: ${entity} (tenant: ${context.tenantId}, industry: ${context.industryType})`);
+          }
+
+          // 개발/테스트 환경: fallbackSchema 허용
           return (fallbackSchema as SchemaByType<T>) || null;
         }
 
         // response.data가 배열인 경우 클라이언트에서 추가 필터링
         if (!response.data || (Array.isArray(response.data) && response.data.length === 0)) {
+          // 환경별 분기 처리
+          if (import.meta.env.PROD || import.meta.env.MODE === 'production') {
+            // 운영 환경: 에러 처리 필수 (Fail-Closed)
+            throw new Error(`Schema Registry 조회 실패: ${entity} (tenant: ${context.tenantId}, industry: ${context.industryType})`);
+          }
+
+          // 개발/테스트 환경: fallbackSchema 허용
           return (fallbackSchema as SchemaByType<T>) || null;
         }
 
@@ -145,6 +159,13 @@ export function useSchema<T extends SchemaType = 'form'>(
         });
 
         if (filteredSchemas.length === 0) {
+          // 환경별 분기 처리
+          if (import.meta.env.PROD || import.meta.env.MODE === 'production') {
+            // 운영 환경: 에러 처리 필수 (Fail-Closed)
+            throw new Error(`Schema Registry 조회 실패: ${entity} (tenant: ${context.tenantId}, industry: ${context.industryType})`);
+          }
+
+          // 개발/테스트 환경: fallbackSchema 허용
           return (fallbackSchema as SchemaByType<T>) || null;
         }
 
@@ -167,6 +188,13 @@ export function useSchema<T extends SchemaType = 'form'>(
         const isSchemaRegistryRequestCatch = tableStr === 'schema_registry' || tableStr.startsWith('schema-registry/');
 
         if (isNotFoundError || isSchemaRegistryRequestCatch) {
+          // 환경별 분기 처리
+          if (import.meta.env.PROD || import.meta.env.MODE === 'production') {
+            // 운영 환경: 에러 처리 필수 (Fail-Closed)
+            throw new Error(`Schema Registry 조회 실패: ${entity} (tenant: ${context.tenantId}, industry: ${context.industryType})`);
+          }
+
+          // 개발/테스트 환경: fallbackSchema 허용
           return (fallbackSchema as SchemaByType<T>) || null;
         }
 
@@ -175,6 +203,13 @@ export function useSchema<T extends SchemaType = 'form'>(
           console.warn(`[useSchema] Unexpected error fetching schema: ${entity} (${type})`, error);
         }
 
+        // 환경별 분기 처리
+        if (import.meta.env.PROD || import.meta.env.MODE === 'production') {
+          // 운영 환경: 에러 처리 필수 (Fail-Closed)
+          throw new Error(`Schema Registry 조회 실패: ${entity} (tenant: ${context.tenantId}, industry: ${context.industryType})`);
+        }
+
+        // 개발/테스트 환경: fallbackSchema 허용
         return (fallbackSchema as SchemaByType<T>) || null;
       }
     },

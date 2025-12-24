@@ -30,7 +30,7 @@ import { handleCardClick } from './handleCardClick';
 export function renderCard(
   card: DashboardCard,
   navigate: NavigateFunction,
-  options?: { maxInsights?: number }
+  options?: { maxInsights?: number; onChartClick?: (card: DashboardCard) => void }
 ): React.ReactNode {
   // Student Task Card
   if ('task_type' in card) {
@@ -79,6 +79,13 @@ export function renderCard(
         key={card.id}
         card={card}
         onAction={handleCardClick(card, navigate)}
+        onChartClick={(card) => {
+          // onChartClick은 HomePage에서 처리 (모달 상태 관리)
+          // 이 함수는 renderCard의 options로 전달받아야 함
+          if (options?.onChartClick) {
+            options.onChartClick(card);
+          }
+        }}
       />
     );
   }

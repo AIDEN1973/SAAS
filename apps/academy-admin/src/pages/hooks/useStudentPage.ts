@@ -152,9 +152,25 @@ export function useStudentPage(): UseStudentPageReturn {
   const [editingConsultationId, setEditingConsultationId] = useState<string | null>(null);
   const [consultationTypeFilter, setConsultationTypeFilter] = useState<ConsultationType | 'all'>('all');
 
+  // ✅ 타입 가드 함수 (P0-E)
+  const isLayerMenuTab = useCallback((value: string | null): value is LayerMenuTab => {
+    if (!value) return false;
+    const validTabs: LayerMenuTab[] = ['info', 'guardians', 'consultations', 'tags', 'classes', 'attendance', 'risk', 'message'];
+    return validTabs.includes(value as LayerMenuTab);
+  }, []);
+
   // URL에서 학생 ID와 탭 정보 읽기
-  const urlStudentId = params.id || searchParams.get('student') || null;
-  const urlTab = searchParams.get('tab') as LayerMenuTab | null;
+  const urlStudentId = params.id
+    || searchParams.get('studentId')  // ✅ 새 표준
+    || searchParams.get('student')    // 기존 호환
+    || null;
+
+  const urlPanel = isLayerMenuTab(searchParams.get('panel'))
+    ? searchParams.get('panel')
+    : null;  // ✅ P0-E: 타입 가드
+  const urlTab = isLayerMenuTab(searchParams.get('tab'))
+    ? searchParams.get('tab')
+    : null;  // ✅ P0-E: 타입 가드
 
   // URL 경로에 따라 초기 탭 설정
   const getInitialTab = useCallback((): LayerMenuTab => {
@@ -166,12 +182,55 @@ export function useStudentPage(): UseStudentPageReturn {
     if (path.includes('/consultations')) return 'consultations';
     if (path.includes('/tags')) return 'tags';
     if (path.includes('/classes')) return 'classes';
-    return urlTab || 'info';
-  }, [location.pathname, urlTab]);
+    return (urlPanel || urlTab || 'info') as LayerMenuTab;  // ✅ canonical 우선
+  }, [location.pathname, urlPanel, urlTab]);
+
+  // ✅ P0-D 개선: 상태별 1회 보장 (더 안전)
+  const lastRewrittenSearchRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const current = location.search;
+
+    // 이미 이 search에 대해 rewrite 했으면 스킵
+    if (lastRewrittenSearchRef.current === current) {
+      return;
+    }
+
+    const legacyStudent = searchParams.get('student');
+    const legacyTab = searchParams.get('tab');
+    const canonicalStudentId = searchParams.get('studentId');
+    const canonicalPanel = searchParams.get('panel');
+
+    // canonical이면 그냥 return
+    if (canonicalStudentId && canonicalPanel) {
+      return;
+    }
+
+    // Legacy → Canonical rewrite
+    if (legacyStudent && !canonicalStudentId) {
+      const targetPanel = canonicalPanel || (isLayerMenuTab(legacyTab) ? legacyTab : 'info');
+      navigate(`/students/list?studentId=${legacyStudent}&panel=${targetPanel}`, {
+        replace: true
+      });
+      lastRewrittenSearchRef.current = current;  // ✅ 이 search에 대해 1회만
+      return;
+    }
+
+    if (legacyTab && !canonicalPanel && canonicalStudentId) {
+      const targetPanel = isLayerMenuTab(legacyTab) ? legacyTab : 'info';
+      navigate(`/students/list?studentId=${canonicalStudentId}&panel=${targetPanel}`, {
+        replace: true
+      });
+      lastRewrittenSearchRef.current = current;  // ✅ 이 search에 대해 1회만
+      return;
+    }
+  }, [location.search, searchParams, navigate, isLayerMenuTab]);
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(urlStudentId);
   // [성능 최적화] lazy initialization으로 초기 렌더링에서만 함수 실행
-  const [layerMenuTab, setLayerMenuTab] = useState<LayerMenuTab>(() => getInitialTab());
+  // ✅ 기본값 fallback: canonical 우선
+  const activeTab: LayerMenuTab = (urlPanel || urlTab || getInitialTab()) as LayerMenuTab;
+  const [layerMenuTab, setLayerMenuTab] = useState<LayerMenuTab>(activeTab);
 
   // 테이블 페이지네이션
   const [tablePage, setTablePage] = useState(1);
@@ -275,29 +334,32 @@ export function useStudentPage(): UseStudentPageReturn {
   useEffect(() => {
     if (urlStudentId && urlStudentId !== selectedStudentId) {
       setSelectedStudentId(urlStudentId);
-      const initialTab = getInitialTab();
+      const initialTab: LayerMenuTab = (urlPanel || urlTab || getInitialTab()) as LayerMenuTab;
       setLayerMenuTab(initialTab);
     } else if (!urlStudentId && selectedStudentId) {
       setSelectedStudentId(null);
     }
-  }, [urlStudentId, selectedStudentId, getInitialTab]);
+  }, [urlStudentId, selectedStudentId, urlPanel, urlTab, getInitialTab]);
 
   useEffect(() => {
-    const newTab = getInitialTab();
+    const newTab: LayerMenuTab = (urlPanel || urlTab || getInitialTab()) as LayerMenuTab;
     if (newTab !== layerMenuTab) {
       setLayerMenuTab(newTab);
     }
-  }, [getInitialTab, layerMenuTab]);
+  }, [urlPanel, urlTab, getInitialTab, layerMenuTab]);
 
   // 학생 선택 핸들러
   const handleStudentSelect = useCallback((studentId: string | null) => {
     setSelectedStudentId(studentId);
     if (studentId) {
-      navigate(`/students/list?student=${studentId}&tab=${layerMenuTab}`, { replace: true });
+      // ✅ canonical URL 사용
+      navigate(`/students/list?studentId=${studentId}&panel=${layerMenuTab}`, { replace: true });
     } else {
       const newSearchParams = new URLSearchParams(searchParams);
-      newSearchParams.delete('student');
-      newSearchParams.delete('tab');
+      newSearchParams.delete('studentId');
+      newSearchParams.delete('student');  // legacy 제거
+      newSearchParams.delete('panel');
+      newSearchParams.delete('tab');  // legacy 제거
       navigate(`/students/list?${newSearchParams.toString()}`, { replace: true });
     }
   }, [navigate, layerMenuTab, searchParams]);
@@ -306,7 +368,8 @@ export function useStudentPage(): UseStudentPageReturn {
   const handleTabChange = useCallback((newTab: LayerMenuTab) => {
     setLayerMenuTab(newTab);
     if (selectedStudentId) {
-      navigate(`/students/list?student=${selectedStudentId}&tab=${newTab}`, { replace: true });
+      // ✅ canonical URL 사용
+      navigate(`/students/list?studentId=${selectedStudentId}&panel=${newTab}`, { replace: true });
     }
   }, [selectedStudentId, navigate]);
 

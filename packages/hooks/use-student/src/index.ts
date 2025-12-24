@@ -36,8 +36,37 @@ export {
   useCompleteStudentTaskCard,
   useRequestApprovalStudentTaskCard,
   useApproveAndExecuteStudentTaskCard,
+  useSnoozeStudentTaskCard,
+  useDeleteStudentTaskCard,
 } from './useStudentTaskCard';
 
 export { useStudentTaskCardAction } from './useStudentTaskCardAction';
 
 export type { StudentTaskCard, TaskCard } from './useStudentTaskCard';
+
+export {
+  useStudentStats,
+  useAttendanceStats,
+  useStudentAlerts,
+  useConsultationStats,
+  fetchStudentStats,
+  fetchAttendanceStats,
+  fetchStudentAlerts,
+  fetchConsultationStats,
+} from './useStudentStats';
+
+export type {
+  StudentStats,
+  AttendanceStats,
+  StudentAlerts,
+  ConsultationStats,
+} from './useStudentStats';
+
+export {
+  useRecentActivity,
+  fetchRecentActivity,
+} from './useRecentActivity';
+
+export type {
+  RecentActivity,
+} from './useRecentActivity';

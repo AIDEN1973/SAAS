@@ -32,7 +32,7 @@ BEGIN
       entity text NOT NULL,
       industry_type text,
       version text NOT NULL,
-      min_supported_client text,
+      min_supported_client text NOT NULL,
       min_client text,
       schema_json jsonb NOT NULL,
       migration_script text,

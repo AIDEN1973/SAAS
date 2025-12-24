@@ -27,7 +27,7 @@
   --color-white: #ffffff;
   --color-gray-50: #f8fafc;
   --color-gray-100: #f1f5f9;
-  --color-gray-200: #e2e8f0;
+  --color-gray-200: #e3e3e3;
   --color-gray-300: #cbd5e1;
   --color-gray-400: #94a3b8;
   --color-gray-500: #64748b;
@@ -167,6 +167,7 @@
   --padding-header-vertical: var(--spacing-sm); /* 8px - 헤더 상하 패딩 (태블릿/데스크탑 일관성 유지) */
   --height-modal-max: 85vh;          /* 모달 최대 높이 (데스크톱) */
   --height-modal-max-mobile: 90vh;   /* 모달 최대 높이 (모바일) */
+  --height-divider-vertical: 40%;     /* 40% - 세로 구분선 높이 (카드 그리드용) */
 
   /* Layout Spacing Tokens */
   --spacing-none: 0;                 /* 0 - 여백 없음 (하드코딩 금지 규칙 준수) */
@@ -340,7 +341,7 @@
     --color-white: #1e293b;
     --color-gray-50: #1e293b;
     --color-gray-100: #334155;
-    --color-gray-200: #475569;
+    --color-gray-200: #e3e3e3;
     --color-gray-300: #64748b;
     --glass-background: rgba(30, 41, 59, 0.8);
     --glass-border: rgba(255, 255, 255, 0.1);

@@ -187,8 +187,8 @@ BEGIN
       NEW.name,
       'new_signup',
       30, -- 기본 우선순위
-      '신규 등록 학생 환영',
-      NEW.name || ' 학생이 등록되었습니다. 환영 메시지 발송 및 초기 설정을 완료하세요.',
+      NEW.name || ' 학생 신규 등록',
+      '환영 메시지를 발송해 보세요.',
       '/students/' || NEW.id || '/welcome',
       expires_at,
       NEW.created_at,

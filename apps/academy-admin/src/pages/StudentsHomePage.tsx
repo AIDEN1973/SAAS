@@ -1,6 +1,7 @@
 /**
- * 학생 관리 홈 페이지 - 오늘의 학생 업무 카드
+ * 학생 관리 홈 페이지
  *
+ * 학생 관리 전용 대시보드 (통계, 빠른 액션, 최근 활동)
  * 아키텍처 문서 3.1.1 섹션 참조
  *
  * [불변 규칙] api-sdk를 통해서만 API 요청
@@ -10,25 +11,79 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary, Container, Card, Button, PageHeader } from '@ui-core/react';
-import { Grid } from '@ui-core/react';
-import { StudentTaskCard } from '../components/StudentTaskCard';
-import { useStudentTaskCards, useStudentTaskCardAction } from '@hooks/use-student';
+import { StudentStatsCard } from '../components/dashboard-cards/StudentStatsCard';
+import { AttendanceStatsCard } from '../components/dashboard-cards/AttendanceStatsCard';
+import { StudentAlertsCard } from '../components/dashboard-cards/StudentAlertsCard';
+import { ConsultationStatsCard } from '../components/dashboard-cards/ConsultationStatsCard';
+import { QuickActionCard } from '../components/dashboard-cards/QuickActionCard';
+import { RecentActivityCard } from '../components/dashboard-cards/RecentActivityCard';
+import { useStudentStats, useAttendanceStats, useStudentAlerts, useConsultationStats, useRecentActivity } from '@hooks/use-student';
+import { CardGridLayout } from '../components/CardGridLayout';
 
 export function StudentsHomePage() {
   const navigate = useNavigate();
-  const { data: cardsData, isLoading, error } = useStudentTaskCards();
-  const cards = cardsData || [];
-  const getCardActionUrl = useStudentTaskCardAction();
+
+  // ✅ 통계 Hook 사용 (학생 관리 전용 기능)
+  const { data: studentStats, isLoading: isLoadingStats } = useStudentStats();
+  const { data: attendanceStats, isLoading: isLoadingAttendance } = useAttendanceStats(new Date());
+  const { data: studentAlerts, isLoading: isLoadingAlerts } = useStudentAlerts();
+  const { data: consultationStats, isLoading: isLoadingConsultation } = useConsultationStats();
+  const { data: recentActivity, isLoading: isLoadingActivity } = useRecentActivity();
 
   const handleViewAllStudents = () => {
     navigate('/students/list');
+  };
+
+  const handleStatsClick = () => {
+    navigate('/students/list');
+  };
+
+  const handleAlertsClick = (type: 'risk' | 'absent' | 'consultation') => {
+    navigate(`/students/list?filter=${type}`);
+  };
+
+  const handleQuickAction = (action: 'register' | 'bulk' | 'list' | 'consultation' | 'attendance') => {
+    switch (action) {
+      case 'register':
+        navigate('/students/list', { state: { showCreateForm: true } });
+        break;
+      case 'bulk':
+        navigate('/students/list', { state: { showBulkUpload: true } });
+        break;
+      case 'list':
+        navigate('/students/list');
+        break;
+      case 'consultation':
+        navigate('/students/list');
+        break;
+      case 'attendance':
+        navigate('/attendance');
+        break;
+    }
+  };
+
+  const handleActivityClick = (type: 'student' | 'consultation' | 'attendance' | 'tag', id?: string) => {
+    switch (type) {
+      case 'student':
+        if (id) navigate(`/students/list?studentId=${id}&panel=info`);
+        break;
+      case 'consultation':
+        if (id) navigate(`/students/list?studentId=${id}&panel=consultations`);
+        break;
+      case 'attendance':
+        navigate('/attendance');
+        break;
+      case 'tag':
+        navigate('/students/list');
+        break;
+    }
   };
 
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
         <PageHeader
-          title="오늘의 학생 업무"
+          title="학생 관리"
           actions={
             <Button
               variant="outline"
@@ -39,82 +94,69 @@ export function StudentsHomePage() {
           }
         />
 
-        {/* 로딩 상태 */}
-        {isLoading && (
-          <Card padding="lg" variant="default">
-            <div style={{
-              textAlign: 'center',
-              color: 'var(--color-text-secondary)',
-              padding: 'var(--spacing-xl)'
-            }}>
-              업무 카드를 불러오는 중...
-            </div>
-          </Card>
-        )}
+        {/* 통계 카드 섹션 */}
+        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+          <CardGridLayout
+            cards={[
+              <StudentStatsCard
+                key="student-stats"
+                stats={studentStats}
+                isLoading={isLoadingStats}
+                onAction={handleStatsClick}
+              />,
+              <AttendanceStatsCard
+                key="attendance-stats"
+                stats={attendanceStats}
+                isLoading={isLoadingAttendance}
+                onAction={handleStatsClick}
+              />,
+              <StudentAlertsCard
+                key="student-alerts"
+                alerts={studentAlerts}
+                isLoading={isLoadingAlerts}
+                onAction={handleAlertsClick}
+              />,
+              <ConsultationStatsCard
+                key="consultation-stats"
+                stats={consultationStats}
+                isLoading={isLoadingConsultation}
+                onAction={handleStatsClick}
+              />,
+            ]}
+            desktopColumns={3}
+            tabletColumns={2}
+            mobileColumns={1}
+          />
+        </div>
 
-        {/* 에러 상태 (로딩이 완료된 후에만 표시) */}
-        {!isLoading && error && (
-          <Card padding="md" variant="outlined">
-            <div style={{ color: 'var(--color-error)' }}>
-              오류: {error instanceof Error ? error.message : '업무 카드를 불러오는데 실패했습니다.'}
-            </div>
-          </Card>
-        )}
+        {/* 빠른 액션 섹션 */}
+        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+          <CardGridLayout
+            cards={[
+              <QuickActionCard key="quick-action" onAction={handleQuickAction} />,
+            ]}
+            desktopColumns={1}
+            tabletColumns={1}
+            mobileColumns={1}
+          />
+        </div>
 
-        {/* 업무 카드 목록 (로딩 완료 후, 에러 없을 때만 표시) */}
-        {!isLoading && !error && cards && cards.length > 0 && (
-          <>
-            <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="md">
-              {/* 최대 3개만 표시 (아키텍처 문서 3.1.1 섹션, 4652줄 참조: student_task_card_display_rule.max_display: 3) */}
-              {/* 카드는 이미 priority 기준 내림차순으로 정렬되어 있음 (useStudentTaskCards에서 orderBy 적용) */}
-              {cards.slice(0, 3).map((card) => (
-                <StudentTaskCard
-                  key={card.id}
-                  card={card}
-                  onAction={(card) => {
-                    // 정본 규칙: 컴포넌트 레벨에서 navigate 호출 (Hook 내부 호출 금지)
-                    const actionUrl = getCardActionUrl(card);
-                    if (actionUrl) {
-                      navigate(actionUrl);
-                    }
-                  }}
-                />
-              ))}
-            </Grid>
-            {/* 3개 초과 시 "더 보기" 버튼 표시 (아키텍처 문서 4655줄 참조: overflow_url: '/students/tasks') */}
-            {cards.length > 3 && (
-              <div style={{ marginTop: 'var(--spacing-lg)', textAlign: 'center' }}>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate('/students/tasks')}
-                >
-                  더 {cards.length - 3}개 보기
-                </Button>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* 업무 카드가 없는 경우 (로딩 완료 후, 에러 없을 때만 표시) */}
-        {!isLoading && !error && cards && cards.length === 0 && (
-          <Card padding="lg" variant="default">
-            <div style={{
-              textAlign: 'center',
-              color: 'var(--color-text-secondary)',
-              padding: 'var(--spacing-xl)'
-            }}>
-                <p style={{ marginBottom: 'var(--spacing-md)' }}>
-                  오늘 발생한 학생 업무가 없습니다.
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={handleViewAllStudents}
-                >
-                  전체 학생 목록 보기
-                </Button>
-              </div>
-            </Card>
-        )}
+        {/* 최근 활동 섹션 */}
+        <div>
+          <CardGridLayout
+            cards={[
+              <RecentActivityCard
+                key="recent-activity"
+                activity={recentActivity}
+                isLoading={isLoadingActivity}
+                onAction={handleActivityClick}
+              />,
+            ]}
+            desktopColumns={1}
+            tabletColumns={1}
+            mobileColumns={1}
+          />
+        </div>
       </Container>
     </ErrorBoundary>
   );

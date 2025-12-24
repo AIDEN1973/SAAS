@@ -17,24 +17,17 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, Container, Card, Button, Badge, PageHeader } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, Button, PageHeader } from '@ui-core/react';
 import { Grid } from '@ui-core/react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { fetchBillingHistory } from '@hooks/use-billing';
 import { toKST } from '@lib/date-utils';
 import type { BillingHistoryItem } from '@hooks/use-billing';
+import { BillingHomeCard } from '../components/dashboard-cards/BillingHomeCard';
+import type { BillingHomeCard as BillingHomeCardType } from '../components/dashboard-cards/BillingHomeCard';
+import { CardGridLayout } from '../components/CardGridLayout';
 
-interface BillingHomeCard {
-  id: string;
-  type: 'no_payment_method' | 'urgent_alert' | 'expected_collection_rate' | 'auto_billing_progress' | 'payment_summary' | 'unpaid_notification_progress';
-  title: string;
-  message?: string;
-  value?: number | string;
-  status?: 'ready' | 'in_progress' | 'completed';
-  action_url?: string;
-  priority: number;
-}
 
 export function BillingHomePage() {
   const navigate = useNavigate();
@@ -47,7 +40,7 @@ export function BillingHomePage() {
     queryFn: async () => {
       if (!tenantId) return [];
 
-      const cards: BillingHomeCard[] = [];
+      const cards: BillingHomeCardType[] = [];
       const currentMonth = toKST().format('YYYY-MM');
 
       // 이번 달 청구서 조회
@@ -160,162 +153,10 @@ export function BillingHomePage() {
     return [...cards].sort((a, b) => a.priority - b.priority);
   }, [cards]);
 
-  const handleCardClick = (card: BillingHomeCard) => {
+  const handleCardClick = (card: BillingHomeCardType) => {
     if (card.action_url) {
       navigate(card.action_url);
     }
-  };
-
-  const renderCard = (card: BillingHomeCard) => {
-    // 결제수단 미등록 카드
-    if (card.type === 'no_payment_method') {
-      return (
-        <Card
-          key={card.id}
-          padding="md"
-          variant="elevated"
-          style={{
-            borderLeft: `var(--border-width-thick) solid var(--color-error)`,
-            cursor: card.action_url ? 'pointer' : 'default',
-          }}
-          onClick={() => card.action_url && handleCardClick(card)}
-        >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-sm)' }}>
-            <div style={{ flex: 1 }}>
-              <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
-                {card.title}
-              </h3>
-              {card.message && (
-                <p style={{ color: 'var(--color-text-secondary)' }}>
-                  {card.message}
-                </p>
-              )}
-            </div>
-          </div>
-        </Card>
-      );
-    }
-
-    // 예상 수납률 카드
-    if (card.type === 'expected_collection_rate') {
-      return (
-        <Card
-          key={card.id}
-          padding="md"
-          variant="default"
-          style={{ cursor: card.action_url ? 'pointer' : 'default' }}
-          onClick={() => card.action_url && handleCardClick(card)}
-        >
-          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
-            {card.title}
-          </h3>
-          <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-xs)' }}>
-            {typeof card.value === 'number' ? `${card.value}%` : card.value}
-          </div>
-          <div style={{ color: 'var(--color-text-secondary)' }}>
-            이번 달 기준
-          </div>
-        </Card>
-      );
-    }
-
-    // 자동 청구 진행 현황 카드
-    if (card.type === 'auto_billing_progress') {
-      return (
-        <Card
-          key={card.id}
-          padding="md"
-          variant="default"
-          style={{ cursor: card.action_url ? 'pointer' : 'default' }}
-          onClick={() => card.action_url && handleCardClick(card)}
-        >
-          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
-            {card.title}
-          </h3>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
-            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
-              {card.value}
-            </div>
-            {card.status && (
-              <Badge color={card.status === 'completed' ? 'green' : card.status === 'in_progress' ? 'blue' : 'gray'}>
-                {card.status === 'completed' ? '완료' : card.status === 'in_progress' ? '진행 중' : '준비 중'}
-              </Badge>
-            )}
-          </div>
-        </Card>
-      );
-    }
-
-    // 결제 현황 요약 카드
-    if (card.type === 'payment_summary') {
-      return (
-        <Card
-          key={card.id}
-          padding="md"
-          variant="default"
-          style={{ cursor: card.action_url ? 'pointer' : 'default' }}
-          onClick={() => card.action_url && handleCardClick(card)}
-        >
-          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
-            {card.title}
-          </h3>
-          <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
-            {card.value}
-          </div>
-        </Card>
-      );
-    }
-
-    // 긴급 알림 카드
-    if (card.type === 'urgent_alert') {
-      return (
-        <Card
-          key={card.id}
-          padding="md"
-          variant="elevated"
-          style={{
-            borderLeft: `var(--border-width-thick) solid var(--color-warning)`,
-            cursor: card.action_url ? 'pointer' : 'default',
-          }}
-          onClick={() => card.action_url && handleCardClick(card)}
-        >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-sm)' }}>
-            <div style={{ flex: 1 }}>
-              <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
-                {card.title}
-              </h3>
-              {card.message && (
-                <p style={{ color: 'var(--color-text-secondary)' }}>
-                  {card.message}
-                </p>
-              )}
-            </div>
-          </div>
-        </Card>
-      );
-    }
-
-    // 미납 알림 진행 현황 카드
-    if (card.type === 'unpaid_notification_progress') {
-      return (
-        <Card
-          key={card.id}
-          padding="md"
-          variant="default"
-          style={{ cursor: card.action_url ? 'pointer' : 'default' }}
-          onClick={() => card.action_url && handleCardClick(card)}
-        >
-          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
-            {card.title}
-          </h3>
-          <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
-            {card.value}
-          </div>
-        </Card>
-      );
-    }
-
-    return null;
   };
 
   return (
@@ -348,9 +189,14 @@ export function BillingHomePage() {
 
         {/* 카드 그리드 */}
         {sortedCards && sortedCards.length > 0 ? (
-          <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="md">
-            {sortedCards.map((card) => renderCard(card))}
-          </Grid>
+          <CardGridLayout
+            cards={sortedCards.map((card) => (
+              <BillingHomeCard key={card.id} card={card} onAction={handleCardClick} />
+            ))}
+            desktopColumns={3}
+            tabletColumns={2}
+            mobileColumns={1}
+          />
         ) : (
           <Card padding="lg" variant="default">
             <div style={{

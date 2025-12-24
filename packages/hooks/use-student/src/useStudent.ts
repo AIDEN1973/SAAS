@@ -252,7 +252,7 @@ export function useStudents(filter?: StudentFilter) {
  */
 export async function fetchPersons(
   tenantId: string,
-  filter?: { person_type?: string; id?: string | string[]; created_at?: { lte?: string } }
+  filter?: { person_type?: string; id?: string | string[]; created_at?: { gte?: string; lte?: string }; status?: string }
 ): Promise<Person[]> {
   if (!tenantId) return [];
 

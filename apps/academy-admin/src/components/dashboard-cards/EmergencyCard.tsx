@@ -3,11 +3,14 @@
  *
  * [불변 규칙] HomePage와 AllCardsPage에서 공통 사용
  * [불변 규칙] SSOT 원칙 준수: 렌더링 로직은 이 컴포넌트에만 존재
+ * [불변 규칙] UI Core Component (NotificationCardLayout) 사용
  */
 
-import React from 'react';
-import { Card } from '@ui-core/react';
+import React, { useMemo } from 'react';
+import { AlertTriangle, CreditCard, AlertCircle, UserX, MessageSquare, Clock } from 'lucide-react';
+import { NotificationCardLayout } from '@ui-core/react';
 import type { EmergencyCard as EmergencyCardType } from '../../types/dashboardCard';
+import { EMPTY_CARD_ID_PREFIX, TEXT_LINE_LIMITS } from '../../constants/dashboard-cards';
 
 export interface EmergencyCardProps {
   card: EmergencyCardType;
@@ -15,28 +18,50 @@ export interface EmergencyCardProps {
 }
 
 export function EmergencyCard({ card, onAction }: EmergencyCardProps) {
+  // 빈 카드 여부 확인 (ID가 empty-로 시작하는 경우)
+  const isEmpty = card.id.startsWith(EMPTY_CARD_ID_PREFIX);
+
+  // 카드 ID에 따라 적절한 아이콘 선택
+  const getIcon = useMemo(() => {
+    if (isEmpty) return <AlertTriangle />;
+
+    if (card.id === 'payment-failed-emergency') {
+      return <CreditCard />;
+    }
+    if (card.id === 'attendance-error-emergency') {
+      return <AlertCircle />;
+    }
+    if (card.id === 'ai-risk-emergency') {
+      return <AlertTriangle />;
+    }
+    if (card.id === 'emergency-risk-students') {
+      return <UserX />;
+    }
+    if (card.id === 'emergency-absent-students') {
+      return <UserX />;
+    }
+    if (card.id === 'emergency-consultation-pending') {
+      return <MessageSquare />;
+    }
+
+    // 기본 아이콘
+    return <AlertTriangle />;
+  }, [card.id, isEmpty]);
+
   return (
-    <Card
+    <NotificationCardLayout
       key={card.id}
-      padding="md"
-      variant="elevated"
-      style={{
-        borderLeft: `var(--border-width-thick) solid var(--color-error)`,
-        cursor: card.action_url ? 'pointer' : 'default',
-      }}
-      onClick={() => card.action_url && onAction?.(card)}
-    >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-sm)' }}>
-        <div style={{ flex: 1 }}>
-          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
-            {card.title}
-          </h3>
-          <p style={{ color: 'var(--color-text-secondary)' }}>
-            {card.message}
-          </p>
-        </div>
-      </div>
-    </Card>
+      isEmpty={isEmpty}
+      onClick={() => !isEmpty && card.action_url && onAction?.(card)}
+      icon={getIcon}
+      title={card.title}
+      description={card.message}
+      variant="default"
+      maxTitleLines={TEXT_LINE_LIMITS.TITLE}
+      maxDescriptionLines={TEXT_LINE_LIMITS.DESCRIPTION}
+      iconBackgroundColor={!isEmpty ? 'var(--color-error-50)' : undefined}
+      titleFontWeight="var(--font-weight-bold)"
+    />
   );
 }
 

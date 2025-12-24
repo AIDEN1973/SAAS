@@ -4,82 +4,87 @@
  * 아키텍처 문서 3.1.2 섹션 참조
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Modal } from '@ui-core/react';
+import { Sparkles, AlertTriangle, Clock, MessageSquare, UserPlus } from 'lucide-react';
+import { NotificationCardLayout, Button, Modal } from '@ui-core/react';
 import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 import type { StudentTaskCard as StudentTaskCardType } from '@hooks/use-student';
-import { useRequestApprovalStudentTaskCard, useApproveAndExecuteStudentTaskCard } from '@hooks/use-student';
+import { useRequestApprovalStudentTaskCard, useApproveAndExecuteStudentTaskCard, useSnoozeStudentTaskCard, useDeleteStudentTaskCard } from '@hooks/use-student';
 import { useUserRole } from '@hooks/use-auth';
+import { EMPTY_CARD_ID_PREFIX, DEFAULT_VALUES, TEXT_LINE_LIMITS, DATE_FORMATS, CARD_LABELS } from '../constants/dashboard-cards';
 
 interface StudentTaskCardProps {
   card: StudentTaskCardType;
   onAction?: (card: StudentTaskCardType) => void;
 }
 
-// SVG strokeWidth는 CSS 변수로 대체 (하드코딩 금지 규칙 준수)
-const SVG_STROKE_WIDTH = 2; // --stroke-width-icon-bold와 동일한 값
-
-const taskTypeIcons: Record<StudentTaskCardType['task_type'], React.ReactNode> = {
-  ai_suggested: (
-    <svg style={{ width: 'var(--font-size-xl)', height: 'var(--font-size-xl)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={SVG_STROKE_WIDTH} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-    </svg>
-  ),
-  risk: (
-    <svg style={{ width: 'var(--font-size-xl)', height: 'var(--font-size-xl)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={SVG_STROKE_WIDTH} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-    </svg>
-  ),
-  absence: (
-    <svg style={{ width: 'var(--font-size-xl)', height: 'var(--font-size-xl)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={SVG_STROKE_WIDTH} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  counseling: (
-    <svg style={{ width: 'var(--font-size-xl)', height: 'var(--font-size-xl)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={SVG_STROKE_WIDTH} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-    </svg>
-  ),
-  new_signup: (
-    <svg style={{ width: 'var(--font-size-xl)', height: 'var(--font-size-xl)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={SVG_STROKE_WIDTH} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-    </svg>
-  ),
+// 아이콘 경로 정의 (하드코딩 제거)
+const iconPaths: Record<StudentTaskCardType['task_type'], string> = {
+  ai_suggested: 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z',
+  risk: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z',
+  absence: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+  counseling: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
+  new_signup: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z',
 };
 
-const taskTypeColors: Record<StudentTaskCardType['task_type'], { bg: string; text: string; border: string }> = {
-  ai_suggested: { bg: 'var(--color-purple-50)', text: 'var(--color-purple-700)', border: 'var(--color-purple-200)' },
-  risk: { bg: 'var(--color-red-50)', text: 'var(--color-red-700)', border: 'var(--color-red-200)' },
-  absence: { bg: 'var(--color-orange-50)', text: 'var(--color-orange-700)', border: 'var(--color-orange-200)' },
-  counseling: { bg: 'var(--color-blue-50)', text: 'var(--color-blue-700)', border: 'var(--color-blue-200)' },
-  new_signup: { bg: 'var(--color-green-50)', text: 'var(--color-green-700)', border: 'var(--color-green-200)' },
-};
+// 아이콘 생성 함수 (CSS 변수 사용)
+// 크기는 NotificationCardLayout에서 제어하므로 여기서는 설정하지 않음
+const createTaskTypeIcon = (path: string, strokeWidth: number): React.ReactNode => (
+  <svg style={{ width: '100%', height: '100%' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d={path} />
+  </svg>
+);
 
-const taskTypeLabels: Record<StudentTaskCardType['task_type'], string> = {
-  ai_suggested: 'AI 업무 카드',
-  risk: '이탈 위험',
-  absence: '결석',
-  counseling: '상담 필요',
-  new_signup: '신규 등록',
-};
-
-const getPriorityBadgeColor = (priority: number): string => {
-  if (priority >= 70) return 'var(--color-red-600)';
-  if (priority >= 40) return 'var(--color-orange-600)';
-  return 'var(--color-blue-600)';
-};
+// 아이콘 배경색은 모두 동일하게 (심플한 디자인)
 
 export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
   const navigate = useNavigate();
-  const typeConfig = taskTypeColors[card.task_type];
-  const icon = taskTypeIcons[card.task_type];
-  const label = taskTypeLabels[card.task_type];
+  // 빈 카드 여부 확인 (ID가 empty-로 시작하는 경우)
+  const isEmpty = card.id.startsWith(EMPTY_CARD_ID_PREFIX);
+
+  // CSS 변수에서 strokeWidth 읽기 (하드코딩 제거)
+  const strokeWidth = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const value = getComputedStyle(document.documentElement)
+        .getPropertyValue('--stroke-width-icon-bold')
+        .trim();
+      return value ? Number(value) : DEFAULT_VALUES.STROKE_WIDTH_FALLBACK;
+    }
+    return DEFAULT_VALUES.STROKE_WIDTH_FALLBACK;
+  }, []);
+
+  const iconPath = iconPaths[card.task_type];
+
+  // 우측 상단 아이콘 (task_type에 따라 다른 아이콘)
+  const topRightIcon = useMemo(() => {
+    switch (card.task_type) {
+      case 'ai_suggested':
+        return <Sparkles style={{ width: '100%', height: '100%' }} />;
+      case 'risk':
+        return <AlertTriangle style={{ width: '100%', height: '100%' }} />;
+      case 'absence':
+        return <Clock style={{ width: '100%', height: '100%' }} />;
+      case 'counseling':
+        return <MessageSquare style={{ width: '100%', height: '100%' }} />;
+      case 'new_signup':
+        return <UserPlus style={{ width: '100%', height: '100%' }} />;
+      default:
+        return null;
+    }
+  }, [card.task_type]);
+
   const { data: userRole } = useUserRole();
   const requestApproval = useRequestApprovalStudentTaskCard();
   const approveAndExecute = useApproveAndExecuteStudentTaskCard();
+  const snoozeCard = useSnoozeStudentTaskCard();
+  const deleteCard = useDeleteStudentTaskCard();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isRemindModalOpen, setIsRemindModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedRemindTime, setSelectedRemindTime] = useState<string>('');
+  const [selectedRemindOptionId, setSelectedRemindOptionId] = useState<string>('');
 
   // StudentTaskCard (task_type: 'ai_suggested')이고 pending 상태인 경우 승인/거부 버튼 표시
   const isAISuggestedPending = card.task_type === 'ai_suggested' && card.status === 'pending';
@@ -128,6 +133,47 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
     setIsPreviewOpen(true);
   };
 
+  const handleSnooze = (e: React.MouseEvent) => {
+    e.stopPropagation(); // 카드 클릭 이벤트 방지
+    setIsRemindModalOpen(true);
+  };
+
+  const handleConfirmSnooze = async () => {
+    if (!selectedRemindTime) return;
+
+    setIsProcessing(true);
+    try {
+      await snoozeCard.mutateAsync({
+        taskId: card.id,
+        remindAt: selectedRemindTime,
+      });
+      setIsRemindModalOpen(false);
+      setSelectedRemindTime('');
+      setSelectedRemindOptionId('');
+    } catch (error) {
+      console.error('Failed to snooze task card:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation(); // 카드 클릭 이벤트 방지
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    setIsProcessing(true);
+    try {
+      await deleteCard.mutateAsync(card.id);
+      setIsDeleteModalOpen(false);
+    } catch (error) {
+      console.error('Failed to delete task card:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   // 미리보기 데이터 추출 (프론트 자동화 문서 14.3 섹션 참조)
   const previewData = React.useMemo(() => {
     if (!card.suggested_action) return null;
@@ -135,7 +181,7 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
     const action = card.suggested_action as any;
     const estimatedCost = typeof card.metadata?.estimated_cost === 'number'
       ? card.metadata.estimated_cost
-      : 0;
+      : DEFAULT_VALUES.ZERO;
 
     if (action.type === 'send_message') {
       return {
@@ -145,8 +191,8 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
         templateId: action.payload?.template_id || '',
         estimatedCost,
         impact: {
-          recipientCount: action.payload?.recipient_ids?.length || 0,
-          estimatedDeliveryTime: '즉시',
+          recipientCount: action.payload?.recipient_ids?.length || DEFAULT_VALUES.ZERO,
+          estimatedDeliveryTime: CARD_LABELS.IMMEDIATE_DELIVERY,
         },
       };
     } else if (action.type === 'run_analysis') {
@@ -157,7 +203,7 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
         targetId: action.class_id || action.student_id || '',
         estimatedCost,
         impact: {
-          scope: impact?.scope || '일부',
+          scope: impact?.scope || CARD_LABELS.SCOPE_PARTIAL,
         },
       };
     }
@@ -166,206 +212,35 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
 
   // 기술문서 5-2: KST 변환 필수 (toLocaleDateString 직접 사용 금지)
   const formatDate = (dateString: string) => {
-    return toKST(dateString).format('MM월 DD일 HH:mm');
+    return toKST(dateString).format(DATE_FORMATS.SHORT_WITH_TIME);
   };
 
+  // 아이콘 (원형 배경은 NotificationCardLayout에서 처리)
+  const taskIcon = createTaskTypeIcon(iconPath, strokeWidth);
+
+  // 메타 정보
+  const metaContent = (
+    <span style={{
+      whiteSpace: 'nowrap',
+      flexShrink: 0,
+    }}>
+      {formatDate(card.created_at)}
+    </span>
+  );
+
   return (
-    <Card
-      variant="default"
-      padding="md"
-      style={{
-        backgroundColor: typeConfig.bg,
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-      onClick={handleAction}
-      disableHoverEffect={true} // 롤오버 효과 완전 제거
-    >
-      {/* 헤더: 아이콘 + 타입 배지 + 우선순위 배지 */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 'var(--spacing-md)',
-        gap: 'var(--spacing-sm)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-          <div style={{
-            color: typeConfig.text,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            {icon}
-          </div>
-          <span style={{
-            fontSize: 'var(--font-size-base)',
-            fontWeight: 'var(--font-weight-semibold)',
-            color: typeConfig.text,
-            padding: 'var(--spacing-xs) var(--spacing-sm)',
-            borderRadius: 'var(--border-radius-sm)',
-            backgroundColor: typeConfig.border,
-            whiteSpace: 'nowrap',
-          }}>
-            {label}
-          </span>
-        </div>
-        <span style={{
-          fontSize: 'var(--font-size-base)',
-          fontWeight: 'var(--font-weight-bold)',
-          color: 'var(--color-white)',
-          backgroundColor: getPriorityBadgeColor(card.priority),
-          padding: 'var(--spacing-xs) var(--spacing-sm)',
-          borderRadius: 'var(--border-radius-sm)',
-          whiteSpace: 'nowrap',
-        }}>
-          우선순위 {card.priority}
-        </span>
-      </div>
-
-      {/* 제목 (최대 2줄) */}
-      <h3 style={{
-        fontSize: 'var(--font-size-lg)',
-        fontWeight: 'var(--font-weight-semibold)',
-        color: 'var(--color-text)',
-        marginBottom: 'var(--spacing-sm)',
-        display: '-webkit-box',
-        WebkitLineClamp: 2,
-        WebkitBoxOrient: 'vertical',
-        overflow: 'hidden',
-        lineHeight: 'var(--line-height)',
-      }}>
-        {card.title}
-      </h3>
-
-      {/* 설명 (최대 3줄) */}
-      <p style={{
-        fontSize: 'var(--font-size-base)',
-        color: 'var(--color-text-secondary)',
-        marginBottom: 'var(--spacing-md)',
-        display: '-webkit-box',
-        WebkitLineClamp: 3,
-        WebkitBoxOrient: 'vertical',
-        overflow: 'hidden',
-        lineHeight: 'var(--line-height)',
-      }}>
-        {card.description}
-      </p>
-
-      {/* 메타 정보: 학생 이름, 생성 시간 */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 'var(--spacing-md)',
-        fontSize: 'var(--font-size-base)',
-        color: 'var(--color-text-secondary)',
-        gap: 'var(--spacing-sm)',
-      }}>
-        {card.student_name && (
-          <span style={{
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}>
-            학생: {card.student_name}
-          </span>
-        )}
-        <span style={{
-          whiteSpace: 'nowrap',
-          flexShrink: 0,
-        }}>
-          {formatDate(card.created_at)}
-        </span>
-      </div>
-
-      {/* 액션 버튼 영역 - 하단 고정 */}
-      <div style={{ marginTop: 'auto', paddingTop: 'var(--spacing-sm)' }}>
-      {isAISuggestedPending && (isTeacher || isAdmin) ? (
-        // StudentTaskCard (task_type: 'ai_suggested')이고 pending 상태: 승인/거부 버튼 표시
-        <div style={{
-          display: 'flex',
-          gap: 'var(--spacing-sm)',
-          flexWrap: 'wrap',
-        }}>
-          {previewData && (
-            <Button
-              variant="outline"
-              color="info"
-              fullWidth
-              onClick={handlePreview}
-              disabled={isProcessing}
-              style={{
-                fontSize: 'var(--font-size-base)',
-              }}
-            >
-              미리보기
-            </Button>
-          )}
-          <Button
-            variant="solid"
-            color="primary"
-            fullWidth
-            onClick={handleApprove}
-            disabled={isProcessing}
-            style={{
-              fontSize: 'var(--font-size-base)',
-            }}
-          >
-            {isTeacher ? '승인 요청' : '승인 및 실행'}
-          </Button>
-          <Button
-            variant="outline"
-            color="secondary"
-            fullWidth
-            onClick={handleReject}
-            disabled={isProcessing}
-            style={{
-              fontSize: 'var(--font-size-base)',
-            }}
-          >
-            거부
-          </Button>
-        </div>
-      ) : (
-        // 일반 카드: 처리하기 버튼 + 나중에 버튼
-        <div style={{
-          display: 'flex',
-          gap: 'var(--spacing-sm)',
-          alignItems: 'stretch',
-        }}>
-          <Button
-            variant="solid"
-            color="primary"
-            fullWidth
-            onClick={handleAction}
-            style={{
-              fontSize: 'var(--font-size-base)',
-            }}
-          >
-            처리하기
-          </Button>
-          <Button
-            variant="outline"
-            color="secondary"
-            onClick={(e) => {
-              e.stopPropagation();
-              // 나중에 버튼: 카드를 숨기지 않고 그대로 유지
-              // 사용자가 나중에 처리할 수 있도록 선택권 제공
-            }}
-            style={{
-              minWidth: 'auto',
-              padding: 'var(--spacing-sm) var(--spacing-md)',
-              fontSize: 'var(--font-size-base)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            나중에
-          </Button>
-        </div>
-      )}
-      </div>
+    <>
+    <NotificationCardLayout
+      isEmpty={isEmpty}
+      onClick={isEmpty || isRemindModalOpen || isPreviewOpen || isDeleteModalOpen ? undefined : handleAction}
+      icon={taskIcon}
+      title={card.title}
+      description={card.description}
+      meta={metaContent}
+      maxTitleLines={TEXT_LINE_LIMITS.TITLE}
+      maxDescriptionLines={TEXT_LINE_LIMITS.DESCRIPTION}
+      titleFontWeight="var(--font-weight-bold)"
+    />
 
       {/* 미리보기 모달 (프론트 자동화 문서 14.3 섹션 참조) */}
       {previewData && (
@@ -401,7 +276,7 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
                     {previewData.message || '(메시지 내용 없음)'}
                   </div>
                 </div>
-                {previewData.estimatedCost > 0 && (
+                {previewData.estimatedCost > DEFAULT_VALUES.ZERO && (
                   <div style={{ marginBottom: 'var(--spacing-md)' }}>
                     <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
                       예상 비용
@@ -432,7 +307,7 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
                     {previewData.analysisType}
                   </p>
                 </div>
-                {previewData.estimatedCost > 0 && (
+                {previewData.estimatedCost > DEFAULT_VALUES.ZERO && (
                   <div style={{ marginBottom: 'var(--spacing-md)' }}>
                     <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
                       예상 비용
@@ -480,7 +355,148 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
           </div>
         </Modal>
       )}
-    </Card>
+
+      {/* 리마인드 모달 */}
+      <Modal
+        isOpen={isRemindModalOpen}
+        onClose={() => {
+          setIsRemindModalOpen(false);
+          setSelectedRemindTime('');
+          setSelectedRemindOptionId('');
+        }}
+        title="나중에 알림"
+        size="md"
+      >
+        <div style={{ padding: 'var(--spacing-md)' }}>
+          <p style={{
+            fontSize: 'var(--font-size-base)',
+            color: 'var(--color-text-secondary)',
+            marginBottom: 'var(--spacing-md)',
+          }}>
+            언제 다시 알림을 받으시겠습니까?
+          </p>
+
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--spacing-sm)',
+          }}>
+            {useMemo(() => {
+              const now = toKST();
+              return [
+                { id: '1hour', label: '1시간 후', getValue: () => now.add(1, 'hour').toISOString() },
+                { id: '3hours', label: '3시간 후', getValue: () => now.add(3, 'hours').toISOString() },
+                { id: '6hours', label: '6시간 후', getValue: () => now.add(6, 'hours').toISOString() },
+                { id: 'tomorrow9am', label: '내일 오전 9시', getValue: () => now.add(1, 'day').hour(9).minute(0).second(0).toISOString() },
+                { id: '3days', label: '3일 후', getValue: () => now.add(3, 'days').startOf('day').toISOString() },
+                { id: '1week', label: '1주일 후', getValue: () => now.add(1, 'week').startOf('day').toISOString() },
+              ];
+            }, []).map((option) => {
+              const isSelected = selectedRemindOptionId === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation(); // 카드 클릭 이벤트 방지
+                    const value = option.getValue();
+                    setSelectedRemindTime(value);
+                    setSelectedRemindOptionId(option.id);
+                  }}
+                  style={{
+                    padding: 'var(--spacing-md)',
+                    border: `var(--border-width-thin) solid ${isSelected ? 'var(--color-primary)' : 'var(--color-gray-300)'}`,
+                    borderRadius: 'var(--border-radius-md)',
+                    backgroundColor: isSelected ? 'var(--color-primary-50)' : 'var(--color-white)',
+                    color: isSelected ? 'var(--color-primary)' : 'var(--color-text)',
+                    fontSize: 'var(--font-size-base)',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'var(--transition-all)',
+                  }}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 'var(--spacing-sm)',
+          padding: 'var(--spacing-md)',
+          borderTop: 'var(--border-width-thin) solid var(--color-gray-200)',
+        }}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsRemindModalOpen(false);
+              setSelectedRemindTime('');
+              setSelectedRemindOptionId('');
+            }}
+            disabled={isProcessing}
+          >
+            취소
+          </Button>
+          <Button
+            variant="solid"
+            color="primary"
+            onClick={handleConfirmSnooze}
+            disabled={!selectedRemindTime || isProcessing}
+          >
+            확인
+          </Button>
+        </div>
+      </Modal>
+
+      {/* 삭제 확인 모달 */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        title="카드 삭제"
+        size="md"
+      >
+        <div style={{ padding: 'var(--spacing-md)' }}>
+          <p style={{
+            fontSize: 'var(--font-size-base)',
+            color: 'var(--color-text)',
+            marginBottom: 'var(--spacing-md)',
+          }}>
+            정말 이 카드를 삭제하시겠습니까?
+          </p>
+          <p style={{
+            fontSize: 'var(--font-size-sm)',
+            color: 'var(--color-text-secondary)',
+          }}>
+            삭제된 카드는 복구할 수 없습니다.
+          </p>
+        </div>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 'var(--spacing-sm)',
+          padding: 'var(--spacing-md)',
+          borderTop: 'var(--border-width-thin) solid var(--color-gray-200)',
+        }}>
+          <Button
+            variant="outline"
+            onClick={() => setIsDeleteModalOpen(false)}
+            disabled={isProcessing}
+          >
+            취소
+          </Button>
+          <Button
+            variant="solid"
+            color="error"
+            onClick={handleConfirmDelete}
+            disabled={isProcessing}
+          >
+            삭제
+          </Button>
+        </div>
+      </Modal>
+    </>
   );
 }
 

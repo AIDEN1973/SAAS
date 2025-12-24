@@ -150,10 +150,14 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
             .getPropertyValue(varName)
             .trim();
           if (!value) return defaultValue;
-          // rem 단위를 px로 변환 (기본값 16px = 1rem)
+          // rem 단위를 px로 변환 (CSS 변수에서 기본 폰트 크기 읽기)
           if (value.endsWith('rem')) {
             const remValue = parseFloat(value);
-            return remValue * 16;
+            // ⚠️ 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
+            const baseFontSize = typeof window !== 'undefined'
+              ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
+              : 16;
+            return remValue * baseFontSize;
           }
           // px 단위인 경우
           if (value.endsWith('px')) {
@@ -162,8 +166,12 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
           return defaultValue;
         };
 
-        const spacingMd = getCSSVariableAsPx('--spacing-md', 16); // 기본값 16px
-        const spacingXs = getCSSVariableAsPx('--spacing-xs', 4); // 기본값 4px
+        // ⚠️ 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
+        const baseFontSize = typeof window !== 'undefined'
+          ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
+          : 16;
+        const spacingMd = getCSSVariableAsPx('--spacing-md', baseFontSize); // 기본값: baseFontSize (16px)
+        const spacingXs = getCSSVariableAsPx('--spacing-xs', baseFontSize * 0.25); // 기본값: baseFontSize * 0.25 (4px)
 
         // 임시 요소를 생성하여 텍스트 너비 측정
         const tempElement = document.createElement('span');
@@ -225,7 +233,11 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
           popover.style.maxWidth = `${calculatedWidth}px`; // 최대 너비도 설정하여 줄바꿈 방지
 
           // 드롭다운 레이어 위치를 wrapper 아래에 배치
-          const minMargin = getCSSVariableAsPx('--spacing-sm', 8); // 최소 여백 (기본값 8px)
+          // ⚠️ 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
+          const baseFontSize = typeof window !== 'undefined'
+            ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
+            : 16;
+          const minMargin = getCSSVariableAsPx('--spacing-sm', baseFontSize * 0.5); // 최소 여백 (기본값: baseFontSize * 0.5 = 8px)
 
           // wrapper의 left 위치를 기준으로 정렬
           let newLeft = wrapperRect.left;
