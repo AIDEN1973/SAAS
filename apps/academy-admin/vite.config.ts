@@ -297,23 +297,13 @@ export default defineConfig(({ mode }) => {
           // node_modules의 큰 라이브러리들을 별도 청크로 분리
           if (id.includes('node_modules')) {
             // React 관련 (가장 먼저 로드되어야 함, React와 React-DOM은 반드시 같은 청크에)
-            // 더 명확한 매칭을 위해 정확한 경로 확인
-            if (
-              id.includes('/react/') || 
-              id.includes('/react-dom/') || 
-              id.includes('\\react\\') || 
-              id.includes('\\react-dom\\') ||
-              id.endsWith('/react') || 
-              id.endsWith('/react-dom') ||
-              id.endsWith('\\react') || 
-              id.endsWith('\\react-dom') ||
-              id === 'react' || 
-              id === 'react-dom'
-            ) {
+            // 정규식으로 더 정확하게 매칭
+            const reactPattern = /[\\/]react[\\/]|[\\/]react-dom[\\/]|^react$|^react-dom$|react[\\/]jsx-runtime|react[\\/]jsx-dev-runtime/;
+            if (reactPattern.test(id)) {
               return 'react-vendor';
             }
-            // react/jsx-runtime도 React와 함께
-            if (id.includes('react/jsx-runtime') || id.includes('react/jsx-dev-runtime')) {
+            // 추가 안전장치: 'react' 문자열이 포함된 모든 모듈 (다른 라이브러리 제외)
+            if (id.includes('react') && !id.includes('react-router') && !id.includes('react-hook-form') && !id.includes('react-query')) {
               return 'react-vendor';
             }
             // React Router
