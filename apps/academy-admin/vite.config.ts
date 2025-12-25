@@ -201,6 +201,10 @@ export default defineConfig(({ mode }) => {
       '@industry/academy/seed',
     ],
     include: [
+      // React를 명시적으로 포함 (초기화 순서 보장)
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
       // xlsx 패키지를 명시적으로 포함
       'xlsx',
       // react-hook-form을 명시적으로 포함 (schema-engine에서 사용)
@@ -208,6 +212,13 @@ export default defineConfig(({ mode }) => {
     ],
     // 강제 재최적화 (캐시 문제 해결)
     force: true,
+    // ESBuild 옵션
+    esbuildOptions: {
+      // React를 전역으로 처리하지 않도록
+      define: {
+        global: 'globalThis',
+      },
+    },
   },
   resolve: {
     alias: [
@@ -274,11 +285,23 @@ export default defineConfig(({ mode }) => {
         format: 'es',
         // 모듈 초기화 순서 보장
         preserveModules: false,
+        // 청크 로딩 순서 보장
+        chunkFileNames: (chunkInfo) => {
+          // React vendor는 가장 먼저 로드되도록
+          if (chunkInfo.name === 'react-vendor') {
+            return 'assets/react-vendor-[hash].js';
+          }
+          return 'assets/[name]-[hash].js';
+        },
         manualChunks: (id) => {
           // node_modules의 큰 라이브러리들을 별도 청크로 분리
           if (id.includes('node_modules')) {
-            // React 관련 (가장 먼저 로드되어야 함)
-            if (id.includes('react') || id.includes('react-dom')) {
+            // React 관련 (가장 먼저 로드되어야 함, React와 React-DOM은 반드시 같은 청크에)
+            if (id.includes('react/') || id.includes('react-dom/') || id === 'react' || id === 'react-dom') {
+              return 'react-vendor';
+            }
+            // react/jsx-runtime도 React와 함께
+            if (id.includes('react/jsx-runtime') || id.includes('react/jsx-dev-runtime')) {
               return 'react-vendor';
             }
             // React Router
