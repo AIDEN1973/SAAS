@@ -34,7 +34,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "setup:env": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-env.ps1",
     "check:shared-catalog": "tsx scripts/check-shared-catalog.ts",
-    "prepare": "husky"
+    "prepare": "node -e \"if (!process.env.CI && !process.env.VERCEL) { try { require('husky').install(); } catch(e) {} }\" || true"
   },
   "devDependencies": {
     "@axe-core/react": "^4.11.0",
