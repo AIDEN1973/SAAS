@@ -6,11 +6,9 @@
  * [요구사항] 강사 프로필 보기
  */
 
-import React, { useState } from 'react';
-import { ErrorBoundary, useModal, useResponsiveMode } from '@ui-core/react';
-import { Container, Card, Button, Modal, Drawer, PageHeader } from '@ui-core/react';
+import React, { useState, useCallback } from 'react';
+import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet } from '@ui-core/react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
-import { apiClient } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
 import {
   useTeachers,
@@ -20,6 +18,7 @@ import {
   useDeleteTeacher,
 } from '@hooks/use-class';
 import type { Teacher, CreateTeacherInput, UpdateTeacherInput, TeacherFilter, TeacherStatus } from '@services/class-service';
+import { apiClient } from '@api-sdk/core';
 import { teacherFormSchema } from '../schemas/teacher.schema';
 import type { FormSchema } from '@schema-engine/types';
 import { teacherFilterSchema } from '../schemas/teacher.filter.schema';
@@ -27,8 +26,10 @@ import { teacherFilterSchema } from '../schemas/teacher.filter.schema';
 export function TeachersPage() {
   const { showConfirm, showAlert } = useModal();
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
   const [filter, setFilter] = useState<TeacherFilter>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null);
@@ -49,7 +50,7 @@ export function TeachersPage() {
   const effectiveFormSchema = teacherFormSchemaData || teacherFormSchema;
   const effectiveFilterSchema = teacherFilterSchemaData || teacherFilterSchema;
 
-  const handleFilterChange = React.useCallback((filters: Record<string, unknown>) => {
+  const handleFilterChange = useCallback((filters: Record<string, unknown>) => {
     setFilter({
       search: typeof filters.search === 'string' ? filters.search : undefined,
       status: filters.status as TeacherStatus | TeacherStatus[] | undefined,
@@ -70,7 +71,7 @@ export function TeachersPage() {
     }
   };
 
-  const handleUpdateTeacher = async (teacherId: string, input: UpdateTeacherInput) => {
+  const handleUpdateTeacher = async (teacherId: string, input: UpdateTeacherInput): Promise<void> => {
     try {
       await updateTeacher.mutateAsync({ teacherId, input });
       setEditingTeacherId(null);
@@ -113,14 +114,14 @@ export function TeachersPage() {
         {/* 강사 등록 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
           {showCreateForm && (
             <>
-              {isMobile || isTablet ? (
+              {isMobileMode || isTabletMode ? (
                 // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
                 <Drawer
                   isOpen={showCreateForm}
                   onClose={() => setShowCreateForm(false)}
                   title="강사 등록"
-                  position={isMobile ? 'bottom' : 'right'}
-                  width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+                  position={isMobileMode ? 'bottom' : 'right'}
+                  width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
                 >
                   <CreateTeacherForm
                     onSubmit={handleCreateTeacher}
@@ -212,11 +213,13 @@ function CreateTeacherForm({
   effectiveFormSchema: FormSchema;
 }) {
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md';
-  const showHeader = !isMobile && !isTablet;
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
+  const showHeader = !isMobileMode && !isTabletMode;
 
-  const handleSubmit = async (data: Record<string, unknown>) => {
+  const handleSubmit = (data: Record<string, unknown>) => {
     // 스키마에서 받은 데이터를 CreateTeacherInput 형식으로 변환
     const input: CreateTeacherInput = {
       name: typeof data.name === 'string' ? data.name : '',
@@ -285,8 +288,10 @@ function EditTeacherModal({
 }) {
   const { showAlert } = useModal();
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
   const { data: teacher, isLoading } = useTeacher(teacherId);
 
   // Schema Registry 연동 (아키텍처 문서 S3 참조)
@@ -312,14 +317,14 @@ function EditTeacherModal({
 
   // 반응형 처리: 모바일/태블릿은 Drawer, 데스크톱은 Modal (아키텍처 문서 6-1 참조)
   if (isLoading) {
-    if (isMobile || isTablet) {
+    if (isMobileMode || isTabletMode) {
       return (
         <Drawer
           isOpen={true}
           onClose={onClose}
           title="강사 수정"
-          position={isMobile ? 'bottom' : 'right'}
-          width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+          position={isMobileMode ? 'bottom' : 'right'}
+          width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
         >
           <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>
         </Drawer>
@@ -333,14 +338,14 @@ function EditTeacherModal({
   }
 
   if (!teacher) {
-    if (isMobile || isTablet) {
+    if (isMobileMode || isTabletMode) {
       return (
         <Drawer
           isOpen={true}
           onClose={onClose}
           title="강사 수정"
-          position={isMobile ? 'bottom' : 'right'}
-          width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+          position={isMobileMode ? 'bottom' : 'right'}
+          width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
         >
           <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>강사를 찾을 수 없습니다.</div>
         </Drawer>
@@ -393,14 +398,14 @@ function EditTeacherModal({
   );
 
   // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
-  if (isMobile || isTablet) {
+  if (isMobileMode || isTabletMode) {
     return (
       <Drawer
         isOpen={true}
         onClose={onClose}
         title="강사 수정"
-        position={isMobile ? 'bottom' : 'right'}
-        width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+        position={isMobileMode ? 'bottom' : 'right'}
+        width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
       >
         {formContent}
       </Drawer>

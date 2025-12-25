@@ -72,7 +72,7 @@ BEGIN
             NEW.tenant_id,
             'send_notification',
             'system',
-            NEW.tenant_id::text || ':' || event_type || ':class:' || NEW.id::text || ':guardian:' || student_record.guardian_id::text || ':' || CURRENT_DATE::text,
+            NEW.tenant_id::text || ':' || event_type || ':class:' || NEW.id::text || ':guardian:' || student_record.guardian_id::text || ':' || timezone('Asia/Seoul', now())::date::text,
             jsonb_build_object(
               'event_type', event_type,
               'class_id', NEW.id,
@@ -109,7 +109,7 @@ BEGIN
           OLD.tenant_id,
           'send_notification',
           'system',
-          OLD.tenant_id::text || ':' || event_type || ':class:' || OLD.id::text || ':guardian:' || student_record.guardian_id::text || ':' || CURRENT_DATE::text,
+            OLD.tenant_id::text || ':' || event_type || ':class:' || OLD.id::text || ':guardian:' || student_record.guardian_id::text || ':' || timezone('Asia/Seoul', now())::date::text,
           jsonb_build_object(
             'event_type', event_type,
             'class_id', OLD.id,
@@ -200,7 +200,7 @@ BEGIN
       NEW.tenant_id,
       'send_notification',
       'system',
-      NEW.tenant_id::text || ':' || event_type || ':invoice:' || NEW.id::text || ':guardian:' || guardian_record.id::text || ':' || CURRENT_DATE::text,
+      NEW.tenant_id::text || ':' || event_type || ':invoice:' || NEW.id::text || ':guardian:' || guardian_record.id::text || ':' || timezone('Asia/Seoul', now())::date::text,
       jsonb_build_object(
         'event_type', event_type,
         'invoice_id', NEW.id,

@@ -75,6 +75,7 @@
       "@payments/*": ["./packages/payments/*/src"]
     }
   },
+  "include": ["vite-env.d.ts"],
   "exclude": ["node_modules", "dist", "build", ".next", "infra", "templates"]
 }
 

@@ -8,6 +8,8 @@
 import React, { useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ErrorBoundary, Container, Card, PageHeader } from '@ui-core/react';
+// [SSOT] Barrel export를 통한 통합 import
+import { ROUTES } from '../constants';
 
 export function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -28,7 +30,8 @@ export function StudentDetailPage() {
       : path.includes('/classes') ? 'classes'
       : 'info';
 
-    navigate(`/students/list?student=${id}&tab=${tab}`, { replace: true });
+    // [SSOT] ROUTES 상수 사용 (legacy student 파라미터는 studentId로 변환)
+    navigate(ROUTES.STUDENT_DETAIL(id, tab), { replace: true });
   }, [id, location.pathname, navigate]);
 
   return (

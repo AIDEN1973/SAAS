@@ -6,36 +6,59 @@
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  */
 
+// [P2] window 타입 선언: 위젯 등록 플래그 타입 안정성
+// [P1-2 수정] 키 기반으로 위젯 등록 플래그 관리하여 다른 위젯/번들과 충돌 방지
+declare global {
+  interface Window {
+    __sduiWidgetRegistered?: Record<string, boolean>; // [P1-2 수정] 키 기반으로 위젯 등록 플래그 관리
+  }
+}
+
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ErrorBoundary, useIconSize, useIconStrokeWidth, useModal, useResponsiveMode, IconButtonGroup, Input, Badge, ActionButtonGroup } from '@ui-core/react';
+import { ErrorBoundary, useIconSize, useIconStrokeWidth, useModal, useResponsiveMode, useToast, IconButtonGroup, Input, Badge, ActionButtonGroup, Container, Card, Button, Drawer, PageHeader, RightLayerMenuLayout, isMobile, isTablet } from '@ui-core/react';
 import { DataTableActionButtons, PlusIcon } from '../components/DataTableActionButtons';
 import { MessageSquare, FileText, User, Users, BookOpen, Calendar, AlertTriangle, Tag as TagIcon, ChevronDown, ChevronUp, Trash2, Pencil, X as XIcon, Save, AlertCircle, CheckCircle2, Lightbulb, RefreshCcw } from 'lucide-react';
 import { BadgeSelect } from '../components/BadgeSelect';
-import { Container, Card, Button, Drawer, PageHeader, RightLayerMenuLayout } from '@ui-core/react';
-import { SchemaForm, SchemaFormWithMethods, SchemaFilter, SchemaTable } from '@schema-engine';
+import { SchemaForm, SchemaFormWithMethods, SchemaFilter, SchemaTable , registerWidget } from '@schema-engine';
 import type { UseFormReturn } from 'react-hook-form';
-import { registerWidget } from '@schema-engine';
 import { useStudentPage } from './hooks/useStudentPage';
 import { useStudentTags, useStudentClasses, useCompleteStudentTaskCard, useStudentTaskCards, useGuardians } from '@hooks/use-student';
-import { useConsultations } from '@hooks/use-student';
 import { useAttendanceLogs, useCreateAttendanceLog, useUpdateAttendanceLog } from '@hooks/use-attendance';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
+import { fetchAIInsights } from '@hooks/use-ai-insights';
 import { useSchema } from '@hooks/use-schema';
 import { useIndustryTranslations } from '@hooks/use-industry-translations';
 import { toKST } from '@lib/date-utils';
-import type { StudentFilter, StudentStatus, Student, CreateStudentInput, Gender, ConsultationType, Guardian, StudentConsultation } from '@services/student-service';
-import type { AttendanceLog, CreateAttendanceLogInput } from '@services/attendance-service';
+import type { Student, StudentStatus, CreateStudentInput, Gender, ConsultationType, Guardian, StudentConsultation } from '@services/student-service';
+import type { CreateAttendanceLogInput } from '@services/attendance-service';
 import type { Class } from '@services/class-service';
 import type { Tag } from '@core/tags';
 import type { FormSchema } from '@schema-engine/types';
 import type { NotificationChannel } from '@core/notification';
 import { notificationFormSchema } from '../schemas/notification.schema';
 import { tagFormSchema } from '../schemas/tag.schema';
+import { isWidgetRegistered, setWidgetRegistered } from '../utils/widget-registry';
+// [SSOT] Barrel export를 통한 통합 import
+import { toNullable, createSafeNavigate } from '../utils';
+
+// [P2-1 수정] 동적 import 캐싱: module-scope로 이동하여 진짜 캐싱 보장
+// useEffect 내부 지역변수는 effect가 다시 돌면 캐시가 초기화되므로 module-scope로 이동
+let maskPIICache: ((x: unknown) => unknown) | null = null;
+
+async function getMaskPII(): Promise<(x: unknown) => unknown> {
+  if (!maskPIICache) {
+    const module = await import('@core/pii-utils');
+    maskPIICache = module.maskPII;
+  }
+  return maskPIICache;
+}
 
 // [코드 중복 제거] 태그 입력값 처리 함수를 공통 유틸로 분리
 // 태그 입력값 실시간 처리: 띄어쓰기 제거 (쉼표 다음 띄어쓰기는 허용)
+// [P2-6 주의] 실시간 변형으로 인해 커서 점프 가능성: onChange에서 정규화하면 caret 위치가 튈 수 있음
+// 개선 옵션: onBlur에서 정규화 적용 또는 selectionStart/End를 유지하는 방식으로 보완
 const processTagInput = (inputValue: string): string => {
   const parts = inputValue.split(',');
 
@@ -64,6 +87,7 @@ const TagNameInputWidget: React.FC<{
   fullWidth?: boolean;
 }> = ({ value = '', onChange, onBlur, label, placeholder, error, disabled, fullWidth = true }) => {
   // [성능 최적화] processTagInput을 useCallback으로 메모이제이션
+  // [P2-6 주의] 실시간 변형으로 인해 커서 점프 가능성 있음
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     const processed = processTagInput(newValue);
@@ -86,12 +110,34 @@ const TagNameInputWidget: React.FC<{
 };
 
 // 위젯 등록
-registerWidget('TagNameInput', () => Promise.resolve(TagNameInputWidget));
+// [P0-2 수정] SSR 안전 + 네임스페이스: 브라우저에서만 등록, 네임스페이스 키 사용
+// registerWidget은 덮어쓰기를 지원하지만, SSR 안정성과 HMR 충돌 방지를 위해 브라우저에서만 등록
+// [P1-2 수정] 로더 반환 형태: WidgetLoader 타입은 () => Promise<ComponentType>을 기대하므로 컴포넌트 직접 반환이 정석
+// loadWidget은 (module as any).default || module로 처리하므로 컴포넌트 직접 반환도 지원
+if (typeof window !== 'undefined') {
+  // [P1-2 수정] 네임스페이스 키 기반으로 위젯 등록 플래그 관리
+  // [P0-1 수정] window.__sduiWidgetRegistered 직접 접근 금지, 전용 util 사용
+  const WIDGET_KEY = 'academy-admin/TagNameInput'; // [P1-2 수정] 위젯 키 네임스페이스화
+  if (!isWidgetRegistered(WIDGET_KEY)) {
+    // [P0-1 수정] WidgetLoader 타입: () => Promise<React.ComponentType<Record<string, unknown>>>
+    // TagNameInputWidget은 명시적 props를 받으므로, Record<string, unknown>를 수용하는 래퍼로 감싸야 타입 안전
+    registerWidget(WIDGET_KEY, () => {
+      const Wrapped: React.FC<Record<string, unknown>> = (props) => (
+        <TagNameInputWidget {...(props as Parameters<typeof TagNameInputWidget>[0])} />
+      );
+      return Promise.resolve(Wrapped);
+    });
+    setWidgetRegistered(WIDGET_KEY);
+  }
+}
+// SSR 환경에서는 등록하지 않음 (브라우저에서만 필요)
 
 export function StudentsPage() {
+  // [P1-7 확인] navigate는 actionContextMemo에서 사용됨 (195줄)
   const navigate = useNavigate();
   const iconSize = useIconSize();
   const iconStrokeWidth = useIconStrokeWidth();
+  const { toast } = useToast();
 
   // [아키텍처] Application Layer와 UI Composition 분리
   // - useStudentPage Hook이 모든 비즈니스 로직, 상태 관리, 데이터 페칭을 담당
@@ -120,7 +166,6 @@ export function StudentsPage() {
     isLoading,
     error,
     tags,
-    classes,
     selectedStudent,
     selectedStudentLoading,
     selectedStudentGuardians,
@@ -145,12 +190,11 @@ export function StudentsPage() {
 
     // 테이블 관련
     tablePage,
-    tablePageSize,
     tableFilters,
 
     // 반응형
-    isMobile,
-    isTablet,
+    isMobile: isMobileMode,
+    isTablet: isTabletMode,
 
     // 핸들러
     handleStudentSelect,
@@ -185,16 +229,23 @@ export function StudentsPage() {
     updateStudentTags,
     assignStudentToClass,
     unassignStudentFromClass,
+    updateStudentClassEnrolledAt,
 
     // 모달
-    showAlert,
     showConfirm,
   } = useStudentPage();
 
+  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
+  const safeNavigate = useMemo(
+    () => createSafeNavigate(navigate),
+    [navigate]
+  );
+
   // actionContext와 onRowClick 메모이제이션하여 불필요한 리렌더링 방지
+  // [P0-2 수정] SSOT: safeNavigate 사용 (외부에서 온 path 보호)
   const actionContextMemo = useMemo(() => ({
-    navigate: (path: string) => navigate(path),
-  }), [navigate]);
+    navigate: (path: string) => safeNavigate(path),
+  }), [safeNavigate]);
 
   const handleRowClickMemo = useCallback((row: Record<string, unknown>) => {
     const studentId = row.id as string;
@@ -229,7 +280,7 @@ export function StudentsPage() {
               </span>
             </span>
           ) : '학생 상세',
-          width: isTablet ? 'var(--width-layer-menu-tablet)' : 'var(--width-layer-menu)',
+          width: isTabletMode ? 'var(--width-layer-menu-tablet)' : 'var(--width-layer-menu)',
           children: selectedStudentLoading ? (
             <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
               로딩 중...
@@ -271,7 +322,7 @@ export function StudentsPage() {
                   size="sm"
                   onClick={() => handleTabChange('classes')}
                 >
-                  반배정 ({selectedStudentClasses.filter((sc) => sc.is_active).length})
+                  반배정 ({(selectedStudentClasses ?? []).filter((sc) => sc.is_active).length})
                 </Button>
                 <Button
                   variant={layerMenuTab === 'attendance' ? 'solid' : 'outline'}
@@ -315,7 +366,7 @@ export function StudentsPage() {
                       );
                       if (!confirmed) return;
                       await deleteStudent.mutateAsync(selectedStudent.id);
-                      showAlert('학생이 삭제(퇴원 처리)되었습니다.', '성공', 'success');
+                      toast('학생이 삭제(퇴원 처리)되었습니다.', 'success');
                       handleStudentSelect(null);
                     }}
                   />
@@ -373,7 +424,7 @@ export function StudentsPage() {
                     }}
                     onCreate={async (data) => {
                       if (!userId) {
-                        showAlert('사용자 정보를 가져올 수 없습니다. 다시 로그인해주세요.', '오류', 'error');
+                        toast('사용자 정보를 가져올 수 없습니다. 다시 로그인해주세요.', 'error');
                         return;
                       }
                       await createConsultation.mutateAsync({ studentId: selectedStudent.id, consultation: data as Omit<StudentConsultation, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>, userId });
@@ -394,9 +445,8 @@ export function StudentsPage() {
                       try {
                         await generateAISummary.mutateAsync({ consultationId, studentId: selectedStudent.id });
                       } catch (error) {
-                        showAlert(
+                        toast(
                           error instanceof Error ? error.message : 'AI 요약에 실패했습니다.',
-                          '오류',
                           'error'
                         );
                       }
@@ -438,10 +488,10 @@ export function StudentsPage() {
                       });
                     }}
                     onUpdate={async (studentClassId, enrolledAt) => {
-                      // enrolled_at만 업데이트 (같은 반일 때)
-                      const { apiClient } = await import('@api-sdk/core');
-                      await apiClient.patch('student_classes', studentClassId, {
-                        enrolled_at: enrolledAt,
+                      // [P0-2 수정] App Layer 분리 원칙 준수: Hook을 통한 업데이트
+                      await updateStudentClassEnrolledAt.mutateAsync({
+                        studentClassId,
+                        enrolledAt,
                       });
                     }}
                     isEditable={userRole !== 'teacher' && userRole !== 'assistant'}
@@ -612,14 +662,14 @@ export function StudentsPage() {
         {/* 학생 등록 폼 - 반응형: 모바일/태블릿은 모달/드로어, 데스크톱은 인라인 */}
         {showCreateForm && (
             <>
-              {isMobile || isTablet ? (
+              {isMobileMode || isTabletMode ? (
                 // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
                 <Drawer
                   isOpen={showCreateForm}
                   onClose={() => setShowCreateForm(false)}
                   title="학생 등록"
-                  position={isMobile ? 'bottom' : 'right'}
-                  width={isTablet ? 'var(--width-drawer-tablet)' : 'var(--width-full)'}
+                  position={isMobileMode ? 'bottom' : 'right'}
+                  width={isTabletMode ? 'var(--width-drawer-tablet)' : 'var(--width-full)'}
                 >
                   <CreateStudentForm
                     onClose={() => setShowCreateForm(false)}
@@ -709,6 +759,7 @@ export function StudentsPage() {
 
 // ============================================================================
 // RightLayerMenu: Header(밑줄만) + Content 컨테이너 공통 스타일
+// [P0-1 수정] 요구사항 확정: 헤더에 밑줄 적용 (주석과 구현 일치)
 // - Card의 title 영역을 쓰지 않고, 상단 헤더를 분리하여 밑줄만 적용
 // - 밑줄 색상은 텍스트 기본색(var(--color-text))을 사용
 // - 테두리/배경은 제거(하드코딩 금지, CSS 변수 사용)
@@ -741,7 +792,8 @@ function LayerSectionHeader({
         minHeight: 'calc(var(--spacing-sm) + var(--size-pagination-button) + var(--spacing-sm))',
         backgroundColor: 'transparent',
         border: 'none',
-        // 요구사항: 헤더 아래 밑줄 제거
+        // [P0-1 수정] 헤더 아래 밑줄 적용 (주석 요구사항과 일치)
+        borderBottom: 'var(--border-width-thin) solid var(--color-text)',
       }}
     >
       <div
@@ -782,10 +834,12 @@ interface CreateStudentFormProps {
 
 function CreateStudentForm({ onClose, onSubmit, effectiveFormSchema }: CreateStudentFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { showAlert } = useModal();
+  const { toast } = useToast();
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     setIsSubmitting(true);
@@ -794,7 +848,7 @@ function CreateStudentForm({ onClose, onSubmit, effectiveFormSchema }: CreateStu
       const input: CreateStudentInput = {
         name: String(data.name ?? ''),
         birth_date: data.birth_date ? String(data.birth_date) : undefined,
-        gender: data.gender as Gender | undefined,
+        gender: data.gender ? (data.gender as Gender) : undefined,
         phone: data.phone ? String(data.phone) : undefined,
         email: data.email ? String(data.email) : undefined,
         address: data.address ? String(data.address) : undefined,
@@ -811,10 +865,10 @@ function CreateStudentForm({ onClose, onSubmit, effectiveFormSchema }: CreateStu
 
   // Drawer 내부에서는 헤더가 Drawer에 있으므로 중복 제거
   // 데스크톱에서만 인라인으로 표시되므로 showHeader는 데스크톱에서만 true
-  const showHeader = !isMobile && !isTablet;
+  const showHeader = !isMobileMode && !isTabletMode;
   // Drawer 내부에서 사용될 때는 padding 중복 방지를 위해 disableCardPadding=true
   // 모바일/태블릿에서는 Drawer를 사용하므로 disableCardPadding=true
-  const isInDrawer = isMobile || isTablet;
+  const isInDrawer = isMobileMode || isTabletMode;
 
   return (
     <div style={showHeader ? { marginBottom: 'var(--spacing-md)' } : {}}>
@@ -827,29 +881,107 @@ function CreateStudentForm({ onClose, onSubmit, effectiveFormSchema }: CreateStu
         </div>
       )}
       <SchemaForm
-        schema={effectiveFormSchema}
+        schema={{
+          ...effectiveFormSchema,
+          form: {
+            ...effectiveFormSchema.form,
+            // [P0-1 수정] actions를 명시적으로 비활성화하여 SchemaForm이 자동 API 호출을 하지 않도록 함
+            // handleSubmit에서 createStudent.mutateAsync를 통해 직접 처리
+            actions: [],
+          },
+          // 최상위 actions도 비활성화
+          actions: [],
+        }}
         onSubmit={handleSubmit}
         defaultValues={{
           status: 'active',
         }}
         disableCardPadding={isInDrawer}
         actionContext={{
+          // [P1-3] apiCall 제공: actions: []로 비활성화되어 있지만, 위젯이나 동적 스키마에서 호출 가능성 대비
+          // 완전 차단이 목적이면 apiCall 자체를 제거하고, 필요한 위젯만 별도 안전 래퍼로 제공 가능
+          // [P0-2 수정] PATCH/PUT/DELETE 지원 추가, endpoint whitelist 검증
           apiCall: async (endpoint: string, method: string, body?: unknown) => {
-            if (method === 'POST') {
-              const response = await apiClient.post(endpoint, body as Record<string, unknown>);
-              if (response.error) {
-                throw new Error(response.error.message);
-              }
-              return response.data;
+            // [P0-2 수정] endpoint 정규화: 선행 / 제거 (쿼리스트링은 유지)
+            // whitelist 검증용: 쿼리스트링 제거 후 base 추출
+            const endpointNoSlash = endpoint.replace(/^\//, '');     // 쿼리 포함 유지
+            const endpointPath = endpointNoSlash.split('?')[0];        // whitelist용
+            const endpointBase = endpointPath.split('/')[0];          // whitelist용
+
+            // [P1-1 수정] endpoint whitelist: 학생 페이지에서 실제로 사용하는 리소스 포함
+            // 보안상 의도: 스키마가 호출할 수 있는 엔드포인트를 제한
+            // 실제 studentFormSchema는 actions가 비활성화되어 있어 호출하지 않지만,
+            // 위젯이나 동적 스키마에서 호출 가능성을 대비한 안전장치
+            // 학생 페이지에서 사용하는 리소스: students, guardians, consultations, attendance_logs, classes, tags, tag_assignments, student_classes
+            const allowedEndpoints = ['students', 'guardians', 'consultations', 'attendance_logs', 'classes', 'tags', 'tag_assignments', 'student_classes'];
+            if (!allowedEndpoints.includes(endpointBase)) {
+              throw new Error(`허용되지 않은 endpoint: ${endpoint}`);
             }
-            const response = await apiClient.get(endpoint);
-            if (response.error) {
-              throw new Error(response.error.message);
+
+            // [P0-2 수정] POST/PATCH/PUT/DELETE는 쿼리스트링 차단: SDK 시그니처와 충돌 방지 및 Zero-Trust 경계 강화
+            // PostgREST 계열에서 쓰기 요청에 쿼리스트링이 포함되면 보안 위험 및 런타임 오류 가능
+            const hasQuery = endpointNoSlash.includes('?');
+            if (hasQuery && ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method.toUpperCase())) {
+              throw new Error(`쿼리스트링이 포함된 쓰기 요청은 허용하지 않습니다: ${endpoint}`);
             }
-            return response.data;
+
+            switch (method.toUpperCase()) {
+              case 'POST':
+                {
+                  // [P0-2 수정] POST는 리소스명만 허용 (쿼리스트링 제거된 endpointPath 사용)
+                  const resourceOnly = endpointPath; // 'students'
+                  const response = await apiClient.post(resourceOnly, body as Record<string, unknown>);
+                  if (response.error) {
+                    throw new Error(response.error.message);
+                  }
+                  return response.data;
+                }
+              case 'PATCH':
+              case 'PUT':
+                {
+                  // [P0-1 수정] 방어적 파싱: 정확히 'resource/id' 형식만 허용
+                  // students/123/extra 같은 잘못된 경로는 거부
+                  const parts = endpointPath.split('/').filter(Boolean);
+                  if (parts.length !== 2) {
+                    throw new Error(`잘못된 endpoint 형식입니다 (resource/id만 허용): ${endpoint}`);
+                  }
+                  const [resource, id] = parts;
+                  // apiClient에는 put 메서드가 없고 patch만 있음 (PostgREST는 PATCH 사용)
+                  // PUT도 patch로 처리하는 것이 올바름
+                  const response = await apiClient.patch(resource, id, body as Record<string, unknown>);
+                  if (response.error) {
+                    throw new Error(response.error.message);
+                  }
+                  return response.data;
+                }
+              case 'DELETE':
+                {
+                  // [P0-1 수정] 방어적 파싱: 정확히 'resource/id' 형식만 허용
+                  // students/123/extra 같은 잘못된 경로는 거부
+                  const parts = endpointPath.split('/').filter(Boolean);
+                  if (parts.length !== 2) {
+                    throw new Error(`잘못된 endpoint 형식입니다 (resource/id만 허용): ${endpoint}`);
+                  }
+                  const [resource, id] = parts;
+                  const response = await apiClient.delete(resource, id);
+                  if (response.error) {
+                    throw new Error(response.error.message);
+                  }
+                  return response.data;
+                }
+              case 'GET':
+              default:
+                {
+                  // [P0-1 수정] GET은 Schema actionContext에서 허용하지 않음 (Zero-Trust 원칙)
+                  // apiClient.get(table, options) 시그니처와 쿼리스트링 포함 raw path가 불일치할 수 있음
+                  // 동적 스키마/위젯에서 GET이 필요한 경우, 별도의 안전한 래퍼를 사용해야 함
+                  throw new Error('GET은 Schema actionContext에서 허용하지 않습니다. 데이터 조회는 useQuery/useMutation을 사용하세요.');
+                }
+            }
           },
           showToast: (message: string, variant?: string) => {
-            showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+            const toastVariant = variant === 'success' ? 'success' : variant === 'error' ? 'error' : variant === 'warning' ? 'warning' : 'info';
+            toast(message, toastVariant);
           },
         }}
       />
@@ -877,15 +1009,18 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
   const titleIconSize = useIconSize();
   const titleIconStrokeWidth = useIconStrokeWidth();
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const { toast } = useToast();
 
   // [성능 최적화] 디버깅 로그는 개발 환경에서만 실행
   // 프로덕션에서는 제거되어 번들 크기 감소
   // [PII 보안] PII 필드는 마스킹하여 로깅
+  // [P2-1 수정] 동적 import 캐싱: module-scope 함수 사용
   useEffect(() => {
     if (import.meta.env?.DEV) {
-      // PII 마스킹 유틸리티 import
-      import('@core/pii-utils').then(({ maskPII }) => {
+      void getMaskPII().then((maskPII) => {
         console.group('[StudentInfoTab] 디버깅 정보');
         console.log('student prop:', maskPII({
           id: student?.id,
@@ -909,7 +1044,7 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
   // defaultValues를 useMemo로 메모이제이션하여 student 변경 시 재계산
   // [중요] 모든 Hook은 조건문 이전에 호출되어야 함
   const formDefaultValues = useMemo(() => {
-    const values = {
+    return {
       name: student.name || '',
       birth_date: student.birth_date || '',
       gender: student.gender || '',
@@ -921,17 +1056,20 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
       status: student.status || 'active',
       notes: student.notes || '',
     };
+  }, [student]);
 
-    // 디버깅: formDefaultValues 계산 확인
-    // [PII 보안] PII 필드는 마스킹하여 로깅
+  // [P2-1 수정] useMemo 내부 dynamic import 로깅을 useEffect로 이동
+  // StrictMode/리렌더 상황에서 메모 계산이 순수하지 않게 되어 예측 불가한 로그 반복 방지
+  // [P2-1 수정] 동적 import 캐싱: module-scope 함수 사용
+  useEffect(() => {
     if (import.meta.env?.DEV) {
-      import('@core/pii-utils').then(({ maskPII }) => {
-        console.log('[StudentInfoTab] formDefaultValues 계산:', maskPII(values));
+      // 디버깅: formDefaultValues 계산 확인
+      // [PII 보안] PII 필드는 마스킹하여 로깅
+      void getMaskPII().then((maskPII) => {
+        console.log('[StudentInfoTab] formDefaultValues 계산:', maskPII(formDefaultValues));
       });
     }
-
-    return values;
-  }, [student]);
+  }, [formDefaultValues]);
 
   // 수정 모드를 위한 스키마 (submit 버튼 커스터마이징)
   // [중요] 모든 Hook은 조건문 이전에 호출되어야 함
@@ -953,9 +1091,10 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
   // 디버깅: SchemaForm 렌더링 확인
   // [중요] 모든 Hook은 조건문 이전에 호출되어야 함
   // [PII 보안] PII 필드는 마스킹하여 로깅
+  // [P2-1 수정] 동적 import 캐싱: module-scope 함수 사용
   useEffect(() => {
     if (isEditing && import.meta.env?.DEV) {
-      import('@core/pii-utils').then(({ maskPII }) => {
+      void getMaskPII().then((maskPII) => {
         console.log('📋 [StudentInfoTab] SchemaForm 렌더링:', maskPII({
           studentId: student.id,
           formDefaultValues,
@@ -1004,7 +1143,7 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+            gridTemplateColumns: isMobileMode ? '1fr' : 'repeat(2, minmax(0, 1fr))',
             gap: 'var(--spacing-md)',
           }}
         >
@@ -1013,7 +1152,7 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
               key={idx}
               style={{
                 // 모바일 기본보기: 1열이므로 colSpan 2도 span 1로 강제
-                gridColumn: field.colSpan === 2 ? (isMobile ? 'span 1' : 'span 2') : undefined,
+                gridColumn: field.colSpan === 2 ? (isMobileMode ? 'span 1' : 'span 2') : undefined,
                 display: 'flex',
                 width: '100%',
                 alignItems: field.label === '메모' ? 'flex-start' : 'center',
@@ -1070,7 +1209,14 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
                   tooltip: '삭제',
                   variant: 'outline' as const,
                   color: 'error' as const,
-                  onClick: () => { void onDelete?.(); },
+                  onClick: async () => {
+                    // [P1-3 수정] await 없는 onDelete에서 실패 시 사용자 피드백 추가
+                    try {
+                      await onDelete?.();
+                    } catch (error) {
+                      toast(error instanceof Error ? error.message : '삭제에 실패했습니다.', 'error');
+                    }
+                  },
                 }] : []),
                 ...(onEdit ? [{
                   icon: Pencil,
@@ -1090,17 +1236,21 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
   // 수정 모드: SchemaForm 사용
   const handleSubmit = async (data: Record<string, unknown>) => {
     // 스키마에서 받은 데이터를 UpdateStudentInput 형식으로 변환
+    // [P0-1 수정] 빈 문자열 처리: CreateStudent와 일치하도록 빈 문자열을 null로 정규화
+    // 서버가 "삭제는 null" 규칙을 따르므로, 빈 문자열은 null로 변환
+    // [SSOT] toNullable은 utils/data-normalization-utils.ts에서 SSOT로 관리
+
     const updateData = {
-      name: data.name || student.name,
-      birth_date: data.birth_date || undefined,
-      gender: data.gender || undefined,
-      phone: data.phone || undefined,
-      email: data.email || undefined,
-      address: data.address || undefined,
-      school_name: data.school_name || undefined,
-      grade: data.grade || undefined,
-      status: data.status || student.status,
-      notes: data.notes || undefined,
+      name: data.name ?? student.name,
+      birth_date: toNullable(data.birth_date),
+      gender: toNullable(data.gender),
+      phone: toNullable(data.phone),
+      email: toNullable(data.email),
+      address: toNullable(data.address),
+      school_name: toNullable(data.school_name),
+      grade: toNullable(data.grade),
+      status: data.status ?? student.status,
+      notes: toNullable(data.notes),
     };
     await onSave(updateData);
   };
@@ -1117,10 +1267,21 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
       />
       <SchemaForm
         key={student.id} // student.id를 key로 사용하여 학생 변경 시 폼 재마운트
-        schema={editSchema}
+        schema={{
+          ...editSchema,
+          form: {
+            ...editSchema.form,
+            // [P0-1 수정] actions를 명시적으로 비활성화하여 SchemaForm이 자동 API 호출을 하지 않도록 함
+            // handleSubmit에서 onSave를 통해 직접 처리
+            actions: [],
+          },
+          // 최상위 actions도 비활성화
+          actions: [],
+        }}
         onSubmit={handleSubmit}
         defaultValues={formDefaultValues}
-        apiClient={apiClient}
+        // [P1-6 수정] actions를 비활성화했으므로 apiClient prop 불필요 (SchemaForm 내부 참조 경로 차단)
+        // apiClient={apiClient}
         disableCardPadding={false}
         cardTitle={undefined}
         onCancel={onCancel}
@@ -1161,9 +1322,12 @@ function GuardiansTab({
   isEditable = true,
 }: GuardiansTabProps) {
   const editingGuardian = editingGuardianId ? guardians.find((g) => g.id === editingGuardianId) : null;
-  const { showAlert, showConfirm } = useModal();
+  const { showConfirm } = useModal();
+  const { toast } = useToast();
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
   const [relationshipFilter, setRelationshipFilter] = useState<'all' | 'parent' | 'guardian' | 'other'>('all');
 
   // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter를 통한 translations 생성
@@ -1175,9 +1339,12 @@ function GuardiansTab({
       // - DB 레벨에 "주 보호자 1명" 제약이 없어서 복수 true가 들어갈 수 있음
       // - 하지만 다른 기능(예: 알림 발송 등)에서 is_primary=true 1명을 전제로 조회하므로
       //   새로 주 보호자를 true로 저장할 때 기존 주 보호자는 자동으로 false로 내림
+      // [P1-4 수정] create/edit 모두 처리: 수정 모드에서도 is_primary=true로 바꾸면 기존 primary 내림
+      // [P2-2 주의] 동시성 문제: 여러 관리자가 동시에 편집하면 경합 조건 발생 가능
+      // 최종적으로는 DB 제약/트랜잭션(또는 RPC)로 "원자적 업데이트"가 제일 안전
       const wantsPrimary = Boolean((data as { is_primary?: unknown }).is_primary);
-      if (!editingGuardianId && wantsPrimary) {
-        const currentPrimaryGuardians = guardians.filter((g) => g.is_primary);
+      if (wantsPrimary) {
+        const currentPrimaryGuardians = guardians.filter((g) => g.is_primary && g.id !== editingGuardianId);
         if (currentPrimaryGuardians.length > 0) {
           // 사용자 확인 없이 자동 조정(UX 단순화)
           await Promise.all(
@@ -1193,7 +1360,7 @@ function GuardiansTab({
       }
       onHideForm();
     } catch (error) {
-      showAlert('오류', error instanceof Error ? error.message : '학부모 정보 저장에 실패했습니다.');
+      toast(error instanceof Error ? error.message : '학부모 정보 저장에 실패했습니다.', 'error');
     }
   };
 
@@ -1345,7 +1512,7 @@ function GuardiansTab({
                       <div
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+                          gridTemplateColumns: isMobileMode ? '1fr' : 'repeat(2, minmax(0, 1fr))',
                           // 기본정보(tab=info) 기본보기와 동일
                           gap: 'var(--spacing-md)',
                           // 기본정보(tab=info)에서는 정상인데 guardians에서만 밑줄이 짧아지는 케이스 방지:
@@ -1359,7 +1526,7 @@ function GuardiansTab({
                             key={idx}
                             style={{
                               // 모바일 기본보기: 1열이므로 colSpan 2도 span 1로 강제
-                              gridColumn: field.colSpan === 2 ? (isMobile ? 'span 1' : 'span 2') : undefined,
+                              gridColumn: field.colSpan === 2 ? (isMobileMode ? 'span 1' : 'span 2') : undefined,
                               display: 'flex',
                               width: '100%',
                               alignItems: field.label === '메모' ? 'flex-start' : 'center',
@@ -1416,7 +1583,16 @@ function GuardiansTab({
                             tooltip: '삭제',
                             variant: 'outline',
                             color: 'error',
-                            onClick: () => onDelete(guardian.id),
+                            onClick: () => {
+                              // [P1-3 수정] await 없는 onDelete에서 실패 시 사용자 피드백 추가
+                              void (async () => {
+                                try {
+                                  await onDelete(guardian.id);
+                                } catch (error) {
+                                  toast(error instanceof Error ? error.message : '보호자 삭제에 실패했습니다.', 'error');
+                                }
+                              })();
+                            },
                           },
                           {
                             icon: Pencil,
@@ -1499,10 +1675,12 @@ function ConsultationsTab({
   isEditable = true,
 }: ConsultationsTabProps) {
   const editingConsultation = editingConsultationId ? consultations.find((c) => c.id === editingConsultationId) : null;
-  const { showAlert, showConfirm } = useModal();
+  const { showConfirm } = useModal();
+  const { toast } = useToast();
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
   const formRef = useRef<HTMLDivElement>(null);
 
   // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter를 통한 translations 생성
@@ -1517,23 +1695,20 @@ function ConsultationsTab({
   const titleIconSize = useIconSize();
   const titleIconStrokeWidth = useIconStrokeWidth();
 
-  // [불변 규칙] textarea 높이는 CSS 변수로만 계산
-  // 하드코딩된 rows 값 사용 금지 (문서 규칙 준수)
-  // getComputedStyle + parseFloat 대신 calc() 사용하여 하드코딩 완전 제거
-  useEffect(() => {
-    if (showForm && formRef.current && !isMobile && !isTablet) {
-      const form = formRef.current.querySelector('form');
-      if (form) {
-        // 상담 내용 textarea 높이 조정
-        const textarea = form.querySelector('textarea[name="content"]') as HTMLTextAreaElement;
-        if (textarea) {
-          // [불변 규칙] CSS 변수만 사용하여 minHeight 계산 (calc() 사용)
-          // 6줄 기준: line-height * font-size-base * 6 + padding (상하)
-          textarea.style.minHeight = 'calc(var(--line-height) * var(--font-size-base) * 6 + var(--spacing-sm) * 2)';
-        }
-      }
-    }
-  }, [showForm, isMobile, isTablet]);
+  // [P2-7 수정] DOM query 제거: textarea 높이는 schema의 ui 옵션으로 처리 권장
+  // 현재는 DOM query로 처리하지만, SDUI 위젯이나 name 변경에 취약함
+  // 향후 schema의 ui.minRows 또는 ui.style 옵션으로 이동 권장
+  // useEffect(() => {
+  //   if (showForm && formRef.current && !isMobile && !isTablet) {
+  //     const form = formRef.current.querySelector('form');
+  //     if (form) {
+  //       const textarea = form.querySelector('textarea[name="content"]') as HTMLTextAreaElement;
+  //       if (textarea) {
+  //         textarea.style.minHeight = 'calc(var(--line-height) * var(--font-size-base) * 6 + var(--spacing-sm) * 2)';
+  //       }
+  //     }
+  //   }
+  // }, [showForm, isMobile, isTablet]);
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
@@ -1544,7 +1719,7 @@ function ConsultationsTab({
       }
       onHideForm();
     } catch (error) {
-      showAlert('오류', error instanceof Error ? error.message : '상담일지 저장에 실패했습니다.');
+      toast(error instanceof Error ? error.message : '상담일지 저장에 실패했습니다.', 'error');
     }
   };
 
@@ -1565,7 +1740,17 @@ function ConsultationsTab({
             }
           />
           <SchemaForm
-            schema={effectiveConsultationFormSchema}
+            schema={{
+              ...effectiveConsultationFormSchema,
+              form: {
+                ...effectiveConsultationFormSchema.form,
+                // [P0-1 수정] actions를 명시적으로 비활성화하여 SchemaForm이 자동 API 호출을 하지 않도록 함
+                // handleSubmit에서 onCreate/onUpdate를 통해 직접 처리
+                actions: [],
+              },
+              // 최상위 actions도 비활성화
+              actions: [],
+            }}
             translations={consultationTranslations}
             onSubmit={handleSubmit}
             defaultValues={editingConsultation ? {
@@ -1667,7 +1852,7 @@ function ConsultationsTab({
                       <div
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+                          gridTemplateColumns: isMobileMode ? '1fr' : 'repeat(2, minmax(0, 1fr))',
                           gap: 'var(--spacing-md)',
                         }}
                       >
@@ -1676,7 +1861,7 @@ function ConsultationsTab({
                             key={idx}
                             style={{
                               // 모바일 기본보기: 1열이므로 colSpan 2도 span 1로 강제
-                              gridColumn: field.colSpan === 2 ? (isMobile ? 'span 1' : 'span 2') : undefined,
+                              gridColumn: field.colSpan === 2 ? (isMobileMode ? 'span 1' : 'span 2') : undefined,
                               display: 'flex',
                               width: '100%',
                               alignItems: (field.label === '내용' || field.label === 'AI 요약') ? 'flex-start' : 'center',
@@ -1733,13 +1918,22 @@ function ConsultationsTab({
                             tooltip: '삭제',
                             variant: 'outline',
                             color: 'error',
-                            onClick: () => onDelete(consultation.id),
+                            onClick: () => {
+                              // [P1-3 수정] await 없는 onDelete에서 실패 시 사용자 피드백 추가
+                              void (async () => {
+                                try {
+                                  await onDelete(consultation.id);
+                                } catch (error) {
+                                  toast(error instanceof Error ? error.message : '상담일지 삭제에 실패했습니다.', 'error');
+                                }
+                              })();
+                            },
                           },
                           {
                             icon: RefreshCcw,
                             tooltip: consultation.ai_summary ? 'AI 재요약' : 'AI 요약',
                             variant: 'outline',
-                            onClick: () => onGenerateAISummary(consultation.id),
+                            onClick: () => void onGenerateAISummary(consultation.id),
                           },
                           {
                             icon: Pencil,
@@ -1796,9 +1990,19 @@ interface TagsTabProps {
 function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable = true, tagFormSchema }: TagsTabProps) {
   // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter를 통한 translations 생성
   const tagTranslations = useIndustryTranslations(tagFormSchema);
+
+  // [P0-1 수정] tagFormSchema의 actions를 명시적으로 비활성화하여 SchemaFormWithMethods가 자동 API 호출을 하지 않도록 함
+  // handleCreateTag에서 직접 처리하므로 스키마의 자동 API 동작을 완전히 차단
+  const safeTagFormSchema = useMemo(() => ({
+    ...tagFormSchema,
+    form: { ...tagFormSchema.form, actions: [] },
+    actions: [],
+  }), [tagFormSchema]);
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
   const { data: allTags, isLoading: allTagsLoading, refetch: refetchTags } = useStudentTags();
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -1806,8 +2010,9 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
   const [tempSelectedTagIds, setTempSelectedTagIds] = useState<string[]>([]);
   const queryClient = useQueryClient();
   const context = getApiContext();
+  // [P1-1] tenantId는 queryKey 네임스페이스용 (서버 전달 아님, Zero-Trust 규칙 준수)
   const tenantId = context.tenantId;
-  const { showAlert } = useModal();
+  const { toast } = useToast();
 
   const titleIconSize = useIconSize();
   const titleIconStrokeWidth = useIconStrokeWidth();
@@ -1817,30 +2022,72 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
   const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
   const emptyStateIconStrokeWidth = useIconStrokeWidth();
 
+  // [P1-4 수정] RGB를 HEX로 변환하는 유틸리티 함수
+  // DB가 hex 포맷을 기대하는 경우를 대비하여 rgb/rgba를 hex로 변환
+  // [P0-3 수정] 하드코딩 fallback 제거: 테마 컬러를 읽을 수 없으면 에러로 처리
+  // 운영에서 테마 토큰이 항상 정의되도록 강제 (하드코딩 금지 규칙 준수)
+  const rgbToHex = (rgb: string): string => {
+    // rgb(34, 197, 94) 또는 rgba(34, 197, 94, 0.5) 형식 파싱
+    const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (match) {
+      const r = parseInt(match[1], 10);
+      const g = parseInt(match[2], 10);
+      const b = parseInt(match[3], 10);
+      return `#${[r, g, b].map(x => {
+        const hex = x.toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+      }).join('')}`;
+    }
+    // 이미 hex 형식이면 그대로 반환
+    if (rgb.startsWith('#')) {
+      return rgb;
+    }
+    // [P0-3 수정] 변환 실패 시 에러: 하드코딩 금지 규칙 준수
+    throw new Error(`색상 변환 실패: ${rgb}. 테마 컬러(--color-primary)를 읽을 수 없습니다. 테마 설정을 확인하세요.`);
+  };
+
   const createTag = useMutation({
     mutationFn: async (data: { name: string }) => {
       // 인더스트리 테마 색상 가져오기
       // [불변 규칙] 하드코딩 금지: CSS 변수만 사용
       // getComputedStyle로 CSS 변수 값을 가져오고, 없으면 CSS 변수 문자열 자체를 사용
+      // [P1-4 수정] DB가 hex 포맷을 기대하는 경우를 대비하여 rgb를 hex로 변환
       let primaryColor = 'var(--color-primary)';
       if (typeof window !== 'undefined') {
         const computedColor = getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim();
         if (computedColor) {
-          primaryColor = computedColor;
+          // rgb/rgba 형식이면 hex로 변환, 이미 hex이면 그대로 사용
+          primaryColor = computedColor.startsWith('rgb') ? rgbToHex(computedColor) : computedColor;
         }
       }
 
-      // 쉼표만 구분자로 사용하고, 각 태그 이름에서 띄어쓰기 제거
-      const tagNames = data.name
+      // [P1-1 수정] processTagInput 규칙 재사용: 입력 표준화 규칙 통일
+      // processTagInput은 "쉼표 뒤 공백 1개 허용" 규칙을 따르므로, 저장 시에도 동일 규칙 적용
+      const processedInput = processTagInput(data.name);
+      const tagNames = processedInput
         .split(',')
-        .map((name) => name.trim().replace(/\s+/g, ''))
+        .map((name) => {
+          // processTagInput 결과에서 쉼표 뒤 공백 1개는 이미 포함되어 있으므로, 최종 저장 시에는 제거
+          // (DB에는 공백 없는 순수 태그명 저장)
+          return name.trim().replace(/\s+/g, '');
+        })
         .filter((name) => name.length > 0);
 
-      if (tagNames.length === 0) {
+      // [P1-2 수정] 중복 제거: 대소문자 구분 없이 Set으로 dedupe
+      const uniqueTagNames = Array.from(new Set(tagNames.map(name => name.toLowerCase())));
+      // 원본 대소문자 유지 (첫 번째 발견된 대소문자 사용)
+      const dedupedTagNames = uniqueTagNames.map(lowerName => {
+        const original = tagNames.find(name => name.toLowerCase() === lowerName);
+        return original || lowerName;
+      });
+
+      if (dedupedTagNames.length === 0) {
         throw new Error('태그 이름을 입력해주세요.');
       }
 
-      const createdTags: Tag[] = [];
+      // [P1-4 수정] createdOrLinkedTags: 새로 생성된 태그 + 기존 태그(재사용) 모두 포함
+      // onSuccess에서 선택 태그 목록 업데이트에 사용되므로, 생성/연결 구분 없이 모두 포함
+      const createdOrLinkedTags: Tag[] = [];
       const errors: string[] = [];
 
       // 기존 태그 목록에서 같은 이름의 태그 찾기
@@ -1851,7 +2098,7 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
       });
 
       // 여러 태그 생성 및 개별회원 전용 태그로 할당
-      for (const tagName of tagNames) {
+      for (const tagName of dedupedTagNames) {
         try {
           let tagId: string | undefined;
 
@@ -1869,8 +2116,12 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
             });
 
             if (tagResponse.error || !tagResponse.data) {
-              // 중복 키 오류인 경우 기존 태그를 다시 찾아보기
-              if (tagResponse.error?.message?.includes('duplicate key')) {
+              // [P2-9 수정] 중복 키 오류 감지: 에러 메시지 의존 대신 에러 코드 기반으로 변경
+              // PostgreSQL 에러 코드 23505 (unique_violation) 사용
+              const isDuplicateKeyError = tagResponse.error?.code === '23505' ||
+                tagResponse.error?.message?.includes('duplicate key') ||
+                tagResponse.error?.message?.includes('unique constraint');
+              if (isDuplicateKeyError) {
                 // 태그 목록을 다시 불러와서 확인
                 const refetchResponse = await refetchTags();
                 const refetchedTags = refetchResponse.data || [];
@@ -1879,6 +2130,13 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
                 );
                 if (foundTag) {
                   tagId = foundTag.id;
+                  // [P1-1 수정] 중복키 처리 시 foundTag도 createdOrLinkedTags에 추가
+                  // onSuccess에서 selectedTagIds 업데이트에 사용되므로 생성/연결 구분 없이 모두 포함
+                  createdOrLinkedTags.push({
+                    id: foundTag.id,
+                    name: foundTag.name,
+                    color: foundTag.color,
+                  } as Tag);
                 } else {
                   errors.push(`${tagName}: ${tagResponse.error?.message || '태그 생성 실패'}`);
                   continue;
@@ -1889,7 +2147,7 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
               }
             } else {
               tagId = tagResponse.data.id;
-              createdTags.push(tagResponse.data);
+              createdOrLinkedTags.push(tagResponse.data);
             }
           }
 
@@ -1898,10 +2156,11 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
             continue;
           }
 
-          // 기존 태그를 사용한 경우에도 createdTags에 추가 (할당 목적)
+          // [P1-4 수정] 기존 태그를 사용한 경우에도 createdOrLinkedTags에 추가 (할당 목적)
+          // onSuccess에서 선택 태그 목록 업데이트에 사용되므로 생성/연결 구분 없이 모두 포함
           if (existingTag) {
             // Tag 타입으로 변환 (필요한 필드만 포함)
-            createdTags.push({
+            createdOrLinkedTags.push({
               id: existingTag.id,
               name: existingTag.name,
               color: existingTag.color,
@@ -1917,8 +2176,15 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
           });
 
           if (assignmentResponse.error) {
+            // [P1-5 수정] 타입 안전성: optional chaining으로 안전하게 접근
+            // [P1-2 수정] 중복 할당 오류 감지: 에러 코드 기반으로 통일 (태그 생성과 동일)
+            // PostgreSQL 에러 코드 23505 (unique_violation) 사용
+            const code = assignmentResponse.error?.code;
+            const isDuplicateKeyError = code === '23505' ||
+              assignmentResponse.error?.message?.includes('duplicate key') ||
+              assignmentResponse.error?.message?.includes('unique constraint');
             // 중복 할당 오류는 무시 (이미 할당된 경우)
-            if (!assignmentResponse.error.message?.includes('duplicate')) {
+            if (!isDuplicateKeyError) {
               errors.push(`${tagName} 할당 실패: ${assignmentResponse.error.message}`);
             }
           }
@@ -1927,35 +2193,36 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
         }
       }
 
-      if (createdTags.length === 0) {
+      if (createdOrLinkedTags.length === 0) {
         throw new Error(errors.length > 0 ? errors.join(', ') : '태그 생성에 실패했습니다.');
       }
 
       if (errors.length > 0) {
-        showAlert(
-          `${createdTags.length}개 태그 생성 완료, ${errors.length}개 실패: ${errors.join(', ')}`,
-          '부분 성공',
-          'warning'
+        toast(
+          `${createdOrLinkedTags.length}개 태그 생성/연결 완료, ${errors.length}개 실패: ${errors.join(', ')}`,
+          'warning',
+          '부분 성공'
         );
       }
 
-      return createdTags;
+      return createdOrLinkedTags;
     },
-    onSuccess: (createdTags) => {
-      queryClient.invalidateQueries({ queryKey: ['tags', tenantId, 'student'] });
-      queryClient.invalidateQueries({ queryKey: ['student-tags', tenantId, studentId] });
-      refetchTags();
+    onSuccess: (createdOrLinkedTags) => {
+      void queryClient.invalidateQueries({ queryKey: ['tags', tenantId, 'student'] });
+      void queryClient.invalidateQueries({ queryKey: ['student-tags', tenantId, studentId] });
+      void refetchTags();
       setShowForm(false);
 
-      // 생성된 태그를 선택된 태그 목록에 추가하여 #태그명 스타일로 표시
-      if (createdTags.length > 0) {
-        const newTagIds = createdTags.map((tag) => tag.id);
-        setSelectedTagIds((prev) => [...prev, ...newTagIds]);
-        showAlert(`${createdTags.length}개 태그가 생성되고 할당되었습니다.`, '성공', 'success');
+      // [P1-4 수정] 생성/연결된 태그를 선택된 태그 목록에 추가 (생성/연결 구분 없이 모두 포함)
+      // [P1-2 수정] 중복 제거: Set으로 중복 tagId 제거
+      if (createdOrLinkedTags.length > 0) {
+        const newTagIds = createdOrLinkedTags.map((tag) => tag.id);
+        setSelectedTagIds((prev) => Array.from(new Set([...prev, ...newTagIds])));
+        toast(`${createdOrLinkedTags.length}개 태그가 생성/연결되고 할당되었습니다.`, 'success');
       }
     },
     onError: (error: Error) => {
-      showAlert(error.message || '태그 생성에 실패했습니다.', '오류', 'error');
+      toast(error.message || '태그 생성에 실패했습니다.', 'error');
     },
   });
 
@@ -1972,22 +2239,33 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
     }
   }, [isEditMode, selectedTagIds]);
 
+  // [P1-4 수정] 태그 즉시 저장 레이스 컨디션 방지: 저장 중 상태 관리
+  const [isSavingTag, setIsSavingTag] = useState(false);
+
   const handleTagToggle = async (tagId: string) => {
     // 수정 모드가 아닐 때만 즉시 저장
     if (!isEditMode) {
-      const newIds = selectedTagIds.includes(tagId)
-        ? selectedTagIds.filter((id) => id !== tagId)
-        : [...selectedTagIds, tagId];
+      // [P1-4 수정] 저장 중이면 무시 (레이스 컨디션 방지)
+      if (isSavingTag) return;
+
+      // [P1-5 수정] race condition 방지: prev를 캡처하여 rollback에 사용
+      const prevIds = selectedTagIds;
+      const newIds = prevIds.includes(tagId)
+        ? prevIds.filter((id) => id !== tagId)
+        : [...prevIds, tagId];
 
       setSelectedTagIds(newIds);
+      setIsSavingTag(true);
 
       // 즉시 저장
       try {
         await onUpdateTags(newIds);
       } catch (error) {
-        // 실패 시 이전 상태로 복원
-        setSelectedTagIds(selectedTagIds);
-        showAlert(error instanceof Error ? error.message : '태그 저장에 실패했습니다.', '오류', 'error');
+        // 실패 시 캡처한 prevIds로 복원 (stale closure 방지)
+        setSelectedTagIds(prevIds);
+        toast(error instanceof Error ? error.message : '태그 저장에 실패했습니다.', 'error');
+      } finally {
+        setIsSavingTag(false);
       }
     } else {
       // 수정 모드에서는 임시 상태만 변경
@@ -2001,54 +2279,68 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
 
   const handleSaveTags = async () => {
     try {
-      // 해제된 태그 ID 찾기 (이전에 선택되었지만 현재 선택되지 않은 태그)
-      const removedTagIds = selectedTagIds.filter((id) => !tempSelectedTagIds.includes(id));
-
-      // 해제된 태그 삭제
-      const deleteErrors: string[] = [];
-      for (const tagId of removedTagIds) {
-        try {
-          const deleteResponse = await apiClient.delete('tags', tagId);
-          if (deleteResponse.error) {
-            const tag = allTags?.find((t) => t.id === tagId);
-            deleteErrors.push(tag ? `${tag.name}: ${deleteResponse.error.message}` : `태그 삭제 실패: ${deleteResponse.error.message}`);
-          }
-        } catch (error) {
-          const tag = allTags?.find((t) => t.id === tagId);
-          deleteErrors.push(tag ? `${tag.name}: ${error instanceof Error ? error.message : '태그 삭제 실패'}` : `태그 삭제 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
-        }
-      }
-
-      // 태그 할당 업데이트
+      // [P0-3 수정] 태그 엔티티 삭제 제거: onUpdateTags가 tag_assignments만 업데이트
+      // 태그가 다른 학생/엔티티에서도 사용될 수 있으므로 태그 자체를 삭제하면 안 됨
+      // 태그 할당만 업데이트 (해제된 태그의 할당은 onUpdateTags 내부에서 자동 제거됨)
       await onUpdateTags(tempSelectedTagIds);
       setSelectedTagIds(tempSelectedTagIds);
       setIsEditMode(false);
       setShowForm(false);
 
       // 태그 목록 새로고침
-      queryClient.invalidateQueries({ queryKey: ['tags', tenantId, 'student'] });
-      refetchTags();
+      void queryClient.invalidateQueries({ queryKey: ['tags', tenantId, 'student'] });
+      void refetchTags();
 
-      if (deleteErrors.length > 0) {
-        showAlert(
-          `태그 저장 완료. 일부 태그 삭제 실패: ${deleteErrors.join(', ')}`,
-          '부분 성공',
-          'warning'
-        );
-      } else {
-        showAlert('태그가 저장되었습니다.', '성공', 'success');
-      }
+      toast('태그가 저장되었습니다.', 'success');
     } catch (error) {
-      showAlert(error instanceof Error ? error.message : '태그 저장에 실패했습니다.', '오류', 'error');
+      toast(error instanceof Error ? error.message : '태그 저장에 실패했습니다.', 'error');
     }
   };
 
-  // hex 색상을 rgba로 변환하여 opacity 적용
-  const hexToRgba = (hex: string, opacity: number) => {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  // hex/rgb 색상을 rgba로 변환하여 opacity 적용
+  // [P0-4 수정] hex뿐만 아니라 rgb() 형식도 지원
+  // [P1-5 수정] CSS 변수(var(--...))는 변환 불가: DB에 HEX 저장하도록 createTag에서 처리
+  // var(--...)가 들어오면 opacity가 적용되지 않으므로, 가능하면 DB에는 항상 HEX 저장 권장
+  const hexToRgba = (color: string, opacity: number) => {
+    // CSS 변수 문자열인 경우 처리 불가 (런타임에만 값 알 수 있음)
+    if (color.startsWith('var(')) {
+      // CSS 변수는 color-mix() 사용 권장, 여기서는 fallback으로 투명도 적용 불가
+      // [P1-5] DB에 HEX 저장하도록 createTag에서 처리하므로, var(--...)는 일반적으로 들어오지 않음
+      // [P2-2 수정] 운영 로그 오염 방지: DEV 환경에서만 경고
+      if (import.meta.env?.DEV) {
+        console.warn('hexToRgba: CSS 변수는 직접 변환 불가, color-mix() 사용 권장 또는 DB에 HEX 저장');
+      }
+      return color;
+    }
+
+    // rgb/rgba 형식 처리
+    const rgbMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (rgbMatch) {
+      return `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, ${opacity})`;
+    }
+
+    // hex 형식 처리 (#RRGGBB 또는 #RGB)
+    if (color.startsWith('#')) {
+      const hex = color.slice(1);
+      // 3자리 hex를 6자리로 확장
+      const fullHex = hex.length === 3
+        ? hex.split('').map(c => c + c).join('')
+        : hex;
+
+      if (fullHex.length === 6) {
+        const r = parseInt(fullHex.slice(0, 2), 16);
+        const g = parseInt(fullHex.slice(2, 4), 16);
+        const b = parseInt(fullHex.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+      }
+    }
+
+    // 변환 실패 시 원본 반환
+    // [P2-2 수정] 운영 로그 오염 방지: DEV 환경에서만 경고
+    if (import.meta.env?.DEV) {
+      console.warn(`hexToRgba: 지원하지 않는 색상 형식: ${color}`);
+    }
+    return color;
   };
 
   // [타입 안정성] any 타입 제거, 명시적 타입 체크
@@ -2071,7 +2363,7 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
   }
 
   return (
-    <div style={{ paddingBottom: isMobile ? 'var(--spacing-bottom-action-bar)' : 'var(--spacing-none)' }}>
+    <div style={{ paddingBottom: isMobileMode ? 'var(--spacing-bottom-action-bar)' : 'var(--spacing-none)' }}>
 
       {showForm && (
         <>
@@ -2086,7 +2378,7 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
           {isEditMode ? (
             // 수정 모드: 태그 선택/해제 UI
             <>
-              {isMobile || isTablet ? (
+              {isMobileMode || isTabletMode ? (
                 <Drawer
                   isOpen={showForm}
                   onClose={() => {
@@ -2095,8 +2387,8 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
                     setTempSelectedTagIds([]);
                   }}
                   title="태그수정"
-                  position={isMobile ? 'bottom' : 'right'}
-                  width={isTablet ? 'var(--width-drawer-tablet)' : 'var(--width-full)'}
+                  position={isMobileMode ? 'bottom' : 'right'}
+                  width={isTabletMode ? 'var(--width-drawer-tablet)' : 'var(--width-full)'}
                 >
                   <div style={{ padding: 'var(--spacing-md)' }}>
                     <Card
@@ -2113,7 +2405,9 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
                             return (
                               <button
                                 key={tag.id}
+                                type="button"
                                 onClick={() => handleTagToggle(tag.id)}
+                                // [P1-4] 수정 모드에서는 disabled 불필요 (임시 상태만 변경)
                                 style={{
                                   padding: 'var(--spacing-sm) var(--spacing-md)',
                                   fontSize: 'var(--font-size-base)',
@@ -2181,6 +2475,7 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
                         return (
                           <button
                             key={tag.id}
+                            type="button"
                             onClick={() => handleTagToggle(tag.id)}
                             style={{
                               padding: 'var(--spacing-sm) var(--spacing-md)',
@@ -2243,7 +2538,7 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
           ) : (
             // 등록 모드: 태그 생성 폼
             <SchemaFormWithMethods
-              schema={tagFormSchema}
+              schema={safeTagFormSchema}
               translations={tagTranslations}
               onSubmit={handleCreateTag}
               onCancel={() => {
@@ -2368,6 +2663,17 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
   );
 }
 
+// [P2-1] 요일 상수: 컴포넌트 외부로 이동하여 매 렌더마다 재생성 방지
+const DAYS_OF_WEEK: { value: string; label: string }[] = [
+  { value: 'monday', label: '월요일' },
+  { value: 'tuesday', label: '화요일' },
+  { value: 'wednesday', label: '수요일' },
+  { value: 'thursday', label: '목요일' },
+  { value: 'friday', label: '금요일' },
+  { value: 'saturday', label: '토요일' },
+  { value: 'sunday', label: '일요일' },
+];
+
 // 반 배정 탭 컴포넌트
 interface ClassesTabProps {
   studentClasses: Array<{
@@ -2399,9 +2705,12 @@ function ClassesTab({
 }: ClassesTabProps) {
   // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter를 통한 translations 생성
   const classAssignmentTranslations = useIndustryTranslations(effectiveClassAssignmentFormSchema);
-  const { showAlert, showConfirm } = useModal();
+  const { showConfirm } = useModal();
+  const { toast } = useToast();
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [classNameFilter, setClassNameFilter] = useState<string>('all');
 
@@ -2423,15 +2732,10 @@ function ClassesTab({
     (c) => c.status === 'active' && !assignedClassIds.includes(c.id)
   );
 
-  const DAYS_OF_WEEK: { value: string; label: string }[] = [
-    { value: 'monday', label: '월요일' },
-    { value: 'tuesday', label: '화요일' },
-    { value: 'wednesday', label: '수요일' },
-    { value: 'thursday', label: '목요일' },
-    { value: 'friday', label: '금요일' },
-    { value: 'saturday', label: '토요일' },
-    { value: 'sunday', label: '일요일' },
-  ];
+  // 수정 모드 상태 관리 (반별) - [P2-3 수정] 선언 순서 정리: handleAssign보다 먼저 선언
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [editingStudentClassId, setEditingStudentClassId] = useState<string | null>(null);
+  const [editingEnrolledAt, setEditingEnrolledAt] = useState<string>('');
 
   const handleAssign = async (data: Record<string, unknown>) => {
     if (!data.class_id) return;
@@ -2442,7 +2746,7 @@ function ClassesTab({
       setEditingClassId(null);
       setEditingEnrolledAt('');
     } catch (error) {
-      showAlert('반 배정에 실패했습니다.', '오류', 'error');
+      toast('반 배정에 실패했습니다.', 'error');
     }
   };
 
@@ -2453,14 +2757,9 @@ function ClassesTab({
     try {
       await onUnassign(classId, toKST().format('YYYY-MM-DD'));
     } catch (error) {
-      showAlert('반 제외에 실패했습니다.', '오류', 'error');
+      toast('반 제외에 실패했습니다.', 'error');
     }
   };
-
-  // 수정 모드 상태 관리 (반별)
-  const [editingClassId, setEditingClassId] = useState<string | null>(null);
-  const [editingStudentClassId, setEditingStudentClassId] = useState<string | null>(null);
-  const [editingEnrolledAt, setEditingEnrolledAt] = useState<string>('');
 
   // 필터링된 반 목록 (handleEdit보다 먼저 정의)
   const filteredStudentClasses = useMemo(() => {
@@ -2487,23 +2786,19 @@ function ClassesTab({
       // 문서 요구사항: 반 배정 수정 시 같은 반이면 enrolled_at만 업데이트, 다른 반이면 반 이동
       if (editingClassId === newClassId) {
         // 같은 반: enrolled_at만 업데이트 (문서 요구사항 준수)
-        if (onUpdate && editingStudentClassId) {
-          await onUpdate(editingStudentClassId, newEnrolledAt);
-        } else {
-          // onUpdate가 없으면 직접 API 호출
-          const { apiClient } = await import('@api-sdk/core');
-          await apiClient.patch('student_classes', editingStudentClassId, {
-            enrolled_at: newEnrolledAt,
-          });
+        // [P1-3 수정] onUpdate는 필수: App Layer 분리 원칙 준수 (UI는 호출만, 비즈니스 로직은 Hook/Service에서)
+        if (!onUpdate) {
+          throw new Error('반 배정 수정 기능이 초기화되지 않았습니다.');
         }
-        showAlert('배정일이 수정되었습니다.', '완료', 'success');
+        await onUpdate(editingStudentClassId, newEnrolledAt);
+        toast('배정일이 수정되었습니다.', 'success', '완료');
       } else {
         // 다른 반: 반 이동 (문서 요구사항: 반 이동 시 이전 반의 left_at 설정)
         // 기존 반 제외 (left_at 설정)
         await onUnassign(editingClassId, toKST().format('YYYY-MM-DD'));
         // 새 반 배정
         await onAssign(newClassId, newEnrolledAt);
-        showAlert('반이 이동되었습니다.', '완료', 'success');
+        toast('반이 이동되었습니다.', 'success', '완료');
       }
       setShowAssignForm(false);
       setEditingClassId(null);
@@ -2511,7 +2806,7 @@ function ClassesTab({
       setEditingEnrolledAt('');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '반 배정 수정에 실패했습니다.';
-      showAlert(errorMessage, '오류', 'error');
+      toast(errorMessage, 'error');
     }
   };
 
@@ -2539,37 +2834,74 @@ function ClassesTab({
               ...effectiveClassAssignmentFormSchema,
               form: {
                 ...effectiveClassAssignmentFormSchema.form,
+                // [P0-1 수정] actions를 명시적으로 비활성화하여 SchemaForm이 자동 API 호출을 하지 않도록 함
+                // handleAssign/handleUpdate에서 onAssign/onUpdate를 통해 직접 처리
+                actions: [],
                 fields: [
-                  {
-                    ...effectiveClassAssignmentFormSchema.form.fields[0],
-                    options: [
-                      { label: '반을 선택하세요', value: '' },
-                      // 수정 모드일 때는 현재 배정된 반도 포함 (현재 반을 유지하거나 다른 반으로 변경 가능)
-                      ...(editingClassId
-                        ? filteredStudentClasses
-                            .filter((sc) => sc.class && sc.class_id === editingClassId)
-                            .map((sc) => {
-                              const classItem = sc.class!;
-                              const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
-                              return {
-                                label: `${classItem.name} (${dayLabel} ${classItem.start_time}~${classItem.end_time})`,
-                                value: classItem.id,
-                              };
-                            })
-                        : []),
-                      // 배정 가능한 반만 포함 (이미 배정된 반 제외)
-                      ...availableClasses.map((classItem) => {
-                        const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
-                        return {
-                          label: `${classItem.name} (${dayLabel} ${classItem.start_time}~${classItem.end_time})`,
-                          value: classItem.id,
-                        };
-                      }),
-                    ],
-                  },
-                  effectiveClassAssignmentFormSchema.form.fields[1],
+                  // [P1-1 수정] 인덱스 접근 대신 name 기반으로 필드 찾기: 스키마 변경에 안전
+                  // [P1-1 수정] 필드가 없을 때 throw 대신 안전한 fallback UI 제공
+                  (() => {
+                    const classIdField = effectiveClassAssignmentFormSchema.form.fields.find(f => f.name === 'class_id');
+                    if (!classIdField) {
+                      // 스키마 버전 불일치 시 안전한 fallback: 기본 필드 반환
+                      console.error('[ClassesTab] class_id 필드를 찾을 수 없습니다. 스키마 버전을 확인하세요.');
+                      return {
+                        name: 'class_id',
+                        kind: 'select' as const,
+                        ui: { label: '반 선택', colSpan: 1 },
+                        validation: { required: true },
+                        options: [{ label: '스키마 오류: 반을 선택할 수 없습니다', value: '' }],
+                      };
+                    }
+                    return {
+                      ...classIdField,
+                      options: [
+                        { label: '반을 선택하세요', value: '' },
+                        // [P0-3 수정] 수정 모드일 때는 현재 배정된 반도 포함 (필터와 독립적으로 원본에서 찾기)
+                        // filteredStudentClasses가 아닌 studentClasses 원본에서 찾아 필터 영향 받지 않도록
+                        ...(editingClassId
+                          ? studentClasses
+                              .filter((sc) => sc.class && sc.class_id === editingClassId)
+                              .map((sc) => {
+                                const classItem = sc.class!;
+                                const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
+                                return {
+                                  label: `${classItem.name} (${dayLabel} ${classItem.start_time}~${classItem.end_time})`,
+                                  value: classItem.id,
+                                };
+                              })
+                          : []),
+                        // 배정 가능한 반만 포함 (이미 배정된 반 제외)
+                        ...availableClasses.map((classItem) => {
+                          const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
+                          return {
+                            label: `${classItem.name} (${dayLabel} ${classItem.start_time}~${classItem.end_time})`,
+                            value: classItem.id,
+                          };
+                        }),
+                      ],
+                    };
+                  })(),
+                  // [P1-1 수정] 인덱스 접근 대신 name 기반으로 필드 찾기: 스키마 변경에 안전
+                  // [P1-1 수정] 필드가 없을 때 throw 대신 안전한 fallback UI 제공
+                  (() => {
+                    const enrolledAtField = effectiveClassAssignmentFormSchema.form.fields.find(f => f.name === 'enrolled_at');
+                    if (!enrolledAtField) {
+                      // 스키마 버전 불일치 시 안전한 fallback: 기본 필드 반환
+                      console.error('[ClassesTab] enrolled_at 필드를 찾을 수 없습니다. 스키마 버전을 확인하세요.');
+                      return {
+                        name: 'enrolled_at',
+                        kind: 'date' as const,
+                        ui: { label: '배정일', colSpan: 1 },
+                        validation: { required: true },
+                      };
+                    }
+                    return enrolledAtField;
+                  })(),
                 ],
               },
+              // 최상위 actions도 비활성화
+              actions: [],
             }}
             translations={classAssignmentTranslations}
             onSubmit={editingClassId ? handleUpdate : handleAssign}
@@ -2671,7 +3003,7 @@ function ClassesTab({
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+                        gridTemplateColumns: isMobileMode ? '1fr' : 'repeat(2, minmax(0, 1fr))',
                         gap: 'var(--spacing-md)',
                       }}
                     >
@@ -2793,8 +3125,7 @@ function AttendanceTab({
   student: Student | null | undefined;
   isEditable: boolean;
 }) {
-  const navigate = useNavigate();
-  const { showAlert } = useModal();
+  const { toast } = useToast();
   const [attendanceStatusFilter, setAttendanceStatusFilter] = useState<'all' | 'present' | 'late' | 'absent' | 'excused'>('all');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
@@ -2809,6 +3140,7 @@ function AttendanceTab({
   const updateAttendanceLog = useUpdateAttendanceLog();
 
   // 학생의 배정된 반 목록 조회
+  // [P1-7] studentId가 null일 수 있지만, hook 내부에서 enabled: !!studentId로 처리됨
   const { data: studentClassesData } = useStudentClasses(studentId);
   const studentClasses = useMemo(() => studentClassesData ?? [], [studentClassesData]);
 
@@ -2853,17 +3185,9 @@ function AttendanceTab({
     return attendanceLogs.filter((log) => log.status === attendanceStatusFilter);
   }, [attendanceLogs, attendanceStatusFilter]);
 
-  if (!studentId || !student) {
-    return (
-      <Card padding="md" variant="default">
-        <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-          학생 정보를 불러올 수 없습니다.
-        </div>
-      </Card>
-    );
-  }
-
-  // 출결 기록 추가 폼 스키마 생성
+  // [P0-1 수정] 출결 기록 추가 폼 스키마 생성: 조건부 return 이전에 Hook 호출
+  // React Hooks 규칙 준수: 모든 Hook은 조건부 return보다 위에서 호출되어야 함
+  // studentClasses는 useStudentClasses에서 안전하게 처리되므로 null 체크 불필요
   const attendanceFormSchema = useMemo<FormSchema>(() => ({
     version: '1.0.0',
     minSupportedClient: '1.0.0',
@@ -2900,7 +3224,7 @@ function AttendanceTab({
             label: '출결 시간',
             colSpan: 1,
           },
-          defaultValue: toKST().format('YYYY-MM-DDTHH:mm'),
+          // [P1-2] defaultValue는 SchemaForm defaultValues prop으로 동적 전달 (마운트 시점 고정 방지)
           validation: {
             required: true,
           },
@@ -2959,11 +3283,14 @@ function AttendanceTab({
     },
   }), [studentClasses]);
 
-  // 수정 중인 출결 기록 찾기
+  // [P0-1 수정] 수정 중인 출결 기록 찾기: 조건부 return 이전에 Hook 호출
   const editingLog = useMemo(() => {
     if (!editingLogId) return null;
     return attendanceLogs.find((log) => log.id === editingLogId);
   }, [editingLogId, attendanceLogs]);
+
+  // [P0-1 수정] 출결 기록 수정 모드 상태: 조건부 return 이전에 Hook 호출
+  const [showEditList, setShowEditList] = useState(false);
 
   // 출결 기록 추가 핸들러
   const handleAddAttendance = async (data: Record<string, unknown>) => {
@@ -2980,11 +3307,11 @@ function AttendanceTab({
       };
       await createAttendanceLog.mutateAsync(input);
 
-      showAlert('출결 기록이 추가되었습니다.', '성공', 'success');
+      toast('출결 기록이 추가되었습니다.', 'success');
       setShowAddForm(false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '출결 기록 추가에 실패했습니다.';
-      showAlert(errorMessage, '오류', 'error');
+      toast(errorMessage, 'error');
     }
   };
 
@@ -3005,21 +3332,29 @@ function AttendanceTab({
         input,
       });
 
-      showAlert('출결 기록이 수정되었습니다.', '성공', 'success');
+      toast('출결 기록이 수정되었습니다.', 'success');
       setEditingLogId(null);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '출결 기록 수정에 실패했습니다.';
-      showAlert(errorMessage, '오류', 'error');
+      toast(errorMessage, 'error');
     }
   };
 
-  // 출결 기록 수정 모드 상태
-  const [showEditList, setShowEditList] = useState(false);
+  // [P0-1 수정] 조건부 return을 모든 Hook 호출 이후로 이동
+  if (!studentId || !student) {
+    return (
+      <Card padding="md" variant="default">
+        <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+          학생 정보를 불러올 수 없습니다.
+        </div>
+      </Card>
+    );
+  }
 
   // 출결 기록 수정 시작 (출결 기록 목록 표시)
   const handleStartEdit = () => {
     if (filteredAttendanceLogs.length === 0) {
-      showAlert('수정할 출결 기록이 없습니다.', '알림', 'info');
+      toast('수정할 출결 기록이 없습니다.', 'info');
       return;
     }
     setShowEditList(true);
@@ -3044,8 +3379,24 @@ function AttendanceTab({
             }
           />
           <SchemaForm
-            schema={attendanceFormSchema}
+            schema={{
+              ...attendanceFormSchema,
+              form: {
+                ...attendanceFormSchema.form,
+                // [P0-1 수정] actions를 명시적으로 비활성화하여 SchemaForm이 자동 API 호출을 하지 않도록 함
+                // handleAddAttendance에서 createAttendanceLog.mutateAsync를 통해 직접 처리
+                actions: [],
+              },
+              // 최상위 actions도 비활성화
+              actions: [],
+            }}
             onSubmit={handleAddAttendance}
+            // [P1-2 수정] showAddForm 열 때마다 최신 시간으로 동적 설정
+            defaultValues={{
+              occurred_at: toKST().format('YYYY-MM-DDTHH:mm'),
+              attendance_type: 'check_in',
+              status: 'present',
+            }}
             disableCardPadding={false}
             cardTitle={undefined}
             onCancel={() => setShowAddForm(false)}
@@ -3158,7 +3509,17 @@ function AttendanceTab({
             }
           />
           <SchemaForm
-            schema={attendanceFormSchema}
+            schema={{
+              ...attendanceFormSchema,
+              form: {
+                ...attendanceFormSchema.form,
+                // [P0-1 수정] actions를 명시적으로 비활성화하여 SchemaForm이 자동 API 호출을 하지 않도록 함
+                // handleUpdateAttendance에서 updateAttendanceLog.mutateAsync를 통해 직접 처리
+                actions: [],
+              },
+              // 최상위 actions도 비활성화
+              actions: [],
+            }}
             onSubmit={handleUpdateAttendance}
             defaultValues={{
               class_id: editingLog.class_id || '',
@@ -3442,7 +3803,7 @@ function RiskAnalysisTab({
   studentId: string | null;
   isEditable: boolean;
 }) {
-  const { showAlert } = useModal();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
@@ -3450,7 +3811,8 @@ function RiskAnalysisTab({
   // 훅은 항상 컴포넌트 최상단에서 호출되어야 함 (React Hooks 규칙)
   const titleIconSize = useIconSize();
   const titleIconStrokeWidth = useIconStrokeWidth();
-  // [불변 규칙] 하드코딩 금지: CSS 변수에서 아이콘 크기 읽기 (--size-icon-md = 14px)
+  // [P0-3 확인] useIconSize는 인자를 받을 수 있음 (cssVarName?: string, fallback?: number)
+  // 타입 안전: useIconSize('--size-icon-md')는 유효한 시그니처
   const buttonIconSize = useIconSize('--size-icon-md');
 
   // 빈 상태 아이콘 크기 계산 (CSS 변수 사용, 기본 크기의 4배)
@@ -3458,17 +3820,15 @@ function RiskAnalysisTab({
   const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
   const emptyStateIconStrokeWidth = useIconStrokeWidth();
 
-  const thirtyDaysAgo = useMemo(() => {
-    return toKST().subtract(30, 'day').format('YYYY-MM-DD');
-  }, []);
-
-  const { data: attendanceLogsData } = useAttendanceLogs({
-    student_id: studentId || undefined,
-    date_from: thirtyDaysAgo,
-  });
-  const attendanceLogs = useMemo(() => attendanceLogsData ?? [], [attendanceLogsData]);
-
-  const { data: consultations } = useConsultations(studentId);
+  // 출결 로그와 상담 기록은 현재 탭에서 사용하지 않음 (향후 사용 예정)
+  // const thirtyDaysAgo = useMemo(() => {
+  //   return toKST().subtract(30, 'day').format('YYYY-MM-DD');
+  // }, []);
+  // const { data: attendanceLogsData } = useAttendanceLogs({
+  //   student_id: studentId || undefined,
+  //   date_from: thirtyDaysAgo,
+  // });
+  // const { data: consultations } = useConsultations(studentId);
 
   // 이탈위험 분석 결과를 DB에서 불러오기
   const { data: savedRiskAnalysis, isLoading: isLoadingSaved } = useQuery({
@@ -3476,32 +3836,20 @@ function RiskAnalysisTab({
     queryFn: async () => {
       if (!tenantId || !studentId) return null;
 
-      const response = await apiClient.get<Array<{
-        id: string;
-        details: {
-          risk_score: number;
-          risk_level: 'low' | 'medium' | 'high';
-          reasons: string[];
-          recommended_actions: string[];
-        };
-        created_at: string;
-        updated_at: string;
-      }>>('ai_insights', {
-        filters: {
-          tenant_id: tenantId,
+      // [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
+      // [ESLint 규칙] ai_insights 직접 조회 금지: fetchAIInsights 사용
+      // [수정] 'risk_analysis'는 유효한 insight_type이 아니므로 제거하고 performance_analysis 사용
+      const insights = await fetchAIInsights(tenantId, {
           student_id: studentId,
-          insight_type: 'risk_analysis',
+        insight_type: 'performance_analysis',
           status: 'active',
-        },
-        orderBy: { column: 'created_at', ascending: false },
-        limit: 1,
       });
 
-      if (response.error || !response.data || response.data.length === 0) {
+      if (!insights || insights.length === 0) {
         return null;
       }
 
-      const insight = (response.data[0] as unknown) as {
+      const insight = (insights[0] as unknown) as {
         id: string;
         details: {
           risk_score: number;
@@ -3638,11 +3986,10 @@ function RiskAnalysisTab({
                 onClick={async () => {
                   try {
                     await refetchRiskAnalysis();
-                    showAlert('이탈위험 분석이 완료되었습니다.', '알림', 'success');
+                    toast('이탈위험 분석이 완료되었습니다.', 'success', '알림');
                   } catch (error) {
-                    showAlert(
+                    toast(
                       error instanceof Error ? error.message : '이탈위험 분석에 실패했습니다.',
-                      '오류',
                       'error'
                     );
                   }
@@ -3685,8 +4032,6 @@ function RiskAnalysisTab({
   const riskLevelLabel = getRiskLevelLabel(riskScore);
   const riskColor = riskScore >= 70 ? 'error' : riskScore >= 40 ? 'warning' : 'success';
   const riskBgColor = riskScore >= 70 ? 'var(--color-error)' : riskScore >= 40 ? 'var(--color-warning)' : 'var(--color-success)';
-  const riskBgColorLight = riskScore >= 70 ? 'var(--color-error-50)' : riskScore >= 40 ? 'var(--color-warning-50)' : 'var(--color-success-50)';
-  const riskBorderColor = riskScore >= 70 ? 'var(--color-error)' : riskScore >= 40 ? 'var(--color-warning)' : 'var(--color-success)';
 
   return (
     <div>
@@ -3801,19 +4146,20 @@ function RiskAnalysisTab({
                     icon: RefreshCcw,
                     tooltip: '재분석',
                     variant: 'outline',
-                    onClick: async () => {
-                      try {
-                        await refetchRiskAnalysis();
-                        // 새로 분석한 결과로 인해 쿼리가 무효화되므로 저장된 결과도 다시 불러옴
-                        queryClient.invalidateQueries({ queryKey: ['student-risk-analysis-saved', tenantId, studentId] });
-                        showAlert('이탈위험 분석이 완료되었습니다.', '알림', 'success');
-                      } catch (error) {
-                        showAlert(
-                          error instanceof Error ? error.message : '이탈위험 분석에 실패했습니다.',
-                          '오류',
-                          'error'
-                        );
-                      }
+                    onClick: () => {
+                      void (async () => {
+                        try {
+                          await refetchRiskAnalysis();
+                          // 새로 분석한 결과로 인해 쿼리가 무효화되므로 저장된 결과도 다시 불러옴
+                          void queryClient.invalidateQueries({ queryKey: ['student-risk-analysis-saved', tenantId, studentId] });
+                          toast('이탈위험 분석이 완료되었습니다.', 'success', '알림');
+                        } catch (error) {
+                          toast(
+                            error instanceof Error ? error.message : '이탈위험 분석에 실패했습니다.',
+                            'error'
+                          );
+                        }
+                      })();
                     },
                   },
                 ]}
@@ -3825,6 +4171,32 @@ function RiskAnalysisTab({
     </div>
   );
 }
+
+// [P2 수정] MESSAGE_CONSTANTS를 컴포넌트 외부로 이동하여 매 렌더마다 재생성 방지
+const MESSAGE_CONSTANTS = {
+  TAB_TITLE: '메시지 발송',
+  STUDENT_DEFAULT: '학생',
+  PHONE_NOT_AVAILABLE: '전화번호 없음',
+  LOADING_GUARDIANS: '보호자 정보를 불러오는 중...',
+  TARGET_STUDENT_LABEL: '학생',
+  NO_GUARDIANS_MESSAGE: '보호자 정보가 없습니다. 보호자를 먼저 등록해주세요.',
+  NO_STUDENT_PHONE_MESSAGE: '학생 전화번호가 없습니다.',
+  NO_RECIPIENTS_SELECTED: '발송 대상을 선택해주세요.',
+  SEND_SUCCESS_TITLE: '성공',
+  SEND_SUCCESS_MESSAGE: '메시지가 발송되었습니다.',
+  ERROR_TITLE: '오류',
+  ERROR_STUDENT_NOT_FOUND: '학생 정보가 없습니다.',
+  ERROR_GUARDIAN_NOT_FOUND: '보호자 정보를 찾을 수 없습니다.',
+  ERROR_PHONE_NOT_FOUND: '보호자 전화번호를 찾을 수 없습니다.',
+  ERROR_CONTENT_REQUIRED: '메시지 내용을 입력해주세요.',
+  ERROR_SEND_PARTIAL_FAILED: '일부 메시지 발송에 실패했습니다:',
+  ERROR_UNKNOWN: '알 수 없는 오류',
+  PARTIAL_SUCCESS_MESSAGE: '명에게 발송 성공,',
+  PARTIAL_FAILURE_MESSAGE: '명에게 발송 실패:',
+  ALERT_TITLE: '알림',
+  COUNT_SUFFIX: '명',
+  COUNT_ZERO: '0명',
+} as const;
 
 // 메시지 발송 탭 컴포넌트
 // [불변 규칙] 기존 notificationFormSchema와 SchemaForm 재사용 (중복 개발 방지)
@@ -3838,45 +4210,21 @@ function MessageSendTab({
   student: Student | null | undefined;
   isEditable: boolean;
 }) {
-  const { showAlert } = useModal();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
   const [searchParams] = useSearchParams();
-  const completeTaskCard = useCompleteStudentTaskCard(true); // 실제 작업 완료 시 삭제
+  // [P1-4 확인] useCompleteStudentTaskCard(true)는 프로덕션 기능: 메시지 발송 완료 시 task card 즉시 삭제
+  // deleteImmediately=true는 실제 작업 완료 시 카드를 삭제하는 정상 기능 (테스트 코드 아님)
+  const completeTaskCard = useCompleteStudentTaskCard(true);
   const { data: studentTaskCards } = useStudentTaskCards();
 
   // [불변 규칙] 기존 스키마 재사용
   const { data: schema } = useSchema('notification', notificationFormSchema, 'form');
 
-  // [불변 규칙] 하드코딩된 문자열 상수화
-  const MESSAGE_CONSTANTS = {
-    TAB_TITLE: '메시지 발송',
-    STUDENT_DEFAULT: '학생',
-    PHONE_NOT_AVAILABLE: '전화번호 없음',
-    LOADING_GUARDIANS: '보호자 정보를 불러오는 중...',
-    TARGET_STUDENT_LABEL: '학생',
-    NO_GUARDIANS_MESSAGE: '보호자 정보가 없습니다. 보호자를 먼저 등록해주세요.',
-    NO_STUDENT_PHONE_MESSAGE: '학생 전화번호가 없습니다.',
-    NO_RECIPIENTS_SELECTED: '발송 대상을 선택해주세요.',
-    SEND_SUCCESS_TITLE: '성공',
-    SEND_SUCCESS_MESSAGE: '메시지가 발송되었습니다.',
-    ERROR_TITLE: '오류',
-    ERROR_STUDENT_NOT_FOUND: '학생 정보가 없습니다.',
-    ERROR_GUARDIAN_NOT_FOUND: '보호자 정보를 찾을 수 없습니다.',
-    ERROR_PHONE_NOT_FOUND: '보호자 전화번호를 찾을 수 없습니다.',
-    ERROR_CONTENT_REQUIRED: '메시지 내용을 입력해주세요.',
-    ERROR_SEND_PARTIAL_FAILED: '일부 메시지 발송에 실패했습니다:',
-    ERROR_UNKNOWN: '알 수 없는 오류',
-    PARTIAL_SUCCESS_MESSAGE: '명에게 발송 성공,',
-    PARTIAL_FAILURE_MESSAGE: '명에게 발송 실패:',
-    ALERT_TITLE: '알림',
-    COUNT_SUFFIX: '명',
-    COUNT_ZERO: '0명',
-  } as const;
-
   const formRef = useRef<UseFormReturn<Record<string, unknown>> | null>(null);
-  const [selectedChannel, setSelectedChannel] = useState<NotificationChannel>('sms');
+  const [selectedChannel] = useState<NotificationChannel>('sms');
   // 수신자 선택 상태 (학생, 보호자 각각 선택 가능)
   const [selectedStudent, setSelectedStudent] = useState(false); // 기본값: 선택 안 함
   const [selectedGuardians, setSelectedGuardians] = useState<Set<string>>(new Set()); // 선택된 보호자 ID 집합
@@ -3934,7 +4282,8 @@ function MessageSendTab({
     return { parent, guardian, other };
   }, [guardians]);
 
-  // 전화번호가 있는 보호자만 필터링
+  // 전화번호가 있는 보호자만 필터링 (향후 사용 예정)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const guardiansWithPhone = useMemo(() => {
     if (!guardians) return [];
     return guardians.filter((g) => {
@@ -4001,19 +4350,8 @@ function MessageSendTab({
     }
   }, [guardiansByRelationship, guardiansLoading, hasInitializedSelection, student]);
 
-  // 보호자 전체 선택/해제 (전화번호가 있는 보호자만)
-  const handleSelectAllGuardians = (checked: boolean) => {
-    if (checked && guardiansWithPhone.length > 0) {
-      const allGuardianIds = new Set(guardiansWithPhone.map((g) => g.id));
-      setSelectedGuardians(allGuardianIds);
-    } else {
-      setSelectedGuardians(new Set());
-    }
-  };
-
-  const allGuardiansSelected = guardiansWithPhone.length > 0 && selectedGuardians.size === guardiansWithPhone.length;
-
-  // 선택된 발송 대상 목록 (채널 셀렉터 아래 표시용)
+  // 선택된 발송 대상 목록 (채널 셀렉터 아래 표시용, 향후 사용 예정)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const selectedRecipients = useMemo(() => {
     const recipients: Array<{ label: string; phone: string }> = [];
 
@@ -4116,10 +4454,9 @@ function MessageSendTab({
         if (successCount > 0) {
           // 부분 성공: 성공한 건수와 실패한 건수를 모두 표시
           const errorMessage = `${successCount}${MESSAGE_CONSTANTS.PARTIAL_SUCCESS_MESSAGE} ${errors.length}${MESSAGE_CONSTANTS.PARTIAL_FAILURE_MESSAGE} ${errors[0].error?.message || MESSAGE_CONSTANTS.ERROR_UNKNOWN}`;
-          // [일관성] useModal 시그니처 준수: showAlert(message, title, type)
-          showAlert(errorMessage, MESSAGE_CONSTANTS.ERROR_TITLE, 'error');
+          toast(errorMessage, 'error', MESSAGE_CONSTANTS.ERROR_TITLE);
           // 부분 성공이어도 쿼리 무효화 (성공한 알림은 조회 가능하도록)
-          queryClient.invalidateQueries({ queryKey: ['notifications', tenantId] });
+          void queryClient.invalidateQueries({ queryKey: ['notifications', tenantId] });
           // 폼은 초기화하지 않음 (사용자가 재시도할 수 있도록)
           return;
         } else {
@@ -4129,7 +4466,7 @@ function MessageSendTab({
       }
 
       // 전체 성공
-      queryClient.invalidateQueries({ queryKey: ['notifications', tenantId] });
+      void queryClient.invalidateQueries({ queryKey: ['notifications', tenantId] });
 
       // 알림 발송 성공 시 관련 StudentTaskCard 완료 처리
       // URL에서 cardId를 추출하거나, student_id로 new_signup 타입 카드를 찾아 완료 처리
@@ -4157,8 +4494,7 @@ function MessageSendTab({
         }
       }
 
-      // [일관성] useModal 시그니처 준수: showAlert(message, title, type)
-      showAlert(MESSAGE_CONSTANTS.SEND_SUCCESS_MESSAGE, MESSAGE_CONSTANTS.SEND_SUCCESS_TITLE, 'success');
+      toast(MESSAGE_CONSTANTS.SEND_SUCCESS_MESSAGE, 'success', MESSAGE_CONSTANTS.SEND_SUCCESS_TITLE);
 
       // 폼 초기화
       if (formRef.current) {
@@ -4166,16 +4502,16 @@ function MessageSendTab({
         formRef.current.setValue('channel', selectedChannel);
       }
     } catch (error) {
-      // [일관성] useModal 시그니처 준수: showAlert(message, title, type)
       const errorMessage = error instanceof Error ? error.message : MESSAGE_CONSTANTS.ERROR_UNKNOWN;
-      showAlert(errorMessage, MESSAGE_CONSTANTS.ERROR_TITLE, 'error');
+      toast(errorMessage, 'error', MESSAGE_CONSTANTS.ERROR_TITLE);
       throw error; // SchemaForm의 에러 처리도 위해 다시 throw
     }
   };
 
   const titleIconSize = useIconSize();
   const titleIconStrokeWidth = useIconStrokeWidth();
-  // [불변 규칙] 하드코딩 금지: CSS 변수에서 아이콘 크기 읽기 (--size-icon-md = 14px)
+  // [P0-3 확인] useIconSize는 인자를 받을 수 있음 (cssVarName?: string, fallback?: number)
+  // 타입 안전: useIconSize('--size-icon-md')는 유효한 시그니처
   const buttonIconSize = useIconSize('--size-icon-md');
 
   return (
@@ -4445,11 +4781,12 @@ function MessageSendTab({
                   <p style={{ color: 'var(--color-warning)', fontSize: 'var(--font-size-base)', textAlign: 'center', margin: 0 }}>
                     {MESSAGE_CONSTANTS.NO_GUARDIANS_MESSAGE}
                   </p>
-          </div>
+                </div>
               )}
+            </div>
+          )}
         </div>
-      )}
-        </div>
+      </Card>
 
         {/* [불변 규칙] 기존 notificationFormSchema와 SchemaForm 재사용 */}
         {/* 학생 또는 보호자가 선택되었을 때만 폼 표시 */}
@@ -4495,7 +4832,7 @@ function MessageSendTab({
                         submit: {
                           ...schema.form.submit,
                           icon: <MessageSquare size={buttonIconSize} />,
-                        } as any,
+                        } as Record<string, unknown>,
                       },
                     }}
                     onSubmit={handleSendMessage}
@@ -4529,16 +4866,12 @@ function MessageSendTab({
                         return response.data;
                       },
                       showToast: (message: string, variant?: string) => {
-                        // [일관성] useModal 시그니처 준수: showAlert(message, title, type)
-                        const title = variant === 'success' ? MESSAGE_CONSTANTS.SEND_SUCCESS_TITLE : variant === 'error' ? MESSAGE_CONSTANTS.ERROR_TITLE : MESSAGE_CONSTANTS.ALERT_TITLE;
-                        const type = variant === 'success' ? 'success' : variant === 'error' ? 'error' : 'info';
-                        showAlert(message, title, type);
+                        toast(message, variant === 'success' ? 'success' : variant === 'error' ? 'error' : 'info');
                       },
                     }}
-              />
-          </>
-      )}
-      </Card>
+                  />
+                </>
+              )}
     </div>
   );
 }

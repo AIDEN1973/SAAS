@@ -59,7 +59,8 @@ BEGIN
           OR NEW.target_audience = 'guardians'
         )
     LOOP
-      dedup_key := NEW.tenant_id || ':' || event_type || ':announcement:' || NEW.id || ':guardian:' || guardian_record.id || ':' || CURRENT_DATE;
+      -- [불변 규칙] 기술문서 19-1-2: KST 기준 날짜 처리 (timezone('Asia/Seoul', now())::date 사용)
+      dedup_key := NEW.tenant_id || ':' || event_type || ':announcement:' || NEW.id || ':guardian:' || guardian_record.id || ':' || timezone('Asia/Seoul', now())::date::text;
       INSERT INTO automation_actions (
         tenant_id,
         action_type,

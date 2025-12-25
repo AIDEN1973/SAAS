@@ -10,7 +10,9 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, Container, Card, Button, PageHeader } from '@ui-core/react';
+// [SSOT] Barrel export를 통한 통합 import
+import { ROUTES } from '../constants';
+import { ErrorBoundary, Container, Button, PageHeader } from '@ui-core/react';
 import { StudentStatsCard } from '../components/dashboard-cards/StudentStatsCard';
 import { AttendanceStatsCard } from '../components/dashboard-cards/AttendanceStatsCard';
 import { StudentAlertsCard } from '../components/dashboard-cards/StudentAlertsCard';
@@ -31,33 +33,44 @@ export function StudentsHomePage() {
   const { data: recentActivity, isLoading: isLoadingActivity } = useRecentActivity();
 
   const handleViewAllStudents = () => {
-    navigate('/students/list');
+    navigate(ROUTES.STUDENTS_LIST);
   };
 
   const handleStatsClick = () => {
-    navigate('/students/list');
+    navigate(ROUTES.STUDENTS_LIST);
   };
 
   const handleAlertsClick = (type: 'risk' | 'absent' | 'consultation') => {
-    navigate(`/students/list?filter=${type}`);
+    // [SSOT] ROUTES 상수 사용
+    switch (type) {
+      case 'risk':
+        navigate(ROUTES.STUDENTS_RISK);
+        break;
+      case 'absent':
+        navigate(ROUTES.STUDENTS_ABSENT);
+        break;
+      case 'consultation':
+        navigate(ROUTES.STUDENTS_CONSULTATION);
+        break;
+    }
   };
 
   const handleQuickAction = (action: 'register' | 'bulk' | 'list' | 'consultation' | 'attendance') => {
     switch (action) {
       case 'register':
-        navigate('/students/list', { state: { showCreateForm: true } });
+        navigate(ROUTES.STUDENTS_LIST, { state: { showCreateForm: true } });
         break;
       case 'bulk':
-        navigate('/students/list', { state: { showBulkUpload: true } });
+        navigate(ROUTES.STUDENTS_LIST, { state: { showBulkUpload: true } });
         break;
       case 'list':
-        navigate('/students/list');
+        navigate(ROUTES.STUDENTS_LIST);
         break;
       case 'consultation':
-        navigate('/students/list');
+        navigate(ROUTES.STUDENTS_LIST);
         break;
       case 'attendance':
-        navigate('/attendance');
+        navigate(ROUTES.ATTENDANCE);
         break;
     }
   };
@@ -65,16 +78,16 @@ export function StudentsHomePage() {
   const handleActivityClick = (type: 'student' | 'consultation' | 'attendance' | 'tag', id?: string) => {
     switch (type) {
       case 'student':
-        if (id) navigate(`/students/list?studentId=${id}&panel=info`);
+        if (id) navigate(ROUTES.STUDENT_DETAIL(id, 'info'));
         break;
       case 'consultation':
-        if (id) navigate(`/students/list?studentId=${id}&panel=consultations`);
+        if (id) navigate(ROUTES.STUDENT_DETAIL(id, 'consultations'));
         break;
       case 'attendance':
-        navigate('/attendance');
+        navigate(ROUTES.ATTENDANCE);
         break;
       case 'tag':
-        navigate('/students/list');
+        navigate(ROUTES.STUDENTS_LIST);
         break;
     }
   };

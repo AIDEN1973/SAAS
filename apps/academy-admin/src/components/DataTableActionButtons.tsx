@@ -8,13 +8,13 @@
  * - 양식 다운로드 버튼
  */
 
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { Upload, Download, FileText } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 import { IconButtonGroup, type IconButtonItem } from '@ui-core/react';
 
 // Plus 아이콘 (커스텀 SVG) - LucideIcon과 호환되도록 forwardRef 사용
-export const PlusIcon = React.forwardRef<SVGSVGElement, LucideProps>(
+export const PlusIcon = forwardRef<SVGSVGElement, LucideProps>(
   ({ size = 24, strokeWidth = 2, className, ...props }, ref) => (
     <svg
       ref={ref}
@@ -128,7 +128,7 @@ export const DataTableActionButtons: React.FC<DataTableActionButtonsProps> = ({
       icon: Download,
       tooltip: downloadTooltip,
       variant: 'outline',
-      onClick: onDownload,
+      onClick: () => void onDownload(),
     });
   }
 
@@ -138,7 +138,7 @@ export const DataTableActionButtons: React.FC<DataTableActionButtonsProps> = ({
       icon: FileText,
       tooltip: templateTooltip,
       variant: 'outline',
-      onClick: onDownloadTemplate,
+      onClick: () => void onDownloadTemplate(),
     });
   }
 

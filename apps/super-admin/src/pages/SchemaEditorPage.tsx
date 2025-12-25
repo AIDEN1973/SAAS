@@ -37,7 +37,7 @@ export function SchemaEditorPage() {
   const editingFormSchema = useMemo<FormSchema | null>(() => {
     if (localFormSchema) return localFormSchema;
     if (selectedSchema && selectedSchema.schema_json.type === 'form') {
-      return selectedSchema.schema_json as FormSchema;
+      return selectedSchema.schema_json;
     }
     if (isCreating) {
       return {
@@ -168,7 +168,7 @@ export function SchemaEditorPage() {
 
   const handleImport = (importedSchema: UISchema) => {
     if (importedSchema.type === 'form') {
-      setLocalFormSchema(importedSchema as FormSchema);
+      setLocalFormSchema(importedSchema);
     }
   };
 
@@ -273,7 +273,7 @@ export function SchemaEditorPage() {
                   onSave={handleSaveSchema}
                   onSchemaJsonChange={(schemaJson) => {
                     if (schemaJson.type === 'form') {
-                      setLocalFormSchema(schemaJson as FormSchema);
+                      setLocalFormSchema(schemaJson);
                     }
                   }}
                   onCancel={() => {

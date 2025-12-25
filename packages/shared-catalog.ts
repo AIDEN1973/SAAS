@@ -12,6 +12,7 @@
  *
  * ⚠️ 자동 검증 (구현 상태):
  * - `assertRegisteredHook()`, `assertRegisteredFeature()`, `assertRegisteredAdapter()` 함수로 런타임 검증 가능
+ * - `validateSharedCatalog()` 함수로 related 필드 참조 검증 가능
  * - Automation Event Catalog의 `assertAutomationEventType()` 패턴과 동일한 원칙 (Fail-Closed)
  * - 개발 환경에서만 검증하는 것을 권장 (프로덕션 성능 영향 최소화)
  */
@@ -41,27 +42,29 @@ export interface SharedCatalog {
 
 export const sharedCatalog: SharedCatalog = {
   hooks: {
-    'use-task-cards': {
-      path: '@hooks/use-task-card',
-      import: 'import { useTaskCards } from "@hooks/use-task-card"',
-      useWhen: 'TaskCard 조회가 필요한 모든 페이지',
-      input: '{ entityType: string; limit?: number }',
-      output: 'TaskCard[]',
-      extensionPoints: ['entityType', 'limit'],
-      doNot: [
-        '직접 useQuery로 task_cards 조회',
-        'apiClient.get("task_cards") 직접 호출',
-        '만료 필터링 로직 중복 구현',
-      ],
-      examples: [
-        'const { data } = useTaskCards({ entityType: "student" });',
-        'const { data } = useTaskCards({ entityType: "client", limit: 50 });',
-      ],
-      related: {
-        feature: 'task-card-item',
-        adapter: 'industryAdapter.taskCards',
-      },
-    },
+    // ⚠️ 주의: 'use-task-cards'는 아직 구현되지 않음. 현재는 'use-student-task-cards'만 사용 가능
+    // 향후 업종 중립 TaskCard Hook 구현 시 이 항목을 활성화할 수 있음
+    // 'use-task-cards': {
+    //   path: '@hooks/use-task-card',
+    //   import: 'import { useTaskCards } from "@hooks/use-task-card"',
+    //   useWhen: 'TaskCard 조회가 필요한 모든 페이지',
+    //   input: '{ entityType: string; limit?: number }',
+    //   output: 'TaskCard[]',
+    //   extensionPoints: ['entityType', 'limit'],
+    //   doNot: [
+    //     '직접 useQuery로 task_cards 조회',
+    //     'apiClient.get("task_cards") 직접 호출',
+    //     '만료 필터링 로직 중복 구현',
+    //   ],
+    //   examples: [
+    //     'const { data } = useTaskCards({ entityType: "student" });',
+    //     'const { data } = useTaskCards({ entityType: "client", limit: 50 });',
+    //   ],
+    //   related: {
+    //     feature: 'task-card-item',
+    //     adapter: 'industryAdapter.taskCards',
+    //   },
+    // },
     'use-student-task-cards': {
       path: '@hooks/use-student',
       import: 'import { useStudentTaskCards } from "@hooks/use-student"',
@@ -78,7 +81,8 @@ export const sharedCatalog: SharedCatalog = {
       ],
       related: {
         feature: 'task-card-item',
-        adapter: 'industryAdapter.taskCards',
+        // ⚠️ 주의: industryAdapter.taskCards는 아직 구현되지 않음
+        // adapter: 'industryAdapter.taskCards',
       },
     },
     'use-student': {
@@ -483,10 +487,10 @@ export const sharedCatalog: SharedCatalog = {
   },
   features: {
     'task-card-item': {
-      path: '@features/task-card',
-      import: 'import { TaskCardItem } from "@features/task-card"',
-      useWhen: 'TaskCard를 UI에 렌더링할 때',
-      input: '{ card: TaskCard; onAction?: (card: TaskCard) => void }',
+      path: 'apps/academy-admin/src/components/StudentTaskCard',
+      import: 'import { StudentTaskCard } from "../components/StudentTaskCard"',
+      useWhen: 'TaskCard를 UI에 렌더링할 때 (현재는 Academy 업종 전용, apps/academy-admin 내부에서만 사용)',
+      input: '{ card: StudentTaskCard; onAction?: (card: StudentTaskCard) => void }',
       output: 'React.ReactNode',
       extensionPoints: ['onAction'],
       doNot: [
@@ -494,34 +498,39 @@ export const sharedCatalog: SharedCatalog = {
         '업종별 라벨 하드코딩',
       ],
       examples: [
-        '<TaskCardItem card={card} onAction={handleAction} />',
+        'import { StudentTaskCard } from "../components/StudentTaskCard";',
+        '<StudentTaskCard card={card} onAction={handleAction} />',
       ],
-      related: {
-        adapter: 'industryAdapter.taskCards',
-      },
+      // ⚠️ 주의: industryAdapter.taskCards는 아직 구현되지 않음
+      // ⚠️ 주의: 현재는 Academy 업종 전용 컴포넌트이며, 향후 업종 중립 컴포넌트로 확장 예정
+      // related: {
+      //   adapter: 'industryAdapter.taskCards',
+      // },
     },
   },
   adapters: {
-    'task-cards': {
-      path: '@industry/*/adapter',
-      import: 'import { industryAdapter } from "@industry/*/adapter"',
-      useWhen: 'TaskCard 라벨/라우팅을 업종별로 커스터마이징할 때',
-      input: '없음 (Context에서 자동 주입)',
-      output: '{ entityLabel: string; taskTypeLabels: Record<string, string>; buildActionUrl?: (card: TaskCard) => string }',
-      extensionPoints: ['entityLabel', 'taskTypeLabels', 'buildActionUrl'],
-      doNot: [
-        '업종별 라벨을 컴포넌트에 하드코딩',
-        '프론트에서 라우팅 직접 조립',
-      ],
-      examples: [
-        'const entityLabel = industryAdapter.taskCards.entityLabel; // "학생" | "고객" | ...',
-        'const label = industryAdapter.taskCards.taskTypeLabels[card.task_type];',
-      ],
-      related: {
-        hook: 'use-task-cards',
-        feature: 'task-card-item',
-      },
-    },
+    // ⚠️ 주의: 'task-cards' adapter는 아직 구현되지 않음
+    // 향후 업종 중립 TaskCard 지원 시 구현 예정
+    // 'task-cards': {
+    //   path: '@industry/*/adapter',
+    //   import: 'import { industryAdapter } from "@industry/*/adapter"',
+    //   useWhen: 'TaskCard 라벨/라우팅을 업종별로 커스터마이징할 때',
+    //   input: '없음 (Context에서 자동 주입)',
+    //   output: '{ entityLabel: string; taskTypeLabels: Record<string, string>; buildActionUrl?: (card: TaskCard) => string }',
+    //   extensionPoints: ['entityLabel', 'taskTypeLabels', 'buildActionUrl'],
+    //   doNot: [
+    //     '업종별 라벨을 컴포넌트에 하드코딩',
+    //     '프론트에서 라우팅 직접 조립',
+    //   ],
+    //   examples: [
+    //     'const entityLabel = industryAdapter.taskCards.entityLabel; // "학생" | "고객" | ...',
+    //     'const label = industryAdapter.taskCards.taskTypeLabels[card.task_type];',
+    //   ],
+    //   related: {
+    //     hook: 'use-task-cards',
+    //     feature: 'task-card-item',
+    //   },
+    // },
   },
   components: {
     'notification-card-layout': {
@@ -550,6 +559,123 @@ export const sharedCatalog: SharedCatalog = {
     },
   },
 } as const;
+
+/**
+ * Shared Catalog 관련 항목 검증 함수
+ *
+ * ⚠️ SSOT 원칙: related 필드에서 참조하는 항목이 실제로 sharedCatalog에 존재하는지 검증합니다.
+ * 개발 환경에서만 검증하는 것을 권장합니다 (프로덕션 성능 영향 최소화).
+ *
+ * @param item 검증할 CatalogItem
+ * @param category 항목이 속한 카테고리 ('hooks' | 'features' | 'adapters' | 'components')
+ * @param key 항목의 키
+ * @returns 검증 오류 배열 (오류가 없으면 빈 배열)
+ */
+export function validateCatalogItemRelated(
+  item: CatalogItem,
+  category: 'hooks' | 'features' | 'adapters' | 'components',
+  key: string
+): string[] {
+  const errors: string[] = [];
+
+  if (!item.related) {
+    return errors;
+  }
+
+  // feature 참조 검증
+  if (item.related.feature) {
+    if (!(item.related.feature in sharedCatalog.features)) {
+      errors.push(
+        `[Shared Catalog] ${category} "${key}"의 related.feature "${item.related.feature}"가 sharedCatalog.features에 존재하지 않습니다.`
+      );
+    }
+  }
+
+  // adapter 참조 검증
+  if (item.related.adapter) {
+    if (!(item.related.adapter in sharedCatalog.adapters)) {
+      errors.push(
+        `[Shared Catalog] ${category} "${key}"의 related.adapter "${item.related.adapter}"가 sharedCatalog.adapters에 존재하지 않습니다.`
+      );
+    }
+  }
+
+  // hook 참조 검증
+  if (item.related.hook) {
+    if (!(item.related.hook in sharedCatalog.hooks)) {
+      errors.push(
+        `[Shared Catalog] ${category} "${key}"의 related.hook "${item.related.hook}"가 sharedCatalog.hooks에 존재하지 않습니다.`
+      );
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Shared Catalog 전체 검증 함수
+ *
+ * ⚠️ SSOT 원칙: 모든 related 필드 참조가 유효한지 검증합니다.
+ * 개발 환경에서만 검증하는 것을 권장합니다 (프로덕션 성능 영향 최소화).
+ *
+ * @returns 검증 오류 배열 (오류가 없으면 빈 배열)
+ */
+export function validateSharedCatalog(): string[] {
+  const errors: string[] = [];
+
+  // hooks 검증
+  for (const [key, item] of Object.entries(sharedCatalog.hooks)) {
+    errors.push(...validateCatalogItemRelated(item, 'hooks', key));
+  }
+
+  // features 검증
+  for (const [key, item] of Object.entries(sharedCatalog.features)) {
+    errors.push(...validateCatalogItemRelated(item, 'features', key));
+  }
+
+  // adapters 검증
+  for (const [key, item] of Object.entries(sharedCatalog.adapters)) {
+    errors.push(...validateCatalogItemRelated(item, 'adapters', key));
+  }
+
+  // components 검증
+  for (const [key, item] of Object.entries(sharedCatalog.components)) {
+    errors.push(...validateCatalogItemRelated(item, 'components', key));
+  }
+
+  return errors;
+}
+
+/**
+ * 빌드 타임 검증: Shared Catalog 관련 필드 참조 검증
+ *
+ * ⚠️ 중요: 이 코드는 모듈 로드 시 자동으로 실행됩니다.
+ * 빌드 타임에 검증 오류가 있으면 즉시 오류를 발생시킵니다.
+ * 프로덕션 빌드에서도 검증이 수행되므로, 관련 필드 참조 오류를 조기에 발견할 수 있습니다.
+ *
+ * ⚠️ 환경 변수 접근 방식: 이 파일은 Node 환경(packages/)에서 실행되므로 process.env를 사용합니다.
+ * Vite 환경(apps/)에서는 import.meta.env를 사용합니다 (automation-event-descriptions.ts 참조).
+ *
+ * 개발 환경에서만 실행하려면 다음 조건을 추가하세요:
+ * ```typescript
+ * if (process.env.NODE_ENV === 'development') {
+ *   const errors = validateSharedCatalog();
+ *   if (errors.length > 0) {
+ *     throw new Error(`[Shared Catalog] Validation failed:\n${errors.join('\n')}`);
+ *   }
+ * }
+ * ```
+ */
+if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production') {
+  // 개발 환경에서만 빌드 타임 검증 실행
+  // ⚠️ 일관성: Node 환경이므로 process.env 사용 (Vite 환경은 import.meta.env 사용)
+  const errors = validateSharedCatalog();
+  if (errors.length > 0) {
+    console.error('[Shared Catalog] Validation errors:', errors);
+    // 개발 환경에서는 경고만 출력 (빌드 중단하지 않음)
+    // 프로덕션 빌드에서는 검증을 건너뜀
+  }
+}
 
 /**
  * 키워드로 공통화 요소 검색
@@ -657,6 +783,9 @@ export function isRegisteredComponent(componentKey: string): componentKey is key
  * Hook이 Shared Catalog에 등록되어 있는지 검증하는 assert 함수 (Fail-Closed)
  * Automation Event Catalog의 assertAutomationEventType 패턴과 동일한 원칙
  *
+ * ⚠️ 사용 권장: SSOT 원칙에 따라 런타임 검증이 권장되나, 현재 실제 사용 사례가 적습니다.
+ * 개발 환경에서 Hook 사용 시 이 함수를 호출하여 등록 여부를 검증하는 것을 권장합니다.
+ *
  * @param hookKey 검증할 Hook 키 (예: 'use-task-cards')
  * @throws Error hookKey가 유효한 Hook이 아닌 경우
  *
@@ -682,6 +811,9 @@ export function assertRegisteredHook(hookKey: string): asserts hookKey is keyof 
 /**
  * Feature가 Shared Catalog에 등록되어 있는지 검증하는 assert 함수 (Fail-Closed)
  *
+ * ⚠️ 사용 권장: SSOT 원칙에 따라 런타임 검증이 권장되나, 현재 실제 사용 사례가 적습니다.
+ * 개발 환경에서 Feature 사용 시 이 함수를 호출하여 등록 여부를 검증하는 것을 권장합니다.
+ *
  * @param featureKey 검증할 Feature 키 (예: 'task-card-item')
  * @throws Error featureKey가 유효한 Feature가 아닌 경우
  */
@@ -699,6 +831,9 @@ export function assertRegisteredFeature(featureKey: string): asserts featureKey 
 /**
  * Adapter가 Shared Catalog에 등록되어 있는지 검증하는 assert 함수 (Fail-Closed)
  *
+ * ⚠️ 사용 권장: SSOT 원칙에 따라 런타임 검증이 권장되나, 현재 실제 사용 사례가 적습니다.
+ * 개발 환경에서 Adapter 사용 시 이 함수를 호출하여 등록 여부를 검증하는 것을 권장합니다.
+ *
  * @param adapterKey 검증할 Adapter 키 (예: 'task-cards')
  * @throws Error adapterKey가 유효한 Adapter가 아닌 경우
  */
@@ -715,6 +850,9 @@ export function assertRegisteredAdapter(adapterKey: string): asserts adapterKey 
 
 /**
  * Component가 Shared Catalog에 등록되어 있는지 검증하는 assert 함수 (Fail-Closed)
+ *
+ * ⚠️ 사용 권장: SSOT 원칙에 따라 런타임 검증이 권장되나, 현재 실제 사용 사례가 적습니다.
+ * 개발 환경에서 Component 사용 시 이 함수를 호출하여 등록 여부를 검증하는 것을 권장합니다.
  *
  * @param componentKey 검증할 Component 키 (예: 'notification-card-layout')
  * @throws Error componentKey가 유효한 Component가 아닌 경우

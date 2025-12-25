@@ -81,7 +81,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       return;
     }
 
-    const autoSelectTenant = async () => {
+    const autoSelectTenant = () => {
       isSelectingRef.current = true;
       try {
         console.log('[ProtectedRoute] Auto-selecting tenant:', tenants[0].id);
@@ -96,7 +96,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
         // 세션 새로고침은 선택적으로 수행 (필요한 경우에만)
         // Rate limit 에러를 방지하기 위해 주석 처리
-        // await selectTenant.mutateAsync(tenants[0].id);
+        // void selectTenant.mutateAsync(tenants[0].id);
       } catch (error) {
         console.error('테넌트 자동 선택 실패:', error);
         // Rate limit 에러인 경우 Context만 설정하고 계속 진행

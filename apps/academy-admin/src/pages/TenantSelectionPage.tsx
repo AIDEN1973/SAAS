@@ -13,13 +13,15 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Card, Button, useModal, useResponsiveMode } from '@ui-core/react';
+import { Container, Card, Button, useModal, useResponsiveMode, isMobile } from '@ui-core/react';
 import { useUserTenants, useSelectTenant } from '@hooks/use-auth';
 
 export function TenantSelectionPage() {
   const navigate = useNavigate();
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
   const { showAlert } = useModal();
 
   const { data: tenants, isLoading: tenantsLoading } = useUserTenants();
@@ -41,7 +43,7 @@ export function TenantSelectionPage() {
   // 테넌트가 하나면 자동 선택
   useEffect(() => {
     if (tenants && tenants.length === 1) {
-      handleSelectTenant(tenants[0].id);
+      void handleSelectTenant(tenants[0].id);
     }
   }, [tenants, handleSelectTenant]);
 
@@ -109,11 +111,11 @@ export function TenantSelectionPage() {
       }}
     >
       <Card
-        padding={isMobile ? 'lg' : 'xl'}
+        padding={isMobileMode ? 'lg' : 'xl'}
         style={{ width: '100%' }}
       >
         <h1 style={{
-          fontSize: isMobile ? 'var(--font-size-2xl)' : 'var(--font-size-3xl)',
+          fontSize: isMobileMode ? 'var(--font-size-2xl)' : 'var(--font-size-3xl)',
           fontWeight: 'var(--font-weight-bold)',
           marginBottom: 'var(--spacing-lg)',
           textAlign: 'center'

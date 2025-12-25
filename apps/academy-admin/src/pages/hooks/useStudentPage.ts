@@ -11,16 +11,18 @@
 
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
-import { useModal } from '@ui-core/react';
-import { useStudentsPaged, useStudentTags, useStudentTagsByStudent, useCreateStudent, useBulkCreateStudents, useStudent, useGuardians, fetchGuardians, useConsultations, useStudentClasses, useUpdateStudent, useDeleteStudent, useCreateGuardian, useUpdateGuardian, useDeleteGuardian, useCreateConsultation, useUpdateConsultation, useDeleteConsultation, useGenerateConsultationAISummary, useUpdateStudentTags, useAssignStudentToClass, useUnassignStudentFromClass } from '@hooks/use-student';
+import { useModal , useResponsiveMode, isMobile, isTablet } from '@ui-core/react';
+import { useStudentsPaged, useStudentTags, useStudentTagsByStudent, useCreateStudent, useBulkCreateStudents, useStudent, useGuardians, useConsultations, useStudentClasses, useUpdateStudent, useDeleteStudent, useCreateGuardian, useUpdateGuardian, useDeleteGuardian, useCreateConsultation, useUpdateConsultation, useDeleteConsultation, useGenerateConsultationAISummary, useUpdateStudentTags, useAssignStudentToClass, useUnassignStudentFromClass, useUpdateStudentClassEnrolledAt } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
 import { useSession, useUserRole } from '@hooks/use-auth';
 import { useSchema } from '@hooks/use-schema';
-import { useResponsiveMode } from '@ui-core/react';
 import { toKST } from '@lib/date-utils';
 import type { StudentFilter, StudentStatus, Student, CreateStudentInput, Gender, ConsultationType, Guardian, StudentConsultation } from '@services/student-service';
 import type { Class } from '@services/class-service';
 import { studentFormSchema } from '../../schemas/student.schema';
+// [SSOT] Barrel export를 통한 통합 import
+import { ROUTES } from '../../constants';
+import { createSafeNavigate } from '../../utils';
 import { guardianFormSchema } from '../../schemas/guardian.schema';
 import { consultationFormSchema } from '../../schemas/consultation.schema';
 import { classAssignmentFormSchema } from '../../schemas/class-assignment.schema';
@@ -120,6 +122,7 @@ export interface UseStudentPageReturn {
   updateStudentTags: ReturnType<typeof useUpdateStudentTags>;
   assignStudentToClass: ReturnType<typeof useAssignStudentToClass>;
   unassignStudentFromClass: ReturnType<typeof useUnassignStudentFromClass>;
+  updateStudentClassEnrolledAt: ReturnType<typeof useUpdateStudentClassEnrolledAt>;
 
   // 모달
   showAlert: (message: string, title?: string, variant?: 'success' | 'error' | 'warning' | 'info') => void;
@@ -128,13 +131,20 @@ export interface UseStudentPageReturn {
 
 export function useStudentPage(): UseStudentPageReturn {
   const navigate = useNavigate();
+  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용 (일관성)
+  const safeNavigate = useMemo(
+    () => createSafeNavigate(navigate),
+    [navigate]
+  );
   const location = useLocation();
   const params = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   const { showAlert, showConfirm } = useModal();
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
 
   // 필터 상태
   const [filter, setFilter] = useState<StudentFilter>({});
@@ -209,7 +219,9 @@ export function useStudentPage(): UseStudentPageReturn {
     // Legacy → Canonical rewrite
     if (legacyStudent && !canonicalStudentId) {
       const targetPanel = canonicalPanel || (isLayerMenuTab(legacyTab) ? legacyTab : 'info');
-      navigate(`/students/list?studentId=${legacyStudent}&panel=${targetPanel}`, {
+      // [SSOT] ROUTES 상수 사용
+      // [P0-2 수정] SSOT: safeNavigate 사용 (일관성)
+      safeNavigate(ROUTES.STUDENT_DETAIL(legacyStudent, targetPanel), {
         replace: true
       });
       lastRewrittenSearchRef.current = current;  // ✅ 이 search에 대해 1회만
@@ -218,13 +230,15 @@ export function useStudentPage(): UseStudentPageReturn {
 
     if (legacyTab && !canonicalPanel && canonicalStudentId) {
       const targetPanel = isLayerMenuTab(legacyTab) ? legacyTab : 'info';
-      navigate(`/students/list?studentId=${canonicalStudentId}&panel=${targetPanel}`, {
+      // [SSOT] ROUTES 상수 사용
+      // [P0-2 수정] SSOT: safeNavigate 사용 (일관성)
+      safeNavigate(ROUTES.STUDENT_DETAIL(canonicalStudentId, targetPanel), {
         replace: true
       });
       lastRewrittenSearchRef.current = current;  // ✅ 이 search에 대해 1회만
       return;
     }
-  }, [location.search, searchParams, navigate, isLayerMenuTab]);
+  }, [location.search, searchParams, navigate, isLayerMenuTab, safeNavigate]);
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(urlStudentId);
   // [성능 최적화] lazy initialization으로 초기 렌더링에서만 함수 실행
@@ -329,6 +343,7 @@ export function useStudentPage(): UseStudentPageReturn {
   const updateStudentTags = useUpdateStudentTags();
   const assignStudentToClass = useAssignStudentToClass();
   const unassignStudentFromClass = useUnassignStudentFromClass();
+  const updateStudentClassEnrolledAt = useUpdateStudentClassEnrolledAt();
 
   // URL 동기화
   useEffect(() => {
@@ -353,25 +368,35 @@ export function useStudentPage(): UseStudentPageReturn {
     setSelectedStudentId(studentId);
     if (studentId) {
       // ✅ canonical URL 사용
-      navigate(`/students/list?studentId=${studentId}&panel=${layerMenuTab}`, { replace: true });
+      // [P0-2 수정] SSOT: ROUTES 상수 사용으로 안전성 확보 (동적 파라미터는 ROUTES 함수로 처리)
+      // [P0-2 수정] SSOT: safeNavigate 사용 (일관성)
+      const targetPath = ROUTES.STUDENT_DETAIL(studentId, layerMenuTab);
+      safeNavigate(targetPath, { replace: true });
     } else {
       const newSearchParams = new URLSearchParams(searchParams);
       newSearchParams.delete('studentId');
       newSearchParams.delete('student');  // legacy 제거
       newSearchParams.delete('panel');
       newSearchParams.delete('tab');  // legacy 제거
-      navigate(`/students/list?${newSearchParams.toString()}`, { replace: true });
+      // [P0-2 수정] SSOT: ROUTES 상수 사용으로 안전성 확보
+      const targetPath = `/students/list?${newSearchParams.toString()}`;
+      // URL 파라미터는 이미 내부에서 생성되므로 안전하지만, 검증을 위해 isSafeInternalPath 사용
+      // [P0-2 수정] SSOT: safeNavigate 사용 (일관성, 내부적으로 isSafeInternalPath 검증)
+      safeNavigate(targetPath, { replace: true });
     }
-  }, [navigate, layerMenuTab, searchParams]);
+  }, [safeNavigate, layerMenuTab, searchParams]);
 
   // 탭 변경 핸들러
   const handleTabChange = useCallback((newTab: LayerMenuTab) => {
     setLayerMenuTab(newTab);
     if (selectedStudentId) {
       // ✅ canonical URL 사용
-      navigate(`/students/list?studentId=${selectedStudentId}&panel=${newTab}`, { replace: true });
+      // [P0-2 수정] SSOT: ROUTES 상수 사용으로 안전성 확보 (동적 파라미터는 ROUTES 함수로 처리)
+      // [P0-2 수정] SSOT: safeNavigate 사용 (일관성)
+      const targetPath = ROUTES.STUDENT_DETAIL(selectedStudentId, newTab);
+      safeNavigate(targetPath, { replace: true });
     }
-  }, [selectedStudentId, navigate]);
+  }, [selectedStudentId, safeNavigate]);
 
   // 학생 선택 시 상태 초기화
   useEffect(() => {
@@ -417,8 +442,8 @@ export function useStudentPage(): UseStudentPageReturn {
     if (!el) return;
 
     const measure = () => {
-      const firstBtn = el.querySelector('button') as HTMLButtonElement | null;
-      const oneLineHeight = firstBtn?.offsetHeight ?? 32;
+      const firstBtn = el.querySelector('button');
+      const oneLineHeight = firstBtn instanceof HTMLButtonElement ? firstBtn.offsetHeight : 32;
       setTagListCollapsedHeight(oneLineHeight);
 
       const isWrapped = el.scrollHeight > oneLineHeight + 1;
@@ -514,9 +539,12 @@ export function useStudentPage(): UseStudentPageReturn {
       const workbook = XLSX.read(arrayBuffer, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet) as Array<Record<string, unknown>>;
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      if (!Array.isArray(jsonData)) {
+        throw new Error('Invalid Excel file format');
+      }
 
-      const students: CreateStudentInput[] = jsonData.map((row: Record<string, unknown>) => ({
+      const students: CreateStudentInput[] = (jsonData as Array<Record<string, unknown>>).map((row: Record<string, unknown>) => ({
         name: String(row['이름'] || row['name'] || ''),
         birth_date: row['생년월일'] || row['birth_date'] ? String(row['생년월일'] || row['birth_date']) : undefined,
         gender: (row['성별'] || row['gender'] || undefined) as Gender | undefined,
@@ -584,7 +612,7 @@ export function useStudentPage(): UseStudentPageReturn {
     students,
     totalCount,
     isLoading,
-    error: error as Error | null,
+    error: error instanceof Error ? error : null,
     tags,
     classes,
     selectedStudent,
@@ -618,8 +646,8 @@ export function useStudentPage(): UseStudentPageReturn {
     tableFilters,
 
     // 반응형
-    isMobile,
-    isTablet,
+    isMobile: isMobileMode,
+    isTablet: isTabletMode,
 
     // 핸들러
     setFilter,
@@ -655,6 +683,7 @@ export function useStudentPage(): UseStudentPageReturn {
     updateStudentTags,
     assignStudentToClass,
     unassignStudentFromClass,
+    updateStudentClassEnrolledAt,
 
     // 모달
     showAlert,

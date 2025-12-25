@@ -9,7 +9,8 @@ import React, { useState } from 'react';
 import { Card, Button } from '@ui-core/react';
 import type { RecentActivity } from '@hooks/use-student';
 import { toKST } from '@lib/date-utils';
-import { DATE_FORMATS } from '../../constants/dashboard-cards';
+// [SSOT] Barrel export를 통한 통합 import
+import { DATE_FORMATS } from '../../constants';
 
 export interface RecentActivityCardProps {
   activity: RecentActivity | undefined;

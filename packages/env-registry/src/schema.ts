@@ -36,7 +36,7 @@ export const envServerSchema = z.object({
 
   // AI 기능 플랫폼 전체 온오프 (env-registry/server에서만 읽음, 기본값: true)
   // SSOT: 프론트 자동화 문서 "글로벌 헤더 AI 토글 — UX/정책 SSOT" 섹션 참조
-  PLATFORM_AI_ENABLED: z.string().transform((val) => val === 'true' || val === '1').optional().default('true'),
+  PLATFORM_AI_ENABLED: z.string().optional().default('true').transform((val) => val === 'true' || val === '1'),
 });
 
 // 클라이언트 사용 스키마(NEXT_PUBLIC_*는 빌드 타임에 추출 값만)

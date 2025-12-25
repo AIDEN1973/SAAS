@@ -265,10 +265,72 @@ export default defineConfig(({ mode }) => {
         '@core/tags',
       ],
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'design-system': ['@design-system/core'],
-          'ui-core': ['@ui-core/react'],
+        manualChunks: (id) => {
+          // node_modules의 큰 라이브러리들을 별도 청크로 분리
+          if (id.includes('node_modules')) {
+            // React 관련
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'react-vendor';
+            }
+            // React Router
+            if (id.includes('react-router')) {
+              return 'react-router-vendor';
+            }
+            // TanStack Query 관련
+            if (id.includes('@tanstack')) {
+              return 'tanstack-vendor';
+            }
+            // React Hook Form
+            if (id.includes('react-hook-form')) {
+              return 'react-hook-form-vendor';
+            }
+            // Recharts는 동적 import로 처리되므로 초기 번들에서 제외
+            // xlsx는 동적 import로 처리되므로 여기서는 제외
+            // Lucide icons
+            if (id.includes('lucide-react')) {
+              return 'lucide-icons-vendor';
+            }
+            // Radix UI
+            if (id.includes('radix-ui') || id.includes('@radix-ui')) {
+              return 'radix-ui-vendor';
+            }
+            // 큰 라이브러리들을 더 세분화
+            // date-fns 같은 유틸리티
+            if (id.includes('date-fns') || id.includes('dayjs') || id.includes('moment')) {
+              return 'date-vendor';
+            }
+            // 기타 큰 라이브러리들을 여러 vendor 청크로 분산
+            // vendor 청크가 너무 커지지 않도록 여러 개로 분리
+            const vendorChunks = ['vendor-1', 'vendor-2', 'vendor-3'];
+            // 파일 경로를 해시하여 일관되게 분배
+            const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            return vendorChunks[hash % vendorChunks.length];
+          }
+
+          // 내부 패키지들
+          if (id.includes('@design-system')) {
+            return 'design-system';
+          }
+          if (id.includes('@ui-core')) {
+            return 'ui-core';
+          }
+          if (id.includes('@schema-engine')) {
+            return 'schema-engine';
+          }
+          if (id.includes('@api-sdk')) {
+            return 'api-sdk';
+          }
+          if (id.includes('@hooks')) {
+            return 'hooks';
+          }
+          if (id.includes('@core')) {
+            return 'core';
+          }
+          if (id.includes('@services')) {
+            return 'services';
+          }
+
+          // 페이지별 코드 스플리팅은 React.lazy로 처리되므로 여기서는 제외
         },
       },
     },

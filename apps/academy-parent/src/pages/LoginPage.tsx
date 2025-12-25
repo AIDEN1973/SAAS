@@ -160,7 +160,7 @@ export function LoginPage() {
             schema={loginFormSchema}
             onSubmit={handleEmailLogin}
             actionContext={{
-              apiCall: async () => ({}),
+              apiCall: () => Promise.resolve({}),
               showToast: () => {},
             }}
           />
@@ -217,10 +217,10 @@ export function LoginPage() {
                   }}
                   onSubmit={(data: Record<string, unknown>) => {
                     setPhone(String(data.phone ?? ''));
-                    handleSendOTP();
+                    void handleSendOTP();
                   }}
                   actionContext={{
-                    apiCall: async () => ({}),
+                    apiCall: () => Promise.resolve({}),
                     showToast: () => {},
                   }}
                 />
@@ -231,7 +231,7 @@ export function LoginPage() {
                 onSubmit={handleOTPLogin}
                 defaultValues={{ phone }}
                 actionContext={{
-                  apiCall: async () => ({}),
+                  apiCall: () => Promise.resolve({}),
                   showToast: () => {},
                 }}
               />

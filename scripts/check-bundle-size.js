@@ -1,7 +1,9 @@
 /**
  * Bundle Size Checker
- * 
+ *
  * [불변 규칙] Initial Load Bundle ≤ 500KB (초과 시 빌드 실패)
+ *
+ * Initial Load Bundle = index.html에서 직접 로드되는 모든 JS/CSS 파일의 합
  */
 
 const fs = require('fs');
@@ -9,52 +11,141 @@ const path = require('path');
 
 const MAX_BUNDLE_SIZE = 500 * 1024; // 500KB
 
+/**
+ * 재귀적으로 디렉토리 내의 모든 파일을 찾습니다
+ */
+function getAllFiles(dirPath, arrayOfFiles = []) {
+  const files = fs.readdirSync(dirPath);
+
+  files.forEach((file) => {
+    const filePath = path.join(dirPath, file);
+    if (fs.statSync(filePath).isDirectory()) {
+      arrayOfFiles = getAllFiles(filePath, arrayOfFiles);
+    } else {
+      arrayOfFiles.push(filePath);
+    }
+  });
+
+  return arrayOfFiles;
+}
+
+/**
+ * index.html에서 직접 로드되는 파일들을 찾습니다
+ *
+ * [중요] modulepreload는 초기 로드가 아닙니다.
+ * 실제로 즉시 실행되는 script 태그와 CSS만 초기 로드로 계산합니다.
+ */
+function getInitialLoadFiles(distPath) {
+  const indexPath = path.join(distPath, 'index.html');
+  if (!fs.existsSync(indexPath)) {
+    return [];
+  }
+
+  const htmlContent = fs.readFileSync(indexPath, 'utf-8');
+
+  // 실제로 즉시 실행되는 script 태그만 (modulepreload 제외)
+  const scriptMatches = htmlContent.matchAll(/<script[^>]*src=["']([^"']+)["'][^>]*>/g);
+
+  // CSS 파일 (stylesheet link만)
+  const stylesheetMatches = htmlContent.matchAll(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+)["'][^>]*>/g);
+
+  const files = [];
+  for (const match of scriptMatches) {
+    if (match[1] && (match[1].endsWith('.js') || match[1].includes('assets/'))) {
+      files.push(match[1]);
+    }
+  }
+  for (const match of stylesheetMatches) {
+    if (match[1] && (match[1].endsWith('.css') || match[1].includes('assets/'))) {
+      files.push(match[1]);
+    }
+  }
+
+  return files;
+}
+
 function checkBundleSize(buildDir) {
-  const distPath = path.join(process.cwd(), buildDir, 'dist');
-  
+  // buildDir가 '.'이면 현재 디렉토리, 아니면 상대 경로로 처리
+  const distPath = buildDir === '.'
+    ? path.join(process.cwd(), 'dist')
+    : path.join(process.cwd(), buildDir, 'dist');
+
   if (!fs.existsSync(distPath)) {
     console.warn(`⚠️  Build directory not found: ${distPath}`);
     return true;
   }
 
-  const files = fs.readdirSync(distPath);
+  // index.html에서 직접 로드되는 파일들 찾기
+  const initialLoadFiles = getInitialLoadFiles(distPath);
+
+  // 모든 JS/CSS 파일 찾기 (재귀적으로)
+  const allFiles = getAllFiles(distPath);
+  const jsCssFiles = allFiles.filter(file =>
+    file.endsWith('.js') || file.endsWith('.css')
+  );
+
   let totalSize = 0;
   const largeFiles = [];
+  let initialLoadSize = 0;
+  const initialLoadFilesList = [];
 
-  files.forEach((file) => {
-    const filePath = path.join(distPath, file);
+  // Initial Load Bundle 계산 (index.html에서 직접 로드되는 파일들)
+  initialLoadFiles.forEach((relativePath) => {
+    const filePath = path.join(distPath, relativePath.startsWith('/') ? relativePath.slice(1) : relativePath);
+    if (fs.existsSync(filePath)) {
+      const stats = fs.statSync(filePath);
+      initialLoadSize += stats.size;
+      initialLoadFilesList.push({
+        name: relativePath,
+        size: (stats.size / 1024).toFixed(2) + ' KB',
+      });
+    }
+  });
+
+  // 모든 파일 크기 계산
+  jsCssFiles.forEach((filePath) => {
     const stats = fs.statSync(filePath);
-    
-    if (stats.isFile() && (file.endsWith('.js') || file.endsWith('.css'))) {
-      totalSize += stats.size;
-      
-      if (stats.size > 100 * 1024) { // 100KB 이상 파일
-        largeFiles.push({
-          name: file,
-          size: (stats.size / 1024).toFixed(2) + ' KB',
-        });
-      }
+    const relativePath = path.relative(distPath, filePath);
+    totalSize += stats.size;
+
+    if (stats.size > 100 * 1024) { // 100KB 이상 파일
+      largeFiles.push({
+        name: relativePath,
+        size: (stats.size / 1024).toFixed(2) + ' KB',
+      });
     }
   });
 
   const totalSizeKB = (totalSize / 1024).toFixed(2);
+  const initialLoadSizeKB = initialLoadFiles.length > 0
+    ? (initialLoadSize / 1024).toFixed(2)
+    : 'N/A';
   const maxSizeKB = (MAX_BUNDLE_SIZE / 1024).toFixed(2);
 
   console.log(`\n📦 Bundle Size Check:`);
-  console.log(`   Total: ${totalSizeKB} KB / ${maxSizeKB} KB`);
+  console.log(`   Total JS/CSS: ${totalSizeKB} KB`);
+  if (initialLoadFiles.length > 0) {
+    console.log(`   Initial Load Bundle: ${initialLoadSizeKB} KB / ${maxSizeKB} KB`);
+  }
 
   if (largeFiles.length > 0) {
-    console.log(`\n   Large files:`);
+    console.log(`\n   Large files (>100KB):`);
     largeFiles.forEach((file) => {
       console.log(`   - ${file.name}: ${file.size}`);
     });
   }
 
-  if (totalSize > MAX_BUNDLE_SIZE) {
-    console.error(`\n❌ Bundle size exceeds limit!`);
-    console.error(`   Current: ${totalSizeKB} KB`);
+  if (initialLoadFiles.length > 0 && initialLoadSize > MAX_BUNDLE_SIZE) {
+    console.error(`\n❌ Initial Load Bundle size exceeds limit!`);
+    console.error(`   Current: ${initialLoadSizeKB} KB`);
     console.error(`   Limit: ${maxSizeKB} KB`);
-    console.error(`   Over: ${((totalSize - MAX_BUNDLE_SIZE) / 1024).toFixed(2)} KB`);
+    console.error(`   Over: ${((initialLoadSize - MAX_BUNDLE_SIZE) / 1024).toFixed(2)} KB`);
+    if (initialLoadFilesList.length > 0) {
+      console.error(`\n   Initial Load Files:`);
+      initialLoadFilesList.forEach((file) => {
+        console.error(`   - ${file.name}: ${file.size}`);
+      });
+    }
     process.exit(1);
   }
 

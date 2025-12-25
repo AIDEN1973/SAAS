@@ -8,30 +8,36 @@
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary, Container, Card, Button, PageHeader } from '@ui-core/react';
-import { Grid } from '@ui-core/react';
-import { useStudentTaskCards } from '@hooks/use-student';
-import type { DashboardCard, EmergencyCard, AIBriefingCard, ClassCard, StatsCard, BillingSummaryCard } from '../types/dashboardCard';
+import { useStudentTaskCards , fetchConsultations, fetchPersons } from '@hooks/use-student';
+import type { DashboardCard, EmergencyCard, AIBriefingCard, ClassCard, StatsCard } from '../types/dashboardCard';
 import { useQuery } from '@tanstack/react-query';
-import { apiClient, getApiContext } from '@api-sdk/core';
+import { getApiContext } from '@api-sdk/core';
 import { useClasses } from '@hooks/use-class';
-import { useAttendanceLogs, fetchAttendanceLogs } from '@hooks/use-attendance';
+import { useAttendanceLogs } from '@hooks/use-attendance';
 import { fetchBillingHistory } from '@hooks/use-billing';
-import { fetchConsultations, fetchPersons } from '@hooks/use-student';
 import { fetchPayments } from '@hooks/use-payments';
 import type { DayOfWeek } from '@services/class-service';
 import { toKST } from '@lib/date-utils';
 import type { BillingHistoryItem } from '@hooks/use-billing';
 import type { AttendanceLog } from '@services/attendance-service';
-import { renderCard } from '../utils/dashboardCardRenderer';
 import { CardGridLayout } from '../components/CardGridLayout';
+// [SSOT] Barrel export를 통한 통합 import
+import { renderCard, createSafeNavigate } from '../utils';
+import { ROUTES } from '../constants';
 
 export function AllCardsPage() {
   const navigate = useNavigate();
   const context = getApiContext();
   const tenantId = context.tenantId;
+
+  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
+  const safeNavigate = useMemo(
+    () => createSafeNavigate(navigate),
+    [navigate]
+  );
 
   // 모든 카드 데이터 조회 (HomePage와 동일한 로직)
   const { data: studentTaskCards } = useStudentTaskCards();
@@ -56,7 +62,7 @@ export function AllCardsPage() {
             title: '결제 실패 알림',
             message: `최근 결제 실패가 ${failedCount}건 발생했습니다.`,
             priority: 1,
-            action_url: '/billing/home',
+            action_url: ROUTES.BILLING_HOME,
           });
         }
       }
@@ -85,7 +91,7 @@ export function AllCardsPage() {
               summary: `오늘 ${todayConsultations.length}건의 상담이 예정되어 있습니다.`,
               insights: ['상담일지를 작성하여 학생 관리를 강화하세요.'],
               created_at: toKST().toISOString(),
-              action_url: '/ai?tab=consultation',
+              action_url: ROUTES.AI_CONSULTATION,
             });
         }
         const currentMonth = toKST().format('YYYY-MM');
@@ -106,7 +112,7 @@ export function AllCardsPage() {
               summary: `이번 달 청구서가 자동 발송되었습니다. 예상 수납률은 ${expectedCollectionRate}%입니다.`,
               insights: [expectedCollectionRate >= 90 ? '수납률이 양호합니다.' : '수납률 개선이 필요합니다.'],
               created_at: toKST().toISOString(),
-              action_url: '/billing/home',
+              action_url: ROUTES.BILLING_HOME,
             });
           }
         }
@@ -120,7 +126,7 @@ export function AllCardsPage() {
   });
 
   // 오늘 수업 조회 (기술문서 5-2: KST 기준 날짜 처리)
-  const todayDayOfWeek = React.useMemo<DayOfWeek>(() => {
+  const todayDayOfWeek = useMemo<DayOfWeek>(() => {
     const todayKST = toKST();
     const dayOfWeek = todayKST.day(); // 0(일) ~ 6(토)
     const dayOfWeekMap: Record<number, DayOfWeek> = {
@@ -135,7 +141,7 @@ export function AllCardsPage() {
     status: 'active',
   });
 
-  const todayDate = React.useMemo(() => toKST().format('YYYY-MM-DD'), []);
+  const todayDate = useMemo(() => toKST().format('YYYY-MM-DD'), []);
   // 정본 규칙: apiClient.get('attendance_logs') 직접 조회 제거, useAttendanceLogs Hook 사용
   const { data: todayAttendanceLogs } = useAttendanceLogs({
     date_from: `${todayDate}T00:00:00`,
@@ -143,10 +149,10 @@ export function AllCardsPage() {
     attendance_type: 'check_in',
   });
 
-  const todayClasses = React.useMemo<ClassCard[]>(() => {
+  const todayClasses = useMemo<ClassCard[]>(() => {
     if (!todayClassesData || todayClassesData.length === 0) return [];
     return todayClassesData.map((cls) => {
-      const attendanceCount = (todayAttendanceLogs as AttendanceLog[] | undefined)?.filter((log: AttendanceLog) =>
+      const attendanceCount = todayAttendanceLogs?.filter((log: AttendanceLog) =>
         log.class_id === cls.id && log.status === 'present'
       ).length || 0;
       return {
@@ -156,7 +162,7 @@ export function AllCardsPage() {
         start_time: cls.start_time,
         student_count: cls.current_count || 0,
         attendance_count: attendanceCount,
-        action_url: `/attendance?class_id=${cls.id}`,
+        action_url: ROUTES.ATTENDANCE_BY_CLASS(cls.id),
       };
     });
   }, [todayClassesData, todayAttendanceLogs]);
@@ -177,7 +183,7 @@ export function AllCardsPage() {
           type: 'stats',
           title: '전체 학생 수',
           value: students.length.toString(),
-          action_url: '/students/list',
+          action_url: ROUTES.STUDENTS_LIST,
         });
       }
       return cards;
@@ -209,14 +215,14 @@ export function AllCardsPage() {
         title: '이번 달 수납 현황',
         expected_collection_rate: expectedCollectionRate,
         unpaid_count: unpaidCount,
-        action_url: '/billing/home',
+        action_url: ROUTES.BILLING_HOME,
       };
     },
     enabled: !!tenantId,
   });
 
   // 모든 카드 합치기 (제한 없이)
-  const allCards = React.useMemo(() => {
+  const allCards = useMemo(() => {
     const cards: DashboardCard[] = [];
     if (emergencyCards) cards.push(...emergencyCards);
     if (aiBriefingCards) cards.push(...aiBriefingCards);
@@ -234,7 +240,7 @@ export function AllCardsPage() {
         <PageHeader
           title="전체 카드 목록"
           actions={
-            <Button variant="outline" onClick={() => navigate('/home')}>
+            <Button variant="outline" onClick={() => safeNavigate(ROUTES.HOME)}>
               홈으로 돌아가기
             </Button>
           }
@@ -242,7 +248,7 @@ export function AllCardsPage() {
 
         {allCards.length > 0 ? (
             <CardGridLayout
-              cards={allCards.map((card) => renderCard(card, navigate, { maxInsights: 0 }))}
+              cards={allCards.map((card) => renderCard(card, safeNavigate, { maxInsights: 0 }))}
               desktopColumns={3}
               tabletColumns={2}
               mobileColumns={1}

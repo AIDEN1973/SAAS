@@ -15,7 +15,7 @@ export const tagFormSchema: FormSchema = {
       {
         name: 'name',
         kind: 'custom',
-        customComponentType: 'TagNameInput',
+        customComponentType: 'academy-admin/TagNameInput',
         ui: {
           labelKey: 'TAG.FORM.NAME.LABEL',
           label: '태그 이름',

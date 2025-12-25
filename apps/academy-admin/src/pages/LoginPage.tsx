@@ -15,7 +15,7 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Card, Button, Input, useModal, useResponsiveMode } from '@ui-core/react';
+import { Container, Card, Button, Input, useModal, useResponsiveMode, isMobile } from '@ui-core/react';
 import { SchemaForm } from '@schema-engine';
 import {
   useLoginWithEmail,
@@ -31,7 +31,9 @@ type LoginMethod = 'email' | 'oauth' | 'otp';
 export function LoginPage() {
   const navigate = useNavigate();
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
   const { showAlert } = useModal();
 
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('email');
@@ -176,11 +178,11 @@ export function LoginPage() {
       }}
     >
       <Card
-        padding={isMobile ? 'lg' : 'xl'}
+        padding={isMobileMode ? 'lg' : 'xl'}
         style={{ width: '100%' }}
       >
         <h1 style={{
-          fontSize: isMobile ? 'var(--font-size-2xl)' : 'var(--font-size-3xl)',
+          fontSize: isMobileMode ? 'var(--font-size-2xl)' : 'var(--font-size-3xl)',
           fontWeight: 'var(--font-weight-bold)',
           marginBottom: 'var(--spacing-lg)',
           textAlign: 'center'

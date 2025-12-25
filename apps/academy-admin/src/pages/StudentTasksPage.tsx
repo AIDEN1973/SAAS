@@ -8,19 +8,27 @@
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, Container, Card, Button, useModal, PageHeader } from '@ui-core/react';
+// [SSOT] Barrel export를 통한 통합 import
+import { ROUTES } from '../constants';
+import { ErrorBoundary, Container, Card, Button, PageHeader } from '@ui-core/react';
 import { StudentTaskCard } from '../components/StudentTaskCard';
 import { useStudentTaskCards, useStudentTaskCardAction } from '@hooks/use-student';
 import { CardGridLayout } from '../components/CardGridLayout';
+import { createSafeNavigate } from '../utils';
 
 export function StudentTasksPage() {
   const navigate = useNavigate();
-  const { showAlert } = useModal();
   const { data: cardsData, isLoading, error } = useStudentTaskCards();
   const cards = cardsData || [];
   const getCardActionUrl = useStudentTaskCardAction();
+
+  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
+  const safeNavigate = useMemo(
+    () => createSafeNavigate(navigate),
+    [navigate]
+  );
 
   return (
     <ErrorBoundary>
@@ -28,7 +36,7 @@ export function StudentTasksPage() {
         <PageHeader
           title="전체 학생 업무"
           actions={
-            <Button variant="outline" onClick={() => navigate('/students/home')}>
+            <Button variant="outline" onClick={() => safeNavigate(ROUTES.STUDENTS_LIST)}>
               학생 관리 홈으로
             </Button>
           }
@@ -58,9 +66,10 @@ export function StudentTasksPage() {
                 card={card}
                 onAction={(card) => {
                   // 정본 규칙: 컴포넌트 레벨에서 navigate 호출 (Hook 내부 호출 금지)
+                  // [P0-2 수정] SSOT: safeNavigate 사용 (서버에서 온 actionUrl 보호)
                   const actionUrl = getCardActionUrl(card);
                   if (actionUrl) {
-                    navigate(actionUrl);
+                    safeNavigate(actionUrl);
                   }
                 }}
               />

@@ -19,7 +19,7 @@ export type SchemaType = 'form' | 'table' | 'detail' | 'filter' | 'widget';
 export interface SchemaVersion {
     version: string;
     minClient?: string;
-    minSupportedClient?: string;
+    minSupportedClient: string;  // 정본 (필수): DB 스키마에서 NOT NULL이므로 필수
     entity: string;
 }
 /**

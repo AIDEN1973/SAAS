@@ -22,7 +22,7 @@ export type SchemaType = 'form' | 'table' | 'detail' | 'filter' | 'widget';
 export interface SchemaVersion {
   version: string;
   minClient?: string;  // 레거시 입력 허용: minSupportedClient가 정본
-  minSupportedClient?: string;  // 정본 (필수): 우선순위 1
+  minSupportedClient: string;  // 정본 (필수): 우선순위 1, DB 스키마에서 NOT NULL이므로 필수
   entity: string;
 }
 

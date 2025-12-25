@@ -11,6 +11,8 @@ import { clsx } from 'clsx';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 import { RightLayerMenu, RightLayerMenuProps } from './RightLayerMenu';
 import { getCSSVariableAsPx, getCSSVariableAsMs, parseWidthToPx } from '../utils/css-variables';
+// [SSOT] 브레이크포인트 값은 BREAKPOINTS 상수 사용
+import { BREAKPOINTS } from '../ssot/layout-templates';
 
 export interface RightLayerMenuLayoutProps {
   children: React.ReactNode;
@@ -52,7 +54,8 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
     const baseFontSize = typeof window !== 'undefined'
       ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
       : 16;
-    const breakpointTabletPx = getCSSVariableAsPx('--breakpoint-tablet', 48 * baseFontSize); // 기본값: 48rem = 768px (fallback)
+    // [SSOT] 브레이크포인트 값은 BREAKPOINTS 상수 사용
+    const breakpointTabletPx = BREAKPOINTS.MD; // 768px (SSOT 상수 사용)
     const overlayThresholdPx = getCSSVariableAsPx('--width-overlay-threshold', 90 * baseFontSize); // 기본값: 90rem = 1440px (fallback)
 
     // 1440px 이상인 경우 반드시 push 모드(바디 축소) 사용 보장
@@ -263,4 +266,3 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
     </div>
   );
 };
-

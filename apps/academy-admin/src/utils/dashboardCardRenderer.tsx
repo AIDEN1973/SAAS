@@ -8,9 +8,7 @@
 import React from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 import type { DashboardCard } from '../types/dashboardCard';
-import { StudentTaskCard } from '../components/StudentTaskCard';
-import type { StudentTaskCard as StudentTaskCardType } from '@hooks/use-student';
-import { useStudentTaskCardAction } from '@hooks/use-student';
+import { StudentTaskCardRenderer } from '../components/StudentTaskCardRenderer';
 import { EmergencyCard } from '../components/dashboard-cards/EmergencyCard';
 import { AIBriefingCard } from '../components/dashboard-cards/AIBriefingCard';
 import { ClassCard } from '../components/dashboard-cards/ClassCard';
@@ -35,7 +33,7 @@ export function renderCard(
   // Student Task Card
   if ('task_type' in card) {
     // Hook은 컴포넌트 내부에서만 사용 가능하므로, 별도 컴포넌트로 처리
-    return <StudentTaskCardRenderer key={card.id} card={card as StudentTaskCardType} navigate={navigate} />;
+    return <StudentTaskCardRenderer key={card.id} card={card} navigate={navigate} />;
   }
 
   // Emergency Card
@@ -102,28 +100,5 @@ export function renderCard(
   }
 
   return null;
-}
-
-/**
- * StudentTaskCard 렌더링 컴포넌트
- *
- * Hook 사용을 위해 별도 컴포넌트로 분리
- */
-function StudentTaskCardRenderer({ card, navigate }: { card: StudentTaskCardType; navigate: NavigateFunction }) {
-  const handleCardAction = useStudentTaskCardAction();
-
-  return (
-    <StudentTaskCard
-      key={card.id}
-      card={card}
-      onAction={(card) => {
-        // ⚠️ 정본 규칙: 컴포넌트 레벨에서 navigate 호출 (Hook 내부 호출 금지)
-        const actionUrl = handleCardAction(card);
-        if (actionUrl) {
-          navigate(actionUrl);
-        }
-      }}
-    />
-  );
 }
 

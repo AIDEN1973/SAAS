@@ -22,9 +22,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ErrorBoundary, useModal } from '@ui-core/react';
-import { Container, Card, Button, PageHeader } from '@ui-core/react';
-import { useResponsiveMode } from '@ui-core/react';
+import { ErrorBoundary, useModal , Container, Card, Button, PageHeader , useResponsiveMode, isMobile } from '@ui-core/react';
 import { RegionalMetricCard } from '../components/analytics-cards/RegionalMetricCard';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useConfig } from '@hooks/use-config';
@@ -36,7 +34,8 @@ import { fetchDailyRegionMetrics } from '@hooks/use-daily-region-metrics';
 import { toKST } from '@lib/date-utils';
 import type { BillingHistoryItem } from '@hooks/use-billing';
 import type { AttendanceLog } from '@services/attendance-service';
-import type { Student } from '@services/student-service';
+// [SSOT] Barrel export를 통한 통합 import
+import { safe } from '../utils';
 
 // 통계문서 2.4: Percentile Rank 계산을 위한 상수 정의 (하드코딩 제거)
 // Policy 기반 값이 없을 경우 사용하는 fallback 비율 (Default Policy)
@@ -69,8 +68,9 @@ export function AnalyticsPage() {
   const industryType = context?.industryType || 'academy'; // Context에서 가져오되, 없으면 fallback
   const { data: config } = useConfig();
   const mode = useResponsiveMode(); // 유아이 문서 6-0: 반응형 브레이크포인트 표준 준수
-  const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
 
   const [selectedMetric, setSelectedMetric] = useState<'students' | 'revenue' | 'attendance' | 'growth'>('students');
   const [heatmapType, setHeatmapType] = useState<'growth' | 'attendance' | 'students'>('growth');
@@ -651,16 +651,17 @@ export function AnalyticsPage() {
 
       // 핵심 지표 수집
       // 정본 규칙: fetch 함수 사용 (Hook의 queryFn 로직 재사용)
+      // [SSOT] 에러 처리 SSOT 사용 (safe 함수)
       const [students, invoices, attendanceLogs, regionalStatsResponse] = await Promise.all([
-        fetchPersons(tenantId, { person_type: 'student' }),
-        fetchBillingHistory(tenantId, {
+        safe(fetchPersons(tenantId, { person_type: 'student' }), []),
+        safe(fetchBillingHistory(tenantId, {
           period_start: { gte: `${currentMonthStr}-01` },
-        }),
-        fetchAttendanceLogs(tenantId, {
+        }), []),
+        safe(fetchAttendanceLogs(tenantId, {
           date_from: `${currentMonthStr}-01T00:00:00`,
-        }),
+        }), []),
         // 지역 통계는 이미 조회된 데이터 사용
-        Promise.resolve({ data: regionalStats }),
+        safe(Promise.resolve({ data: regionalStats }), { data: regionalStats }),
       ]);
 
       // 리포트 데이터 생성 (통계문서 FR-09: 핵심 지표 요약, 지역 대비 평가, 이번달 개선점)
@@ -712,13 +713,13 @@ export function AnalyticsPage() {
 
   return (
     <ErrorBoundary>
-      <Container maxWidth="xl" padding={isMobile ? "sm" : "lg"}>
+      <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"}>
         <PageHeader
           title="지역 기반 통계"
           actions={
             <Button
               variant="outline"
-              size={isMobile ? "sm" : "md"}
+              size={isMobileMode ? "sm" : "md"}
               onClick={() => generateMonthlyReport.mutate()}
               disabled={generateMonthlyReport.isPending}
             >
@@ -912,30 +913,30 @@ export function AnalyticsPage() {
                     </div>
                     <div style={{
                       display: 'flex',
-                      gap: isMobile ? 'var(--spacing-md)' : 'var(--spacing-lg)',
-                      flexWrap: isMobile ? 'wrap' : 'nowrap',
+                      gap: isMobileMode ? 'var(--spacing-md)' : 'var(--spacing-lg)',
+                      flexWrap: isMobileMode ? 'wrap' : 'nowrap',
                     }}>
-                      <div style={{ flex: isMobile ? '1 1 100%' : '1' }}>
+                      <div style={{ flex: isMobileMode ? '1 1 100%' : '1' }}>
                         <div style={{ color: 'var(--color-text-secondary)' }}>
                           우리 학원
                         </div>
-                        <div style={{ fontSize: isMobile ? 'var(--font-size-lg)' : 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }}>
+                        <div style={{ fontSize: isMobileMode ? 'var(--font-size-lg)' : 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }}>
                           {regionalStats.value}
                         </div>
                       </div>
-                      <div style={{ flex: isMobile ? '1 1 100%' : '1' }}>
+                      <div style={{ flex: isMobileMode ? '1 1 100%' : '1' }}>
                         <div style={{ color: 'var(--color-text-secondary)' }}>
                           지역 평균
                         </div>
-                        <div style={{ fontSize: isMobile ? 'var(--font-size-lg)' : 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }}>
+                        <div style={{ fontSize: isMobileMode ? 'var(--font-size-lg)' : 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)' }}>
                           {regionalStats.average}
                         </div>
                       </div>
-                      <div style={{ flex: isMobile ? '1 1 100%' : '1' }}>
+                      <div style={{ flex: isMobileMode ? '1 1 100%' : '1' }}>
                         <div style={{ color: 'var(--color-text-secondary)' }}>
                           변화율
                         </div>
-                        <div style={{ fontSize: isMobile ? 'var(--font-size-lg)' : 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-success)' }}>
+                        <div style={{ fontSize: isMobileMode ? 'var(--font-size-lg)' : 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-success)' }}>
                           {regionalStats.trend}
                         </div>
                       </div>
@@ -987,7 +988,9 @@ function HeatmapCard({
   tenantId: string | null;
 }) {
   const mode = useResponsiveMode(); // 유아이 문서 6-0: 반응형 브레이크포인트 표준 준수
-  const isMobile = mode === 'xs' || mode === 'sm';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
   // [불변 규칙] Zero-Trust: industryType은 Context에서 가져와야 함 (하드코딩 금지)
   const context = getApiContext();
   const industryType = context?.industryType || 'academy'; // Context에서 가져오되, 없으면 fallback
@@ -1149,7 +1152,7 @@ function HeatmapCard({
               gridTemplateColumns: 'repeat(7, 1fr)',
               gap: 'var(--spacing-xs)',
               width: '100%',
-              maxWidth: isMobile ? '100%' : 'var(--width-content-max)',
+              maxWidth: isMobileMode ? '100%' : 'var(--width-content-max)',
               margin: '0 auto',
             }}>
               {heatmapGridData.map((item) => {

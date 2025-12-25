@@ -7,7 +7,14 @@
  *
  * 참고: docu/AI_자동화_기능_정리.md Section 11
  *
- * ⚠️ 중요: 이 파일은 packages/core/core-automation과 동기화되어야 합니다.
+ * ⚠️ 동기화 필수: 이 파일은 다음 파일들과 동일한 내용을 유지해야 합니다:
+ * - packages/core/core-automation/src/automation-event-catalog.ts (최상위 정본)
+ * - infra/supabase/functions/_shared/automation-event-catalog.ts (이 파일, Edge Function 구현)
+ * - infra/supabase/supabase/functions/_shared/automation-event-catalog.ts (re-export, 자동 동기화됨)
+ *
+ * 수정 시 2개 파일(packages + infra/functions/_shared)만 업데이트하면 됩니다.
+ * infra/supabase/functions/_shared/automation-event-catalog.ts는 re-export이므로 자동으로 동기화됩니다.
+ * (향후 자동 동기화 스크립트 또는 CI 검증 추가 권장)
  */
 
 /**
@@ -80,12 +87,22 @@ export const AUTOMATION_EVENT_CATALOG = [
 export type AutomationEventType = (typeof AUTOMATION_EVENT_CATALOG)[number];
 
 /**
+ * Automation Event Catalog Set (성능 최적화용)
+ *
+ * O(1) 검증을 위한 Set 자료구조. 배열의 includes()는 O(n)이지만 Set의 has()는 O(1)입니다.
+ * 39개 항목이므로 성능 개선 효과가 있습니다.
+ */
+const AUTOMATION_EVENT_CATALOG_SET = new Set<string>(AUTOMATION_EVENT_CATALOG);
+
+/**
  * event_type 검증 가드 함수
+ *
+ * 성능 최적화: Set을 사용하여 O(1) 시간 복잡도로 검증합니다.
  * @param v 검증할 문자열
  * @returns v가 유효한 AutomationEventType인지 여부
  */
 export function isAutomationEventType(v: string): v is AutomationEventType {
-  return (AUTOMATION_EVENT_CATALOG as readonly string[]).includes(v);
+  return AUTOMATION_EVENT_CATALOG_SET.has(v);
 }
 
 /**

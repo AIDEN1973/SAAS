@@ -54,7 +54,7 @@ export function QRAttendancePage() {
       }
 
       const result = await submitAttendance({
-        qrToken: q!,
+        qrToken: q,
         studentId,
         authMethod,
         gps,
@@ -89,7 +89,7 @@ export function QRAttendancePage() {
           if (user) {
             // 로그인 상태 → 자동 인증
             setAuthStep('authenticated');
-            handleSubmitAttendance(user.id, 'jwt');
+            void handleSubmitAttendance(user.id, 'jwt');
           } else {
             // 비로그인 상태 → SMS 인증 또는 보조 인증
             setAuthStep('sms');
@@ -130,7 +130,7 @@ export function QRAttendancePage() {
       const result = await verifyOTP(phone, otp);
       if (result.success && result.studentId) {
         setAuthStep('authenticated');
-        handleSubmitAttendance(result.studentId, 'sms_auth');
+        void handleSubmitAttendance(result.studentId, 'sms_auth');
       } else {
         showAlert('오류', result.error || '인증에 실패했습니다.');
       }

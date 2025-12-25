@@ -61,6 +61,18 @@
     - 반환 값 의미: Policy가 없으면 `null`, 있으면 직접 값 `T` 반환 (`.value` 접근 불필요)
     - **프론트엔드 Hook `useTenantSettingByPath`**: `UseQueryResult<unknown, Error>` 반환 (React Query의 `useQuery` 반환 객체)
       - 사용 예시: `const { data: enabledValue } = useTenantSettingByPath("auto_notification.overdue.enabled");`
+    - **프론트엔드 SSOT 유틸리티** (apps/academy-admin/src/utils):
+      - ⚠️ **Policy 조회 SSOT**: `getPolicyValueFromConfig<T>(config, path)` 함수 사용 (SSOT 위치: `apps/academy-admin/src/utils/policy-utils.ts`)
+        - 사용 예시: `import { getPolicyValueFromConfig } from '../utils'; const threshold = getPolicyValueFromConfig<number>(config, 'auto_notification.overdue.threshold');`
+      - ⚠️ **Policy Registry SSOT**: `POLICY_REGISTRY` 및 `getPolicyValue<T>(key, config)` 함수 사용 (SSOT 위치: `apps/academy-admin/src/utils/policy-registry.ts`)
+        - Policy 소스 이원화 문제 해결: 모든 Policy를 Registry에 등록하여 단일 소스로 통일
+        - 사용 예시: `import { getPolicyValue, POLICY_REGISTRY } from '../utils'; const threshold = getPolicyValue<number>('PAYMENT_FAILED_THRESHOLD', config);`
+        - ⚠️ **EMERGENCY_CARDS_POLICY_PATHS 변경사항**: `apps/academy-admin/src/constants/emergency-cards-policy.ts`의 `EMERGENCY_CARDS_POLICY_PATHS`는 `POLICY_REGISTRY`를 기반으로 재정의되었습니다. 하위 호환성을 위해 export는 유지하되, 신규 코드에서는 `POLICY_REGISTRY`를 직접 사용하는 것을 권장합니다.
+      - ⚠️ **Barrel Export 패턴**: 모든 유틸리티는 `apps/academy-admin/src/utils/index.ts`를 통해 export (SSOT)
+        - 사용 예시: `import { getPolicyValueFromConfig, getPolicyValue, safe, normalizeDashboardCard } from '../utils';`
+      - ⚠️ **Constants Barrel Export 패턴**: 모든 상수는 `apps/academy-admin/src/constants/index.ts`를 통해 export (SSOT)
+        - 사용 예시: `import { POLICY_KEY_V2_CATEGORIES, AUTOMATION_EVENT_CRITERIA_FIELDS, AUTOMATION_EVENT_DESCRIPTIONS, validateAutomationEventDescriptions } from '../constants';`
+        - Automation Event 관련 상수와 검증 함수는 이 파일을 통해 export
       - `data` 속성: `T | null` (Policy가 없으면 `null`, 있으면 직접 값 `T`, `.value` 접근 불필요)
       - 코드 위치: `packages/hooks/use-config/src/useConfig.ts`
     - 코드 위치: `infra/supabase/functions/_shared/policy-utils.ts`
@@ -174,8 +186,12 @@ AI 기능은 다음 2계층으로 구성된다.
 ### 코드 SSOT 위치
 - ⚠️ 중요: 정본(SSOT)은 코드 상수 `AUTOMATION_EVENT_CATALOG`, 문서의 표는 그 출력물
 - event_type 카탈로그 정본(SSOT)은 코드 상수 `AUTOMATION_EVENT_CATALOG`이며, 문서의 표는 그 카탈로그를 반영한 출력물이다.
-  - **구현 상태**: ✅ `AUTOMATION_EVENT_CATALOG` 코드 상수 구현 완료 (2024년 구현, 파일 경로: `packages/core/core-automation/src/automation-event-catalog.ts`, `infra/supabase/functions/_shared/automation-event-catalog.ts`)
-  - **코드 위치**: `packages/core/core-automation/src/automation-event-catalog.ts`, `infra/supabase/functions/_shared/automation-event-catalog.ts`
+  - **구현 상태**: ✅ `AUTOMATION_EVENT_CATALOG` 코드 상수 구현 완료 (2024년 구현, 파일 경로: `packages/core/core-automation/src/automation-event-catalog.ts`, `infra/supabase/functions/_shared/automation-event-catalog.ts`, `infra/supabase/supabase/functions/_shared/automation-event-catalog.ts`)
+  - **코드 위치**:
+    - `packages/core/core-automation/src/automation-event-catalog.ts` (Node.js/TypeScript 환경, 정본)
+    - `infra/supabase/functions/_shared/automation-event-catalog.ts` (Edge Function/Deno 환경)
+    - `infra/supabase/supabase/functions/_shared/automation-event-catalog.ts` (re-export 파일, 자동 동기화됨)
+    - ⚠️ **수정 시**: 2개 파일(packages + infra/functions/_shared)만 업데이트하면 됩니다. infra/supabase/supabase/functions/_shared/automation-event-catalog.ts는 re-export이므로 자동으로 동기화됩니다.
 - legacy_policy_key는 UI 필터/검색/호환 표기용이며, 런타임 저장/실행/권한 분기에는 사용하지 않는다.
 - 설정 저장은 `tenant_settings` KV 구조에서 key='config' row의 value(JSONB) 경로 기반이며, 신규 항목은 `auto_notification.<event_type>.<field>` 형식으로 추가한다.
   - **서버/Edge Function 코드 예시**: `await getTenantSettingByPath(supabase, tenantId, "auto_notification.overdue_outstanding_over_limit.enabled")`
@@ -859,13 +875,17 @@ CREATE TABLE IF NOT EXISTS automation_undo_logs (
 **카탈로그와 문서 간 동기화가 필요하며, 코드 카탈로그가 우선한다.**
 
 **⚠️ 구현 상태:**
-- ✅ `AUTOMATION_EVENT_CATALOG` 코드 상수 구현 완료 (2024년 구현, 파일 경로: `packages/core/core-automation/src/automation-event-catalog.ts`, `infra/supabase/functions/_shared/automation-event-catalog.ts`)
+- ✅ `AUTOMATION_EVENT_CATALOG` 코드 상수 구현 완료 (2024년 구현, 파일 경로: `packages/core/core-automation/src/automation-event-catalog.ts`, `infra/supabase/functions/_shared/automation-event-catalog.ts`, `infra/supabase/supabase/functions/_shared/automation-event-catalog.ts`)
 - **코드 위치**:
-  - `packages/core/core-automation/src/automation-event-catalog.ts` (Node.js/TypeScript 환경)
+  - `packages/core/core-automation/src/automation-event-catalog.ts` (Node.js/TypeScript 환경, 정본)
   - `infra/supabase/functions/_shared/automation-event-catalog.ts` (Edge Function/Deno 환경)
+  - `infra/supabase/supabase/functions/_shared/automation-event-catalog.ts` (re-export 파일, 자동 동기화됨)
+  - ⚠️ **수정 시**: 2개 파일(packages + infra/functions/_shared)만 업데이트하면 됩니다. infra/supabase/supabase/functions/_shared/automation-event-catalog.ts는 re-export이므로 자동으로 동기화됩니다.
 - **사용 방법**:
   - Edge Function에서 `auto_notification.<event_type>.*` 경로 사용 시 `getTenantSettingByPath()` 함수가 자동으로 event_type을 검증합니다.
   - 추가 안전장치로 명시적으로 `assertAutomationEventType(eventType)` 호출도 가능합니다 (중복 검증, 권장).
+  - **성능 최적화**: `isAutomationEventType()` 함수는 Set 자료구조를 사용하여 O(1) 시간 복잡도로 검증합니다. 배열의 `includes()`는 O(n)이지만 Set의 `has()`는 O(1)입니다.
+  - **검증 함수**: `apps/academy-admin/src/constants/automation-event-descriptions.ts`의 `validateAutomationEventDescriptions()` 함수는 `AUTOMATION_EVENT_CRITERIA_FIELDS`와 `AUTOMATION_EVENT_DESCRIPTIONS`가 `AUTOMATION_EVENT_CATALOG`와 일치하는지 검증합니다 (개발 환경에서만 사용 권장)
 - 문서의 카탈로그 표는 코드 카탈로그의 출력물이며, 코드 카탈로그가 SSOT입니다.
 - 일부 Edge Function은 신규 경로 우선, 레거시 경로 fallback 메커니즘을 사용하여 하위 호환성을 보장합니다.
 - **레거시 fallback 정책**: 이행 기간 한정 read-only fallback, 일몰 예정. 신규 자동화는 반드시 `auto_notification.<event_type>.<field>` 형식을 사용합니다.
@@ -885,6 +905,10 @@ CREATE TABLE IF NOT EXISTS automation_undo_logs (
 - payment_due_reminder | financial_health | payment_overdue | guardian | L0 | 매일(설정 가능: days_before_first, days_before_second) | 배치 EF+dispatch | auto_notification.payment_due_reminder.* | active
 - invoice_partial_balance | financial_health | payment_overdue | guardian | L0 | 부분결제 감지 | 트리거/배치+dispatch | auto_notification.invoice_partial_balance.* | active
 - recurring_payment_failed | financial_health | payment_overdue | guardian | L0 | webhook 실패 | webhook+dispatch | auto_notification.recurring_payment_failed.* | active
+  - **Policy 필드:**
+    - `auto_notification.recurring_payment_failed.threshold`: 결제 실패 임계값 (건수, Default: 2)
+    - `auto_notification.recurring_payment_failed.lookback_days`: 조회 기간 (일수, 최근 N일간의 실패만 조회)
+  - **Fail Closed:** Policy가 없으면 Emergency Card 생성하지 않음
 - revenue_target_under | financial_health | payment_overdue | owner_admin | L1 | 매일 07:10 | daily-statistics-update 확장 | auto_notification.revenue_target_under.* | active
 - collection_rate_drop | financial_health | payment_overdue | owner_admin | L1 | 매일 07:20 | 배치 EF | auto_notification.collection_rate_drop.* | active
 - overdue_outstanding_over_limit | financial_health | payment_overdue | owner_admin | L1 | 매일 09:00 | overdue-scheduler 확장 | auto_notification.overdue_outstanding_over_limit.* | active

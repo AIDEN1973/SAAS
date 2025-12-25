@@ -32,8 +32,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, useResponsiveMode } from '@ui-core/react';
-import { Container, Card, Button, Badge, PageHeader } from '@ui-core/react';
+import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Badge, PageHeader, isMobile } from '@ui-core/react';
 import { SchemaForm } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -42,7 +41,6 @@ import { useStudents, useGenerateConsultationAISummary, fetchConsultations, fetc
 import { fetchAttendanceLogs } from '@hooks/use-attendance';
 import { fetchBillingHistory } from '@hooks/use-billing';
 import { fetchAIInsights } from '@hooks/use-ai-insights';
-import { fetchClasses } from '@hooks/use-class';
 import type { BillingHistoryItem } from '@hooks/use-billing';
 import type { AttendanceLog } from '@services/attendance-service';
 import type { Student, StudentConsultation } from '@services/student-service';
@@ -50,13 +48,17 @@ import type { Class } from '@services/class-service';
 import type { Person } from '@core/party';
 import { studentSelectFormSchema } from '../schemas/student-select.schema';
 import { useUserRole } from '@hooks/use-auth';
+// [SSOT] Barrel export를 통한 통합 import
+import { ROUTES } from '../constants';
 
 export function AIPage() {
   const { showAlert } = useModal();
   const context = getApiContext();
   const tenantId = context.tenantId;
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab'); // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
@@ -118,6 +120,7 @@ export function AIPage() {
       }
 
       // 1. 출결 이상 탐지 (attendance_anomaly)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       interface AttendanceAnomalyInsight {
         id: string;
         related_entity_id?: string;
@@ -207,6 +210,7 @@ export function AIPage() {
       }
 
       // 2. 반/과목 성과 분석 (performance_analysis) - 아키텍처 문서 3.7.1: 반/과목 성과 분석
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       interface PerformanceAnalysisInsight {
         id: string;
         related_entity_id?: string;
@@ -265,6 +269,7 @@ export function AIPage() {
       }
 
       // 3. 지역 대비 비교 (regional_comparison) - 아키텍처 문서 3.7.1: 지역 대비 부족 영역 분석
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       interface RegionalComparisonInsight {
         id: string;
         metadata?: { area?: string; status?: string };
@@ -364,7 +369,7 @@ export function AIPage() {
 
   return (
     <ErrorBoundary>
-      <Container maxWidth="xl" padding={isMobile ? "sm" : "lg"}>
+      <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"}>
         <PageHeader
           title="AI 분석"
         />
@@ -386,7 +391,7 @@ export function AIPage() {
                     if (element) {
                       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     } else {
-                      navigate('/ai?tab=attendance');
+                      navigate(ROUTES.AI_ATTENDANCE);
                     }
                   }}
                 >
@@ -401,7 +406,7 @@ export function AIPage() {
                     if (element) {
                       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     } else {
-                      navigate('/ai?tab=performance');
+                      navigate(ROUTES.AI_HOME);
                     }
                   }}
                 >
@@ -420,7 +425,7 @@ export function AIPage() {
                   size="sm"
                   onClick={() => {
                     // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
-                    navigate('/ai?tab=consultation');
+                    navigate(ROUTES.AI_CONSULTATION);
                   }}
                 >
                   상담일지 요약
@@ -648,7 +653,7 @@ function ConsultationSummaryTab() {
 
       // 정본 규칙: fetchConsultations 함수 사용 (Hook의 queryFn 로직 재사용)
       if (!tenantId) return [];
-      return await fetchConsultations(tenantId, {
+      return fetchConsultations(tenantId, {
         student_id: selectedStudentId,
       });
     },

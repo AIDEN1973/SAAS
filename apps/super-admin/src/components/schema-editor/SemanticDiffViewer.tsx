@@ -56,7 +56,11 @@ function analyzeFieldDiff(
         changes.push(`colSpan: ${oldField.ui?.colSpan || 1} → ${newField.ui?.colSpan || 1}`);
       }
       if (JSON.stringify(oldField.validation?.required) !== JSON.stringify(newField.validation?.required)) {
-        changes.push(`required: ${oldField.validation?.required || false} → ${newField.validation?.required || false}`);
+        const oldRequired = oldField.validation?.required;
+        const newRequired = newField.validation?.required;
+        const oldRequiredStr = typeof oldRequired === 'boolean' ? String(oldRequired) : JSON.stringify(oldRequired ?? false);
+        const newRequiredStr = typeof newRequired === 'boolean' ? String(newRequired) : JSON.stringify(newRequired ?? false);
+        changes.push(`required: ${oldRequiredStr} → ${newRequiredStr}`);
       }
       if (changes.length > 0) {
         diff.push({ type: 'modified', field: newField.name, changes });

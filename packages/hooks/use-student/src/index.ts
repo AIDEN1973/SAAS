@@ -29,6 +29,7 @@ export {
   useStudentClasses,
   useAssignStudentToClass,
   useUnassignStudentFromClass,
+  useUpdateStudentClassEnrolledAt,
 } from './useStudent';
 
 export {

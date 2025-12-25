@@ -6,9 +6,8 @@
  * [요구사항] 반 리스트 + 캘린더 뷰 생성 (Calendar-like) 제공
  */
 
-import React, { useState, useMemo } from 'react';
-import { ErrorBoundary, useModal, useResponsiveMode } from '@ui-core/react';
-import { Container, Card, Button, Modal, Drawer, PageHeader } from '@ui-core/react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet } from '@ui-core/react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
 import { apiClient } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
@@ -23,9 +22,8 @@ import {
   useTeachers,
   useAssignTeacher,
 } from '@hooks/use-class';
-import type { Class, CreateClassInput, UpdateClassInput, ClassFilter, ClassStatus, DayOfWeek } from '@services/class-service';
+import type { Class, CreateClassInput, UpdateClassInput, ClassFilter, ClassStatus, DayOfWeek , Teacher } from '@services/class-service';
 import { createClassFormSchema } from '../schemas/class.schema';
-import type { Teacher } from '@services/class-service';
 import type { FormSchema } from '@schema-engine/types';
 import { classFilterSchema } from '../schemas/class.filter.schema';
 
@@ -42,8 +40,10 @@ const DAYS_OF_WEEK: { value: DayOfWeek; label: string }[] = [
 export function ClassesPage() {
   const { showConfirm, showAlert } = useModal();
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [filter, setFilter] = useState<ClassFilter>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -52,7 +52,7 @@ export function ClassesPage() {
 
   // Today-First 기준: 기본적으로 오늘 수업 있는 반만 필터링
   // 기술문서 5-2: KST 기준 날짜 처리
-  const todayFilter: ClassFilter = React.useMemo(() => {
+  const todayFilter: ClassFilter = useMemo(() => {
     if (showAllClasses) {
       return filter; // 전체 반 보기 모드
     }
@@ -96,12 +96,13 @@ export function ClassesPage() {
   const effectiveFormSchema = classFormSchemaData || createClassFormSchema(teachers || []);
   const effectiveFilterSchema = classFilterSchemaData || classFilterSchema;
 
-  const handleFilterChange = React.useCallback((filters: Record<string, unknown>) => {
+  const handleFilterChange = useCallback((filters: Record<string, unknown>) => {
     setFilter({
       search: filters.search ? String(filters.search) : undefined,
       status: filters.status as ClassStatus | ClassStatus[] | undefined,
       day_of_week: filters.day_of_week as DayOfWeek | undefined,
     });
+    // Promise 반환 없음
   }, []);
 
   const handleCreateClass = async (input: CreateClassInput) => {
@@ -166,7 +167,9 @@ export function ClassesPage() {
               <Button
                 variant={viewMode === 'list' ? 'solid' : 'outline'}
                 size="sm"
-                onClick={() => setViewMode('list')}
+                onClick={() => {
+                  setViewMode('list');
+                }}
               >
                 리스트
               </Button>
@@ -191,7 +194,9 @@ export function ClassesPage() {
         {/* 검색 및 필터 패널 */}
         <SchemaFilter
           schema={effectiveFilterSchema}
-          onFilterChange={handleFilterChange}
+          onFilterChange={(filters) => {
+            void handleFilterChange(filters);
+          }}
           defaultValues={{
             search: filter.search || '',
             status: filter.status || '',
@@ -202,14 +207,14 @@ export function ClassesPage() {
           {/* 반 생성 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
           {showCreateForm && (
             <>
-              {isMobile || isTablet ? (
+              {isMobileMode || isTabletMode ? (
                 // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
                 <Drawer
                   isOpen={showCreateForm}
                   onClose={() => setShowCreateForm(false)}
                   title="반 생성"
-                  position={isMobile ? 'bottom' : 'right'}
-                  width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+                  position={isMobileMode ? 'bottom' : 'right'}
+                  width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
                 >
                   <CreateClassForm
                     effectiveFormSchema={effectiveFormSchema}
@@ -221,7 +226,9 @@ export function ClassesPage() {
                 // 데스크톱: 인라인 폼 (기존 방식)
                 <CreateClassForm
                   effectiveFormSchema={effectiveFormSchema}
-                  onSubmit={handleCreateClass}
+                  onSubmit={(input) => {
+                    void handleCreateClass(input);
+                  }}
                   onCancel={() => setShowCreateForm(false)}
                 />
               )}
@@ -292,11 +299,13 @@ function CreateClassForm({
   onCancel: () => void;
 }) {
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md';
-  const showHeader = !isMobile && !isTablet;
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
+  const showHeader = !isMobileMode && !isTabletMode;
 
-  const handleSubmit = async (data: Record<string, unknown>) => {
+  const handleSubmit = (data: Record<string, unknown>) => {
     // 스키마에서 받은 데이터를 CreateClassInput 형식으로 변환
     const input: CreateClassInput = {
       name: String(data.name ?? ''),
@@ -373,15 +382,17 @@ function EditClassModal({
 }) {
   const { showAlert } = useModal();
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
   const { data: classData, isLoading } = useClass(classId);
 
   // Schema Registry 연동 (아키텍처 문서 S3 참조)
   const { data: classFormSchemaData } = useSchema('class', createClassFormSchema(teachers || []), 'form');
   const classFormSchema = useMemo(() => classFormSchemaData || createClassFormSchema(teachers || []), [classFormSchemaData, teachers]);
 
-  const handleSubmit = async (data: Record<string, unknown>) => {
+  const handleSubmit = (data: Record<string, unknown>) => {
     const input: UpdateClassInput = {
       name: data.name ? String(data.name) : undefined,
       subject: data.subject ? String(data.subject) : undefined,
@@ -394,19 +405,19 @@ function EditClassModal({
       notes: data.notes ? String(data.notes) : undefined,
       status: data.status as ClassStatus | undefined,
     };
-    await onSave(classId, input);
+    void onSave(classId, input);
   };
 
   // 반응형 처리: 모바일/태블릿은 Drawer, 데스크톱은 Modal (아키텍처 문서 6-1 참조)
   if (isLoading) {
-    if (isMobile || isTablet) {
+    if (isMobileMode || isTabletMode) {
       return (
         <Drawer
           isOpen={true}
           onClose={onClose}
           title="반 수정"
-          position={isMobile ? 'bottom' : 'right'}
-          width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+          position={isMobileMode ? 'bottom' : 'right'}
+          width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
         >
           <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>
         </Drawer>
@@ -420,14 +431,14 @@ function EditClassModal({
   }
 
   if (!classData) {
-    if (isMobile || isTablet) {
+    if (isMobileMode || isTabletMode) {
       return (
         <Drawer
           isOpen={true}
           onClose={onClose}
           title="반 수정"
-          position={isMobile ? 'bottom' : 'right'}
-          width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+          position={isMobileMode ? 'bottom' : 'right'}
+          width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
         >
           <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>반을 찾을 수 없습니다.</div>
         </Drawer>
@@ -479,14 +490,14 @@ function EditClassModal({
   );
 
   // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
-  if (isMobile || isTablet) {
+  if (isMobileMode || isTabletMode) {
     return (
       <Drawer
         isOpen={true}
         onClose={onClose}
         title="반 수정"
-        position={isMobile ? 'bottom' : 'right'}
-        width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+        position={isMobileMode ? 'bottom' : 'right'}
+        width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
       >
         {formContent}
       </Drawer>
@@ -591,7 +602,7 @@ function ClassCard({
  */
 function ClassCalendarView({ classes }: { classes: Class[] }) {
   // 시간대 생성 (08:00 ~ 22:00, 30분 단위)
-  const timeSlots = React.useMemo(() => {
+  const timeSlots = useMemo(() => {
     const slots: string[] = [];
     for (let hour = 8; hour < 22; hour++) {
       slots.push(`${hour.toString().padStart(2, '0')}:00`);

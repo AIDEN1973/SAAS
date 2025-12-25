@@ -7,10 +7,11 @@
  */
 
 import React, { useMemo } from 'react';
-import { AlertTriangle, CreditCard, AlertCircle, UserX, MessageSquare, Clock } from 'lucide-react';
+import { AlertTriangle, AlertCircle, UserX, MessageSquare, CreditCard } from 'lucide-react';
 import { NotificationCardLayout } from '@ui-core/react';
 import type { EmergencyCard as EmergencyCardType } from '../../types/dashboardCard';
-import { EMPTY_CARD_ID_PREFIX, TEXT_LINE_LIMITS } from '../../constants/dashboard-cards';
+// [SSOT] Barrel export를 통한 통합 import
+import { EMPTY_CARD_ID_PREFIX, TEXT_LINE_LIMITS } from '../../constants';
 
 export interface EmergencyCardProps {
   card: EmergencyCardType;

@@ -1,12 +1,13 @@
 module.exports = {
-  root: true,
+  root: false,
   env: { browser: true, es2020: true },
   extends: [
+    '../../.eslintrc.cjs',
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
     'plugin:react-hooks/recommended',
   ],
-  ignorePatterns: ['dist', '.eslintrc.cjs'],
+  ignorePatterns: ['dist', '.eslintrc.cjs', 'vite.config.ts'],
   parser: '@typescript-eslint/parser',
   plugins: ['react-refresh'],
   rules: {
@@ -50,4 +51,3 @@ module.exports = {
     ],
   },
 };
-

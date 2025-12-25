@@ -210,10 +210,11 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
         const expectedTop = wrapperRect.bottom + spacingXs;
         const expectedLeft = wrapperRect.left;
 
-        const listboxes = Array.from(document.querySelectorAll('[role="listbox"]')) as HTMLElement[];
+        const listboxes = Array.from(document.querySelectorAll('[role="listbox"]'));
         const pickClosestListbox = () => {
           let best: { el: HTMLElement; score: number } | null = null;
           for (const el of listboxes) {
+            if (!(el instanceof HTMLElement)) continue;
             const r = el.getBoundingClientRect();
             // 너무 멀리 떨어진 listbox는 제외 (다른 Select 가능성)
             const dx = Math.abs(r.left - expectedLeft);

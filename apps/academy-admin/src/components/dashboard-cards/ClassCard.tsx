@@ -10,7 +10,8 @@ import React from 'react';
 import { GraduationCap } from 'lucide-react';
 import { NotificationCardLayout } from '@ui-core/react';
 import type { ClassCard as ClassCardType } from '../../types/dashboardCard';
-import { EMPTY_CARD_ID_PREFIX, CARD_LABELS } from '../../constants/dashboard-cards';
+// [SSOT] Barrel export를 통한 통합 import
+import { EMPTY_CARD_ID_PREFIX, CARD_LABELS } from '../../constants';
 
 export interface ClassCardProps {
   card: ClassCardType;

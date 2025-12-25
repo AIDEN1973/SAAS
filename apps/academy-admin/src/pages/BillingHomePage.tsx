@@ -15,24 +15,32 @@
  * 6. 미납 알림 진행 현황
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary, Container, Card, Button, PageHeader } from '@ui-core/react';
-import { Grid } from '@ui-core/react';
 import { useQuery } from '@tanstack/react-query';
-import { apiClient, getApiContext } from '@api-sdk/core';
+import { getApiContext } from '@api-sdk/core';
 import { fetchBillingHistory } from '@hooks/use-billing';
 import { toKST } from '@lib/date-utils';
 import type { BillingHistoryItem } from '@hooks/use-billing';
 import { BillingHomeCard } from '../components/dashboard-cards/BillingHomeCard';
 import type { BillingHomeCard as BillingHomeCardType } from '../components/dashboard-cards/BillingHomeCard';
 import { CardGridLayout } from '../components/CardGridLayout';
+// [SSOT] Barrel export를 통한 통합 import
+import { ROUTES } from '../constants';
+import { createSafeNavigate } from '../utils';
 
 
 export function BillingHomePage() {
   const navigate = useNavigate();
   const context = getApiContext();
   const tenantId = context.tenantId;
+
+  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
+  const safeNavigate = useMemo(
+    () => createSafeNavigate(navigate),
+    [navigate]
+  );
 
   // Billing Home Cards 조회
   const { data: cards, isLoading } = useQuery({
@@ -95,7 +103,7 @@ export function BillingHomePage() {
           type: 'urgent_alert',
           title: '긴급 알림',
           message: `미납 7일 이상 청구서가 ${overdueInvoices.length}건 있습니다.`,
-          action_url: '/billing/list?status=overdue',
+          action_url: ROUTES.BILLING_LIST('overdue'),
           priority: 2,
         });
       }
@@ -110,7 +118,7 @@ export function BillingHomePage() {
         type: 'expected_collection_rate',
         title: '이번달 예상 수납률',
         value: expectedCollectionRate,
-        action_url: '/billing/list',
+        action_url: ROUTES.BILLING_LIST(),
         priority: 3,
       });
 
@@ -126,7 +134,7 @@ export function BillingHomePage() {
         title: '자동 청구 진행 현황',
         value: `${autoBillingProgress}%`,
         status: autoBillingProgress >= 80 ? 'completed' : 'in_progress',
-        action_url: '/billing/list',
+        action_url: ROUTES.BILLING_LIST(),
         priority: 4,
       });
 
@@ -137,7 +145,7 @@ export function BillingHomePage() {
         type: 'payment_summary',
         title: '결제 현황 요약',
         value: `${paymentCount}건`,
-        action_url: '/billing/list',
+        action_url: ROUTES.BILLING_LIST(),
         priority: 5,
       });
 
@@ -148,14 +156,15 @@ export function BillingHomePage() {
   });
 
   // 우선순위 정렬
-  const sortedCards = React.useMemo(() => {
+  const sortedCards = useMemo(() => {
     if (!cards) return [];
     return [...cards].sort((a, b) => a.priority - b.priority);
   }, [cards]);
 
+  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
   const handleCardClick = (card: BillingHomeCardType) => {
     if (card.action_url) {
-      navigate(card.action_url);
+      safeNavigate(card.action_url);
     }
   };
 
@@ -167,7 +176,7 @@ export function BillingHomePage() {
           actions={
             <Button
               variant="outline"
-              onClick={() => navigate('/billing/list')}
+              onClick={() => safeNavigate(ROUTES.BILLING_HOME)}
             >
               전체 청구서 보기
             </Button>
@@ -209,7 +218,7 @@ export function BillingHomePage() {
                 </p>
                 <Button
                   variant="outline"
-                  onClick={() => navigate('/billing/list')}
+                  onClick={() => safeNavigate(ROUTES.BILLING_HOME)}
                 >
                   전체 청구서 보기
                 </Button>

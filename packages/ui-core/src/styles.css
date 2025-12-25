@@ -207,6 +207,10 @@
 
   /* Component Size Tokens */
   --size-checkbox: 1.25rem;              /* 20px - 체크박스/라디오 크기 */
+  --size-font-reduction: 0.125rem;       /* 2px - 폰트 크기 축소용 (에러 메시지 등) */
+  --width-datepicker-year: 6.5rem;       /* 104px - DatePicker 연도 드롭다운 최소 너비 */
+  --width-datepicker-month: 5.25rem;      /* 84px - DatePicker 월 드롭다운 최소 너비 */
+  --height-datepicker-dropdown: 13.75rem; /* 220px - DatePicker 드롭다운 최대 높이 */
   --size-switch-width: 2.75rem;         /* 44px - 스위치 너비 (접근성) */
   --size-switch-height: 1.5rem;         /* 24px - 스위치 높이 */
   --size-switch-thumb: 1.25rem;         /* 20px - 스위치 썸 크기 */

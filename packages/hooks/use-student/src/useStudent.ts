@@ -1747,3 +1747,52 @@ export function useUnassignStudentFromClass() {
     },
   });
 }
+
+/**
+ * 학생 반 배정일(enrolled_at) 업데이트 Hook
+ * [P0-2] App Layer 분리 원칙 준수: UI에서 직접 apiClient.patch 호출 제거
+ * [요구사항] 같은 반일 때 enrolled_at만 업데이트
+ * [주의] 현재는 apiClient를 통해 직접 호출하나, 향후 Edge Function으로 이동 권장
+ */
+export function useUpdateStudentClassEnrolledAt() {
+  const queryClient = useQueryClient();
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+
+  return useMutation({
+    mutationFn: async ({
+      studentClassId,
+      enrolledAt,
+    }: {
+      studentClassId: string;
+      enrolledAt: string;
+    }) => {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      // student_classes의 enrolled_at만 업데이트
+      // [주의] current_count 업데이트는 필요 없음 (같은 반이므로 학생 수 변화 없음)
+      const response = await apiClient.patch<StudentClass>('student_classes', studentClassId, {
+        // 기술문서 5-2: KST 기준 날짜 처리
+        enrolled_at: enrolledAt,
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      if (!response.data) {
+        throw new Error('Failed to update student class enrolled_at: No data returned');
+      }
+
+      return response.data;
+    },
+    onSuccess: (data) => {
+      // [성능 최적화] 캐시 무효화를 배치로 처리 (React Query v5 최적화)
+      // studentClassId로 student_id를 찾을 수 없으므로, 모든 student-classes 쿼리 무효화
+      queryClient.invalidateQueries({ queryKey: ['student-classes', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['students', tenantId] });
+    },
+  });
+}

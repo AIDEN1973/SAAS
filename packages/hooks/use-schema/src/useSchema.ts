@@ -120,6 +120,9 @@ export function useSchema<T extends SchemaType = 'form'>(
           }
 
           // 환경별 분기 처리
+          // [불변 규칙] Vite 환경에서 import.meta.env.PROD는 빌드 타임에 주입됨
+          // import.meta.env.MODE === 'production'도 빌드 타임에 결정됨
+          // 운영 환경(Production): 에러 처리 필수 (Fail-Closed, fail-open 방지)
           if (import.meta.env.PROD || import.meta.env.MODE === 'production') {
             // 운영 환경: 에러 처리 필수 (Fail-Closed)
             throw new Error(`Schema Registry 조회 실패: ${entity} (tenant: ${context.tenantId}, industry: ${context.industryType})`);
@@ -132,6 +135,9 @@ export function useSchema<T extends SchemaType = 'form'>(
         // response.data가 배열인 경우 클라이언트에서 추가 필터링
         if (!response.data || (Array.isArray(response.data) && response.data.length === 0)) {
           // 환경별 분기 처리
+          // [불변 규칙] Vite 환경에서 import.meta.env.PROD는 빌드 타임에 주입됨
+          // import.meta.env.MODE === 'production'도 빌드 타임에 결정됨
+          // 운영 환경(Production): 에러 처리 필수 (Fail-Closed, fail-open 방지)
           if (import.meta.env.PROD || import.meta.env.MODE === 'production') {
             // 운영 환경: 에러 처리 필수 (Fail-Closed)
             throw new Error(`Schema Registry 조회 실패: ${entity} (tenant: ${context.tenantId}, industry: ${context.industryType})`);
@@ -160,6 +166,9 @@ export function useSchema<T extends SchemaType = 'form'>(
 
         if (filteredSchemas.length === 0) {
           // 환경별 분기 처리
+          // [불변 규칙] Vite 환경에서 import.meta.env.PROD는 빌드 타임에 주입됨
+          // import.meta.env.MODE === 'production'도 빌드 타임에 결정됨
+          // 운영 환경(Production): 에러 처리 필수 (Fail-Closed, fail-open 방지)
           if (import.meta.env.PROD || import.meta.env.MODE === 'production') {
             // 운영 환경: 에러 처리 필수 (Fail-Closed)
             throw new Error(`Schema Registry 조회 실패: ${entity} (tenant: ${context.tenantId}, industry: ${context.industryType})`);
@@ -189,6 +198,9 @@ export function useSchema<T extends SchemaType = 'form'>(
 
         if (isNotFoundError || isSchemaRegistryRequestCatch) {
           // 환경별 분기 처리
+          // [불변 규칙] Vite 환경에서 import.meta.env.PROD는 빌드 타임에 주입됨
+          // import.meta.env.MODE === 'production'도 빌드 타임에 결정됨
+          // 운영 환경(Production): 에러 처리 필수 (Fail-Closed, fail-open 방지)
           if (import.meta.env.PROD || import.meta.env.MODE === 'production') {
             // 운영 환경: 에러 처리 필수 (Fail-Closed)
             throw new Error(`Schema Registry 조회 실패: ${entity} (tenant: ${context.tenantId}, industry: ${context.industryType})`);

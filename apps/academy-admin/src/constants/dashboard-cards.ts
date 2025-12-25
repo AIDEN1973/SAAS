@@ -127,3 +127,9 @@ export const DATE_FORMATS = {
   SHORT_WITH_TIME: 'MM월 DD일 HH:mm',
 } as const;
 
+/**
+ * 클래스 정렬 기본값
+ * [P2-1 수정] 하드코딩 금지 규칙 준수: 상수로 관리
+ */
+export const DEFAULT_CLASS_START_TIME = '00:00';
+

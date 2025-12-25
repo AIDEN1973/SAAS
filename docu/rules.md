@@ -127,6 +127,28 @@ import { withTenant } from '@lib/supabase-client/db';
 
 특히 packages/env-registry는 모든 앱/서비스에서 환경변수 접근의 유일한 경로입니다.
 
+## [SSOT] UI Design, Style, Layout, Component Rules
+
+**⚠️ 중요: 디자인/스타일/레이아웃/공통 컴포넌트 사용 규칙의 정본(SSOT)은 `docu/SSOT_UI_DESIGN.md`입니다.**
+
+이 문서는 다음을 정의합니다:
+- Design Tokens SSOT (토큰 종류/네이밍/추가 규칙/금지 규칙)
+- Theme/Override SSOT (core/industry/tenant 우선순위, 허용 범위, 예외 처리)
+- UI Core Component SSOT (컴포넌트 분류, "언제 무엇을 쓰는지" 결정표, 상태 UI 단일화 규칙)
+- Layout SSOT (Layout primitives 규칙, Page templates 규칙, Responsive 규칙)
+- SDUI 연동 규칙 (스키마에서 표현 가능한 ui.variant/ui.density/ui.intent 등)
+- Enforcement (PR 체크리스트, ESLint/코드 규칙 후보, 예외 승인 프로세스)
+
+**관련 문서**:
+- 상세 가이드: `docu/컴포넌트 디자인.md` (컴포넌트별 사용 예시)
+- 아키텍처 문서: `docu/디어쌤 아키텍처.md` (4장: Multi-Tenant Theme Engine, 6장: Responsive UX)
+
+**불변 규칙**:
+- "디자인 값"의 정본은 Design Tokens/Theme로만 존재한다. 임의 px/hex 하드코딩을 금지한다.
+- "UI 조립"의 정본은 UI Core Component 카탈로그/사용 규칙이다.
+- "레이아웃"의 정본은 Layout Primitives + Page Templates 규칙이다.
+- 페이지/피처는 SSOT를 소비만 한다. 새 규칙/새 값은 SSOT에 먼저 추가한다.
+
 1-2. 의존성 방향 (중요)
 
 [불변 규칙] Industry Layer는 상용화 단계부터 적용됩니다.

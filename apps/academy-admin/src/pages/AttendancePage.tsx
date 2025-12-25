@@ -15,17 +15,17 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary } from '@ui-core/react';
-import { Container, Card, Button, Input, Badge, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid, PageHeader } from '@ui-core/react';
+import { ErrorBoundary , Container, Card, Button, Input, Badge, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid, PageHeader , useResponsiveMode, isMobile, isTablet } from '@ui-core/react';
 import type { TabItem } from '@ui-core/react';
 import { SchemaFilter } from '@schema-engine';
 import { useAttendanceLogs, fetchAttendanceLogs, useCreateAttendanceLog, useDeleteAttendanceLog } from '@hooks/use-attendance';
 import { useStudents } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
 import { useConfig } from '@hooks/use-config';
+// [SSOT] Barrel export를 통한 통합 import
+import { ROUTES } from '../constants';
 import type { AttendanceFilter, AttendanceType, AttendanceStatus, AttendanceLog } from '@services/attendance-service';
-import type { Student, StudentClass } from '@services/student-service';
-import { useResponsiveMode } from '@ui-core/react';
+import type { Student } from '@services/student-service';
 import type { ColorToken } from '@design-system/core';
 import type { DayOfWeek } from '@services/class-service';
 import { toKST } from '@lib/date-utils';
@@ -33,7 +33,7 @@ import { createAttendanceFormSchema } from '../schemas/attendance.schema';
 import { createAttendanceFilterSchema, createAttendanceHeaderFilterSchema } from '../schemas/attendance.filter.schema';
 // 출결 설정은 환경설정 > 출결 설정으로 이동 (아키텍처 문서 3.3.7)
 // import { attendanceSettingsFormSchema } from '../schemas/attendance-settings.schema';
-import { apiClient, getApiContext } from '@api-sdk/core';
+import { getApiContext } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
 import { useUserRole } from '@hooks/use-auth';
 
@@ -50,8 +50,11 @@ interface StudentAttendanceState {
 export function AttendancePage() {
   const navigate = useNavigate();
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md'; // 아키텍처 문서 3.3.9: 태블릿 모드 감지 (768px ~ 1024px)
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  // mode는 'xs' | 'sm' | 'md' | 'lg' | 'xl' 형식이므로 대문자로 변환
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper); // 아키텍처 문서 3.3.9: 태블릿 모드 감지 (768px ~ 1024px)
   const { data: userRole } = useUserRole();
   const context = getApiContext();
   const tenantId = context.tenantId;
@@ -330,7 +333,7 @@ export function AttendancePage() {
   const effectiveHeaderFilterSchema = attendanceHeaderFilterSchemaData || attendanceHeaderFilterSchema;
 
   // 필터 변경 핸들러
-  const handleFilterChange = React.useCallback((filters: Record<string, unknown>) => {
+  const handleFilterChange = useCallback((filters: Record<string, unknown>) => {
     setFilter({
       date_from: filters.date_from ? String(filters.date_from) : toKST().format('YYYY-MM-DD'),
       date_to: filters.date_to ? String(filters.date_to) : toKST().format('YYYY-MM-DD'),
@@ -504,8 +507,8 @@ export function AttendancePage() {
       let classId: string | undefined;
 
       try {
-        const parsed = JSON.parse(qrData);
-        studentId = parsed.student_id;
+        const parsed = JSON.parse(qrData) as { student_id?: string; class_id?: string };
+        studentId = parsed.student_id ?? qrData;
         classId = parsed.class_id;
       } catch {
         // JSON이 아니면 student_id로 간주
@@ -818,7 +821,7 @@ export function AttendancePage() {
         <PageHeader
           title="출결 관리"
           style={{
-            ...(isTablet && {
+            ...(isTabletMode && {
               fontSize: 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))',
             }),
           }}
@@ -858,7 +861,7 @@ export function AttendancePage() {
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 'var(--spacing-sm)',
-                paddingBottom: isMobile ? 'var(--spacing-bottom-action-bar)' : '0', // Bottom Action Bar 높이만큼 패딩
+                paddingBottom: isMobileMode ? 'var(--spacing-bottom-action-bar)' : '0', // Bottom Action Bar 높이만큼 패딩
               }}>
                 {/* 로딩 상태 (아키텍처 문서 3.3.3: loading 상태) */}
                 {isLoading && (
@@ -936,7 +939,7 @@ export function AttendancePage() {
                 )}
                 {!isLoading && !error && filteredStudents.length > 0 && (
                   // 아키텍처 문서 3.3.9: 태블릿 모드에서는 학생 리스트를 2열 그리드로 표시
-                  isTablet ? (
+                  isTabletMode ? (
                     <Grid
                       columns={{
                         md: 2, // 태블릿: 2열 그리드 (아키텍처 문서 419줄)
@@ -981,7 +984,7 @@ export function AttendancePage() {
                             <div style={{ flex: 1 }}>
                               {/* 아키텍처 문서 3.3.9: 태블릿 모드 기본 텍스트 최소 16px */}
                               <div style={{
-                                fontSize: isTablet ? 'max(var(--font-size-lg), var(--tablet-font-size-text-min))' : 'var(--font-size-lg)',
+                                fontSize: isTabletMode ? 'max(var(--font-size-lg), var(--tablet-font-size-text-min))' : 'var(--font-size-lg)',
                                 fontWeight: 'var(--font-weight-semibold)',
                                 marginBottom: 'var(--spacing-xs)'
                               }}>
@@ -989,7 +992,7 @@ export function AttendancePage() {
                               </div>
                               {gradeClassInfo && (
                                 <div style={{
-                                  fontSize: isTablet ? 'max(var(--font-size-sm), var(--tablet-font-size-text-min))' : 'var(--font-size-sm)',
+                                  fontSize: isTabletMode ? 'max(var(--font-size-sm), var(--tablet-font-size-text-min))' : 'var(--font-size-sm)',
                                   color: 'var(--color-text-secondary)',
                                   marginBottom: 'var(--spacing-xs)'
                                 }}>
@@ -1076,10 +1079,10 @@ export function AttendancePage() {
                           {/* ActionButtons: 등원 버튼, 하원 버튼, 상세 보기 버튼 (아키텍처 문서 3.3.3) */}
                           {/* 아키텍처 문서 3.3.9: 태블릿 모드에서는 큰 터치 버튼 (등원/하원 버튼 최소 80px × 80px) */}
                           {/* 아키텍처 문서 3.3.9: 태블릿 모드 버튼 간 간격 최소 8px */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: isTablet ? 'max(var(--spacing-sm), var(--tablet-spacing-min))' : 'var(--spacing-xs)', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: isTabletMode ? 'max(var(--spacing-sm), var(--tablet-spacing-min))' : 'var(--spacing-xs)', flexWrap: 'wrap' }}>
                             <Button
                               variant="outline"
-                              size={isTablet ? 'lg' : 'sm'}
+                              size={isTabletMode ? 'lg' : 'sm'}
                               onClick={() => {
                                 setStudentAttendanceStates(prev => ({
                                   ...prev,
@@ -1091,7 +1094,7 @@ export function AttendancePage() {
                                   },
                                 }));
                               }}
-                              style={isTablet ? {
+                              style={isTabletMode ? {
                                 minWidth: 'var(--spacing-bottom-action-bar)',
                                 minHeight: 'var(--spacing-bottom-action-bar)',
                                 fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
@@ -1101,7 +1104,7 @@ export function AttendancePage() {
                             </Button>
                             <Button
                               variant="outline"
-                              size={isTablet ? 'lg' : 'sm'}
+                              size={isTabletMode ? 'lg' : 'sm'}
                               onClick={() => {
                                 setStudentAttendanceStates(prev => ({
                                   ...prev,
@@ -1113,7 +1116,7 @@ export function AttendancePage() {
                                   },
                                 }));
                               }}
-                              style={isTablet ? {
+                              style={isTabletMode ? {
                                 minWidth: 'var(--spacing-bottom-action-bar)',
                                 minHeight: 'var(--spacing-bottom-action-bar)',
                                 fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
@@ -1123,9 +1126,9 @@ export function AttendancePage() {
                             </Button>
                             <Button
                               variant="ghost"
-                              size={isTablet ? 'md' : 'sm'}
-                              onClick={() => navigate(`/students/${student.id}`)}
-                              style={isTablet ? {
+                              size={isTabletMode ? 'md' : 'sm'}
+                              onClick={() => navigate(ROUTES.STUDENT_DETAIL(student.id, 'info'))}
+                              style={isTabletMode ? {
                                 minWidth: 'var(--spacing-xl)',
                                 minHeight: 'var(--spacing-xl)',
                               } : undefined}
@@ -1300,7 +1303,7 @@ export function AttendancePage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => navigate(`/students/${student.id}`)}
+                                onClick={() => navigate(ROUTES.STUDENT_DETAIL(student.id, 'info'))}
                               >
                                 상세
                               </Button>
@@ -1320,7 +1323,7 @@ export function AttendancePage() {
                     <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                       총원
                     </div>
-                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
+                    <div style={{ fontSize: isTabletMode ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
                       {attendanceSummary.total}
                     </div>
                   </div>
@@ -1328,7 +1331,7 @@ export function AttendancePage() {
                     <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                       출석
                     </div>
-                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
+                    <div style={{ fontSize: isTabletMode ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
                       {attendanceSummary.present}
                     </div>
                   </div>
@@ -1336,7 +1339,7 @@ export function AttendancePage() {
                     <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                       지각
                     </div>
-                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-warning)' }}>
+                    <div style={{ fontSize: isTabletMode ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-warning)' }}>
                       {attendanceSummary.late}
                     </div>
                   </div>
@@ -1344,7 +1347,7 @@ export function AttendancePage() {
                     <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
                       결석
                     </div>
-                    <div style={{ fontSize: isTablet ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-error)' }}>
+                    <div style={{ fontSize: isTabletMode ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-error)' }}>
                       {attendanceSummary.absent}
                     </div>
                   </div>
@@ -1354,7 +1357,7 @@ export function AttendancePage() {
               {/* AttendanceActions: 일괄 등원/하원/저장 버튼 (아키텍처 문서 3.3.3: Summary 다음에 Actions) */}
               {/* 모바일: Bottom Action Bar, 태블릿/데스크톱: Card */}
               {/* 아키텍처 문서 3.3.9: 태블릿 모드에서는 큰 터치 버튼 (최소 120px × 60px) */}
-              {isMobile ? (
+              {isMobileMode ? (
                 <BottomActionBar style={{ pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
                   <Button
                     variant="outline"
@@ -1385,13 +1388,13 @@ export function AttendancePage() {
                 </BottomActionBar>
               ) : (
                 <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
-                  <div style={{ display: 'flex', gap: isTablet ? 'max(var(--spacing-md), var(--tablet-spacing-min))' : 'var(--spacing-sm)', flexWrap: 'wrap' }}> {/* 아키텍처 문서 3.3.9: 버튼 간 간격 최소 8px */}
+                  <div style={{ display: 'flex', gap: isTabletMode ? 'max(var(--spacing-md), var(--tablet-spacing-min))' : 'var(--spacing-sm)', flexWrap: 'wrap' }}> {/* 아키텍처 문서 3.3.9: 버튼 간 간격 최소 8px */}
                     <Button
                       variant="outline"
-                      size={isTablet ? 'lg' : 'md'}
+                      size={isTabletMode ? 'lg' : 'md'}
                       onClick={handleBulkCheckIn}
                       disabled={isSaving || isLoading}
-                      style={isTablet ? {
+                      style={isTabletMode ? {
                         minWidth: 'var(--width-button-min)',
                         minHeight: 'var(--height-button-min)',
                         fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
@@ -1401,10 +1404,10 @@ export function AttendancePage() {
                     </Button>
                     <Button
                       variant="outline"
-                      size={isTablet ? 'lg' : 'md'}
+                      size={isTabletMode ? 'lg' : 'md'}
                       onClick={handleBulkCheckOut}
                       disabled={isSaving || isLoading}
-                      style={isTablet ? {
+                      style={isTabletMode ? {
                         minWidth: 'var(--width-button-min)',
                         minHeight: 'var(--height-button-min)',
                         fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
@@ -1417,10 +1420,10 @@ export function AttendancePage() {
                     <Button
                       variant="solid"
                       color="primary"
-                      size={isTablet ? 'lg' : 'md'}
+                      size={isTabletMode ? 'lg' : 'md'}
                       onClick={handleSaveAttendance}
                       disabled={isSaving || isLoading}
-                      style={isTablet ? {
+                      style={isTabletMode ? {
                         minWidth: 'var(--width-button-min)',
                         minHeight: 'var(--height-button-min)',
                         fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
@@ -1510,7 +1513,7 @@ export function AttendancePage() {
                       if (e.key === 'Enter') {
                         const value = (e.target as HTMLInputElement).value.trim();
                         if (value) {
-                          handleQRScan(value);
+                          void handleQRScan(value);
                           (e.target as HTMLInputElement).value = '';
                         }
                       }
@@ -1522,7 +1525,7 @@ export function AttendancePage() {
                     onClick={() => {
                       const input = document.querySelector('input[placeholder*="QR 코드"]') as HTMLInputElement;
                       if (input?.value.trim()) {
-                        handleQRScan(input.value.trim());
+                        void handleQRScan(input.value.trim());
                         input.value = '';
                       }
                     }}
@@ -1534,13 +1537,11 @@ export function AttendancePage() {
               </div>
             </Card>
           )}
+            </>
+          )}
 
         {/* 통계/히트맵/패턴 분석 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8) */}
-          </>
-        )}
-
       </Container>
     </ErrorBoundary>
   );
 }
-

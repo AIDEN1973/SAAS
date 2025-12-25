@@ -315,10 +315,9 @@ CREATE INDEX idx_schema_registry_version ON meta.schema_registry(entity, industr
 
 ⚠️ 중요: 마이그레이션 파일 일관성
 - 정본 마이그레이션: `infra/supabase/migrations/039_create_schema_registry.sql` (20줄)에서 `min_supported_client text NOT NULL`로 정의됨
-- ⚠️ 코드 수정 필요: `infra/supabase/migrations/043_verify_meta_tables.sql` (35줄)에서 `min_supported_client text,` (nullable)로 생성되고 있어 불일치
-  - 수정 필요: `min_supported_client text NOT NULL,`로 변경
-- ⚠️ 코드 수정 필요: `packages/core/core-schema-registry/src/service.ts` (61줄)에서 `input.minSupportedClient`가 null/undefined인 경우 에러 처리 또는 기본값 설정 필요
-  - 문서 스펙에 따르면 `min_supported_client`는 필수(NOT NULL)이므로, 서비스 레벨에서도 검증 필요
+- ✅ 검증 완료: `infra/supabase/migrations/043_verify_meta_tables.sql` (35줄)에서 `min_supported_client text NOT NULL,`로 올바르게 정의됨 (일관성 유지)
+- ✅ 검증 완료: `packages/core/core-schema-registry/src/service.ts` (54-58줄)에서 `input.minSupportedClient`가 null/undefined인 경우 에러 처리 로직이 이미 구현되어 있음
+  - 문서 스펙에 따르면 `min_supported_client`는 필수(NOT NULL)이며, 서비스 레벨 검증도 완료됨
 
 RLS 정책:
 ⚠️ 중요: `meta.schema_registry`는 공통 스키마 저장소이므로 `tenant_id` 컬럼이 없습니다.

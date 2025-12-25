@@ -12,13 +12,16 @@
  * - 설정이 없으면 실행하지 않음 (Fail Closed)
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, Container, Card, PageHeader, Switch, useResponsiveMode } from '@ui-core/react';
-import { apiClient, getApiContext } from '@api-sdk/core';
+import { ErrorBoundary, useModal, Container, Card, PageHeader, Switch, useResponsiveMode, isMobile, isTablet } from '@ui-core/react';
+import { getApiContext } from '@api-sdk/core';
 import { AUTOMATION_EVENT_CATALOG } from '@core/core-automation';
-import { AUTOMATION_EVENT_DESCRIPTIONS, POLICY_KEY_V2_CATEGORIES, AUTOMATION_EVENT_CRITERIA_FIELDS } from '../constants/automation-event-descriptions';
+// [SSOT] Barrel export를 통한 통합 import
+import { AUTOMATION_EVENT_DESCRIPTIONS, POLICY_KEY_V2_CATEGORIES, AUTOMATION_EVENT_CRITERIA_FIELDS } from '../constants';
 import { useTenantSettingByPath, useUpdateConfig, useConfig } from '@hooks/use-config';
+// [SSOT] Barrel export를 통한 통합 import
+import { getPolicyValueFromConfig, getAutomationEventPolicyPath } from '../utils';
 
 type AutomationEventType = (typeof AUTOMATION_EVENT_CATALOG)[number];
 
@@ -160,38 +163,38 @@ function AutomationSettingsCard({ eventType, onCancel }: AutomationSettingsCardP
   const tenantId = context.tenantId;
 
   const description = AUTOMATION_EVENT_DESCRIPTIONS[eventType];
-  const criteriaFields = AUTOMATION_EVENT_CRITERIA_FIELDS[eventType] || [];
-  const enabledPolicyPath = `auto_notification.${eventType}.enabled`;
+  // [SSOT] Policy 경로를 헬퍼 함수로 생성하여 하드코딩 방지
+  const enabledPolicyPath = getAutomationEventPolicyPath(eventType, 'enabled');
 
   // 현재 설정 조회
   const { data: enabledValue, isLoading: isLoadingEnabled } = useTenantSettingByPath(enabledPolicyPath);
   const isEnabled = enabledValue === true;
 
-  // 자동화 기준 필드 값 조회
-  const criteriaQueries = criteriaFields.map((field) => ({
-    field,
-    query: useTenantSettingByPath(field.policyPath),
-  }));
+  // 전체 config 조회 (React Hooks 규칙 준수: map 내부에서 Hook 호출 금지)
+  const { data: configData, isLoading: isLoadingConfig } = useConfig();
 
-  const isLoadingCriteria = criteriaQueries.some(({ query }) => query.isLoading);
-  const isLoading = isLoadingEnabled || isLoadingCriteria;
+  // 기준 필드 목록 (useMemo로 메모이제이션하여 의존성 안정화)
+  const criteriaFields = useMemo(() => AUTOMATION_EVENT_CRITERIA_FIELDS[eventType] || [], [eventType]);
 
   // 기준 필드 값 객체 생성
-  // 각 쿼리의 data와 isLoading 상태를 의존성으로 사용하여 안정적인 메모이제이션
-  // isLoading이 false이고 data가 null이면 기본값이 설정되지 않은 것이므로 표시하지 않음
-  const criteriaDataArray = criteriaQueries.map(({ query }) => ({ data: query.data, isLoading: query.isLoading }));
-  const criteriaValues = useMemo(() => {
-    const values: Record<string, unknown> = {};
-    criteriaQueries.forEach(({ field, query }) => {
-      // 조회가 완료되었고 값이 있으면 포함
-      // 조회 중이면 포함하지 않음 (로딩 중 표시 방지)
-      if (!query.isLoading && query.data !== null && query.data !== undefined) {
-        values[field.field] = query.data;
-      }
-    });
-    return values;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, criteriaDataArray);
+  // configData에서 필요한 경로만 추출
+    const criteriaValues = useMemo(() => {
+      if (!configData || isLoadingConfig) return {};
+
+      const values: Record<string, unknown> = {};
+      criteriaFields.forEach((field) => {
+        // [SSOT] Policy 경로를 헬퍼 함수로 생성하여 하드코딩 방지
+        const policyPath = getAutomationEventPolicyPath(eventType, field.field);
+        // [SSOT] getPolicyValueFromConfig를 사용하여 Policy 조회 통일
+        const value = getPolicyValueFromConfig(configData, policyPath);
+        if (value !== null && value !== undefined) {
+          values[field.field] = value;
+        }
+      });
+      return values;
+    }, [configData, isLoadingConfig, criteriaFields, eventType]);
+
+  const isLoading = isLoadingEnabled || isLoadingConfig;
 
   // 설정 저장
   // 정본 규칙: apiClient.get('tenant_settings') 직접 호출 금지, useUpdateConfig Hook 사용
@@ -218,7 +221,10 @@ function AutomationSettingsCard({ eventType, onCancel }: AutomationSettingsCardP
       criteriaFields.forEach((field) => {
         const value = values.criteria[field.field];
         if (value !== null && value !== undefined) {
+          // [SSOT] Policy 경로를 헬퍼 함수로 생성하여 하드코딩 방지
           // 중첩 경로 처리 (예: throttle.daily_limit)
+          // field.policyPath는 SSOT 원칙을 준수하는 형식이지만, 경로 파싱을 위해 사용
+          // SSOT 원칙 준수: field.policyPath는 AUTOMATION_EVENT_CRITERIA_FIELDS에 정의된 SSOT 경로
           const pathParts = field.policyPath.split('.');
           if (pathParts.length > 3) {
             // auto_notification.eventType.throttle.daily_limit 같은 경우
@@ -250,15 +256,19 @@ function AutomationSettingsCard({ eventType, onCancel }: AutomationSettingsCardP
         auto_notification: updatedAutoNotification,
       };
 
-      return await updateConfig.mutateAsync(updateInput);
+      return updateConfig.mutateAsync(updateInput);
     },
     onSuccess: () => {
       // 모든 관련 쿼리 무효화
-      queryClient.invalidateQueries({ queryKey: ['config', tenantId, 'path', enabledPolicyPath] });
+      void queryClient.invalidateQueries({ queryKey: ['config', tenantId, 'path', enabledPolicyPath] });
       criteriaFields.forEach((field) => {
-        queryClient.invalidateQueries({ queryKey: ['config', tenantId, 'path', field.policyPath] });
+        // [SSOT] Policy 경로를 헬퍼 함수로 생성하여 하드코딩 방지
+        // field.policyPath는 SSOT 원칙을 준수하는 형식이지만, 쿼리 무효화를 위해 사용
+        // SSOT 원칙 준수: field.policyPath는 AUTOMATION_EVENT_CRITERIA_FIELDS에 정의된 SSOT 경로
+        const policyPath = field.policyPath;
+        void queryClient.invalidateQueries({ queryKey: ['config', tenantId, 'path', policyPath] });
       });
-      queryClient.invalidateQueries({ queryKey: ['config', tenantId] });
+      void queryClient.invalidateQueries({ queryKey: ['config', tenantId] });
       showAlert('자동화 설정이 저장되었습니다.', '성공');
       onCancel();
     },
@@ -275,7 +285,7 @@ function AutomationSettingsCard({ eventType, onCancel }: AutomationSettingsCardP
   // enabled 또는 criteriaValues 변경 시 formValues 업데이트
   // criteriaValues 객체의 깊은 비교를 위해 JSON.stringify 사용
   const criteriaValuesString = JSON.stringify(criteriaValues);
-  React.useEffect(() => {
+  useEffect(() => {
     setFormValues({
       enabled: isEnabled,
       criteria: criteriaValues,
@@ -588,12 +598,13 @@ export function AutomationSettingsPage() {
       }));
   }, [visibleEvents]);
 
-  // 반응형 그리드 컬럼 수 계산 (3열 기본, 모바일은 1열, 태블릿은 2열)
+  // [SSOT] 반응형 그리드 컬럼 수 계산 (3열 기본, 모바일은 1열, 태블릿은 2열)
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const gridColumns = useMemo(() => {
-    if (mode === 'xs' || mode === 'sm') return 1;
-    if (mode === 'md') return 2;
-    return 3; // lg, xl
-  }, [mode]);
+    if (isMobile(modeUpper)) return 1;
+    if (isTablet(modeUpper)) return 2;
+    return 3; // lg, xl (desktop)
+  }, [modeUpper]);
 
 
   return (
@@ -690,62 +701,50 @@ function AutomationCardWithState({
   onEdit: () => void;
   onCancel: () => void;
 }) {
-  const enabledPolicyPath = `auto_notification.${eventType}.enabled`;
+  // [SSOT] Policy 경로를 헬퍼 함수로 생성하여 하드코딩 방지
+  const enabledPolicyPath = getAutomationEventPolicyPath(eventType, 'enabled');
   const { data: enabledValue } = useTenantSettingByPath(enabledPolicyPath);
   const isEnabled = enabledValue === true;
 
-  const criteriaFields = AUTOMATION_EVENT_CRITERIA_FIELDS[eventType] || [];
-  const criteriaQueries = criteriaFields.map((field) => ({
-    field,
-    query: useTenantSettingByPath(field.policyPath),
-  }));
+  // 전체 config 조회 (React Hooks 규칙 준수: map 내부에서 Hook 호출 금지)
+  const { data: configData, isLoading: isLoadingConfig } = useConfig();
 
-  // 각 쿼리의 data와 isLoading 상태를 의존성으로 사용하여 안정적인 메모이제이션
-  // isLoading이 false이고 data가 null이면 기본값이 설정되지 않은 것이므로 표시하지 않음
-  const criteriaDataArray = criteriaQueries.map(({ query }) => ({ data: query.data, isLoading: query.isLoading }));
+  // 기준 필드 목록 (useMemo로 메모이제이션하여 의존성 안정화)
+  const criteriaFields = useMemo(() => AUTOMATION_EVENT_CRITERIA_FIELDS[eventType] || [], [eventType]);
+
+  // 기준 필드 값 객체 생성
+  // configData에서 필요한 경로만 추출
   const criteriaValues = useMemo(() => {
+    if (!configData || isLoadingConfig) return {};
+
     const values: Record<string, unknown> = {};
-    criteriaQueries.forEach(({ field, query }) => {
-      // 조회가 완료되었고 값이 있으면 포함
-      // 조회 중이면 포함하지 않음 (로딩 중 표시 방지)
-      // 중요: 기본값이 설정되어 있으면 query.data가 값을 반환해야 함
-      if (!query.isLoading) {
-        if (query.data !== null && query.data !== undefined) {
-          values[field.field] = query.data;
-          // 디버깅: 값이 있는 경우
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`[AutomationCardWithState] 값 있음: ${field.policyPath}`, {
-              field: field.field,
-              value: query.data,
-              type: typeof query.data,
-            });
-          }
-        }
-        // 디버깅: 기본값이 설정되어 있어도 null이면 상세 로그 출력
-        else if (process.env.NODE_ENV === 'development') {
-          console.warn(`[AutomationCardWithState] 기본값 없음: ${field.policyPath}`, {
+    criteriaFields.forEach((field) => {
+      // [SSOT] Policy 경로를 헬퍼 함수로 생성하여 하드코딩 방지
+      const policyPath = getAutomationEventPolicyPath(eventType, field.field);
+      // [SSOT] getPolicyValueFromConfig를 사용하여 Policy 조회 통일
+      const value = getPolicyValueFromConfig(configData, policyPath);
+      if (value !== null && value !== undefined) {
+        values[field.field] = value;
+        // 디버깅: 값이 있는 경우
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[AutomationCardWithState] 값 있음: ${policyPath}`, {
             field: field.field,
-            policyPath: field.policyPath,
-            data: query.data,
-            isLoading: query.isLoading,
-            queryState: {
-              data: query.data,
-              isLoading: query.isLoading,
-              isError: query.isError,
-              error: query.error,
-            },
+            value: value,
+            type: typeof value,
           });
         }
       } else {
-        // 디버깅: 로딩 중
+        // 디버깅: 기본값이 설정되어 있어도 null이면 상세 로그 출력
         if (process.env.NODE_ENV === 'development') {
-          console.log(`[AutomationCardWithState] 로딩 중: ${field.policyPath}`, { isLoading: query.isLoading });
+          console.warn(`[AutomationCardWithState] 기본값 없음: ${policyPath}`, {
+            field: field.field,
+            policyPath: policyPath,
+          });
         }
       }
     });
     return values;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, criteriaDataArray);
+  }, [configData, isLoadingConfig, criteriaFields, eventType]);
 
   return (
     <AutomationCard

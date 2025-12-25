@@ -112,7 +112,7 @@ export function useCreateClass() {
       return response.data!;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['classes', tenantId] });
+      void queryClient.invalidateQueries({ queryKey: ['classes', tenantId] });
     },
   });
 }
@@ -146,8 +146,8 @@ export function useUpdateClass() {
       return response.data!;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['classes', tenantId] });
-      queryClient.invalidateQueries({
+      void queryClient.invalidateQueries({ queryKey: ['classes', tenantId] });
+      void queryClient.invalidateQueries({
         queryKey: ['class', tenantId, data.id],
       });
     },

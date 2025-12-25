@@ -39,10 +39,10 @@ export function AISuggestionCard({
   const [isProcessing, setIsProcessing] = useState(false);
 
   // 정본 규칙: 승인만 처리, 실행은 Edge Function에서 Role 검증 후 처리
-  const handleApprove = async () => {
+  const handleApprove = () => {
     setIsProcessing(true);
     try {
-      await onApprove(suggestion.id);
+      onApprove(suggestion.id);
       // 정본: 승인만 처리, 실행은 Edge Function이 자동으로 처리
     } catch (error) {
       console.error('Failed to approve suggestion:', error);
@@ -51,10 +51,10 @@ export function AISuggestionCard({
     }
   };
 
-  const handleReject = async () => {
+  const handleReject = () => {
     setIsProcessing(true);
     try {
-      await onReject(suggestion.id);
+      onReject(suggestion.id);
     } catch (error) {
       console.error('Failed to reject suggestion:', error);
     } finally {

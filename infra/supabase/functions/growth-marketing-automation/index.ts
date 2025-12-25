@@ -233,12 +233,13 @@ async function processRegionalRankDrop(
   }
 
   // 이번 달 순위
+  // [불변 규칙] SELECT 쿼리는 withTenant() 사용하여 tenant_id 필터 강제
+  // withTenant() 내부에서 이미 tenant_id 필터가 적용되므로 .eq('tenant_id') 중복 사용 금지
   const currentMonth = toKSTDate(kstTime).slice(0, 7);
   const { data: currentRank } = await withTenant(
     supabase
       .from('analytics.ranking_snapshot')
       .select('rank')
-      .eq('tenant_id', tenantId)
       .eq('metric', 'students')
       .eq('date_kst', `${currentMonth}-01`)
       .single(),
@@ -246,13 +247,14 @@ async function processRegionalRankDrop(
   );
 
   // 지난 달 순위
+  // [불변 규칙] SELECT 쿼리는 withTenant() 사용하여 tenant_id 필터 강제
+  // withTenant() 내부에서 이미 tenant_id 필터가 적용되므로 .eq('tenant_id') 중복 사용 금지
   const lastMonth = new Date(kstTime.getFullYear(), kstTime.getMonth() - 1, 1);
   const lastMonthStr = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`;
   const { data: previousRank } = await withTenant(
     supabase
       .from('analytics.ranking_snapshot')
       .select('rank')
-      .eq('tenant_id', tenantId)
       .eq('metric', 'students')
       .eq('date_kst', `${lastMonthStr}-01`)
       .single(),

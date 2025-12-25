@@ -13,7 +13,7 @@
  */
 
 import { useNavigate } from 'react-router-dom';
-import { Container, Card, useModal, useResponsiveMode } from '@ui-core/react';
+import { Container, Card, useModal, useResponsiveMode, isMobile } from '@ui-core/react';
 import { SchemaForm } from '@schema-engine';
 import { useSignupWithEmail } from '@hooks/use-auth';
 import { signupFormSchema } from '../schemas/signup.schema';
@@ -22,7 +22,9 @@ import type { IndustryType } from '@core/tenancy';
 export function SignupPage() {
   const navigate = useNavigate();
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
   const { showAlert } = useModal();
 
   const signup = useSignupWithEmail();
@@ -84,11 +86,11 @@ export function SignupPage() {
       }}
     >
       <Card
-        padding={isMobile ? 'lg' : 'xl'}
+        padding={isMobileMode ? 'lg' : 'xl'}
         style={{ width: '100%' }}
       >
         <h1 style={{
-          fontSize: isMobile ? 'var(--font-size-2xl)' : 'var(--font-size-3xl)',
+          fontSize: isMobileMode ? 'var(--font-size-2xl)' : 'var(--font-size-3xl)',
           fontWeight: 'var(--font-weight-bold)',
           marginBottom: 'var(--spacing-lg)',
           textAlign: 'center'

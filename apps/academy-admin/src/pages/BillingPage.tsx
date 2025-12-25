@@ -10,33 +10,36 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, Modal, Container, Card, Button, useResponsiveMode, Drawer, PageHeader } from '@ui-core/react';
+import { ErrorBoundary, useModal, Modal, Container, Card, Button, useResponsiveMode, Drawer, PageHeader, isMobile, isTablet } from '@ui-core/react';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
-import { useBillingHistory } from '@hooks/use-billing';
+import { useBillingHistory , fetchBillingHistory } from '@hooks/use-billing';
 import { fetchInvoiceItems } from '@hooks/use-invoice-items';
 import { useUpdateConfig } from '@hooks/use-config';
 import type { UpdateConfigInput } from '@core/config';
-import { apiClient, getApiContext } from '@api-sdk/core';
+import { getApiContext, apiClient } from '@api-sdk/core';
 import { toKST } from '@lib/date-utils';
-import type { Invoice, InvoiceStatus, InvoiceItem } from '@core/billing';
+import type { Invoice, InvoiceStatus } from '@core/billing';
 import type { BillingHistoryItem } from '@hooks/use-billing';
-import { fetchBillingHistory } from '@hooks/use-billing';
 import { billingFormSchema } from '../schemas/billing.schema';
 import { productFormSchema } from '../schemas/product.schema';
 import { invoiceTableSchema } from '../schemas/invoice.table.schema';
 import { subjectRevenueTableSchema } from '../schemas/subject-revenue.table.schema';
 import { settlementFormSchema } from '../schemas/settlement.schema';
 import { teacherRevenueSplitFormSchema } from '../schemas/teacher-revenue-split.schema';
+// [SSOT] Barrel export를 통한 통합 import
+import { ROUTES } from '../constants';
 
 export function BillingPage() {
-  const { showAlert, showConfirm } = useModal();
+  const { showAlert } = useModal();
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
 
   const [filter, setFilter] = useState<{ status?: InvoiceStatus }>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -92,7 +95,7 @@ export function BillingPage() {
       return response.data!;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices', tenantId] });
+      void queryClient.invalidateQueries({ queryKey: ['invoices', tenantId] });
       setShowCreateForm(false);
       showAlert('성공', '인보이스가 생성되었습니다.');
     },
@@ -135,22 +138,8 @@ export function BillingPage() {
   void products;
   void productsLoading;
 
-  // 상품 생성
-  const createProduct = useMutation({
-    mutationFn: async (data: Record<string, unknown>) => {
-      // TODO: products 테이블이 생성되면 실제 생성으로 변경
-      // 현재는 플레이스홀더
-      return { id: 'temp-' + Date.now(), ...data };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products', tenantId] });
-      setShowProductForm(false);
-      showAlert('성공', '상품이 생성되었습니다.');
-    },
-    onError: (error: Error) => {
-      showAlert('오류', error.message);
-    },
-  });
+  // 상품 생성 (TODO: products 테이블이 생성되면 구현)
+  // const createProduct = useMutation({ ... });
 
   // 매출 통계 조회는 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙)
 
@@ -181,7 +170,7 @@ export function BillingPage() {
       };
     },
     onSuccess: (data: { total_amount?: number }) => {
-      queryClient.invalidateQueries({ queryKey: ['revenue-stats', tenantId] });
+      void queryClient.invalidateQueries({ queryKey: ['revenue-stats', tenantId] });
       setShowSettlementForm(false);
       showAlert('성공', `정산이 완료되었습니다. (정산 금액: ${new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(data.total_amount || 0)})`);
     },
@@ -209,7 +198,7 @@ export function BillingPage() {
         },
       } as UpdateConfigInput;
 
-      return await updateConfig.mutateAsync(updateInput);
+      return updateConfig.mutateAsync(updateInput);
     },
     onSuccess: () => {
       setShowTeacherRevenueSplitForm(false);
@@ -221,58 +210,37 @@ export function BillingPage() {
   });
   void saveTeacherRevenueSplit;
 
-  // 인보이스 상태 업데이트
-  const updateInvoiceStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: InvoiceStatus }) => {
-      const response = await apiClient.patch<Invoice>('invoices', id, { status });
-
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-
-      return response.data!;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices', tenantId] });
-      showAlert('성공', '인보이스 상태가 업데이트되었습니다.');
-    },
-    onError: (error: Error) => {
-      showAlert('오류', error.message);
-    },
-  });
+  // 인보이스 상태 업데이트 (TODO: 구현 필요)
+  // const updateInvoiceStatus = useMutation({
+  //   mutationFn: async ({ id, status }: { id: string; status: InvoiceStatus }) => {
+  //     const response = await apiClient.patch<Invoice>('invoices', id, { status });
+  //     if (response.error) {
+  //       throw new Error(response.error.message);
+  //     }
+  //     return response.data!;
+  //   },
+  //   onSuccess: () => {
+  //     void queryClient.invalidateQueries({ queryKey: ['invoices', tenantId] });
+  //     showAlert('성공', '인보이스 상태가 업데이트되었습니다.');
+  //   },
+  //   onError: (error: Error) => {
+  //     showAlert('오류', error.message);
+  //   },
+  // });
 
   const handleStatusFilter = (status?: InvoiceStatus) => {
     setFilter({ status });
   };
 
-  const handleCreateInvoice = async (data: Record<string, unknown>) => {
-    try {
-      await createInvoice.mutateAsync(data);
-      // 성공 시 모달 닫기는 onSuccess에서 처리됨
-    } catch (error) {
-      // 에러는 onError에서 처리됨
-    }
+  const handleCreateInvoice = (data: Record<string, unknown>) => {
+    void createInvoice.mutateAsync(data);
+    // 성공 시 모달 닫기는 onSuccess에서 처리됨
+    // 에러는 onError에서 처리됨
   };
 
-  const handleCreateProduct = async (data: Record<string, unknown>) => {
-    try {
-      await createProduct.mutateAsync(data);
-    } catch (error) {
-      // 에러는 onError에서 처리됨
-    }
-  };
-  void handleCreateProduct;
 
-  const handleStatusChange = async (id: string, newStatus: InvoiceStatus) => {
-    const confirmed = await showConfirm(
-      '상태 변경',
-      `인보이스 상태를 "${newStatus}"로 변경하시겠습니까?`
-    );
-    if (confirmed) {
-      updateInvoiceStatus.mutate({ id, status: newStatus });
-    }
-  };
-  void handleStatusChange;
+  // TODO: handleStatusChange 구현 필요 (현재 미사용)
+  // const handleStatusChange = async (id: string, newStatus: InvoiceStatus) => { ... };
 
   const statusColors: Record<InvoiceStatus, string> = {
     draft: 'gray',
@@ -307,21 +275,21 @@ export function BillingPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate('/billing/products')}
+                onClick={() => navigate(ROUTES.BILLING_HOME)}
               >
                 상품 관리
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate('/billing/payments')}
+                onClick={() => navigate(ROUTES.BILLING_HOME)}
               >
                 결제 관리
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate('/billing/reports')}
+                onClick={() => navigate(ROUTES.BILLING_HOME)}
               >
                 매출/정산
               </Button>
@@ -398,13 +366,13 @@ export function BillingPage() {
           {/* 인보이스 생성 폼 - 반응형: 모바일/태블릿은 Drawer, 데스크톱은 Modal */}
           {schema && (
             <>
-              {isMobile || isTablet ? (
+              {isMobileMode || isTabletMode ? (
                 <Drawer
                   isOpen={showCreateForm}
                   onClose={() => setShowCreateForm(false)}
                   title="새 인보이스 생성"
-                  position={isMobile ? 'bottom' : 'right'}
-                  width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+                  position={isMobileMode ? 'bottom' : 'right'}
+                  width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
                 >
                   <SchemaForm
                     schema={schema}
@@ -479,21 +447,21 @@ export function BillingPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate('/billing/products')}
+                onClick={() => navigate(ROUTES.BILLING_HOME)}
               >
                 상품 관리
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate('/billing/payments')}
+                onClick={() => navigate(ROUTES.BILLING_HOME)}
               >
                 결제 관리
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate('/billing/reports')}
+                onClick={() => navigate(ROUTES.BILLING_HOME)}
               >
                 매출/정산
               </Button>

@@ -6,6 +6,15 @@
  * [불변 규칙] 카탈로그 수정 시 문서(AI_자동화_기능_정리.md)와 동기화 필수
  *
  * 참고: docu/AI_자동화_기능_정리.md Section 11
+ *
+ * ⚠️ 동기화 필수: 이 파일은 다음 파일들과 동일한 내용을 유지해야 합니다:
+ * - packages/core/core-automation/src/automation-event-catalog.ts (이 파일, 최상위 정본)
+ * - infra/supabase/functions/_shared/automation-event-catalog.ts (Edge Function 구현)
+ * - infra/supabase/supabase/functions/_shared/automation-event-catalog.ts (re-export, 자동 동기화됨)
+ *
+ * 수정 시 2개 파일(packages + infra/functions/_shared)만 업데이트하면 됩니다.
+ * infra/supabase/functions/_shared/automation-event-catalog.ts는 re-export이므로 자동으로 동기화됩니다.
+ * (향후 자동 동기화 스크립트 또는 CI 검증 추가 권장)
  */
 
 /**
@@ -78,12 +87,22 @@ export const AUTOMATION_EVENT_CATALOG = [
 export type AutomationEventType = (typeof AUTOMATION_EVENT_CATALOG)[number];
 
 /**
+ * Automation Event Catalog Set (성능 최적화용)
+ *
+ * O(1) 검증을 위한 Set 자료구조. 배열의 includes()는 O(n)이지만 Set의 has()는 O(1)입니다.
+ * 39개 항목이므로 성능 개선 효과가 있습니다.
+ */
+const AUTOMATION_EVENT_CATALOG_SET = new Set<string>(AUTOMATION_EVENT_CATALOG);
+
+/**
  * event_type 검증 가드 함수
+ *
+ * 성능 최적화: Set을 사용하여 O(1) 시간 복잡도로 검증합니다.
  * @param v 검증할 문자열
  * @returns v가 유효한 AutomationEventType인지 여부
  */
 export function isAutomationEventType(v: string): v is AutomationEventType {
-  return (AUTOMATION_EVENT_CATALOG as readonly string[]).includes(v);
+  return AUTOMATION_EVENT_CATALOG_SET.has(v);
 }
 
 /**
@@ -98,5 +117,58 @@ export function assertAutomationEventType(v: string): asserts v is AutomationEve
       `Must be one of: ${AUTOMATION_EVENT_CATALOG.join(', ')}`
     );
   }
+}
+
+/**
+ * Automation Event Catalog 동기화 검증 함수
+ *
+ * ⚠️ 빌드 타임 검증: 이 함수는 빌드 시 또는 CI에서 호출하여
+ * 2개 파일(packages/core/core-automation/src/automation-event-catalog.ts,
+ * infra/supabase/functions/_shared/automation-event-catalog.ts)의
+ * AUTOMATION_EVENT_CATALOG 내용이 일치하는지 검증합니다.
+ * (infra/supabase/supabase/functions/_shared/automation-event-catalog.ts는 re-export이므로 제외)
+ *
+ * ⚠️ 사용 참고: 현재는 scripts/verify-ssot-sync.ts에서 자체 검증 로직을 사용하고 있습니다.
+ * 향후 이 함수를 사용하도록 통합하는 것을 검토할 수 있습니다.
+ *
+ * @param otherCatalog 다른 파일의 AUTOMATION_EVENT_CATALOG 배열
+ * @param sourceFileName 검증 중인 파일 이름 (디버깅용)
+ * @returns 검증 오류 배열 (오류가 없으면 빈 배열)
+ */
+export function validateCatalogSync(
+  otherCatalog: readonly string[],
+  sourceFileName: string
+): string[] {
+  const errors: string[] = [];
+  const thisSet = new Set(AUTOMATION_EVENT_CATALOG);
+  const otherSet = new Set(otherCatalog);
+
+  // 길이 검증
+  if (AUTOMATION_EVENT_CATALOG.length !== otherCatalog.length) {
+    errors.push(
+      `[Catalog Sync] Length mismatch: main catalog has ${AUTOMATION_EVENT_CATALOG.length} items, ` +
+      `${sourceFileName} has ${otherCatalog.length} items`
+    );
+  }
+
+  // 누락된 항목 검증
+  for (const item of AUTOMATION_EVENT_CATALOG) {
+    if (!otherSet.has(item)) {
+      errors.push(
+        `[Catalog Sync] Missing item in ${sourceFileName}: "${item}"`
+      );
+    }
+  }
+
+  // 추가된 항목 검증
+  for (const item of otherCatalog) {
+    if (!thisSet.has(item as AutomationEventType)) {
+      errors.push(
+        `[Catalog Sync] Extra item in ${sourceFileName}: "${item}"`
+      );
+    }
+  }
+
+  return errors;
 }
 

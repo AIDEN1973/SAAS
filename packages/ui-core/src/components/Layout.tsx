@@ -11,6 +11,8 @@
 import React from 'react';
 import { clsx } from 'clsx';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
+// [SSOT] 브레이크포인트는 BREAKPOINTS 상수 사용
+import { BREAKPOINTS } from '../ssot/layout-templates';
 // SpacingToken은 로컬 타입으로 정의 (다른 컴포넌트와 일관성 유지)
 type SpacingToken = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
 
@@ -35,13 +37,14 @@ export const Container: React.FC<ContainerProps> = ({
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
 
-  // 브레이크포인트는 useResponsiveMode와 일치해야 함 (유아이 문서 6-0 준수)
+  // [SSOT] 브레이크포인트는 BREAKPOINTS 상수 사용
   // Container의 maxWidth는 실제 컨테이너 너비이므로 rem 단위 사용 (일관성)
+  // BREAKPOINTS 값(px)을 rem으로 변환: px / 16 = rem
   const maxWidthMap: Record<'sm' | 'md' | 'lg' | 'xl' | 'full', string> = {
-    sm: '40rem', // 640px - 브레이크포인트 sm과 동일
-    md: '48rem', // 768px - 브레이크포인트 md와 동일
-    lg: '64rem', // 1024px - 브레이크포인트 lg와 동일
-    xl: '80rem', // 1280px - 브레이크포인트 xl과 동일
+    sm: `${BREAKPOINTS.SM / 16}rem`, // 640px = 40rem (SSOT 상수 사용)
+    md: `${BREAKPOINTS.MD / 16}rem`, // 768px = 48rem (SSOT 상수 사용)
+    lg: `${BREAKPOINTS.LG / 16}rem`, // 1024px = 64rem (SSOT 상수 사용)
+    xl: `${BREAKPOINTS.XL / 16}rem`, // 1280px = 80rem (SSOT 상수 사용)
     full: '100%',
   };
 

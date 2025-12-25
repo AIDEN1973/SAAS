@@ -10,7 +10,8 @@ import React from 'react';
 import { MessageSquare } from 'lucide-react';
 import { NotificationCardLayout } from '@ui-core/react';
 import type { ConsultationStats } from '@hooks/use-student';
-import { EMPTY_MESSAGES } from '../../constants/dashboard-cards';
+// [SSOT] Barrel export를 통한 통합 import
+import { EMPTY_MESSAGES } from '../../constants';
 
 export interface ConsultationStatsCardProps {
   stats: ConsultationStats | undefined;

@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { useResponsiveMode } from '@ui-core/react';
+import { useResponsiveMode, isDesktop, isTablet } from '@ui-core/react';
 
 export interface CardGridLayoutProps {
   /** 카드 배열 */
@@ -31,11 +31,12 @@ export function CardGridLayout({
   mobileColumns = 1,
 }: CardGridLayoutProps) {
   const mode = useResponsiveMode();
-  const isDesktop = mode === 'lg' || mode === 'xl';
-  const isTablet = mode === 'md';
-  const isMobile = mode === 'xs' || mode === 'sm';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isDesktopMode = isDesktop(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
 
-  const columnsPerRow = isDesktop ? desktopColumns : isTablet ? tabletColumns : mobileColumns;
+  const columnsPerRow = isDesktopMode ? desktopColumns : isTabletMode ? tabletColumns : mobileColumns;
   // 그리드 형태(여러 열)로 출력될 때 상단 테두리 표시
   const showTopBorder = columnsPerRow > 1;
 
@@ -43,9 +44,9 @@ export function CardGridLayout({
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: isDesktop
+        gridTemplateColumns: isDesktopMode
           ? `repeat(${desktopColumns}, 1fr)`
-          : isTablet
+          : isTabletMode
             ? `repeat(${tabletColumns}, 1fr)`
             : `repeat(${mobileColumns}, 1fr)`,
         ...(showTopBorder && {
@@ -107,7 +108,7 @@ export function CardGridLayout({
         const lastRowCards = cards.slice(lastRowStartIndex);
         const emptyCells = columnsPerRow - lastRowCards.length;
 
-        if (emptyCells > 0 && isDesktop) {
+        if (emptyCells > 0 && isDesktopMode) {
           // 데스크탑에서만 빈 셀 표시 (태블릿/모바일에서는 불필요)
           return Array.from({ length: emptyCells }).map((_, emptyIndex) => {
             const colIndex = lastRowCards.length + emptyIndex;
@@ -130,4 +131,3 @@ export function CardGridLayout({
     </div>
   );
 }
-

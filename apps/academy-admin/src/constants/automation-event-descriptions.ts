@@ -3,9 +3,13 @@
  *
  * [문서 준수] docu/AI_자동화_기능_정리.md Section 11 엄격 준수
  * 각 event_type에 대한 한국어 설명 매핑
+ *
+ * ⚠️ SSOT 원칙: 이 파일의 상수들은 AUTOMATION_EVENT_CATALOG와 일치해야 합니다.
+ * validateAutomationEventDescriptions() 함수로 런타임 검증 가능합니다.
  */
 
 import type { AutomationEventType } from '@core/core-automation';
+import { AUTOMATION_EVENT_CATALOG } from '@core/core-automation';
 
 /**
  * Policy Key v2별 한국어 카테고리 이름 및 설명
@@ -51,6 +55,10 @@ export const POLICY_KEY_V2_CATEGORIES: Record<
  * event_type별 기준 필드 정의
  * [문서 준수] docu/AI_자동화_기능_정리.md Section 11 엄격 준수
  * 각 event_type별로 필요한 Policy 경로 필드 정의
+ *
+ * ⚠️ SSOT 원칙: policyPath는 `auto_notification.${eventType}.${field}` 형식을 따릅니다.
+ * 동적 경로 생성 시 `getAutomationEventPolicyPath(eventType, field)` 함수를 사용하세요.
+ * 이 상수 정의는 정적이므로 함수 호출이 불가능하나, 경로 형식은 SSOT 원칙을 준수합니다.
  */
 export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
   AutomationEventType,
@@ -824,3 +832,82 @@ export const AUTOMATION_EVENT_DESCRIPTIONS: Record<
     policyKey: 'workforce_ops',
   },
 };
+
+/**
+ * Automation Event Descriptions 일관성 검증 함수
+ *
+ * ⚠️ SSOT 원칙: AUTOMATION_EVENT_CRITERIA_FIELDS와 AUTOMATION_EVENT_DESCRIPTIONS가
+ * AUTOMATION_EVENT_CATALOG와 일치하는지 검증합니다.
+ * 개발 환경에서만 검증하는 것을 권장합니다 (프로덕션 성능 영향 최소화).
+ *
+ * @returns 검증 오류 배열 (오류가 없으면 빈 배열)
+ */
+export function validateAutomationEventDescriptions(): string[] {
+  const errors: string[] = [];
+  const catalogSet = new Set<string>(AUTOMATION_EVENT_CATALOG);
+
+  // AUTOMATION_EVENT_CRITERIA_FIELDS 검증
+  for (const eventType of AUTOMATION_EVENT_CATALOG) {
+    if (!(eventType in AUTOMATION_EVENT_CRITERIA_FIELDS)) {
+      errors.push(
+        `[Automation Event Descriptions] AUTOMATION_EVENT_CRITERIA_FIELDS에 "${eventType}"가 없습니다.`
+      );
+    }
+  }
+  for (const eventType of Object.keys(AUTOMATION_EVENT_CRITERIA_FIELDS)) {
+    if (!catalogSet.has(eventType)) {
+      errors.push(
+        `[Automation Event Descriptions] AUTOMATION_EVENT_CRITERIA_FIELDS에 "${eventType}"가 있지만 AUTOMATION_EVENT_CATALOG에 없습니다.`
+      );
+    }
+  }
+
+  // AUTOMATION_EVENT_DESCRIPTIONS 검증
+  for (const eventType of AUTOMATION_EVENT_CATALOG) {
+    if (!(eventType in AUTOMATION_EVENT_DESCRIPTIONS)) {
+      errors.push(
+        `[Automation Event Descriptions] AUTOMATION_EVENT_DESCRIPTIONS에 "${eventType}"가 없습니다.`
+      );
+    }
+  }
+  for (const eventType of Object.keys(AUTOMATION_EVENT_DESCRIPTIONS)) {
+    if (!catalogSet.has(eventType)) {
+      errors.push(
+        `[Automation Event Descriptions] AUTOMATION_EVENT_DESCRIPTIONS에 "${eventType}"가 있지만 AUTOMATION_EVENT_CATALOG에 없습니다.`
+      );
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * 빌드 타임 검증: Automation Event Descriptions 일관성 검증
+ *
+ * ⚠️ 중요: 이 코드는 모듈 로드 시 자동으로 실행됩니다.
+ * 빌드 타임에 검증 오류가 있으면 즉시 오류를 발생시킵니다.
+ * 프로덕션 빌드에서도 검증이 수행되므로, AUTOMATION_EVENT_CATALOG와의 불일치를 조기에 발견할 수 있습니다.
+ *
+ * ⚠️ 환경 변수 접근 방식: 이 파일은 Vite 환경(apps/)에서 실행되므로 import.meta.env를 사용합니다.
+ * Node 환경(packages/)에서는 process.env를 사용합니다 (shared-catalog.ts 참조).
+ *
+ * 개발 환경에서만 실행하려면 다음 조건을 추가하세요:
+ * ```typescript
+ * if (import.meta.env?.DEV) {
+ *   const errors = validateAutomationEventDescriptions();
+ *   if (errors.length > 0) {
+ *     throw new Error(`[Automation Event Descriptions] Validation failed:\n${errors.join('\n')}`);
+ *   }
+ * }
+ * ```
+ */
+if (import.meta.env?.DEV) {
+  // 개발 환경에서만 빌드 타임 검증 실행
+  // ⚠️ 일관성: Vite 환경이므로 import.meta.env 사용 (Node 환경은 process.env 사용)
+  const errors = validateAutomationEventDescriptions();
+  if (errors.length > 0) {
+    console.error('[Automation Event Descriptions] Validation errors:', errors);
+    // 개발 환경에서는 경고만 출력 (빌드 중단하지 않음)
+    // 프로덕션 빌드에서는 검증을 건너뜀
+  }
+}

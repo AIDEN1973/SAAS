@@ -519,7 +519,7 @@ JSON 형식으로만 응답하고, 다른 설명은 포함하지 마세요.`;
     return new Response(
       JSON.stringify({
         error: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? errorStack : undefined,
+        details: envServer.NODE_ENV === 'development' ? errorStack : undefined,
       }),
       {
         status: 500,

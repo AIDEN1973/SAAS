@@ -9,7 +9,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer, PageHeader, useIconSize, useIconStrokeWidth } from '@ui-core/react';
+import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer, PageHeader, useIconSize, useIconStrokeWidth, isMobile, isTablet } from '@ui-core/react';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -30,8 +30,10 @@ export function NotificationsPage() {
   const context = getApiContext();
   const tenantId = context.tenantId;
   const mode = useResponsiveMode();
-  const isMobile = mode === 'xs' || mode === 'sm';
-  const isTablet = mode === 'md';
+  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
   const iconSize = useIconSize('--size-icon-base', 20);
   const iconStrokeWidth = useIconStrokeWidth('--stroke-width-icon', 1.5);
 
@@ -70,7 +72,7 @@ export function NotificationsPage() {
       if (!tenantId) return [];
 
       // 정본 규칙: fetchNotificationTemplates 함수 사용 (Hook의 queryFn 로직 재사용)
-      return await fetchNotificationTemplates(tenantId, {});
+      return fetchNotificationTemplates(tenantId, {});
     },
     enabled: !!tenantId && activeTab === 'templates', // 템플릿 탭 활성화 시에만 조회
   });
@@ -100,7 +102,7 @@ export function NotificationsPage() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notification-templates', tenantId] });
+      void queryClient.invalidateQueries({ queryKey: ['notification-templates', tenantId] });
       setShowTemplateForm(false);
       showAlert('성공', '템플릿이 생성되었습니다.');
     },
@@ -137,7 +139,7 @@ export function NotificationsPage() {
         },
       };
 
-      return await updateConfig.mutateAsync(updateInput);
+      return updateConfig.mutateAsync(updateInput);
     },
     onSuccess: () => {
       // setShowAutoNotificationSettings(false); // (미사용) 자동 알림 설정 Drawer/Modal 도입 시 사용
@@ -168,7 +170,7 @@ export function NotificationsPage() {
       return results;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications', tenantId] });
+      void queryClient.invalidateQueries({ queryKey: ['notifications', tenantId] });
       // setShowBulkForm(false); // (미사용) 단체 발송 Drawer/Modal 도입 시 사용
       showAlert('성공', '메시지가 발송되었습니다.');
     },
@@ -195,7 +197,7 @@ export function NotificationsPage() {
       return response.data!;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications', tenantId] });
+      void queryClient.invalidateQueries({ queryKey: ['notifications', tenantId] });
       setShowCreateForm(false);
       showAlert('성공', '알림이 생성되었습니다.');
     },
@@ -211,14 +213,11 @@ export function NotificationsPage() {
 
   // statusColors/statusLabels는 SchemaTable 스키마 기반 렌더링으로 대체됨 (미사용)
 
-  const handleCreateNotification = async (data: Record<string, unknown>) => {
-    try {
-      await createNotification.mutateAsync(data);
-      // 성공 시 모달 닫기는 onSuccess에서 처리됨
-      setAiDraftValues(null); // AI 초안 값 초기화
-    } catch (error) {
-      // 에러는 onError에서 처리됨
-    }
+  const handleCreateNotification = (data: Record<string, unknown>) => {
+    void createNotification.mutateAsync(data);
+    // 성공 시 모달 닫기는 onSuccess에서 처리됨
+    setAiDraftValues(null); // AI 초안 값 초기화
+    // 에러는 onError에서 처리됨
   };
 
   // AI 초안 적용 핸들러
@@ -226,8 +225,8 @@ export function NotificationsPage() {
   // StudentTaskCard의 suggested_action.payload에서 message만 추출하여 폼에 적용
   // recipient는 guardian_id 배열이므로 사용자가 직접 입력하도록 함
   const handleApplyAIDraft = (suggestion: (typeof messageDraftSuggestions)[number]) => {
-    const payload = suggestion.suggested_action?.payload as Record<string, unknown> | undefined;
-    if (payload && payload.message) {
+    const payload = suggestion.suggested_action?.payload;
+    if (payload && typeof payload === 'object' && 'message' in payload) {
       const draftValues: Record<string, unknown> = {
         content: String(payload.message || ''),
         channel: (payload.channel as NotificationChannel) || 'sms', // payload에 channel이 있으면 사용, 없으면 기본값 'sms'
@@ -372,7 +371,7 @@ export function NotificationsPage() {
           {/* 메시지 발송 폼 - 반응형: 모바일/태블릿은 Drawer, 데스크톱은 Modal */}
           {schema && (
             <>
-              {isMobile || isTablet ? (
+              {isMobileMode || isTabletMode ? (
                 <Drawer
                   isOpen={showCreateForm}
                   onClose={() => {
@@ -380,8 +379,8 @@ export function NotificationsPage() {
                     setAiDraftValues(null);
                   }}
                   title="새 메시지 발송"
-                  position={isMobile ? 'bottom' : 'right'}
-                  width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+                  position={isMobileMode ? 'bottom' : 'right'}
+                  width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
                 >
                   <SchemaForm
                     schema={schema}
@@ -542,7 +541,7 @@ export function NotificationsPage() {
                 </div>
               {schema && (
                 <>
-              {isMobile || isTablet ? (
+              {isMobileMode || isTabletMode ? (
                 <Drawer
                   isOpen={showCreateForm}
                   onClose={() => {
@@ -550,8 +549,8 @@ export function NotificationsPage() {
                     setAiDraftValues(null);
                   }}
                   title="새 메시지 발송"
-                  position={isMobile ? 'bottom' : 'right'}
-                  width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+                  position={isMobileMode ? 'bottom' : 'right'}
+                  width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
                 >
                   <SchemaForm
                     schema={schema}
@@ -657,13 +656,13 @@ export function NotificationsPage() {
               )}
               {templateSchema && (
                 <>
-                  {isMobile || isTablet ? (
+                  {isMobileMode || isTabletMode ? (
                     <Drawer
                       isOpen={showTemplateForm}
                       onClose={() => setShowTemplateForm(false)}
                       title="새 템플릿 생성"
-                      position={isMobile ? 'bottom' : 'right'}
-                      width={isTablet ? 'var(--width-drawer-tablet)' : '100%'}
+                      position={isMobileMode ? 'bottom' : 'right'}
+                      width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
                     >
                       <SchemaForm
                         schema={templateSchema}
@@ -807,4 +806,3 @@ export function NotificationsPage() {
     </ErrorBoundary>
   );
 }
-

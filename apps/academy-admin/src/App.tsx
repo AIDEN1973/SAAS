@@ -1,36 +1,54 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { Suspense, lazy, useMemo } from 'react';
 import { AppLayout, Button, useModal, useTheme, AIToggle } from '@ui-core/react';
 import type { SidebarItem } from '@ui-core/react';
-import { StudentsHomePage } from './pages/StudentsHomePage';
-import { StudentsListPage } from './pages/StudentsListPage';
-// StudentDetailPage는 StudentsPage의 레이어 메뉴로 통합됨
-import { ClassesPage } from './pages/ClassesPage';
-import { TeachersPage } from './pages/TeachersPage';
-import { AttendancePage } from './pages/AttendancePage';
-import { BillingPage } from './pages/BillingPage';
-import { BillingHomePage } from './pages/BillingHomePage';
-import { NotificationsPage } from './pages/NotificationsPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
-import { AIPage } from './pages/AIPage';
-import { HomePage } from './pages/HomePage';
-import { AllCardsPage } from './pages/AllCardsPage';
-import { StudentTasksPage } from './pages/StudentTasksPage';
-import { LoginPage } from './pages/LoginPage';
-import { SignupPage } from './pages/SignupPage';
-import { TenantSelectionPage } from './pages/TenantSelectionPage';
-import { AutomationSettingsPage } from './pages/AutomationSettingsPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleBasedRoute } from './components/RoleBasedRoute';
 import { useLogout, useUserRole } from '@hooks/use-auth';
-import { SchemaEditorPage } from '../../super-admin/src/pages/SchemaEditorPage';
-import { AuthGuard } from '../../super-admin/src/components/AuthGuard';
 import type { TenantRole } from '@core/tenancy';
+import { createSafeNavigate } from './utils';
+
+// 핵심 페이지는 즉시 로드 (초기 로딩 속도)
+import { HomePage } from './pages/HomePage';
+import { LoginPage } from './pages/LoginPage';
+import { SignupPage } from './pages/SignupPage';
+import { TenantSelectionPage } from './pages/TenantSelectionPage';
+
+// 나머지 페이지는 코드 스플리팅 (지연 로딩)
+const StudentsHomePage = lazy(() => import('./pages/StudentsHomePage').then(m => ({ default: m.StudentsHomePage })));
+const StudentsListPage = lazy(() => import('./pages/StudentsListPage').then(m => ({ default: m.StudentsListPage })));
+const ClassesPage = lazy(() => import('./pages/ClassesPage').then(m => ({ default: m.ClassesPage })));
+const TeachersPage = lazy(() => import('./pages/TeachersPage').then(m => ({ default: m.TeachersPage })));
+const AttendancePage = lazy(() => import('./pages/AttendancePage').then(m => ({ default: m.AttendancePage })));
+const BillingPage = lazy(() => import('./pages/BillingPage').then(m => ({ default: m.BillingPage })));
+const BillingHomePage = lazy(() => import('./pages/BillingHomePage').then(m => ({ default: m.BillingHomePage })));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(m => ({ default: m.AnalyticsPage })));
+const AIPage = lazy(() => import('./pages/AIPage').then(m => ({ default: m.AIPage })));
+const AllCardsPage = lazy(() => import('./pages/AllCardsPage').then(m => ({ default: m.AllCardsPage })));
+const StudentTasksPage = lazy(() => import('./pages/StudentTasksPage').then(m => ({ default: m.StudentTasksPage })));
+const AutomationSettingsPage = lazy(() => import('./pages/AutomationSettingsPage').then(m => ({ default: m.AutomationSettingsPage })));
+const SchemaEditorPage = lazy(() => import('../../super-admin/src/pages/SchemaEditorPage').then(m => ({ default: m.SchemaEditorPage })));
+const AuthGuard = lazy(() => import('../../super-admin/src/components/AuthGuard').then(m => ({ default: m.AuthGuard })));
+
+// 로딩 컴포넌트
+// [SSOT] 하드코딩 금지: CSS 변수 사용
+const PageLoader = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'var(--spacing-3xl)' }}>
+    <div>로딩 중...</div>
+  </div>
+);
 
 function AppContent() {
   // 테넌트별 테마 적용
   useTheme({ mode: 'auto' });
   const location = useLocation();
   const navigate = useNavigate();
+  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용 (일관성)
+  const safeNavigate = useMemo(
+    () => createSafeNavigate(navigate),
+    [navigate]
+  );
   const { showAlert } = useModal();
   const logout = useLogout();
   const { data: userRole } = useUserRole();
@@ -284,9 +302,10 @@ function AppContent() {
     }
 
     // 일반 메뉴 클릭 시 경로 이동
+    // [P0-2 수정] SSOT: safeNavigate 사용 (일관성, 내부적으로 isSafeInternalPath 검증)
     if (item.path) {
       console.log('[App.tsx] Navigating to:', item.path);
-      navigate(item.path);
+      safeNavigate(item.path);
       console.log('[App.tsx] Navigate called, new path should be:', item.path);
     } else {
       console.warn('[App.tsx] Sidebar item has no path:', item);
@@ -296,7 +315,8 @@ function AppContent() {
   const handleLogout = async () => {
     try {
       await logout.mutateAsync();
-      navigate('/auth/login');
+      // [P0-2 수정] SSOT: safeNavigate 사용 (일관성)
+      safeNavigate('/auth/login');
     } catch (error) {
       const message = error instanceof Error ? error.message : '로그아웃에 실패했습니다.';
       showAlert('오류', message);
@@ -339,33 +359,35 @@ function AppContent() {
             >
               <Routes>
                 <Route path="/home" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><HomePage /></RoleBasedRoute>} />
-                <Route path="/home/all-cards" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><AllCardsPage /></RoleBasedRoute>} />
-                <Route path="/students/home" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><StudentsHomePage /></RoleBasedRoute>} />
-                <Route path="/students/tasks" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><StudentTasksPage /></RoleBasedRoute>} />
-                <Route path="/students/list" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><StudentsListPage /></RoleBasedRoute>} />
-                <Route path="/students" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><StudentsHomePage /></RoleBasedRoute>} />
+                <Route path="/home/all-cards" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><AllCardsPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/students/home" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><StudentsHomePage /></Suspense></RoleBasedRoute>} />
+                <Route path="/students/tasks" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><StudentTasksPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/students/list" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><StudentsListPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/students" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><StudentsHomePage /></Suspense></RoleBasedRoute>} />
                 {/* StudentDetailPage는 레이어 메뉴로 통합됨 - URL은 StudentsPage로 리다이렉트 */}
-                <Route path="/students/:id" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><StudentsListPage /></RoleBasedRoute>} />
-                <Route path="/students/:id/counsel" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'counselor', 'staff', 'manager', 'super_admin']}><StudentsListPage /></RoleBasedRoute>} />
-                <Route path="/students/:id/attendance" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><StudentsListPage /></RoleBasedRoute>} />
-                <Route path="/students/:id/risk" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'counselor', 'staff', 'manager', 'super_admin']}><StudentsListPage /></RoleBasedRoute>} />
-                <Route path="/students/:id/welcome" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'staff', 'manager', 'super_admin']}><StudentsListPage /></RoleBasedRoute>} />
-                <Route path="/classes" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'staff', 'manager', 'super_admin']}><ClassesPage /></RoleBasedRoute>} />
-                <Route path="/teachers" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'staff', 'manager', 'super_admin']}><TeachersPage /></RoleBasedRoute>} />
-                <Route path="/attendance" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><AttendancePage /></RoleBasedRoute>} />
-                <Route path="/billing/home" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><BillingHomePage /></RoleBasedRoute>} />
-                <Route path="/billing/list" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><BillingPage /></RoleBasedRoute>} />
-                <Route path="/billing" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><BillingHomePage /></RoleBasedRoute>} />
-                <Route path="/notifications" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'staff', 'manager', 'super_admin']}><NotificationsPage /></RoleBasedRoute>} />
-                <Route path="/analytics" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><AnalyticsPage /></RoleBasedRoute>} />
-                <Route path="/ai" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'counselor', 'staff', 'manager', 'super_admin']}><AIPage /></RoleBasedRoute>} />
-                <Route path="/settings/automation" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'super_admin']}><AutomationSettingsPage /></RoleBasedRoute>} />
+                <Route path="/students/:id" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><StudentsListPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/students/:id/counsel" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><StudentsListPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/students/:id/attendance" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><StudentsListPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/students/:id/risk" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><StudentsListPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/students/:id/welcome" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><StudentsListPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/classes" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><ClassesPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/teachers" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><TeachersPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/attendance" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><AttendancePage /></Suspense></RoleBasedRoute>} />
+                <Route path="/billing/home" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><BillingHomePage /></Suspense></RoleBasedRoute>} />
+                <Route path="/billing/list" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><BillingPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/billing" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><BillingHomePage /></Suspense></RoleBasedRoute>} />
+                <Route path="/notifications" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><NotificationsPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/analytics" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><AnalyticsPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/ai" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><AIPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/settings/automation" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'super_admin']}><Suspense fallback={<PageLoader />}><AutomationSettingsPage /></Suspense></RoleBasedRoute>} />
                 <Route
                   path="/super-admin"
                   element={
-                    <AuthGuard>
-                      <SchemaEditorPage />
-                    </AuthGuard>
+                    <Suspense fallback={<PageLoader />}>
+                      <AuthGuard>
+                        <SchemaEditorPage />
+                      </AuthGuard>
+                    </Suspense>
                   }
                 />
                 <Route path="/" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><HomePage /></RoleBasedRoute>} />

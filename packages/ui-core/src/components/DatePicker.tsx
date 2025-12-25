@@ -541,7 +541,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                     }}
                   >
                     {/* 연도 커스텀 드롭다운 */}
-                    <div style={{ position: 'relative', minWidth: '6.5rem' }}>
+                    {/* [불변 규칙] CSS 하드코딩 금지: CSS 변수 사용 */}
+                    <div style={{ position: 'relative', minWidth: 'var(--width-datepicker-year)' }}>
                       <button
                         ref={yearButtonRef}
                         type="button"
@@ -622,8 +623,9 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                             left: 0,
                             zIndex: 5,
                             width: '100%',
-                            minWidth: '6.5rem',
-                            maxHeight: '220px',
+                            // [불변 규칙] CSS 하드코딩 금지: CSS 변수 사용
+                            minWidth: 'var(--width-datepicker-year)',
+                            maxHeight: 'var(--height-datepicker-dropdown)',
                             overflowY: 'auto',
                             backgroundColor: 'var(--color-white)',
                             border: 'var(--border-width-thin) solid var(--color-gray-200)',
@@ -672,7 +674,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                     </div>
 
                     {/* 월 커스텀 드롭다운 */}
-                    <div style={{ position: 'relative', minWidth: '5.25rem' }}>
+                    {/* [불변 규칙] CSS 하드코딩 금지: CSS 변수 사용 */}
+                    <div style={{ position: 'relative', minWidth: 'var(--width-datepicker-month)' }}>
                       <button
                         ref={monthButtonRef}
                         type="button"
@@ -753,8 +756,9 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                             left: 0,
                             zIndex: 5,
                             width: '100%',
-                            minWidth: '5.25rem',
-                            maxHeight: '220px',
+                            // [불변 규칙] CSS 하드코딩 금지: CSS 변수 사용
+                            minWidth: 'var(--width-datepicker-month)',
+                            maxHeight: 'var(--height-datepicker-dropdown)',
                             overflowY: 'auto',
                             backgroundColor: 'var(--color-white)',
                             border: 'var(--border-width-thin) solid var(--color-gray-200)',
@@ -1003,7 +1007,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
             color: 'var(--color-form-error)', // styles.css 토큰: 폼 필드 에러 메시지 색상
             marginTop: 'var(--spacing-xs)',
             // 요구사항: 에러 메시지를 2pt 작게 표시 (공통 컴포넌트 기준)
-            fontSize: 'calc(var(--font-size-sm) - 2px)',
+            // [불변 규칙] CSS 하드코딩 금지: CSS 변수 사용
+            fontSize: 'calc(var(--font-size-sm) - var(--size-font-reduction))',
           }}
         >
           {error}

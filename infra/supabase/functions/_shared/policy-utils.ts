@@ -90,10 +90,16 @@ export async function getTenantSettingByPath(
   }
 
   // 2단계: value(JSONB)에서 경로 추출 (신규 경로 우선)
+  // ⚠️ 일관성 참고: 클라이언트의 getPolicyValueFromConfig와 동일한 알고리즘을 사용합니다.
+  // 차이점: 서버에서는 `key in current`를 사용하고, 클라이언트에서는 hasOwnProperty를 사용합니다.
+  // 1. 경로를 점(.)으로 분리
+  // 2. 각 키를 순차적으로 탐색
+  // 3. 중간 경로가 없으면 레거시 경로 fallback 시도 또는 null 반환 (Fail Closed)
   const keys = path.split('.');
   let current: unknown = config;
 
   for (const key of keys) {
+    // ⚠️ 일관성: 서버에서는 `key in current`를 사용 (프로토타입 체인 탐색 허용, JSONB 객체이므로 안전)
     if (current && typeof current === 'object' && key in current) {
       current = (current as Record<string, unknown>)[key];
     } else {

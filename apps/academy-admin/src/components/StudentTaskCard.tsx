@@ -6,13 +6,14 @@
 
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, AlertTriangle, Clock, MessageSquare, UserPlus } from 'lucide-react';
 import { NotificationCardLayout, Button, Modal } from '@ui-core/react';
 import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 import type { StudentTaskCard as StudentTaskCardType } from '@hooks/use-student';
 import { useRequestApprovalStudentTaskCard, useApproveAndExecuteStudentTaskCard, useSnoozeStudentTaskCard, useDeleteStudentTaskCard } from '@hooks/use-student';
 import { useUserRole } from '@hooks/use-auth';
-import { EMPTY_CARD_ID_PREFIX, DEFAULT_VALUES, TEXT_LINE_LIMITS, DATE_FORMATS, CARD_LABELS } from '../constants/dashboard-cards';
+// [SSOT] Barrel export를 통한 통합 import
+import { EMPTY_CARD_ID_PREFIX, DEFAULT_VALUES, TEXT_LINE_LIMITS, DATE_FORMATS, CARD_LABELS } from '../constants';
+import { isSafeInternalPath } from '../utils/navigation-utils';
 
 interface StudentTaskCardProps {
   card: StudentTaskCardType;
@@ -56,24 +57,6 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
 
   const iconPath = iconPaths[card.task_type];
 
-  // 우측 상단 아이콘 (task_type에 따라 다른 아이콘)
-  const topRightIcon = useMemo(() => {
-    switch (card.task_type) {
-      case 'ai_suggested':
-        return <Sparkles style={{ width: '100%', height: '100%' }} />;
-      case 'risk':
-        return <AlertTriangle style={{ width: '100%', height: '100%' }} />;
-      case 'absence':
-        return <Clock style={{ width: '100%', height: '100%' }} />;
-      case 'counseling':
-        return <MessageSquare style={{ width: '100%', height: '100%' }} />;
-      case 'new_signup':
-        return <UserPlus style={{ width: '100%', height: '100%' }} />;
-      default:
-        return null;
-    }
-  }, [card.task_type]);
-
   const { data: userRole } = useUserRole();
   const requestApproval = useRequestApprovalStudentTaskCard();
   const approveAndExecute = useApproveAndExecuteStudentTaskCard();
@@ -86,26 +69,35 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
   const [selectedRemindTime, setSelectedRemindTime] = useState<string>('');
   const [selectedRemindOptionId, setSelectedRemindOptionId] = useState<string>('');
 
-  // StudentTaskCard (task_type: 'ai_suggested')이고 pending 상태인 경우 승인/거부 버튼 표시
-  const isAISuggestedPending = card.task_type === 'ai_suggested' && card.status === 'pending';
   const isTeacher = userRole === 'teacher';
   const isAdmin = userRole === 'admin' || userRole === 'owner';
 
-  const handleAction = () => {
+  const handleAction = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     if (onAction) {
       // onAction이 제공되면 사용 (정본: 컴포넌트 레벨에서 navigate 호출)
+      // [P0-2 수정] SSOT: onAction에서 반환된 actionUrl도 검증 (이중 방어)
       const actionUrl = onAction(card);
-      if (typeof actionUrl === 'string' && actionUrl) {
+      if (typeof actionUrl === 'string' && actionUrl && isSafeInternalPath(actionUrl)) {
         navigate(actionUrl);
       }
+      // 외부 URL 또는 잘못된 형식은 무시 (Fail Closed)
     } else if (card.action_url) {
       // onAction이 없으면 직접 action_url 사용 (하위 호환)
-      navigate(card.action_url);
+      // [P0-2 수정] SSOT: 서버에서 온 action_url 검증 (오픈 리다이렉트 방지)
+      if (isSafeInternalPath(card.action_url)) {
+        navigate(card.action_url);
+      }
+      // 외부 URL 또는 잘못된 형식은 무시 (Fail Closed)
     }
   };
 
-  const handleApprove = async (e: React.MouseEvent) => {
+  const handleApprove = async (e?: React.MouseEvent) => {
+    if (e) {
     e.stopPropagation(); // 카드 클릭 이벤트 방지
+    }
     setIsProcessing(true);
     try {
       if (isTeacher) {
@@ -122,21 +114,6 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
     }
   };
 
-  const handleReject = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // 카드 클릭 이벤트 방지
-    // TODO: 거부 기능 구현 (Edge Function 또는 직접 업데이트)
-    console.log('Reject task card:', card.id);
-  };
-
-  const handlePreview = (e: React.MouseEvent) => {
-    e.stopPropagation(); // 카드 클릭 이벤트 방지
-    setIsPreviewOpen(true);
-  };
-
-  const handleSnooze = (e: React.MouseEvent) => {
-    e.stopPropagation(); // 카드 클릭 이벤트 방지
-    setIsRemindModalOpen(true);
-  };
 
   const handleConfirmSnooze = async () => {
     if (!selectedRemindTime) return;
@@ -157,10 +134,6 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
     }
   };
 
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation(); // 카드 클릭 이벤트 방지
-    setIsDeleteModalOpen(true);
-  };
 
   const handleConfirmDelete = async () => {
     setIsProcessing(true);
@@ -175,23 +148,47 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
   };
 
   // 미리보기 데이터 추출 (프론트 자동화 문서 14.3 섹션 참조)
-  const previewData = React.useMemo(() => {
+  type PreviewData =
+    | {
+        type: 'send_message';
+        recipients: string[];
+        message: string;
+        templateId: string;
+        estimatedCost: number;
+        impact: {
+          recipientCount: number;
+          estimatedDeliveryTime: string;
+        };
+      }
+    | {
+        type: 'run_analysis';
+        analysisType: string;
+        targetId: string;
+        estimatedCost: number;
+        impact: {
+          scope: string;
+        };
+      }
+    | null;
+
+  const previewData = useMemo<PreviewData>(() => {
     if (!card.suggested_action) return null;
 
-    const action = card.suggested_action as any;
+    const action = card.suggested_action as { type: string; payload?: Record<string, unknown>; analysis_type?: string; class_id?: string; student_id?: string };
     const estimatedCost = typeof card.metadata?.estimated_cost === 'number'
       ? card.metadata.estimated_cost
       : DEFAULT_VALUES.ZERO;
 
     if (action.type === 'send_message') {
+      const recipientIds = Array.isArray(action.payload?.recipient_ids) ? action.payload.recipient_ids : [];
       return {
         type: 'send_message',
-        recipients: action.payload?.recipient_ids || [],
-        message: action.payload?.message || '',
-        templateId: action.payload?.template_id || '',
+        recipients: recipientIds as string[],
+        message: typeof action.payload?.message === 'string' ? action.payload.message : '',
+        templateId: typeof action.payload?.template_id === 'string' ? action.payload.template_id : '',
         estimatedCost,
         impact: {
-          recipientCount: action.payload?.recipient_ids?.length || DEFAULT_VALUES.ZERO,
+          recipientCount: recipientIds.length || DEFAULT_VALUES.ZERO,
           estimatedDeliveryTime: CARD_LABELS.IMMEDIATE_DELIVERY,
         },
       };
@@ -199,8 +196,8 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
       const impact = card.metadata?.impact as { scope?: string } | undefined;
       return {
         type: 'run_analysis',
-        analysisType: action.analysis_type || '',
-        targetId: action.class_id || action.student_id || '',
+        analysisType: typeof action.analysis_type === 'string' ? action.analysis_type : '',
+        targetId: (typeof action.class_id === 'string' ? action.class_id : '') || (typeof action.student_id === 'string' ? action.student_id : ''),
         estimatedCost,
         impact: {
           scope: impact?.scope || CARD_LABELS.SCOPE_PARTIAL,
@@ -258,7 +255,7 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
                     발송 대상
                   </h4>
                   <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
-                    {previewData.recipients.length}명의 학부모
+                    {(previewData.type === 'send_message' ? previewData.recipients.length : 0)}명의 학부모
                   </p>
                 </div>
                 <div style={{ marginBottom: 'var(--spacing-md)' }}>
@@ -345,8 +342,9 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
               variant="solid"
               color="primary"
               onClick={(e) => {
+                e.stopPropagation();
                 setIsPreviewOpen(false);
-                handleApprove(e as any);
+                void handleApprove(e);
               }}
               disabled={isProcessing}
             >

@@ -57,14 +57,14 @@ export async function debugCurrentJWT(): Promise<void> {
     }
 
     // Payload 디코딩
-    const payload = JSON.parse(atob(parts[1]));
+    const payload = JSON.parse(atob(parts[1])) as Record<string, unknown>;
 
     console.log('📋 JWT Payload:', payload);
-    console.log('🔑 tenant_id claim:', payload.tenant_id || '❌ 없음');
-    console.log('🔑 tenant_role claim:', payload.tenant_role || '❌ 없음');
-    console.log('🔑 role claim (PostgreSQL ROLE):', payload.role || 'authenticated (기본값)');
-    console.log('🔑 sub (user_id):', payload.sub);
-    console.log('🔑 exp (만료 시간):', new Date(payload.exp * 1000).toISOString());
+    console.log('🔑 tenant_id claim:', (typeof payload.tenant_id === 'string' ? payload.tenant_id : null) || '❌ 없음');
+    console.log('🔑 tenant_role claim:', (typeof payload.tenant_role === 'string' ? payload.tenant_role : null) || '❌ 없음');
+    console.log('🔑 role claim (PostgreSQL ROLE):', (typeof payload.role === 'string' ? payload.role : null) || 'authenticated (기본값)');
+    console.log('🔑 sub (user_id):', typeof payload.sub === 'string' ? payload.sub : '❌ 없음');
+    console.log('🔑 exp (만료 시간):', typeof payload.exp === 'number' ? new Date(payload.exp * 1000).toISOString() : '❌ 없음');
 
     // 3. user_tenant_roles 확인 (API 호출)
     const { data: userTenantRoles, error: utrError } = await supabase
@@ -87,19 +87,19 @@ export async function debugCurrentJWT(): Promise<void> {
 
     // 4. Hook 활성화 상태 확인 (RPC 호출)
     try {
-      const { data: hookStatus, error: hookError } = await supabase.rpc('check_hook_status');
-      if (hookError) {
-        console.warn('⚠️ Hook 상태 확인 실패 (정상일 수 있음):', hookError.message);
+      const result = await supabase.rpc('check_hook_status');
+      if (result.error) {
+        console.warn('⚠️ Hook 상태 확인 실패 (정상일 수 있음):', result.error.message);
       } else {
-        console.log('📋 Hook 상태:', hookStatus);
+        console.log('📋 Hook 상태:', result.data);
       }
-    } catch (e) {
+    } catch {
       // RPC 함수가 없을 수 있으므로 무시
     }
 
     // 5. 진단 결과
     console.group('📊 진단 결과');
-    if (payload.tenant_id) {
+    if (typeof payload.tenant_id === 'string' && payload.tenant_id) {
       console.log('✅ JWT claim에 tenant_id 포함됨');
       console.log('   → Custom Access Token Hook이 정상 작동 중');
     } else {

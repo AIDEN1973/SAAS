@@ -11,7 +11,8 @@ import React, { useMemo } from 'react';
 import { Sparkles, Calendar, DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
 import { NotificationCardLayout } from '@ui-core/react';
 import type { AIBriefingCard as AIBriefingCardType } from '../../types/dashboardCard';
-import { EMPTY_CARD_ID_PREFIX, DEFAULT_VALUES, TEXT_LINE_LIMITS } from '../../constants/dashboard-cards';
+// [SSOT] Barrel export를 통한 통합 import
+import { EMPTY_CARD_ID_PREFIX, DEFAULT_VALUES, TEXT_LINE_LIMITS } from '../../constants';
 
 export interface AIBriefingCardProps {
   card: AIBriefingCardType;

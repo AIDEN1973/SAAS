@@ -8,13 +8,14 @@
 
 import React, { useMemo } from 'react';
 import {
-  ClipboardCheck, Users, DollarSign, CreditCard, Clock,
+  ClipboardCheck, Users, DollarSign, Clock,
   UserPlus, TrendingUp, Calendar, Package, Receipt,
   AlertCircle, BarChart3, UserCheck, UserX
 } from 'lucide-react';
 import { NotificationCardLayout } from '@ui-core/react';
 import type { StatsCard as StatsCardType } from '../../types/dashboardCard';
-import { EMPTY_CARD_ID_PREFIX } from '../../constants/dashboard-cards';
+// [SSOT] Barrel export를 통한 통합 import
+import { EMPTY_CARD_ID_PREFIX } from '../../constants';
 
 export interface StatsCardProps {
   card: StatsCardType;

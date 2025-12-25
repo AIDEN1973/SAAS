@@ -49,7 +49,6 @@ const metricLabels: Record<'students' | 'revenue' | 'attendance' | 'growth', str
 
 export function RegionalMetricCard({ metric, regionalStats, selectedMetric, onSelect }: RegionalMetricCardProps) {
   const isSelected = selectedMetric === metric;
-  const canCalculateRank = regionalStats.comparisonGroup !== 'insufficient' && regionalStats.sampleCount >= 3;
 
   // 값 포맷팅
   const formatValue = (): string => {

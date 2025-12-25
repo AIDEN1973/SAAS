@@ -19,7 +19,7 @@ import { FormSchema, SchemaVersion } from './types';
 const schemaVersionBase = z.object({
   version: z.string().regex(/^\d+\.\d+\.\d+$/),
   minClient: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),  // 레거시 입력 허용
-  minSupportedClient: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),  // 정본 (필수)
+  minSupportedClient: z.string().regex(/^\d+\.\d+\.\d+$/),  // 정본 (필수): DB 스키마에서 NOT NULL이므로 필수
   entity: z.string().min(1),
 });
 
@@ -650,10 +650,16 @@ export function checkSchemaVersion(
   requiresMigration?: boolean;
 } {
   // 정본 규칙: minSupportedClient를 우선 사용하여 클라이언트 버전을 비교 (minClient는 레거시 fallback)
+  // minSupportedClient는 필수이므로 항상 존재함
   const minClientVersion = schema.minSupportedClient || schema.minClient;
+
   if (!minClientVersion) {
-    // minSupportedClient가 없으면 호환 가능하다고 간주 (하위 호환성)
-    return { compatible: true };
+    // minSupportedClient가 없으면 호환 불가로 처리
+    return {
+      compatible: false,
+      requiresUpdate: true,
+      requiresMigration: false,
+    };
   }
 
   const [minClientMajor, minClientMinor] = minClientVersion.split('.').map(Number);

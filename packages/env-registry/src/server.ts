@@ -65,8 +65,14 @@ export const envServer = validateEnvServer();
  * 플랫폼 AI 기능 온오프 확인
  * SSOT: 프론트 자동화 문서 "글로벌 헤더 AI 토글 — UX/정책 SSOT" 섹션 참조
  *
+ * ⚠️ 일관성: Edge Function의 getPlatformAIEnabled()와 동일한 로직 사용
+ * 기본값: true (활성화)
+ *
  * @returns 플랫폼 AI 기능이 활성화되어 있으면 true, 아니면 false
  */
 export function getPlatformAIEnabled(): boolean {
-  return envServer.PLATFORM_AI_ENABLED ?? true; // 기본값: true (활성화)
+  // Edge Function과 동일한 로직: transform으로 이미 boolean으로 변환됨
+  // 기본값: true (활성화)
+  const value = envServer.PLATFORM_AI_ENABLED;
+  return value ?? true; // undefined일 때 true 반환
 }

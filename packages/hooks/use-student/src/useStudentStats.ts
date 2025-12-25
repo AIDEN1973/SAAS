@@ -9,6 +9,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getApiContext } from '@api-sdk/core';
 import { apiClient } from '@api-sdk/core';
+import { toKST } from '@lib/date-utils'; // [불변 규칙] KST 변환 필수
 
 // React Query 시간 설정 상수 (하드코딩 금지)
 const STALE_TIME_ONE_MINUTE = 60000; // 1분
@@ -95,11 +96,9 @@ export async function fetchAttendanceStats(
   tenantId: string,
   date: Date
 ): Promise<AttendanceStats> {
-  // KST 기준 날짜로 변환
-  const kstDate = new Date(
-    date.toLocaleString('en-US', { timeZone: 'Asia/Seoul' })
-  );
-  const dateStr = kstDate.toISOString().split('T')[0]; // YYYY-MM-DD
+  // [불변 규칙] KST 기준 날짜 변환: toISOString().split('T')[0] 직접 사용 금지
+  // 기술문서 19-1-2: KST 기준 날짜 처리 필수
+  const dateStr = toKST(date).format('YYYY-MM-DD');
 
   const response = await apiClient.callRPC<AttendanceStats[]>('attendance_stats', {
     p_tenant_id: tenantId,
@@ -134,8 +133,11 @@ export function useAttendanceStats(date: Date) {
   const context = getApiContext();
   const tenantId = context.tenantId;
 
+  // [불변 규칙] KST 기준 날짜 변환: toISOString().split('T')[0] 직접 사용 금지
+  // 기술문서 19-1-2: KST 기준 날짜 처리 필수
+  const dateStr = toKST(date).format('YYYY-MM-DD');
   return useQuery<AttendanceStats>({
-    queryKey: ['attendance-stats', tenantId, date.toISOString().split('T')[0]],
+    queryKey: ['attendance-stats', tenantId, dateStr],
     queryFn: () => fetchAttendanceStats(tenantId!, date),
     enabled: !!tenantId && !!date,
     staleTime: STALE_TIME_ONE_MINUTE,
@@ -229,4 +231,3 @@ export function useConsultationStats() {
     gcTime: GC_TIME_FIVE_MINUTES,
   });
 }
-

@@ -1,8 +1,17 @@
 /**
- * Custom Widget Registry
+ * Custom Widget Loader Registry (SDUI 위젯 로더 레지스트리)
+ *
+ * ⚠️ 중요: 이 파일은 실제 위젯 컴포넌트를 등록하고 로드하는 레지스트리입니다.
+ * 위젯 등록 플래그 관리 유틸리티는 apps/academy-admin/src/utils/widget-registry.ts를 참조하세요.
+ *
+ * 목적:
+ * - Custom Widget 컴포넌트의 동적 로더 함수 등록 및 관리
+ * - 위젯 컴포넌트를 런타임에 동적으로 로드
+ *
+ * 관련 파일:
+ * - apps/academy-admin/src/utils/widget-registry.ts: 위젯 등록 플래그 관리 (window.__sduiWidgetRegistered)
  *
  * SDUI v1.1: Custom Widget 컴포넌트를 등록하고 로드하는 레지스트리
- *
  * 기술문서: SDUI 기술문서 v1.1 - 22. 확장 전략
  */
 
