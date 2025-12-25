@@ -254,6 +254,11 @@ export default defineConfig(({ mode }) => {
   },
   build: {
     outDir: 'dist',
+    commonjsOptions: {
+      // 순환 의존성 문제 해결을 위한 설정
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+    },
     rollupOptions: {
       // 서버 전용 코드를 external로 처리하여 클라이언트 번들에서 제외
       external: [
@@ -265,10 +270,14 @@ export default defineConfig(({ mode }) => {
         '@core/tags',
       ],
       output: {
+        // 순환 의존성 문제 해결을 위한 설정
+        format: 'es',
+        // 모듈 초기화 순서 보장
+        preserveModules: false,
         manualChunks: (id) => {
           // node_modules의 큰 라이브러리들을 별도 청크로 분리
           if (id.includes('node_modules')) {
-            // React 관련
+            // React 관련 (가장 먼저 로드되어야 함)
             if (id.includes('react') || id.includes('react-dom')) {
               return 'react-vendor';
             }
@@ -299,12 +308,24 @@ export default defineConfig(({ mode }) => {
             if (id.includes('date-fns') || id.includes('dayjs') || id.includes('moment')) {
               return 'date-vendor';
             }
+            // Zod (validation library)
+            if (id.includes('zod')) {
+              return 'zod-vendor';
+            }
             // 기타 큰 라이브러리들을 여러 vendor 청크로 분산
-            // vendor 청크가 너무 커지지 않도록 여러 개로 분리
-            const vendorChunks = ['vendor-1', 'vendor-2', 'vendor-3'];
-            // 파일 경로를 해시하여 일관되게 분배
-            const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-            return vendorChunks[hash % vendorChunks.length];
+            // 해시 기반 분배 대신 더 안정적인 방법 사용
+            if (id.includes('node_modules')) {
+              // 나머지 vendor 라이브러리들을 패키지 이름 기반으로 분배
+              const packageName = id.split('node_modules/')[1]?.split('/')[0];
+              if (packageName) {
+                // 패키지 이름의 첫 글자로 분배 (더 안정적)
+                const firstChar = packageName.charCodeAt(0);
+                const chunkIndex = (firstChar % 3) + 1;
+                return `vendor-${chunkIndex}`;
+              }
+            }
+            // 기본값
+            return 'vendor-1';
           }
 
           // 내부 패키지들
@@ -331,11 +352,24 @@ export default defineConfig(({ mode }) => {
           }
 
           // 페이지별 코드 스플리팅은 React.lazy로 처리되므로 여기서는 제외
+          return null;
         },
+      },
+      // 순환 의존성 감지 활성화
+      onwarn(warning, warn) {
+        // 순환 의존성 경고는 무시하지 않고 로그만 출력
+        if (warning.code === 'CIRCULAR_DEPENDENCY') {
+          console.warn('Circular dependency detected:', warning.message);
+        }
+        warn(warning);
       },
     },
     // Chunk size warning limit (500KB)
     chunkSizeWarningLimit: 500,
+    // 소스맵 생성 (디버깅용, 프로덕션에서는 false로 설정 가능)
+    sourcemap: false,
+    // minify 옵션
+    minify: 'esbuild',
   },
   };
 });
