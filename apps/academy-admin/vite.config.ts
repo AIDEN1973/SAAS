@@ -297,7 +297,19 @@ export default defineConfig(({ mode }) => {
           // node_modules의 큰 라이브러리들을 별도 청크로 분리
           if (id.includes('node_modules')) {
             // React 관련 (가장 먼저 로드되어야 함, React와 React-DOM은 반드시 같은 청크에)
-            if (id.includes('react/') || id.includes('react-dom/') || id === 'react' || id === 'react-dom') {
+            // 더 명확한 매칭을 위해 정확한 경로 확인
+            if (
+              id.includes('/react/') || 
+              id.includes('/react-dom/') || 
+              id.includes('\\react\\') || 
+              id.includes('\\react-dom\\') ||
+              id.endsWith('/react') || 
+              id.endsWith('/react-dom') ||
+              id.endsWith('\\react') || 
+              id.endsWith('\\react-dom') ||
+              id === 'react' || 
+              id === 'react-dom'
+            ) {
               return 'react-vendor';
             }
             // react/jsx-runtime도 React와 함께
@@ -336,19 +348,21 @@ export default defineConfig(({ mode }) => {
               return 'zod-vendor';
             }
             // 기타 큰 라이브러리들을 여러 vendor 청크로 분산
-            // 해시 기반 분배 대신 더 안정적인 방법 사용
-            if (id.includes('node_modules')) {
-              // 나머지 vendor 라이브러리들을 패키지 이름 기반으로 분배
-              const packageName = id.split('node_modules/')[1]?.split('/')[0];
-              if (packageName) {
-                // 패키지 이름의 첫 글자로 분배 (더 안정적)
-                const firstChar = packageName.charCodeAt(0);
-                const chunkIndex = (firstChar % 3) + 1;
-                return `vendor-${chunkIndex}`;
-              }
+            // React 관련이 아닌 것만 vendor-1, vendor-2, vendor-3에 분배
+            const packageName = id.split('node_modules/')[1]?.split('/')[0] || 
+                                id.split('node_modules\\')[1]?.split('\\')[0];
+            if (packageName && !packageName.startsWith('react')) {
+              // 패키지 이름의 첫 글자로 분배 (더 안정적)
+              const firstChar = packageName.charCodeAt(0);
+              const chunkIndex = (firstChar % 3) + 1;
+              return `vendor-${chunkIndex}`;
             }
-            // 기본값
-            return 'vendor-1';
+            // React 관련이 아니고 패키지 이름도 없는 경우 기본값
+            if (!id.includes('react')) {
+              return 'vendor-1';
+            }
+            // React 관련은 react-vendor로
+            return 'react-vendor';
           }
 
           // 내부 패키지들
