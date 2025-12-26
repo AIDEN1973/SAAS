@@ -340,31 +340,31 @@ export default defineConfig(({ mode }) => {
             }
 
             // React Router
-            if (id.includes('react-router')) {
+            if (normalizedId.includes('react-router')) {
               return 'react-router-vendor';
             }
             // TanStack Query 관련
-            if (id.includes('@tanstack')) {
+            if (normalizedId.includes('@tanstack')) {
               return 'tanstack-vendor';
             }
             // React Hook Form
-            if (id.includes('react-hook-form')) {
+            if (normalizedId.includes('react-hook-form')) {
               return 'react-hook-form-vendor';
             }
             // Lucide icons
-            if (id.includes('lucide-react')) {
+            if (normalizedId.includes('lucide-react')) {
               return 'lucide-icons-vendor';
             }
             // Radix UI
-            if (id.includes('radix-ui') || id.includes('@radix-ui')) {
+            if (normalizedId.includes('radix-ui') || normalizedId.includes('@radix-ui')) {
               return 'radix-ui-vendor';
             }
             // date-fns 같은 유틸리티
-            if (id.includes('date-fns') || id.includes('dayjs') || id.includes('moment')) {
+            if (normalizedId.includes('date-fns') || normalizedId.includes('dayjs') || normalizedId.includes('moment')) {
               return 'date-vendor';
             }
             // Zod (validation library)
-            if (id.includes('zod')) {
+            if (normalizedId.includes('zod')) {
               return 'zod-vendor';
             }
 
@@ -385,7 +385,7 @@ export default defineConfig(({ mode }) => {
             }
 
             // React 관련이 확실히 아닌 경우만 vendor-1로
-            if (!id.includes('react')) {
+            if (!normalizedId.includes('react')) {
               return 'vendor-1';
             }
 
