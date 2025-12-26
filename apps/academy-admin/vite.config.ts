@@ -24,34 +24,40 @@ function enforceReactChunk(): RollupPlugin {
       return null;
     },
     generateBundle(options, bundle) {
-      // 빌드 후 검증: vendor-1, vendor-2, vendor-3에 React가 포함되어 있는지 확인
+      // 빌드 후 검증: vendor 및 lib 청크에 React가 포함되어 있는지 확인
       for (const [fileName, chunk] of Object.entries(bundle)) {
         if (chunk.type === 'chunk') {
-          // vendor-1, vendor-2, vendor-3 청크에서 React 검사 (react-vendor는 제외)
-          const isVendorChunk = /vendor-[123]-/.test(fileName);
-          const isReactVendor = fileName.includes('react-vendor');
-
-          if (isVendorChunk && !isReactVendor) {
+          // vendor-1, vendor-2, vendor-3, lib-a-m, lib-n-z, lib-other 청크에서 React 검사
+          // react-vendor, react-router-vendor, react-hook-form-vendor는 제외
+          const isNonReactVendorChunk = /vendor-[123]-|lib-a-m-|lib-n-z-|lib-other-/.test(fileName);
+          const isReactChunk = /react-vendor|react-router-vendor|react-hook-form-vendor/.test(fileName);
+          
+          if (isNonReactVendorChunk && !isReactChunk) {
             // React 관련 코드가 포함되어 있는지 확인
             const reactIndicators = [
               'forwardRef',
               'createElement',
               'useState',
               'useEffect',
+              'useContext',
+              'useCallback',
+              'useMemo',
               'React.createElement',
               'React.forwardRef',
               'react/jsx-runtime',
-              'react-dom/client'
+              'react-dom/client',
+              '__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED'
             ];
-
+            
             const hasReact = reactIndicators.some(indicator => chunk.code.includes(indicator));
-
+            
             if (hasReact) {
               console.error(`\n❌ [enforce-react-chunk] React detected in ${fileName}!`);
               console.error(`   This should not happen. React must be in react-vendor chunk.`);
-              console.error(`   React indicators found in vendor chunk.`);
+              console.error(`   React indicators found in chunk.`);
               console.error(`   Tracked React modules:`, Array.from(reactModuleIds).slice(0, 10));
-              throw new Error(`React found in vendor chunk: ${fileName}. Build failed to prevent runtime errors.`);
+              console.error(`   Chunk modules:`, chunk.moduleIds?.slice(0, 5));
+              throw new Error(`React found in non-React chunk: ${fileName}. Build failed to prevent runtime errors.`);
             }
           }
         }
@@ -367,13 +373,21 @@ export default defineConfig(({ mode }) => {
             // 패키지 이름을 먼저 추출
             const packageName = normalizedId.split('node_modules/')[1]?.split('/')[0];
 
+            // ===== React 관련 모듈을 최우선으로 처리 (다른 로직보다 먼저) =====
+            // React 또는 react-dom 패키지인 경우 무조건 react-vendor로
+            if (packageName === 'react' || packageName === 'react-dom') {
+              console.log('[manualChunks] React core package:', packageName, '-> react-vendor');
+              return 'react-vendor';
+            }
+
             // 디버깅: React 관련 모듈 로그 출력 (프로덕션 빌드에서도)
             if (normalizedId.includes('react')) {
               const chunkName = (() => {
-                // React 또는 react-dom 패키지인 경우 무조건 react-vendor로
-                if (packageName === 'react' || packageName === 'react-dom') {
-                  return 'react-vendor';
-                }
+                // react-router, react-hook-form 등 다른 라이브러리 체크
+                if (normalizedId.includes('react-router')) return 'react-router-vendor';
+                if (normalizedId.includes('react-hook-form')) return 'react-hook-form-vendor';
+                if (normalizedId.includes('lucide-react')) return 'lucide-icons-vendor';
+                if (normalizedId.includes('@tanstack/react-query')) return 'tanstack-vendor';
 
                 // 정규식으로 정확하게 매칭
                 const reactPattern = /\/react\/|\/react-dom\//;
@@ -381,23 +395,12 @@ export default defineConfig(({ mode }) => {
                   return 'react-vendor';
                 }
 
-                // react-router, react-hook-form 등 다른 라이브러리 체크
-                if (normalizedId.includes('react-router')) return 'react-router-vendor';
-                if (normalizedId.includes('react-hook-form')) return 'react-hook-form-vendor';
-                if (normalizedId.includes('lucide-react')) return 'lucide-icons-vendor';
-
-                // 기타 react 포함 모듈은 react-vendor로
+                // 기타 react 포함 모듈은 react-vendor로 (안전장치)
                 return 'react-vendor';
               })();
 
               console.log('[manualChunks] React module:', packageName, '-> chunk:', chunkName, 'id:', normalizedId.substring(normalizedId.indexOf('node_modules')));
               return chunkName;
-            }
-
-            // React 또는 react-dom 패키지인 경우 무조건 react-vendor로
-            if (packageName === 'react' || packageName === 'react-dom') {
-              console.log('[manualChunks] React core package:', packageName, '-> react-vendor');
-              return 'react-vendor';
             }
 
             // 정규식으로 정확하게 매칭 (정규화된 ID 사용)
@@ -452,7 +455,7 @@ export default defineConfig(({ mode }) => {
 
             // 기타 큰 라이브러리들을 명시적으로 분류
             // vendor-1, 2, 3 대신 명시적인 청크 이름 사용
-            
+
             // React 관련 패키지는 절대 다른 청크로 가지 않도록
             if (packageName && (packageName === 'react' || packageName === 'react-dom' || packageName.startsWith('react'))) {
               console.log('[manualChunks] React package fallback:', packageName, '-> react-vendor');
