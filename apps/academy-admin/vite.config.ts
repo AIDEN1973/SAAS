@@ -375,8 +375,16 @@ export default defineConfig(({ mode }) => {
 
             // ===== React 관련 모듈을 최우선으로 처리 (다른 로직보다 먼저) =====
             // React 또는 react-dom 패키지인 경우 무조건 react-vendor로
-            if (packageName === 'react' || packageName === 'react-dom') {
+            // scheduler는 React의 내부 의존성이므로 함께 포함
+            if (packageName === 'react' || packageName === 'react-dom' || packageName === 'scheduler') {
               console.log('[manualChunks] React core package:', packageName, '-> react-vendor');
+              return 'react-vendor';
+            }
+            
+            // React 내부 패키지들도 react-vendor로
+            // object-assign, prop-types 등 React가 사용하는 유틸리티
+            if (packageName === 'object-assign' || packageName === 'prop-types') {
+              console.log('[manualChunks] React utility package:', packageName, '-> react-vendor');
               return 'react-vendor';
             }
 
