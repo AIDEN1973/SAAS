@@ -12,14 +12,14 @@ function enforceReactChunk(): RollupPlugin {
   return {
     name: 'enforce-react-chunk',
     resolveId(id) {
-      // React 모듈 ID 추적 (디버깅용)
+      // React 모듈 ID 추적 (디버깅용, 프로덕션에서는 로그 최소화)
       const normalizedId = id.split('?')[0].replace(/\\/g, '/');
       if (normalizedId.includes('node_modules')) {
         const packageName = normalizedId.split('node_modules/')[1]?.split('/')[0];
         if (packageName === 'react' || packageName === 'react-dom') {
           reactModuleIds.add(normalizedId);
-          // 프로덕션 빌드에서는 로그 제거
-          if (process.env.NODE_ENV === 'development') {
+          // 프로덕션 빌드에서는 로그 최소화
+          if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
             console.log('[enforce-react-chunk] React module resolved:', normalizedId);
           }
         }
@@ -31,7 +31,6 @@ function enforceReactChunk(): RollupPlugin {
       for (const [fileName, chunk] of Object.entries(bundle)) {
         if (chunk.type === 'chunk') {
           // 모든 vendor 및 lib 청크에서 React 검사 (react-vendor 제외)
-          // lib-a-z는 더 이상 생성되지 않지만 안전장치로 포함
           const isNonReactVendorChunk = /vendor-[123]-|lib-a-z-|lib-a-m-|lib-n-z-|lib-other-|lib-scoped-|lib-utils-/.test(fileName);
           const isReactChunk = /react-vendor|react-router-vendor|react-hook-form-vendor|radix-ui-vendor|charts-vendor|redux-vendor/.test(fileName);
 
@@ -229,28 +228,32 @@ export default defineConfig(({ mode }) => {
     finalEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY = envLocal.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   }
 
-  // 디버깅: 로드된 환경변수 출력
-  console.log('🔍 Vite Config - 환경변수 로드:');
-  console.log('  loadEnv 결과 VITE_SUPABASE_URL:', env.VITE_SUPABASE_URL || '(없음)');
-  console.log('  .env.local 파일 VITE_SUPABASE_URL:', envLocal.VITE_SUPABASE_URL || '(없음)');
-  console.log('  최종 사용 VITE_SUPABASE_URL:', finalEnv.VITE_SUPABASE_URL || '(없음)');
-  console.log('  envDir:', envDir);
-  console.log('  mode:', mode);
-
   // 환경변수를 define에 주입 (VITE_ 접두사가 있는 것만)
   const define: Record<string, string> = {};
 
-  // 환경변수 로드 확인 (디버깅용)
+  // 환경변수 로드 확인
   const loadedUrl = finalEnv.VITE_SUPABASE_URL || finalEnv.NEXT_PUBLIC_SUPABASE_URL;
   const loadedKey = finalEnv.VITE_SUPABASE_ANON_KEY || finalEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  console.log('🔍 Vite Config - 환경변수 로드 결과:');
-  console.log('  로드된 URL:', loadedUrl || '(없음)');
-  console.log('  로드된 Key:', loadedKey ? '***' : '(없음)');
+  // 디버깅: 프로덕션 빌드에서는 로그 최소화
+  if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
+    console.log('🔍 Vite Config - 환경변수 로드:');
+    console.log('  loadEnv 결과 VITE_SUPABASE_URL:', env.VITE_SUPABASE_URL || '(없음)');
+    console.log('  .env.local 파일 VITE_SUPABASE_URL:', envLocal.VITE_SUPABASE_URL || '(없음)');
+    console.log('  최종 사용 VITE_SUPABASE_URL:', finalEnv.VITE_SUPABASE_URL || '(없음)');
+    console.log('  envDir:', envDir);
+    console.log('  mode:', mode);
+    console.log('🔍 Vite Config - 환경변수 로드 결과:');
+    console.log('  로드된 URL:', loadedUrl || '(없음)');
+    console.log('  로드된 Key:', loadedKey ? '***' : '(없음)');
+  }
 
   // 환경변수가 없으면 경고만 출력 (강제 주입하지 않음)
+  // 프로덕션 빌드에서는 경고만 출력
   if (!loadedUrl || !loadedKey) {
-    console.warn('⚠️  Supabase 환경변수가 설정되지 않았습니다. .env.local 파일을 확인하세요.');
+    if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
+      console.warn('⚠️  Supabase 환경변수가 설정되지 않았습니다. .env.local 파일을 확인하세요.');
+    }
   }
 
   // 환경변수를 define에 주입 (있는 경우만)
@@ -418,7 +421,8 @@ export default defineConfig(({ mode }) => {
             ];
 
             if (reactRelatedPackages.includes(packageName)) {
-              if (process.env.NODE_ENV === 'development') {
+              // 프로덕션 빌드에서는 로그 최소화
+              if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
                 console.log('[manualChunks] React related package:', packageName, '-> react-vendor');
               }
               return 'react-vendor';
@@ -434,7 +438,8 @@ export default defineConfig(({ mode }) => {
             ];
             
             if (reactPathPatterns.some(pattern => normalizedId.includes(pattern))) {
-              if (process.env.NODE_ENV === 'development') {
+              // 프로덕션 빌드에서는 로그 최소화
+              if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
                 console.log('[manualChunks] React internal path:', normalizedId.substring(normalizedId.indexOf('node_modules')), '-> react-vendor');
               }
               return 'react-vendor';
@@ -462,7 +467,8 @@ export default defineConfig(({ mode }) => {
               ];
               
               if (!excludedReactLibs.some(lib => normalizedId.includes(lib))) {
-                if (process.env.NODE_ENV === 'development') {
+                // 프로덕션 빌드에서는 로그 최소화
+                if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
                   console.log('[manualChunks] React module fallback:', packageName, '-> react-vendor');
                 }
                 return 'react-vendor';
@@ -470,8 +476,18 @@ export default defineConfig(({ mode }) => {
             }
 
             // TanStack Query 관련 (위에서 react 포함 체크 후 처리)
+
+            // React Router
+            if (normalizedId.includes('react-router')) {
+              return 'react-router-vendor';
+            }
+            // TanStack Query 관련
             if (normalizedId.includes('@tanstack')) {
               return 'tanstack-vendor';
+            }
+            // React Hook Form
+            if (normalizedId.includes('react-hook-form')) {
+              return 'react-hook-form-vendor';
             }
             // Lucide icons
             if (normalizedId.includes('lucide-react')) {
@@ -510,7 +526,8 @@ export default defineConfig(({ mode }) => {
             if (packageName && (packageName === 'react' || packageName === 'react-dom' || 
                 (packageName.startsWith('react') && !packageName.includes('react-router') && 
                  !packageName.includes('react-hook-form')))) {
-              if (process.env.NODE_ENV === 'development') {
+              // 프로덕션 빌드에서는 로그 최소화
+              if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
                 console.log('[manualChunks] React package final fallback:', packageName, '-> react-vendor');
               }
               return 'react-vendor';
@@ -574,7 +591,8 @@ export default defineConfig(({ mode }) => {
 
             // 패키지 이름을 추출할 수 없는 경우 최종 React 경로 체크
             if (normalizedId.includes('/react/') || normalizedId.includes('/react-dom/')) {
-              if (process.env.NODE_ENV === 'development') {
+              // 프로덕션 빌드에서는 로그 최소화
+              if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
                 console.log('[manualChunks] React path final fallback:', normalizedId.substring(normalizedId.indexOf('node_modules')), '-> react-vendor');
               }
               return 'react-vendor';

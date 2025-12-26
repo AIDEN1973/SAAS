@@ -151,47 +151,31 @@ function checkBundleSize(buildDir) {
 
   console.log(`\n✅ Bundle size is within limit`);
 
-  // React가 잘못된 청크에 포함되어 있는지 확인 (안전장치)
-  // vendor-1, lib-* 청크에서 React 모듈 경로 확인
-  const nonReactVendorFiles = jsCssFiles.filter(file => {
+  // React가 vendor-1에 포함되어 있는지 확인 (안전장치)
+  // Note: vendor-1은 더 이상 생성되지 않지만, 혹시 모를 경우를 대비해 검사
+  const vendor1Files = jsCssFiles.filter(file => {
     const relativePath = path.relative(distPath, file);
-    const fileName = path.basename(relativePath);
-    // vendor-1, lib-* 청크는 있지만 react-vendor는 제외
-    return (fileName.includes('vendor-1-') || 
-            (fileName.startsWith('lib-') && !fileName.includes('react-vendor'))) &&
-           relativePath.endsWith('.js');
+    return relativePath.includes('vendor-1-') && relativePath.endsWith('.js');
   });
 
-  if (nonReactVendorFiles.length > 0) {
-    let hasReactInWrongChunk = false;
-    
-    nonReactVendorFiles.forEach((filePath) => {
+  if (vendor1Files.length > 0) {
+    vendor1Files.forEach((filePath) => {
       const content = fs.readFileSync(filePath, 'utf-8');
-      const relativePath = path.relative(distPath, filePath);
-      
-      // 실제 React 모듈 경로가 포함되어 있는지 확인 (더 정확한 검사)
-      const reactModulePatterns = [
-        'node_modules/react/',
-        'node_modules/react-dom/',
-        'node_modules/react-is/',
-        'node_modules/scheduler/',
-        'node_modules/use-sync-external-store/'
-      ];
-      
-      const hasReactModule = reactModulePatterns.some(pattern => content.includes(pattern));
-      
-      if (hasReactModule) {
-        hasReactInWrongChunk = true;
-        console.error(`\n❌ React module detected in non-React chunk!`);
-        console.error(`   File: ${relativePath}`);
-        console.error(`   This indicates React is not properly separated into react-vendor chunk.`);
-        console.error(`   Please check vite.config.ts manualChunks configuration.`);
+      // React 관련 코드가 포함되어 있는지 확인
+      // Note: enforce-react-chunk 플러그인이 더 정확한 검사를 수행하므로,
+      // 여기서는 기본적인 문자열 검사만 수행
+      if (content.includes('forwardRef') || content.includes('createElement') || content.includes('useState') || content.includes('useEffect')) {
+        // react-vendor 파일이 아닌 경우에만 오류
+        const relativePath = path.relative(distPath, filePath);
+        if (!relativePath.includes('react-vendor')) {
+          console.error(`\n❌ React detected in vendor-1 chunk!`);
+          console.error(`   File: ${relativePath}`);
+          console.error(`   This indicates React is not properly separated into react-vendor chunk.`);
+          console.error(`   Please check vite.config.ts manualChunks configuration.`);
+          process.exit(1);
+        }
       }
     });
-    
-    if (hasReactInWrongChunk) {
-      process.exit(1);
-    }
   }
 
   return true;
