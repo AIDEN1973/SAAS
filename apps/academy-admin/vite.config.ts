@@ -374,22 +374,22 @@ export default defineConfig(({ mode }) => {
                 if (packageName === 'react' || packageName === 'react-dom') {
                   return 'react-vendor';
                 }
-                
+
                 // 정규식으로 정확하게 매칭
                 const reactPattern = /\/react\/|\/react-dom\//;
                 if (reactPattern.test(normalizedId)) {
                   return 'react-vendor';
                 }
-                
+
                 // react-router, react-hook-form 등 다른 라이브러리 체크
                 if (normalizedId.includes('react-router')) return 'react-router-vendor';
                 if (normalizedId.includes('react-hook-form')) return 'react-hook-form-vendor';
                 if (normalizedId.includes('lucide-react')) return 'lucide-icons-vendor';
-                
+
                 // 기타 react 포함 모듈은 react-vendor로
                 return 'react-vendor';
               })();
-              
+
               console.log('[manualChunks] React module:', packageName, '-> chunk:', chunkName, 'id:', normalizedId.substring(normalizedId.indexOf('node_modules')));
               return chunkName;
             }
@@ -450,29 +450,47 @@ export default defineConfig(({ mode }) => {
               return 'zod-vendor';
             }
 
-            // 기타 큰 라이브러리들을 여러 vendor 청크로 분산
-            // React 관련이 아닌 것만 vendor-1, vendor-2, vendor-3에 분배
-            // packageName은 이미 위에서 추출했으므로 재사용
-
-            // React 관련 패키지는 절대 vendor-1, 2, 3에 들어가지 않도록
+            // 기타 큰 라이브러리들을 명시적으로 분류
+            // vendor-1, 2, 3 대신 명시적인 청크 이름 사용
+            
+            // React 관련 패키지는 절대 다른 청크로 가지 않도록
             if (packageName && (packageName === 'react' || packageName === 'react-dom' || packageName.startsWith('react'))) {
+              console.log('[manualChunks] React package fallback:', packageName, '-> react-vendor');
               return 'react-vendor';
             }
 
-            if (packageName && !packageName.startsWith('react')) {
-              // 패키지 이름의 첫 글자로 분배
+            // Supabase
+            if (packageName && packageName.startsWith('@supabase')) {
+              return 'supabase-vendor';
+            }
+
+            // D3 (for recharts)
+            if (packageName && packageName.startsWith('d3-')) {
+              return 'charts-vendor';
+            }
+
+            // 기타 라이브러리들을 명시적인 청크로
+            if (packageName) {
+              // 알파벳 범위로 분배 (안정적)
               const firstChar = packageName.charCodeAt(0);
-              const chunkIndex = (firstChar % 3) + 1;
-              return `vendor-${chunkIndex}`;
+              if (firstChar >= 97 && firstChar <= 109) { // a-m
+                return 'lib-a-m';
+              } else if (firstChar >= 110 && firstChar <= 122) { // n-z
+                return 'lib-n-z';
+              } else { // @, 숫자 등
+                return 'lib-other';
+              }
             }
 
-            // React 관련이 확실히 아닌 경우만 vendor-1로
-            if (!normalizedId.includes('react')) {
-              return 'vendor-1';
+            // 패키지 이름을 추출할 수 없는 경우 (절대 react가 아님)
+            // React 체크를 한 번 더 수행
+            if (normalizedId.includes('/react/') || normalizedId.includes('/react-dom/')) {
+              console.log('[manualChunks] React path fallback:', normalizedId.substring(normalizedId.indexOf('node_modules')), '-> react-vendor');
+              return 'react-vendor';
             }
 
-            // 기본값: React 관련은 react-vendor로
-            return 'react-vendor';
+            // 기본값: lib-other (vendor-1 대신)
+            return 'lib-other';
           }
 
           // 내부 패키지들
@@ -520,4 +538,5 @@ export default defineConfig(({ mode }) => {
   },
   };
 });
+
 
