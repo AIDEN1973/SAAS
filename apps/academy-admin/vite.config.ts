@@ -56,7 +56,20 @@ function enforceReactChunk(): RollupPlugin {
               console.error(`   This should not happen. React must be in react-vendor chunk.`);
               console.error(`   React indicators found in chunk.`);
               console.error(`   Tracked React modules:`, Array.from(reactModuleIds).slice(0, 10));
-              console.error(`   Chunk modules:`, chunk.moduleIds?.slice(0, 5));
+              
+              // 청크에 포함된 모듈 출력 (node_modules만)
+              const chunkModules = Object.keys(chunk.modules || {})
+                .filter(id => id.includes('node_modules'))
+                .map(id => {
+                  const normalized = id.split('?')[0].replace(/\\/g, '/');
+                  const packageName = normalized.split('node_modules/')[1]?.split('/')[0];
+                  return packageName;
+                })
+                .filter((v, i, a) => a.indexOf(v) === i); // unique
+              
+              console.error(`   Chunk packages (unique):`, chunkModules.slice(0, 20));
+              console.error(`   Total packages in chunk:`, chunkModules.length);
+              
               throw new Error(`React found in non-React chunk: ${fileName}. Build failed to prevent runtime errors.`);
             }
           }
@@ -380,7 +393,7 @@ export default defineConfig(({ mode }) => {
               console.log('[manualChunks] React core package:', packageName, '-> react-vendor');
               return 'react-vendor';
             }
-            
+
             // React 내부 패키지들도 react-vendor로
             // object-assign, prop-types 등 React가 사용하는 유틸리티
             if (packageName === 'object-assign' || packageName === 'prop-types') {
@@ -484,13 +497,21 @@ export default defineConfig(({ mode }) => {
             if (packageName) {
               // 알파벳 범위로 분배 (안정적)
               const firstChar = packageName.charCodeAt(0);
+              let chunkName;
               if (firstChar >= 97 && firstChar <= 109) { // a-m
-                return 'lib-a-m';
+                chunkName = 'lib-a-m';
               } else if (firstChar >= 110 && firstChar <= 122) { // n-z
-                return 'lib-n-z';
+                chunkName = 'lib-n-z';
               } else { // @, 숫자 등
-                return 'lib-other';
+                chunkName = 'lib-other';
               }
+              
+              // n-z 청크로 가는 모듈 로그 (React 문제 디버깅)
+              if (chunkName === 'lib-n-z') {
+                console.log('[manualChunks] lib-n-z:', packageName);
+              }
+              
+              return chunkName;
             }
 
             // 패키지 이름을 추출할 수 없는 경우 (절대 react가 아님)
