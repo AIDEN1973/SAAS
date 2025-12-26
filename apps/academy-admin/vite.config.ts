@@ -303,6 +303,15 @@ export default defineConfig(({ mode }) => {
           // node_modules의 큰 라이브러리들을 별도 청크로 분리
           if (id.includes('node_modules')) {
             // React 관련을 가장 먼저 체크 (우선순위 최상위)
+            // 패키지 이름을 먼저 확인
+            const packageName = id.split('node_modules/')[1]?.split('/')[0] || 
+                                id.split('node_modules\\')[1]?.split('\\')[0];
+            
+            // React 또는 react-dom 패키지인 경우 무조건 react-vendor로
+            if (packageName === 'react' || packageName === 'react-dom') {
+              return 'react-vendor';
+            }
+            
             // 정규식으로 정확하게 매칭
             const reactPattern = /[\\/]react[\\/]|[\\/]react-dom[\\/]|^react$|^react-dom$|react[\\/]jsx-runtime|react[\\/]jsx-dev-runtime/;
             if (reactPattern.test(id)) {
@@ -355,11 +364,10 @@ export default defineConfig(({ mode }) => {
             
             // 기타 큰 라이브러리들을 여러 vendor 청크로 분산
             // React 관련이 아닌 것만 vendor-1, vendor-2, vendor-3에 분배
-            const packageName = id.split('node_modules/')[1]?.split('/')[0] || 
-                                id.split('node_modules\\')[1]?.split('\\')[0];
+            // packageName은 이미 위에서 추출했으므로 재사용
             
             // React 관련 패키지는 절대 vendor-1, 2, 3에 들어가지 않도록
-            if (packageName && packageName.startsWith('react')) {
+            if (packageName && (packageName === 'react' || packageName === 'react-dom' || packageName.startsWith('react'))) {
               return 'react-vendor';
             }
             
