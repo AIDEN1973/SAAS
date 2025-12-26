@@ -28,7 +28,7 @@ function enforceReactChunk(): RollupPlugin {
       for (const [fileName, chunk] of Object.entries(bundle)) {
         if (chunk.type === 'chunk') {
           // 모든 vendor 및 lib 청크에서 React 검사 (react-vendor 제외)
-          const isNonReactVendorChunk = /vendor-[123]-|lib-a-z-|lib-a-m-|lib-n-z-|lib-other-|lib-scoped-/.test(fileName);
+          const isNonReactVendorChunk = /vendor-[123]-|lib-a-z-|lib-a-m-|lib-n-z-|lib-other-|lib-scoped-|lib-utils-/.test(fileName);
           const isReactChunk = /react-vendor|react-router-vendor|react-hook-form-vendor|radix-ui-vendor|charts-vendor|redux-vendor/.test(fileName);
 
           if (isNonReactVendorChunk && !isReactChunk) {
@@ -532,8 +532,28 @@ export default defineConfig(({ mode }) => {
             }
 
             // 기타 라이브러리들을 명시적인 청크로
-            // lib-n-z 청크를 제거하고 모든 라이브러리를 lib-a-z로 통합
+            // lib-a-z를 제거하고 각 라이브러리를 명시적으로 분류
             if (packageName) {
+              // 특정 라이브러리들을 명시적으로 분류
+              if (packageName === 'clsx') {
+                return 'lib-utils';
+              }
+              if (packageName === 'immer') {
+                return 'lib-utils';
+              }
+              if (packageName === 'tslib') {
+                return 'lib-utils';
+              }
+              if (packageName === 'xlsx') {
+                return 'lib-utils';
+              }
+              if (packageName === 'es-toolkit' || packageName === 'internmap' || packageName === 'decimal.js-light' || packageName === 'eventemitter3' || packageName === 'tiny-invariant') {
+                return 'lib-utils';
+              }
+              if (packageName === 'iceberg-js') {
+                return 'lib-utils';
+              }
+              
               const firstChar = packageName.charCodeAt(0);
               
               // @로 시작하는 스코프 패키지들
@@ -547,10 +567,11 @@ export default defineConfig(({ mode }) => {
                 return 'lib-scoped';
               }
               
-              // 알파벳 범위로 분배
-              // n-z를 a-m과 통합하여 lib-n-z 청크 제거
-              if (firstChar >= 97 && firstChar <= 122) { // a-z (모두 lib-a-z로)
-                return 'lib-a-z';
+              // 알파벳 범위로 분배 (lib-a-z 제거)
+              if (firstChar >= 97 && firstChar <= 109) { // a-m
+                return 'lib-a-m';
+              } else if (firstChar >= 110 && firstChar <= 122) { // n-z
+                return 'lib-n-z';
               } else { // 숫자 등
                 return 'lib-other';
               }
