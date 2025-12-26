@@ -28,7 +28,7 @@ function enforceReactChunk(): RollupPlugin {
       for (const [fileName, chunk] of Object.entries(bundle)) {
         if (chunk.type === 'chunk') {
           // 모든 vendor 및 lib 청크에서 React 검사 (react-vendor 제외)
-          const isNonReactVendorChunk = /vendor-[123]-|lib-a-m-|lib-n-z-|lib-other-|lib-scoped-/.test(fileName);
+          const isNonReactVendorChunk = /vendor-[123]-|lib-a-z-|lib-a-m-|lib-n-z-|lib-other-|lib-scoped-/.test(fileName);
           const isReactChunk = /react-vendor|react-router-vendor|react-hook-form-vendor|radix-ui-vendor|charts-vendor|redux-vendor/.test(fileName);
 
           if (isNonReactVendorChunk && !isReactChunk) {
@@ -400,7 +400,7 @@ export default defineConfig(({ mode }) => {
               'regenerator-runtime',      // React async 지원
               'use-sync-external-store',  // React 18의 내부 훅 (useSyncExternalStore)
             ];
-            
+
             if (reactRelatedPackages.includes(packageName)) {
               console.log('[manualChunks] React related package:', packageName, '-> react-vendor');
               return 'react-vendor';
@@ -413,7 +413,7 @@ export default defineConfig(({ mode }) => {
             }
 
             // React 패키지 내부 경로도 체크 (더 안전하게)
-            if (normalizedId.includes('/react/') || normalizedId.includes('/react-dom/') || 
+            if (normalizedId.includes('/react/') || normalizedId.includes('/react-dom/') ||
                 normalizedId.includes('/react-is/') ||
                 normalizedId.includes('/scheduler/') ||
                 normalizedId.includes('/use-sync-external-store/')) {
@@ -494,12 +494,22 @@ export default defineConfig(({ mode }) => {
               return 'zod-vendor';
             }
             // Recharts (React 차트 라이브러리 - React를 사용하므로 별도 청크로)
+            // recharts는 React를 peer dependency로 사용하지만, 내부적으로 React 코드를 포함할 수 있음
             if (normalizedId.includes('recharts')) {
+              // recharts 내부의 React 코드는 react-vendor로, 나머지는 charts-vendor로
+              if (normalizedId.includes('recharts') && (normalizedId.includes('/react/') || normalizedId.includes('forwardRef') || normalizedId.includes('createElement'))) {
+                console.log('[manualChunks] recharts React code -> react-vendor');
+                return 'react-vendor';
+              }
               return 'charts-vendor';
             }
             // Redux (상태 관리 - React와 함께 사용되지만 별도 청크로)
             if (normalizedId.includes('redux') || normalizedId.includes('reselect')) {
               return 'redux-vendor';
+            }
+            // Victory (차트 라이브러리 - React 사용)
+            if (normalizedId.includes('victory')) {
+              return 'charts-vendor';
             }
 
             // 기타 큰 라이브러리들을 명시적으로 분류
@@ -522,10 +532,10 @@ export default defineConfig(({ mode }) => {
             }
 
             // 기타 라이브러리들을 명시적인 청크로
-            // lib-a-z 청크를 제거하고 더 세분화된 청크로 분리
+            // lib-n-z 청크를 제거하고 모든 라이브러리를 lib-a-z로 통합
             if (packageName) {
               const firstChar = packageName.charCodeAt(0);
-
+              
               // @로 시작하는 스코프 패키지들
               if (packageName.startsWith('@')) {
                 // @radix-ui는 별도 청크로
@@ -536,13 +546,11 @@ export default defineConfig(({ mode }) => {
                 // 기타 @ 패키지는 lib-scoped로
                 return 'lib-scoped';
               }
-
+              
               // 알파벳 범위로 분배
-              if (firstChar >= 97 && firstChar <= 109) { // a-m
-                return 'lib-a-m';
-              } else if (firstChar >= 110 && firstChar <= 122) { // n-z
-                // n-z는 별도 청크로 유지하되 React 체크 강화
-                return 'lib-n-z';
+              // n-z를 a-m과 통합하여 lib-n-z 청크 제거
+              if (firstChar >= 97 && firstChar <= 122) { // a-z (모두 lib-a-z로)
+                return 'lib-a-z';
               } else { // 숫자 등
                 return 'lib-other';
               }
