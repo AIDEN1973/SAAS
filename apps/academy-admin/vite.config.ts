@@ -32,32 +32,44 @@ function enforceReactChunk(): RollupPlugin {
           const isReactChunk = /react-vendor|react-router-vendor|react-hook-form-vendor|radix-ui-vendor|charts-vendor|redux-vendor/.test(fileName);
 
           if (isNonReactVendorChunk && !isReactChunk) {
-            // React 관련 코드가 포함되어 있는지 확인
-            const reactIndicators = [
-              'forwardRef',
-              'createElement',
-              'useState',
-              'useEffect',
-              'useContext',
-              'useCallback',
-              'useMemo',
-              'React.createElement',
-              'React.forwardRef',
-              'react/jsx-runtime',
-              'react-dom/client',
-              '__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED'
-            ];
+            // 실제로 React 모듈이 포함되어 있는지 확인 (더 정확한 검사)
+            const chunkModuleIds = Object.keys(chunk.modules || {});
+            const hasReactModule = chunkModuleIds.some(id => {
+              const normalized = id.split('?')[0].replace(/\\/g, '/');
+              return normalized.includes('/react/') || 
+                     normalized.includes('/react-dom/') ||
+                     normalized.includes('/react-is/') ||
+                     normalized.includes('/scheduler/') ||
+                     normalized.includes('/use-sync-external-store/') ||
+                     normalized.includes('node_modules/react') ||
+                     normalized.includes('node_modules/react-dom');
+            });
 
-            const hasReact = reactIndicators.some(indicator => chunk.code.includes(indicator));
-
-            if (hasReact) {
-              console.error(`\n❌ [enforce-react-chunk] React detected in ${fileName}!`);
+            // React 모듈이 실제로 포함되어 있는 경우에만 오류
+            if (hasReactModule) {
+              console.error(`\n❌ [enforce-react-chunk] React module detected in ${fileName}!`);
               console.error(`   This should not happen. React must be in react-vendor chunk.`);
-              console.error(`   React indicators found in chunk.`);
               console.error(`   Tracked React modules:`, Array.from(reactModuleIds).slice(0, 10));
 
+              // 청크에 포함된 React 모듈 찾기
+              const reactModulesInChunk = chunkModuleIds
+                .filter(id => {
+                  const normalized = id.split('?')[0].replace(/\\/g, '/');
+                  return normalized.includes('/react/') || 
+                         normalized.includes('/react-dom/') ||
+                         normalized.includes('/react-is/') ||
+                         normalized.includes('/scheduler/') ||
+                         normalized.includes('/use-sync-external-store/');
+                })
+                .map(id => {
+                  const normalized = id.split('?')[0].replace(/\\/g, '/');
+                  return normalized.substring(normalized.indexOf('node_modules'));
+                });
+
+              console.error(`   React modules in chunk:`, reactModulesInChunk.slice(0, 10));
+
               // 청크에 포함된 모듈 출력 (node_modules만)
-              const chunkModules = Object.keys(chunk.modules || {})
+              const chunkModules = chunkModuleIds
                 .filter(id => id.includes('node_modules'))
                 .map(id => {
                   const normalized = id.split('?')[0].replace(/\\/g, '/');
@@ -70,7 +82,7 @@ function enforceReactChunk(): RollupPlugin {
               console.error(`   Total packages in chunk:`, chunkModules.length);
 
               // 빌드 실패로 변경하여 React가 잘못된 청크에 포함되는 것을 방지
-              throw new Error(`React found in non-React chunk: ${fileName}. Build failed to prevent runtime errors. Packages in chunk: ${chunkModules.slice(0, 10).join(', ')}`);
+              throw new Error(`React module found in non-React chunk: ${fileName}. Build failed to prevent runtime errors. React modules: ${reactModulesInChunk.slice(0, 5).join(', ')}`);
             }
           }
         }
@@ -553,9 +565,9 @@ export default defineConfig(({ mode }) => {
               if (packageName === 'iceberg-js') {
                 return 'lib-utils';
               }
-              
+
               const firstChar = packageName.charCodeAt(0);
-              
+
               // @로 시작하는 스코프 패키지들
               if (packageName.startsWith('@')) {
                 // @radix-ui는 별도 청크로
@@ -566,7 +578,7 @@ export default defineConfig(({ mode }) => {
                 // 기타 @ 패키지는 lib-scoped로
                 return 'lib-scoped';
               }
-              
+
               // 알파벳 범위로 분배 (lib-a-z 제거)
               if (firstChar >= 97 && firstChar <= 109) { // a-m
                 return 'lib-a-m';
