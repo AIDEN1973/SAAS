@@ -299,20 +299,23 @@ export default defineConfig(({ mode }) => {
         entryFileNames: 'assets/[name]-[hash].js',
         manualChunks: (id) => {
           // CommonJS 모듈 쿼리 파라미터 제거 (정규화)
-          const normalizedId = id.split('?')[0];
-          
-          // 디버깅: React 관련 모듈 로그 출력 (개발 환경에서만)
-          if (process.env.NODE_ENV === 'development' && normalizedId.includes('react') && normalizedId.includes('node_modules')) {
+          // Windows와 Unix 경로 모두 처리
+          let normalizedId = id.split('?')[0];
+          // 경로 정규화 (Windows 경로를 Unix 스타일로)
+          normalizedId = normalizedId.replace(/\\/g, '/');
+
+          // 디버깅: React 관련 모듈 로그 출력 (프로덕션 빌드에서도)
+          if (normalizedId.includes('react') && normalizedId.includes('node_modules')) {
             console.log('[manualChunks] React module detected:', id, '-> normalized:', normalizedId);
           }
-          
+
           // node_modules의 큰 라이브러리들을 별도 청크로 분리
           if (normalizedId.includes('node_modules')) {
             // React 관련을 가장 먼저 체크 (우선순위 최상위)
             // 패키지 이름을 먼저 확인 (정규화된 ID 사용)
-            const packageName = normalizedId.split('node_modules/')[1]?.split('/')[0] || 
+            const packageName = normalizedId.split('node_modules/')[1]?.split('/')[0] ||
                                 normalizedId.split('node_modules\\')[1]?.split('\\')[0];
-            
+
             // React 또는 react-dom 패키지인 경우 무조건 react-vendor로
             if (packageName === 'react' || packageName === 'react-dom') {
               return 'react-vendor';
@@ -323,12 +326,12 @@ export default defineConfig(({ mode }) => {
             if (reactPattern.test(normalizedId)) {
               return 'react-vendor';
             }
-            
+
             // 추가 안전장치: 'react' 문자열이 포함된 모든 모듈을 react-vendor로
             // 단, react-router, react-hook-form, react-query 등은 제외
-            if (normalizedId.includes('react') && 
-                !normalizedId.includes('react-router') && 
-                !normalizedId.includes('react-hook-form') && 
+            if (normalizedId.includes('react') &&
+                !normalizedId.includes('react-router') &&
+                !normalizedId.includes('react-hook-form') &&
                 !normalizedId.includes('react-query') &&
                 !normalizedId.includes('@tanstack/react-query') &&
                 !normalizedId.includes('react-select') &&

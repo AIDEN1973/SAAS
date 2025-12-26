@@ -150,6 +150,31 @@ function checkBundleSize(buildDir) {
   }
 
   console.log(`\n✅ Bundle size is within limit`);
+  
+  // React가 vendor-1에 포함되어 있는지 확인
+  const vendor1Files = jsCssFiles.filter(file => {
+    const relativePath = path.relative(distPath, file);
+    return relativePath.includes('vendor-1-') && relativePath.endsWith('.js');
+  });
+  
+  if (vendor1Files.length > 0) {
+    vendor1Files.forEach((filePath) => {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      // React 관련 코드가 포함되어 있는지 확인
+      if (content.includes('forwardRef') || content.includes('createElement') || content.includes('useState') || content.includes('useEffect')) {
+        // react-vendor 파일이 아닌 경우에만 오류
+        const relativePath = path.relative(distPath, filePath);
+        if (!relativePath.includes('react-vendor')) {
+          console.error(`\n❌ React detected in vendor-1 chunk!`);
+          console.error(`   File: ${relativePath}`);
+          console.error(`   This indicates React is not properly separated into react-vendor chunk.`);
+          console.error(`   Please check vite.config.ts manualChunks configuration.`);
+          process.exit(1);
+        }
+      }
+    });
+  }
+  
   return true;
 }
 
