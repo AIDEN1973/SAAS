@@ -11,7 +11,7 @@
   ],
   "headers": [
     {
-      "source": "/assets/(.*\\.js)",
+      "source": "/assets/*.js",
       "headers": [
         {
           "key": "Content-Type",
@@ -20,7 +20,7 @@
       ]
     },
     {
-      "source": "/assets/(.*\\.css)",
+      "source": "/assets/*.css",
       "headers": [
         {
           "key": "Content-Type",
