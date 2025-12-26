@@ -27,10 +27,9 @@ function enforceReactChunk(): RollupPlugin {
       // 빌드 후 검증: vendor 및 lib 청크에 React가 포함되어 있는지 확인
       for (const [fileName, chunk] of Object.entries(bundle)) {
         if (chunk.type === 'chunk') {
-          // vendor-1, vendor-2, vendor-3, lib-a-z, lib-other 청크에서 React 검사
-          // react-vendor, react-router-vendor, react-hook-form-vendor는 제외
-          const isNonReactVendorChunk = /vendor-[123]-|lib-a-z-|lib-n-z-|lib-other-/.test(fileName);
-          const isReactChunk = /react-vendor|react-router-vendor|react-hook-form-vendor/.test(fileName);
+          // 모든 vendor 및 lib 청크에서 React 검사 (react-vendor 제외)
+          const isNonReactVendorChunk = /vendor-[123]-|lib-a-m-|lib-n-z-|lib-other-|lib-scoped-/.test(fileName);
+          const isReactChunk = /react-vendor|react-router-vendor|react-hook-form-vendor|radix-ui-vendor/.test(fileName);
 
           if (isNonReactVendorChunk && !isReactChunk) {
             // React 관련 코드가 포함되어 있는지 확인
@@ -69,14 +68,9 @@ function enforceReactChunk(): RollupPlugin {
 
               console.error(`   Chunk packages (unique):`, chunkModules.slice(0, 20));
               console.error(`   Total packages in chunk:`, chunkModules.length);
-              
-              // 일시적으로 경고로 변경하여 전체 로그 확인
-              console.warn(`\n⚠️  [enforce-react-chunk] Build will continue but runtime error is expected!`);
-              console.warn(`   React found in: ${fileName}`);
-              console.warn(`   Fix: Add the following packages to react-vendor in vite.config.ts:`);
-              console.warn(`   ${chunkModules.slice(0, 10).join(', ')}`);
-              
-              // throw new Error(`React found in non-React chunk: ${fileName}. Build failed to prevent runtime errors.`);
+
+              // 빌드 실패로 변경하여 React가 잘못된 청크에 포함되는 것을 방지
+              throw new Error(`React found in non-React chunk: ${fileName}. Build failed to prevent runtime errors. Packages in chunk: ${chunkModules.slice(0, 10).join(', ')}`);
             }
           }
         }
@@ -393,17 +387,27 @@ export default defineConfig(({ mode }) => {
             const packageName = normalizedId.split('node_modules/')[1]?.split('/')[0];
 
             // ===== React 관련 모듈을 최우선으로 처리 (다른 로직보다 먼저) =====
-            // React 또는 react-dom 패키지인 경우 무조건 react-vendor로
-            // scheduler는 React의 내부 의존성이므로 함께 포함
-            if (packageName === 'react' || packageName === 'react-dom' || packageName === 'scheduler') {
-              console.log('[manualChunks] React core package:', packageName, '-> react-vendor');
+            // React의 모든 내부 의존성과 관련 패키지를 명시적으로 나열
+            const reactRelatedPackages = [
+              'react',
+              'react-dom',
+              'scheduler',           // React의 내부 스케줄러
+              'object-assign',       // React 유틸리티
+              'prop-types',          // React prop 검증
+              'loose-envify',        // React 빌드 도구
+              'js-tokens',           // React 파서
+              'regenerator-runtime', // React async 지원
+            ];
+            
+            if (reactRelatedPackages.includes(packageName)) {
+              console.log('[manualChunks] React related package:', packageName, '-> react-vendor');
               return 'react-vendor';
             }
-
-            // React 내부 패키지들도 react-vendor로
-            // object-assign, prop-types 등 React가 사용하는 유틸리티
-            if (packageName === 'object-assign' || packageName === 'prop-types') {
-              console.log('[manualChunks] React utility package:', packageName, '-> react-vendor');
+            
+            // React 패키지 내부 경로도 체크 (더 안전하게)
+            if (normalizedId.includes('/react/') || normalizedId.includes('/react-dom/') || 
+                normalizedId.includes('/scheduler/')) {
+              console.log('[manualChunks] React internal path:', normalizedId.substring(normalizedId.indexOf('node_modules')), '-> react-vendor');
               return 'react-vendor';
             }
 
@@ -506,7 +510,7 @@ export default defineConfig(({ mode }) => {
               if (firstChar >= 110 && firstChar <= 122) { // n-z
                 console.log('[manualChunks] lib-n-z candidate:', packageName, 'firstChar:', String.fromCharCode(firstChar));
               }
-              
+
               // 알파벳 범위로 분배 (안정적)
               // n-z 범위를 lib-a-m에 병합하여 lib-n-z 청크 제거
               if (firstChar >= 97 && firstChar <= 122) { // a-z (모두 lib-a-z로)
