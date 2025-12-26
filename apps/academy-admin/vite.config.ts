@@ -8,7 +8,7 @@ import type { Plugin as RollupPlugin } from 'rollup';
 // React를 강제로 react-vendor 청크로 분리하는 플러그인
 function enforceReactChunk(): RollupPlugin {
   const reactModuleIds = new Set<string>();
-  
+
   return {
     name: 'enforce-react-chunk',
     resolveId(id) {
@@ -30,7 +30,7 @@ function enforceReactChunk(): RollupPlugin {
           // vendor-1, vendor-2, vendor-3 청크에서 React 검사 (react-vendor는 제외)
           const isVendorChunk = /vendor-[123]-/.test(fileName);
           const isReactVendor = fileName.includes('react-vendor');
-          
+
           if (isVendorChunk && !isReactVendor) {
             // React 관련 코드가 포함되어 있는지 확인
             const reactIndicators = [
@@ -43,9 +43,9 @@ function enforceReactChunk(): RollupPlugin {
               'react/jsx-runtime',
               'react-dom/client'
             ];
-            
+
             const hasReact = reactIndicators.some(indicator => chunk.code.includes(indicator));
-            
+
             if (hasReact) {
               console.error(`\n❌ [enforce-react-chunk] React detected in ${fileName}!`);
               console.error(`   This should not happen. React must be in react-vendor chunk.`);
@@ -362,20 +362,41 @@ export default defineConfig(({ mode }) => {
           // 경로 정규화 (Windows 경로를 Unix 스타일로)
           normalizedId = normalizedId.replace(/\\/g, '/');
 
-          // 디버깅: React 관련 모듈 로그 출력 (프로덕션 빌드에서도)
-          if (normalizedId.includes('react') && normalizedId.includes('node_modules')) {
-            console.log('[manualChunks] React module detected:', id, '-> normalized:', normalizedId);
-          }
-
           // node_modules의 큰 라이브러리들을 별도 청크로 분리
           if (normalizedId.includes('node_modules')) {
-            // React 관련을 가장 먼저 체크 (우선순위 최상위)
-            // 패키지 이름을 먼저 확인 (정규화된 ID 사용)
-            const packageName = normalizedId.split('node_modules/')[1]?.split('/')[0] ||
-                                normalizedId.split('node_modules\\')[1]?.split('\\')[0];
+            // 패키지 이름을 먼저 추출
+            const packageName = normalizedId.split('node_modules/')[1]?.split('/')[0];
+
+            // 디버깅: React 관련 모듈 로그 출력 (프로덕션 빌드에서도)
+            if (normalizedId.includes('react')) {
+              const chunkName = (() => {
+                // React 또는 react-dom 패키지인 경우 무조건 react-vendor로
+                if (packageName === 'react' || packageName === 'react-dom') {
+                  return 'react-vendor';
+                }
+                
+                // 정규식으로 정확하게 매칭
+                const reactPattern = /\/react\/|\/react-dom\//;
+                if (reactPattern.test(normalizedId)) {
+                  return 'react-vendor';
+                }
+                
+                // react-router, react-hook-form 등 다른 라이브러리 체크
+                if (normalizedId.includes('react-router')) return 'react-router-vendor';
+                if (normalizedId.includes('react-hook-form')) return 'react-hook-form-vendor';
+                if (normalizedId.includes('lucide-react')) return 'lucide-icons-vendor';
+                
+                // 기타 react 포함 모듈은 react-vendor로
+                return 'react-vendor';
+              })();
+              
+              console.log('[manualChunks] React module:', packageName, '-> chunk:', chunkName, 'id:', normalizedId.substring(normalizedId.indexOf('node_modules')));
+              return chunkName;
+            }
 
             // React 또는 react-dom 패키지인 경우 무조건 react-vendor로
             if (packageName === 'react' || packageName === 'react-dom') {
+              console.log('[manualChunks] React core package:', packageName, '-> react-vendor');
               return 'react-vendor';
             }
 
