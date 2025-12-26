@@ -504,18 +504,28 @@ export default defineConfig(({ mode }) => {
             }
 
             // 기타 라이브러리들을 명시적인 청크로
+            // lib-a-z 청크를 제거하고 더 세분화된 청크로 분리
             if (packageName) {
-              // n-z 청크로 가는 모듈 먼저 로그 (React 문제 디버깅)
               const firstChar = packageName.charCodeAt(0);
-              if (firstChar >= 110 && firstChar <= 122) { // n-z
-                console.log('[manualChunks] lib-n-z candidate:', packageName, 'firstChar:', String.fromCharCode(firstChar));
+              
+              // @로 시작하는 스코프 패키지들
+              if (packageName.startsWith('@')) {
+                // @radix-ui는 별도 청크로
+                if (packageName.startsWith('@radix-ui')) {
+                  return 'radix-ui-vendor';
+                }
+                // @tanstack는 이미 위에서 처리됨
+                // 기타 @ 패키지는 lib-scoped로
+                return 'lib-scoped';
               }
-
-              // 알파벳 범위로 분배 (안정적)
-              // n-z 범위를 lib-a-m에 병합하여 lib-n-z 청크 제거
-              if (firstChar >= 97 && firstChar <= 122) { // a-z (모두 lib-a-z로)
-                return 'lib-a-z';
-              } else { // @, 숫자 등
+              
+              // 알파벳 범위로 분배
+              if (firstChar >= 97 && firstChar <= 109) { // a-m
+                return 'lib-a-m';
+              } else if (firstChar >= 110 && firstChar <= 122) { // n-z
+                // n-z는 별도 청크로 유지하되 React 체크 강화
+                return 'lib-n-z';
+              } else { // 숫자 등
                 return 'lib-other';
               }
             }
