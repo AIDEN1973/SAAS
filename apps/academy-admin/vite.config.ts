@@ -391,12 +391,13 @@ export default defineConfig(({ mode }) => {
             const reactRelatedPackages = [
               'react',
               'react-dom',
-              'scheduler',           // React의 내부 스케줄러
-              'object-assign',       // React 유틸리티
-              'prop-types',          // React prop 검증
-              'loose-envify',        // React 빌드 도구
-              'js-tokens',           // React 파서
-              'regenerator-runtime', // React async 지원
+              'scheduler',                // React의 내부 스케줄러
+              'object-assign',            // React 유틸리티
+              'prop-types',               // React prop 검증
+              'loose-envify',             // React 빌드 도구
+              'js-tokens',                // React 파서
+              'regenerator-runtime',      // React async 지원
+              'use-sync-external-store',  // React 18의 내부 훅 (useSyncExternalStore)
             ];
             
             if (reactRelatedPackages.includes(packageName)) {
@@ -404,9 +405,16 @@ export default defineConfig(({ mode }) => {
               return 'react-vendor';
             }
             
+            // use-sync-external-store는 React 18의 핵심 훅이므로 경로로도 체크
+            if (normalizedId.includes('/use-sync-external-store/')) {
+              console.log('[manualChunks] use-sync-external-store path detected -> react-vendor');
+              return 'react-vendor';
+            }
+
             // React 패키지 내부 경로도 체크 (더 안전하게)
             if (normalizedId.includes('/react/') || normalizedId.includes('/react-dom/') || 
-                normalizedId.includes('/scheduler/')) {
+                normalizedId.includes('/scheduler/') ||
+                normalizedId.includes('/use-sync-external-store/')) {
               console.log('[manualChunks] React internal path:', normalizedId.substring(normalizedId.indexOf('node_modules')), '-> react-vendor');
               return 'react-vendor';
             }
@@ -507,7 +515,7 @@ export default defineConfig(({ mode }) => {
             // lib-a-z 청크를 제거하고 더 세분화된 청크로 분리
             if (packageName) {
               const firstChar = packageName.charCodeAt(0);
-              
+
               // @로 시작하는 스코프 패키지들
               if (packageName.startsWith('@')) {
                 // @radix-ui는 별도 청크로
@@ -518,7 +526,7 @@ export default defineConfig(({ mode }) => {
                 // 기타 @ 패키지는 lib-scoped로
                 return 'lib-scoped';
               }
-              
+
               // 알파벳 범위로 분배
               if (firstChar >= 97 && firstChar <= 109) { // a-m
                 return 'lib-a-m';
