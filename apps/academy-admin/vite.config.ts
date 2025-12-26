@@ -269,6 +269,8 @@ export default defineConfig(({ mode }) => {
       // 순환 의존성 문제 해결을 위한 설정
       include: [/node_modules/],
       transformMixedEsModules: true,
+      // CommonJS 모듈도 ES 모듈로 변환하여 일관된 처리 보장
+      strictRequires: true,
     },
     rollupOptions: {
       // 서버 전용 코드를 external로 처리하여 클라이언트 번들에서 제외
@@ -296,43 +298,47 @@ export default defineConfig(({ mode }) => {
         // 청크 간 의존성 순서 보장
         entryFileNames: 'assets/[name]-[hash].js',
         manualChunks: (id) => {
+          // CommonJS 모듈 쿼리 파라미터 제거 (정규화)
+          const normalizedId = id.split('?')[0];
+          
           // 디버깅: React 관련 모듈 로그 출력 (개발 환경에서만)
-          if (process.env.NODE_ENV === 'development' && id.includes('react') && id.includes('node_modules')) {
-            console.log('[manualChunks] React module detected:', id);
+          if (process.env.NODE_ENV === 'development' && normalizedId.includes('react') && normalizedId.includes('node_modules')) {
+            console.log('[manualChunks] React module detected:', id, '-> normalized:', normalizedId);
           }
+          
           // node_modules의 큰 라이브러리들을 별도 청크로 분리
-          if (id.includes('node_modules')) {
+          if (normalizedId.includes('node_modules')) {
             // React 관련을 가장 먼저 체크 (우선순위 최상위)
-            // 패키지 이름을 먼저 확인
-            const packageName = id.split('node_modules/')[1]?.split('/')[0] || 
-                                id.split('node_modules\\')[1]?.split('\\')[0];
+            // 패키지 이름을 먼저 확인 (정규화된 ID 사용)
+            const packageName = normalizedId.split('node_modules/')[1]?.split('/')[0] || 
+                                normalizedId.split('node_modules\\')[1]?.split('\\')[0];
             
             // React 또는 react-dom 패키지인 경우 무조건 react-vendor로
             if (packageName === 'react' || packageName === 'react-dom') {
               return 'react-vendor';
             }
-            
-            // 정규식으로 정확하게 매칭
+
+            // 정규식으로 정확하게 매칭 (정규화된 ID 사용)
             const reactPattern = /[\\/]react[\\/]|[\\/]react-dom[\\/]|^react$|^react-dom$|react[\\/]jsx-runtime|react[\\/]jsx-dev-runtime/;
-            if (reactPattern.test(id)) {
+            if (reactPattern.test(normalizedId)) {
               return 'react-vendor';
             }
             
             // 추가 안전장치: 'react' 문자열이 포함된 모든 모듈을 react-vendor로
             // 단, react-router, react-hook-form, react-query 등은 제외
-            if (id.includes('react') && 
-                !id.includes('react-router') && 
-                !id.includes('react-hook-form') && 
-                !id.includes('react-query') &&
-                !id.includes('@tanstack/react-query') &&
-                !id.includes('react-select') &&
-                !id.includes('react-dnd') &&
-                !id.includes('react-beautiful-dnd') &&
-                !id.includes('react-window') &&
-                !id.includes('react-virtual')) {
+            if (normalizedId.includes('react') && 
+                !normalizedId.includes('react-router') && 
+                !normalizedId.includes('react-hook-form') && 
+                !normalizedId.includes('react-query') &&
+                !normalizedId.includes('@tanstack/react-query') &&
+                !normalizedId.includes('react-select') &&
+                !normalizedId.includes('react-dnd') &&
+                !normalizedId.includes('react-beautiful-dnd') &&
+                !normalizedId.includes('react-window') &&
+                !normalizedId.includes('react-virtual')) {
               return 'react-vendor';
             }
-            
+
             // React Router
             if (id.includes('react-router')) {
               return 'react-router-vendor';
@@ -361,28 +367,28 @@ export default defineConfig(({ mode }) => {
             if (id.includes('zod')) {
               return 'zod-vendor';
             }
-            
+
             // 기타 큰 라이브러리들을 여러 vendor 청크로 분산
             // React 관련이 아닌 것만 vendor-1, vendor-2, vendor-3에 분배
             // packageName은 이미 위에서 추출했으므로 재사용
-            
+
             // React 관련 패키지는 절대 vendor-1, 2, 3에 들어가지 않도록
             if (packageName && (packageName === 'react' || packageName === 'react-dom' || packageName.startsWith('react'))) {
               return 'react-vendor';
             }
-            
+
             if (packageName && !packageName.startsWith('react')) {
               // 패키지 이름의 첫 글자로 분배
               const firstChar = packageName.charCodeAt(0);
               const chunkIndex = (firstChar % 3) + 1;
               return `vendor-${chunkIndex}`;
             }
-            
+
             // React 관련이 확실히 아닌 경우만 vendor-1로
             if (!id.includes('react')) {
               return 'vendor-1';
             }
-            
+
             // 기본값: React 관련은 react-vendor로
             return 'react-vendor';
           }
