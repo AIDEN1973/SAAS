@@ -296,16 +296,28 @@ export default defineConfig(({ mode }) => {
         manualChunks: (id) => {
           // node_modules의 큰 라이브러리들을 별도 청크로 분리
           if (id.includes('node_modules')) {
-            // React 관련 (가장 먼저 로드되어야 함, React와 React-DOM은 반드시 같은 청크에)
-            // 정규식으로 더 정확하게 매칭
+            // React 관련을 가장 먼저 체크 (우선순위 최상위)
+            // 정규식으로 정확하게 매칭
             const reactPattern = /[\\/]react[\\/]|[\\/]react-dom[\\/]|^react$|^react-dom$|react[\\/]jsx-runtime|react[\\/]jsx-dev-runtime/;
             if (reactPattern.test(id)) {
               return 'react-vendor';
             }
-            // 추가 안전장치: 'react' 문자열이 포함된 모든 모듈 (다른 라이브러리 제외)
-            if (id.includes('react') && !id.includes('react-router') && !id.includes('react-hook-form') && !id.includes('react-query')) {
+            
+            // 추가 안전장치: 'react' 문자열이 포함된 모든 모듈을 react-vendor로
+            // 단, react-router, react-hook-form, react-query 등은 제외
+            if (id.includes('react') && 
+                !id.includes('react-router') && 
+                !id.includes('react-hook-form') && 
+                !id.includes('react-query') &&
+                !id.includes('@tanstack/react-query') &&
+                !id.includes('react-select') &&
+                !id.includes('react-dnd') &&
+                !id.includes('react-beautiful-dnd') &&
+                !id.includes('react-window') &&
+                !id.includes('react-virtual')) {
               return 'react-vendor';
             }
+            
             // React Router
             if (id.includes('react-router')) {
               return 'react-router-vendor';
@@ -318,8 +330,6 @@ export default defineConfig(({ mode }) => {
             if (id.includes('react-hook-form')) {
               return 'react-hook-form-vendor';
             }
-            // Recharts는 동적 import로 처리되므로 초기 번들에서 제외
-            // xlsx는 동적 import로 처리되므로 여기서는 제외
             // Lucide icons
             if (id.includes('lucide-react')) {
               return 'lucide-icons-vendor';
@@ -328,7 +338,6 @@ export default defineConfig(({ mode }) => {
             if (id.includes('radix-ui') || id.includes('@radix-ui')) {
               return 'radix-ui-vendor';
             }
-            // 큰 라이브러리들을 더 세분화
             // date-fns 같은 유틸리티
             if (id.includes('date-fns') || id.includes('dayjs') || id.includes('moment')) {
               return 'date-vendor';
@@ -337,21 +346,30 @@ export default defineConfig(({ mode }) => {
             if (id.includes('zod')) {
               return 'zod-vendor';
             }
+            
             // 기타 큰 라이브러리들을 여러 vendor 청크로 분산
             // React 관련이 아닌 것만 vendor-1, vendor-2, vendor-3에 분배
             const packageName = id.split('node_modules/')[1]?.split('/')[0] || 
                                 id.split('node_modules\\')[1]?.split('\\')[0];
+            
+            // React 관련 패키지는 절대 vendor-1, 2, 3에 들어가지 않도록
+            if (packageName && packageName.startsWith('react')) {
+              return 'react-vendor';
+            }
+            
             if (packageName && !packageName.startsWith('react')) {
-              // 패키지 이름의 첫 글자로 분배 (더 안정적)
+              // 패키지 이름의 첫 글자로 분배
               const firstChar = packageName.charCodeAt(0);
               const chunkIndex = (firstChar % 3) + 1;
               return `vendor-${chunkIndex}`;
             }
-            // React 관련이 아니고 패키지 이름도 없는 경우 기본값
+            
+            // React 관련이 확실히 아닌 경우만 vendor-1로
             if (!id.includes('react')) {
               return 'vendor-1';
             }
-            // React 관련은 react-vendor로
+            
+            // 기본값: React 관련은 react-vendor로
             return 'react-vendor';
           }
 
