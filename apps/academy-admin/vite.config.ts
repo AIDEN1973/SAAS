@@ -293,7 +293,13 @@ export default defineConfig(({ mode }) => {
           }
           return 'assets/[name]-[hash].js';
         },
+        // 청크 간 의존성 순서 보장
+        entryFileNames: 'assets/[name]-[hash].js',
         manualChunks: (id) => {
+          // 디버깅: React 관련 모듈 로그 출력 (개발 환경에서만)
+          if (process.env.NODE_ENV === 'development' && id.includes('react') && id.includes('node_modules')) {
+            console.log('[manualChunks] React module detected:', id);
+          }
           // node_modules의 큰 라이브러리들을 별도 청크로 분리
           if (id.includes('node_modules')) {
             // React 관련을 가장 먼저 체크 (우선순위 최상위)
