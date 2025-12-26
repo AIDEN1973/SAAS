@@ -29,7 +29,7 @@ function enforceReactChunk(): RollupPlugin {
         if (chunk.type === 'chunk') {
           // 모든 vendor 및 lib 청크에서 React 검사 (react-vendor 제외)
           const isNonReactVendorChunk = /vendor-[123]-|lib-a-m-|lib-n-z-|lib-other-|lib-scoped-/.test(fileName);
-          const isReactChunk = /react-vendor|react-router-vendor|react-hook-form-vendor|radix-ui-vendor/.test(fileName);
+          const isReactChunk = /react-vendor|react-router-vendor|react-hook-form-vendor|radix-ui-vendor|charts-vendor|redux-vendor/.test(fileName);
 
           if (isNonReactVendorChunk && !isReactChunk) {
             // React 관련 코드가 포함되어 있는지 확인
@@ -391,6 +391,7 @@ export default defineConfig(({ mode }) => {
             const reactRelatedPackages = [
               'react',
               'react-dom',
+              'react-is',                 // React 타입 체크 유틸리티
               'scheduler',                // React의 내부 스케줄러
               'object-assign',            // React 유틸리티
               'prop-types',               // React prop 검증
@@ -404,7 +405,7 @@ export default defineConfig(({ mode }) => {
               console.log('[manualChunks] React related package:', packageName, '-> react-vendor');
               return 'react-vendor';
             }
-            
+
             // use-sync-external-store는 React 18의 핵심 훅이므로 경로로도 체크
             if (normalizedId.includes('/use-sync-external-store/')) {
               console.log('[manualChunks] use-sync-external-store path detected -> react-vendor');
@@ -413,6 +414,7 @@ export default defineConfig(({ mode }) => {
 
             // React 패키지 내부 경로도 체크 (더 안전하게)
             if (normalizedId.includes('/react/') || normalizedId.includes('/react-dom/') || 
+                normalizedId.includes('/react-is/') ||
                 normalizedId.includes('/scheduler/') ||
                 normalizedId.includes('/use-sync-external-store/')) {
               console.log('[manualChunks] React internal path:', normalizedId.substring(normalizedId.indexOf('node_modules')), '-> react-vendor');
@@ -490,6 +492,14 @@ export default defineConfig(({ mode }) => {
             // Zod (validation library)
             if (normalizedId.includes('zod')) {
               return 'zod-vendor';
+            }
+            // Recharts (React 차트 라이브러리 - React를 사용하므로 별도 청크로)
+            if (normalizedId.includes('recharts')) {
+              return 'charts-vendor';
+            }
+            // Redux (상태 관리 - React와 함께 사용되지만 별도 청크로)
+            if (normalizedId.includes('redux') || normalizedId.includes('reselect')) {
+              return 'redux-vendor';
             }
 
             // 기타 큰 라이브러리들을 명시적으로 분류
