@@ -5,13 +5,20 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/((?!assets/).*)",
-      "destination": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": "text/html"
+        }
+      ]
     }
   ],
   "headers": [
     {
-      "source": "/assets/*.js",
+      "source": "/assets/(.*\\.js)",
       "headers": [
         {
           "key": "Content-Type",
@@ -20,7 +27,7 @@
       ]
     },
     {
-      "source": "/assets/*.css",
+      "source": "/assets/(.*\\.css)",
       "headers": [
         {
           "key": "Content-Type",
