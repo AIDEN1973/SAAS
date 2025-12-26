@@ -7,8 +7,22 @@ import type { Plugin as RollupPlugin } from 'rollup';
 
 // React를 강제로 react-vendor 청크로 분리하는 플러그인
 function enforceReactChunk(): RollupPlugin {
+  const reactModuleIds = new Set<string>();
+  
   return {
     name: 'enforce-react-chunk',
+    resolveId(id) {
+      // React 모듈 ID 추적
+      const normalizedId = id.split('?')[0].replace(/\\/g, '/');
+      if (normalizedId.includes('node_modules')) {
+        const packageName = normalizedId.split('node_modules/')[1]?.split('/')[0];
+        if (packageName === 'react' || packageName === 'react-dom') {
+          reactModuleIds.add(normalizedId);
+          console.log('[enforce-react-chunk] React module resolved:', normalizedId);
+        }
+      }
+      return null;
+    },
     generateBundle(options, bundle) {
       // 빌드 후 검증: vendor-1, vendor-2, vendor-3에 React가 포함되어 있는지 확인
       for (const [fileName, chunk] of Object.entries(bundle)) {
@@ -36,6 +50,7 @@ function enforceReactChunk(): RollupPlugin {
               console.error(`\n❌ [enforce-react-chunk] React detected in ${fileName}!`);
               console.error(`   This should not happen. React must be in react-vendor chunk.`);
               console.error(`   React indicators found in vendor chunk.`);
+              console.error(`   Tracked React modules:`, Array.from(reactModuleIds).slice(0, 10));
               throw new Error(`React found in vendor chunk: ${fileName}. Build failed to prevent runtime errors.`);
             }
           }
