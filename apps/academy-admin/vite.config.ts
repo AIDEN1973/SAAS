@@ -3,6 +3,47 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { readFileSync, existsSync } from 'fs';
+import type { Plugin as RollupPlugin } from 'rollup';
+
+// React를 강제로 react-vendor 청크로 분리하는 플러그인
+function enforceReactChunk(): RollupPlugin {
+  return {
+    name: 'enforce-react-chunk',
+    generateBundle(options, bundle) {
+      // 빌드 후 검증: vendor-1, vendor-2, vendor-3에 React가 포함되어 있는지 확인
+      for (const [fileName, chunk] of Object.entries(bundle)) {
+        if (chunk.type === 'chunk') {
+          // vendor-1, vendor-2, vendor-3 청크에서 React 검사 (react-vendor는 제외)
+          const isVendorChunk = /vendor-[123]-/.test(fileName);
+          const isReactVendor = fileName.includes('react-vendor');
+          
+          if (isVendorChunk && !isReactVendor) {
+            // React 관련 코드가 포함되어 있는지 확인
+            const reactIndicators = [
+              'forwardRef',
+              'createElement',
+              'useState',
+              'useEffect',
+              'React.createElement',
+              'React.forwardRef',
+              'react/jsx-runtime',
+              'react-dom/client'
+            ];
+            
+            const hasReact = reactIndicators.some(indicator => chunk.code.includes(indicator));
+            
+            if (hasReact) {
+              console.error(`\n❌ [enforce-react-chunk] React detected in ${fileName}!`);
+              console.error(`   This should not happen. React must be in react-vendor chunk.`);
+              console.error(`   React indicators found in vendor chunk.`);
+              throw new Error(`React found in vendor chunk: ${fileName}. Build failed to prevent runtime errors.`);
+            }
+          }
+        }
+      }
+    },
+  };
+}
 
 // 서버 전용 코드를 클라이언트 번들에서 제외하는 플러그인
 function excludeServerCode(): Plugin {
@@ -184,6 +225,8 @@ export default defineConfig(({ mode }) => {
   plugins: [
     react(),
     excludeServerCode(),
+    // React 청크 강제 분리 플러그인
+    enforceReactChunk(),
     // Bundle analyzer (개발 시에만)
     ...(process.env.ANALYZE ? [visualizer({
       open: true,
