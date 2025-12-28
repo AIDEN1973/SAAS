@@ -276,10 +276,7 @@ export default defineConfig(({ mode }) => {
   // 환경변수를 빌드 타임에 주입
   define,
   plugins: [
-    react({
-      // CSS 파일이 제대로 처리되도록 설정
-      include: /\.(jsx|tsx|js|ts)$/,
-    }),
+    react(),
     excludeServerCode(),
     // React 청크 강제 분리 플러그인
     enforceReactChunk(),
@@ -372,8 +369,10 @@ export default defineConfig(({ mode }) => {
   },
   build: {
     outDir: 'dist',
-    // CSS 코드 스플리팅 활성화 (기본값이지만 명시적으로 설정)
-    cssCodeSplit: false, // CSS를 하나의 파일로 합쳐서 모든 페이지에서 로드되도록
+    // CSS 코드 스플리팅 설정
+    // true: CSS를 청크별로 분리 (기본값, 각 청크와 함께 로드되어 타이밍 문제 방지)
+    // false: CSS를 하나의 파일로 합침 (CSS 로딩 타이밍 문제 발생 가능)
+    cssCodeSplit: true, // 기본값으로 복원 - CSS가 각 청크와 함께 로드되도록
     // CSS 파일을 별도 파일로 추출
     cssMinify: true,
     // CSS 파일이 제대로 포함되도록 명시적으로 설정
@@ -410,6 +409,13 @@ export default defineConfig(({ mode }) => {
         },
         // 청크 간 의존성 순서 보장
         entryFileNames: 'assets/[name]-[hash].js',
+        // CSS 파일 이름 설정 (명시적으로 설정하여 로딩 순서 보장)
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name && assetInfo.name.endsWith('.css')) {
+            return 'assets/style-[hash][extname]';
+          }
+          return 'assets/[name]-[hash][extname]';
+        },
         manualChunks: (id) => {
           // CommonJS 모듈 쿼리 파라미터 제거 (정규화)
           // Windows와 Unix 경로 모두 처리
