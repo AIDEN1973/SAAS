@@ -5,8 +5,7 @@ import { ModalProvider, AILayerMenuProvider } from '@ui-core/react';
 // Atlaskit v21에서는 ThemeProvider가 필요 없습니다. 기본 테마가 자동 적용됩니다.
 import App from './App';
 // 전역 스타일은 @ui-core/react에서 중앙 관리
-// 프로덕션 빌드에서 CSS가 제대로 포함되도록 직접 경로 사용
-import '../../../packages/ui-core/src/styles.css';
+import '@ui-core/react/styles';
 // academy-admin 앱 전용 스타일 (스크롤바 숨김 등 pseudo selector 필요 시)
 import './index.css';
 import { checkSupabaseUrl, checkEnvVariables } from './utils/checkSupabaseUrl';

@@ -276,7 +276,10 @@ export default defineConfig(({ mode }) => {
   // 환경변수를 빌드 타임에 주입
   define,
   plugins: [
-    react(),
+    react({
+      // CSS 파일이 제대로 처리되도록 설정
+      include: /\.(jsx|tsx|js|ts)$/,
+    }),
     excludeServerCode(),
     // React 청크 강제 분리 플러그인
     enforceReactChunk(),
@@ -288,6 +291,14 @@ export default defineConfig(({ mode }) => {
       brotliSize: true,
     })] : []),
   ],
+  css: {
+    // CSS 파일이 제대로 처리되도록 설정
+    devSourcemap: true,
+    // CSS 모듈 처리
+    modules: {
+      localsConvention: 'camelCase',
+    },
+  },
   optimizeDeps: {
     exclude: [
       // 서버 전용 코드는 클라이언트 번들에서 제외
@@ -362,9 +373,11 @@ export default defineConfig(({ mode }) => {
   build: {
     outDir: 'dist',
     // CSS 코드 스플리팅 활성화 (기본값이지만 명시적으로 설정)
-    cssCodeSplit: true,
+    cssCodeSplit: false, // CSS를 하나의 파일로 합쳐서 모든 페이지에서 로드되도록
     // CSS 파일을 별도 파일로 추출
     cssMinify: true,
+    // CSS 파일이 제대로 포함되도록 명시적으로 설정
+    assetsInlineLimit: 0, // CSS를 인라인하지 않고 별도 파일로 유지
     commonjsOptions: {
       // 순환 의존성 문제 해결을 위한 설정
       include: [/node_modules/],
