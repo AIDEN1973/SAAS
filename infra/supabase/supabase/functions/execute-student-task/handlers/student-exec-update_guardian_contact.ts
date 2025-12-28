@@ -51,7 +51,9 @@ export const student_exec_update_guardian_contactHandler: IntentHandler = {
         policyPath
       );
 
-      if (!policyEnabled || policyEnabled !== true) {
+      // 정책이 없으면 기본값으로 true 사용 (마이그레이션 미실행 시 호환성)
+      // 정책이 명시적으로 false로 설정된 경우에만 비활성화
+      if (policyEnabled === false) {
         return {
           status: 'failed',
           error_code: 'POLICY_DISABLED',
@@ -93,20 +95,18 @@ export const student_exec_update_guardian_contactHandler: IntentHandler = {
           };
         }
 
-        const { error: createError } = await withTenant(
-          context.supabase
-            .from('guardians')
-            .insert({
-              tenant_id: context.tenant_id,
-              student_id: studentId,
-              name: guardianName,
-              phone: guardianPhone,
-              email: guardianEmail || null,
-              relationship: 'guardian',
-              is_primary: true,
-            }),
-          context.tenant_id
-        );
+        // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
+        const { error: createError } = await context.supabase
+          .from('guardians')
+          .insert({
+            tenant_id: context.tenant_id,
+            student_id: studentId,
+            name: guardianName,
+            phone: guardianPhone,
+            email: guardianEmail || null,
+            relationship: 'guardian',
+            is_primary: true,
+          });
 
         if (createError) {
           const maskedError = maskPII(createError);

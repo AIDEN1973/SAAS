@@ -18,9 +18,17 @@ import { intentRegistry } from '../_shared/intent-registry.ts';
 import { maskPII } from '../_shared/pii-utils.ts';
 import { getL0Handler, hasL0Handler } from '../_shared/l0-handlers.ts';
 import { getTenantSettingByPath } from '../_shared/policy-utils.ts';
-import { createTaskCardWithDedup } from '../_shared/create-task-card-with-dedup.ts';
 import { withTenant } from '../_shared/withTenant.ts';
 import { toKSTDate } from '../_shared/date-utils.ts';
+import { computeMissingRequired } from '../_shared/compute-missing-required.ts';
+import { assertAutomationEventType } from '../_shared/automation-event-catalog.ts';
+import type { SuggestedActionChatOpsPlanV1 } from '../execute-student-task/handlers/types.ts';
+import { ContractErrorCategory } from '../execute-student-task/handlers/types.ts';
+import { shouldUseWorker, createJob } from '../_shared/job-utils.ts';
+import { runAllPreflightChecks, type HealthCheckResult } from '../execute-student-task/handlers/system-exec-run_healthcheck.ts';
+import { getTenantTableName } from '../_shared/industry-adapter.ts';
+import { createExecutionAuditRecord } from '../_shared/execution-audit-utils.ts';
+import { normalizeParams as normalizeParamsShared } from '../_shared/normalize-params.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,7 +37,11 @@ const corsHeaders = {
 };
 
 interface ChatOpsRequest {
+  session_id: string;
   message: string;
+  action?: 'message' | 'draft_apply' | 'draft_confirm' | 'draft_cancel'; // 기본값: 'message'
+  draft_id?: string; // draft_apply/confirm/cancel 시 필요
+  draft_params?: Record<string, unknown>; // draft_apply 시 파라미터 업데이트
 }
 
 interface ChatOpsResponse {
@@ -41,12 +53,186 @@ interface ChatOpsResponse {
     params?: Record<string, unknown>;
   };
   l0_result?: unknown; // L0 Intent 실행 결과
-  task_card_id?: string; // L1/L2 Intent의 경우 생성된 TaskCard ID
+  original_message?: string; // 원본 사용자 메시지 (필터링용)
+  // Draft 관련 필드 (Inline Execution)
+  draft_id?: string;
+  draft_status?: 'collecting' | 'ready' | 'executed' | 'cancelled';
+  missing_required?: string[];
+  next_question?: string; // 다음 질문 템플릿
+  summary?: string; // ready 상태일 때 실행 요약
+  confirm_required?: boolean; // 확인 필요 여부
+}
+
+/**
+ * Intent 후보 추출 (Resolver 구조: 후보→선택)
+ *
+ * Registry의 examples 필드와 키워드를 기반으로 사용자 메시지와 유사한 Intent 후보를 추출합니다.
+ * 이 함수는 나중에 임베딩 기반 검색으로 교체 가능하도록 구조를 고정합니다.
+ *
+ * @param message 사용자 메시지
+ * @param maxCandidates 최대 후보 수 (기본값: 10)
+ * @returns Intent 후보 목록 (intent_key, score, reason)
+ */
+function extractIntentCandidates(
+  message: string,
+  maxCandidates: number = 10
+): Array<{ intent_key: string; score: number; reason: string }> {
+  const lowerMessage = message.toLowerCase();
+  const candidates: Array<{ intent_key: string; score: number; reason: string }> = [];
+
+  // Registry의 모든 Intent를 순회하며 유사도 계산
+  for (const [intentKey, intent] of Object.entries(intentRegistry)) {
+    let score = 0;
+    const reasons: string[] = [];
+
+    // 1. examples 필드 기반 매칭 (가장 높은 가중치)
+    let hasExampleMatch = false;
+    let bestExampleScore = 0;
+    if (intent.examples && intent.examples.length > 0) {
+      for (const example of intent.examples) {
+        const lowerExample = example.toLowerCase();
+        let exampleScore = 0;
+
+        // 정확히 일치 (최고 점수)
+        if (lowerMessage === lowerExample) {
+          exampleScore = 30; // 점수 증가
+          hasExampleMatch = true;
+          reasons.push(`예시 정확 일치: "${example}"`);
+        }
+        // 부분 일치 (최소 길이 요구사항 추가)
+        else if (lowerExample.length >= 5 && (lowerMessage.includes(lowerExample) || lowerExample.includes(lowerMessage))) {
+          // 부분 일치 시 길이 비율에 따라 점수 조정
+          const overlapRatio = Math.min(lowerMessage.length, lowerExample.length) / Math.max(lowerMessage.length, lowerExample.length);
+          if (overlapRatio >= 0.7) { // 60% -> 70%로 강화
+            exampleScore = Math.floor(12 * overlapRatio); // 8 -> 12로 증가
+            hasExampleMatch = true;
+            reasons.push(`예시 부분 일치: "${example}" (${Math.floor(overlapRatio * 100)}%)`);
+          }
+        }
+        // 키워드 일치 (최소 2개 이상 키워드 매칭 요구, 중요 키워드 가중치)
+        else {
+          const exampleWords = lowerExample.split(/\s+/).filter(w => w.length >= 2);
+          const matchedWords = exampleWords.filter(word => lowerMessage.includes(word));
+
+          // 중요 키워드 확인 (도메인 특화 키워드)
+          const importantKeywords = ['지각', '결석', '출석', '출결', '연체', '미납', '프로필', '검색'];
+          const matchedImportant = matchedWords.filter(w => importantKeywords.some(kw => w.includes(kw) || kw.includes(w)));
+
+          if (matchedWords.length >= 2) {
+            // 중요 키워드가 매칭되면 추가 점수
+            const baseScore = matchedWords.length * 2;
+            const importantBonus = matchedImportant.length * 3;
+            exampleScore = baseScore + importantBonus;
+            hasExampleMatch = true;
+            reasons.push(`예시 키워드 일치: ${matchedWords.join(', ')}${matchedImportant.length > 0 ? ` (중요 키워드: ${matchedImportant.join(', ')})` : ''}`);
+          }
+        }
+
+        // 최고 점수 업데이트 (여러 examples 중 최고 점수만 사용)
+        if (exampleScore > bestExampleScore) {
+          bestExampleScore = exampleScore;
+        }
+      }
+
+      // 최고 점수만 추가 (중복 점수 방지)
+      score += bestExampleScore;
+    }
+
+    // 2. description 기반 매칭 (examples 매칭이 없을 때만 높은 점수)
+    if (intent.description) {
+      const lowerDesc = intent.description.toLowerCase();
+      if (lowerMessage.includes(lowerDesc)) {
+        if (hasExampleMatch) {
+          score += 1; // examples가 있으면 낮은 점수
+        } else {
+          score += 5; // examples가 없으면 높은 점수
+        }
+        reasons.push(`설명 일치: "${intent.description}"`);
+      }
+    }
+
+    // 3. intent_key 기반 키워드 매칭 (도메인/타입/액션)
+    const parts = intentKey.split('.');
+    if (parts.length === 3) {
+      const [domain, type, action] = parts;
+
+      // 도메인 키워드
+      const domainKeywords: Record<string, string[]> = {
+        'student': ['학생', '대상', '회원', '원생', '수강생'],
+        'attendance': ['출결', '출석', '지각', '결석', '조퇴', '나온', '안온', '불참'],
+        'billing': ['수납', '청구', '결제', '납부', '연체', '환불', '미납', '미결제', '돈', '요금', '비용'],
+        'message': ['문자', '메시지', '알림', '공지'],
+        'class': ['반', '수업', '클래스'],
+        'schedule': ['일정', '스케줄', '시간표'],
+        'report': ['리포트', '보고서', '요약', '현황'],
+      };
+
+      const domainKw = domainKeywords[domain] || [];
+      if (domainKw.some(kw => lowerMessage.includes(kw))) {
+        if (hasExampleMatch) {
+          score += 1; // examples가 있으면 낮은 점수
+        } else {
+          score += 2; // examples가 없으면 기본 점수
+        }
+        reasons.push(`도메인 키워드: ${domain}`);
+      }
+
+      // 타입 키워드 (query 타입에 더 높은 가중치)
+      const typeKeywords: Record<string, string[]> = {
+        'query': ['조회', '검색', '찾기', '확인', '보기', '보여줘', '보여주세요', '애들', '목록', '리스트', '현황'],
+        'exec': ['실행', '처리', '해', '시켜', '하기', '해줘', '해주세요'],
+        'task': ['업무', '작업', '태스크'],
+        'draft': ['초안', '작성', '만들기'],
+      };
+
+      const typeKw = typeKeywords[type] || [];
+      const matchedTypeKw = typeKw.filter(kw => lowerMessage.includes(kw));
+      if (matchedTypeKw.length > 0) {
+        if (hasExampleMatch) {
+          score += 0.5; // examples가 있으면 매우 낮은 점수
+        } else {
+          // query 타입은 더 높은 점수 (조회 의도가 명확)
+          const typeScore = type === 'query' ? 2 : 1;
+          score += typeScore;
+        }
+        reasons.push(`타입 키워드: ${type} (${matchedTypeKw.join(', ')})`);
+      }
+    }
+
+    // 4. INTENT_KEYWORD_MAP 기반 매칭 (하위 호환성, examples가 없을 때만 높은 점수)
+    const keywordMap = INTENT_KEYWORD_MAP[intentKey];
+    if (keywordMap) {
+      for (const keyword of keywordMap) {
+        if (lowerMessage.includes(keyword.toLowerCase())) {
+          if (hasExampleMatch) {
+            score += 1; // examples가 있으면 낮은 점수
+          } else {
+            score += 2; // examples가 없으면 기본 점수
+          }
+          reasons.push(`키워드 매핑: "${keyword}"`);
+        }
+      }
+    }
+
+    // 점수가 0보다 크면 후보에 추가
+    if (score > 0) {
+      candidates.push({
+        intent_key: intentKey,
+        score,
+        reason: reasons.join('; '),
+      });
+    }
+  }
+
+  // 점수 내림차순 정렬 후 상위 N개 반환
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates.slice(0, maxCandidates);
 }
 
 /**
  * Intent 키워드 매핑 (Fallback용)
  * Intent Registry의 intent_key를 기반으로 키워드 매핑을 생성합니다.
+ * ⚠️ 주의: 이 매핑은 하위 호환성을 위해 유지되지만, Registry의 examples 필드를 우선 사용합니다.
  */
 const INTENT_KEYWORD_MAP: Record<string, string[]> = {
   // Student 도메인
@@ -72,7 +258,19 @@ const INTENT_KEYWORD_MAP: Record<string, string[]> = {
   'attendance.exec.mark_excused': ['사유 처리', '사유 인정', '사유 체크'],
 
   // Billing 도메인
-  'billing.query.overdue_list': ['연체', '연체자', '연체 목록', '미납', '미납자'],
+  'billing.query.overdue_list': [
+    // 기본 키워드
+    '연체', '연체자', '연체 목록', '미납', '미납자',
+    // 동의어/유의어 확장
+    '돈 안낸', '돈 안낸 사람', '돈 안낸 학생', '돈 안낸 사람들',
+    '납부 안한', '납부 안한 사람', '납부 안한 학생', '납부 안한 사람들',
+    '결제 안한', '결제 안한 사람', '결제 안한 학생', '결제 안한 사람들',
+    '미결제', '미결제자', '미결제 학생', '미결제자 목록',
+    '미납자 목록', '연체자 목록', '미납 학생', '미납 학생들',
+    '안낸 사람', '안낸 학생', '안낸 사람들',
+    '미납 대상', '연체 대상', '미납 회원', '연체 회원',
+    '납부 안된', '결제 안된', '미납된', '연체된',
+  ],
   'billing.query.overdue_month': ['월별 연체', '월 연체', '연체 월별'],
   'billing.query.by_student': ['청구', '수납', '청구 조회', '수납 조회', '납부'],
   'billing.query.invoice_status': ['청구서', '인보이스', '청구서 상태', '인보이스 상태'],
@@ -193,9 +391,9 @@ function inferIntentFromMessage(message: string): ChatOpsResponse['intent'] | un
 
       // 도메인 키워드 매핑
       const domainKeywords: Record<string, string[]> = {
-        'student': ['학생', '대상', '회원', '원생'],
-        'attendance': ['출결', '출석', '지각', '결석', '조퇴'],
-        'billing': ['수납', '청구', '결제', '납부', '연체', '환불'],
+        'student': ['학생', '대상', '회원', '원생', '수강생'],
+        'attendance': ['출결', '출석', '지각', '결석', '조퇴', '나온', '안온', '불참'],
+        'billing': ['수납', '청구', '결제', '납부', '연체', '환불', '미납', '미결제', '돈', '요금', '비용'],
         'message': ['문자', '메시지', '알림', '공지'],
         'class': ['반', '수업', '클래스'],
         'schedule': ['일정', '스케줄', '시간표'],
@@ -216,11 +414,11 @@ function inferIntentFromMessage(message: string): ChatOpsResponse['intent'] | un
         'pause': ['휴원'],
         'resume': ['재개', '복학'],
         'register': ['등록'],
-        'late': ['지각'],
-        'absent': ['결석'],
-        'overdue': ['연체'],
-        'invoice': ['청구서', '인보이스'],
-        'payment': ['결제', '납부'],
+        'late': ['지각', '늦은', '늦게 온'],
+        'absent': ['결석', '안온', '안나온', '불참'],
+        'overdue': ['연체', '미납', '돈 안낸', '납부 안한', '결제 안한', '미결제'],
+        'invoice': ['청구서', '인보이스', '납부서', '계산서'],
+        'payment': ['결제', '납부', '입금', '수납'],
       };
 
       const domainKw = domainKeywords[domain] || [];
@@ -255,114 +453,7 @@ function inferIntentFromMessage(message: string): ChatOpsResponse['intent'] | un
   return undefined;
 }
 
-/**
- * 파라미터 정규화 (범용)
- *
- * AI가 추출한 파라미터를 Handler가 기대하는 형식으로 변환합니다.
- * - name → student_id (학생 이름으로 조회)
- * - class_name → class_id (반 이름으로 조회)
- * - 기타 일반적인 변환 규칙 적용
- *
- * 이 함수는 모든 Intent에 일관되게 적용되며, 케이스별 로직을 피합니다.
- */
-async function normalizeParams(
-  params: Record<string, unknown>,
-  intentKey: string,
-  supabase: any,
-  tenantId: string
-): Promise<Record<string, unknown>> {
-  const normalized = { ...params };
-
-  // student_id가 없고 name이 있는 경우: name으로 student_id 조회
-  if (!normalized.student_id && normalized.name && typeof normalized.name === 'string') {
-    const studentName = normalized.name;
-    try {
-      // ⚠️ 중요: withTenant를 사용하여 tenant_id 필터링 필수
-      const { data: persons, error: searchError } = await withTenant(
-        supabase
-          .from('persons')
-          .select('id, name')
-          .eq('name', studentName)
-          .eq('person_type', 'student')
-          .limit(1),
-        tenantId
-      );
-
-      if (!searchError && persons && persons.length > 0) {
-        normalized.student_id = persons[0].id;
-        console.log('[ChatOps:Normalize] name → student_id 변환 성공:', {
-          name: maskPII(studentName),
-          student_id: persons[0].id.substring(0, 8) + '...',
-        });
-        // name은 제거하지 않음 (Handler가 필요할 수 있음)
-      } else {
-        console.log('[ChatOps:Normalize] name → student_id 변환 실패:', {
-          name: maskPII(studentName),
-          error: searchError ? maskPII(searchError) : '학생을 찾을 수 없음',
-        });
-      }
-    } catch (error) {
-      const maskedError = maskPII(error);
-      console.log('[ChatOps:Normalize] name → student_id 변환 중 오류:', maskedError);
-    }
-  }
-
-  // class_id가 없고 class_name이 있는 경우: class_name으로 class_id 조회
-  if (!normalized.class_id && normalized.class_name && typeof normalized.class_name === 'string') {
-    const className = normalized.class_name;
-    try {
-      // ⚠️ 중요: withTenant를 사용하여 tenant_id 필터링 필수
-      const { data: classes, error: searchError } = await withTenant(
-        supabase
-          .from('academy_classes')
-          .select('id, name')
-          .eq('name', className)
-          .limit(1),
-        tenantId
-      );
-
-      if (!searchError && classes && classes.length > 0) {
-        normalized.class_id = classes[0].id;
-        console.log('[ChatOps:Normalize] class_name → class_id 변환 성공:', {
-          class_name: className,
-          class_id: classes[0].id.substring(0, 8) + '...',
-        });
-      } else {
-        console.log('[ChatOps:Normalize] class_name → class_id 변환 실패:', {
-          class_name: className,
-          error: searchError ? maskPII(searchError) : '반을 찾을 수 없음',
-        });
-      }
-    } catch (error) {
-      const maskedError = maskPII(error);
-      console.log('[ChatOps:Normalize] class_name → class_id 변환 중 오류:', maskedError);
-    }
-  }
-
-  // 날짜 형식 정규화 (YYYY-MM-DD)
-  // ⚠️ P1: 날짜 처리 - toKSTDate() 사용 (체크리스트 준수)
-  if (normalized.date && typeof normalized.date === 'string') {
-    // 이미 YYYY-MM-DD 형식인지 확인
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(normalized.date)) {
-      try {
-        const date = new Date(normalized.date);
-        if (!isNaN(date.getTime())) {
-          // ⚠️ P1: toISOString().split('T')[0] 직접 사용 금지, toKSTDate() 사용
-          normalized.date = toKSTDate(date);
-          console.log('[ChatOps:Normalize] 날짜 형식 정규화:', {
-            original: normalized.date,
-            normalized: normalized.date,
-          });
-        }
-      } catch (error) {
-        // 날짜 파싱 실패는 무시
-      }
-    }
-  }
-
-  return normalized;
-}
+// normalizeParams는 _shared/normalize-params.ts로 이동됨
 
 /**
  * JWT에서 tenant_id 추출
@@ -401,6 +492,82 @@ function extractTenantIdFromJWT(authHeader: string | null): string | null {
     console.error('[ChatOps] JWT parsing error:', maskedError);
     return null;
   }
+}
+
+/**
+ * Preflight 검증 캐시 (모듈 레벨)
+ * 붕괴사전예방.md Layer C 참조: 부팅 시 자동 Preflight 검증
+ * Edge Function 특성상 첫 요청 시 검증 + 캐싱 방식
+ */
+let preflightCache: HealthCheckResult | null = null;
+let preflightCacheTime = 0;
+const PREFLIGHT_CACHE_TTL = 5 * 60 * 1000; // 5분
+
+/**
+ * Preflight 검증 실행 또는 캐시 반환
+ * 붕괴사전예방.md Layer C 참조
+ */
+async function getOrRunPreflight(
+  supabase: any,
+  tenantId: string
+): Promise<HealthCheckResult> {
+  const now = Date.now();
+
+  // 캐시가 유효하면 반환
+  if (preflightCache && (now - preflightCacheTime) < PREFLIGHT_CACHE_TTL) {
+    console.log('[ChatOps] Preflight 검증 캐시 사용');
+    return preflightCache;
+  }
+
+  // 캐시가 없거나 만료되었으면 검증 실행
+  console.log('[ChatOps] Preflight 검증 실행 (캐시 없음 또는 만료)');
+  const result = await runAllPreflightChecks(supabase, tenantId);
+
+  // 캐시 업데이트
+  preflightCache = result;
+  preflightCacheTime = now;
+
+  // 검증 실패 시 로그
+  if (result.status === 'unhealthy') {
+    console.error('[ChatOps] Preflight 검증 실패 (unhealthy):', {
+      layer_a: result.layer_a,
+      layer_b: result.layer_b,
+      layer_c: result.layer_c,
+    });
+  } else if (result.status === 'degraded') {
+    console.warn('[ChatOps] Preflight 검증 경고 (degraded):', {
+      layer_c: result.layer_c,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * ChatOps 실행 가능 여부 확인 (Preflight 기반)
+ * 붕괴사전예방.md 7. Preflight 실패 시 시스템 행동 규칙 참조
+ */
+function isChatOpsEnabled(preflightResult: HealthCheckResult): boolean {
+  // DB 계약 실패 시 ChatOps 전체 비활성화
+  if (preflightResult.status === 'unhealthy') {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * L2 실행 가능 여부 확인 (Preflight 기반)
+ * 붕괴사전예방.md 7. Preflight 실패 시 시스템 행동 규칙 참조
+ */
+function isL2ExecutionEnabled(preflightResult: HealthCheckResult): boolean {
+  // DB 계약 실패 또는 Policy Registry 실패 시 L2 실행 차단
+  if (preflightResult.status === 'unhealthy') {
+    return false;
+  }
+  if (preflightResult.status === 'degraded' && !preflightResult.layer_c?.policy_registry_accessible) {
+    return false;
+  }
+  return true;
 }
 
 serve(async (req) => {
@@ -455,7 +622,18 @@ serve(async (req) => {
       );
     }
 
-    const { message } = requestBody;
+    let { session_id, message, action = 'message', draft_id, draft_params } = requestBody;
+
+    if (!session_id || typeof session_id !== 'string' || session_id.trim().length === 0) {
+      console.error('[ChatOps] session_id is missing or empty');
+      return new Response(
+        JSON.stringify({ error: 'session_id가 필요합니다.' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
       console.error('[ChatOps] message is missing or empty');
@@ -471,6 +649,7 @@ serve(async (req) => {
     // P0: PII 마스킹 필수
     console.log('[ChatOps] ===== 작업 시작 =====');
     console.log('[ChatOps] 사용자 메시지 수신:', {
+      session_id: session_id.substring(0, 8) + '...',
       message_preview: maskPII(message.substring(0, 100)),
       message_length: message.length,
       tenant_id: tenant_id ? 'present' : 'missing',
@@ -478,6 +657,153 @@ serve(async (req) => {
 
     // Supabase 클라이언트 생성
     const supabase = createClient(envServer.SUPABASE_URL, envServer.SERVICE_ROLE_KEY);
+
+    // ⚠️ P0: 부팅 시 자동 Preflight 검증 (첫 요청 시 검증 + 캐싱)
+    // 붕괴사전예방.md Layer C 참조
+    const preflightResult = await getOrRunPreflight(supabase, tenant_id);
+
+    // ChatOps 실행 가능 여부 확인
+    if (!isChatOpsEnabled(preflightResult)) {
+      console.error('[ChatOps] Preflight 검증 실패로 ChatOps 전체 비활성화');
+      return new Response(
+        JSON.stringify({
+          error: 'SYSTEM_UNHEALTHY',
+          message: '시스템 헬스체크 실패로 ChatOps 기능이 비활성화되었습니다. 관리자에게 문의하세요.',
+          health_status: preflightResult,
+        }),
+        {
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // JWT에서 user_id 추출
+    let user_id = 'system'; // 기본값
+    try {
+      if (authHeader) {
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user } } = await supabase.auth.getUser(token);
+        if (user) {
+          user_id = user.id;
+        }
+      }
+    } catch (userError) {
+      // user_id 추출 실패는 치명적 오류가 아니므로 기본값 사용
+      console.log('[ChatOps] Failed to extract user_id from JWT, using default');
+    }
+
+    // ⚠️ 중요: action이 'message'이고 메시지가 실행 확인 키워드를 포함하면
+    // 자동으로 'draft_confirm'으로 변환 (사용자가 "실행해", "확인" 등으로 답변한 경우)
+    if (action === 'message') {
+      const confirmKeywords = ['실행해', '실행', '등록', '확인', '네', '예', 'ok', 'yes', 'go', '진행'];
+      const normalizedMessage = message.trim().toLowerCase();
+      const isConfirmMessage = confirmKeywords.some(keyword =>
+        normalizedMessage.includes(keyword.toLowerCase())
+      );
+
+      if (isConfirmMessage) {
+        // 기존 ready 상태의 draft 조회
+        const { data: existingDraft } = await supabase
+          .from('chatops_drafts')
+          .select('id')
+          .eq('session_id', session_id)
+          .eq('tenant_id', tenant_id)
+          .eq('user_id', user_id)
+          .eq('status', 'ready')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existingDraft) {
+          action = 'draft_confirm';
+          draft_id = existingDraft.id;
+          console.log('[ChatOps] 자동으로 draft_confirm 액션으로 전환 (실행 확인 키워드 감지):', {
+            message: message,
+            draft_id: draft_id,
+          });
+        }
+      }
+    }
+
+    // 세션 조회 또는 생성
+    let session: { id: string; summary?: string | null; updated_at?: string } | null = null;
+    try {
+      const { data: existingSession, error: sessionError } = await supabase
+        .from('chatops_sessions')
+        .select('id, summary, updated_at')
+        .eq('id', session_id)
+        .eq('tenant_id', tenant_id)
+        .eq('user_id', user_id)
+        .maybeSingle();
+
+      if (sessionError && sessionError.code !== 'PGRST116') { // PGRST116 = not found
+        throw sessionError;
+      }
+
+      if (existingSession) {
+        session = existingSession;
+        console.log('[ChatOps] 기존 세션 조회 성공:', {
+          session_id: session_id.substring(0, 8) + '...',
+          has_summary: !!(session?.summary),
+        });
+      } else {
+        // 새 세션 생성
+        const { data: newSession, error: createError } = await supabase
+          .from('chatops_sessions')
+          .insert({
+            id: session_id,
+            tenant_id: tenant_id,
+            user_id: user_id,
+            summary: null,
+          })
+          .select('id, summary, updated_at')
+          .single();
+
+        if (createError) {
+          throw createError;
+        }
+
+        session = newSession;
+        console.log('[ChatOps] 새 세션 생성 성공:', {
+          session_id: session_id.substring(0, 8) + '...',
+        });
+      }
+    } catch (sessionError) {
+      const maskedError = maskPII(sessionError);
+      console.error('[ChatOps] 세션 조회/생성 실패:', maskedError);
+      // 세션 오류는 치명적이지 않으므로 계속 진행 (기본 동작)
+    }
+
+    // 최근 메시지 조회 (기본 N=16)
+    const HISTORY_WINDOW = 16;
+    let recentMessages: Array<{ role: string; content: string }> = [];
+    try {
+      const { data: messages, error: messagesError } = await supabase
+        .from('chatops_messages')
+        .select('role, content')
+        .eq('session_id', session_id)
+        .eq('tenant_id', tenant_id)
+        .eq('user_id', user_id)
+        .order('created_at', { ascending: false })
+        .limit(HISTORY_WINDOW);
+
+      if (messagesError) {
+        throw messagesError;
+      }
+
+      if (messages && messages.length > 0) {
+        // 시간 역순으로 정렬되어 있으므로 뒤집어서 시간 순서대로 만듦
+        recentMessages = messages.reverse();
+        console.log('[ChatOps] 최근 메시지 조회 성공:', {
+          count: recentMessages.length,
+        });
+      }
+    } catch (messagesError) {
+      const maskedError = maskPII(messagesError);
+      console.error('[ChatOps] 최근 메시지 조회 실패:', maskedError);
+      // 메시지 조회 실패는 치명적이지 않으므로 계속 진행
+    }
 
     // AI 기능 온오프 체크 (SSOT 기준, Fail Closed)
     if (!(await shouldUseAI(supabase, tenant_id))) {
@@ -507,10 +833,966 @@ serve(async (req) => {
       );
     }
 
+    // Draft apply 액션 처리 (파라미터 업데이트)
+    if (action === 'draft_apply') {
+      if (!draft_id) {
+        return new Response(
+          JSON.stringify({ error: 'draft_id가 필요합니다.' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      if (!draft_params || typeof draft_params !== 'object') {
+        return new Response(
+          JSON.stringify({ error: 'draft_params가 필요합니다.' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Draft 조회
+      const { data: draft, error: draftError } = await supabase
+        .from('chatops_drafts')
+        .select('*')
+        .eq('id', draft_id)
+        .eq('tenant_id', tenant_id)
+        .eq('user_id', user_id)
+        .in('status', ['collecting', 'ready'])
+        .single();
+
+      if (draftError || !draft) {
+        return new Response(
+          JSON.stringify({ error: 'Draft를 찾을 수 없거나 업데이트할 수 없는 상태입니다.' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Draft 파라미터 병합
+      const updatedParams = {
+        ...(draft.draft_params || {}),
+        ...draft_params,
+      };
+
+      // Inline Execution으로 파라미터 업데이트 처리
+      const intent = intentRegistry[draft.intent_key];
+      if (!intent) {
+        return new Response(
+          JSON.stringify({ error: 'Intent를 찾을 수 없습니다.' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      try {
+        const { processInlineExecution } = await import('../_shared/inline-execution.ts');
+        const inlineResult = await processInlineExecution(
+          supabase,
+          session_id,
+          tenant_id,
+          user_id,
+          intent,
+          updatedParams,
+          'apply'
+        );
+
+        return new Response(
+          JSON.stringify({
+            response: inlineResult.response || '파라미터가 업데이트되었습니다.',
+            draft_id: inlineResult.draft_id,
+            draft_status: inlineResult.draft_status,
+            missing_required: inlineResult.missing_required,
+            next_question: inlineResult.next_question,
+            summary: inlineResult.summary,
+            confirm_required: inlineResult.confirm_required,
+            intent: {
+              intent_key: draft.intent_key,
+              automation_level: intent.automation_level,
+              ...(intent.execution_class && { execution_class: intent.execution_class }),
+            },
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (applyError) {
+        const maskedError = maskPII(applyError);
+        console.error('[ChatOps] Draft apply error:', maskedError);
+        return new Response(
+          JSON.stringify({
+            error: '파라미터 업데이트 중 오류가 발생했습니다.',
+            details: maskedError,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
+    // Draft confirm/cancel 액션 처리 (Inline Execution)
+    if (action === 'draft_confirm' || action === 'draft_cancel') {
+      if (!draft_id) {
+        return new Response(
+          JSON.stringify({ error: 'draft_id가 필요합니다.' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Draft 조회 (resolve_snapshot 포함)
+      // ChatOps_계약_붕괴_방지_체계_분석.md 3.3 참조: 세션 혼선 방지
+      const { data: draft, error: draftError } = await supabase
+        .from('chatops_drafts')
+        .select('*, session_id, resolve_snapshot')
+        .eq('id', draft_id)
+        .eq('tenant_id', tenant_id)
+        .eq('user_id', user_id)
+        .eq('status', 'ready')
+        .single();
+
+      if (draftError || !draft) {
+        return new Response(
+          JSON.stringify({ error: 'Draft를 찾을 수 없거나 실행 준비 상태가 아닙니다.' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // ⚠️ 세션 일치 검증 추가 (CONTRACT_SESSION_MISMATCH)
+      // ChatOps_계약_붕괴_방지_체계_분석.md 3.3 참조
+      if (draft.session_id !== session_id) {
+        return new Response(
+          JSON.stringify({
+            error: 'CONTRACT_SESSION_MISMATCH',
+            message: 'Draft 세션이 일치하지 않습니다. 다른 세션의 draft를 실행할 수 없습니다.',
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (action === 'draft_cancel') {
+        // Draft 취소
+        await supabase
+          .from('chatops_drafts')
+          .update({ status: 'cancelled' })
+          .eq('id', draft_id);
+        return new Response(
+          JSON.stringify({
+            response: '등록이 취소되었습니다.',
+            draft_id: draft_id,
+            draft_status: 'cancelled',
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // confirm: 실제 Handler 실행
+      const intent = intentRegistry[draft.intent_key];
+      // ⚠️ 모든 L1/L2 Intent는 Inline Execution으로 처리
+      const isInlineExecution = intent && (
+        intent.automation_level === 'L1' ||
+        intent.automation_level === 'L2'
+      );
+      if (!intent || !isInlineExecution) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid intent for inline execution' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Handler 실행 (execute-student-task의 Handler 사용)
+      try {
+        const { handlerRegistry } = await import('../execute-student-task/handlers/registry.ts');
+        const handler = handlerRegistry[draft.intent_key];
+        if (!handler) {
+          throw new Error(`Handler not found for ${draft.intent_key}`);
+        }
+
+        // ⚠️ 체크리스트 준수: Zod 검증 (Validate)
+        // Edge Function에서는 Zod를 직접 사용하기 어려우므로, Handler에서 검증하지만
+        // 여기서는 기본적인 타입 검증만 수행
+        let handlerParams = draft.draft_params;
+        if (draft.intent_key === 'student.exec.register' && handlerParams.form_values) {
+          // Handler는 plan.params를 직접 formValues로 사용하므로 form_values를 추출
+          handlerParams = handlerParams.form_values as Record<string, unknown>;
+
+          // 기본 검증: name 필수
+          if (!handlerParams.name || typeof handlerParams.name !== 'string' || handlerParams.name.trim() === '') {
+            return new Response(
+              JSON.stringify({ error: '학생 이름이 필요합니다.' }),
+              {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              }
+            );
+          }
+        }
+
+        // ⚠️ P0: Resolver Gate - 파라미터 정규화 (name → student_id 등)
+        // ChatOps_계약_붕괴_방지_체계_분석.md 2.2.2 참조: Query→ID 해소 없으면 Apply 진입 금지
+        try {
+          console.log('[ChatOps] 파라미터 정규화 시작:', {
+            intent_key: draft.intent_key,
+            params_keys: Object.keys(handlerParams),
+            has_name: !!handlerParams.name,
+            has_student_id: !!handlerParams.student_id,
+          });
+
+          handlerParams = await normalizeParamsShared(
+            handlerParams,
+            draft.intent_key,
+            supabase,
+            tenant_id
+          );
+
+          console.log('[ChatOps] 파라미터 정규화 완료:', {
+            has_student_id: !!handlerParams.student_id,
+            has_resolve_failed: !!handlerParams._resolve_failed,
+          });
+
+          // ⚠️ P0: Resolver Gate - Query→ID 해소 검증
+          // ChatOps_계약_붕괴_방지_체계_분석.md 2.2.2 참조: Query→ID 해소 없으면 Apply 진입 금지
+          if (handlerParams._resolve_failed) {
+            const resolveFailed = handlerParams._resolve_failed as { field: string; original_value: string; reason: string };
+            console.log('[ChatOps] Resolver Gate 실패:', {
+              field: resolveFailed.field,
+              original_value: maskPII(resolveFailed.original_value),
+              reason: resolveFailed.reason,
+            });
+            return new Response(
+              JSON.stringify({
+                error: 'CONTRACT_RESOLUTION_FAILED',
+                contract_category: ContractErrorCategory.CONTRACT_INPUT_TYPE,
+                message: `학생을 찾을 수 없습니다: "${maskPII(resolveFailed.original_value)}". 정확한 학생 이름을 입력해주세요.`,
+                missing_field: resolveFailed.field,
+                original_value: maskPII(resolveFailed.original_value),
+              }),
+              {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              }
+            );
+          }
+
+          // ⚠️ P0: Schema Gate - Apply 입력 스키마 강제 검증 게이트
+          // 붕괴사전예방.md Layer A 참조: Apply 입력 스키마 강제 검증
+          // UUID 필수 필드 검증 (student_id, class_id, teacher_id 등)
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          const uuidFields = ['student_id', 'class_id', 'teacher_id', 'person_id', 'user_id', 'invoice_id', 'session_id'];
+
+          for (const field of uuidFields) {
+            if (handlerParams[field] !== undefined && handlerParams[field] !== null) {
+              const value = handlerParams[field];
+              if (typeof value !== 'string' || !uuidRegex.test(value)) {
+                console.log('[ChatOps] Schema Gate 실패: 잘못된 UUID 형식:', {
+                  field,
+                  value: maskPII(String(value)),
+                });
+                return new Response(
+                  JSON.stringify({
+                    error: 'CONTRACT_INPUT_TYPE',
+                    contract_category: ContractErrorCategory.CONTRACT_INPUT_TYPE,
+                    message: `잘못된 ${field} 형식입니다. UUID 형식이어야 합니다.`,
+                    invalid_field: field,
+                    invalid_value: maskPII(String(value)),
+                  }),
+                  {
+                    status: 400,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  }
+                );
+              }
+            }
+          }
+
+          // student.exec.* Intent는 student_id 필수 검증
+          if (draft.intent_key.startsWith('student.exec.')) {
+            if (!handlerParams.student_id || typeof handlerParams.student_id !== 'string') {
+              console.log('[ChatOps] Schema Gate 실패: student_id 없음', {
+                intent_key: draft.intent_key,
+                params_keys: Object.keys(handlerParams),
+                has_name: !!handlerParams.name,
+              });
+              // name이 있었지만 student_id로 변환되지 않은 경우 더 구체적인 메시지 제공
+              const errorMessage = handlerParams.name
+                ? `학생 "${maskPII(String(handlerParams.name))}"을(를) 찾을 수 없습니다. 정확한 학생 이름을 입력해주세요.`
+                : '학생 정보가 필요합니다. 학생 이름을 입력해주세요.';
+              return new Response(
+                JSON.stringify({
+                  error: 'CONTRACT_RESOLUTION_FAILED',
+                  contract_category: ContractErrorCategory.CONTRACT_INPUT_TYPE,
+                  message: errorMessage,
+                  missing_field: 'student_id',
+                  ...(handlerParams.name && { provided_name: maskPII(String(handlerParams.name)) }),
+                }),
+                {
+                  status: 400,
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                }
+              );
+            }
+          }
+
+          // _resolve_failed 필드 제거 (Handler에 전달하지 않음)
+          delete handlerParams._resolve_failed;
+        } catch (normalizeError) {
+          const maskedError = maskPII(normalizeError);
+          console.error('[ChatOps] 파라미터 정규화 중 오류:', maskedError);
+          return new Response(
+            JSON.stringify({
+              error: 'CONTRACT_RESOLUTION_FAILED',
+              contract_category: ContractErrorCategory.CONTRACT_INPUT_TYPE,
+              message: '파라미터 정규화 중 오류가 발생했습니다.',
+            }),
+            {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        // ⚠️ 체크리스트 준수: 멱등성/중복 방지 (dedup_key) - Handler 실행 **전**에 체크
+        // dedup_key = sha256(tenant_id + intent_key + stableJson(params))
+        // 안정적인 JSON 직렬화를 위해 정렬된 키 사용
+        const stableParams = JSON.stringify(handlerParams, Object.keys(handlerParams).sort());
+        // Deno 환경에서는 crypto.subtle.digest 사용
+        const paramsHash = await crypto.subtle.digest(
+          'SHA-256',
+          new TextEncoder().encode(`${tenant_id}:${draft.intent_key}:${stableParams}`)
+        );
+        const hashArray = Array.from(new Uint8Array(paramsHash));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        const dedupKey = hashHex.substring(0, 64); // SHA-256은 64자리 hex
+
+        // ⚠️ 체크리스트 준수: 중복 실행 방지 체크 (Handler 실행 전)
+        // 기존 automation_actions 레코드 확인
+        const { data: existingAction, error: checkError } = await supabase
+          .from('automation_actions')
+          .select('id, result, executed_at')
+          .eq('tenant_id', tenant_id)
+          .eq('dedup_key', dedupKey)
+          .maybeSingle();
+
+        if (existingAction) {
+          // 중복 실행: 기존 결과 반환 (Handler 실행하지 않음)
+          console.log('[ChatOps] 중복 실행 감지, 기존 결과 반환:', {
+            existing_action_id: existingAction.id?.substring(0, 8) + '...',
+            executed_at: existingAction.executed_at,
+          });
+          // Draft 상태도 executed로 업데이트 (이미 실행된 것으로 간주)
+          await supabase
+            .from('chatops_drafts')
+            .update({ status: 'executed' })
+            .eq('id', draft_id);
+          return new Response(
+            JSON.stringify({
+              response: '이미 처리된 요청입니다.',
+              draft_id: draft_id,
+              draft_status: 'executed',
+              intent: {
+                intent_key: draft.intent_key,
+                automation_level: intent.automation_level,
+                ...(intent.execution_class && { execution_class: intent.execution_class }),
+              },
+              result: existingAction.result,
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        // ⚠️ 체크리스트 준수: L2-A Policy 체크 (execute-task-card와 동일한 로직)
+        // ChatOps_계약_붕괴_방지_체계_분석.md 2.2.3 참조: Policy 재평가
+        let policyEnabled: unknown = null;
+        let eventType: string | undefined;
+        // L2-A Intent는 event_type 필수
+        // Edge Function의 intentRegistry에는 event_type이 없으므로, Handler 내부에서 확인
+        // 일단 Handler 실행 시 plan.event_type을 확인하도록 함
+        // Handler는 plan.event_type을 사용하므로, plan 객체에 event_type을 추가해야 함
+        // 하지만 Edge Function의 intentRegistry에는 event_type이 없으므로, Handler 내부에서 확인하도록 함
+        if (intent.automation_level === 'L2' && intent.execution_class === 'A') {
+          // L2-A Intent는 event_type이 필요하지만, Edge Function의 intentRegistry에는 없음
+          // Handler 내부에서 plan.event_type을 확인하므로, 여기서는 Policy 체크를 하지 않음
+          // Handler 내부에서 Policy 체크를 수행함
+          eventType = undefined; // Handler 내부에서 확인
+          if (!eventType) {
+            return new Response(
+              JSON.stringify({
+                error: 'CONTRACT_INPUT_TYPE',
+                message: 'L2-A Intent는 event_type이 필요합니다.',
+              }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          // event_type 검증 (AUTOMATION_EVENT_CATALOG)
+          try {
+            assertAutomationEventType(eventType);
+          } catch (eventTypeError) {
+            const maskedError = maskPII(eventTypeError);
+            console.error('[ChatOps] Invalid event_type:', maskedError);
+            return new Response(
+              JSON.stringify({
+                error: 'CONTRACT_INPUT_TYPE',
+                message: `유효하지 않은 event_type입니다: ${eventType}`,
+              }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          // Policy 재평가 (Fail-Closed)
+          policyEnabled = await getTenantSettingByPath(
+            supabase,
+            tenant_id,
+            `auto_notification.${eventType}.enabled`
+          );
+
+          if (!policyEnabled || policyEnabled !== true) {
+            return new Response(
+              JSON.stringify({
+                error: 'CONTRACT_POLICY_DISABLED',
+                contract_category: ContractErrorCategory.CONTRACT_POLICY_DISABLED,
+                message: '실행 정책이 비활성화되어 있거나 존재하지 않습니다.',
+              }),
+              { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+
+        // Plan 객체 구성 (Handler 실행용)
+        // ChatOps_계약_붕괴_방지_체계_분석.md 참조: Plan 스냅샷 구조
+        // ⚠️ 중요: automation_level은 'L1' | 'L2'만 허용 (L0는 Inline Execution 불가)
+        const plan: SuggestedActionChatOpsPlanV1 = {
+          schema_version: 'chatops.plan.v1',
+          intent_key: draft.intent_key,
+          params: handlerParams,
+          automation_level: intent.automation_level === 'L0' ? 'L1' : (intent.automation_level as 'L1' | 'L2'), // 타입 안전성
+          ...(intent.execution_class && { execution_class: intent.execution_class }),
+          // event_type은 Handler 내부에서 확인 (Edge Function의 intentRegistry에는 없음)
+          // plan_snapshot은 Handler가 필요로 하는 정보이므로, Handler 실행 시 동적으로 구성
+          // 일단 기본 구조만 제공 (Handler 내부에서 실제 targets 구성)
+          plan_snapshot: {
+            summary: `ChatOps Inline Execution: ${draft.intent_key}`,
+            target_count: 0, // Handler 내부에서 실제 계산
+            targets: {
+              kind: 'student_id_list',
+              student_ids: [], // Handler 내부에서 실제 targets 구성
+            },
+          },
+          security: {
+            requested_by_user_id: user_id,
+            requested_at_utc: new Date().toISOString(),
+          },
+        };
+
+        // Handler Context 생성
+        // ⚠️ HandlerContext는 user_role, now_kst도 필요
+        // ⚠️ 디버깅: tenant_id 값 확인
+        console.log('[ChatOps] Handler Context 생성:', {
+          tenant_id: tenant_id,
+          tenant_id_type: typeof tenant_id,
+          tenant_id_is_null: tenant_id === null,
+          tenant_id_is_undefined: tenant_id === undefined,
+          user_id: user_id,
+        });
+
+        // ⚠️ Preflight: 실행 직전 상태 재확인 (계약 붕괴 방지)
+        // ChatOps_계약_붕괴_방지_체계_분석.md 2.2.2 참조
+        // Handler 내부에서 plan.plan_snapshot.targets.student_ids를 구성하므로,
+        // 여기서는 Preflight 체크를 하지 않음 (Handler 내부에서 수행)
+        // 일단 주석 처리 (Handler 내부에서 Preflight 체크 수행)
+        /*
+        if (plan.plan_snapshot?.targets?.kind === 'student_id_list' && plan.plan_snapshot.targets.student_ids?.length > 0) {
+          const { data: currentState, error: preflightError } = await withTenant(
+            supabase
+              .from('persons')
+              .select('id, person_type, status')
+              .in('id', plan.plan_snapshot.targets.student_ids)
+              .eq('person_type', 'student'),
+            tenant_id
+          );
+
+          if (preflightError) {
+            console.error('[ChatOps] Preflight query failed:', maskPII(preflightError));
+            return new Response(
+              JSON.stringify({
+                error: 'CONTRACT_PREFLIGHT_FAILED',
+                message: '실행 전 상태 확인 중 오류가 발생했습니다.',
+              }),
+              { status: 500, headers: corsHeaders }
+            );
+          }
+
+          // 상태 변화 감지 (이미 퇴원한 학생 등)
+          const dischargedStudents = currentState?.filter(s => s.status === 'discharged');
+          if (dischargedStudents && dischargedStudents.length > 0) {
+            return new Response(
+              JSON.stringify({
+                error: 'CONTRACT_STATE_CHANGED',
+                contract_category: ContractErrorCategory.CONTRACT_STATE_CHANGED,
+                message: `이미 퇴원한 학생이 포함되어 있습니다: ${dischargedStudents.length}명`,
+                affected_students: dischargedStudents.map(s => s.id),
+              }),
+              { status: 409, headers: corsHeaders }
+            );
+          }
+
+          // 존재하지 않는 학생 감지
+          const foundIds = new Set(currentState?.map(s => s.id) || []);
+          const missingIds = plan.plan_snapshot.targets.student_ids.filter(
+            id => !foundIds.has(id)
+          );
+          if (missingIds.length > 0) {
+            return new Response(
+              JSON.stringify({
+                error: 'CONTRACT_TARGET_NOT_FOUND',
+                contract_category: ContractErrorCategory.CONTRACT_TARGET_NOT_FOUND,
+                message: `존재하지 않는 학생이 포함되어 있습니다: ${missingIds.length}명`,
+                missing_ids: missingIds,
+              }),
+              { status: 404, headers: corsHeaders }
+            );
+          }
+        }
+        */
+
+        // ⚠️ P0: L2 실행 전 Preflight 검증 확인
+        // 붕괴사전예방.md 7. Preflight 실패 시 시스템 행동 규칙 참조
+        if (intent.automation_level === 'L2' && !isL2ExecutionEnabled(preflightResult)) {
+          console.warn('[ChatOps] Preflight 검증 실패로 L2 실행 차단');
+          return new Response(
+            JSON.stringify({
+              error: 'L2_EXECUTION_DISABLED',
+              message: '시스템 헬스체크 실패로 L2 자동 실행이 비활성화되었습니다. L0/L1 조회만 가능합니다.',
+              health_status: preflightResult,
+            }),
+            {
+              status: 503,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        // ⚠️ Worker 아키텍처: Apply 단계는 job 생성만, 실제 실행은 Worker가 처리
+        // ChatOps_계약_붕괴_방지_체계_분석.md 4.5 참조
+        const executionStartTime = Date.now();
+        const executedAt = new Date().toISOString();
+
+        // Worker가 필요한 작업인지 판단
+        const useWorker = shouldUseWorker(plan);
+
+        let handlerResult: any = null;
+        let jobId: string | undefined = undefined;
+
+        if (useWorker) {
+          // Worker 아키텍처: job 생성 후 즉시 Worker 호출 (지연 없음)
+          const jobResult = await createJob(
+            supabase,
+            tenant_id,
+            plan,
+            { user_id: user_id, user_role: 'admin' },
+            {
+              resolve_snapshot: draft.resolve_snapshot || null,
+              apply_input: {
+                params: maskPII(handlerParams), // PII 마스킹 필수
+                target_count: plan.plan_snapshot?.target_count,
+                target_ids_sample: plan.plan_snapshot?.targets?.student_ids?.slice(0, 5),
+              },
+              policy_verdict: plan.automation_level === 'L2' && plan.execution_class === 'A' ? {
+                enabled: policyEnabled,
+                path: `auto_notification.${eventType}.enabled`,
+                checked_at: executedAt,
+                event_type: eventType,
+              } : null,
+            },
+            {
+              supabaseUrl: envServer.SUPABASE_URL,
+              serviceRoleKey: envServer.SERVICE_ROLE_KEY,
+            }
+          );
+
+          if (!jobResult) {
+            // job 생성 실패
+            await supabase
+              .from('chatops_drafts')
+              .update({ status: 'cancelled' })
+              .eq('id', draft_id);
+
+            return new Response(
+              JSON.stringify({
+                response: '작업 생성에 실패했습니다.',
+                draft_id: draft_id,
+                draft_status: 'cancelled',
+                error_code: 'JOB_CREATION_FAILED',
+                intent: {
+                  intent_key: draft.intent_key,
+                  automation_level: intent.automation_level,
+                  ...(intent.execution_class && { execution_class: intent.execution_class }),
+                },
+              }),
+              {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              }
+            );
+          }
+
+          jobId = jobResult.job_id;
+          handlerResult = {
+            status: 'success',
+            message: '처리가 시작되었습니다. Worker가 실행을 처리합니다.',
+            job_id: jobId,
+          };
+        } else {
+          // 즉시 실행 (Worker 불필요한 작업)
+          const handlerContext = {
+            tenant_id: tenant_id,
+            user_id: user_id,
+            user_role: 'admin', // Inline Execution은 사용자 직접 요청이므로 admin으로 가정
+            now_kst: new Date().toISOString(), // ISO 8601 형식 (HandlerContext 타입에 맞춤)
+            supabase: supabase,
+          };
+
+          // Handler 실행 (실행 시간 측정)
+          const handlerStartTime = Date.now();
+          handlerResult = await handler.execute(plan, handlerContext);
+          const handlerDurationMs = Date.now() - handlerStartTime;
+
+          // handlerResult에 duration_ms가 없으면 계산한 값 추가
+          if (!handlerResult.duration_ms) {
+            handlerResult.duration_ms = handlerDurationMs;
+          }
+
+          // ⚠️ 중요: Handler 실행 결과 확인 (실패 시 에러 반환)
+          if (handlerResult.status === 'failed') {
+            console.error('[ChatOps] Handler execution failed:', {
+              error_code: handlerResult.error_code,
+              message: handlerResult.message,
+              intent_key: draft.intent_key,
+            });
+
+            // Draft 상태를 cancelled로 업데이트 (실패한 실행)
+            await supabase
+              .from('chatops_drafts')
+              .update({ status: 'cancelled' })
+              .eq('id', draft_id);
+
+            return new Response(
+              JSON.stringify({
+                response: handlerResult.message || '실행에 실패했습니다.',
+                draft_id: draft_id,
+                draft_status: 'cancelled',
+                error_code: handlerResult.error_code,
+                intent: {
+                  intent_key: draft.intent_key,
+                  automation_level: intent.automation_level,
+                  ...(intent.execution_class && { execution_class: intent.execution_class }),
+                },
+              }),
+              {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              }
+            );
+          }
+        }
+
+        // Draft 상태 업데이트
+        await supabase
+          .from('chatops_drafts')
+          .update({ status: 'executed' })
+          .eq('id', draft_id);
+
+        // ⚠️ P0-5: request_id 생성 (서버에서 생성, 클라이언트 입력 금지)
+        // request_id 형식: {draft_id}:draft_confirm:{attempt_window} (액티비티.md 7.2, 챗봇.md 6.3.1 참조)
+        // draft_confirm는 버킷 멱등 (5분 버킷)
+        const attemptWindow = Math.floor(Date.now() / (5 * 60 * 1000)); // 5분 버킷
+        const requestId = `${draft_id}:draft_confirm:${attemptWindow}`;
+
+        // ⚠️ 체크리스트 준수: Activity 기록 (실행 정본)
+        // automation_actions에 실행 결과 기록
+        // ChatOps_계약_붕괴_방지_체계_분석.md 3.5 참조: 실행 스냅샷 저장 확장
+        const { error: insertError } = await supabase.from('automation_actions').insert({
+          tenant_id: tenant_id,
+          action_type: draft.intent_key,
+          executed_by: user_id,
+          executed_at: executedAt,
+          result: handlerResult,
+          request_id: requestId, // ⚠️ P0-5: request_id 기록 (automation_actions와 execution_audit_runs 동일 형식)
+          dedup_key: dedupKey,
+          execution_context: {
+            intent_key: draft.intent_key,
+            draft_params: draft.draft_params,
+            executed_at: executedAt,
+            // Resolve 스냅샷 (draft 생성 시점의 intentCandidates 정보)
+            resolve_snapshot: draft.resolve_snapshot || null,
+            // Apply 입력 스냅샷 (PII 마스킹)
+            apply_input: {
+              params: maskPII(handlerParams), // PII 마스킹 필수
+              target_count: plan.plan_snapshot?.target_count,
+              target_ids_sample: plan.plan_snapshot?.targets?.student_ids?.slice(0, 5),
+            },
+            // Policy 판정 스냅샷 (L2-A인 경우)
+            policy_verdict: plan.automation_level === 'L2' && plan.execution_class === 'A' ? {
+              enabled: policyEnabled,
+              path: `auto_notification.${eventType}.enabled`,
+              checked_at: executedAt,
+              event_type: eventType,
+            } : null,
+            // 멱등성 정보
+            idempotency: {
+              request_id: requestId,
+              dedup_key: dedupKey,
+              ...(jobId && { job_id: jobId }),
+            },
+          },
+        });
+
+        if (insertError) {
+          // 중복 키 오류인 경우 기존 레코드 조회
+          if (insertError.code === '23505') { // unique_violation
+            const { data: retryAction } = await supabase
+              .from('automation_actions')
+              .select('id, result, executed_at')
+              .eq('tenant_id', tenant_id)
+              .eq('dedup_key', dedupKey)
+              .single();
+
+            if (retryAction) {
+              console.log('[ChatOps] 중복 실행 감지 (race condition), 기존 결과 반환');
+              return new Response(
+                JSON.stringify({
+                  response: '이미 처리된 요청입니다.',
+                  draft_id: draft_id,
+                  draft_status: 'executed',
+                  intent: {
+                    intent_key: draft.intent_key,
+                    automation_level: intent.automation_level,
+                    ...(intent.execution_class && { execution_class: intent.execution_class }),
+                  },
+                  result: retryAction.result,
+                }),
+                {
+                  status: 200,
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                }
+              );
+            }
+          }
+          // 다른 오류는 throw
+          throw insertError;
+        }
+
+        // ⚠️ P0-10: Execution Audit 기록 (액티비티.md 12)
+        // automation_actions 기록 후 execution_audit_runs도 생성되어야 함
+        // intent_key → operation_type 매핑은 meta.operation_registry 테이블에서 조회
+        let operationType = 'unknown_operation';
+        // HandlerResult.status는 'success' | 'failed' | 'partial' 중 하나
+        let auditStatus: 'success' | 'failed' | 'partial' = handlerResult.status;
+        let errorCode: string | undefined = handlerResult.error_code;
+        let errorSummary: string | undefined = handlerResult.message;
+        let allowedDetailsKeys: Record<string, boolean> | null = null;
+
+        // intent_key → operation_type 매핑 (액티비티.md 8.A.2 매핑 규칙)
+        if (draft.intent_key) {
+          try {
+            const { data: registryEntry, error: registryError } = await supabase
+              .from('meta.operation_registry')
+              .select('operation_type, is_enabled, allowed_details_keys')
+              .eq('intent_key', draft.intent_key)
+              .single();
+
+            if (registryError) {
+              const maskedRegistryError = maskPII(registryError);
+              console.error('[ChatOps] Failed to query operation_registry:', maskedRegistryError);
+              operationType = 'unknown_operation';
+              auditStatus = 'failed';
+              errorCode = 'unknown_operation';
+              errorSummary = 'operation_registry 조회 실패';
+            } else if (registryEntry && registryEntry.is_enabled !== false) {
+              operationType = registryEntry.operation_type;
+              allowedDetailsKeys = registryEntry.allowed_details_keys as Record<string, boolean> | null;
+            } else {
+              operationType = 'unknown_operation';
+              auditStatus = 'failed';
+              errorCode = 'unknown_operation';
+              errorSummary = `Intent '${draft.intent_key}'에 대한 operation_type이 meta.operation_registry에 등록되지 않았습니다.`;
+            }
+          } catch (registryError) {
+            const maskedRegistryError = maskPII(registryError);
+            console.error('[ChatOps] Failed to query operation_registry:', maskedRegistryError);
+            operationType = 'unknown_operation';
+            auditStatus = 'failed';
+            errorCode = 'unknown_operation';
+            errorSummary = 'operation_registry 조회 실패';
+          }
+        }
+
+        // execution_audit_runs 생성 (액티비티.md 8.1, 12 참조)
+        // ⚠️ P0-10: Correlation Key 필수 (request_id 우선, 액티비티.md 7.2 참조)
+        // request_id는 위에서 이미 생성됨 (automation_actions와 동일한 값 사용)
+
+        // duration_ms: handlerResult에 있으면 사용, 없으면 전체 실행 시간 계산 (Worker 사용 시 null)
+        const durationMs = handlerResult.duration_ms || (useWorker ? null : (Date.now() - executionStartTime));
+
+        await createExecutionAuditRecord(supabase, {
+          tenant_id: tenant_id,
+          operation_type: operationType,
+          status: auditStatus,
+          source: 'ai', // ChatOps는 source='ai' (액티비티.md 12 참조)
+          actor_type: 'user',
+          actor_id: `user:${user_id}`,
+          summary: plan.plan_snapshot?.summary || handlerResult.message || `Intent '${draft.intent_key}' 실행 완료`,
+          details: (() => {
+            // ⚠️ P0-10: details allowlist 적용
+            // partial 상태도 details 저장 (성공한 부분에 대한 정보)
+            if (handlerResult.status === 'failed') {
+              return null;
+            }
+
+            const rawDetails: Record<string, unknown> = {
+              intent_key: draft.intent_key,
+            };
+
+            // allowlist 적용: allowed_details_keys에 있는 키만 저장
+            if (allowedDetailsKeys && typeof allowedDetailsKeys === 'object') {
+              const filteredDetails: Record<string, unknown> = {};
+              for (const key in rawDetails) {
+                if (allowedDetailsKeys[key] === true) {
+                  filteredDetails[key] = rawDetails[key];
+                }
+              }
+              return Object.keys(filteredDetails).length > 0 ? filteredDetails : null;
+            }
+
+            return rawDetails;
+          })(),
+          reference: {
+            request_id: requestId, // ⚠️ P0-10: correlation key 필수 (request_id 우선, 액티비티.md 7.2 참조)
+            draft_id: draft_id,
+            entity_type: plan.plan_snapshot?.targets?.kind === 'student_id_list' ? 'student' : undefined,
+            entity_id: plan.plan_snapshot?.targets?.student_ids?.[0] || undefined,
+            source_event_id: dedupKey,
+          },
+          counts: plan.plan_snapshot?.target_count ? { affected: plan.plan_snapshot.target_count } :
+                  (handlerResult.result?.total_count ? {
+                    affected: handlerResult.result.total_count,
+                    ...(handlerResult.result.success_count !== undefined && { success: handlerResult.result.success_count }),
+                    ...(handlerResult.result.error_count !== undefined && { failed: handlerResult.result.error_count })
+                  } : null),
+          duration_ms: durationMs,
+          error_code: errorCode,
+          error_summary: errorSummary,
+          version: plan.schema_version || 'chatops.plan.v1',
+        });
+
+        return new Response(
+          JSON.stringify({
+            response: handlerResult.message || '실행이 완료되었습니다.',
+            draft_id: draft_id,
+            draft_status: 'executed',
+            intent: {
+              intent_key: draft.intent_key,
+              automation_level: intent.automation_level,
+              ...(intent.execution_class && { execution_class: intent.execution_class }),
+            },
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (execError) {
+        const maskedError = maskPII(execError);
+        console.error('[ChatOps] Handler execution error:', maskedError);
+        return new Response(
+          JSON.stringify({
+            error: '실행 중 오류가 발생했습니다.',
+            error_code: 'EXECUTION_FAILED',
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
+    // ⚠️ 중요: draft_confirm/cancel 액션일 때는 OpenAI API 호출 스킵
+    // (이미 Draft가 ready 상태이므로 Intent 파싱 불필요)
+    // draft_confirm/cancel은 위에서 이미 처리되었으므로 여기 도달하지 않음
+
+    // ⚠️ Resolver 구조 고정: 후보 추출 → LLM 선택
+    // Registry 기반 후보 추출 (나중에 임베딩으로 교체 가능하도록 구조 고정)
+    // resolve_snapshot 저장을 위해 상위 스코프 변수로 선언
+    const candidates = extractIntentCandidates(message, 10);
+    console.log('[ChatOps] Intent 후보 추출 완료:', {
+      candidate_count: candidates.length,
+      top_candidates: candidates.slice(0, 5).map(c => ({
+        intent_key: c.intent_key,
+        score: c.score,
+        reason_preview: c.reason.substring(0, 50),
+      })),
+    });
+
     // ChatGPT API 호출 (상담일지 요약과 동일한 모델 설정)
     // ⚠️ 업종 중립: "학원" 대신 "기관" 또는 일반적인 용어 사용
     // ⚠️ 개선: System prompt를 간결하게 재구성하고 Few-shot 예시 추가
+    // ⚠️ 구조적 제약: Registry의 Intent만 선택 가능하도록 후보 목록 주입
+    const candidateList = candidates.length > 0
+      ? candidates.map((c, idx) => `  ${idx + 1}. ${c.intent_key} (점수: ${c.score}, 이유: ${c.reason.substring(0, 100)})`).join('\n')
+      : '  (후보 없음 - 모든 Intent 검토 필요)';
+
     const systemPrompt = `당신은 기관 관리 시스템의 AI 어시스턴트입니다.
+
+⚠️⚠️⚠️ 맥락 유지 규칙 (매우 중요) ⚠️⚠️⚠️:
+
+이 대화는 세션 기반으로 진행되며, 이전 대화 내용이 포함되어 있습니다.
+**반드시 이전 대화를 참조하여 맥락을 이해하세요.**
+
+특히 다음 경우를 주의하세요:
+- 사용자가 "도", "또한", "그리고" 등의 단어를 사용하면 이전 대화를 참조하는 것입니다.
+- 이전 대화에서 언급된 학생 이름, 반, 날짜 등을 현재 요청에도 적용해야 합니다.
+- 예: 이전에 "박소영 퇴원시켜"라고 했다면, "전화번호도 확인"은 "박소영의 전화번호 확인"을 의미합니다.
+- 예: 이전에 "오늘 지각한 학생"이라고 했다면, "그 학생들 전화번호"는 "오늘 지각한 학생들의 전화번호"를 의미합니다.
+
+⚠️⚠️⚠️ 구조적 제약 (절대 준수 필수) ⚠️⚠️⚠️:
+
+다음은 사용자 메시지와 유사한 Intent 후보 목록입니다.
+**반드시 이 후보 목록에서만 Intent를 선택하세요.**
+후보 목록에 없는 Intent는 절대 생성하지 마세요!
+
+Intent 후보 목록:
+${candidateList}
+
+⚠️ 중요:
+- 후보 목록이 비어있지 않으면, 반드시 후보 중 하나를 선택하세요.
+- 후보 목록이 비어있으면, 아래 "사용 가능한 Intent 목록" 전체를 검토하여 선택하세요.
+- Registry에 등록되지 않은 Intent는 절대 생성하지 마세요!
 
 ⚠️ 필수: 모든 응답 끝에 반드시 Intent JSON을 포함해야 합니다.
 
@@ -775,7 +2057,12 @@ Few-shot 예시 (정확히 이 형식을 따르세요):
 ⚠️⚠️⚠️ params 필드 필수 규칙 (절대 준수) ⚠️⚠️⚠️:
 
 1. 사용자 메시지에서 필요한 파라미터를 반드시 추출하여 params에 포함하세요.
-2. 학생 이름이 포함된 경우:
+2. **이전 대화 참조 규칙 (매우 중요)**:
+   - 사용자 메시지에 "도", "또한", "그리고" 등의 단어가 있으면 이전 대화를 참조하는 것입니다.
+   - 이전 대화에서 언급된 학생 이름, 반, 날짜 등을 현재 요청의 params에 포함해야 합니다.
+   - 예: 이전에 "박소영 퇴원시켜"라고 했다면, "전화번호도 확인"은 { "name": "박소영" }을 params에 포함해야 합니다.
+   - 예: 이전에 "오늘 지각한 학생"이라고 했다면, "그 학생들 전화번호"는 이전 대화의 학생 목록을 참조해야 합니다.
+3. 학생 이름이 포함된 경우:
    - student.query.* Intent: params에 { "student_id": "..." } 또는 { "name": "..." } 포함
    - student.exec.* Intent: params에 { "student_id": "..." } 포함
    - 학생 이름으로 student_id를 찾을 수 없으면 { "name": "..." } 포함
@@ -870,7 +2157,88 @@ Intent 규칙:
 4. Intent 이름은 반드시 위 목록에서 정확히 복사하세요 (임의로 만들지 마세요)
 5. Intent 이름 형식: "{도메인}.{타입}.{액션}" (예: student.exec.discharge)
 6. 모든 응답 끝에 Intent JSON을 반드시 포함하세요
-7. 위 Few-shot 예시를 참고하여 정확한 형식으로 응답하세요`;
+7. 위 Few-shot 예시를 참고하여 정확한 형식으로 응답하세요
+
+⚠️⚠️⚠️ 동의어/유의어 처리 규칙 (매우 중요) ⚠️⚠️⚠️:
+
+사용자가 다양한 표현으로 같은 의미를 전달할 수 있습니다.
+다음과 같은 동의어 매핑을 이해하고 올바른 Intent를 선택하세요:
+
+[수납/청구 도메인 - 미납/연체 관련]
+- "미납", "연체", "돈 안낸", "돈 안낸 사람", "납부 안한", "결제 안한", "미결제", "미결제자"
+  → billing.query.overdue_list (연체 목록 조회)
+- "청구서", "인보이스", "납부서", "계산서" → billing.query.invoice_status (청구서 상태 조회)
+- "결제", "납부", "입금", "수납" → billing.query.by_student (결제 내역 조회)
+
+[출결 도메인]
+- "지각", "늦은", "늦게 온", "지각한" → attendance.query.late (지각 조회)
+- "결석", "안온", "안나온", "불참", "결석한" → attendance.query.absent (결석 조회)
+- "출석", "나온", "참석" → attendance.query.by_student (출결 조회)
+
+[학생 도메인]
+- "학생", "대상", "회원", "원생", "수강생" → student.query.* (학생 관련 Intent)
+- "전화번호", "연락처", "번호", "핸드폰", "폰번호" → student.query.profile (전화번호 조회 시)
+
+⚠️ 중요: 사용자 메시지의 의미를 파악하여 올바른 Intent를 선택하세요.
+예를 들어:
+- "돈 안낸 사람" = "미납자" = billing.query.overdue_list
+- "납부 안한 학생들" = "미납 학생들" = billing.query.overdue_list
+- "미결제자 조회" = billing.query.overdue_list
+
+의미가 동일하면 같은 Intent를 사용하세요!`;
+
+    // OpenAI messages 배열 구성: system + summary(있으면) + recentHistory + current user message
+    const openaiMessages: Array<{ role: string; content: string }> = [
+      {
+        role: 'system',
+        content: systemPrompt,
+      },
+    ];
+
+    // summary가 있으면 추가 (developer 역할로 추가하거나 system에 포함)
+    if (session && session.summary && session.summary.trim().length > 0) {
+      openaiMessages.push({
+        role: 'system',
+        content: `이전 대화 요약:\n${session.summary}\n\n위 요약을 참고하여 사용자의 현재 질문에 답변하세요.`,
+      });
+    }
+
+    // 최근 메시지 히스토리 추가
+    // ⚠️ 중요: 이전 대화가 있으면 명시적으로 맥락 참조 지시 추가
+    if (recentMessages.length > 0) {
+      // 이전 대화 히스토리 추가 전에 맥락 참조 지시 추가
+      openaiMessages.push({
+        role: 'system',
+        content: `아래는 이전 대화 히스토리입니다. 사용자의 현재 요청이 "도", "또한", "그리고" 등의 단어를 포함하거나 명시적인 대상이 없으면, 반드시 이전 대화에서 언급된 학생 이름, 반, 날짜 등을 참조하여 params에 포함하세요.`,
+      });
+    }
+
+    for (const msg of recentMessages) {
+      openaiMessages.push({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: msg.content,
+      });
+    }
+
+    // 현재 사용자 메시지 추가
+    // ⚠️ 중요: 현재 요청의 사용자 메시지도 히스토리에 포함하여 빠른 연속 요청 시에도 맥락 유지
+    openaiMessages.push({
+      role: 'user',
+      content: message,
+    });
+
+    console.log('[ChatOps] OpenAI messages 구성 완료:', {
+      total_messages: openaiMessages.length,
+      has_summary: !!session?.summary,
+      recent_history_count: recentMessages.length,
+      // PII 마스킹: messages 배열 구조만 로깅 (내용은 마스킹)
+      messages_structure: openaiMessages.map((msg, idx) => ({
+        index: idx,
+        role: msg.role,
+        content_length: msg.content.length,
+        content_preview: maskPII(msg.content.substring(0, 50)),
+      })),
+    });
 
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -880,16 +2248,7 @@ Intent 규칙:
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini', // 상담일지 요약과 동일한 모델
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: message,
-          },
-        ],
+        messages: openaiMessages,
         temperature: 0.3, // 상담일지 요약과 동일한 temperature
         max_tokens: 800, // Intent JSON 포함을 위해 토큰 수 증가
       }),
@@ -969,8 +2328,8 @@ Intent 규칙:
           // PII 보호를 위해 details는 제한적으로만 로깅
         });
 
+        // ⚠️ 중요: Fallback을 여기서 즉시 실행 (L0/Inline Execution 전에)
         // Fallback: 사용자 요청에서 키워드를 분석하여 올바른 Intent 추론
-        // ⚠️ 중요: 이 로직은 반드시 실행되어야 하므로 try-catch로 감싸서 안전하게 처리
         console.log('[ChatOps] Fallback: 사용자 요청 분석하여 Intent 추론 시도...', {
           user_message_preview: maskPII(message.substring(0, 100)),
           user_message_length: message.length,
@@ -1038,29 +2397,15 @@ Intent 규칙:
         if (hasL0Handler(parsedIntent.intent_key)) {
           const handler = getL0Handler(parsedIntent.intent_key);
           if (handler) {
-            // JWT에서 user_id 추출
-            let userId = 'system'; // 기본값
-            try {
-              if (authHeader) {
-                const token = authHeader.replace('Bearer ', '');
-                const { data: { user } } = await supabase.auth.getUser(token);
-                if (user) {
-                  userId = user.id;
-                }
-              }
-            } catch (userError) {
-              // user_id 추출 실패는 치명적 오류가 아니므로 기본값 사용
-              console.log('[ChatOps] Failed to extract user_id from JWT, using default');
-            }
-
+            // user_id는 이미 위에서 추출했으므로 재사용
             const handlerContext = {
               tenant_id: tenant_id,
-              user_id: userId,
+              user_id: user_id,
               supabase: supabase,
             };
 
             // 파라미터 정규화 (범용 변환 규칙 적용)
-            const normalizedParams = await normalizeParams(
+            const normalizedParams = await normalizeParamsShared(
               parsedIntent.params || {},
               parsedIntent.intent_key,
               supabase,
@@ -1103,811 +2448,187 @@ Intent 규칙:
       }
     }
 
-    // L1/L2 Intent TaskCard 생성 (업무화/승인 후 실행)
-    // 챗봇.md 6.2, 6.3: L1은 TaskCard 생성(업무화), L2는 TaskCard 생성 후 승인 시 실행
-    let taskCardId: string | undefined = undefined;
-    if (parsedIntent && (parsedIntent.automation_level === 'L1' || parsedIntent.automation_level === 'L2')) {
-      console.log('[ChatOps] L1/L2 Intent TaskCard 생성 시작:', {
-        intent_key: parsedIntent.intent_key,
-        automation_level: parsedIntent.automation_level,
-        execution_class: parsedIntent.execution_class,
-      });
-      try {
-        // Intent Registry에서 Intent 정보 조회
-        const intent = intentRegistry[parsedIntent.intent_key];
-        if (!intent) {
-          console.log('[ChatOps] Intent not found in registry:', {
-            intent_key: parsedIntent.intent_key,
-          });
-          // Intent가 Registry에 없어도 응답은 반환 (자연어 응답은 이미 생성됨)
-        } else {
-          // JWT에서 user_id 추출
-          let userId = 'system'; // 기본값
-          try {
-            if (authHeader) {
-              const token = authHeader.replace('Bearer ', '');
-              const { data: { user } } = await supabase.auth.getUser(token);
-              if (user) {
-                userId = user.id;
-              }
+    // Inline Execution 처리 (execution_mode === 'inline')
+    let draftResponse: ChatOpsResponse['draft_id'] | undefined;
+    let draftStatus: ChatOpsResponse['draft_status'] | undefined;
+    let missingRequired: ChatOpsResponse['missing_required'] | undefined;
+    let nextQuestion: ChatOpsResponse['next_question'] | undefined;
+    let summary: ChatOpsResponse['summary'] | undefined;
+    let confirmRequired: ChatOpsResponse['confirm_required'] | undefined;
+
+    if (parsedIntent && (action === 'message' || action === 'draft_apply')) {
+      const intent = intentRegistry[parsedIntent.intent_key];
+      // ⚠️ 모든 L1/L2 Intent는 Inline Execution으로 처리 (TaskCard 생성 없이 대화만으로 처리)
+      // L0는 조회/초안이므로 Inline Execution 불필요
+      const isInlineExecution = intent && (
+        parsedIntent.automation_level === 'L1' ||
+        parsedIntent.automation_level === 'L2'
+      );
+      if (isInlineExecution) {
+        console.log('[ChatOps] Inline Execution 시작:', {
+          intent_key: parsedIntent.intent_key,
+        });
+
+        try {
+          // Inline Execution 로직은 별도 파일로 분리 (파일 크기 제한)
+          // 여기서는 기본 처리만 수행
+          const { processInlineExecution } = await import('../_shared/inline-execution.ts');
+
+          // student.exec.register의 경우: params를 form_values로 변환
+          let draftParams = parsedIntent.params || {};
+          if (intent.intent_key === 'student.exec.register') {
+            // 사용자가 제공한 params를 form_values로 변환
+            if (draftParams.name) {
+              draftParams = { form_values: { name: draftParams.name } };
+            } else {
+              draftParams = { form_values: {} };
             }
-          } catch (userError) {
-            // user_id 추출 실패는 치명적 오류가 아니므로 기본값 사용
-            console.log('[ChatOps] Failed to extract user_id from JWT, using default');
           }
 
-          // Policy에서 priority 조회
-          // ⚠️ ChatOps는 사용자 직접 요청 기능이므로 기본값 제공 (다른 자동화와 차별화)
-          // 다른 자동화 함수들은 모두 Fail-Closed를 따르지만, ChatOps는 사용자 경험을 위해 기본값 사용
-          const priorityPolicyPath = `chatops.taskcard.priority`;
-          console.log('[ChatOps] Policy에서 priority 조회 중...', {
-            policy_path: priorityPolicyPath,
-          });
-          const priority = await getTenantSettingByPath(
+          // ⚠️ 중요: action이 'message'이고 parsedIntent.params에 값이 있으면
+          // 자동으로 'apply' 액션으로 처리 (사용자가 질문에 답변한 경우)
+          let inlineAction: 'start' | 'apply' = (action === 'draft_apply') ? 'apply' : 'start';
+          // action이 'message'인 경우에만 자동 apply 체크 (타입 안전성)
+          if (action === 'message' && draftParams && Object.keys(draftParams).length > 0) {
+            // draftParams에 실제 값이 있으면 (빈 객체가 아니면) 'apply'로 처리
+            const hasValues = Object.values(draftParams).some(v => {
+              if (typeof v === 'object' && v !== null) {
+                return Object.keys(v).length > 0;
+              }
+              return v !== undefined && v !== null && v !== '';
+            });
+            if (hasValues) {
+              inlineAction = 'apply';
+              console.log('[ChatOps] 자동으로 apply 액션으로 전환 (사용자 답변 감지):', {
+                draft_params: draftParams,
+              });
+            }
+          }
+
+          const inlineResult = await processInlineExecution(
             supabase,
+            session_id,
             tenant_id,
-            priorityPolicyPath
+            user_id,
+            intent,
+            draftParams,
+            inlineAction,
+            candidates // resolve_snapshot으로 저장
           );
 
-          // ChatOps 기본 priority: 50 (사용자 직접 요청 기능이므로 기본값 제공)
-          // ⚠️ 참고: 다른 자동화 함수들은 모두 Fail-Closed를 따르지만, ChatOps는 사용자 경험을 위해 예외
-          const priorityValue = priority !== null && priority !== undefined && typeof priority === 'number'
-            ? priority
-            : 50; // 기본값 50 (ChatOps 전용 예외)
+          draftResponse = inlineResult.draft_id;
+          draftStatus = inlineResult.draft_status;
+          missingRequired = inlineResult.missing_required;
+          nextQuestion = inlineResult.next_question;
+          summary = inlineResult.summary;
+          confirmRequired = inlineResult.confirm_required;
 
-          if (priority === null || priority === undefined) {
-            console.log('[ChatOps] Priority policy 없음, 기본값(50) 사용 (ChatOps 전용 예외):', {
-              intent_key: parsedIntent.intent_key,
-              policy_path: priorityPolicyPath,
-              default_priority: priorityValue,
-            });
-          } else {
-            console.log('[ChatOps] Priority 조회 성공:', {
-              priority: priorityValue,
-              from_policy: true,
-            });
+          if (inlineResult.response) {
+            cleanResponse = inlineResult.response;
           }
 
-          // priority 검증 (0-100 범위)
-          if (priorityValue < 0 || priorityValue > 100) {
-            console.error('[ChatOps] Invalid priority value:', {
-              intent_key: parsedIntent.intent_key,
-              priority: priorityValue,
-            });
-            cleanResponse = `${cleanResponse}\n\n[오류] TaskCard 생성에 실패했습니다. Priority 값이 유효하지 않습니다.`;
-          } else {
-            console.log('[ChatOps] ===== Priority 검증 통과, TaskCard 생성 로직 시작 =====');
-            console.log('[ChatOps] Priority 검증 통과:', {
-              priority_value: priorityValue,
-              intent_key: parsedIntent.intent_key,
-            });
+          console.log('[ChatOps] Inline Execution 처리 완료:', {
+            draft_id: draftResponse,
+            status: draftStatus,
+            missing_count: missingRequired?.length || 0,
+          });
 
-            // 간소화된 Plan 생성
-            // Edge Function 환경에서는 packages/chatops-intents를 직접 import할 수 없으므로 간소화된 버전 사용
-            const targetStudentIds = Array.isArray(parsedIntent.params?.student_ids)
-              ? parsedIntent.params.student_ids as string[]
-              : [];
-
-            console.log('[ChatOps] Plan 생성 중...', {
-              target_student_count: targetStudentIds.length,
-            });
-
-            const plan: any = {
-              schema_version: 'chatops.plan.v1',
-              intent_key: parsedIntent.intent_key,
-              params: parsedIntent.params || {},
-              automation_level: intent.automation_level,
-              ...(intent.automation_level === 'L2' && intent.execution_class && {
-                execution_class: intent.execution_class,
-                // L2-A Intent의 경우 event_type은 Registry에서 가져올 수 없으므로
-                // 실제 구현 시에는 packages/chatops-intents의 Registry를 참조해야 함
-                // 현재는 간소화된 버전이므로 event_type은 생략
-              }),
-              plan_snapshot: {
-                summary: cleanResponse.substring(0, 200), // 자연어 응답의 일부를 summary로 사용
-                target_count: targetStudentIds.length,
-                targets: {
-                  kind: 'student_id_list',
-                  student_ids: targetStudentIds,
-                },
-              },
-              security: {
-                requested_by_user_id: userId,
-                requested_at_utc: new Date().toISOString(),
-              },
-            };
-
-            // TaskCard 생성 (간소화된 버전)
-            // entity_id 및 entity_type 결정: SSOT Registry의 taskcard.entity_type 규칙 반영
-            // ⚠️ 중요: SSOT Registry(packages/chatops-intents/src/registry.ts)의 taskcard.entity_type 규칙 준수
-            // ⚠️ 업종 중립성: entity_type은 업종과 무관하게 Core Party 개념 사용
-            //   - 'student': Core Party의 person_type='student' (업종별로 customer, client, member 등으로 매핑되지만 entity_type은 'student'로 통일)
-            //   - 'tenant': 테넌트 레벨 작업
-            //   - 'class': 업종별 클래스/서비스/프로그램 (업종별로 class, service, program 등으로 매핑되지만 entity_type은 'class'로 통일)
-            //   - 'billing': 청구 관련 엔티티 (특수 케이스)
-            // ⚠️ 확장성: 새로운 업종 추가 시에도 entity_type은 변경되지 않음 (업종별 매핑은 Industry Adapter에서 처리)
-            // - student.*: 항상 'student' (학생 등록 등 targetStudentIds가 비어있어도 'student')
-            // - attendance.*: student_ids가 있으면 'student', 없으면 'tenant' (대량 작업)
-            // - billing.*: 대부분 'tenant', 일부 'student' (payment_link, manual_payment 등)
-            // - message.*: student_id가 있으면 'student', 없으면 'tenant'
-            // - class.*: class_id가 있으면 'class', 없으면 'tenant'
-            // - schedule.*: class_id가 있으면 'class', 없으면 'tenant'
-            // - note.*: 항상 'student'
-            // - ai.*: student_id가 있으면 'student', 없으면 'tenant'
-            // - report.*, system.*, policy.*, rbac.*: 항상 'tenant'
-
-            // ⚠️ 중요: domain 파싱은 반드시 실행되어야 함
-            console.log('[ChatOps] ===== Domain 파싱 시작 전 =====');
-            console.log('[ChatOps] parsedIntent 확인:', {
-              has_parsed_intent: !!parsedIntent,
-              intent_key: parsedIntent?.intent_key,
-              intent_key_type: typeof parsedIntent?.intent_key,
-            });
-
-            const intentKey = parsedIntent.intent_key;
-            if (!intentKey || typeof intentKey !== 'string') {
-              console.error('[ChatOps] ⚠️⚠️⚠️ 치명적 오류: intent_key가 유효하지 않음!', {
-                intent_key: intentKey,
-                parsed_intent: parsedIntent,
-              });
-              throw new Error('Invalid intent_key');
-            }
-
-            console.log('[ChatOps] intentKey 확인 완료:', {
-              intent_key: intentKey,
-              intent_key_type: typeof intentKey,
-              intent_key_length: intentKey.length,
-            });
-
-            const domainParts = intentKey.split('.');
-            const domain = domainParts[0];
-
-            // ⚠️ 디버깅: domain 파싱 확인 (필수) - 반드시 출력되어야 함
-            // ⚠️ 중요: 이 로그가 없으면 domain 파싱이 실행되지 않은 것
-            console.log('[ChatOps] ===== Intent domain 파싱 시작 =====');
-            console.log('[ChatOps] Intent domain 파싱:', {
-              intent_key: intentKey,
-              domain: domain,
-              domain_parts: domainParts,
-              domain_parts_length: domainParts.length,
-              parsed_intent_key: parsedIntent.intent_key,
-              parsed_intent_type: typeof parsedIntent.intent_key,
-              domain_is_student: domain === 'student',
-              intent_key_type: typeof intentKey,
-              intent_key_length: intentKey?.length,
-            });
-
-            // ⚠️ 검증: domain이 'student'가 아니면 경고 및 강제 수정
-            if (domain !== 'student' && intentKey === 'student.exec.register') {
-              console.error('[ChatOps] ⚠️⚠️⚠️ 치명적 오류: student.exec.register인데 domain이 student가 아님!', {
-                intent_key: intentKey,
-                domain: domain,
-                domain_parts: domainParts,
-              });
-              // domain을 강제로 'student'로 수정
-              const correctedDomain = 'student';
-              console.log('[ChatOps] ✅ domain을 강제로 student로 수정:', {
-                original_domain: domain,
-                corrected_domain: correctedDomain,
-              });
-              // domain 변수를 수정할 수 없으므로, 나중에 entityType을 강제로 설정
-            }
-
-            // entity_type 및 entity_id 결정 로직 (SSOT Registry 규칙 반영)
-            let entityType: string;
-            let entityId: string;
-
-            console.log('[ChatOps] domain 비교 시작:', {
-              domain: domain,
-              is_student: domain === 'student',
-              domain_type: typeof domain,
-              intent_key: intentKey,
-            });
-
-            // ⚠️ 중요: student.exec.register는 무조건 domain='student'로 처리 (domain 파싱 실패 대비)
-            if (intentKey === 'student.exec.register') {
-              console.log('[ChatOps] ✅ student.exec.register 강제 처리 시작 (domain 파싱 실패 대비)');
-              entityType = 'student';
-              entityId = targetStudentIds.length > 0 ? targetStudentIds[0] : tenant_id;
-              console.log('[ChatOps] ✅ student.exec.register entityType 설정 완료:', {
-                entity_type: entityType,
-                entity_id: entityId.substring(0, 8) + '...',
-                entity_id_is_tenant: entityId === tenant_id,
-              });
-            } else if (domain === 'student') {
-              console.log('[ChatOps] ✅ domain === "student" 조건 통과!');
-              console.log('[ChatOps] student 도메인 처리 시작:', {
-                intent_key: intentKey,
-                domain: domain,
-                target_student_ids_count: targetStudentIds.length,
-              });
-              // student.* Intent는 항상 entity_type='student' (SSOT Registry 규칙)
-              entityType = 'student';
-              // ⚠️ 중요: 학생 등록(student.exec.register)의 경우 targetStudentIds가 비어있으므로 entityId=tenant_id
-              // 이것은 정상이며, 학생이 등록되면 TaskCard의 entity_id를 업데이트해야 함
-              entityId = targetStudentIds.length > 0 ? targetStudentIds[0] : tenant_id;
-
-              console.log('[ChatOps] student 도메인 entityType 설정 완료:', {
-                entity_type: entityType,
-                entity_id: entityId.substring(0, 8) + '...',
-                entity_id_is_tenant: entityId === tenant_id,
-              });
-
-              console.log('[ChatOps] student 도메인 entity 결정:', {
-                intent_key: intentKey,
-                target_student_ids_count: targetStudentIds.length,
-                entity_type: entityType,
-                entity_id: entityId.substring(0, 8) + '...',
-                is_register: intentKey === 'student.exec.register',
-                entity_id_is_tenant: entityId === tenant_id,
-              });
-            } else if (domain === 'attendance') {
-              // attendance.*: student_ids가 있으면 'student', 없으면 'tenant' (대량 작업)
-              if (targetStudentIds.length > 0) {
-                entityType = 'student';
-                entityId = targetStudentIds[0];
-              } else {
-                entityType = 'tenant';
-                entityId = tenant_id;
-              }
-            } else if (domain === 'billing') {
-              // billing.*: 대부분 'tenant', 일부 'student', 일부 'billing' (SSOT Registry 규칙)
-              // SSOT Registry: payment_link, manual_payment, discount, refund, installment_plan은 'student'
-              // SSOT Registry: reissue_invoice는 'billing' (특수 케이스)
-              const studentBillingIntents = [
-                'billing.exec.send_payment_link',
-                'billing.exec.record_manual_payment',
-                'billing.exec.apply_discount',
-                'billing.exec.apply_refund',
-                'billing.exec.create_installment_plan',
-              ];
-              const billingEntityIntents = [
-                'billing.exec.reissue_invoice',
-              ];
-              if (studentBillingIntents.includes(intentKey) && targetStudentIds.length > 0) {
-                entityType = 'student';
-                entityId = targetStudentIds[0];
-              } else if (billingEntityIntents.includes(intentKey)) {
-                // billing entity_type: entity_id는 invoice_id 또는 tenant_id
-                // SSOT Registry: reissue_invoice는 'billing' entity_type
-                entityType = 'billing';
-                entityId = parsedIntent.params?.invoice_id as string | undefined || tenant_id;
-              } else {
-                entityType = 'tenant';
-                entityId = tenant_id;
-              }
-            } else if (domain === 'message') {
-              // message.*: student_id가 있으면 'student', 없으면 'tenant'
-              const studentId = targetStudentIds.length > 0 ? targetStudentIds[0] : (parsedIntent.params?.student_id as string | undefined);
-              if (studentId) {
-                entityType = 'student';
-                entityId = studentId;
-              } else {
-                entityType = 'tenant';
-                entityId = tenant_id;
-              }
-            } else if (domain === 'class') {
-              // class.*: class_id가 있으면 'class', 없으면 'tenant'
-              const classId = parsedIntent.params?.class_id as string | undefined;
-              if (classId) {
-                entityType = 'class';
-                entityId = classId;
-              } else {
-                entityType = 'tenant';
-                entityId = tenant_id;
-              }
-            } else if (domain === 'schedule') {
-              // schedule.*: class_id가 있으면 'class', 없으면 'tenant'
-              const classId = parsedIntent.params?.class_id as string | undefined;
-              if (classId) {
-                entityType = 'class';
-                entityId = classId;
-              } else {
-                entityType = 'tenant';
-                entityId = tenant_id;
-              }
-            } else if (domain === 'note') {
-              // note.*: 항상 'student' (SSOT Registry 규칙)
-              entityType = 'student';
-              const studentId = targetStudentIds.length > 0 ? targetStudentIds[0] : (parsedIntent.params?.student_id as string | undefined);
-              entityId = studentId || tenant_id;
-            } else if (domain === 'ai') {
-              // ai.*: student_id가 있으면 'student', 없으면 'tenant'
-              const studentId = targetStudentIds.length > 0 ? targetStudentIds[0] : (parsedIntent.params?.student_id as string | undefined);
-              if (studentId) {
-                entityType = 'student';
-                entityId = studentId;
-              } else {
-                entityType = 'tenant';
-                entityId = tenant_id;
-              }
-            } else if (domain === 'report' || domain === 'system' || domain === 'policy' || domain === 'rbac') {
-              // report.*, system.*, policy.*, rbac.*: 항상 'tenant' (SSOT Registry 규칙)
-              entityType = 'tenant';
-              entityId = tenant_id;
-            } else {
-              // 기본값: targetStudentIds가 있으면 'student', 없으면 'tenant'
-              console.log('[ChatOps] ⚠️ 기본값 블록 실행 (domain이 매칭되지 않음):', {
-                domain: domain,
-                intent_key: intentKey,
-                target_student_ids_count: targetStudentIds.length,
-                domain_parts: domainParts,
-              });
-
-              // ⚠️ 중요: student.exec.register는 기본값 블록에 도달하면 안 됨
-              if (intentKey === 'student.exec.register') {
-                console.error('[ChatOps] ⚠️⚠️⚠️ 치명적 오류: student.exec.register가 기본값 블록에 도달함!', {
-                  intent_key: intentKey,
-                  domain: domain,
-                  domain_parts: domainParts,
-                });
-                // 강제로 student로 설정
-                entityType = 'student';
-                entityId = tenant_id;
-                console.log('[ChatOps] ✅ student.exec.register를 강제로 student로 설정:', {
-                  entity_type: entityType,
-                  entity_id: entityId.substring(0, 8) + '...',
-                });
-              } else if (targetStudentIds.length > 0) {
-                entityType = 'student';
-                entityId = targetStudentIds[0];
-              } else {
-                entityType = 'tenant';
-                entityId = tenant_id;
-              }
-            }
-
-            // ⚠️ 최종 검증: student.exec.register는 반드시 entity_type='student'여야 함
-            if (intentKey === 'student.exec.register' && entityType !== 'student') {
-              console.error('[ChatOps] ⚠️⚠️⚠️ 치명적 오류: student.exec.register인데 entity_type이 student가 아님!', {
-                intent_key: intentKey,
-                entity_type: entityType,
-                domain: domain,
-                domain_parts: domainParts,
-                target_student_ids_count: targetStudentIds.length,
-                parsed_intent_key: parsedIntent.intent_key,
-              });
-              // 강제로 수정
-              entityType = 'student';
-              entityId = targetStudentIds.length > 0 ? targetStudentIds[0] : tenant_id;
-              console.log('[ChatOps] ✅ entity_type을 강제로 student로 수정:', {
-                entity_type: entityType,
-                entity_id: entityId.substring(0, 8) + '...',
-                entity_id_is_tenant: entityId === tenant_id,
-              });
-            }
-
-            // ⚠️ 추가 검증: student.* 도메인은 항상 entity_type='student'여야 함
-            if (domain === 'student' && entityType !== 'student') {
-              console.error('[ChatOps] ⚠️⚠️⚠️ 치명적 오류: student 도메인인데 entity_type이 student가 아님!', {
-                intent_key: intentKey,
-                domain: domain,
-                entity_type: entityType,
-                target_student_ids_count: targetStudentIds.length,
-              });
-              // 강제로 수정
-              entityType = 'student';
-              entityId = targetStudentIds.length > 0 ? targetStudentIds[0] : tenant_id;
-              console.log('[ChatOps] ✅ student 도메인 entity_type을 강제로 student로 수정:', {
-                entity_type: entityType,
-                entity_id: entityId.substring(0, 8) + '...',
-                entity_id_is_tenant: entityId === tenant_id,
-              });
-            }
-
-            // dedup_key 생성 (간소화된 버전)
-            // 챗봇.md: dedup_key 포맷 "{tenantId}:{trigger}:{entityType}:{entityId}:{window}"
-            // ⚠️ P1: 날짜 처리 - toKSTDate() 사용 (체크리스트 준수)
-            // ⚠️ 중요: student.exec.register의 경우 entity_id=tenant_id이므로 중복 방지를 위해 학생 이름을 포함
-            const window = toKSTDate(); // YYYY-MM-DD (KST 기준)
-            let dedupEntityId = entityType === 'tenant' ? 'global' : entityId;
-
-            // student.exec.register의 경우: entity_id=tenant_id이므로 학생 이름을 dedup_key에 포함하여 중복 방지
-            if (intentKey === 'student.exec.register' && entityId === tenant_id) {
-              const studentName = parsedIntent.params?.name;
-              if (studentName && typeof studentName === 'string') {
-                // 학생 이름을 URL-safe하게 인코딩하여 dedup_key에 포함
-                const encodedName = encodeURIComponent(studentName.trim());
-                dedupEntityId = `${entityId}:${encodedName}`;
-                console.log('[ChatOps] student.exec.register dedup_key에 학생 이름 포함:', {
-                  student_name: maskPII(studentName),
-                  encoded_name: encodedName,
-                  dedup_entity_id: dedupEntityId.substring(0, 20) + '...',
-                });
-              }
-            }
-
-            const dedupKey = `${tenant_id}:chatops:${entityType}:${dedupEntityId}:${window}`;
-
-            // action_url 생성 (SSOT: packages/chatops-intents/src/taskcard.ts 참조)
-            // ⚠️ 중요: entity_type과 entity_id에 따라 적절한 URL 생성
-            // SSOT 규칙: entity_type='student'이면 `/students/${entityId}/tasks`
-            // 단, 학생 등록의 경우 entity_id=tenant_id이므로 특수 처리
-            let actionUrl = '';
-            if (entityType === 'student') {
-              // 학생 등록의 경우 entity_id=tenant_id이므로, TaskCard 목록 페이지로 이동
-              // 학생이 등록되면 TaskCard의 entity_id를 업데이트해야 함
-              if (intentKey === 'student.exec.register' && entityId === tenant_id) {
-                actionUrl = '/students/tasks';
-              } else {
-                // 일반 학생 TaskCard: `/students/${entityId}/tasks`
-                actionUrl = `/students/${entityId}/tasks`;
-              }
-            } else if (entityType === 'class') {
-              actionUrl = `/classes/${entityId}/tasks`;
-            } else if (entityType === 'billing') {
-              // billing entity_type: 청구 관련 TaskCard
-              actionUrl = '/billing/tasks';
-            } else {
-              // tenant, report, system 등: `/tasks/${dedupKey}` (SSOT 규칙)
-              // dedupKey는 아직 생성되지 않았으므로 임시로 '/tasks' 사용
-              actionUrl = '/tasks';
-            }
-
-            // title 생성 (자연어 응답에서 추출 또는 Intent 키 변환)
-            // ⚠️ 참고: Edge Function의 intent-registry는 간소화된 버전이라 description이 없음
-            // 자연어 응답(cleanResponse)의 첫 줄을 title로 사용하거나, intent_key를 변환
-            let taskCardTitle = '';
-            if (cleanResponse && cleanResponse.trim().length > 0) {
-              // 자연어 응답의 첫 줄 추출 (최대 50자)
-              const firstLine = cleanResponse.split('\n')[0].trim();
-              taskCardTitle = firstLine.length > 50
-                ? firstLine.substring(0, 50) + '...'
-                : firstLine;
-            } else {
-              // Fallback: intent_key를 읽기 쉬운 형식으로 변환
-              taskCardTitle = parsedIntent.intent_key
-                .replace(/\./g, ' ')
-                .replace(/\b\w/g, (l) => l.toUpperCase());
-            }
-
-            // TaskCard 생성
-            // ⚠️ 중요: service_role을 사용하므로 RPC 대신 직접 INSERT (RLS 우회)
-            console.log('[ChatOps] ===== TaskCard 생성 디버깅 시작 =====');
-            console.log('[ChatOps] entity_type/entity_id 최종 결정:', {
-              intent_key: intentKey,
-              domain: domain,
-              entity_type: entityType,
-              entity_id: entityId.substring(0, 8) + '...',
-              entity_id_is_tenant: entityId === tenant_id,
-              target_student_ids_count: targetStudentIds.length,
-            });
-
-            // ⚠️ 최종 검증: student.exec.register는 반드시 entity_type='student'여야 함
-            if (intentKey === 'student.exec.register' && entityType !== 'student') {
-              console.error('[ChatOps] ⚠️⚠️⚠️ 최종 검증 실패: student.exec.register인데 entity_type이 student가 아님!', {
-                intent_key: intentKey,
-                entity_type: entityType,
-                domain: domain,
-                domain_parts: domainParts,
-              });
-              // 강제로 수정
-              entityType = 'student';
-              entityId = tenant_id;
-              console.log('[ChatOps] ✅ 최종 검증 후 entity_type을 강제로 student로 수정:', {
-                entity_type: entityType,
-                entity_id: entityId.substring(0, 8) + '...',
-              });
-            }
-
-            console.log('[ChatOps] TaskCard 생성 시도...', {
-              tenant_id: tenant_id.substring(0, 8) + '...',
-              entity_id: entityId.substring(0, 8) + '...',
-              entity_type: entityType,
-              dedup_key: dedupKey,
-              priority: priorityValue,
-              intent_key: intentKey,
-              action_url: actionUrl,
-              title: taskCardTitle,
-              student_id: entityType === 'student' ? entityId.substring(0, 8) + '...' : null,
-              domain: domain,
-              domain_is_student: domain === 'student',
-            });
-
-            try {
-              // ⚠️ 문서 준수: 프론트 자동화.md 2.3 섹션 - Supabase client upsert() 직접 사용 가능
-              // service_role을 사용하므로 RLS 우회하여 직접 INSERT 가능
-              // ⚠️ 중요: 부분 인덱스(WHERE dedup_key IS NOT NULL AND status = 'pending')는 Supabase client의 onConflict와 호환되지 않음
-              // 따라서 먼저 기존 레코드를 확인하고, 있으면 업데이트, 없으면 삽입하는 방식 사용
-
-              const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-              const updatedAt = new Date().toISOString();
-
-              // 먼저 기존 레코드 확인 (부분 인덱스 조건: dedup_key IS NOT NULL AND status = 'pending')
-              console.log('[ChatOps] 기존 TaskCard 확인 중...', {
-                tenant_id: tenant_id.substring(0, 8) + '...',
-                dedup_key: dedupKey,
-              });
-              const { data: existingCard, error: checkError } = await supabase
-                .from('task_cards')
-                .select('id, tenant_id, entity_id, entity_type, task_type, dedup_key, status, action_url, created_at, updated_at, priority')
-                .eq('tenant_id', tenant_id)
-                .eq('dedup_key', dedupKey)
-                .eq('status', 'pending')
-                .maybeSingle();
-
-              console.log('[ChatOps] 기존 TaskCard 확인 결과:', {
-                found: !!existingCard,
-                error: checkError ? maskPII(checkError) : null,
-                card_id: existingCard?.id?.substring(0, 8) + '...',
-                card_entity_type: existingCard?.entity_type,
-                card_status: existingCard?.status,
-              });
-
-              let taskCardData: any = null;
-              let taskCardError: any = null;
-
-              if (existingCard) {
-                // 기존 레코드 업데이트 (RPC 함수의 DO UPDATE 로직과 동일)
-                // ⚠️ 중요: action_url이 없으면 업데이트 (기존 값이 없거나 빈 문자열인 경우)
-                console.log('[ChatOps] 기존 TaskCard 업데이트 시작:', {
-                  card_id: existingCard.id?.substring(0, 8) + '...',
-                  existing_action_url: existingCard.action_url,
-                  new_action_url: actionUrl,
-                });
-
-                const updateData: any = {
-                  updated_at: updatedAt,
-                  priority: Math.max(existingCard.priority || 0, priorityValue),
-                  suggested_action: plan,
-                  description: cleanResponse.substring(0, 500),
-                };
-
-                // action_url이 없거나 빈 문자열이면 업데이트 (RPC 함수: COALESCE(EXCLUDED.action_url, task_cards.action_url))
-                if (!existingCard.action_url || existingCard.action_url.trim() === '') {
-                  updateData.action_url = actionUrl;
-                  console.log('[ChatOps] action_url 업데이트 (기존 값 없음):', actionUrl);
-                } else {
-                  console.log('[ChatOps] action_url 유지 (기존 값 있음):', existingCard.action_url);
-                }
-
-                const { data: updatedCard, error: updateError } = await supabase
-                  .from('task_cards')
-                  .update(updateData)
-                  .eq('id', existingCard.id)
-                  .select('id, tenant_id, entity_id, entity_type, task_type, dedup_key, status, action_url, created_at, updated_at')
-                  .single();
-
-                console.log('[ChatOps] TaskCard 업데이트 결과:', {
-                  success: !!updatedCard,
-                  error: updateError ? maskPII(updateError) : null,
-                  card_id: updatedCard?.id?.substring(0, 8) + '...',
-                  action_url: updatedCard?.action_url,
-                });
-
-                taskCardData = updatedCard;
-                taskCardError = updateError;
-              } else {
-                // 새 레코드 삽입 시도
-                // ⚠️ 중요: action_url은 NOT NULL이므로 빈 문자열로 설정
-                const insertData = {
-                  tenant_id: tenant_id,
-                  entity_id: entityId,
-                  entity_type: entityType,
-                  task_type: 'ai_suggested',
-                  source: 'chatops',
-                  priority: priorityValue,
-                  title: taskCardTitle,
-                  description: cleanResponse.substring(0, 500),
-                  action_url: actionUrl,
-                  expires_at: expiresAt,
-                  dedup_key: dedupKey,
-                  status: 'pending',
-                  suggested_action: plan,
-                    // student_id 설정: entity_type='student'일 때 entity_id와 동일하게 설정 (레거시 호환)
-                    // ⚠️ 중요: 마이그레이션 126의 CHECK 제약조건: entity_type='student'이면 student_id = entity_id AND student_id IS NOT NULL
-                    // 학생 등록의 경우 entity_id=tenant_id이므로 student_id=tenant_id로 설정됨 (CHECK 제약조건 만족)
-                    student_id: entityType === 'student' ? entityId : null,
-                  updated_at: updatedAt,
-                };
-
-                console.log('[ChatOps] TaskCard 삽입 데이터:', {
-                  tenant_id: tenant_id.substring(0, 8) + '...',
-                  entity_id: entityId.substring(0, 8) + '...',
-                  entity_type: entityType,
-                  task_type: insertData.task_type,
-                  source: insertData.source,
-                  priority: insertData.priority,
-                  title: insertData.title.substring(0, 50),
-                  action_url: insertData.action_url,
-                  dedup_key: insertData.dedup_key,
-                  status: insertData.status,
-                  student_id: insertData.student_id ? insertData.student_id.substring(0, 8) + '...' : null,
-                });
-
-                const { data: insertedCard, error: insertError } = await supabase
-                  .from('task_cards')
-                  .insert(insertData)
-                  .select('id, tenant_id, entity_id, entity_type, task_type, dedup_key, status, action_url, created_at, updated_at')
-                  .single();
-
-                console.log('[ChatOps] TaskCard 삽입 결과:', {
-                  success: !!insertedCard,
-                  error: insertError ? maskPII(insertError) : null,
-                  error_code: insertError?.code,
-                  error_message: insertError?.message,
-                  error_details: insertError?.details,
-                  error_hint: insertError?.hint,
-                  card_id: insertedCard?.id?.substring(0, 8) + '...',
-                  card_entity_type: insertedCard?.entity_type,
-                  card_status: insertedCard?.status,
-                });
-
-                if (insertError) {
-                  // unique_violation 오류인 경우 (race condition), 다시 조회
-                  if (insertError.code === '23505') {
-                    console.log('[ChatOps] TaskCard 삽입 중 중복 감지, 기존 레코드 재조회 중...');
-                    const { data: retryCard } = await supabase
-                      .from('task_cards')
-                      .select('id, tenant_id, entity_id, entity_type, task_type, dedup_key, status, action_url, created_at, updated_at')
-                      .eq('tenant_id', tenant_id)
-                      .eq('dedup_key', dedupKey)
-                      .eq('status', 'pending')
-                      .single();
-
-                    if (retryCard) {
-                      taskCardData = retryCard;
-                      taskCardError = null;
-                    } else {
-                      taskCardError = insertError;
-                    }
-                  } else {
-                    taskCardError = insertError;
-                  }
-                } else {
-                  taskCardData = insertedCard;
-                }
-              }
-
-              if (taskCardError) {
-                // 중복 키 오류인 경우 기존 레코드 조회 (RPC 함수 EXCEPTION 처리와 동일)
-                if (taskCardError.code === '23505') { // unique_violation
-                  console.log('[ChatOps] TaskCard 중복 감지, 기존 레코드 조회 중...');
-                  const { data: existingCard } = await supabase
-                    .from('task_cards')
-                    .select('id, tenant_id, entity_id, entity_type, task_type, dedup_key, status, action_url, created_at, updated_at')
-                    .eq('tenant_id', tenant_id)
-                    .eq('dedup_key', dedupKey)
-                    .single();
-
-                  if (existingCard) {
-                    taskCardId = existingCard.id;
-                    cleanResponse = `${cleanResponse}\n\n[업무 카드 생성 완료] TaskCard ID: ${taskCardId}`;
-                    console.log('[ChatOps] TaskCard 조회 성공 (중복):', {
-                      task_card_id: taskCardId,
-                      intent_key: parsedIntent.intent_key,
-                    });
-                  } else {
-                    throw taskCardError;
-                  }
-                } else {
-                  throw taskCardError;
-                }
-              } else if (taskCardData) {
-                taskCardId = taskCardData.id;
-                cleanResponse = `${cleanResponse}\n\n[업무 카드 생성 완료] TaskCard ID: ${taskCardId}`;
-                console.log('[ChatOps] ===== TaskCard 생성 성공 =====');
-                console.log('[ChatOps] TaskCard 생성 성공:', {
-                  task_card_id: taskCardId,
-                  tenant_id: tenant_id.substring(0, 8) + '...',
-                  entity_id: taskCardData.entity_id?.substring(0, 8) + '...',
-                  entity_type: taskCardData.entity_type,
-                  task_type: taskCardData.task_type,
-                  dedup_key: taskCardData.dedup_key,
-                  status: taskCardData.status,
-                  created_at: taskCardData.created_at,
-                  intent_key: parsedIntent.intent_key,
-                  automation_level: intent.automation_level,
-                  execution_class: intent.execution_class,
-                });
-
-                // 생성된 TaskCard를 다시 조회하여 모든 필드 확인
-                const { data: verifyCard, error: verifyError } = await supabase
-                  .from('task_cards')
-                  .select('*')
-                  .eq('id', taskCardId)
-                  .single();
-
-                console.log('[ChatOps] TaskCard 검증 조회 결과:', {
-                  found: !!verifyCard,
-                  error: verifyError ? maskPII(verifyError) : null,
-                  entity_type: verifyCard?.entity_type,
-                  entity_id: verifyCard?.entity_id?.substring(0, 8) + '...',
-                  student_id: verifyCard?.student_id?.substring(0, 8) + '...',
-                  status: verifyCard?.status,
-                  expires_at: verifyCard?.expires_at,
-                  action_url: verifyCard?.action_url,
-                });
-              } else {
-                throw new Error('TaskCard 생성 결과가 없습니다.');
-              }
-            } catch (taskCardInsertError) {
-              const maskedError = maskPII(taskCardInsertError);
-              console.error('[ChatOps] TaskCard 생성 실패:', {
-                intent_key: parsedIntent.intent_key,
-                automation_level: intent.automation_level,
-                error: maskedError,
-              });
-              cleanResponse = `${cleanResponse}\n\n[오류] TaskCard 생성에 실패했습니다.`;
-            }
-          }
+          // Inline Execution이면 TaskCard 생성하지 않고 종료
+          // (confirm 단계에서 실제 실행)
+        } catch (inlineError) {
+          const maskedError = maskPII(inlineError);
+          console.error('[ChatOps] Inline Execution error:', maskedError);
+          cleanResponse = `${cleanResponse}\n\n[오류] Inline Execution 처리 중 오류가 발생했습니다.`;
         }
-      } catch (taskCardError) {
-        // P0: PII 마스킹 필수
-        const maskedTaskCardError = maskPII(taskCardError);
-        console.error('[ChatOps] TaskCard creation error:', maskedTaskCardError);
-        // TaskCard 생성 실패는 치명적 오류가 아니므로 로그만 남기고 계속 진행
-        cleanResponse = `${cleanResponse}\n\n[오류] TaskCard 생성 중 오류가 발생했습니다.`;
       }
     }
 
-    // ⚠️ 중요: 응답 반환 전 Fallback 강제 실행 (parsedIntent가 없고 사용자 메시지가 있는 경우)
-    // 이 로직은 반드시 실행되어야 하므로 try-catch로 감싸서 안전하게 처리
-    if (!parsedIntent && message && typeof message === 'string') {
-      console.log('[ChatOps] parsedIntent가 없음 - Fallback 강제 실행 (응답 반환 전)...', {
-        message_preview: maskPII(message.substring(0, 50)),
-        message_length: message.length,
-      });
-      try {
-        const fallbackIntent = inferIntentFromMessage(message);
-        if (fallbackIntent) {
-          console.log('[ChatOps] Fallback 강제 실행 성공:', {
-            intent_key: fallbackIntent.intent_key,
-            automation_level: fallbackIntent.automation_level,
-            execution_class: fallbackIntent.execution_class,
-          });
-          parsedIntent = fallbackIntent;
-          console.log('[ChatOps] parsedIntent 최종 설정 완료:', {
-            intent_key: parsedIntent.intent_key,
-            automation_level: parsedIntent.automation_level,
-          });
-        } else {
-          console.log('[ChatOps] Fallback 강제 실행 실패 - 키워드 매칭 실패');
-        }
-      } catch (fallbackError) {
-        const maskedFallbackError = maskPII(fallbackError);
-        console.error('[ChatOps] Fallback 강제 실행 중 오류:', maskedFallbackError);
+    // ⚠️ 모든 L1/L2 Intent는 Inline Execution으로 처리하므로 TaskCard 생성하지 않음
+    // 모든 Intent는 대화만으로 처리 (TaskCard 기반 프로세스 완전 제거)
+    // ⚠️ 참고: Fallback은 이미 Intent 파싱 실패 시점에 실행되었음
+
+    // DB에 메시지 저장 (원자적으로 가능하면 트랜잭션)
+    try {
+      // 사용자 메시지 저장
+      const { error: userMsgError } = await supabase
+        .from('chatops_messages')
+        .insert({
+          session_id: session_id,
+          tenant_id: tenant_id,
+          user_id: user_id,
+          role: 'user',
+          content: message,
+        });
+
+      if (userMsgError) {
+        throw userMsgError;
       }
+
+      // Assistant 응답 저장
+      const { error: assistantMsgError } = await supabase
+        .from('chatops_messages')
+        .insert({
+          session_id: session_id,
+          tenant_id: tenant_id,
+          user_id: user_id,
+          role: 'assistant',
+          content: cleanResponse,
+          intent_key: parsedIntent?.intent_key,
+          automation_level: parsedIntent?.automation_level,
+          execution_class: parsedIntent?.execution_class,
+        });
+
+      if (assistantMsgError) {
+        throw assistantMsgError;
+      }
+    } catch (dbError) {
+      const maskedDbError = maskPII(dbError);
+      console.error('[ChatOps] DB 저장 실패:', maskedDbError);
+      // DB 저장 실패는 사용자에게 영향을 주지 않도록 함 (응답은 반환)
     }
 
-    // 응답 반환
-    console.log('[ChatOps] ===== 작업 완료 =====');
-    console.log('[ChatOps] 최종 응답 상태:', {
+    console.log('[ChatOps] ===== 최종 응답 반환 =====');
+    console.log('[ChatOps] 최종 응답:', {
+      response_length: cleanResponse.length,
       has_intent: !!parsedIntent,
       intent_key: parsedIntent?.intent_key,
       automation_level: parsedIntent?.automation_level,
-      has_l0_result: !!l0ExecutionResult,
-      has_task_card: !!taskCardId,
-      task_card_id: taskCardId,
-      response_length: cleanResponse.length,
     });
 
+    // 응답 객체 구성 (ChatOpsResponse 인터페이스 준수)
     const response: ChatOpsResponse = {
       response: cleanResponse,
-      intent: parsedIntent,
-      l0_result: l0ExecutionResult, // L0 실행 결과 포함
-      task_card_id: taskCardId, // L1/L2 Intent의 경우 생성된 TaskCard ID
+      ...(parsedIntent && {
+        intent: {
+          intent_key: parsedIntent.intent_key,
+          automation_level: parsedIntent.automation_level,
+          ...(parsedIntent.execution_class && { execution_class: parsedIntent.execution_class }),
+          ...(parsedIntent.params && { params: parsedIntent.params }),
+        },
+      }),
+      ...(l0ExecutionResult !== undefined && { l0_result: l0ExecutionResult }),
+      ...(draftResponse && { draft_id: draftResponse }),
+      ...(draftStatus && { draft_status: draftStatus }),
+      ...(missingRequired && missingRequired.length > 0 && { missing_required: missingRequired }),
+      ...(nextQuestion && { next_question: nextQuestion }),
+      ...(summary && { summary: summary }),
+      ...(confirmRequired !== undefined && { confirm_required: confirmRequired }),
     };
 
-    return new Response(JSON.stringify(response), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify(response),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   } catch (error) {
-    // P0: PII 마스킹 필수
     const maskedError = maskPII(error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    console.error('[ChatOps] Fatal error:', maskedError);
-    if (errorStack) {
-      // P0: PII 마스킹 필수 (스택 트레이스에도 PII가 포함될 수 있음)
-      const maskedStack = maskPII(errorStack);
-      console.error('[ChatOps] Error stack:', maskedStack);
-    }
+    console.error('[ChatOps] 최상위 에러:', maskedError);
     return new Response(
       JSON.stringify({
-        error: 'AI response generation failed',
-        message: errorMessage,
+        error: '챗봇 처리 중 오류가 발생했습니다.',
+        details: maskedError,
       }),
       {
         status: 500,
@@ -1916,4 +2637,3 @@ Intent 규칙:
     );
   }
 });
-

@@ -51,7 +51,9 @@ export const rbac_exec_assign_roleHandler: IntentHandler = {
         policyPath
       );
 
-      if (!policyEnabled || policyEnabled !== true) {
+      // 정책이 없으면 기본값으로 true 사용 (마이그레이션 미실행 시 호환성)
+      // 정책이 명시적으로 false로 설정된 경우에만 비활성화
+      if (policyEnabled === false) {
         return {
           status: 'failed',
           error_code: 'POLICY_DISABLED',

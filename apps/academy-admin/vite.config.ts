@@ -611,11 +611,20 @@ export default defineConfig(({ mode }) => {
             return 'lib-other';
           }
 
-          // 내부 패키지들
+          // 내부 패키지들을 더 작은 청크로 분리 (초기 로드 번들 크기 감소)
           if (id.includes('@design-system')) {
             return 'design-system';
           }
+          // @ui-core를 더 작은 청크로 분리
           if (id.includes('@ui-core')) {
+            // 큰 컴포넌트들은 별도 청크로 (초기 로드에서 제외)
+            if (id.includes('ChatOpsPanel') || id.includes('AILayerMenu') || id.includes('AppLayout')) {
+              return 'ui-core-components';
+            }
+            // 스타일 파일은 별도 청크로
+            if (id.includes('styles') || id.includes('index.css')) {
+              return 'ui-core-styles';
+            }
             return 'ui-core';
           }
           if (id.includes('@schema-engine')) {
@@ -624,7 +633,12 @@ export default defineConfig(({ mode }) => {
           if (id.includes('@api-sdk')) {
             return 'api-sdk';
           }
+          // @hooks를 더 작은 청크로 분리
           if (id.includes('@hooks')) {
+            // 큰 hook들은 별도 청크로 (초기 로드에서 제외)
+            if (id.includes('use-chatops') || id.includes('use-execution-audit')) {
+              return 'hooks-chatops';
+            }
             return 'hooks';
           }
           if (id.includes('@core')) {

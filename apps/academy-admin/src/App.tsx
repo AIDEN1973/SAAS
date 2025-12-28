@@ -1,7 +1,14 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { Suspense, lazy, useMemo, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { AppLayout, Button, useModal, useTheme, AIToggle, useAILayerMenu } from '@ui-core/react';
+import {
+  Button,
+  useModal,
+  useTheme,
+  AIToggle,
+  useAILayerMenu,
+  getOrCreateChatOpsSessionId,
+} from '@ui-core/react';
 import type { SidebarItem } from '@ui-core/react';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleBasedRoute } from './components/RoleBasedRoute';
@@ -12,6 +19,9 @@ import { getApiContext } from '@api-sdk/core';
 import type { TenantRole } from '@core/tenancy';
 import { createSafeNavigate, logError, logWarn, logInfo } from './utils';
 import { maskPII } from '@core/pii-utils';
+
+// 큰 컴포넌트는 lazy loading으로 전환 (초기 로드 번들 크기 감소)
+const AppLayout = lazy(() => import('@ui-core/react').then(m => ({ default: m.AppLayout })));
 
 // 핵심 페이지는 즉시 로드 (초기 로딩 속도)
 import { HomePage } from './pages/HomePage';
@@ -168,8 +178,12 @@ function AppContent() {
       aiLayerMenu.setChatOpsLoading(true);
 
       // ChatOps API 호출
-      console.log('[ChatOps:Frontend] API 호출 중...');
-      const response = await chatOpsMutation.mutateAsync(message);
+      // session_id 가져오기 (새로고침 시에도 유지)
+      const sessionId = getOrCreateChatOpsSessionId();
+      console.log('[ChatOps:Frontend] API 호출 중...', {
+        session_id: sessionId.substring(0, 8) + '...',
+      });
+      const response = await chatOpsMutation.mutateAsync({ sessionId, message });
       console.log('[ChatOps:Frontend] API 응답 수신:', {
         has_intent: !!response.intent,
         intent_key: response.intent?.intent_key,
@@ -245,6 +259,7 @@ function AppContent() {
             automation_level: response.intent.automation_level,
             params: response.intent.params,
             l0_result: response.l0_result, // L0 실행 결과 포함
+            original_message: response.original_message, // 원본 사용자 메시지 (필터링용)
           } : undefined,
         });
       }
@@ -283,6 +298,13 @@ function AppContent() {
       aiLayerMenu.setChatOpsLoading(false);
     }
   }, [aiLayerMenu, chatOpsMutation, queryClient]);
+
+  // ChatOps 초기화 핸들러
+  const handleChatOpsReset = useCallback(() => {
+    console.log('[ChatOps:Frontend] ===== 대화 초기화 =====');
+    aiLayerMenu.clearChatOpsMessages();
+    console.log('[ChatOps:Frontend] 대화 초기화 완료');
+  }, [aiLayerMenu]);
 
   // Location 변경 추적 (필요시 디버깅용으로 활성화)
   // useEffect(() => {
@@ -604,6 +626,7 @@ function AppContent() {
                 onItemClick: handleSidebarItemClick,
               }}
               onChatOpsSendMessage={handleChatOpsSendMessage}
+              onChatOpsReset={handleChatOpsReset}
             >
               <Routes>
                 <Route path="/home" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><HomePage /></RoleBasedRoute>} />

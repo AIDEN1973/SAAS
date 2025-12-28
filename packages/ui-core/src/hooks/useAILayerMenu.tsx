@@ -7,10 +7,16 @@
  * [불변 규칙] 모든 페이지에서 사용 가능한 전역 상태
  */
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import { ChatOpsMessage } from '../components/ChatOpsPanel';
 import { ExecutionAuditRun, ExecutionAuditStep, ExecutionAuditFilters } from '../components/ExecutionAuditPanel';
 import type { AILayerMenuTab } from '../components/AILayerMenu';
+import {
+  getOrCreateChatOpsSessionId,
+  saveChatOpsMessagesToCache,
+  loadChatOpsMessagesFromCache,
+  resetChatOpsSessionId,
+} from '../utils/chatops-session';
 
 interface AILayerMenuContextType {
   isOpen: boolean;
@@ -58,9 +64,72 @@ export function AILayerMenuProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<AILayerMenuTab>('activity');
 
+  // ChatOps session_id 관리
+  const sessionIdRef = useRef<string | null>(null);
+  const isInitializedRef = useRef(false);
+
   // ChatOps 상태
-  const [chatOpsMessages, setChatOpsMessages] = useState<ChatOpsMessage[]>([]);
+  // 초기값은 localStorage에서 로드 (새로고침 시 복원)
+  const [chatOpsMessages, setChatOpsMessages] = useState<ChatOpsMessage[]>(() => {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    try {
+      const sessionId = getOrCreateChatOpsSessionId();
+      sessionIdRef.current = sessionId;
+      const cached = loadChatOpsMessagesFromCache(sessionId);
+      return cached || [];
+    } catch (error) {
+      console.error('[useAILayerMenu] Failed to load cached messages:', error);
+      return [];
+    }
+  });
   const [chatOpsLoading, setChatOpsLoading] = useState(false);
+
+  // 초기화: session_id 설정 및 캐시 복원
+  useEffect(() => {
+    if (isInitializedRef.current) {
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      const sessionId = getOrCreateChatOpsSessionId();
+      sessionIdRef.current = sessionId;
+
+      // 캐시에서 메시지 복원
+      const cached = loadChatOpsMessagesFromCache(sessionId);
+      if (cached && cached.length > 0) {
+        setChatOpsMessages(cached);
+      }
+
+      isInitializedRef.current = true;
+    } catch (error) {
+      console.error('[useAILayerMenu] Failed to initialize session:', error);
+      isInitializedRef.current = true;
+    }
+  }, []);
+
+  // 메시지 변경 시 localStorage에 저장
+  useEffect(() => {
+    if (!isInitializedRef.current || !sessionIdRef.current) {
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      saveChatOpsMessagesToCache(sessionIdRef.current, chatOpsMessages);
+    } catch (error) {
+      console.error('[useAILayerMenu] Failed to save messages to cache:', error);
+    }
+  }, [chatOpsMessages]);
 
   // Execution Audit 상태
   const [executionAuditRuns, setExecutionAuditRuns] = useState<ExecutionAuditRun[]>([]);
@@ -90,6 +159,15 @@ export function AILayerMenuProvider({ children }: { children: ReactNode }) {
 
   const clearChatOpsMessages = useCallback(() => {
     setChatOpsMessages([]);
+    // session_id도 초기화 (새 대화 시작)
+    if (typeof window !== 'undefined') {
+      try {
+        const newSessionId = resetChatOpsSessionId();
+        sessionIdRef.current = newSessionId;
+      } catch (error) {
+        console.error('[useAILayerMenu] Failed to reset session:', error);
+      }
+    }
   }, []);
 
   const addExecutionAuditRun = useCallback((run: ExecutionAuditRun) => {

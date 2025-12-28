@@ -63,6 +63,8 @@ export interface IntentRegistryItem {
   intent_key: string;
   automation_level: 'L0' | 'L1' | 'L2';
   execution_class?: 'A' | 'B'; // L2일 때만 존재
+  description?: string; // Intent 설명 (후보 추출용)
+  examples?: string[]; // 발화 예시 (후보 추출용, 우선순위 높음)
   // params 스키마 검증은 Edge Function에서 zod를 사용하기 어려우므로,
   // 기본적인 타입 검증만 수행
   // 실제 스키마 검증은 서버 측에서 수행

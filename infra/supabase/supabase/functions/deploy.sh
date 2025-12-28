@@ -20,50 +20,64 @@ if [ -z "$PROJECT_REF" ]; then
   echo ""
   echo "사용법:"
   echo "  cd infra/supabase"
-  echo "  ./functions/deploy.sh YOUR_PROJECT_REF"
+  echo "  ./supabase/supabase/functions/deploy.sh YOUR_PROJECT_REF"
   echo ""
   echo "또는 환경변수로 설정:"
   echo "  export SUPABASE_PROJECT_REF=YOUR_PROJECT_REF"
   echo "  cd infra/supabase"
-  echo "  ./functions/deploy.sh"
+  echo "  ./supabase/supabase/functions/deploy.sh"
   echo ""
   echo "프로젝트 ref는 Supabase Dashboard → Settings → General에서 확인할 수 있습니다."
   exit 1
 fi
 
-# infra/supabase 디렉토리로 이동
+# infra/supabase 디렉토리로 이동 (Supabase CLI는 이 디렉토리에서 실행되어야 함)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/.." || exit 1
+cd "$SCRIPT_DIR/../.." || exit 1
 
-# 배포 전 파일 동기화 (필수)
-# ⚠️ 중요: 소스 파일은 functions/ 디렉토리에서만 수정하세요
-# supabase/functions/는 배포용이므로 직접 수정하지 마세요
-echo "🔄 배포 전 파일 동기화 중..."
-if [ -f "functions/sync-for-deploy.sh" ]; then
-  bash functions/sync-for-deploy.sh
-  echo ""
-else
-  echo "❌ sync-for-deploy.sh를 찾을 수 없습니다."
-  exit 1
-fi
+# ⚠️ 중요: Supabase CLI는 supabase/functions 디렉토리를 찾으므로
+#          infra/supabase 디렉토리에서 실행해야 합니다.
+#          현재 디렉토리: infra/supabase (supabase/functions가 여기에 있음)
 
 echo "🚀 Supabase Edge Functions 배포 시작"
 echo "프로젝트 Ref: $PROJECT_REF"
 echo "작업 디렉토리: $(pwd)"
 echo ""
 
+# ⚠️ P1: DB Contract Gate 검증 (배포 전 자동 실행)
+# 붕괴사전예방.md Layer B 참조: CI/CD 파이프라인 자동 통합
+echo "🔍 DB Contract Gate 검증 실행 중..."
+if ! npm run test:db-contract; then
+  echo "❌ DB Contract Gate 검증 실패 - 배포 중단"
+  echo "마이그레이션이 누락되었거나 스키마가 불일치합니다."
+  echo "scripts/test-db-contract.ts를 확인하세요."
+  exit 1
+fi
+echo "✅ DB Contract Gate 검증 통과"
+echo ""
+
 FUNCTIONS=(
-  "auto-billing-generation"
-  "student-task-card-generation"
   "ai-briefing-generation"
-  "daily-statistics-update"
-  "overdue-notification-scheduler"
-  "student-risk-analysis"
-  "execute-student-task"
-  "auto-message-suggestion"
-  "consultation-ai-summary"
+  "auto-billing-generation"
+  "capacity-optimization-automation"
   "chatops"
+  "consultation-ai-summary"
+  "customer-retention-automation"
+  "daily-statistics-update"
+  "execute-student-task"
+  "execute-task-card"
   "execution-audit-runs"
+  "financial-automation-batch"
+  "growth-marketing-automation"
+  "monthly-business-report"
+  "overdue-notification-scheduler"
+  "payment-webhook-handler"
+  "plan-upgrade"
+  "safety-compliance-automation"
+  "student-risk-analysis"
+  "student-task-card-generation"
+  "worker-process-job"
+  "workforce-ops-automation"
 )
 
 SUCCESS_COUNT=0

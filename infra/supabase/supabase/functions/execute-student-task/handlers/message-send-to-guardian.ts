@@ -28,11 +28,12 @@ export const messageSendToGuardianHandler: IntentHandler = {
   ): Promise<HandlerResult> {
     try {
       // ⚠️ P0: Plan 스냅샷에서만 실행 대상 로드 (클라이언트 입력 무시)
+      const params = plan.params as Record<string, unknown>;
       const studentId = plan.plan_snapshot.targets?.student_ids?.[0];
       const channel = plan.plan_snapshot.channel || 'sms';
       const templateId = plan.plan_snapshot.template_id;
-      const text = plan.params.text as string | undefined;
-      const messagePurpose = plan.params.message_purpose as 'absence' | 'overdue' | 'general' | undefined;
+      const text = params.text as string | undefined;
+      const messagePurpose = params.message_purpose as 'absence' | 'overdue' | 'general' | undefined;
 
       if (!studentId) {
         return {
@@ -82,7 +83,9 @@ export const messageSendToGuardianHandler: IntentHandler = {
         context.tenant_id,
         policyEnabledPath
       );
-      if (!policyEnabled || policyEnabled !== true) {
+      // 정책이 없으면 기본값으로 true 사용 (마이그레이션 미실행 시 호환성)
+      // 정책이 명시적으로 false로 설정된 경우에만 비활성화
+      if (policyEnabled === false) {
         return {
           status: 'failed',
           error_code: 'POLICY_DISABLED',
@@ -137,49 +140,109 @@ export const messageSendToGuardianHandler: IntentHandler = {
         };
       }
 
-      // 알림 발송
-      const notification = {
+      // ⚠️ Outbox 패턴: message_outbox에 기록 (외부 발송과 DB 트랜잭션 분리)
+      // ChatOps_계약_붕괴_방지_체계_분석.md 2.2.4 참조
+      // idempotency_key 생성: intent_key + studentId + channel + templateId 조합
+      const idempotencyKeyParts = [
+        plan.intent_key,
+        studentId,
+        normalizedChannel,
+        templateId || 'no-template',
+        context.now_kst.split('T')[0], // 날짜별 중복 방지 (YYYY-MM-DD만 사용)
+      ];
+      const idempotencyKeyRaw = idempotencyKeyParts.join(':');
+      // SHA-256 해시 생성 (Deno 환경)
+      const encoder = new TextEncoder();
+      const data = encoder.encode(idempotencyKeyRaw);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      const idempotencyKey = `msg:${hashHex.substring(0, 64)}`;
+
+      // message_outbox에 기록
+      const outboxRecord = {
         tenant_id: context.tenant_id,
+        intent_key: plan.intent_key,
+        student_ids: [studentId],
         channel: normalizedChannel,
-        recipient: recipient,
         template_id: templateId || null,
-        content: text || plan.plan_snapshot.summary || '메시지',
-        status: 'pending',
-        event_type: eventType,
-        execution_context: {
-          intent_key: plan.intent_key,
-          student_id: studentId,
-          guardian_id: guardian.id,
+        params: {
+          text: text || plan.plan_snapshot.summary || '메시지',
           event_type: eventType,
           message_purpose: messagePurpose,
+          recipient: recipient, // PII이지만 발송에 필요
+          guardian_id: guardian.id,
         },
+        status: 'pending',
+        idempotency_key: idempotencyKey,
+        retry_count: 0,
+        max_retries: 3,
+        success_count: 0,
+        failure_count: 0,
+        success_list: null,
+        failure_list: null,
+        error_message: null,
       };
 
-      const { data: createdNotification, error: notificationError } = await context.supabase
-        .from('notifications')
-        .insert(notification)
-        .select('id')
-        .single();
+      const { data: createdOutbox, error: outboxError } = await withTenant(
+        context.supabase
+          .from('message_outbox')
+          .insert(outboxRecord)
+          .select('id')
+          .single(),
+        context.tenant_id
+      );
 
-      if (notificationError) {
-        const maskedError = maskPII(notificationError);
-        console.error('[messageSendToGuardianHandler] Failed to create notification:', maskedError);
+      if (outboxError) {
+        // 중복 키 오류인 경우 기존 레코드 조회 (멱등성 보장)
+        if (outboxError.code === '23505') { // unique_violation
+          console.log('[messageSendToGuardianHandler] 중복 발송 요청 감지 (idempotency_key):', {
+            idempotency_key: idempotencyKey.substring(0, 20) + '...',
+          });
+          // 기존 레코드 조회하여 상태 반환
+          const { data: existingOutbox } = await withTenant(
+            context.supabase
+              .from('message_outbox')
+              .select('id, status, success_count, failure_count')
+              .eq('idempotency_key', idempotencyKey)
+              .single(),
+            context.tenant_id
+          );
+
+          if (existingOutbox) {
+            return {
+              status: existingOutbox.status === 'sent' ? 'success' : 'failed',
+              result: {
+                message_sent: existingOutbox.status === 'sent',
+                channel: normalizedChannel,
+                outbox_id: existingOutbox.id,
+                status: existingOutbox.status,
+              },
+              affected_count: existingOutbox.success_count || 0,
+              message: '이미 처리된 발송 요청입니다.',
+            };
+          }
+        }
+
+        const maskedError = maskPII(outboxError);
+        console.error('[messageSendToGuardianHandler] Failed to create outbox record:', maskedError);
         return {
           status: 'failed',
-          error_code: 'NOTIFICATION_CREATION_FAILED',
-          message: '알림 생성에 실패했습니다.',
+          error_code: 'OUTBOX_CREATION_FAILED',
+          message: '발송 요청 기록에 실패했습니다.',
         };
       }
 
       return {
         status: 'success',
         result: {
-          message_sent: true,
+          message_sent: false, // Outbox 패턴: 실제 발송은 워커가 처리
           channel: normalizedChannel,
-          recipient: recipient,
+          outbox_id: createdOutbox?.id,
+          status: 'pending', // 워커가 처리할 때까지 pending
         },
         affected_count: 1,
-        message: '보호자 메시지 발송을 완료했습니다.',
+        message: '보호자 메시지 발송 요청이 기록되었습니다. (Outbox 패턴)',
       };
     } catch (error) {
       const maskedError = maskPII(error);

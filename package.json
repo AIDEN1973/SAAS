@@ -35,6 +35,8 @@
     "setup:env": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-env.ps1",
     "check:shared-catalog": "tsx scripts/check-shared-catalog.ts",
     "test:chatops-intents": "tsx scripts/test-chatops-all-intents.ts",
+    "gen:intent-examples": "tsx scripts/generate-intent-examples.ts",
+    "test:db-contract": "tsx scripts/test-db-contract.ts",
     "prepare": "node -e \"try { if (!process.env.CI && !process.env.VERCEL && require('fs').existsSync('node_modules/husky')) { require('husky').install(); } } catch(e) {}\" || true"
   },
   "devDependencies": {
@@ -47,6 +49,7 @@
     "@types/node": "^20.10.0",
     "@vitest/coverage-v8": "^4.0.16",
     "@vitest/ui": "^4.0.16",
+    "dotenv": "^17.2.3",
     "eslint": "^8.57.1",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",

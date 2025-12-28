@@ -104,6 +104,32 @@ export async function getTenantSettingByPath(
 }
 
 /**
+ * Feature Flag 체크 (AI 외 기능)
+ * ChatOps_계약_붕괴_방지_체계_분석.md 3.4 참조
+ *
+ * @param supabase Supabase 클라이언트
+ * @param tenantId 테넌트 ID
+ * @param featureKey Feature Flag 키 (예: 'messaging', 'automation')
+ * @returns Feature가 활성화되어 있으면 true, 아니면 false (Fail-Closed)
+ */
+export async function shouldUseFeature(
+  supabase: SupabaseClient,
+  tenantId: string,
+  featureKey: string
+): Promise<boolean> {
+  const { data: feature } = await withTenant(
+    supabase
+      .from('tenant_features')
+      .select('enabled')
+      .eq('feature_key', featureKey),
+    tenantId
+  ).single();
+
+  // Fail-Closed: Feature가 없거나 비활성화되어 있으면 false
+  return feature?.enabled === true;
+}
+
+/**
  * 동적 Policy 경로 생성 헬퍼 함수 (SSOT)
  *
  * SSOT 원칙: 동적 경로(`auto_notification.${eventType}.${field}`)도 이 헬퍼 함수를 통해 생성해야 합니다.

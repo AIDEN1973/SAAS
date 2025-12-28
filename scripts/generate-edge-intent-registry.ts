@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 const SSOT_REGISTRY_PATH = join(process.cwd(), 'packages/chatops-intents/src/registry.ts');
-const EDGE_REGISTRY_PATH = join(process.cwd(), 'infra/supabase/functions/_shared/intent-registry.ts');
+const EDGE_REGISTRY_PATH = join(process.cwd(), 'infra/supabase/supabase/functions/_shared/intent-registry.ts');
 
 const registryContent = readFileSync(SSOT_REGISTRY_PATH, 'utf-8');
 
@@ -20,12 +20,16 @@ const intents: Array<{
   key: string;
   automation_level: string;
   execution_class?: string;
+  description?: string;
+  examples?: string[];
 }> = [];
 
 let currentIntent: {
   key?: string;
   automation_level?: string;
   execution_class?: string;
+  description?: string;
+  examples?: string[];
 } | null = null;
 let braceCount = 0;
 let inIntentBlock = false;
@@ -59,6 +63,47 @@ for (let i = 0; i < lines.length; i++) {
       currentIntent.execution_class = executionClassMatch[1];
     }
 
+    // description 추출
+    const descriptionMatch = line.match(/description:\s*'([^']+)'/);
+    if (descriptionMatch) {
+      currentIntent.description = descriptionMatch[1];
+    }
+
+    // examples 추출 시작
+    if (line.includes('examples:') && line.includes('[')) {
+      currentIntent.examples = [];
+      // 한 줄에 examples가 모두 있는 경우
+      const singleLineMatch = line.match(/examples:\s*\[(.*?)\]/);
+      if (singleLineMatch) {
+        const examplesStr = singleLineMatch[1];
+        const examples = examplesStr
+          .split(',')
+          .map(ex => ex.trim().replace(/^['"]|['"]$/g, ''))
+          .filter(ex => ex.length > 0);
+        currentIntent.examples = examples;
+      } else {
+        // 여러 줄에 걸친 examples 추출
+        let examplesStart = i;
+        let examplesEnd = i;
+        let examplesBraceCount = 1;
+        for (let j = i + 1; j < lines.length; j++) {
+          const exLine = lines[j];
+          examplesBraceCount += (exLine.match(/\[/g) || []).length;
+          examplesBraceCount -= (exLine.match(/\]/g) || []).length;
+          if (examplesBraceCount === 0) {
+            examplesEnd = j;
+            break;
+          }
+        }
+        // examples 블록 파싱
+        const examplesBlock = lines.slice(examplesStart, examplesEnd + 1).join('\n');
+        const examplesMatches = examplesBlock.match(/'([^']+)'/g);
+        if (examplesMatches) {
+          currentIntent.examples = examplesMatches.map(m => m.replace(/^'|'$/g, ''));
+        }
+      }
+    }
+
     // Intent 블록 종료
     if (braceCount === 0) {
       if (currentIntent.key && currentIntent.automation_level) {
@@ -66,6 +111,8 @@ for (let i = 0; i < lines.length; i++) {
           key: currentIntent.key,
           automation_level: currentIntent.automation_level,
           execution_class: currentIntent.execution_class,
+          description: currentIntent.description,
+          examples: currentIntent.examples,
         });
       }
       currentIntent = null;
@@ -110,9 +157,27 @@ for (const intent of intents) {
     ? `    execution_class: '${intent.execution_class}',`
     : '';
 
+  const descriptionLine = intent.description
+    ? `    description: '${intent.description.replace(/'/g, "\\'")}',`
+    : '';
+
+  const examplesLines: string[] = [];
+  if (intent.examples && intent.examples.length > 0) {
+    const examplesStr = intent.examples
+      .map(ex => `      '${ex.replace(/'/g, "\\'")}'`)
+      .join(',\n');
+    examplesLines.push(`    examples: [\n${examplesStr},\n    ],`);
+  }
+
+  const fields: string[] = [];
+  fields.push(`    intent_key: '${intent.key}',`);
+  fields.push(`    automation_level: '${intent.automation_level}',`);
+  if (executionClassLine) fields.push(executionClassLine);
+  if (descriptionLine) fields.push(descriptionLine);
+  if (examplesLines.length > 0) fields.push(...examplesLines);
+
   registryEntries.push(`  '${intent.key}': {
-    intent_key: '${intent.key}',
-    automation_level: '${intent.automation_level}',${executionClassLine ? '\n' + executionClassLine : ''}
+${fields.join('\n')}
   },`);
 }
 

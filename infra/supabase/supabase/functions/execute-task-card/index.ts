@@ -22,8 +22,10 @@ import { maskPII } from '../_shared/pii-utils.ts';
 import { assertAutomationEventType } from '../_shared/automation-event-catalog.ts';
 import { getHandler, hasHandler } from '../execute-student-task/handlers/registry.ts';
 import type { HandlerContext } from '../execute-student-task/handlers/types.ts';
+import { ContractErrorCategory } from '../execute-student-task/handlers/types.ts';
 import { getIntent } from '../_shared/intent-registry.ts';
 import { isDomainActionKey } from '../_shared/domain-action-catalog.ts';
+import { shouldUseWorker, createJob } from '../_shared/job-utils.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -228,13 +230,15 @@ serve(async (req) => {
     // ⚠️ P1: action_type 정규화 (체크리스트.md 6. 데이터 정규화 규칙)
     // 레거시 'approve'는 'approve-and-execute'로 정규화
     // 언더스코어 형태는 하이픈으로 정규화
-    if (action === 'approve') {
-      action = 'approve-and-execute';
-    } else if (action === 'request_approval') {
-      action = 'request-approval';
-    } else if (action === 'approve_and_execute') {
-      action = 'approve-and-execute';
+    let normalizedAction = action;
+    if (normalizedAction === 'approve') {
+      normalizedAction = 'approve-and-execute';
+    } else if (normalizedAction === 'request_approval') {
+      normalizedAction = 'request-approval';
+    } else if (normalizedAction === 'approve_and_execute') {
+      normalizedAction = 'approve-and-execute';
     }
+    action = normalizedAction as ExecuteRequest['action'];
 
     // ⚠️ P0: action enum 검증 (SSOT 정본)
     if (action !== 'request-approval' && action !== 'approve-and-execute') {
@@ -289,7 +293,21 @@ serve(async (req) => {
     }
 
     // Plan 스냅샷 검증
+    // ChatOps_계약_붕괴_방지_체계_분석.md 3.2 참조: L0/L1/L2 경계 혼선 방지
     if (!validatePlan(taskCard.suggested_action)) {
+      const plan = taskCard.suggested_action as Partial<SuggestedActionChatOpsPlanV1>;
+      // L0는 TaskCard 생성 자체가 불가능하지만, 방어 깊이를 위해 명시적 검증
+      const automationLevel = plan.automation_level;
+      if (automationLevel === 'L0' || (automationLevel !== 'L1' && automationLevel !== 'L2')) {
+        return new Response(
+          JSON.stringify({
+            error: 'CONTRACT_LEVEL_MISMATCH',
+            contract_category: ContractErrorCategory.CONTRACT_LEVEL_MISMATCH,
+            message: 'L0 intent는 TaskCard 생성 및 실행을 지원하지 않습니다.',
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       return new Response(
         JSON.stringify({ error: 'Invalid Plan snapshot schema' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -428,7 +446,8 @@ serve(async (req) => {
       if (plan.automation_level === 'L2' && plan.execution_class === 'B') {
         // Domain Action Catalog 확인
         const intent = getIntent(plan.intent_key);
-        const actionKey = intent?.action_key;
+        // Edge Function의 IntentRegistryItem 타입에는 action_key가 없지만, 실제 registry에는 존재함
+        const actionKey = (intent as { action_key?: string })?.action_key;
 
         if (!actionKey || !isDomainActionKey(actionKey)) {
           return new Response(
@@ -472,8 +491,10 @@ serve(async (req) => {
       // 챗봇.md 6.3: 실행 시점마다 Policy/RBAC를 다시 로드/평가
       // Plan 스냅샷은 "요청 당시 의도"이며 허가가 아님
       // L2-A(알림/발송) 실행은 `auto_notification.<event_type>.*` 정책을 재평가
+      let policyEnabled: unknown = null;
+      let eventType: string | undefined;
       if (plan.automation_level === 'L2' && plan.execution_class === 'A') {
-        const eventType = plan.event_type;
+        eventType = plan.event_type;
         if (!eventType) {
           return new Response(
             JSON.stringify({ error: 'event_type is required for L2-A execution', message: '실행에 필요한 event_type이 없습니다.' }),
@@ -499,7 +520,7 @@ serve(async (req) => {
 
         // Policy 재평가 (Fail-Closed)
         // 챗봇.md 6.3: event_type이 카탈로그 미등록이면 Fail-Closed (policy-utils.ts에서 자동 검증)
-        const policyEnabled = await getTenantSettingByPath(
+        policyEnabled = await getTenantSettingByPath(
           supabase,
           taskCard.tenant_id,
           `auto_notification.${eventType}.enabled`
@@ -508,7 +529,8 @@ serve(async (req) => {
         if (!policyEnabled || policyEnabled !== true) {
           return new Response(
             JSON.stringify({
-              error: 'Policy disabled or not found',
+              error: 'CONTRACT_POLICY_DISABLED',
+              contract_category: ContractErrorCategory.CONTRACT_POLICY_DISABLED,
               message: '실행 정책이 비활성화되어 있거나 존재하지 않습니다.',
             }),
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -516,91 +538,194 @@ serve(async (req) => {
         }
       }
 
-      // 실제 액션 실행 (Plan 스냅샷 기반)
-      // ⚠️ 중요: duration_ms 계산을 위해 실행 시작 시간 기록
-      const executionStartTime = Date.now();
+      // ⚠️ Preflight: 실행 직전 상태 재확인 (계약 붕괴 방지)
+      // ChatOps_계약_붕괴_방지_체계_분석.md 2.2.2 참조
+      if (plan.plan_snapshot?.targets?.kind === 'student_id_list' && plan.plan_snapshot.targets.student_ids?.length > 0) {
+        const { data: currentState, error: preflightError } = await withTenant(
+          supabase
+            .from('persons')
+            .select('id, person_type, status')
+            .in('id', plan.plan_snapshot.targets.student_ids)
+            .eq('person_type', 'student'),
+          taskCard.tenant_id
+        );
 
-      // Intent Registry 연동하여 intent_key 기반 실행 로직 라우팅
-      // 챗봇.md 592-593: automation_actions.result는 {status: "success" | "failed", error_code?: string, message?: string} 형태
-      let executionResult: { status: 'success' | 'failed'; error_code?: string; message?: string } = {
+        if (preflightError) {
+          console.error('[execute-task-card] Preflight query failed:', maskPII(preflightError));
+          return new Response(
+            JSON.stringify({
+              error: 'CONTRACT_PREFLIGHT_FAILED',
+              message: '실행 전 상태 확인 중 오류가 발생했습니다.',
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // 상태 변화 감지 (이미 퇴원한 학생 등)
+        const dischargedStudents = currentState?.filter(s => s.status === 'discharged');
+        if (dischargedStudents && dischargedStudents.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: 'CONTRACT_STATE_CHANGED',
+              contract_category: ContractErrorCategory.CONTRACT_STATE_CHANGED,
+              message: `이미 퇴원한 학생이 포함되어 있습니다: ${dischargedStudents.length}명`,
+              affected_students: dischargedStudents.map(s => s.id),
+            }),
+            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // 존재하지 않는 학생 감지
+        const foundIds = new Set(currentState?.map(s => s.id) || []);
+        const missingIds = plan.plan_snapshot.targets.student_ids.filter(
+          id => !foundIds.has(id)
+        );
+        if (missingIds.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: 'CONTRACT_TARGET_NOT_FOUND',
+              contract_category: ContractErrorCategory.CONTRACT_TARGET_NOT_FOUND,
+              message: `존재하지 않는 학생이 포함되어 있습니다: ${missingIds.length}명`,
+              missing_ids: missingIds,
+            }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
+      // ⚠️ Worker 아키텍처: Apply 단계는 job 생성만, 실제 실행은 Worker가 처리
+      // ChatOps_계약_붕괴_방지_체계_분석.md 4.5 참조
+      const executedAt = new Date().toISOString();
+      const approvedAt = executedAt; // approve-and-execute는 승인과 실행이 동시
+
+      // Worker가 필요한 작업인지 판단
+      const useWorker = shouldUseWorker(plan);
+
+      let executionResult: { status: 'success' | 'failed'; error_code?: string; message?: string; job_id?: string } = {
         status: 'success',
         message: 'Execution completed',
       };
+      let durationMs = 0; // duration_ms 초기화
 
-      try {
-        // L2-A Intent 실행 (Handler Registry 사용)
-        if (plan.automation_level === 'L2' && plan.execution_class === 'A') {
-          if (hasHandler(plan.intent_key)) {
-            const handler = getHandler(plan.intent_key);
-            if (handler) {
-              // Handler 실행 컨텍스트 생성
-              const handlerContext: HandlerContext = {
-                tenant_id: taskCard.tenant_id,
-                user_id: user.id,
-                user_role: userRole,
-                now_kst: new Date().toISOString(),
-                supabase: supabase,
-              };
+      if (useWorker) {
+        // Worker 아키텍처: job 생성 후 즉시 Worker 호출 (지연 없음)
+        const jobResult = await createJob(
+          supabase,
+          taskCard.tenant_id,
+          plan,
+          { user_id: user.id, user_role: userRole },
+          {
+            resolve_snapshot: null, // TaskCard는 이미 Resolve 완료된 상태
+            apply_input: {
+              params: maskPII(plan.params), // PII 마스킹 필수
+              target_count: plan.plan_snapshot?.target_count,
+              target_ids_sample: plan.plan_snapshot?.targets?.student_ids?.slice(0, 5),
+            },
+            policy_verdict: plan.automation_level === 'L2' && plan.execution_class === 'A' ? {
+              enabled: policyEnabled,
+              path: `auto_notification.${eventType}.enabled`,
+              checked_at: executedAt,
+              event_type: eventType,
+            } : null,
+          },
+          {
+            supabaseUrl: envServer.SUPABASE_URL,
+            serviceRoleKey: envServer.SERVICE_ROLE_KEY,
+          }
+        );
 
-              // Handler 실행
-              const handlerResult = await handler.execute(plan, handlerContext);
+        if (!jobResult) {
+          executionResult = {
+            status: 'failed',
+            error_code: 'JOB_CREATION_FAILED',
+            message: '작업 생성에 실패했습니다.',
+          };
+        } else {
+          executionResult = {
+            status: 'success',
+            message: '처리가 시작되었습니다. Worker가 실행을 처리합니다.',
+            job_id: jobResult.job_id,
+          };
+        }
+      } else {
+        // 즉시 실행 (Worker 불필요한 작업)
+        // ⚠️ 중요: duration_ms 계산을 위해 실행 시작 시간 기록
+        const executionStartTime = Date.now();
 
-              // Handler 결과를 executionResult로 변환
-              if (handlerResult.status === 'success') {
-                executionResult = {
-                  status: 'success',
-                  message: handlerResult.message || `Intent '${plan.intent_key}' 실행 완료`,
+        try {
+          // L2-A Intent 실행 (Handler Registry 사용)
+          if (plan.automation_level === 'L2' && plan.execution_class === 'A') {
+            if (hasHandler(plan.intent_key)) {
+              const handler = getHandler(plan.intent_key);
+              if (handler) {
+                // Handler 실행 컨텍스트 생성
+                const handlerContext: HandlerContext = {
+                  tenant_id: taskCard.tenant_id,
+                  user_id: user.id,
+                  user_role: userRole,
+                  now_kst: new Date().toISOString(),
+                  supabase: supabase,
                 };
-              } else if (handlerResult.status === 'partial') {
-                executionResult = {
-                  status: 'failed',
-                  error_code: handlerResult.error_code || 'PARTIAL_SUCCESS',
-                  message: handlerResult.message || '일부 실행에 실패했습니다.',
-                };
+
+                // Handler 실행
+                const handlerResult = await handler.execute(plan, handlerContext);
+
+                // Handler 결과를 executionResult로 변환
+                if (handlerResult.status === 'success') {
+                  executionResult = {
+                    status: 'success',
+                    message: handlerResult.message || `Intent '${plan.intent_key}' 실행 완료`,
+                  };
+                } else if (handlerResult.status === 'partial') {
+                  executionResult = {
+                    status: 'failed',
+                    error_code: handlerResult.error_code || 'PARTIAL_SUCCESS',
+                    message: handlerResult.message || '일부 실행에 실패했습니다.',
+                  };
+                } else {
+                  executionResult = {
+                    status: 'failed',
+                    error_code: handlerResult.error_code || 'EXECUTION_FAILED',
+                    message: handlerResult.message || '실행에 실패했습니다.',
+                  };
+                }
               } else {
                 executionResult = {
                   status: 'failed',
-                  error_code: handlerResult.error_code || 'EXECUTION_FAILED',
-                  message: handlerResult.message || '실행에 실패했습니다.',
+                  error_code: 'HANDLER_NOT_FOUND',
+                  message: `Intent '${plan.intent_key}'에 대한 핸들러를 찾을 수 없습니다.`,
                 };
               }
             } else {
               executionResult = {
                 status: 'failed',
-                error_code: 'HANDLER_NOT_FOUND',
-                message: `Intent '${plan.intent_key}'에 대한 핸들러를 찾을 수 없습니다.`,
+                error_code: 'HANDLER_NOT_REGISTERED',
+                message: `Intent '${plan.intent_key}'에 대한 핸들러가 등록되지 않았습니다.`,
               };
             }
           } else {
+            // L2-B는 이미 위에서 차단되었으므로 여기서는 L2-A만 처리
             executionResult = {
               status: 'failed',
-              error_code: 'HANDLER_NOT_REGISTERED',
-              message: `Intent '${plan.intent_key}'에 대한 핸들러가 등록되지 않았습니다.`,
+              error_code: 'INVALID_AUTOMATION_LEVEL',
+              message: `이 Intent는 실행할 수 없습니다: automation_level=${plan.automation_level}, execution_class=${plan.execution_class}`,
             };
           }
-        } else {
-          // L2-B는 이미 위에서 차단되었으므로 여기서는 L2-A만 처리
+        } catch (execError) {
+          // P0: PII 마스킹 필수
+          const maskedExecError = maskPII(execError);
+          console.error('[execute-task-card] Execution error:', maskedExecError);
           executionResult = {
             status: 'failed',
-            error_code: 'INVALID_AUTOMATION_LEVEL',
-            message: `이 Intent는 실행할 수 없습니다: automation_level=${plan.automation_level}, execution_class=${plan.execution_class}`,
+            error_code: 'EXECUTION_ERROR',
+            message: execError instanceof Error ? execError.message : 'Execution failed',
           };
         }
-      } catch (execError) {
-        // P0: PII 마스킹 필수
-        const maskedExecError = maskPII(execError);
-        console.error('[execute-task-card] Execution error:', maskedExecError);
-        executionResult = {
-          status: 'failed',
-          error_code: 'EXECUTION_ERROR',
-          message: execError instanceof Error ? execError.message : 'Execution failed',
-        };
-      }
 
-      const executedAt = new Date().toISOString();
-      // ⚠️ 중요: duration_ms 계산 (액티비티.md 8.1 참조)
-      const durationMs = Date.now() - executionStartTime;
-      const approvedAt = executedAt; // approve-and-execute는 승인과 실행이 동시
+        // ⚠️ 중요: duration_ms 계산 (액티비티.md 8.1 참조)
+        durationMs = Date.now() - executionStartTime;
+      }
+      // Worker 사용 시: job 생성만 하므로 durationMs는 이미 0으로 초기화됨
 
       // ⚠️ P0-1: 실행 로그 기록 (automation_actions)
       const { data: actionData, error: logError } = await supabase
@@ -616,9 +741,30 @@ serve(async (req) => {
           approved_at: approvedAt,
           executor_role: userRole,
           execution_context: {
+            // 기존 필드 유지
             intent_key: plan.intent_key,
             suggested_action: taskCard.suggested_action,
             executed_at: executedAt,
+            // ChatOps_계약_붕괴_방지_체계_분석.md 3.5 참조: 실행 스냅샷 저장 확장
+            // Resolve 스냅샷 (TaskCard 실행 시에는 null, ChatOps에서만 의미 있음)
+            resolve_snapshot: null, // TaskCard는 이미 Resolve 완료된 상태
+            // Apply 입력 스냅샷 (PII 마스킹)
+            apply_input: {
+              params: maskPII(plan.params), // PII 마스킹 필수
+              target_count: plan.plan_snapshot?.target_count,
+              target_ids_sample: plan.plan_snapshot?.targets?.student_ids?.slice(0, 5), // 샘플만
+            },
+            // Policy 판정 스냅샷
+            policy_verdict: plan.automation_level === 'L2' && plan.execution_class === 'A' ? {
+              enabled: policyEnabled,
+              path: `auto_notification.${eventType}.enabled`,
+              checked_at: executedAt,
+              event_type: eventType,
+            } : null,
+            // 멱등성 정보
+            idempotency: {
+              request_id: requestId,
+            },
           },
         })
         .select('id')
@@ -786,4 +932,12 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+});

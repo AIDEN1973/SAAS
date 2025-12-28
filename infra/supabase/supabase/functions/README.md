@@ -2,6 +2,14 @@
 
 Zero-Management Platform을 위한 자동화 배치 작업들입니다.
 
+## ⚠️ 중요: 소스 파일 위치
+
+**이 디렉토리(`supabase/supabase/functions/`)가 소스 디렉토리입니다.**
+
+- 모든 Edge Function 소스 코드는 이 디렉토리에서 직접 수정하세요
+- Supabase CLI는 `infra/supabase/supabase/` 디렉토리에서 실행해야 합니다
+- 동기화 단계 없이 바로 수정하고 배포할 수 있습니다
+
 ## ✅ 현재 상태
 
 - **배포 상태**: 모든 Edge Functions 배포 완료 (6개)
@@ -54,12 +62,12 @@ Zero-Management Platform을 위한 자동화 배치 작업들입니다.
 
 ```bash
 # Linux/Mac
-cd infra/supabase/functions
-./deploy.sh YOUR_PROJECT_REF
+cd infra/supabase/supabase
+../supabase/functions/deploy.sh YOUR_PROJECT_REF
 
 # Windows PowerShell
-cd infra/supabase/functions
-.\deploy.ps1 YOUR_PROJECT_REF
+cd infra/supabase/supabase
+..\supabase\functions\deploy.ps1 YOUR_PROJECT_REF
 ```
 
 ### 방법 2: 개별 배포

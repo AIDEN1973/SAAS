@@ -40,6 +40,10 @@
       "dependsOn": ["^build"],
       "cache": false
     },
+    "test:db-contract": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
     "clean": {
       "cache": false
     }

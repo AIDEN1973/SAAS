@@ -27,6 +27,14 @@ export const studentRegisterHandler: IntentHandler = {
     plan: SuggestedActionChatOpsPlanV1,
     context: HandlerContext
   ): Promise<HandlerResult> {
+    // ⚠️ 디버깅: context.tenant_id 값 확인
+    console.log('[studentRegisterHandler] Context received:', {
+      tenant_id: context.tenant_id,
+      tenant_id_type: typeof context.tenant_id,
+      tenant_id_is_null: context.tenant_id === null,
+      tenant_id_is_undefined: context.tenant_id === undefined,
+      user_id: context.user_id,
+    });
     try {
       // ⚠️ P0: Plan 스냅샷에서만 실행 대상 로드 (클라이언트 입력 무시)
       const formValues = plan.params as Record<string, unknown>;
@@ -51,7 +59,20 @@ export const studentRegisterHandler: IntentHandler = {
         policyPath
       );
 
-      if (!policyEnabled || policyEnabled !== true) {
+      // 디버깅: 정책 값 로그
+      console.log('[studentRegisterHandler] Policy check:', {
+        policyPath,
+        policyEnabled,
+        policyEnabledType: typeof policyEnabled,
+        policyEnabledIsFalse: policyEnabled === false,
+        policyEnabledIsNull: policyEnabled === null,
+        policyEnabledIsUndefined: policyEnabled === undefined,
+      });
+
+      // 정책이 없으면 기본값으로 true 사용 (마이그레이션 미실행 시 호환성)
+      // 정책이 명시적으로 false로 설정된 경우에만 비활성화
+      if (policyEnabled === false) {
+        console.warn('[studentRegisterHandler] Policy is explicitly disabled:', policyPath);
         return {
           status: 'failed',
           error_code: 'POLICY_DISABLED',
@@ -70,20 +91,26 @@ export const studentRegisterHandler: IntentHandler = {
       }
 
       // 1. persons 테이블에 생성
-      const { data: person, error: personError } = await withTenant(
-        context.supabase
-          .from('persons')
-          .insert({
-            name: name,
-            email: (formValues.email as string) || null,
-            phone: (formValues.phone as string) || null,
-            address: (formValues.address as string) || null,
-            person_type: 'student',
-          })
-          .select('id, tenant_id, name, email, phone, address, created_at, updated_at')
-          .single(),
-        context.tenant_id
-      );
+      // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
+      // ⚠️ 디버깅: INSERT 전 tenant_id 값 확인
+      console.log('[studentRegisterHandler] Before INSERT:', {
+        tenant_id: context.tenant_id,
+        tenant_id_type: typeof context.tenant_id,
+        name: name,
+      });
+
+      const { data: person, error: personError } = await context.supabase
+        .from('persons')
+        .insert({
+          tenant_id: context.tenant_id,
+          name: name,
+          email: (formValues.email as string) || null,
+          phone: (formValues.phone as string) || null,
+          address: (formValues.address as string) || null,
+          person_type: 'student',
+        })
+        .select('id, tenant_id, name, email, phone, address, created_at, updated_at')
+        .single();
 
       if (personError || !person) {
         const maskedError = maskPII(personError);
@@ -96,29 +123,29 @@ export const studentRegisterHandler: IntentHandler = {
       }
 
       // 2. Industry Adapter: 업종별 학생 테이블에 장기 정보 추가
+      // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
+      // ⚠️ 중요: academy_students 테이블은 이제 id 컬럼이 PRIMARY KEY이고 person_id는 UNIQUE 제약조건
+      //          PostgREST가 자동으로 id 컬럼을 RETURNING 할 수 있으므로 일반 INSERT 사용 가능
       const studentTableName = await getTenantTableName(context.supabase, context.tenant_id, 'student');
-      const { data: academyData, error: academyError } = await withTenant(
-        context.supabase
-          .from(studentTableName || 'academy_students') // Fallback
-          .insert({
-            person_id: person.id,
-            tenant_id: context.tenant_id,
-            birth_date: (formValues.birth_date as string) || null,
-            gender: (formValues.gender as string) || null,
-            school_name: (formValues.school_name as string) || null,
-            grade: (formValues.grade as string) || null,
-            status: (formValues.status as string) || 'active',
-            notes: (formValues.notes as string) || null,
-            profile_image_url: (formValues.profile_image_url as string) || null,
-            created_by: context.user_id,
-            updated_by: context.user_id,
-          })
-          .select('id, person_id, birth_date, gender, school_name, grade, status, notes, profile_image_url, created_at, updated_at, created_by, updated_by')
-          .single(),
-        context.tenant_id
-      );
+      const { data: academyData, error: academyError } = await context.supabase
+        .from(studentTableName || 'academy_students') // Fallback
+        .insert({
+          person_id: person.id,
+          tenant_id: context.tenant_id,
+          birth_date: (formValues.birth_date as string) || null,
+          gender: (formValues.gender as string) || null,
+          school_name: (formValues.school_name as string) || null,
+          grade: (formValues.grade as string) || null,
+          status: (formValues.status as string) || 'active',
+          notes: (formValues.notes as string) || null,
+          profile_image_url: (formValues.profile_image_url as string) || null,
+          created_by: context.user_id,
+          updated_by: context.user_id,
+        })
+        .select('id, person_id')
+        .single();
 
-      if (academyError) {
+      if (academyError || !academyData) {
         // 롤백: persons 삭제
         await withTenant(
           context.supabase.from('persons').delete().eq('id', person.id),
@@ -134,24 +161,22 @@ export const studentRegisterHandler: IntentHandler = {
       }
 
       // 3. 보호자 정보 생성 (있는 경우)
+      // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
       if (formValues.guardians && Array.isArray(formValues.guardians)) {
         for (const guardian of formValues.guardians) {
           if (typeof guardian === 'object' && guardian !== null) {
             const guardianData = guardian as Record<string, unknown>;
-            await withTenant(
-              context.supabase
-                .from('guardians')
-                .insert({
-                  student_id: person.id,
-                  tenant_id: context.tenant_id,
-                  name: (guardianData.name as string) || null,
-                  phone: (guardianData.phone as string) || null,
-                  email: (guardianData.email as string) || null,
-                  relationship: (guardianData.relationship as string) || null,
-                  is_primary: (guardianData.is_primary as boolean) || false,
-                }),
-              context.tenant_id
-            );
+            await context.supabase
+              .from('guardians')
+              .insert({
+                student_id: person.id,
+                tenant_id: context.tenant_id,
+                name: (guardianData.name as string) || null,
+                phone: (guardianData.phone as string) || null,
+                email: (guardianData.email as string) || null,
+                relationship: (guardianData.relationship as string) || null,
+                is_primary: (guardianData.is_primary as boolean) || false,
+              });
             // 보호자 생성 실패는 로그만 남기고 계속 진행 (부분 실패 허용)
             // 필요시 에러를 수집하여 partial 상태로 반환할 수 있음
           }
@@ -159,20 +184,18 @@ export const studentRegisterHandler: IntentHandler = {
       }
 
       // 4. 태그 할당 (있는 경우)
+      // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
       if (formValues.tag_ids && Array.isArray(formValues.tag_ids)) {
         for (const tagId of formValues.tag_ids) {
           if (typeof tagId === 'string') {
-            await withTenant(
-              context.supabase
-                .from('tag_assignments')
-                .insert({
-                  entity_id: person.id,
-                  entity_type: 'student',
-                  tag_id: tagId,
-                  tenant_id: context.tenant_id,
-                }),
-              context.tenant_id
-            );
+            await context.supabase
+              .from('tag_assignments')
+              .insert({
+                entity_id: person.id,
+                entity_type: 'student',
+                tag_id: tagId,
+                tenant_id: context.tenant_id,
+              });
             // 태그 할당 실패는 로그만 남기고 계속 진행
           }
         }

@@ -653,9 +653,11 @@ export const attendanceQueryUncheckedHandler: L0IntentHandler = {
 
       // 1. 모든 활성 학생 조회
       // Industry Adapter: 업종별 FK 관계명 동적 조회
+      // ⚠️ 중요: PostgREST FK 관계명은 대상 테이블!FK명 형식
+      // academy_students.person_id → persons.id 관계는 persons!academy_students_person_id_fkey
       const personFKName = studentTableName
-        ? `${studentTableName}!${studentTableName}_person_id_fkey`
-        : 'academy_students!academy_students_person_id_fkey'; // Fallback
+        ? `persons!${studentTableName}_person_id_fkey`
+        : 'persons!academy_students_person_id_fkey'; // Fallback
 
       const { data: allStudents, error: studentsError } = await withTenant(
         supabase
@@ -944,11 +946,12 @@ export const studentQueryProfileHandler: L0IntentHandler = {
         student: {
           id: person.id,
           name: person.name || '',
+          phone: person.phone || '', // 학생 전화번호
           grade: academyStudent?.grade || '',
           class_name: industryClass?.name || '',
           status: academyStudent?.status || 'active',
           guardian_name: guardian?.name || '',
-          guardian_contact: guardian?.phone || '',
+          guardian_contact: guardian?.phone || '', // 보호자 전화번호
         },
       };
 
@@ -999,9 +1002,11 @@ export const studentQueryStatusListHandler: L0IntentHandler = {
         'academy_classes!student_classes_class_id_fkey'; // Fallback
       const studentFKName = getFKRelationName('student_classes_student_id', industryType) ||
         'academy_students!student_classes_student_id_fkey'; // Fallback
+      // ⚠️ 중요: PostgREST FK 관계명은 대상 테이블!FK명 형식
+      // academy_students.person_id → persons.id 관계는 persons!academy_students_person_id_fkey
       const personFKName = studentTableName
-        ? `${studentTableName}!${studentTableName}_person_id_fkey`
-        : 'academy_students!academy_students_person_id_fkey'; // Fallback
+        ? `persons!${studentTableName}_person_id_fkey`
+        : 'persons!academy_students_person_id_fkey'; // Fallback
 
       let query = withTenant(
         supabase
@@ -1179,19 +1184,19 @@ export const classQueryRosterHandler: L0IntentHandler = {
 
       // Industry Adapter: 업종별 FK 관계명 동적 조회
       const industryType = await getTenantIndustryType(supabase, tenant_id);
-      const studentFKName = getFKRelationName('student_classes_student_id', industryType) ||
-        'academy_students!student_classes_student_id_fkey'; // Fallback
+      const studentTableName = await getTenantTableName(supabase, tenant_id, 'student');
 
       // 해당 날짜(또는 현재) 기준으로 반 학생 조회
       const targetDate = date || toKSTDate();
 
+      // ⚠️ 중요: student_classes.student_id는 persons.id를 참조
+      // academy_students.status를 가져오려면 별도 조회 필요
       const { data, error } = await withTenant(
         supabase
           .from('student_classes')
           .select(`
             student_id,
-            persons!student_classes_student_id_fkey(id, name),
-            ${studentFKName}(status)
+            persons!student_classes_student_id_fkey(id, name)
           `)
           .eq('class_id', classId)
           .lte('started_at', `${targetDate}T23:59:59+09:00`)
@@ -1211,12 +1216,27 @@ export const classQueryRosterHandler: L0IntentHandler = {
         };
       }
 
+      // academy_students에서 status 조회 (person_id로 조회)
+      const studentIds = (data || []).map((sc: any) => sc.student_id);
+      const { data: academyStudents } = await withTenant(
+        supabase
+          .from(studentTableName || 'academy_students')
+          .select('person_id, status')
+          .in('person_id', studentIds),
+        tenant_id
+      );
+
+      // person_id → status 매핑
+      const statusMap = new Map<string, string>();
+      for (const student of academyStudents || []) {
+        statusMap.set(student.person_id, student.status || 'active');
+      }
+
       // Industry Adapter: 업종별 학생 테이블 정보 동적 접근
-      const studentTableName = studentFKName.split('!')[0] || 'academy_students';
       const students = (data || []).map((sc: any) => ({
         id: sc.student_id,
         name: sc.persons?.name || '',
-        status: sc[studentTableName]?.status || sc.academy_students?.status || 'active',
+        status: statusMap.get(sc.student_id) || 'active',
       }));
 
       const responseData = {
@@ -1378,10 +1398,9 @@ export const attendanceQueryRateSummaryHandler: L0IntentHandler = {
       const industryType = await getTenantIndustryType(supabase, tenant_id);
       const classFKName = getFKRelationName('attendance_logs_class_id', industryType) ||
         'academy_classes!attendance_logs_class_id_fkey'; // Fallback
-      const studentTableName = await getTenantTableName(supabase, tenant_id, 'student');
-      const studentFKName = studentTableName
-        ? `${studentTableName}!attendance_logs_student_id_fkey`
-        : 'academy_students!attendance_logs_student_id_fkey'; // Fallback
+      // ⚠️ 중요: attendance_logs.student_id는 persons.id를 참조
+      // PostgREST FK 관계명은 대상 테이블!FK명 형식
+      const studentFKName = 'persons!attendance_logs_student_id_fkey';
 
       // 출결 로그 조회
       const { data, error } = await withTenant(
@@ -1391,7 +1410,7 @@ export const attendanceQueryRateSummaryHandler: L0IntentHandler = {
             student_id,
             status,
             ${classFKName}(id, name),
-            ${studentFKName}(grade)
+            ${studentFKName}(id, name)
           `)
           .gte('occurred_at', `${from}T00:00:00+09:00`)
           .lte('occurred_at', `${to}T23:59:59+09:00`),
@@ -2311,11 +2330,12 @@ export const billingQueryKpiSummaryHandler: L0IntentHandler = {
 
       // Industry Adapter: 업종별 FK 관계명 동적 조회
       const industryType = await getTenantIndustryType(supabase, tenant_id);
-      const studentFKName = getFKRelationName('invoices_student_id', industryType) ||
-        'academy_students!invoices_student_id_fkey'; // Fallback
-      const studentClassesFKName = getFKRelationName('student_classes_student_id', industryType) ||
-        'academy_students!student_classes_student_id_fkey'; // Fallback
+      const studentTableName = await getTenantTableName(supabase, tenant_id, 'student');
+      const classFKName = getFKRelationName('student_classes_class_id', industryType) ||
+        'academy_classes!student_classes_class_id_fkey'; // Fallback
 
+      // ⚠️ 중요: invoices.student_id는 persons.id를 참조
+      // academy_students를 가져오려면 별도 쿼리 필요 (간접 관계)
       // 청구서 및 결제 데이터 조회
       const { data: invoices, error: invoicesError } = await withTenant(
         supabase
@@ -2325,7 +2345,7 @@ export const billingQueryKpiSummaryHandler: L0IntentHandler = {
             student_id,
             amount,
             status,
-            ${studentFKName}(grade, student_classes!${studentClassesFKName}(class_id))
+            persons!invoices_student_id_fkey(id, name)
           `)
           .gte('month', from.substring(0, 7))
           .lte('month', to.substring(0, 7)),
@@ -2344,29 +2364,86 @@ export const billingQueryKpiSummaryHandler: L0IntentHandler = {
         };
       }
 
+      // ⚠️ 중요: invoices.student_id는 persons.id를 참조
+      // academy_students와 student_classes 정보를 별도로 조회
+      const studentIds = (invoices || []).map((inv: any) => inv.student_id);
+
+      // academy_students에서 grade 조회
+      const { data: academyStudents } = await withTenant(
+        supabase
+          .from(studentTableName || 'academy_students')
+          .select('person_id, grade')
+          .in('person_id', studentIds),
+        tenant_id
+      );
+
+      // student_classes에서 class_id 조회
+      const { data: studentClasses } = await withTenant(
+        supabase
+          .from('student_classes')
+          .select(`student_id, ${classFKName}(id, name)`)
+          .in('student_id', studentIds)
+          .eq('is_active', true),
+        tenant_id
+      );
+
+      // 매핑 생성
+      const gradeMap = new Map<string, string>();
+      for (const student of academyStudents || []) {
+        gradeMap.set(student.person_id, student.grade || '');
+      }
+
+      const classMapByStudent = new Map<string, { class_id: string; class_name: string }>();
+      const classTableName = classFKName.split('!')[0] || 'academy_classes';
+      for (const sc of studentClasses || []) {
+        const industryClass = sc[classTableName] || sc.academy_classes;
+        classMapByStudent.set(sc.student_id, {
+          class_id: industryClass?.id || 'unknown',
+          class_name: industryClass?.name || 'Unknown',
+        });
+      }
+
       // KPI 계산 (간단한 예시)
       let summary: Array<{ group_key: string; group_name: string; total_revenue: number; collection_rate: number }> = [];
       let overallRevenue = 0;
       let overallPaid = 0;
 
-      // Industry Adapter: 업종별 학생 테이블 정보 동적 접근
-      const studentTableNameForAccess = studentFKName.split('!')[0] || 'academy_students';
       if (groupBy === 'class') {
-        const classMap = new Map<string, { revenue: number; paid: number; name: string }>();
+        const classStatsMap = new Map<string, { revenue: number; paid: number; name: string }>();
         for (const invoice of invoices || []) {
-          const studentData = invoice[studentTableNameForAccess] || invoice.academy_students;
-          const classId = studentData?.student_classes?.[0]?.class_id || 'unknown';
-          const existing = classMap.get(classId) || { revenue: 0, paid: 0, name: 'Unknown' };
+          const classInfo = classMapByStudent.get(invoice.student_id) || { class_id: 'unknown', class_name: 'Unknown' };
+          const existing = classStatsMap.get(classInfo.class_id) || { revenue: 0, paid: 0, name: classInfo.class_name };
           existing.revenue += invoice.amount || 0;
           if (invoice.status === 'paid') {
             existing.paid += invoice.amount || 0;
           }
-          classMap.set(classId, existing);
+          classStatsMap.set(classInfo.class_id, existing);
         }
-        for (const [classId, stats] of classMap.entries()) {
+        for (const [classId, stats] of classStatsMap.entries()) {
           summary.push({
             group_key: classId,
             group_name: stats.name,
+            total_revenue: stats.revenue,
+            collection_rate: stats.revenue > 0 ? (stats.paid / stats.revenue) * 100 : 0,
+          });
+          overallRevenue += stats.revenue;
+          overallPaid += stats.paid;
+        }
+      } else if (groupBy === 'grade') {
+        const gradeStatsMap = new Map<string, { revenue: number; paid: number }>();
+        for (const invoice of invoices || []) {
+          const grade = gradeMap.get(invoice.student_id) || 'unknown';
+          const existing = gradeStatsMap.get(grade) || { revenue: 0, paid: 0 };
+          existing.revenue += invoice.amount || 0;
+          if (invoice.status === 'paid') {
+            existing.paid += invoice.amount || 0;
+          }
+          gradeStatsMap.set(grade, existing);
+        }
+        for (const [grade, stats] of gradeStatsMap.entries()) {
+          summary.push({
+            group_key: grade,
+            group_name: grade || 'Unknown',
             total_revenue: stats.revenue,
             collection_rate: stats.revenue > 0 ? (stats.paid / stats.revenue) * 100 : 0,
           });
@@ -2432,9 +2509,11 @@ export const billingQueryUnissuedInvoicesHandler: L0IntentHandler = {
 
       // Industry Adapter: 업종별 학생 테이블명 동적 조회
       const studentTableName = await getTenantTableName(supabase, tenant_id, 'student');
+      // ⚠️ 중요: PostgREST FK 관계명은 대상 테이블!FK명 형식
+      // academy_students.person_id → persons.id 관계는 persons!academy_students_person_id_fkey
       const personFKName = studentTableName
-        ? `${studentTableName}!${studentTableName}_person_id_fkey`
-        : 'academy_students!academy_students_person_id_fkey'; // Fallback
+        ? `persons!${studentTableName}_person_id_fkey`
+        : 'persons!academy_students_person_id_fkey'; // Fallback
 
       // 미발행 청구서 조회 (실제로는 학생별 예상 청구 금액 계산 필요)
       const { data: students, error: studentsError } = await withTenant(
@@ -2839,9 +2918,11 @@ export const messageDraftAbsenceNoticeHandler: L0IntentHandler = {
 
       // Industry Adapter: 업종별 학생 테이블명 동적 조회
       const studentTableName = await getTenantTableName(supabase, tenant_id, 'student');
+      // ⚠️ 중요: PostgREST FK 관계명은 대상 테이블!FK명 형식
+      // academy_students.person_id → persons.id 관계는 persons!academy_students_person_id_fkey
       const personFKName = studentTableName
-        ? `${studentTableName}!${studentTableName}_person_id_fkey`
-        : 'academy_students!academy_students_person_id_fkey'; // Fallback
+        ? `persons!${studentTableName}_person_id_fkey`
+        : 'persons!academy_students_person_id_fkey'; // Fallback
 
       // 학생 정보 조회
       const { data: student } = await withTenant(
@@ -3130,9 +3211,11 @@ export const messagePreviewTemplateRenderHandler: L0IntentHandler = {
 
       // Industry Adapter: 업종별 학생 테이블명 동적 조회
       const studentTableName = await getTenantTableName(supabase, tenant_id, 'student');
+      // ⚠️ 중요: PostgREST FK 관계명은 대상 테이블!FK명 형식
+      // academy_students.person_id → persons.id 관계는 persons!academy_students_person_id_fkey
       const personFKName = studentTableName
-        ? `${studentTableName}!${studentTableName}_person_id_fkey`
-        : 'academy_students!academy_students_person_id_fkey'; // Fallback
+        ? `persons!${studentTableName}_person_id_fkey`
+        : 'persons!academy_students_person_id_fkey'; // Fallback
 
       // 학생 정보 조회
       const { data: students } = await withTenant(
@@ -3334,9 +3417,11 @@ export const studentQueryMissingGuardianContactHandler: L0IntentHandler = {
         'academy_classes!student_classes_class_id_fkey'; // Fallback
       const studentFKName = getFKRelationName('student_classes_student_id', industryType) ||
         'academy_students!student_classes_student_id_fkey'; // Fallback
+      // ⚠️ 중요: PostgREST FK 관계명은 대상 테이블!FK명 형식
+      // academy_students.person_id → persons.id 관계는 persons!academy_students_person_id_fkey
       const personFKName = studentTableName
-        ? `${studentTableName}!${studentTableName}_person_id_fkey`
-        : 'academy_students!academy_students_person_id_fkey'; // Fallback
+        ? `persons!${studentTableName}_person_id_fkey`
+        : 'persons!academy_students_person_id_fkey'; // Fallback
 
       // 보호자 연락처가 없는 학생 조회
       const { data: students, error: studentsError } = await withTenant(
@@ -3385,14 +3470,18 @@ export const studentQueryMissingGuardianContactHandler: L0IntentHandler = {
 
       // Industry Adapter: 업종별 클래스 정보 동적 접근
       const classTableName = classFKName.split('!')[0] || 'academy_classes';
+      // ⚠️ 중요: PostgREST FK 관계 결과는 관계명이 아닌 대상 테이블명으로 접근
+      // persons!academy_students_person_id_fkey → persons 객체로 접근
       const missingStudents = (students || [])
         .filter((s: any) => !guardianMap.has(s.person_id))
         .map((s: any) => {
           const studentClass = s.student_classes?.[0];
           const industryClass = studentClass?.[classTableName] || studentClass?.academy_classes;
+          // persons FK 관계 결과 접근 (persons!academy_students_person_id_fkey → persons 객체)
+          const personData = s.persons || (Array.isArray(s.persons) ? s.persons[0] : null);
           return {
             id: s.person_id,
-            name: s.persons?.name || '',
+            name: personData?.name || '',
             class_name: industryClass?.name || '',
           };
         });
@@ -3434,9 +3523,11 @@ export const studentQueryDuplicatesSuspectedHandler: L0IntentHandler = {
 
       // Industry Adapter: 업종별 학생 테이블명 동적 조회
       const studentTableName = await getTenantTableName(supabase, tenant_id, 'student');
+      // ⚠️ 중요: PostgREST FK 관계명은 대상 테이블!FK명 형식
+      // academy_students.person_id → persons.id 관계는 persons!academy_students_person_id_fkey
       const personFKName = studentTableName
-        ? `${studentTableName}!${studentTableName}_person_id_fkey`
-        : 'academy_students!academy_students_person_id_fkey'; // Fallback
+        ? `persons!${studentTableName}_person_id_fkey`
+        : 'persons!academy_students_person_id_fkey'; // Fallback
 
       // 중복 의심 학생 조회 (실제로는 더 복잡한 알고리즘 필요)
       // 간단한 예시: 이름과 전화번호가 같은 학생
@@ -3539,9 +3630,11 @@ export const studentQueryOnboardingNeededHandler: L0IntentHandler = {
 
       // Industry Adapter: 업종별 학생 테이블명 동적 조회
       const studentTableName = await getTenantTableName(supabase, tenant_id, 'student');
+      // ⚠️ 중요: PostgREST FK 관계명은 대상 테이블!FK명 형식
+      // academy_students.person_id → persons.id 관계는 persons!academy_students_person_id_fkey
       const personFKName = studentTableName
-        ? `${studentTableName}!${studentTableName}_person_id_fkey`
-        : 'academy_students!academy_students_person_id_fkey'; // Fallback
+        ? `persons!${studentTableName}_person_id_fkey`
+        : 'persons!academy_students_person_id_fkey'; // Fallback
 
       // 해당 기간에 등록된 학생 조회
       const { data: students, error } = await withTenant(
@@ -3624,9 +3717,11 @@ export const studentQueryDataQualityScanHandler: L0IntentHandler = {
 
       // Industry Adapter: 업종별 학생 테이블명 동적 조회
       const studentTableName = await getTenantTableName(supabase, tenant_id, 'student');
+      // ⚠️ 중요: PostgREST FK 관계명은 대상 테이블!FK명 형식
+      // academy_students.person_id → persons.id 관계는 persons!academy_students_person_id_fkey
       const personFKName = studentTableName
-        ? `${studentTableName}!${studentTableName}_person_id_fkey`
-        : 'academy_students!academy_students_person_id_fkey'; // Fallback
+        ? `persons!${studentTableName}_person_id_fkey`
+        : 'persons!academy_students_person_id_fkey'; // Fallback
 
       // 학생 데이터 조회
       const { data: students, error } = await withTenant(
@@ -4742,6 +4837,7 @@ export const rbacQueryMyPermissionsHandler: L0IntentHandler = {
 /**
  * 시스템: 시스템 헬스 체크
  * Intent: system.query.health
+ * 붕괴사전예방.md 참조: Layer A/B/C Preflight 검증 통합
  */
 export const systemQueryHealthHandler: L0IntentHandler = {
   intent_key: 'system.query.health',
@@ -4749,10 +4845,32 @@ export const systemQueryHealthHandler: L0IntentHandler = {
     try {
       const checks = params.checks as string[] | undefined;
 
-      // 헬스 체크 수행
+      // ⚠️ P0: 전체 Preflight 검증 실행 (Layer A/B/C 통합)
+      // system.exec.run_healthcheck Handler의 로직 재사용
+      const { runAllPreflightChecks } = await import('../execute-student-task/handlers/system-exec-run_healthcheck.ts');
+      const healthCheckResult = await runAllPreflightChecks(
+        context.supabase,
+        context.tenant_id
+      );
+
+      // checks 파라미터가 있으면 특정 체크만 필터링
+      let filteredChecks: Record<string, 'ok' | 'warning' | 'error'> = healthCheckResult.checks;
+      if (checks && Array.isArray(checks) && checks.length > 0) {
+        filteredChecks = {};
+        for (const checkKey of checks) {
+          if (healthCheckResult.checks[checkKey]) {
+            filteredChecks[checkKey] = healthCheckResult.checks[checkKey];
+          }
+        }
+      }
+
       const health = {
-        status: 'healthy' as 'healthy' | 'degraded' | 'unhealthy',
-        checks: {},
+        status: healthCheckResult.status,
+        checks: filteredChecks,
+        layer_a: healthCheckResult.layer_a,
+        layer_b: healthCheckResult.layer_b,
+        layer_c: healthCheckResult.layer_c,
+        timestamp: healthCheckResult.timestamp,
       };
 
       const responseData = {

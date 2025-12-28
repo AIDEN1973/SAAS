@@ -14,12 +14,12 @@ if ([string]::IsNullOrEmpty($ProjectRef)) {
     Write-Host ""
     Write-Host "사용법:" -ForegroundColor Yellow
     Write-Host "  cd infra\supabase"
-    Write-Host "  .\functions\deploy.ps1 YOUR_PROJECT_REF"
+    Write-Host "  .\supabase\supabase\functions\deploy.ps1 YOUR_PROJECT_REF"
     Write-Host ""
     Write-Host "또는 환경변수로 설정:" -ForegroundColor Yellow
     Write-Host "  `$env:SUPABASE_PROJECT_REF = 'YOUR_PROJECT_REF'"
     Write-Host "  cd infra\supabase"
-    Write-Host "  .\functions\deploy.ps1"
+    Write-Host "  .\supabase\supabase\functions\deploy.ps1"
     Write-Host ""
     Write-Host "프로젝트 ref는 Supabase Dashboard → Settings → General에서 확인할 수 있습니다." -ForegroundColor Yellow
     exit 1
@@ -27,28 +27,27 @@ if ([string]::IsNullOrEmpty($ProjectRef)) {
 
 # infra/supabase 디렉토리로 이동
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location (Join-Path $scriptDir "..")
+Set-Location (Join-Path $scriptDir "../../..")
 
-# 배포 전 파일 동기화 (필수)
-# ⚠️ 중요: 소스 파일은 functions/ 디렉토리에서만 수정하세요
-# supabase/functions/는 배포용이므로 직접 수정하지 마세요
-Write-Host "🔄 배포 전 파일 동기화 중..." -ForegroundColor Yellow
-if (Test-Path "functions\sync-for-deploy.sh") {
-    bash functions/sync-for-deploy.sh
-    Write-Host ""
-} else {
-    Write-Host "⚠️ sync-for-deploy.sh를 찾을 수 없습니다. 수동 동기화가 필요할 수 있습니다." -ForegroundColor Yellow
-    # Fallback: 기본 복사
-    if (-not (Test-Path "supabase\functions")) {
-        Write-Host "📁 supabase/functions 디렉토리 생성 중..." -ForegroundColor Yellow
-        New-Item -ItemType Directory -Path "supabase" -Force | Out-Null
-        Copy-Item -Path "functions" -Destination "supabase\functions" -Recurse -Force
-    }
-}
+# ⚠️ 중요: 이제 supabase/supabase/functions/가 소스 디렉토리입니다
+# 동기화 단계가 필요 없습니다. 직접 수정하고 배포하세요.
 
 Write-Host "🚀 Supabase Edge Functions 배포 시작" -ForegroundColor Green
 Write-Host "프로젝트 Ref: $ProjectRef" -ForegroundColor Cyan
 Write-Host "작업 디렉토리: $(Get-Location)" -ForegroundColor Cyan
+Write-Host ""
+
+# ⚠️ P1: DB Contract Gate 검증 (배포 전 자동 실행)
+# 붕괴사전예방.md Layer B 참조: CI/CD 파이프라인 자동 통합
+Write-Host "🔍 DB Contract Gate 검증 실행 중..." -ForegroundColor Yellow
+$dbContractResult = npm run test:db-contract
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ DB Contract Gate 검증 실패 - 배포 중단" -ForegroundColor Red
+    Write-Host "마이그레이션이 누락되었거나 스키마가 불일치합니다." -ForegroundColor Red
+    Write-Host "scripts/test-db-contract.ts를 확인하세요." -ForegroundColor Yellow
+    exit 1
+}
+Write-Host "✅ DB Contract Gate 검증 통과" -ForegroundColor Green
 Write-Host ""
 
 $functions = @(
@@ -60,6 +59,7 @@ $functions = @(
     "customer-retention-automation",
     "daily-statistics-update",
     "execute-student-task",
+    "execute-task-card",
     "execution-audit-runs",
     "financial-automation-batch",
     "growth-marketing-automation",
@@ -70,6 +70,7 @@ $functions = @(
     "safety-compliance-automation",
     "student-risk-analysis",
     "student-task-card-generation",
+    "worker-process-job",
     "workforce-ops-automation"
 )
 

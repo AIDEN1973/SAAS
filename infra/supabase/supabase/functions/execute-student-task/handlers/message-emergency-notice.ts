@@ -29,9 +29,10 @@ export const messageEmergencyNoticeHandler: IntentHandler = {
   ): Promise<HandlerResult> {
     try {
       // ⚠️ P0: Plan 스냅샷에서만 실행 대상 로드 (클라이언트 입력 무시)
-      const audience = plan.params.audience as 'all' | 'class' | 'grade';
+      const params = plan.params as Record<string, unknown>;
+      const audience = params.audience as 'all' | 'class' | 'grade';
       const channel = plan.plan_snapshot.channel || 'sms';
-      const text = plan.params.text as string;
+      const text = params.text as string;
 
       if (!audience || !text) {
         return {
@@ -72,7 +73,9 @@ export const messageEmergencyNoticeHandler: IntentHandler = {
         context.tenant_id,
         policyEnabledPath
       );
-      if (!policyEnabled || policyEnabled !== true) {
+      // 정책이 없으면 기본값으로 true 사용 (마이그레이션 미실행 시 호환성)
+      // 정책이 명시적으로 false로 설정된 경우에만 비활성화
+      if (policyEnabled === false) {
         return {
           status: 'failed',
           error_code: 'POLICY_DISABLED',

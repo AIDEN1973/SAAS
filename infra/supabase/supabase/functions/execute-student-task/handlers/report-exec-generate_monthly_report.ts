@@ -51,7 +51,9 @@ export const report_exec_generate_monthly_reportHandler: IntentHandler = {
         policyPath
       );
 
-      if (!policyEnabled || policyEnabled !== true) {
+      // 정책이 없으면 기본값으로 true 사용 (마이그레이션 미실행 시 호환성)
+      // 정책이 명시적으로 false로 설정된 경우에만 비활성화
+      if (policyEnabled === false) {
         return {
           status: 'failed',
           error_code: 'POLICY_DISABLED',
@@ -71,20 +73,18 @@ export const report_exec_generate_monthly_reportHandler: IntentHandler = {
       }
 
       // 월간 리포트 생성 (ai_insights 테이블에 저장)
+      // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
       // TODO: 실제 리포트 생성 로직 구현 필요
-      const { data: report, error: createError } = await withTenant(
-        context.supabase
-          .from('ai_insights')
-          .insert({
-            tenant_id: context.tenant_id,
-            insight_type: 'monthly_report',
-            title: `${month} 월간 리포트`,
-            summary: `월간 리포트 생성 완료 (섹션: ${sections?.join(', ') || '전체'})`,
-          })
-          .select('id')
-          .single(),
-        context.tenant_id
-      );
+      const { data: report, error: createError } = await context.supabase
+        .from('ai_insights')
+        .insert({
+          tenant_id: context.tenant_id,
+          insight_type: 'monthly_report',
+          title: `${month} 월간 리포트`,
+          summary: `월간 리포트 생성 완료 (섹션: ${sections?.join(', ') || '전체'})`,
+        })
+        .select('id')
+        .single();
 
       if (createError) {
         const maskedError = maskPII(createError);

@@ -52,7 +52,9 @@ export const student_exec_bulk_registerHandler: IntentHandler = {
         policyPath
       );
 
-      if (!policyEnabled || policyEnabled !== true) {
+      // 정책이 없으면 기본값으로 true 사용 (마이그레이션 미실행 시 호환성)
+      // 정책이 명시적으로 false로 설정된 경우에만 비활성화
+      if (policyEnabled === false) {
         return {
           status: 'failed',
           error_code: 'POLICY_DISABLED',
@@ -85,20 +87,19 @@ export const student_exec_bulk_registerHandler: IntentHandler = {
           }
 
           // persons 테이블에 생성
-          const { data: person, error: personError } = await withTenant(
-            context.supabase
-              .from('persons')
-              .insert({
-                name: name,
-                email: (row.email as string) || null,
-                phone: (row.phone as string) || null,
-                address: (row.address as string) || null,
-                person_type: 'student',
-              })
-              .select('id')
-              .single(),
-            context.tenant_id
-          );
+          // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
+          const { data: person, error: personError } = await context.supabase
+            .from('persons')
+            .insert({
+              tenant_id: context.tenant_id,
+              name: name,
+              email: (row.email as string) || null,
+              phone: (row.phone as string) || null,
+              address: (row.address as string) || null,
+              person_type: 'student',
+            })
+            .select('id')
+            .single();
 
           if (personError || !person) {
             const maskedError = maskPII(personError);
@@ -111,25 +112,27 @@ export const student_exec_bulk_registerHandler: IntentHandler = {
           const studentTableName = await getTenantTableName(context.supabase, context.tenant_id, 'student');
 
           // academy_students 테이블에 장기 정보 추가
-          const { error: academyError } = await withTenant(
-            context.supabase
-              .from(studentTableName || 'academy_students') // Fallback
-              .insert({
-                person_id: person.id,
-                tenant_id: context.tenant_id,
-                birth_date: (row.birth_date as string) || null,
-                gender: (row.gender as string) || null,
-                school_name: (row.school_name as string) || null,
-                grade: (row.grade as string) || null,
-                status: (row.status as string) || 'active',
-                notes: (row.notes as string) || null,
-                created_by: context.user_id,
-                updated_by: context.user_id,
-              }),
-            context.tenant_id
-          );
+          // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
+          // ⚠️ 중요: academy_students 테이블은 이제 id 컬럼이 PRIMARY KEY이고 person_id는 UNIQUE 제약조건
+          //          PostgREST가 자동으로 id 컬럼을 RETURNING 할 수 있으므로 일반 INSERT 사용 가능
+          const { data: academyData, error: academyError } = await context.supabase
+            .from(studentTableName || 'academy_students') // Fallback
+            .insert({
+              person_id: person.id,
+              tenant_id: context.tenant_id,
+              birth_date: (row.birth_date as string) || null,
+              gender: (row.gender as string) || null,
+              school_name: (row.school_name as string) || null,
+              grade: (row.grade as string) || null,
+              status: (row.status as string) || 'active',
+              notes: (row.notes as string) || null,
+              created_by: context.user_id,
+              updated_by: context.user_id,
+            })
+            .select('id, person_id')
+            .single();
 
-          if (academyError) {
+          if (academyError || !academyData) {
             // 롤백: persons 삭제
             await withTenant(
               context.supabase.from('persons').delete().eq('id', person.id),

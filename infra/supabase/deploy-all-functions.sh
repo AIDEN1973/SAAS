@@ -32,7 +32,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR" || exit 1
 
 # ⚠️ 중요: 이제 supabase/functions/를 직접 사용합니다
-# functions/ 디렉토리는 더 이상 사용하지 않습니다
 if [ ! -d "supabase/functions" ]; then
   echo "❌ 오류: supabase/functions 디렉토리를 찾을 수 없습니다."
   echo "   supabase/functions/ 디렉토리가 존재하는지 확인해주세요."

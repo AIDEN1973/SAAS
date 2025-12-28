@@ -25,6 +25,7 @@ export interface AppLayoutProps {
   children: React.ReactNode;
   className?: string;
   onChatOpsSendMessage?: (message: string) => void | Promise<void>;
+  onChatOpsReset?: () => void;
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({
@@ -33,6 +34,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   children,
   className,
   onChatOpsSendMessage,
+  onChatOpsReset,
 }) => {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
@@ -148,6 +150,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           }
           // 외부 URL 또는 잘못된 형식은 무시 (Fail Closed)
         }}
+        onChatOpsReset={onChatOpsReset}
         executionAuditRuns={aiLayerMenu.executionAuditRuns}
         executionAuditLoading={aiLayerMenu.executionAuditLoading}
         executionAuditHasMore={aiLayerMenu.executionAuditHasMore}

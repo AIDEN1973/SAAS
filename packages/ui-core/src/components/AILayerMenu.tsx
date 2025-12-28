@@ -41,6 +41,7 @@ export interface AILayerMenuProps {
   onChatOpsRequestApproval?: (taskId: string) => void;
   onChatOpsViewActivity?: (runId?: string, requestId?: string) => void;
   onChatOpsViewTaskCard?: (taskId: string) => void; // 업종 중립: TaskCard 라우팅
+  onChatOpsReset?: () => void; // 대화 초기화 콜백
 
   // Execution Audit Props
   executionAuditRuns?: ExecutionAuditRun[];
@@ -80,6 +81,7 @@ export const AILayerMenu: React.FC<AILayerMenuProps> = ({
   onChatOpsRequestApproval,
   onChatOpsViewActivity,
   onChatOpsViewTaskCard,
+  onChatOpsReset,
 
   // Execution Audit Props
   executionAuditRuns = [],
@@ -168,6 +170,7 @@ export const AILayerMenu: React.FC<AILayerMenuProps> = ({
               onRequestApproval={onChatOpsRequestApproval}
               onViewActivity={onChatOpsViewActivity}
               onViewTaskCard={onChatOpsViewTaskCard}
+              onReset={onChatOpsReset}
             />
           )}
         </div>

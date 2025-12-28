@@ -23,9 +23,11 @@ export interface CreateExecutionAuditParams {
     source_event_id?: string;
     [key: string]: unknown;
   };
+  counts?: { affected?: number; success?: number; failed?: number } | null;
   duration_ms?: number;
   error_code?: string;
   error_summary?: string;
+  version?: string;
 }
 
 /**
@@ -57,9 +59,11 @@ export async function createExecutionAuditRecord(
         // source_event_id가 없으면 자동 생성
         source_event_id: params.reference.source_event_id || `${params.source}:${params.operation_type}:${params.reference.entity_id || 'unknown'}:${Date.now()}`,
       },
+      counts: params.counts || null,
       duration_ms: params.duration_ms || null,
       error_code: params.error_code || null,
       error_summary: params.error_summary || null,
+      version: params.version || null,
     };
 
     const { error: auditError } = await supabase

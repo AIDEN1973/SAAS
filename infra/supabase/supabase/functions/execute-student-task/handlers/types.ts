@@ -57,13 +57,31 @@ export interface HandlerContext {
 
 /**
  * Handler 실행 결과
+ * ChatOps_계약_붕괴_방지_체계_분석.md 2.2.6 참조: 부분 성공 처리 모델
  */
 export interface HandlerResult {
   status: 'success' | 'failed' | 'partial';
-  result?: unknown;
+  result?: {
+    total_count?: number;
+    success_count?: number;
+    error_count?: number;
+    // 부분 성공 시 성공/실패 리스트
+    success_list?: Array<{
+      entity_id: string;
+      entity_name?: string;
+    }>;
+    failure_list?: Array<{
+      entity_id: string;
+      entity_name?: string;
+      reason?: string;
+    }>;
+    // 기타 결과 데이터
+    [key: string]: unknown;
+  };
   error_code?: string;
+  contract_category?: ContractErrorCategory; // 계약 카테고리별 에러 태깅
   message?: string;
-  affected_count?: number; // 대량 작업 시
+  affected_count?: number; // 대량 작업 시 (하위 호환성)
 }
 
 /**
@@ -91,5 +109,23 @@ export enum HandlerErrorCode {
   INVALID_PARAMS = 'INVALID_PARAMS',
   EXECUTION_FAILED = 'EXECUTION_FAILED',
   PARTIAL_SUCCESS = 'PARTIAL_SUCCESS',
+}
+
+/**
+ * 계약 카테고리별 에러 분류
+ * ChatOps_계약_붕괴_방지_체계_분석.md 2.2.5 참조
+ * 인텐트별 에러가 아닌 계약 카테고리별로 집계하여 원인 추적 개선
+ */
+export enum ContractErrorCategory {
+  CONTRACT_INPUT_TYPE = 'CONTRACT_INPUT_TYPE',
+  CONTRACT_RESOLUTION_AMBIGUOUS = 'CONTRACT_RESOLUTION_AMBIGUOUS',
+  CONTRACT_DB_SCHEMA_MISMATCH = 'CONTRACT_DB_SCHEMA_MISMATCH',
+  CONTRACT_POLICY_DISABLED = 'CONTRACT_POLICY_DISABLED',
+  CONTRACT_IDEMPOTENCY_VIOLATION = 'CONTRACT_IDEMPOTENCY_VIOLATION',
+  CONTRACT_STATE_CHANGED = 'CONTRACT_STATE_CHANGED',
+  CONTRACT_TARGET_NOT_FOUND = 'CONTRACT_TARGET_NOT_FOUND',
+  CONTRACT_SESSION_MISMATCH = 'CONTRACT_SESSION_MISMATCH',
+  CONTRACT_LEVEL_MISMATCH = 'CONTRACT_LEVEL_MISMATCH',
+  EXTERNAL_PROVIDER_FAILURE = 'EXTERNAL_PROVIDER_FAILURE',
 }
 

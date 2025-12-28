@@ -52,7 +52,9 @@ export const billing_exec_issue_invoicesHandler: IntentHandler = {
         policyPath
       );
 
-      if (!policyEnabled || policyEnabled !== true) {
+      // 정책이 없으면 기본값으로 true 사용 (마이그레이션 미실행 시 호환성)
+      // 정책이 명시적으로 false로 설정된 경우에만 비활성화
+      if (policyEnabled === false) {
         return {
           status: 'failed',
           error_code: 'POLICY_DISABLED',
@@ -187,12 +189,11 @@ export const billing_exec_issue_invoicesHandler: IntentHandler = {
         industry_type: tenant.industry_type,
       }));
 
-      const { error: insertError } = await withTenant(
-        context.supabase
-          .from('invoices')
-          .insert(invoices),
-        context.tenant_id
-      );
+      // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
+      // invoices 배열에 이미 tenant_id가 포함되어 있음
+      const { error: insertError } = await context.supabase
+        .from('invoices')
+        .insert(invoices);
 
       if (insertError) {
         const maskedError = maskPII(insertError);

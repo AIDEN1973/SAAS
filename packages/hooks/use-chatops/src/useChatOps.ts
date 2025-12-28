@@ -16,6 +16,7 @@ import { maskPII } from '@core/pii-utils';
  * ChatOps 요청 인터페이스
  */
 export interface ChatOpsRequest {
+  session_id: string;
   message: string;
 }
 
@@ -32,6 +33,7 @@ export interface ChatOpsResponse {
   };
   l0_result?: unknown; // L0 Intent 실행 결과
   task_card_id?: string; // L1/L2 Intent의 경우 생성된 TaskCard ID
+  original_message?: string; // 원본 사용자 메시지 (필터링용)
 }
 
 /**
@@ -39,10 +41,15 @@ export interface ChatOpsResponse {
  */
 async function sendChatOpsMessage(
   tenantId: string,
+  sessionId: string,
   message: string
 ): Promise<ChatOpsResponse> {
   if (!tenantId) {
     throw new Error('Tenant ID is required');
+  }
+
+  if (!sessionId || sessionId.trim().length === 0) {
+    throw new Error('Session ID is required');
   }
 
   if (!message || message.trim().length === 0) {
@@ -54,6 +61,7 @@ async function sendChatOpsMessage(
   const response = await apiClient.invokeFunction<ChatOpsResponse>(
     'chatops',
     {
+      session_id: sessionId,
       message: message.trim(),
     }
   );
@@ -79,7 +87,8 @@ export function useChatOps() {
   const tenantId = context.tenantId;
 
   return useMutation({
-    mutationFn: (message: string) => sendChatOpsMessage(tenantId || '', message),
+    mutationFn: ({ sessionId, message }: { sessionId: string; message: string }) =>
+      sendChatOpsMessage(tenantId || '', sessionId, message),
     onError: (error) => {
       // P0: PII 마스킹 필수 (체크리스트.md 4. PII 마스킹)
       // P2: packages/hooks 레벨에서는 로깅 유틸리티가 없으므로 console.error 사용

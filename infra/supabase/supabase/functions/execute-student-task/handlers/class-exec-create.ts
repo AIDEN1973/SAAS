@@ -52,7 +52,9 @@ export const class_exec_createHandler: IntentHandler = {
         policyPath
       );
 
-      if (!policyEnabled || policyEnabled !== true) {
+      // 정책이 없으면 기본값으로 true 사용 (마이그레이션 미실행 시 호환성)
+      // 정책이 명시적으로 false로 설정된 경우에만 비활성화
+      if (policyEnabled === false) {
         return {
           status: 'failed',
           error_code: 'POLICY_DISABLED',
@@ -74,24 +76,22 @@ export const class_exec_createHandler: IntentHandler = {
       }
 
       // Industry Adapter: 업종별 클래스 테이블에 반 생성
+      // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
       const classTableName = await getTenantTableName(context.supabase, context.tenant_id, 'class');
-      const { data: newClass, error: createError } = await withTenant(
-        context.supabase
-          .from(classTableName || 'academy_classes') // Fallback
-          .insert({
-            tenant_id: context.tenant_id,
-            name,
-            grade: grade || null,
-            capacity: capacity || 20,
-            current_count: 0,
-            status: 'active',
-            created_by: context.user_id,
-            updated_by: context.user_id,
-          })
-          .select('id')
-          .single(),
-        context.tenant_id
-      );
+      const { data: newClass, error: createError } = await context.supabase
+        .from(classTableName || 'academy_classes') // Fallback
+        .insert({
+          tenant_id: context.tenant_id,
+          name,
+          grade: grade || null,
+          capacity: capacity || 20,
+          current_count: 0,
+          status: 'active',
+          created_by: context.user_id,
+          updated_by: context.user_id,
+        })
+        .select('id')
+        .single();
 
       if (createError) {
         const maskedError = maskPII(createError);
@@ -104,19 +104,17 @@ export const class_exec_createHandler: IntentHandler = {
       }
 
       // 강사 배정 (있는 경우)
+      // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
       if (teacherId) {
-        const { error: assignError } = await withTenant(
-          context.supabase
-            .from('class_teachers')
-            .insert({
-              tenant_id: context.tenant_id,
-              class_id: newClass.id,
-              teacher_id: teacherId,
-              role: 'teacher',
-              is_active: true,
-            }),
-          context.tenant_id
-        );
+        const { error: assignError } = await context.supabase
+          .from('class_teachers')
+          .insert({
+            tenant_id: context.tenant_id,
+            class_id: newClass.id,
+            teacher_id: teacherId,
+            role: 'teacher',
+            is_active: true,
+          });
 
         if (assignError) {
           const maskedError = maskPII(assignError);

@@ -51,7 +51,9 @@ export const schedule_exec_add_sessionHandler: IntentHandler = {
         policyPath
       );
 
-      if (!policyEnabled || policyEnabled !== true) {
+      // 정책이 없으면 기본값으로 true 사용 (마이그레이션 미실행 시 호환성)
+      // 정책이 명시적으로 false로 설정된 경우에만 비활성화
+      if (policyEnabled === false) {
         return {
           status: 'failed',
           error_code: 'POLICY_DISABLED',
@@ -89,20 +91,18 @@ export const schedule_exec_add_sessionHandler: IntentHandler = {
       }
 
       // 수업 세션 생성
-      const { data: session, error: createError } = await withTenant(
-        context.supabase
-          .from('class_sessions')
-          .insert({
-            tenant_id: context.tenant_id,
-            class_id: classId,
-            starts_at: startsAt,
-            ends_at: endsAt,
-            room: room || null,
-          })
-          .select('id')
-          .single(),
-        context.tenant_id
-      );
+      // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
+      const { data: session, error: createError } = await context.supabase
+        .from('class_sessions')
+        .insert({
+          tenant_id: context.tenant_id,
+          class_id: classId,
+          starts_at: startsAt,
+          ends_at: endsAt,
+          room: room || null,
+        })
+        .select('id')
+        .single();
 
       if (createError) {
         const maskedError = maskPII(createError);

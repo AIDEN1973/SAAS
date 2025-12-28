@@ -289,12 +289,14 @@ const FK_RELATION_REGISTRY: Record<string, Record<IndustryType, string>> = {
     ngo: 'ngo_beneficiaries!invoices_student_id_fkey', // 예상
   },
   // student_person_id_fkey (업종별 학생 테이블 -> persons)
+  // ⚠️ 중요: PostgREST FK 관계명은 대상 테이블!FK명 형식
+  // academy_students.person_id → persons.id 관계는 persons!academy_students_person_id_fkey
   'student_person_id': {
-    academy: 'academy_students!academy_students_person_id_fkey',
-    salon: 'salon_customers!salon_customers_person_id_fkey', // 예상
-    real_estate: 'real_estate_clients!real_estate_clients_person_id_fkey', // 예상
-    gym: 'gym_members!gym_members_person_id_fkey', // 예상
-    ngo: 'ngo_beneficiaries!ngo_beneficiaries_person_id_fkey', // 예상
+    academy: 'persons!academy_students_person_id_fkey',
+    salon: 'persons!salon_customers_person_id_fkey', // 예상
+    real_estate: 'persons!real_estate_clients_person_id_fkey', // 예상
+    gym: 'persons!gym_members_person_id_fkey', // 예상
+    ngo: 'persons!ngo_beneficiaries_person_id_fkey', // 예상
   },
   // class_teacher_id_fkey (업종별 클래스 테이블 -> persons)
   'class_teacher_id': {
