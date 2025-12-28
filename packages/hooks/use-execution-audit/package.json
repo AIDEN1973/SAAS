@@ -9,8 +9,8 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",
-    "@api-sdk/core": "workspace:*",
-    "@lib/date-utils": "workspace:*"
+    "@api-sdk/core": "file:../../api-sdk",
+    "@lib/date-utils": "file:../../lib/date-utils"
   },
   "devDependencies": {
     "@types/react": "^18.0.0",
