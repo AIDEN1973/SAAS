@@ -19,6 +19,12 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
+      "@env-registry/client": ["../../packages/env-registry/src/client.ts"],
+      "@industry/academy/types": ["../../packages/industry/industry-academy/src/types"],
+      "@hooks/use-tenant-feature": ["../../packages/hooks/use-tenant-feature/src"],
+      "@hooks/use-tenant-feature/*": ["../../packages/hooks/use-tenant-feature/src/*"],
+      "@hooks/use-auth": ["../../packages/hooks/use-auth/src"],
+      "@hooks/use-auth/*": ["../../packages/hooks/use-auth/src/*"],
       "@hooks/use-execution-audit": ["../../packages/hooks/use-execution-audit/src"],
       "@hooks/use-execution-audit/*": ["../../packages/hooks/use-execution-audit/src/*"],
       "@hooks/use-chatops": ["../../packages/hooks/use-chatops/src"],
