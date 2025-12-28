@@ -11,7 +11,7 @@ import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 import type { StudentTaskCard as StudentTaskCardType } from '@hooks/use-student';
 import { useRequestApprovalStudentTaskCard, useApproveAndExecuteStudentTaskCard, useSnoozeStudentTaskCard, useDeleteStudentTaskCard } from '@hooks/use-student';
 import { useUserRole } from '@hooks/use-auth';
-import type { SuggestedActionChatOpsPlanV1 } from '@chatops-intents/registry';
+import type { SuggestedActionChatOpsPlanV1 } from '@chatops-intents/types';
 // [SSOT] Barrel export를 통한 통합 import
 import { EMPTY_CARD_ID_PREFIX, DEFAULT_VALUES, TEXT_LINE_LIMITS, DATE_FORMATS, CARD_LABELS } from '../constants';
 import { isSafeInternalPath } from '../utils/navigation-utils';
