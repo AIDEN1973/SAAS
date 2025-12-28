@@ -6,7 +6,7 @@ import { ModalProvider, AILayerMenuProvider } from '@ui-core/react';
 import App from './App';
 // 전역 스타일은 @ui-core/react에서 중앙 관리
 // 프로덕션 빌드에서 CSS가 제대로 포함되도록 직접 경로 사용
-import '../../packages/ui-core/src/styles.css';
+import '../../../packages/ui-core/src/styles.css';
 // academy-admin 앱 전용 스타일 (스크롤바 숨김 등 pseudo selector 필요 시)
 import './index.css';
 import { checkSupabaseUrl, checkEnvVariables } from './utils/checkSupabaseUrl';
