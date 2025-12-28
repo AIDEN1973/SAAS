@@ -16,7 +16,7 @@ import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useSession } from '@hooks/use-auth';
-import { createExecutionAuditRecord } from '@hooks/use-student/src/execution-audit-utils';
+import { createExecutionAuditRecord } from '@hooks/use-student';
 import type { Notification, NotificationChannel, NotificationStatus } from '@core/notification';
 import { notificationFormSchema } from '../schemas/notification.schema';
 import { notificationTemplateFormSchema } from '../schemas/notification-template.schema';

@@ -13,9 +13,12 @@
   },
   "dependencies": {
     "@api-sdk/core": "file:../../packages/api-sdk",
+    "@chatops-intents/registry": "file:../../packages/chatops-intents",
     "@core/tags": "file:../../packages/core/core-tags",
     "@env-registry/core": "file:../../packages/env-registry",
+    "@hooks/use-chatops": "file:../../packages/hooks/use-chatops",
     "@hooks/use-class": "file:../../packages/hooks/use-class",
+    "@hooks/use-execution-audit": "file:../../packages/hooks/use-execution-audit",
     "@hooks/use-student": "file:../../packages/hooks/use-student",
     "@lib/date-utils": "file:../../packages/lib/date-utils",
     "@lib/supabase-client": "file:../../packages/lib/supabase-client",

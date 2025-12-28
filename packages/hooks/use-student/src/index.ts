@@ -71,3 +71,11 @@ export {
 export type {
   RecentActivity,
 } from './useRecentActivity';
+
+export {
+  createExecutionAuditRecord,
+} from './execution-audit-utils';
+
+export type {
+  CreateExecutionAuditParams,
+} from './execution-audit-utils';
