@@ -333,11 +333,11 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
   // - 현재 상태: AI_RISK_SCORE_THRESHOLD만 path 기반, 나머지는 모두 config 기반
   // - 향후 통일 계획: 모든 Policy를 config 기반으로 통일 예정 (policy-registry.ts의 마이그레이션 가이드 참조)
   // [P1-ARCH-2 수정] Policy 경로 점(.) 이스케이프 규칙:
-  // - ⚠️ 운영 규칙: Policy 경로 키에는 점(.) 사용 금지
+  // - 운영 규칙: Policy 경로 키에는 점(.) 사용 금지
   // - Policy Registry 초기화 시 validatePolicyPath()로 자동 검증 (개발 환경)
   // - 현재 구현은 단순 split('.')을 사용하므로 키에 점이 포함되면 파싱 오류 발생
-  // - 예: "auto_notification.payment_due_reminder.enabled" ✅ (정상)
-  // - 예: "auto_notification.payment.due.reminder" ❌ (키에 점 포함, 금지)
+  // - 예: "auto_notification.payment_due_reminder.enabled" (정상)
+  // - 예: "auto_notification.payment.due.reminder" (키에 점 포함, 금지)
 
 
   // Emergency Cards 조회 (결제 실패, 출결 오류, AI 위험 점수 기반)
@@ -506,7 +506,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
     // [P1-ARCH-3 수정] 정책 해석 일관성 문제: task_type별 priority 스케일 규칙 명확화
     // - task_type='risk'인 카드에서 priority는 risk_score를 담습니다 (create_risk_task_card RPC에서 p_risk_score를 priority에 저장)
     // - 따라서 priority >= aiRiskScoreThresholdValue 비교는 위험 점수 임계값 비교와 동일합니다
-    // - ⚠️ 주의: 이는 task_type='risk'인 경우에만 유효하며, 다른 task_type과는 스케일(0~100) 규칙이 다를 수 있습니다
+    // - 주의: 이는 task_type='risk'인 경우에만 유효하며, 다른 task_type과는 스케일(0~100) 규칙이 다를 수 있습니다
     // - 아키텍처 문서 3.1.2: TaskCard의 priority는 0-100 스케일로 정의되어 있으나, task_type='risk'에서만 특수 해석 적용
     // - TODO[ARCH]: task_type별 priority 스케일 규칙을 SSOT(아키텍처 문서 또는 Policy Registry)에 명시하여 확장 시 일관성 보장
     //   * 옵션 1: 아키텍처 문서에 task_type별 priority 해석 규칙 명시
@@ -1577,7 +1577,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
         // - created_at: 결제 생성 시각 (결제 요청 시점)
         // - updated_at: 결제 상태 업데이트 시각 (결제 완료 시각이 아닐 수 있음)
         // - 실제 매출: paid_at(결제 완료 시각) 기준이 가장 정확하나, 현재 필터 스펙에 없음
-        // ⚠️ 운영 지표로 사용 시 분쟁 포인트 가능성: 운영자는 숫자만 보고 판단하기 쉬움
+        // 운영 지표로 사용 시 분쟁 포인트 가능성: 운영자는 숫자만 보고 판단하기 쉬움
         // TODO[DATA]: 정확도 개선 방안
         //   1. paid_at 같은 명시 컬럼이 있으면 그걸 사용
         //   2. 없으면 payments 기반으로 별도 집계 query로 분리

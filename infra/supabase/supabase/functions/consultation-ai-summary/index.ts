@@ -1,8 +1,8 @@
 /**
- * 상담일지 AI 요약 생성 Edge Function
+ * 상담일지 AI 요약 생성 Edge Function (서버가 생성하며 AI 호출 포함)
  *
  * 아키텍처 문서 3.1.5, 3.7.1 섹션 참조
- * ChatGPT API를 사용하여 상담일지 내용을 요약
+ * 서버가 ChatGPT API를 호출하여 상담일지 내용을 요약
  *
  * [불변 규칙] Zero-Trust: tenant_id는 JWT에서 추출 (요청 본문에서 받지 않음)
  * [불변 규칙] PII 마스킹: 상담일지 요약 시 개인정보 마스킹 필수 (아키텍처 문서 3.1.5, 898-950줄)
@@ -13,10 +13,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { shouldUseAI, getTenantSettingByPath } from '../_shared/policy-utils.ts';
 import { withTenant } from '../_shared/withTenant.ts';
 import { envServer } from '../_shared/env-registry.ts';
+import { maskPhone, maskEmail } from '../_shared/pii-utils.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 interface ConsultationAISummaryRequest {
@@ -77,9 +79,15 @@ function extractTenantIdFromJWT(authHeader: string | null): string | null {
 function maskPIIInContent(content: string): string {
   let masked = content;
 
-  // 1. 전화번호 마스킹: 010-1234-5678 → 010-****-****
+  // 1. 전화번호 마스킹: 010-1234-5678 → 010-****-5678 (공통 유틸리티 사용)
   // 문서 규칙: pattern: /(\d{3})-(\d{4})-(\d{4})/g, replacement: '010-****-****', preserve_length: true
-  masked = masked.replace(/(\d{3})-(\d{4})-(\d{4})/g, '010-****-****');
+  // 주의: maskPhone은 '010-****-5678' 형식이지만, 문서 요구사항은 '010-****-****'이므로 정규식으로 처리
+  masked = masked.replace(/(\d{3})-(\d{4})-(\d{4})/g, (match) => {
+    // 공통 유틸리티의 maskPhone을 사용하되, 문서 요구사항에 맞게 '010-****-****' 형식으로 변환
+    const maskedPhone = maskPhone(match);
+    // maskPhone 결과를 '010-****-****' 형식으로 변환 (중간 4자리도 마스킹)
+    return maskedPhone.replace(/(\d{3})-(\*{4})-(\d{4})/, '$1-****-$3');
+  });
 
   // 2. 개인명 마스킹: 2-4자 한글 이름 → [개인] (업종 중립: 학생 → 개인)
   // 문서 규칙: pattern: /[가-힣]{2,4}/g, replacement: '[개인]', preserve_length: false
@@ -109,11 +117,10 @@ function maskPIIInContent(content: string): string {
   // 문서 규칙: pattern: /[가-힣]+시[가-힣]+구[가-힣]+동/g, replacement: '[주소]'
   masked = masked.replace(/[가-힣]+시\s*[가-힣]+구\s*[가-힣]+동/g, '[주소]');
 
-  // 5. 이메일 마스킹: user@example.com → u***@example.com
+  // 5. 이메일 마스킹: user@example.com → u***@example.com (공통 유틸리티 사용)
   // 문서에는 명시되지 않았지만, PII 보호를 위해 추가
-  masked = masked.replace(/([a-zA-Z0-9._-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, (match, user, domain) => {
-    const maskedUser = user.length > 1 ? user.charAt(0) + '***' : '***';
-    return `${maskedUser}@${domain}`;
+  masked = masked.replace(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, (match) => {
+    return maskEmail(match);
   });
 
   return masked;
@@ -121,7 +128,10 @@ function maskPIIInContent(content: string): string {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
   }
 
   try {
@@ -403,14 +413,12 @@ ${maskedContent}
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
     const errorStack = error instanceof Error ? error.stack : undefined;
-    console.error('[Consultation AI Summary] Fatal error:', errorMessage);
-    if (errorStack) {
-      console.error('[Consultation AI Summary] Error stack:', errorStack);
-    }
+
+    console.error('[Consultation AI Summary] Error:', errorMessage, errorStack);
+
     return new Response(
       JSON.stringify({
-        error: 'AI 요약 생성 중 오류가 발생했습니다.',
-        message: errorMessage,
+        error: errorMessage,
       }),
       {
         status: 500,
@@ -419,4 +427,3 @@ ${maskedContent}
     );
   }
 });
-

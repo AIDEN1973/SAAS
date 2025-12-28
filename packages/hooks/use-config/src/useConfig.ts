@@ -8,6 +8,8 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
+import { useSession } from '@hooks/use-auth';
+import { createExecutionAuditRecord } from '@hooks/use-student/src/execution-audit-utils';
 import type { TenantConfig, UpdateConfigInput } from '@core/config';
 
 /**
@@ -174,9 +176,11 @@ export function useUpdateConfig() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async (input: UpdateConfigInput) => {
+      const startTime = Date.now();
       if (!tenantId) {
         throw new Error('Tenant ID is required');
       }
@@ -260,6 +264,28 @@ export function useUpdateConfig() {
         } else {
           result = mergedConfig;
         }
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        const changedSections = Object.keys(input);
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'config.update',
+            status: 'success',
+            summary: `테넌트 설정 업데이트 완료 (${changedSections.join(', ')})`,
+            details: {
+              changed_sections: changedSections,
+            },
+            reference: {
+              entity_type: 'tenant',
+              entity_id: tenantId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return result;

@@ -901,6 +901,8 @@ export class AcademyService {
   /**
    * 반 색상 자동 생성
    * [불변 규칙] 반 색상 자동 생성
+   * [P1 수정] Math.random() 사용 금지: 첫 번째 색상을 기본값으로 사용
+   * 향후에는 기존 반 색상과 중복되지 않도록 개선 예정
    */
   private generateClassColor(): string {
     // 기본 색상 목록(16진수 색상 코드)
@@ -917,8 +919,9 @@ export class AcademyService {
       '#6366f1', // 인디고
     ];
 
-    // 랜덤 색상 반환 (향후에는 기존 반 색상과 중복되지 않도록 개선 예정)
-    return colors[Math.floor(Math.random() * colors.length)];
+    // 첫 번째 색상을 기본값으로 사용 (Math.random() 사용 금지)
+    // 향후에는 기존 반 색상과 중복되지 않도록 개선 예정
+    return colors[0];
   }
 
   /**

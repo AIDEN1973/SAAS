@@ -1,8 +1,8 @@
 /**
  * StudentTaskCard (task_type: 'ai_suggested') Card 컴포넌트 (레거시)
  *
- * ⚠️ 레거시 (v2.x): 이 컴포넌트는 더 이상 사용하지 않습니다.
- * ⚠️ v3.3 정본 규칙: StudentTaskCard (task_type: 'ai_suggested')로 통합되었습니다.
+ * 레거시 (v2.x): 이 컴포넌트는 더 이상 사용하지 않습니다.
+ * v3.3 정본 규칙: StudentTaskCard (task_type: 'ai_suggested')로 통합되었습니다.
  *
  * 정본: StudentTaskCard를 사용하세요 (프론트 자동화 문서 2.2 섹션 참조)
  *

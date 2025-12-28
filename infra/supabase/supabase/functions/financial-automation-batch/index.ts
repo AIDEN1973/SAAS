@@ -18,6 +18,7 @@ import { withTenant } from '../_shared/withTenant.ts';
 import { envServer } from '../_shared/env-registry.ts';
 import { toKSTDate, toKST, toKSTMonth } from '../_shared/date-utils.ts';
 import { checkAndUpdateAutomationSafety } from '../_shared/automation-safety.ts';
+import { createTaskCardWithDedup } from '../_shared/create-task-card-with-dedup.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -311,6 +312,26 @@ async function processCollectionRateDrop(
     return 0; // Fail Closed
   }
 
+  // Policy에서 priority 조회 (Fail-Closed)
+  const priorityPolicy = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.priority`
+  ) as number | null;
+  if (!priorityPolicy || typeof priorityPolicy !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 TTL 조회 (Fail-Closed)
+  const ttlDays = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.ttl_days`
+  ) as number | null;
+  if (!ttlDays || typeof ttlDays !== 'number') {
+    return 0; // Fail Closed
+  }
+
   // ⚠️ 중요: 자동화 안전성 체크 (AI_자동화_기능_정리.md Section 10.4)
   const safetyCheck = await checkAndUpdateAutomationSafety(
     supabase,
@@ -361,19 +382,19 @@ async function processCollectionRateDrop(
   if (dropRate >= threshold) {
     // owner/admin에게 알림 (TaskCard 생성, 정본)
     const dedupKey = `${tenantId}:${eventType}:tenant:${tenantId}:${toKSTDate(kstTime)}`;
-    await supabase.from('task_cards').upsert({
+    // ⚠️ 정본 규칙: 부분 유니크 인덱스 사용 시 Supabase client upsert() 직접 사용 불가
+    // RPC 함수 create_task_card_with_dedup_v1 사용 (프론트 자동화 문서 2.3 섹션 참조)
+    await createTaskCardWithDedup(supabase, {
       tenant_id: tenantId,
       entity_id: tenantId,  // entity_id = tenantId (entity_type='tenant')
       entity_type: 'tenant', // entity_type
       task_type: 'risk',
       title: '수납률 하락 알림',
       description: `이번 달 수납률이 지난 달 대비 ${dropRate.toFixed(1)}% 하락했습니다.`,
-      priority: 70,
+      priority: priorityPolicy,
       dedup_key: dedupKey,
-      expires_at: new Date(kstTime.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    }, {
-      onConflict: 'tenant_id,dedup_key',
-      ignoreDuplicates: false,
+      expires_at: new Date(kstTime.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'pending',
     });
 
     return 1;
@@ -492,6 +513,26 @@ async function processRefundSpike(
     return 0; // Fail Closed
   }
 
+  // Policy에서 priority 조회 (Fail-Closed)
+  const priorityPolicy = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.priority`
+  ) as number | null;
+  if (!priorityPolicy || typeof priorityPolicy !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 TTL 조회 (Fail-Closed)
+  const ttlDays = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.ttl_days`
+  ) as number | null;
+  if (!ttlDays || typeof ttlDays !== 'number') {
+    return 0; // Fail Closed
+  }
+
   // ⚠️ 중요: 자동화 안전성 체크 (AI_자동화_기능_정리.md Section 10.4)
   const safetyCheck = await checkAndUpdateAutomationSafety(
     supabase,
@@ -534,19 +575,19 @@ async function processRefundSpike(
 
   if (previousCount > 0 && (recentCount / previousCount) >= threshold) {
     const dedupKey = `${tenantId}:${eventType}:tenant:${tenantId}:${today}`;
-    await supabase.from('task_cards').upsert({
+    // ⚠️ 정본 규칙: 부분 유니크 인덱스 사용 시 Supabase client upsert() 직접 사용 불가
+    // RPC 함수 create_task_card_with_dedup_v1 사용 (프론트 자동화 문서 2.3 섹션 참조)
+    await createTaskCardWithDedup(supabase, {
       tenant_id: tenantId,
       entity_id: tenantId,  // entity_id = tenantId (entity_type='tenant')
       entity_type: 'tenant', // entity_type
       task_type: 'risk',
       title: '환불 급증 알림',
       description: `최근 7일간 환불 건수가 이전 대비 ${((recentCount / previousCount - 1) * 100).toFixed(1)}% 증가했습니다.`,
-      priority: 80,
+      priority: priorityPolicy,
       dedup_key: dedupKey,
-      expires_at: new Date(kstTime.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    }, {
-      onConflict: 'tenant_id,dedup_key',
-      ignoreDuplicates: false,
+      expires_at: new Date(kstTime.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'pending',
     });
 
     return 1;
@@ -556,8 +597,12 @@ async function processRefundSpike(
 }
 
 serve(async (req) => {
+  // CORS preflight 요청 처리
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
   }
 
   try {

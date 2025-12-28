@@ -4,7 +4,7 @@
  * [불변 규칙] 모든 네비게이션 경로 검증은 이 파일의 함수를 통해서만 수행
  * [불변 규칙] 오픈 리다이렉트 방지: 외부 URL 또는 잘못된 형식은 무시 (Fail Closed)
  *
- * ⚠️ P0 보안: 서버/DB/정책에서 온 action_url은 반드시 이 함수로 검증해야 합니다.
+ * P0 보안: 서버/DB/정책에서 온 action_url은 반드시 이 함수로 검증해야 합니다.
  */
 
 import type { NavigateFunction } from 'react-router-dom';
@@ -13,7 +13,7 @@ import { ROUTES } from '../constants';
 /**
  * 내부 경로 검증 함수 (P0-3: 인코딩/정규화 우회 방지)
  *
- * ⚠️ SSOT 원칙: 모든 경로 검증은 이 함수를 통해서만 수행
+ * SSOT 원칙: 모든 경로 검증은 이 함수를 통해서만 수행
  * 하드코딩된 문자열 패턴 검사 대신 이 함수를 사용하세요.
  *
  * @param target 이동할 경로
@@ -125,7 +125,7 @@ export function isSafeInternalPath(target: string): boolean {
 /**
  * 안전한 네비게이션 래퍼 함수 (P0-2: 단일 게이트 SSOT)
  *
- * ⚠️ SSOT 원칙: 모든 네비게이션은 이 함수를 통해서만 수행
+ * SSOT 원칙: 모든 네비게이션은 이 함수를 통해서만 수행
  * navigate() 직접 호출 대신 이 함수를 사용하세요.
  *
  * @param navigate React Router navigate 함수

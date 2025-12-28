@@ -246,6 +246,44 @@ export const sharedCatalog: SharedCatalog = {
         'const insights = await fetchAIInsights(tenantId, { insight_type: "attendance_anomaly" });',
       ],
     },
+    'use-chatops': {
+      path: '@hooks/use-chatops',
+      import: 'import { useChatOps } from "@hooks/use-chatops"',
+      useWhen: 'ChatOps 메시지 전송이 필요한 모든 페이지 (챗봇.md 참조)',
+      input: 'useChatOps(): React Query Mutation Hook, mutateAsync(message: string): 메시지 문자열',
+      output: 'useChatOps(): UseMutationResult<ChatOpsResponse>, mutateAsync(): Promise<ChatOpsResponse>',
+      extensionPoints: ['message (mutateAsync)'],
+      doNot: [
+        '직접 apiClient.invokeFunction("chatops") 호출',
+        'fetch로 Edge Function 직접 호출',
+      ],
+      examples: [
+        'const chatOpsMutation = useChatOps();',
+        'const response = await chatOpsMutation.mutateAsync("오늘 지각한 학생 목록 보여줘");',
+      ],
+      related: {
+        component: 'chatops-panel',
+      },
+    },
+    'use-execution-audit': {
+      path: '@hooks/use-execution-audit',
+      import: 'import { useExecutionAuditRuns, useExecutionAuditRun, useExecutionAuditSteps, fetchExecutionAuditSteps } from "@hooks/use-execution-audit"',
+      useWhen: 'Execution Audit Runs/Steps 조회가 필요한 모든 페이지 (액티비티.md 참조)',
+      input: 'useExecutionAuditRuns(filters?: ExecutionAuditFilters, cursor?: string): 필터 객체 및 커서, fetchExecutionAuditSteps(tenantId, runId, cursor?): useQuery 내부에서 사용',
+      output: 'useExecutionAuditRuns(): UseQueryResult<ExecutionAuditRunsResponse>, fetchExecutionAuditSteps(): Promise<ExecutionAuditStepsResponse>',
+      extensionPoints: ['filters (useExecutionAuditRuns)', 'cursor (useExecutionAuditRuns)'],
+      doNot: [
+        '직접 apiClient.invokeFunction("execution-audit-runs") 호출',
+        'fetch로 Edge Function 직접 호출',
+      ],
+      examples: [
+        'const { data: runs } = useExecutionAuditRuns({ status: "success" }, cursor);',
+        'const steps = await fetchExecutionAuditSteps(tenantId, runId);',
+      ],
+      related: {
+        component: 'execution-audit-panel',
+      },
+    },
     'use-daily-region-metrics': {
       path: '@hooks/use-daily-region-metrics',
       import: 'import { useDailyRegionMetrics, fetchDailyRegionMetrics } from "@hooks/use-daily-region-metrics"',
@@ -484,8 +522,53 @@ export const sharedCatalog: SharedCatalog = {
         hook: 'use-student',
       },
     },
+    'use-ai-layer-menu': {
+      path: '@ui-core/react',
+      import: 'import { useAILayerMenu, AILayerMenuProvider } from "@ui-core/react"',
+      useWhen: '전역 AI 레이어 메뉴 상태 관리가 필요한 경우 (모든 페이지에서 사용 가능)',
+      input: 'useAILayerMenu(): 없음 (Provider 내부에서 자동 주입), AILayerMenuProvider: 앱 최상위에 배치',
+      output: 'useAILayerMenu(): AILayerMenuContextType (isOpen, open, close, toggle, activeTab, setActiveTab, chatOpsMessages, executionAuditRuns 등)',
+      extensionPoints: ['activeTab', 'chatOpsMessages', 'executionAuditRuns'],
+      doNot: [
+        '직접 useState로 AI 레이어 메뉴 상태 관리',
+        '페이지별로 별도 상태 관리',
+        'AILayerMenuProvider 없이 useAILayerMenu 사용',
+      ],
+      examples: [
+        'import { AILayerMenuProvider, useAILayerMenu } from "@ui-core/react";',
+        '// main.tsx: <AILayerMenuProvider><App /></AILayerMenuProvider>',
+        '// 컴포넌트: const aiLayerMenu = useAILayerMenu(); aiLayerMenu.open();',
+      ],
+      related: {
+        component: 'ai-layer-menu',
+      },
+    },
   },
   features: {
+    'chatops-intent-registry': {
+      path: '@chatops-intents/registry',
+      import: 'import { intentRegistry, getIntent, getAllIntents, getL0Intents, getL1Intents, getL2Intents, getL2AIntents, getL2BIntents, hasIntent, createPlan, validatePlan, createTaskCardFromPlan, type IntentEnvelope, type SuggestedActionChatOpsPlanV1, type TaskCardInput, type CreateTaskCardFromPlanOptions } from "@chatops-intents/registry"',
+      useWhen: 'ChatOps Intent 조회, Plan 생성, TaskCard 생성 및 검증이 필요한 모든 곳 (Edge Function, Planner 등)',
+      input: 'getIntent(intent_key: string): IntentRegistryItem | undefined, createPlan(envelope: IntentEnvelope, options: CreatePlanOptions): SuggestedActionChatOpsPlanV1, validatePlan(plan: unknown): boolean, createTaskCardFromPlan(options: CreateTaskCardFromPlanOptions): TaskCardInput',
+      output: 'IntentRegistryItem | undefined, SuggestedActionChatOpsPlanV1, boolean, TaskCardInput',
+      extensionPoints: ['intent_key', 'envelope', 'options', 'plan'],
+      doNot: [
+        '문서(챗봇.md)에서 Intent 정보를 직접 하드코딩',
+        'Intent 정보를 별도 파일에 중복 정의',
+        '런타임에서 Intent Registry를 동적으로 수정',
+        'Plan 스냅샷에 PII 원문 저장 (마스킹 필수)',
+        'TaskCard 생성 시 INSERT만 사용 (UPSERT 필수)',
+      ],
+      examples: [
+        'import { getIntent, createPlan, createTaskCardFromPlan } from "@chatops-intents/registry";',
+        'const intent = getIntent("attendance.query.late");',
+        'const plan = createPlan(envelope, { requested_by_user_id: "user-123", target_student_ids: ["student-1"] });',
+        'const taskCard = createTaskCardFromPlan({ tenant_id: "tenant-123", plan, priority: 50, expires_at: "2025-12-27T00:00:00Z", now_kst: "2025-12-26T12:00:00+09:00" });',
+      ],
+      related: {
+        component: 'chatops-panel',
+      },
+    },
     'task-card-item': {
       path: 'apps/academy-admin/src/components/StudentTaskCard',
       import: 'import { StudentTaskCard } from "../components/StudentTaskCard"',
@@ -555,6 +638,69 @@ export const sharedCatalog: SharedCatalog = {
       ],
       related: {
         feature: 'task-card-item',
+      },
+    },
+    'chatops-panel': {
+      path: '@ui-core/react',
+      import: 'import { ChatOpsPanel } from "@ui-core/react"',
+      useWhen: 'AI 챗봇 UI 패널 구현 시 (버블 대화 방식)',
+      input: '{ messages: ChatOpsMessage[]; isLoading?: boolean; onSendMessage: (message: string) => void; onSelectCandidate?: (candidateId: string, tokenId?: string) => void; onApprovePlan?: (taskId: string) => void; onRequestApproval?: (taskId: string) => void; onViewActivity?: (runId?: string, requestId?: string) => void; onViewTaskCard?: (taskId: string) => void }',
+      output: 'React.ReactNode (챗봇 UI 패널)',
+      extensionPoints: ['messages', 'onSendMessage', 'onSelectCandidate', 'onApprovePlan', 'onRequestApproval', 'onViewActivity', 'onViewTaskCard'],
+      doNot: [
+        '직접 채팅 UI 구현',
+        '버블 대화 방식 외의 UI 구현',
+        '실행 결과를 ChatOps UI에 직접 표시 (Activity 시스템에 기록)',
+      ],
+      examples: [
+        'import { ChatOpsPanel } from "@ui-core/react";',
+        '<ChatOpsPanel messages={messages} onSendMessage={handleSend} />',
+      ],
+      related: {
+        component: 'ai-layer-menu',
+        hook: 'use-ai-layer-menu',
+      },
+    },
+    'execution-audit-panel': {
+      path: '@ui-core/react',
+      import: 'import { ExecutionAuditPanel } from "@ui-core/react"',
+      useWhen: 'Execution Audit UI 패널 구현 시 (타임라인/리스트 기반)',
+      input: '{ runs: ExecutionAuditRun[]; isLoading?: boolean; onLoadMore?: (cursor?: string) => void; onLoadSteps?: (runId: string, cursor?: string) => void; stepsByRunId?: Record<string, ExecutionAuditStep[]>; stepsLoading?: Record<string, boolean>; hasMore?: boolean; nextCursor?: string; onViewRun?: (runId: string) => void; onFilterChange?: (filters: ExecutionAuditFilters) => void; initialFilters?: ExecutionAuditFilters; availableOperationTypes?: string[] }',
+      output: 'React.ReactNode (Execution Audit UI 패널)',
+      extensionPoints: ['runs', 'onLoadMore', 'onLoadSteps', 'stepsByRunId', 'onViewRun', 'onFilterChange', 'initialFilters', 'availableOperationTypes'],
+      doNot: [
+        '직접 타임라인/리스트 UI 구현',
+        '채팅 방식으로 Execution Audit 표시 (타임라인/리스트 기반)',
+        'Step을 Run 목록과 함께 조회 (성능 보호, 액티비티.md 4.2 참조)',
+      ],
+      examples: [
+        'import { ExecutionAuditPanel } from "@ui-core/react";',
+        '<ExecutionAuditPanel runs={runs} onLoadMore={handleLoadMore} onLoadSteps={handleLoadSteps} />',
+      ],
+      related: {
+        component: 'ai-layer-menu',
+        hook: 'use-ai-layer-menu',
+      },
+    },
+    'ai-layer-menu': {
+      path: '@ui-core/react',
+      import: 'import { AILayerMenu } from "@ui-core/react"',
+      useWhen: '전역 AI 우측 레이어 메뉴 구현 시 (ChatOps + Execution Audit 탭 구조)',
+      input: '{ isOpen: boolean; onClose: () => void; width?: string; chatOpsMessages?: ChatOpsMessage[]; executionAuditRuns?: ExecutionAuditRun[]; ... (ChatOps 및 Execution Audit 관련 props) }',
+      output: 'React.ReactNode (전역 AI 레이어 메뉴)',
+      extensionPoints: ['width', 'chatOpsMessages', 'executionAuditRuns', 'onChatOpsSendMessage', 'onExecutionAuditLoadMore', 'onChatOpsViewTaskCard'],
+      doNot: [
+        '직접 우측 레이어 메뉴 구현',
+        '학생관리 페이지와 다른 크기/로직 사용',
+        '탭 구조 없이 단일 패널로 구현',
+      ],
+      examples: [
+        'import { AILayerMenu, useAILayerMenu } from "@ui-core/react";',
+        'const aiLayerMenu = useAILayerMenu();',
+        '<AILayerMenu isOpen={aiLayerMenu.isOpen} onClose={aiLayerMenu.close} chatOpsMessages={aiLayerMenu.chatOpsMessages} />',
+      ],
+      related: {
+        hook: 'use-ai-layer-menu',
       },
     },
   },

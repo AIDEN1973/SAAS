@@ -1,6 +1,8 @@
 /**
  * 반 관리 페이지
  *
+ * [LAYER: UI_PAGE]
+ *
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  * [요구사항] 반 리스트 + 캘린더 뷰 생성 (Calendar-like) 제공
@@ -676,11 +678,13 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
                     key={`${day.value}-${timeSlot}`}
                     style={{
                       minHeight: 'var(--height-row-min)',
+                      // HARD-CODE-EXCEPTION: padding 0은 레이아웃용 특수 값
                       padding: isStartTime ? 'var(--spacing-xs)' : '0',
                       backgroundColor: classAtTime
                         ? `${classAtTime.color}20`
                         : 'transparent',
                       borderLeft: isStartTime ? `var(--border-width-thick) solid ${classAtTime.color}` : 'none',
+                      // HARD-CODE-EXCEPTION: borderRadius 0은 레이아웃용 특수 값
                       borderRadius: isStartTime ? 'var(--border-radius-sm)' : '0',
                     }}
                   >

@@ -6,4 +6,5 @@
  */
 
 export * from './automation-event-catalog';
+export * from './domain-action-catalog';
 

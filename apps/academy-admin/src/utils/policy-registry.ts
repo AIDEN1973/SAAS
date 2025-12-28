@@ -38,7 +38,7 @@ export interface PolicyDefinition {
  * - Policy 경로 키에는 점(.) 사용 금지 (운영 규칙)
  * - 이 함수는 Policy Registry에 등록 시 경로를 검증하여 운영 실수 방지
  *
- * ⚠️ 운영 규칙: Policy 경로 키에는 점(.) 사용 금지
+ * 운영 규칙: Policy 경로 키에는 점(.) 사용 금지
  * - 예: "auto_notification.payment_due_reminder.days_before_first" ✅ (정상)
  * - 예: "auto_notification.payment.due.reminder" ❌ (키에 점 포함, 금지)
  *
@@ -94,7 +94,7 @@ export function validatePolicyPath(path: string): boolean {
  * 모든 Policy는 이 레지스트리에 등록되어야 합니다.
  * 새로운 Policy 추가 시 이 레지스트리에 먼저 추가하세요.
  *
- * ⚠️ SSOT 원칙: 모든 Policy 경로는 이 레지스트리를 통해야 합니다.
+ * SSOT 원칙: 모든 Policy 경로는 이 레지스트리를 통해야 합니다.
  * 하드코딩된 경로 사용을 금지하며, 반드시 POLICY_REGISTRY를 통해 접근해야 합니다.
  *
  * [P1-ARCH-1 수정] Policy 소스 이원화 명확화:
@@ -106,7 +106,7 @@ export function validatePolicyPath(path: string): boolean {
  * - 향후 통일 계획: 모든 Policy를 config 기반으로 통일 예정 (마이그레이션 가이드 참조)
  *
  * [P1-ARCH-2 수정] Policy 경로 점(.) 이스케이프 규칙:
- * - ⚠️ 운영 규칙: Policy 경로 키에는 점(.) 사용 금지
+ * - 운영 규칙: Policy 경로 키에는 점(.) 사용 금지
  * - 현재 구현은 단순 split('.')을 사용하므로 키에 점이 포함되면 파싱 오류 발생
  * - Policy Registry 초기화 시 validatePolicyPath()로 자동 검증
  * - 예: "auto_notification.payment_due_reminder.enabled" ✅ (정상)
@@ -204,7 +204,7 @@ export type PolicyKey = keyof typeof POLICY_REGISTRY;
 /**
  * Policy 키 검증 assert 함수 (Fail-Closed)
  *
- * ⚠️ SSOT 원칙: 등록되지 않은 Policy 키 사용 시 즉시 오류 발생
+ * SSOT 원칙: 등록되지 않은 Policy 키 사용 시 즉시 오류 발생
  * 개발 환경에서만 검증하는 것을 권장합니다 (프로덕션 성능 영향 최소화).
  *
  * @param key 검증할 Policy 키
@@ -274,7 +274,7 @@ function validatePolicyType(
  *
  * Policy Registry를 기반으로 tenant_settings.config에서 값을 조회합니다.
  *
- * ⚠️ 주의: 이 함수는 config 기반 Policy만 조회합니다.
+ * 주의: 이 함수는 config 기반 Policy만 조회합니다.
  * path 기반 Policy는 getPolicyValueWithPath 함수를 사용하세요.
  *
  * @param key Policy 키
@@ -332,7 +332,7 @@ export function getPolicyValue<T = unknown>(
  * Policy Registry를 기반으로 적절한 소스(config 또는 path)에서 값을 조회합니다.
  * config 기반과 path 기반 Policy를 모두 지원합니다.
  *
- * ⚠️ 타입 안전성 강화:
+ * 타입 안전성 강화:
  * - policy.source === 'path'일 때는 pathValue가 필수입니다.
  * - pathValue가 없으면 기본값을 반환 (Fail Closed).
  * - 함수 오버로드를 통해 타입 안전성을 보장합니다.
@@ -381,7 +381,7 @@ export function getPolicyValueWithPath<T = unknown>(
 
   if (policy.source === 'path') {
     // path 기반은 pathValue를 직접 전달받아야 함 (useTenantSettingByPath Hook 호출은 컴포넌트에서)
-    // ⚠️ 타입 안전성: pathValue가 없으면 기본값 반환 (Fail Closed)
+    // 타입 안전성: pathValue가 없으면 기본값 반환 (Fail Closed)
     const value = pathValue;
     if (value === null || value === undefined) {
       return policy.defaultValue as T | null;
@@ -402,7 +402,7 @@ export function getPolicyValueWithPath<T = unknown>(
 /**
  * 동적 Policy 경로 생성 헬퍼 함수 (SSOT)
  *
- * ⚠️ SSOT 원칙: 동적 경로(`auto_notification.${eventType}.${field}`)도 이 헬퍼 함수를 통해 생성해야 합니다.
+ * SSOT 원칙: 동적 경로(`auto_notification.${eventType}.${field}`)도 이 헬퍼 함수를 통해 생성해야 합니다.
  * 하드코딩된 문자열 템플릿 리터럴 대신 이 함수를 사용하세요.
  *
  * @param eventType Automation Event Type
@@ -432,7 +432,7 @@ export function getAutomationEventPolicyPath(eventType: string, field: string, n
 /**
  * Policy 소스 통일 가이드
  *
- * ⚠️ 현재 Policy 소스가 이원화되어 있습니다:
+ * 현재 Policy 소스가 이원화되어 있습니다:
  * - config: tenant_settings.config JSONB 기반 (대부분의 Policy)
  * - path: useTenantSettingByPath 기반 (AI_RISK_SCORE_THRESHOLD만 예외)
  *

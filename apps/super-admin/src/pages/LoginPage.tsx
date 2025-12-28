@@ -58,7 +58,33 @@ export function LoginPage() {
         // returnTo 파라미터 확인
         const returnTo = searchParams.get('returnTo');
         if (returnTo) {
-          window.location.href = decodeURIComponent(returnTo);
+          // [P0 수정] returnTo 파라미터 검증 (오픈 리다이렉트 방지)
+          try {
+            const decoded = decodeURIComponent(returnTo);
+            // 제어 문자 제거 (보안상 필요하므로 ESLint 규칙 비활성화)
+            // eslint-disable-next-line no-control-regex
+            const normalized = decoded.trim().replace(/[\x00-\x1F\x7F]/g, '');
+            const lowerNormalized = normalized.toLowerCase();
+            const isSafe = normalized.startsWith('/') &&
+              !normalized.startsWith('//') &&
+              !normalized.includes('://') &&
+              !lowerNormalized.includes('javascript:') &&
+              !lowerNormalized.includes('data:') &&
+              !lowerNormalized.includes('vbscript:') &&
+              !lowerNormalized.includes('file:') &&
+              !lowerNormalized.includes('about:') &&
+              !normalized.includes('\\') &&
+              !normalized.includes('..');
+            if (isSafe) {
+              window.location.href = decoded;
+            } else {
+              // 외부 URL 또는 잘못된 형식은 무시하고 홈으로 이동
+              navigate('/');
+            }
+          } catch {
+            // 디코딩 실패 시 홈으로 이동
+            navigate('/');
+          }
         } else {
           navigate('/');
         }
@@ -111,7 +137,33 @@ export function LoginPage() {
 
         const returnTo = searchParams.get('returnTo');
         if (returnTo) {
-          window.location.href = decodeURIComponent(returnTo);
+          // [P0 수정] returnTo 파라미터 검증 (오픈 리다이렉트 방지)
+          try {
+            const decoded = decodeURIComponent(returnTo);
+            // 제어 문자 제거 (보안상 필요하므로 ESLint 규칙 비활성화)
+            // eslint-disable-next-line no-control-regex
+            const normalized = decoded.trim().replace(/[\x00-\x1F\x7F]/g, '');
+            const lowerNormalized = normalized.toLowerCase();
+            const isSafe = normalized.startsWith('/') &&
+              !normalized.startsWith('//') &&
+              !normalized.includes('://') &&
+              !lowerNormalized.includes('javascript:') &&
+              !lowerNormalized.includes('data:') &&
+              !lowerNormalized.includes('vbscript:') &&
+              !lowerNormalized.includes('file:') &&
+              !lowerNormalized.includes('about:') &&
+              !normalized.includes('\\') &&
+              !normalized.includes('..');
+            if (isSafe) {
+              window.location.href = decoded;
+            } else {
+              // 외부 URL 또는 잘못된 형식은 무시하고 홈으로 이동
+              navigate('/');
+            }
+          } catch {
+            // 디코딩 실패 시 홈으로 이동
+            navigate('/');
+          }
         } else {
           navigate('/');
         }

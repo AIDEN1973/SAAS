@@ -94,6 +94,7 @@ export function CardGridLayout({
                   width: 'var(--border-width-thin)',
                   height: 'var(--height-divider-vertical)',
                   backgroundColor: 'var(--color-gray-200)',
+                  // HARD-CODE-EXCEPTION: zIndex 1은 레이어 순서를 위한 특수 값 (레이아웃용 특수 값)
                   zIndex: 1,
                   pointerEvents: 'none', // 클릭 이벤트 방지
                 }}

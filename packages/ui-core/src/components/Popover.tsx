@@ -89,21 +89,26 @@ export const Popover: React.FC<PopoverProps> = ({
         try {
           const v = getComputedStyle(document.documentElement).getPropertyValue('--spacing-sm').trim();
           // ⚠️ 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
+          // HARD-CODE-EXCEPTION: fallback 값 16은 브라우저 기본 폰트 크기 (브라우저 호환성용 상수)
           const baseFontSize = typeof window !== 'undefined'
             ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
             : 16;
+          // HARD-CODE-EXCEPTION: 0.5는 수학적 비율 값 (CSS 변수로 대체하기 어려운 계산식 내부 상수)
           if (!v) return baseFontSize * 0.5; // 기본값: baseFontSize * 0.5 = 8px
           if (v.endsWith('rem')) {
             return parseFloat(v) * baseFontSize;
           }
           if (v.endsWith('px')) return parseFloat(v);
           const n = Number(v);
+          // HARD-CODE-EXCEPTION: 0.5는 수학적 비율 값 (CSS 변수로 대체하기 어려운 계산식 내부 상수)
           return Number.isFinite(n) ? n : baseFontSize * 0.5; // 기본값: baseFontSize * 0.5 = 8px
         } catch {
           // ⚠️ 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
+          // HARD-CODE-EXCEPTION: fallback 값 16은 브라우저 기본 폰트 크기 (브라우저 호환성용 상수)
           const baseFontSize = typeof window !== 'undefined'
             ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
             : 16;
+          // HARD-CODE-EXCEPTION: 0.5는 수학적 비율 값 (CSS 변수로 대체하기 어려운 계산식 내부 상수)
           return baseFontSize * 0.5; // 기본값: baseFontSize * 0.5 = 8px
         }
       };

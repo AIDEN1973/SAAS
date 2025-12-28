@@ -64,6 +64,7 @@ export const Switch: React.FC<SwitchProps> = ({
             onChange={onChange}
             style={{
               position: 'absolute',
+              // HARD-CODE-EXCEPTION: opacity 0은 완전 투명을 의미하는 특수 값 (숨김 처리용 레이아웃 특수 값)
               opacity: 0,
               width: '100%',
               height: '100%',

@@ -1,6 +1,8 @@
 /**
  * 학생 관리 페이지
  *
+ * [LAYER: UI_PAGE]
+ *
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] SDUI 스키마 기반 화면 자동 생성
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
@@ -27,6 +29,8 @@ import { useStudentTags, useStudentClasses, useCompleteStudentTaskCard, useStude
 import { useAttendanceLogs, useCreateAttendanceLog, useUpdateAttendanceLog } from '@hooks/use-attendance';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
+import { useSession } from '@hooks/use-auth';
+import { createExecutionAuditRecord } from '@hooks/use-student/src/execution-audit-utils';
 import { fetchAIInsights } from '@hooks/use-ai-insights';
 import { useSchema } from '@hooks/use-schema';
 import { useIndustryTranslations } from '@hooks/use-industry-translations';
@@ -41,7 +45,7 @@ import { notificationFormSchema } from '../schemas/notification.schema';
 import { tagFormSchema } from '../schemas/tag.schema';
 import { isWidgetRegistered, setWidgetRegistered } from '../utils/widget-registry';
 // [SSOT] Barrel export를 통한 통합 import
-import { toNullable, createSafeNavigate } from '../utils';
+import { toNullable, createSafeNavigate, logError, logWarn, logInfo } from '../utils';
 
 // [P2-1 수정] 동적 import 캐싱: module-scope로 이동하여 진짜 캐싱 보장
 // useEffect 내부 지역변수는 effect가 다시 돌면 캐시가 초기화되므로 module-scope로 이동
@@ -260,6 +264,10 @@ export function StudentsPage() {
         layerMenu={{
           isOpen: !!selectedStudentId,
           onClose: () => handleStudentSelect(null),
+          // 중요: 학생 상세 레이어 메뉴는 AI 레이어 메뉴보다 높은 z-index를 가져야 함 (항상 열려있는 AI 레이어 위에 오버레이)
+          style: {
+            zIndex: 'var(--z-modal)', // AI 레이어 메뉴(--z-sticky)보다 높음
+          },
           title: selectedStudentLoading ? '로딩 중...' : selectedStudent ? (
             <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 'var(--spacing-xs)', minWidth: 0 }}>
               <span
@@ -582,6 +590,7 @@ export function StudentsPage() {
                     ? 'calc(var(--spacing-sm) + var(--size-icon-base) + var(--spacing-xs))'
                     : undefined,
                   // 접기 상태: 1줄까지만 보여주기
+                  // HARD-CODE-EXCEPTION: tagListCollapsedHeight는 동적으로 계산된 값이지만 px 단위 사용 (레이아웃용 특수 값)
                   maxHeight: !isTagListExpanded && tagListCollapsedHeight ? `${tagListCollapsedHeight}px` : undefined,
                   overflow: !isTagListExpanded && showTagListToggle ? 'hidden' : undefined,
                   transition: 'max-height var(--transition-fast)',
@@ -639,8 +648,8 @@ export function StudentsPage() {
                     position: 'absolute',
                     top: 0,
                     right: 0,
+                    // HARD-CODE-EXCEPTION: tagListCollapsedHeight는 동적으로 계산된 값이지만 px 단위 사용 (레이아웃용 특수 값)
                     height: tagListCollapsedHeight ? `${tagListCollapsedHeight}px` : 'var(--size-pagination-button)',
-                    // [불변 규칙] 하드코딩 금지: CSS 변수만 사용 (스키마엔진 문서 1 참조)
                     width: 'calc(var(--spacing-sm) + var(--size-icon-base) + var(--spacing-xs))',
                     display: 'flex',
                     alignItems: 'center',
@@ -1021,8 +1030,7 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
   useEffect(() => {
     if (import.meta.env?.DEV) {
       void getMaskPII().then((maskPII) => {
-        console.group('[StudentInfoTab] 디버깅 정보');
-        console.log('student prop:', maskPII({
+        logInfo('StudentInfoTab:Debug', 'student prop', maskPII({
           id: student?.id,
           name: student?.name,
           birth_date: student?.birth_date,
@@ -1035,8 +1043,7 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
           status: student?.status,
           notes: student?.notes,
         }));
-        console.log('isEditing:', isEditing);
-        console.groupEnd();
+        logInfo('StudentInfoTab:Debug', 'isEditing', isEditing);
       });
     }
   }, [student, isEditing]);
@@ -1066,7 +1073,7 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
       // 디버깅: formDefaultValues 계산 확인
       // [PII 보안] PII 필드는 마스킹하여 로깅
       void getMaskPII().then((maskPII) => {
-        console.log('[StudentInfoTab] formDefaultValues 계산:', maskPII(formDefaultValues));
+        logInfo('StudentInfoTab:FormDefaultValues', 'formDefaultValues 계산', maskPII(formDefaultValues));
       });
     }
   }, [formDefaultValues]);
@@ -1095,7 +1102,7 @@ function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCanc
   useEffect(() => {
     if (isEditing && import.meta.env?.DEV) {
       void getMaskPII().then((maskPII) => {
-        console.log('📋 [StudentInfoTab] SchemaForm 렌더링:', maskPII({
+        logInfo('StudentInfoTab:SchemaForm', 'SchemaForm 렌더링', maskPII({
           studentId: student.id,
           formDefaultValues,
           editSchemaFields: editSchema.form?.fields?.map(f => f.name),
@@ -2308,7 +2315,7 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
       // [P1-5] DB에 HEX 저장하도록 createTag에서 처리하므로, var(--...)는 일반적으로 들어오지 않음
       // [P2-2 수정] 운영 로그 오염 방지: DEV 환경에서만 경고
       if (import.meta.env?.DEV) {
-        console.warn('hexToRgba: CSS 변수는 직접 변환 불가, color-mix() 사용 권장 또는 DB에 HEX 저장');
+        logWarn('StudentsPage:hexToRgba', 'CSS 변수는 직접 변환 불가, color-mix() 사용 권장 또는 DB에 HEX 저장');
       }
       return color;
     }
@@ -2338,7 +2345,7 @@ function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable =
     // 변환 실패 시 원본 반환
     // [P2-2 수정] 운영 로그 오염 방지: DEV 환경에서만 경고
     if (import.meta.env?.DEV) {
-      console.warn(`hexToRgba: 지원하지 않는 색상 형식: ${color}`);
+      logWarn('StudentsPage:hexToRgba', `지원하지 않는 색상 형식: ${color}`);
     }
     return color;
   };
@@ -2844,7 +2851,7 @@ function ClassesTab({
                     const classIdField = effectiveClassAssignmentFormSchema.form.fields.find(f => f.name === 'class_id');
                     if (!classIdField) {
                       // 스키마 버전 불일치 시 안전한 fallback: 기본 필드 반환
-                      console.error('[ClassesTab] class_id 필드를 찾을 수 없습니다. 스키마 버전을 확인하세요.');
+                      logError('StudentsPage:ClassesTab', 'class_id 필드를 찾을 수 없습니다. 스키마 버전을 확인하세요.');
                       return {
                         name: 'class_id',
                         kind: 'select' as const,
@@ -2888,7 +2895,7 @@ function ClassesTab({
                     const enrolledAtField = effectiveClassAssignmentFormSchema.form.fields.find(f => f.name === 'enrolled_at');
                     if (!enrolledAtField) {
                       // 스키마 버전 불일치 시 안전한 fallback: 기본 필드 반환
-                      console.error('[ClassesTab] enrolled_at 필드를 찾을 수 없습니다. 스키마 버전을 확인하세요.');
+                      logError('StudentsPage:ClassesTab', 'enrolled_at 필드를 찾을 수 없습니다. 스키마 버전을 확인하세요.');
                       return {
                         name: 'enrolled_at',
                         kind: 'date' as const,
@@ -4215,6 +4222,7 @@ function MessageSendTab({
   const context = getApiContext();
   const tenantId = context.tenantId;
   const [searchParams] = useSearchParams();
+  const { data: session } = useSession();
   // [P1-4 확인] useCompleteStudentTaskCard(true)는 프로덕션 기능: 메시지 발송 완료 시 task card 즉시 삭제
   // deleteImmediately=true는 실제 작업 완료 시 카드를 삭제하는 정상 기능 (테스트 코드 아님)
   const completeTaskCard = useCompleteStudentTaskCard(true);
@@ -4434,6 +4442,7 @@ function MessageSendTab({
 
       // 각 수신자에게 메시지 발송
       // [불변 규칙] 아키텍처 문서 3.5.4: 채널 우선순위는 Edge Function에서 처리
+      const startTime = Date.now();
       const promises = recipientPhones.map((phone) =>
         apiClient.post<{ id: string }>('notifications', {
           channel: data.channel,
@@ -4468,6 +4477,37 @@ function MessageSendTab({
       // 전체 성공
       void queryClient.invalidateQueries({ queryKey: ['notifications', tenantId] });
 
+      // Execution Audit 기록 생성 (액티비티.md 3.2, 3.3, 12 참조)
+      if (session?.user?.id && tenantId) {
+        const durationMs = Date.now() - startTime;
+        const executionErrors = results.filter((r) => r.error);
+        const successCount = results.length - executionErrors.length;
+        const status: 'success' | 'partial' = executionErrors.length > 0 ? 'partial' : 'success';
+
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'messaging.send-sms',
+            status: status,
+            summary: `${student?.name || '학생'}에게 메시지 발송 요청 완료 (${successCount}건)`,
+            details: {
+              student_id: studentId,
+              recipient_count: successCount,
+              channel: data.channel as string,
+            },
+            reference: {
+              entity_type: 'student',
+              entity_id: studentId || '',
+            },
+            duration_ms: durationMs,
+            ...(executionErrors.length > 0 && {
+              error_code: 'PARTIAL_FAILURE',
+              error_summary: `${executionErrors.length}건 발송 실패`,
+            }),
+          },
+          session.user.id
+        );
+      }
+
       // 알림 발송 성공 시 관련 StudentTaskCard 완료 처리
       // URL에서 cardId를 추출하거나, student_id로 new_signup 타입 카드를 찾아 완료 처리
       const cardId = searchParams.get('cardId');
@@ -4477,7 +4517,7 @@ function MessageSendTab({
           await completeTaskCard.mutateAsync(cardId);
         } catch (error) {
           // 카드 완료 처리 실패는 무시 (알림 발송은 성공했으므로)
-          console.error('Failed to complete task card:', error);
+          logError('StudentsPage:CompleteTaskCard', error);
         }
       } else if (studentId && studentTaskCards) {
         // cardId가 없으면 student_id로 new_signup 타입 카드 찾기
@@ -4489,7 +4529,7 @@ function MessageSendTab({
             await completeTaskCard.mutateAsync(newSignupCard.id);
           } catch (error) {
             // 카드 완료 처리 실패는 무시 (알림 발송은 성공했으므로)
-            console.error('Failed to complete task card:', error);
+            logError('StudentsPage:CompleteTaskCard:NewSignup', error);
           }
         }
       }
@@ -4546,6 +4586,7 @@ function MessageSendTab({
                   borderRadius: 'var(--border-radius-full)',
                   backgroundColor: selectedStudent ? 'var(--color-primary-50)' : 'var(--color-gray-50)',
                   border: selectedStudent ? 'var(--border-width-thin) solid var(--color-primary)' : 'var(--border-width-thin) solid var(--color-gray-200)',
+                  // HARD-CODE-EXCEPTION: opacity 1은 전체 불투명을 의미하는 특수 값, 0.5는 비활성화 상태를 위한 레이아웃용 특수 값
                   opacity: student?.phone ? 1 : 0.5,
                   whiteSpace: 'nowrap',
                 }}

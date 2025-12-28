@@ -90,7 +90,12 @@ export function BillingPage() {
                         fontWeight: 'var(--font-weight-bold)',
                         color: 'var(--color-text)'
                       }}>
-                        금액: {item.amount?.toLocaleString()}원
+                        금액: {(() => {
+                          // [P1 수정] toLocaleString() 대신 Intl.NumberFormat 사용
+                          if (!item.amount) return '0원';
+                          const formatter = new Intl.NumberFormat('ko-KR');
+                          return `${formatter.format(item.amount)}원`;
+                        })()}
                       </p>
                       {item.amount_due && item.amount_due > 0 && (
                         <p style={{
@@ -98,7 +103,11 @@ export function BillingPage() {
                           color: 'var(--color-error)',
                           marginTop: 'var(--spacing-xs)'
                         }}>
-                          미납: {item.amount_due.toLocaleString()}원
+                          미납: {(() => {
+                            // [P1 수정] toLocaleString() 대신 Intl.NumberFormat 사용
+                            const formatter = new Intl.NumberFormat('ko-KR');
+                            return `${formatter.format(item.amount_due)}원`;
+                          })()}
                         </p>
                       )}
                     </div>
@@ -108,7 +117,26 @@ export function BillingPage() {
                         color="primary"
                         onClick={() => {
                           // 결제 페이지로 이동 (public-gateway)
-                          window.location.href = `/payment?invoice_id=${item.id}`;
+                          // [P0 수정] 내부 경로 검증 (오픈 리다이렉트 방지)
+                          const targetPath = `/payment?invoice_id=${item.id}`;
+                          // 제어 문자 제거 (보안상 필요하므로 ESLint 규칙 비활성화)
+                          // eslint-disable-next-line no-control-regex
+                          const normalized = targetPath.trim().replace(/[\x00-\x1F\x7F]/g, '');
+                          const lowerNormalized = normalized.toLowerCase();
+                          const isSafe = normalized.startsWith('/') &&
+                            !normalized.startsWith('//') &&
+                            !normalized.includes('://') &&
+                            !lowerNormalized.includes('javascript:') &&
+                            !lowerNormalized.includes('data:') &&
+                            !lowerNormalized.includes('vbscript:') &&
+                            !lowerNormalized.includes('file:') &&
+                            !lowerNormalized.includes('about:') &&
+                            !normalized.includes('\\') &&
+                            !normalized.includes('..');
+                          if (isSafe) {
+                            window.location.href = targetPath;
+                          }
+                          // 외부 URL 또는 잘못된 형식은 무시 (Fail Closed)
                         }}
                       >
                         결제하기

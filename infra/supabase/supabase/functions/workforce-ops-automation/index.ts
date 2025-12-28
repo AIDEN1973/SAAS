@@ -18,6 +18,7 @@ import { withTenant } from '../_shared/withTenant.ts';
 import { envServer } from '../_shared/env-registry.ts';
 import { toKSTDate, toKST } from '../_shared/date-utils.ts';
 import { checkAndUpdateAutomationSafety } from '../_shared/automation-safety.ts';
+import { createTaskCardWithDedup } from '../_shared/create-task-card-with-dedup.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,6 +53,26 @@ async function processTeacherWorkloadImbalance(
     `auto_notification.${eventType}.threshold`
   ) as number;
   if (!threshold || typeof threshold !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 priority 조회 (Fail-Closed)
+  const priorityPolicy = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.priority`
+  ) as number | null;
+  if (!priorityPolicy || typeof priorityPolicy !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 TTL 조회 (Fail-Closed)
+  const ttlDays = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.ttl_days`
+  ) as number | null;
+  if (!ttlDays || typeof ttlDays !== 'number') {
     return 0; // Fail Closed
   }
 
@@ -101,19 +122,19 @@ async function processTeacherWorkloadImbalance(
 
   if (imbalance >= threshold) {
     const dedupKey = `${tenantId}:${eventType}:tenant:${tenantId}:${toKSTDate(kstTime)}`;
-    await supabase.from('task_cards').upsert({
+    // ⚠️ 정본 규칙: 부분 유니크 인덱스 사용 시 Supabase client upsert() 직접 사용 불가
+    // RPC 함수 create_task_card_with_dedup_v1 사용 (프론트 자동화 문서 2.3 섹션 참조)
+    await createTaskCardWithDedup(supabase, {
       tenant_id: tenantId,
       entity_id: tenantId,  // entity_id = tenantId (entity_type='tenant')
       entity_type: 'tenant', // entity_type
       task_type: 'risk',
       title: '강사 업무량 불균형',
       description: `강사 간 업무량 차이가 ${imbalance}개 수업으로 ${threshold}개 이상입니다. 평균: ${avgWorkload.toFixed(1)}개, 최대: ${maxWorkload}개, 최소: ${minWorkload}개`,
-      priority: 65,
+      priority: priorityPolicy,
       dedup_key: dedupKey,
-      expires_at: new Date(kstTime.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    }, {
-      onConflict: 'tenant_id,dedup_key',
-      ignoreDuplicates: false,
+      expires_at: new Date(kstTime.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'pending',
     });
 
     return 1;
@@ -207,8 +228,12 @@ async function processStaffAbsenceScheduleRisk(
 }
 
 serve(async (req) => {
+  // CORS preflight 요청 처리
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
   }
 
   try {

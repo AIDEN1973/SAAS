@@ -91,6 +91,76 @@ AI 기능은 다음 2계층으로 구성된다.
 
 ⚠️ AI 판단 및 실행 로직은 Core Engine에만 존재한다.
 
+### Edge Functions Industry Adapter 구현 (SSOT)
+
+Edge Functions에서 업종별 테이블명 및 FK 관계명을 동적으로 매핑하기 위한 Industry Adapter가 구현되어 있습니다.
+
+**구현 위치:**
+- `infra/supabase/functions/_shared/industry-adapter.ts`
+
+**주요 기능:**
+1. **테이블명 동적 매핑**
+   - `getTenantTableName(supabase, tenantId, entityType)`: 테넌트의 industry_type에 따라 엔티티 타입('student', 'class' 등)을 업종별 테이블명으로 변환
+   - 예: `academy` → `academy_students`, `salon` → `salon_customers`
+
+2. **FK 관계명 동적 매핑**
+   - `getFKRelationName(fkKey, industryType)`: 업종별 FK 관계명을 레지스트리에서 조회
+   - 지원 FK 키: `attendance_logs_class_id`, `student_classes_class_id`, `student_classes_student_id`, `class_sessions_class_id`, `invoices_student_id`, `student_person_id`, `class_teacher_id`
+
+3. **업종 타입 조회**
+   - `getTenantIndustryType(supabase, tenantId)`: 테넌트의 industry_type 조회
+
+**사용 규칙:**
+- ❌ 하드코딩된 테이블명 사용 금지 (예: `'academy_students'`, `'academy_classes'`)
+- ✅ Industry Adapter 함수 사용 필수
+- ✅ Fail-Closed 원칙: 매핑 실패 시 null 반환, fallback 패턴 사용
+
+**사용 예시:**
+```typescript
+import { getTenantTableName, getTenantIndustryType, getFKRelationName } from '../_shared/industry-adapter.ts';
+
+// 테이블명 동적 조회
+const studentTableName = await getTenantTableName(supabase, tenant_id, 'student');
+const classTableName = await getTenantTableName(supabase, tenant_id, 'class');
+
+// FK 관계명 동적 조회
+const industryType = await getTenantIndustryType(supabase, tenant_id);
+const classFKName = getFKRelationName('attendance_logs_class_id', industryType) ||
+  'academy_classes!attendance_logs_class_id_fkey'; // Fallback
+
+// 쿼리 실행
+const { data } = await withTenant(
+  supabase
+    .from(studentTableName || 'academy_students') // Fallback
+    .select(`*`),
+  tenant_id
+);
+```
+
+**적용 범위:**
+- 모든 Edge Functions에서 업종별 테이블명 사용 시 필수
+- L0 핸들러 (`l0-handlers.ts`): 모든 핸들러에서 적용 완료
+- Task 실행 핸들러 (`execute-student-task/handlers/*`): 모든 핸들러에서 적용 완료
+- 자동화 Edge Functions: 모든 자동화 함수에서 적용 완료
+
+### UI Component Industry-Neutral Rule
+
+AI 관련 UI 컴포넌트(ChatOpsPanel, ExecutionAuditPanel, AILayerMenu)도 업종에 종속되지 않으며, 모든 업종에서 공통으로 사용 가능합니다.
+
+**불변 원칙:**
+- AI UI 컴포넌트는 `packages/ui-core/src/components/`에 위치하며, 업종 독립적으로 설계됩니다.
+- 업종별 차이는 prop을 통한 확장 포인트(`onViewTaskCard`, `onChatOpsViewTaskCard` 등)로 처리됩니다.
+- 업종별 하드코딩된 라우팅 경로나 CSS 클래스는 금지됩니다.
+
+**구현 위치:**
+- `ChatOpsPanel`: `packages/ui-core/src/components/ChatOpsPanel.tsx`
+- `ExecutionAuditPanel`: `packages/ui-core/src/components/ExecutionAuditPanel.tsx`
+- `AILayerMenu`: `packages/ui-core/src/components/AILayerMenu.tsx`
+
+**업종별 확장 방법:**
+- 업종별 라우팅은 `AppLayout`에서 `onChatOpsViewTaskCard` prop을 통해 처리합니다.
+- 업종별 라벨/용어는 Industry Adapter를 통해 변환됩니다.
+
 ### Automation Policy Schema Rule
 
 자동화 설정(Policy)은 업종과 무관한 **중립 스키마**로 정의된다.
@@ -1482,6 +1552,10 @@ Edge Function에서 tenant_id 설정:
 
 현재 RLS.txt에는 두 패턴이 혼재되어 있습니다:
 - ✅ **JWT claim 기반 (정본)**: `attendance_logs`, `automation_actions`, `automation_undo_logs`, `automation_safety_state`, `ai_decision_logs`, `tags`, `tag_assignments`, `tenant_features` 등
+  - ⚠️ 참고: automation_actions 테이블의 request_id는 별도 규칙을 따릅니다 (챗봇.md 6.3.1 참조)
+  - request_id 형식: `{task_id}:{action}:{attempt_window}` (5분 버킷)
+  - automation_actions 테이블에서 request_id 유니크 제약으로 멱등 강제
+  - ⚠️ 참고: automation_actions(워크플로우 이벤트)와 execution_audit_runs(실행 결과)의 관계는 액티비티.md 참조
 - ⚠️ **레거시 패턴 (마이그레이션 대상)**: `academy_classes`, `academy_students`, `academy_teachers`, `ai_insights`, `persons` 등은 `user_tenant_roles` 조인 기반
 
 **문제점:**

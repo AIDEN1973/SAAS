@@ -1,6 +1,8 @@
 /**
  * 전체 카드 목록 페이지
  *
+ * [LAYER: UI_PAGE]
+ *
  * 아키텍처 문서 3.7.1 섹션 참조: overflow_card_handling
  * 홈 화면에서 8개를 초과하는 카드들을 모두 표시하는 페이지
  *
@@ -25,7 +27,7 @@ import type { BillingHistoryItem } from '@hooks/use-billing';
 import type { AttendanceLog } from '@services/attendance-service';
 import { CardGridLayout } from '../components/CardGridLayout';
 // [SSOT] Barrel export를 통한 통합 import
-import { renderCard, createSafeNavigate } from '../utils';
+import { renderCard, createSafeNavigate, logError, normalizeEmergencyCard, normalizeAIBriefingCard, normalizeClassCard, normalizeStatsCard, normalizeBillingSummaryCard, normalizeDashboardCards } from '../utils';
 import { ROUTES } from '../constants';
 
 export function AllCardsPage() {
@@ -56,14 +58,15 @@ export function AllCardsPage() {
       if (failedPayments && failedPayments.length > 0) {
         const failedCount = failedPayments.length;
         if (failedCount >= 2) {
-          cards.push({
+          // [SSOT] 입력 정규화 레이어 사용
+          cards.push(normalizeEmergencyCard({
             id: 'payment-failed-emergency',
             type: 'emergency',
             title: '결제 실패 알림',
             message: `최근 결제 실패가 ${failedCount}건 발생했습니다.`,
             priority: 1,
             action_url: ROUTES.BILLING_HOME,
-          });
+          }));
         }
       }
       return cards;
@@ -84,7 +87,8 @@ export function AllCardsPage() {
           consultation_date: { gte: todayDate },
         });
         if (todayConsultations.length > 0) {
-            cards.push({
+            // [SSOT] 입력 정규화 레이어 사용
+            cards.push(normalizeAIBriefingCard({
               id: 'briefing-consultations',
               type: 'ai_briefing',
               title: '오늘의 상담 일정',
@@ -92,7 +96,7 @@ export function AllCardsPage() {
               insights: ['상담일지를 작성하여 학생 관리를 강화하세요.'],
               created_at: toKST().toISOString(),
               action_url: ROUTES.AI_CONSULTATION,
-            });
+            }));
         }
         const currentMonth = toKST().format('YYYY-MM');
         // 정본 규칙: fetchBillingHistory 함수 사용 (Hook의 queryFn 로직 재사용)
@@ -105,7 +109,8 @@ export function AllCardsPage() {
           const paidAmount = invoices.reduce((sum: number, inv: BillingHistoryItem) => sum + (inv.amount_paid || 0), 0);
           const expectedCollectionRate = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
           if (invoices.length > 0) {
-            cards.push({
+            // [SSOT] 입력 정규화 레이어 사용
+            cards.push(normalizeAIBriefingCard({
               id: 'briefing-billing',
               type: 'ai_briefing',
               title: '이번 달 수납 현황',
@@ -113,11 +118,11 @@ export function AllCardsPage() {
               insights: [expectedCollectionRate >= 90 ? '수납률이 양호합니다.' : '수납률 개선이 필요합니다.'],
               created_at: toKST().toISOString(),
               action_url: ROUTES.BILLING_HOME,
-            });
+            }));
           }
         }
       } catch (error) {
-        console.error('Failed to generate AI briefing cards:', error);
+        logError('AllCardsPage:AIBriefingCards', error);
       }
       return cards;
     },
@@ -155,15 +160,16 @@ export function AllCardsPage() {
       const attendanceCount = todayAttendanceLogs?.filter((log: AttendanceLog) =>
         log.class_id === cls.id && log.status === 'present'
       ).length || 0;
-      return {
+      // [SSOT] 입력 정규화 레이어 사용
+      return normalizeClassCard({
         id: cls.id,
-        type: 'class' as const,
+        type: 'class',
         class_name: cls.name,
         start_time: cls.start_time,
         student_count: cls.current_count || 0,
         attendance_count: attendanceCount,
         action_url: ROUTES.ATTENDANCE_BY_CLASS(cls.id),
-      };
+      });
     });
   }, [todayClassesData, todayAttendanceLogs]);
 
@@ -178,13 +184,14 @@ export function AllCardsPage() {
         person_type: 'student',
       });
       if (students && students.length > 0) {
-        cards.push({
+        // [SSOT] 입력 정규화 레이어 사용
+        cards.push(normalizeStatsCard({
           id: 'stats-students',
           type: 'stats',
           title: '전체 학생 수',
           value: students.length.toString(),
           action_url: ROUTES.STUDENTS_LIST,
-        });
+        }));
       }
       return cards;
     },
@@ -209,28 +216,64 @@ export function AllCardsPage() {
       const paidAmount = invoices.reduce((sum: number, inv: BillingHistoryItem) => sum + (inv.amount_paid || 0), 0);
       const expectedCollectionRate = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
       const unpaidCount = invoices.filter((inv: BillingHistoryItem) => inv.status === 'pending' || inv.status === 'overdue').length;
-      return {
+      // [SSOT] 입력 정규화 레이어 사용
+      return normalizeBillingSummaryCard({
         id: 'billing-summary',
-        type: 'billing_summary' as const,
+        type: 'billing_summary',
         title: '이번 달 수납 현황',
         expected_collection_rate: expectedCollectionRate,
         unpaid_count: unpaidCount,
         action_url: ROUTES.BILLING_HOME,
-      };
+      });
     },
     enabled: !!tenantId,
   });
 
   // 모든 카드 합치기 (제한 없이)
+  // [P0-DATA-1 수정] Fail-Closed: null/비객체/배열/id 없는 요소 제거
+  // [SSOT] 입력 정규화 레이어 사용
+  // [P0-BUILD] TSX 파싱 안정성: 제네릭 화살표 함수를 함수 선언으로 변경
+  function asObjectArray<T extends { id: string }>(value: unknown): T[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+    // [P0-DATA-1 수정] 배열 제외 및 id 필드 런타임 보장
+    return value.filter((v): v is T =>
+      !!v &&
+      typeof v === 'object' &&
+      !Array.isArray(v) &&
+      'id' in v &&
+      typeof (v as { id?: unknown }).id === 'string'
+    );
+  }
+
   const allCards = useMemo(() => {
-    const cards: DashboardCard[] = [];
-    if (emergencyCards) cards.push(...emergencyCards);
-    if (aiBriefingCards) cards.push(...aiBriefingCards);
-    if (studentTaskCards) cards.push(...(studentTaskCards as unknown as DashboardCard[]));
-    if (todayClasses) cards.push(...todayClasses);
-    if (statsCards) cards.push(...statsCards);
-    if (billingSummary) cards.push(billingSummary);
-    return cards;
+    const rawCards: Array<Partial<DashboardCard> & { id: string }> = [];
+    if (emergencyCards) {
+      const safeEmergency = asObjectArray<Partial<DashboardCard> & { id: string }>(emergencyCards);
+      rawCards.push(...safeEmergency);
+    }
+    if (aiBriefingCards) {
+      const safeBriefing = asObjectArray<Partial<DashboardCard> & { id: string }>(aiBriefingCards);
+      rawCards.push(...safeBriefing);
+    }
+    if (studentTaskCards) {
+      const safeTasks = asObjectArray<Partial<DashboardCard> & { id: string }>(studentTaskCards);
+      rawCards.push(...safeTasks);
+    }
+    if (todayClasses) {
+      const safeClasses = asObjectArray<Partial<DashboardCard> & { id: string }>(todayClasses);
+      rawCards.push(...safeClasses);
+    }
+    if (statsCards) {
+      const safeStats = asObjectArray<Partial<DashboardCard> & { id: string }>(statsCards);
+      rawCards.push(...safeStats);
+    }
+    if (billingSummary) {
+      rawCards.push(billingSummary as Partial<DashboardCard> & { id: string });
+    }
+    // [SSOT] 입력 정규화 레이어 사용
+    return normalizeDashboardCards(rawCards);
   }, [emergencyCards, aiBriefingCards, studentTaskCards, todayClasses, statsCards, billingSummary]);
 
 

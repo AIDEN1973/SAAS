@@ -197,15 +197,15 @@ export class ApiClient {
     try {
       const context = getApiContext();
 
-      console.group(`🔍 [ApiClient.post] ${table} 테이블 INSERT`);
-      console.log('📋 Context:', {
+      console.group(`[ApiClient.post] ${table} 테이블 INSERT`);
+      console.log('Context:', {
         tenantId: context?.tenantId,
         industryType: context?.industryType,
       });
-      console.log('📤 입력 데이터 (tenant_id 주입 전):', data);
+      console.log('입력 데이터 (tenant_id 주입 전):', data);
 
       if (!context?.tenantId) {
-        console.error('❌ tenant_id 없음!');
+        console.error('tenant_id 없음!');
         console.groupEnd();
         return {
           success: false,
@@ -231,7 +231,7 @@ export class ApiClient {
         (payload as Record<string, unknown>).industry_type = context.industryType;
       }
 
-      console.log('📤 최종 Payload (tenant_id 주입 후):', payload);
+      console.log('최종 Payload (tenant_id 주입 후):', payload);
 
       // 스키마 접두사 처리
       let insertQuery;
@@ -245,7 +245,7 @@ export class ApiClient {
       const { data: result, error } = await insertQuery;
 
       if (error) {
-        console.error('❌ INSERT 실패:', {
+        console.error('INSERT 실패:', {
           message: error.message,
           code: error.code,
           details: error.details,
@@ -262,8 +262,8 @@ export class ApiClient {
         };
       }
 
-      console.log('✅ INSERT 성공!');
-      console.log('📥 생성된 데이터:', result);
+      console.log('INSERT 성공!');
+      console.log('생성된 데이터:', result);
       console.groupEnd();
 
       return {
@@ -272,7 +272,7 @@ export class ApiClient {
         error: undefined,
       };
     } catch (error) {
-      console.error('❌ 예외 발생:', error);
+      console.error('예외 발생:', error);
       console.groupEnd();
       return {
         success: false,
@@ -480,9 +480,19 @@ export class ApiClient {
     body?: Record<string, unknown>
   ): Promise<ApiResponse<T>> {
     try {
+      // 개발 환경에서만 디버그 로그 출력
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[ApiClient] invokeFunction 호출 시작:', {
+          function_name: functionName,
+          has_body: !!body,
+          body_keys: body ? Object.keys(body) : [],
+        });
+      }
+
       const context = getApiContext();
 
       if (!context?.tenantId) {
+        console.error('[ApiClient] invokeFunction 실패: Tenant ID 없음');
         return {
           success: false,
           error: {
@@ -493,11 +503,35 @@ export class ApiClient {
         };
       }
 
+      // 개발 환경에서만 디버그 로그 출력
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[ApiClient] ========================================');
+        console.log('[ApiClient] Supabase functions.invoke 호출:', {
+          function_name: functionName,
+          url: `/functions/v1/${functionName}`,
+          body: body || {},
+        });
+        console.log('[ApiClient] ========================================');
+      }
+
       // Edge Function 호출
       // [불변 규칙] JWT 토큰은 supabase client에 자동으로 포함됩니다
       const { data, error } = await this.supabase.functions.invoke<T>(functionName, {
         body: body || {},
       });
+
+      // 개발 환경에서만 디버그 로그 출력
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[ApiClient] ========================================');
+        console.log('[ApiClient] Supabase functions.invoke 응답:', {
+          function_name: functionName,
+          has_data: !!data,
+          has_error: !!error,
+          error_message: error?.message,
+          error_name: error?.name,
+        });
+        console.log('[ApiClient] ========================================');
+      }
 
       if (error) {
         return {

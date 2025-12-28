@@ -18,6 +18,7 @@ import { withTenant } from '../_shared/withTenant.ts';
 import { envServer } from '../_shared/env-registry.ts';
 import { checkAndUpdateAutomationSafety } from '../_shared/automation-safety.ts';
 import { toKST, toKSTDate } from '../_shared/date-utils.ts';
+import { createExecutionAuditRecord } from '../_shared/execution-audit-utils.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,8 +26,12 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // CORS preflight 요청 처리
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
   }
 
   try {
@@ -136,6 +141,7 @@ serve(async (req) => {
     }
 
     // 정기 결제 실패 알림 발송
+    const startTime = Date.now();
     const today = toKSTDate(kstTime);
     const dedupKey = `${tenantId}:${automationEventType}:invoice:${invoiceId}:guardian:${guardian.id}:${today}`;
     await supabase.from('automation_actions').insert({
@@ -151,6 +157,29 @@ serve(async (req) => {
         channel,
         failure_reason: body.failure_reason || 'Unknown',
       },
+    });
+
+    // Execution Audit 기록 생성 (액티비티.md 3.4, 12 참조)
+    // 웹훅 수신 처리: source='webhook' (액티비티.md 6.1 참조)
+    const durationMs = Date.now() - startTime;
+    await createExecutionAuditRecord(supabase, {
+      tenant_id: tenantId,
+      operation_type: 'payment.webhook-failed',
+      status: 'success',
+      source: 'webhook', // 웹훅 수신 처리 (액티비티.md 6.1 참조)
+      actor_type: 'system',
+      actor_id: 'svc:edge:payment-webhook-handler',
+      summary: `결제 실패 웹훅 처리 완료 (invoice_id: ${invoiceId.substring(0, 8)}...)`,
+      details: {
+        invoice_id: invoiceId,
+        payment_id: paymentId,
+      },
+      reference: {
+        entity_type: 'invoice',
+        entity_id: invoiceId,
+        source_event_id: `webhook:payment.failed:${paymentId}:${Date.now()}`,
+      },
+      duration_ms: durationMs,
     });
 
     return new Response(

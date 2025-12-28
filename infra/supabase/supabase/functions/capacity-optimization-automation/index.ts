@@ -18,6 +18,8 @@ import { withTenant } from '../_shared/withTenant.ts';
 import { envServer } from '../_shared/env-registry.ts';
 import { toKSTDate, toKST } from '../_shared/date-utils.ts';
 import { checkAndUpdateAutomationSafety } from '../_shared/automation-safety.ts';
+import { createTaskCardWithDedup } from '../_shared/create-task-card-with-dedup.ts';
+import { getTenantTableName } from '../_shared/industry-adapter.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -64,6 +66,26 @@ async function processClassFillRateLowPersistent(
     return 0; // Fail Closed
   }
 
+  // Policy에서 priority 조회 (Fail-Closed)
+  const priorityPolicy = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.priority`
+  ) as number | null;
+  if (!priorityPolicy || typeof priorityPolicy !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 TTL 조회 (Fail-Closed)
+  const ttlDays = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.ttl_days`
+  ) as number | null;
+  if (!ttlDays || typeof ttlDays !== 'number') {
+    return 0; // Fail Closed
+  }
+
   // ⚠️ 중요: 자동화 안전성 체크 (AI_자동화_기능_정리.md Section 10.4)
   const safetyCheck = await checkAndUpdateAutomationSafety(
     supabase,
@@ -77,10 +99,13 @@ async function processClassFillRateLowPersistent(
     return 0;
   }
 
+  // Industry Adapter: 업종별 클래스 테이블명 동적 조회
+  const classTableName = await getTenantTableName(supabase, tenantId, 'class');
+
   // 최근 N일간 정원률이 임계값 미만인 반 조회
   const { data: classes, error } = await withTenant(
     supabase
-      .from('academy_classes')
+      .from(classTableName || 'academy_classes') // Fallback
       .select('id, name, max_students, current_students')
       .eq('status', 'active'),
     tenantId
@@ -98,19 +123,19 @@ async function processClassFillRateLowPersistent(
 
     if (fillRate < threshold) {
       const dedupKey = `${tenantId}:${eventType}:class:${cls.id}:${toKSTDate(kstTime)}`;
-      await supabase.from('task_cards').upsert({
+      // ⚠️ 정본 규칙: 부분 유니크 인덱스 사용 시 Supabase client upsert() 직접 사용 불가
+      // RPC 함수 create_task_card_with_dedup_v1 사용 (프론트 자동화 문서 2.3 섹션 참조)
+      await createTaskCardWithDedup(supabase, {
         tenant_id: tenantId,
         entity_id: cls.id,  // entity_id = class_id (entity_type='class')
         entity_type: 'class', // entity_type
         task_type: 'risk',
         title: `${cls.name} 정원률 저조`,
         description: `${cls.name}의 정원률이 ${fillRate.toFixed(1)}%로 ${threshold}% 미만입니다.`,
-        priority: 60,
+        priority: priorityPolicy,
         dedup_key: dedupKey,
-        expires_at: new Date(kstTime.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      }, {
-        onConflict: 'tenant_id,dedup_key',
-        ignoreDuplicates: false,
+        expires_at: new Date(kstTime.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'pending',
       });
       createdCount++;
     }
@@ -149,6 +174,26 @@ async function processTimeSlotFillRateLow(
     return 0; // Fail Closed
   }
 
+  // Policy에서 priority 조회 (Fail-Closed)
+  const priorityPolicy = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.priority`
+  ) as number | null;
+  if (!priorityPolicy || typeof priorityPolicy !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 TTL 조회 (Fail-Closed)
+  const ttlDays = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.ttl_days`
+  ) as number | null;
+  if (!ttlDays || typeof ttlDays !== 'number') {
+    return 0; // Fail Closed
+  }
+
   // ⚠️ 중요: 자동화 안전성 체크 (AI_자동화_기능_정리.md Section 10.4)
   const safetyCheck = await checkAndUpdateAutomationSafety(
     supabase,
@@ -162,10 +207,13 @@ async function processTimeSlotFillRateLow(
     return 0;
   }
 
+  // Industry Adapter: 업종별 클래스 테이블명 동적 조회
+  const classTableName = await getTenantTableName(supabase, tenantId, 'class');
+
   // 시간대별 수업 그룹화 및 정원률 계산
   const { data: classes, error } = await withTenant(
     supabase
-      .from('academy_classes')
+      .from(classTableName || 'academy_classes') // Fallback
       .select('id, name, start_time, max_students, current_students')
       .eq('status', 'active'),
     tenantId
@@ -193,19 +241,19 @@ async function processTimeSlotFillRateLow(
     const fillRate = data.total > 0 ? (data.current / data.total) * 100 : 0;
     if (fillRate < threshold) {
       const dedupKey = `${tenantId}:${eventType}:timeslot:${slot}:${toKSTDate(kstTime)}`;
-      await supabase.from('task_cards').upsert({
+      // ⚠️ 정본 규칙: 부분 유니크 인덱스 사용 시 Supabase client upsert() 직접 사용 불가
+      // RPC 함수 create_task_card_with_dedup_v1 사용 (프론트 자동화 문서 2.3 섹션 참조)
+      await createTaskCardWithDedup(supabase, {
         tenant_id: tenantId,
         entity_id: tenantId,  // entity_id = tenantId (entity_type='tenant')
         entity_type: 'tenant', // entity_type
         task_type: 'risk',
         title: `${slot} 시간대 정원률 저조`,
         description: `${slot} 시간대의 정원률이 ${fillRate.toFixed(1)}%로 ${threshold}% 미만입니다.`,
-        priority: 60,
+        priority: priorityPolicy,
         dedup_key: dedupKey,
-        expires_at: new Date(kstTime.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      }, {
-        onConflict: 'tenant_id,dedup_key',
-        ignoreDuplicates: false,
+        expires_at: new Date(kstTime.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'pending',
       });
       createdCount++;
     }
@@ -244,6 +292,26 @@ async function processHighFillRateExpandCandidate(
     return 0; // Fail Closed
   }
 
+  // Policy에서 priority 조회 (Fail-Closed)
+  const priorityPolicy = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.priority`
+  ) as number | null;
+  if (!priorityPolicy || typeof priorityPolicy !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 TTL 조회 (Fail-Closed)
+  const ttlDays = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.ttl_days`
+  ) as number | null;
+  if (!ttlDays || typeof ttlDays !== 'number') {
+    return 0; // Fail Closed
+  }
+
   // ⚠️ 중요: 자동화 안전성 체크 (AI_자동화_기능_정리.md Section 10.4)
   const safetyCheck = await checkAndUpdateAutomationSafety(
     supabase,
@@ -257,9 +325,12 @@ async function processHighFillRateExpandCandidate(
     return 0;
   }
 
+  // Industry Adapter: 업종별 클래스 테이블명 동적 조회
+  const classTableName = await getTenantTableName(supabase, tenantId, 'class');
+
   const { data: classes, error } = await withTenant(
     supabase
-      .from('academy_classes')
+      .from(classTableName || 'academy_classes') // Fallback
       .select('id, name, max_students, current_students')
       .eq('status', 'active'),
     tenantId
@@ -277,19 +348,19 @@ async function processHighFillRateExpandCandidate(
 
     if (fillRate >= threshold) {
       const dedupKey = `${tenantId}:${eventType}:class:${cls.id}:${toKSTDate(kstTime)}`;
-      await supabase.from('task_cards').upsert({
+      // ⚠️ 정본 규칙: 부분 유니크 인덱스 사용 시 Supabase client upsert() 직접 사용 불가
+      // RPC 함수 create_task_card_with_dedup_v1 사용 (프론트 자동화 문서 2.3 섹션 참조)
+      await createTaskCardWithDedup(supabase, {
         tenant_id: tenantId,
         entity_id: cls.id,  // entity_id = class_id (entity_type='class')
         entity_type: 'class', // entity_type
         task_type: 'ai_suggested',
         title: `${cls.name} 확장 제안`,
         description: `${cls.name}의 정원률이 ${fillRate.toFixed(1)}%로 높습니다. 추가 반 개설을 고려해보세요.`,
-        priority: 50,
+        priority: priorityPolicy,
         dedup_key: dedupKey,
-        expires_at: new Date(kstTime.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      }, {
-        onConflict: 'tenant_id,dedup_key',
-        ignoreDuplicates: false,
+        expires_at: new Date(kstTime.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'pending',
       });
       createdCount++;
     }
@@ -328,6 +399,26 @@ async function processUnusedClassPersistent(
     return 0; // Fail Closed
   }
 
+  // Policy에서 priority 조회 (Fail-Closed)
+  const priorityPolicy = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.priority`
+  ) as number | null;
+  if (!priorityPolicy || typeof priorityPolicy !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 TTL 조회 (Fail-Closed)
+  const ttlDays = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.ttl_days`
+  ) as number | null;
+  if (!ttlDays || typeof ttlDays !== 'number') {
+    return 0; // Fail Closed
+  }
+
   // ⚠️ 중요: 자동화 안전성 체크 (AI_자동화_기능_정리.md Section 10.4)
   const safetyCheck = await checkAndUpdateAutomationSafety(
     supabase,
@@ -343,10 +434,13 @@ async function processUnusedClassPersistent(
 
   const cutoffDate = toKSTDate(new Date(kstTime.getTime() - persistentDays * 24 * 60 * 60 * 1000));
 
+  // Industry Adapter: 업종별 클래스 테이블명 동적 조회
+  const classTableName = await getTenantTableName(supabase, tenantId, 'class');
+
   // 학생이 없는 반 또는 최근 출석이 없는 반 조회
   const { data: classes, error } = await withTenant(
     supabase
-      .from('academy_classes')
+      .from(classTableName || 'academy_classes') // Fallback
       .select('id, name, current_students')
       .eq('status', 'active')
       .eq('current_students', 0),
@@ -372,19 +466,19 @@ async function processUnusedClassPersistent(
 
     if (!attendance || attendance.length === 0) {
       const dedupKey = `${tenantId}:${eventType}:class:${cls.id}:${toKSTDate(kstTime)}`;
-      await supabase.from('task_cards').upsert({
+      // ⚠️ 정본 규칙: 부분 유니크 인덱스 사용 시 Supabase client upsert() 직접 사용 불가
+      // RPC 함수 create_task_card_with_dedup_v1 사용 (프론트 자동화 문서 2.3 섹션 참조)
+      await createTaskCardWithDedup(supabase, {
         tenant_id: tenantId,
         entity_id: cls.id,  // entity_id = class_id (entity_type='class')
         entity_type: 'class', // entity_type
         task_type: 'risk',
         title: `${cls.name} 미사용 알림`,
         description: `${cls.name}가 ${persistentDays}일 이상 사용되지 않고 있습니다.`,
-        priority: 55,
+        priority: priorityPolicy,
         dedup_key: dedupKey,
-        expires_at: new Date(kstTime.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      }, {
-        onConflict: 'tenant_id,dedup_key',
-        ignoreDuplicates: false,
+        expires_at: new Date(kstTime.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'pending',
       });
       createdCount++;
     }
@@ -394,8 +488,12 @@ async function processUnusedClassPersistent(
 }
 
 serve(async (req) => {
+  // CORS preflight 요청 처리
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
   }
 
   try {

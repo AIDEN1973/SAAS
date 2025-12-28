@@ -2,30 +2,54 @@
 
 # Supabase Edge Functions 배포 스크립트
 # 사용법: ./deploy.sh YOUR_PROJECT_REF
+#
+# 참고: 이 스크립트는 infra/supabase 디렉토리에서 실행해야 합니다.
+#       Supabase CLI는 supabase/functions 디렉토리를 찾습니다.
 
 set -e
 
 PROJECT_REF=$1
 
 if [ -z "$PROJECT_REF" ]; then
+  # 환경변수에서 가져오기
+  PROJECT_REF=$SUPABASE_PROJECT_REF
+fi
+
+if [ -z "$PROJECT_REF" ]; then
   echo "❌ 오류: 프로젝트 ref가 필요합니다."
   echo ""
   echo "사용법:"
-  echo "  ./deploy.sh YOUR_PROJECT_REF"
+  echo "  cd infra/supabase"
+  echo "  ./functions/deploy.sh YOUR_PROJECT_REF"
   echo ""
   echo "또는 환경변수로 설정:"
   echo "  export SUPABASE_PROJECT_REF=YOUR_PROJECT_REF"
-  echo "  ./deploy.sh"
+  echo "  cd infra/supabase"
+  echo "  ./functions/deploy.sh"
+  echo ""
+  echo "프로젝트 ref는 Supabase Dashboard → Settings → General에서 확인할 수 있습니다."
   exit 1
 fi
 
-# 환경변수에서 가져오기 (인자가 없으면)
-if [ -z "$PROJECT_REF" ] && [ ! -z "$SUPABASE_PROJECT_REF" ]; then
-  PROJECT_REF=$SUPABASE_PROJECT_REF
+# infra/supabase 디렉토리로 이동
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.." || exit 1
+
+# 배포 전 파일 동기화 (필수)
+# ⚠️ 중요: 소스 파일은 functions/ 디렉토리에서만 수정하세요
+# supabase/functions/는 배포용이므로 직접 수정하지 마세요
+echo "🔄 배포 전 파일 동기화 중..."
+if [ -f "functions/sync-for-deploy.sh" ]; then
+  bash functions/sync-for-deploy.sh
+  echo ""
+else
+  echo "❌ sync-for-deploy.sh를 찾을 수 없습니다."
+  exit 1
 fi
 
 echo "🚀 Supabase Edge Functions 배포 시작"
 echo "프로젝트 Ref: $PROJECT_REF"
+echo "작업 디렉토리: $(pwd)"
 echo ""
 
 FUNCTIONS=(
@@ -35,6 +59,11 @@ FUNCTIONS=(
   "daily-statistics-update"
   "overdue-notification-scheduler"
   "student-risk-analysis"
+  "execute-student-task"
+  "auto-message-suggestion"
+  "consultation-ai-summary"
+  "chatops"
+  "execution-audit-runs"
 )
 
 SUCCESS_COUNT=0
@@ -42,8 +71,8 @@ FAILED_COUNT=0
 
 for func in "${FUNCTIONS[@]}"; do
   echo "📦 배포 중: $func"
-  
-  if supabase functions deploy "$func" --project-ref "$PROJECT_REF" --use-api; then
+
+  if supabase functions deploy "$func" --project-ref "$PROJECT_REF" --use-api --yes; then
     echo "✅ $func 배포 성공"
     ((SUCCESS_COUNT++))
   else

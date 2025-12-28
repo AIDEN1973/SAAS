@@ -1,6 +1,8 @@
 /**
  * 지역 기반 통계 페이지 (Regional Analytics)
  *
+ * [LAYER: UI_PAGE]
+ *
  * [Phase 1 MVP 범위] 통계문서 333-342줄:
  * - 학생 수 / 매출 / 출석률 지역순위
  * - 지역 평균 대비 비교 차트
@@ -35,12 +37,13 @@ import { toKST } from '@lib/date-utils';
 import type { BillingHistoryItem } from '@hooks/use-billing';
 import type { AttendanceLog } from '@services/attendance-service';
 // [SSOT] Barrel export를 통한 통합 import
-import { safe } from '../utils';
+import { safe, logWarn } from '../utils';
 
 // 통계문서 2.4: Percentile Rank 계산을 위한 상수 정의 (하드코딩 제거)
 // Policy 기반 값이 없을 경우 사용하는 fallback 비율 (Default Policy)
 // 중요: 이 값들은 Default Policy이며, 테넌트 생성 시 설정값으로 저장됨 (없으면 실행 안 함)
 // 실제 운영 시 tenant_settings에서 조회해야 함
+// HARD-CODE-EXCEPTION: Policy fallback 값 (비즈니스 로직 하드코딩, 테넌트 생성 시 설정값으로 저장됨)
 const PERCENTILE_FALLBACK_RATIOS = {
   P25_FACTOR: 0.75, // 25분위수 추정: 평균의 75% (Default Policy: 테넌트 생성 시 설정값으로 저장)
   P75_FACTOR: 1.25, // 75분위수 추정: 평균의 125% (Default Policy: 테넌트 생성 시 설정값으로 저장)
@@ -559,7 +562,7 @@ export function AnalyticsPage() {
           });
         } catch (error) {
           // 저장 실패는 무시 (선택적 기능)
-          console.warn('[AnalyticsPage] Failed to save ranking snapshot:', error);
+          logWarn('AnalyticsPage:SaveRankingSnapshot', 'Failed to save ranking snapshot', error);
         }
 
         // 통계문서 258-260줄: AI 인사이트를 ai_insights 테이블에 저장
@@ -586,7 +589,7 @@ export function AnalyticsPage() {
           });
         } catch (error) {
           // 저장 실패는 무시 (선택적 기능)
-          console.warn('[AnalyticsPage] Failed to save AI insight:', error);
+          logWarn('AnalyticsPage:SaveAIInsight', 'Failed to save AI insight', error);
         }
 
         return {

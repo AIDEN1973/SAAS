@@ -8,6 +8,8 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
+import { useSession } from '@hooks/use-auth';
+import { createExecutionAuditRecord } from '@hooks/use-student/src/execution-audit-utils';
 import type { AttendanceLog, CreateAttendanceLogInput, AttendanceFilter } from '@services/attendance-service';
 
 export interface AttendanceNotification {
@@ -279,13 +281,38 @@ export function useCreateAttendanceLog() {
   const context = getApiContext();
   const tenantId = context.tenantId;
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async (input: CreateAttendanceLogInput) => {
+      const startTime = Date.now();
       const response = await apiClient.post<AttendanceLog>('attendance_logs', input as unknown as Record<string, unknown>);
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id && response.data) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'attendance.create',
+            status: 'success',
+            summary: `출결 로그 생성 완료 (${input.attendance_type})`,
+            details: {
+              attendance_log_id: response.data.id,
+              student_id: input.student_id,
+              attendance_type: input.attendance_type,
+            },
+            reference: {
+              entity_type: 'attendance_log',
+              entity_id: response.data.id,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return response.data!;
@@ -305,13 +332,38 @@ export function useUpdateAttendanceLog() {
   const context = getApiContext();
   const tenantId = context.tenantId;
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({ logId, input }: { logId: string; input: Partial<CreateAttendanceLogInput> }) => {
+      const startTime = Date.now();
       const response = await apiClient.patch<AttendanceLog>('attendance_logs', logId, input as unknown as Record<string, unknown>);
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id && response.data) {
+        const durationMs = Date.now() - startTime;
+        const changedFields = Object.keys(input);
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'attendance.update',
+            status: 'success',
+            summary: `출결 로그 수정 완료 (${changedFields.join(', ')})`,
+            details: {
+              attendance_log_id: logId,
+              changed_fields: changedFields,
+            },
+            reference: {
+              entity_type: 'attendance_log',
+              entity_id: logId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return response.data!;
@@ -331,13 +383,36 @@ export function useDeleteAttendanceLog() {
   const context = getApiContext();
   const tenantId = context.tenantId;
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async (logId: string) => {
+      const startTime = Date.now();
       const response = await apiClient.delete('attendance_logs', logId);
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'attendance.delete',
+            status: 'success',
+            summary: `출결 로그 삭제 완료`,
+            details: {
+              attendance_log_id: logId,
+            },
+            reference: {
+              entity_type: 'attendance_log',
+              entity_id: logId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
     },
     onSuccess: () => {

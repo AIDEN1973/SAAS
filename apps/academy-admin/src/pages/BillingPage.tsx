@@ -1,15 +1,19 @@
 /**
  * 수납/청구 관리 페이지
  *
+ * [LAYER: UI_PAGE]
+ *
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] SDUI 스키마 기반 화면 자동 생성
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  * [요구사항] 월정액/횟수제/패키지 상품, 월 자동 청구 생성, 미납 관리, 결제 수단 지원
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+// [SSOT] Barrel export를 통한 통합 import
+import { createSafeNavigate } from '../utils';
 import { ErrorBoundary, useModal, Modal, Container, Card, Button, useResponsiveMode, Drawer, PageHeader, isMobile, isTablet } from '@ui-core/react';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
@@ -48,6 +52,11 @@ export function BillingPage() {
   const [showSettlementForm, setShowSettlementForm] = useState(false);
   const [showTeacherRevenueSplitForm, setShowTeacherRevenueSplitForm] = useState(false);
   const navigate = useNavigate();
+  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
+  const safeNavigate = useMemo(
+    () => createSafeNavigate(navigate),
+    [navigate]
+  );
   // 현재 화면 구현 범위에서 미사용 상태/세터들은 명시적으로 참조하여 lint(0/0)를 유지합니다.
   void setActiveTab;
   void showProductForm;
@@ -275,21 +284,21 @@ export function BillingPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(ROUTES.BILLING_HOME)}
+                onClick={() => safeNavigate(ROUTES.BILLING_HOME)}
               >
                 상품 관리
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(ROUTES.BILLING_HOME)}
+                onClick={() => safeNavigate(ROUTES.BILLING_HOME)}
               >
                 결제 관리
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(ROUTES.BILLING_HOME)}
+                onClick={() => safeNavigate(ROUTES.BILLING_HOME)}
               >
                 매출/정산
               </Button>
@@ -447,21 +456,21 @@ export function BillingPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(ROUTES.BILLING_HOME)}
+                onClick={() => safeNavigate(ROUTES.BILLING_HOME)}
               >
                 상품 관리
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(ROUTES.BILLING_HOME)}
+                onClick={() => safeNavigate(ROUTES.BILLING_HOME)}
               >
                 결제 관리
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(ROUTES.BILLING_HOME)}
+                onClick={() => safeNavigate(ROUTES.BILLING_HOME)}
               >
                 매출/정산
               </Button>

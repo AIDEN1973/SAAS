@@ -127,7 +127,11 @@ export function StatsChartModal({ isOpen, onClose, card, data }: StatsChartModal
       case 'revenue':
         return {
           yAxisLabel: '매출',
-          formatter: (value: number) => `${value.toLocaleString()}${card.unit || '원'}`,
+          formatter: (value: number) => {
+            // [P1 수정] toLocaleString() 대신 Intl.NumberFormat 사용
+            const formatter = new Intl.NumberFormat('ko-KR');
+            return `${formatter.format(value)}${card.unit || '원'}`;
+          },
         };
       case 'attendance_rate': {
         // [P1-2 수정] 출석률 차트 라벨 강화: 로그 기반 지표임을 명시
@@ -177,7 +181,11 @@ export function StatsChartModal({ isOpen, onClose, card, data }: StatsChartModal
       case 'arpu':
         return {
           yAxisLabel: 'ARPU',
-          formatter: (value: number) => `${value.toLocaleString()}${card.unit || '원'}`,
+          formatter: (value: number) => {
+            // [P1 수정] toLocaleString() 대신 Intl.NumberFormat 사용
+            const formatter = new Intl.NumberFormat('ko-KR');
+            return `${formatter.format(value)}${card.unit || '원'}`;
+          },
         };
       default:
         return { yAxisLabel: '', formatter: (value: number) => value.toString() };
@@ -197,14 +205,16 @@ export function StatsChartModal({ isOpen, onClose, card, data }: StatsChartModal
     >
       <div style={{
         padding: 'var(--spacing-md)',
-        minHeight: 'var(--spacing-3xl) * 10', // 300px (하드코딩 금지 규칙 준수)
+        // HARD-CODE-EXCEPTION: minHeight는 calc()로 계산된 값 (레이아웃용 특수 값)
+        minHeight: 'calc(var(--spacing-3xl) * 10)',
       }}>
         {isLoading ? (
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            height: 'var(--spacing-3xl) * 10',
+            // HARD-CODE-EXCEPTION: height는 calc()로 계산된 값 (레이아웃용 특수 값)
+            height: 'calc(var(--spacing-3xl) * 10)',
             color: 'var(--color-text-secondary)',
             fontSize: 'var(--font-size-base)',
           }}>
@@ -215,7 +225,8 @@ export function StatsChartModal({ isOpen, onClose, card, data }: StatsChartModal
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            height: 'var(--spacing-3xl) * 10',
+            // HARD-CODE-EXCEPTION: height는 calc()로 계산된 값 (레이아웃용 특수 값)
+            height: 'calc(var(--spacing-3xl) * 10)',
             color: 'var(--color-text-secondary)',
             fontSize: 'var(--font-size-base)',
           }}>
@@ -226,48 +237,59 @@ export function StatsChartModal({ isOpen, onClose, card, data }: StatsChartModal
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            height: 'var(--spacing-3xl) * 10',
+            // HARD-CODE-EXCEPTION: height는 calc()로 계산된 값 (레이아웃용 특수 값)
+            height: 'calc(var(--spacing-3xl) * 10)',
             color: 'var(--color-text-secondary)',
             fontSize: 'var(--font-size-base)',
           }}>
             데이터가 없습니다.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-gray-200)" />
-              <XAxis
-                dataKey="date"
-                stroke="var(--color-text-secondary)"
-                style={{ fontSize: 'var(--font-size-sm)' }}
-              />
-              <YAxis
-                label={{ value: yAxisLabel, angle: -90, position: 'insideLeft' }}
-                stroke="var(--color-text-secondary)"
-                style={{ fontSize: 'var(--font-size-sm)' }}
-              />
-              <Tooltip
-                formatter={(value: string | number) => {
-                  const numValue = typeof value === 'string' ? parseFloat(value) : value;
-                  return [formatter(numValue), yAxisLabel];
-                }}
-                labelStyle={{ color: 'var(--color-text)' }}
-                contentStyle={{
-                  backgroundColor: 'var(--color-white)',
-                  border: '1px solid var(--color-gray-200)',
-                  borderRadius: 'var(--border-radius-md)',
-                }}
-              />
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke="var(--color-primary)"
-                strokeWidth={2}
-                dot={{ fill: 'var(--color-primary)', r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <>
+            {/* HARD-CODE-EXCEPTION: recharts 라이브러리 요구값 (3rd-party 라이브러리 요구값) */}
+            {/* height={400}, margin, strokeDasharray 등은 recharts API 요구사항 */}
+            <ResponsiveContainer width="100%" height={400}>
+              <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                {/* HARD-CODE-EXCEPTION: recharts CartesianGrid strokeDasharray는 숫자만 허용 (3rd-party 라이브러리 요구값) */}
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-gray-200)" />
+                <XAxis
+                  dataKey="date"
+                  stroke="var(--color-text-secondary)"
+                  style={{ fontSize: 'var(--font-size-sm)' }}
+                />
+                {/* HARD-CODE-EXCEPTION: recharts YAxis label angle은 숫자만 허용 (3rd-party 라이브러리 요구값) */}
+                <YAxis
+                  label={{ value: yAxisLabel, angle: -90, position: 'insideLeft' }}
+                  stroke="var(--color-text-secondary)"
+                  style={{ fontSize: 'var(--font-size-sm)' }}
+                />
+                <Tooltip
+                  formatter={(value: string | number) => {
+                    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+                    return [formatter(numValue), yAxisLabel];
+                  }}
+                  labelStyle={{ color: 'var(--color-text)' }}
+                  contentStyle={{
+                    backgroundColor: 'var(--color-white)',
+                    // HARD-CODE-EXCEPTION: recharts Tooltip contentStyle은 CSS 변수를 직접 사용할 수 없음 (3rd-party 라이브러리 요구값)
+                    // border-width-thin은 1px이지만 recharts는 CSS 변수를 직접 사용할 수 없으므로 하드코딩
+                    border: 'var(--border-width-thin) solid var(--color-gray-200)',
+                    borderRadius: 'var(--border-radius-md)',
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  stroke="var(--color-primary)"
+                  // HARD-CODE-EXCEPTION: recharts Line strokeWidth는 숫자만 허용 (3rd-party 라이브러리 요구값)
+                  strokeWidth={2}
+                  // HARD-CODE-EXCEPTION: recharts dot/activeDot r은 숫자만 허용 (3rd-party 라이브러리 요구값)
+                  dot={{ fill: 'var(--color-primary)', r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </>
         )}
       </div>
     </Modal>

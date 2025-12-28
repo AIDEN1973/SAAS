@@ -162,7 +162,7 @@ export function useStudentPage(): UseStudentPageReturn {
   const [editingConsultationId, setEditingConsultationId] = useState<string | null>(null);
   const [consultationTypeFilter, setConsultationTypeFilter] = useState<ConsultationType | 'all'>('all');
 
-  // ✅ 타입 가드 함수 (P0-E)
+  // 타입 가드 함수 (P0-E)
   const isLayerMenuTab = useCallback((value: string | null): value is LayerMenuTab => {
     if (!value) return false;
     const validTabs: LayerMenuTab[] = ['info', 'guardians', 'consultations', 'tags', 'classes', 'attendance', 'risk', 'message'];
@@ -171,16 +171,16 @@ export function useStudentPage(): UseStudentPageReturn {
 
   // URL에서 학생 ID와 탭 정보 읽기
   const urlStudentId = params.id
-    || searchParams.get('studentId')  // ✅ 새 표준
+    || searchParams.get('studentId')  // 새 표준
     || searchParams.get('student')    // 기존 호환
     || null;
 
   const urlPanel = isLayerMenuTab(searchParams.get('panel'))
     ? searchParams.get('panel')
-    : null;  // ✅ P0-E: 타입 가드
+    : null;  // P0-E: 타입 가드
   const urlTab = isLayerMenuTab(searchParams.get('tab'))
     ? searchParams.get('tab')
-    : null;  // ✅ P0-E: 타입 가드
+    : null;  // P0-E: 타입 가드
 
   // URL 경로에 따라 초기 탭 설정
   const getInitialTab = useCallback((): LayerMenuTab => {
@@ -192,10 +192,10 @@ export function useStudentPage(): UseStudentPageReturn {
     if (path.includes('/consultations')) return 'consultations';
     if (path.includes('/tags')) return 'tags';
     if (path.includes('/classes')) return 'classes';
-    return (urlPanel || urlTab || 'info') as LayerMenuTab;  // ✅ canonical 우선
+    return (urlPanel || urlTab || 'info') as LayerMenuTab;  // canonical 우선
   }, [location.pathname, urlPanel, urlTab]);
 
-  // ✅ P0-D 개선: 상태별 1회 보장 (더 안전)
+  // P0-D 개선: 상태별 1회 보장 (더 안전)
   const lastRewrittenSearchRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -224,7 +224,7 @@ export function useStudentPage(): UseStudentPageReturn {
       safeNavigate(ROUTES.STUDENT_DETAIL(legacyStudent, targetPanel), {
         replace: true
       });
-      lastRewrittenSearchRef.current = current;  // ✅ 이 search에 대해 1회만
+      lastRewrittenSearchRef.current = current;  // 이 search에 대해 1회만
       return;
     }
 
@@ -235,14 +235,14 @@ export function useStudentPage(): UseStudentPageReturn {
       safeNavigate(ROUTES.STUDENT_DETAIL(canonicalStudentId, targetPanel), {
         replace: true
       });
-      lastRewrittenSearchRef.current = current;  // ✅ 이 search에 대해 1회만
+      lastRewrittenSearchRef.current = current;  // 이 search에 대해 1회만
       return;
     }
   }, [location.search, searchParams, navigate, isLayerMenuTab, safeNavigate]);
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(urlStudentId);
   // [성능 최적화] lazy initialization으로 초기 렌더링에서만 함수 실행
-  // ✅ 기본값 fallback: canonical 우선
+  // 기본값 fallback: canonical 우선
   const activeTab: LayerMenuTab = (urlPanel || urlTab || getInitialTab()) as LayerMenuTab;
   const [layerMenuTab, setLayerMenuTab] = useState<LayerMenuTab>(activeTab);
 
@@ -367,7 +367,7 @@ export function useStudentPage(): UseStudentPageReturn {
   const handleStudentSelect = useCallback((studentId: string | null) => {
     setSelectedStudentId(studentId);
     if (studentId) {
-      // ✅ canonical URL 사용
+      // canonical URL 사용
       // [P0-2 수정] SSOT: ROUTES 상수 사용으로 안전성 확보 (동적 파라미터는 ROUTES 함수로 처리)
       // [P0-2 수정] SSOT: safeNavigate 사용 (일관성)
       const targetPath = ROUTES.STUDENT_DETAIL(studentId, layerMenuTab);
@@ -390,7 +390,7 @@ export function useStudentPage(): UseStudentPageReturn {
   const handleTabChange = useCallback((newTab: LayerMenuTab) => {
     setLayerMenuTab(newTab);
     if (selectedStudentId) {
-      // ✅ canonical URL 사용
+      // canonical URL 사용
       // [P0-2 수정] SSOT: ROUTES 상수 사용으로 안전성 확보 (동적 파라미터는 ROUTES 함수로 처리)
       // [P0-2 수정] SSOT: safeNavigate 사용 (일관성)
       const targetPath = ROUTES.STUDENT_DETAIL(selectedStudentId, newTab);

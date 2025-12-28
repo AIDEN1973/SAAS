@@ -30,7 +30,8 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
   list,
   detail,
   listWidth = '40%',
-  detailMinWidth = '22.5rem', // 360px - styles.css 준수: rem 단위 사용 (CSS 변수로 대체 가능하나 현재 토큰 없음)
+  // HARD-CODE-EXCEPTION: 우측 상세 패널 최소 너비 지정 (레이아웃용 특수 값, CSS 변수로 대체 가능하나 현재 토큰 없음)
+  detailMinWidth = '22.5rem', // 360px - styles.css 준수: rem 단위 사용
   className,
   onDetailClose,
 }) => {

@@ -57,7 +57,7 @@ POST /functions/v1/student-risk-analysis
 2. 상담일지 조회
 3. 반 배정 정보 조회
 4. ChatGPT API를 통해 종합 분석 수행
-5. 위험 점수가 90 이상이면 `student_task_cards`에 카드 자동 생성
+5. 위험 점수가 90 이상이면 `task_cards`에 카드 자동 생성 (StudentTaskCard는 학생용 별칭)
 
 ## 모델
 

@@ -9,9 +9,12 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getTenantSettingByPath } from '../_shared/policy-utils.ts';
+import { assertAutomationEventType } from '../_shared/automation-event-catalog.ts';
 import { withTenant } from '../_shared/withTenant.ts';
 import { envServer } from '../_shared/env-registry.ts';
-import { toKSTDate, toKST } from '../_shared/date-utils.ts';
+import { toKSTDate, toKST, toKSTMonth } from '../_shared/date-utils.ts';
+import { checkAndUpdateAutomationSafety } from '../_shared/automation-safety.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,8 +22,12 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // CORS preflight 요청 처리
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
   }
 
   try {
@@ -56,17 +63,18 @@ serve(async (req) => {
 
     for (const tenant of tenants) {
       try {
-        // 학생 수 통계
-        const { data: students, error: studentsError } = await withTenant(
+        // 학생 수 통계 (전체, 활성, 비활성)
+        const { data: allStudents, error: allStudentsError } = await withTenant(
           supabase
           .from('persons')
-          .select('id', { count: 'exact', head: true })
-          .eq('person_type', 'student')
-            .eq('status', 'active'),
+          .select('id, status', { count: 'exact' })
+          .eq('person_type', 'student'),
           tenant.id
         );
 
-        const studentCount = studentsError ? 0 : (students?.length || 0);
+        const studentCount = allStudentsError ? 0 : (allStudents?.length || 0);
+        const activeStudentCount = allStudentsError ? 0 : (allStudents?.filter((s: { status: string }) => s.status === 'active').length || 0);
+        const inactiveStudentCount = allStudentsError ? 0 : (allStudents?.filter((s: { status: string }) => s.status === 'inactive').length || 0);
 
         // 출석 통계
         const { data: attendanceLogs, error: attendanceError } = await withTenant(
@@ -79,7 +87,13 @@ serve(async (req) => {
         );
 
         const attendanceCount = attendanceError ? 0 : (attendanceLogs?.filter((log: { status: string }) => log.status === 'present').length || 0);
+        const lateCount = attendanceError ? 0 : (attendanceLogs?.filter((log: { status: string }) => log.status === 'late').length || 0);
         const absentCount = attendanceError ? 0 : (attendanceLogs?.filter((log: { status: string }) => log.status === 'absent').length || 0);
+
+        // 출석률, 지각률, 결석률 계산
+        const attendanceRate = studentCount > 0 ? (attendanceCount / studentCount) * 100 : 0;
+        const lateRate = studentCount > 0 ? (lateCount / studentCount) * 100 : 0;
+        const absentRate = studentCount > 0 ? (absentCount / studentCount) * 100 : 0;
 
         // 매출 통계
         const { data: invoices, error: invoicesError } = await withTenant(
@@ -95,6 +109,27 @@ serve(async (req) => {
           ? 0
           : (invoices?.reduce((sum: number, inv: { amount_paid?: number }) => sum + (inv.amount_paid || 0), 0) || 0);
 
+        // 반 통계 조회
+        const { data: classes, error: classesError } = await withTenant(
+          supabase
+          .from('classes')
+          .select('current_count, capacity')
+          .eq('status', 'active'),
+          tenant.id
+        );
+
+        let avgStudentsPerClass = 0;
+        let avgCapacityRate = 0;
+        if (!classesError && classes && classes.length > 0) {
+          const totalStudentsInClasses = classes.reduce((sum: number, cls: { current_count?: number }) => sum + (cls.current_count || 0), 0);
+          const totalCapacity = classes.reduce((sum: number, cls: { capacity?: number }) => sum + (cls.capacity || 0), 0);
+          avgStudentsPerClass = classes.length > 0 ? totalStudentsInClasses / classes.length : 0;
+          avgCapacityRate = totalCapacity > 0 ? (totalStudentsInClasses / totalCapacity) * 100 : 0;
+        }
+
+        // ARPU 계산 (학생 1인당 평균 매출)
+        const arpu = studentCount > 0 ? revenue / studentCount : 0;
+
         // 통계 업데이트 (analytics.daily_store_metrics 테이블 사용, 정본)
         // ⚠️ 참고: analytics.daily_metrics는 구버전/폐기된 네이밍입니다.
         const { error: upsertError } = await supabase
@@ -103,10 +138,16 @@ serve(async (req) => {
             tenant_id: tenant.id,
             date_kst: dateKst,
             student_count: studentCount,
-            attendance_count: attendanceCount,
-            absent_count: absentCount,
             revenue: revenue,
-            industry_type: tenant.industry_type,
+            attendance_rate: attendanceRate,
+            new_enrollments: 0, // 신규 등록 수는 별도 계산 필요 (현재는 0)
+            late_rate: lateRate,
+            absent_rate: absentRate,
+            active_student_count: activeStudentCount,
+            inactive_student_count: inactiveStudentCount,
+            avg_students_per_class: avgStudentsPerClass,
+            avg_capacity_rate: avgCapacityRate,
+            arpu: arpu,
             updated_at: toKST().toISOString(),
           }, {
             onConflict: 'tenant_id,date_kst',
@@ -117,6 +158,78 @@ serve(async (req) => {
           console.log(`[Daily Statistics] Updated metrics for tenant ${tenant.id}`);
         } else {
           console.error(`[Daily Statistics] Failed to update for tenant ${tenant.id}:`, upsertError);
+        }
+
+        // revenue_target_under 처리 (매일 07:10 실행)
+        // AI_자동화_기능_정리.md Section 11: revenue_target_under
+        const hour = kstTime.getHours();
+        const minute = kstTime.getMinutes();
+        if (hour === 7 && minute >= 10 && minute < 20) {
+          const eventType = 'revenue_target_under';
+          assertAutomationEventType(eventType);
+
+          const enabled = await getTenantSettingByPath(
+            supabase,
+            tenant.id,
+            `auto_notification.${eventType}.enabled`
+          );
+          if (enabled === true) {
+            // ⚠️ 중요: 자동화 안전성 체크 (AI_자동화_기능_정리.md Section 10.4)
+            const safetyCheck = await checkAndUpdateAutomationSafety(
+              supabase,
+              tenant.id,
+              'create_task',
+              kstTime,
+              `auto_notification.${eventType}.throttle.daily_limit`
+            );
+            if (!safetyCheck.canExecute) {
+              console.warn(`[${eventType}] Skipping due to safety check: ${safetyCheck.reason}`);
+            } else {
+              // Policy에서 월 목표 매출 조회
+              const monthlyTarget = await getTenantSettingByPath(
+                supabase,
+              tenant.id,
+              `auto_notification.${eventType}.monthly_target`
+              ) as number;
+
+              if (monthlyTarget && typeof monthlyTarget === 'number') {
+              const currentMonth = toKSTMonth(kstTime);
+              const dayOfMonth = kstTime.getDate();
+              const daysInMonth = new Date(kstTime.getFullYear(), kstTime.getMonth() + 1, 0).getDate();
+              const expectedRevenue = (monthlyTarget / daysInMonth) * dayOfMonth;
+
+              // 이번 달 현재 매출
+              const { data: currentInvoices } = await withTenant(
+                supabase
+                  .from('invoices')
+                  .select('amount_paid')
+                  .gte('period_start', `${currentMonth}-01`)
+                  .lte('period_start', toKSTDate(kstTime)),
+                tenant.id
+              );
+
+              const currentRevenue = currentInvoices
+                ? currentInvoices.reduce((sum: number, inv: any) => sum + (inv.amount_paid || 0), 0)
+                : 0;
+
+              if (currentRevenue < expectedRevenue) {
+                const dedupKey = `${tenant.id}:${eventType}:tenant:${tenant.id}:${toKSTDate(kstTime)}`;
+                await supabase.from('student_task_cards').upsert({
+                  tenant_id: tenant.id,
+                  task_type: 'risk',
+                  title: '월 매출 목표 미달',
+                  description: `이번 달 현재 매출이 목표 대비 ${((expectedRevenue - currentRevenue) / expectedRevenue * 100).toFixed(1)}% 부족합니다.`,
+                  priority: 75,
+                  dedup_key: dedupKey,
+                  expires_at: new Date(kstTime.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                }, {
+                  onConflict: 'tenant_id,dedup_key',
+                  ignoreDuplicates: false,
+                });
+              }
+            }
+          }
+          }
         }
 
       } catch (error) {
@@ -146,3 +259,9 @@ serve(async (req) => {
     );
   }
 });
+
+
+
+
+
+                                                                                                                                                                                                                                                                                                                

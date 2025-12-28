@@ -153,7 +153,7 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
           // rem 단위를 px로 변환 (CSS 변수에서 기본 폰트 크기 읽기)
           if (value.endsWith('rem')) {
             const remValue = parseFloat(value);
-            // ⚠️ 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
+            // 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
             const baseFontSize = typeof window !== 'undefined'
               ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
               : 16;
@@ -167,11 +167,12 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
         };
 
         // ⚠️ 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
+        // HARD-CODE-EXCEPTION: baseFontSize 기본값 16은 CSS 변수를 읽을 수 없을 때의 fallback 값 (브라우저 버그 회피용 상수)
         const baseFontSize = typeof window !== 'undefined'
           ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
           : 16;
-        const spacingMd = getCSSVariableAsPx('--spacing-md', baseFontSize); // 기본값: baseFontSize (16px)
-        const spacingXs = getCSSVariableAsPx('--spacing-xs', baseFontSize * 0.25); // 기본값: baseFontSize * 0.25 (4px)
+        const spacingMd = getCSSVariableAsPx('--spacing-md', baseFontSize);
+        const spacingXs = getCSSVariableAsPx('--spacing-xs', baseFontSize * 0.25);
 
         // 임시 요소를 생성하여 텍스트 너비 측정
         const tempElement = document.createElement('span');
@@ -235,10 +236,11 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
 
           // 드롭다운 레이어 위치를 wrapper 아래에 배치
           // ⚠️ 중요: 하드코딩 금지, CSS 변수에서 기본 폰트 크기 읽기
+          // HARD-CODE-EXCEPTION: baseFontSize 기본값 16은 CSS 변수를 읽을 수 없을 때의 fallback 값 (브라우저 버그 회피용 상수)
           const baseFontSize = typeof window !== 'undefined'
             ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
             : 16;
-          const minMargin = getCSSVariableAsPx('--spacing-sm', baseFontSize * 0.5); // 최소 여백 (기본값: baseFontSize * 0.5 = 8px)
+          const minMargin = getCSSVariableAsPx('--spacing-sm', baseFontSize * 0.5);
 
           // wrapper의 left 위치를 기준으로 정렬
           let newLeft = wrapperRect.left;

@@ -88,6 +88,7 @@ export const ActionButtonGroup: React.FC<ActionButtonGroupProps> = ({
         // ⚠️ 중요: 하드코딩 금지, CSS 변수 사용
         // 기본 폰트 크기는 CSS 변수에서 읽어야 하지만, fallback으로 16px 사용
         // 실제로는 var(--font-size-base)를 사용하는 것이 권장됨
+        // HARD-CODE-EXCEPTION: fallback 값 16은 브라우저 기본 폰트 크기 (브라우저 호환성용 상수)
         const baseFontSize = typeof window !== 'undefined'
           ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
           : 16;

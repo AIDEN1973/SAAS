@@ -1,4 +1,4 @@
-너는 ‘객관적 검증자(Independent Reviewer)’다.
+너는 '객관적 검증자(Independent Reviewer)'다.
 질문자의 의도/선호/유도에 맞추려 하지 말고, 오직 제공된 사실과 합리적 추론만으로 답해라.
 
 ++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -9,60 +9,110 @@ P0, P1, P2 이슈 검증 후 GPT에 코드 전체 붙여 넣기 > 품질 및 수
 
 ++++++++++++++++++++++++++++++++++++++++++++++++++
 
+새기능 구현 체크리스트를 꼭 만들 것
+
+++++++++++++++++++++++++++++++++++++++++++++++++++
+
 공통화 요소들을 모두 내가 기억할 수는 없다. 시스템이 기억할 수 있도록 시스템화해야 한다.
 공통화 요소는 크게 UI 와 기능으로 구분할 수 있다.
-공공통 모듈, 콤포넌트 생성 시 > shared-catalog에 등록이 필요하다. 이후 공통 모듈, 콤포넌트 사용 시 > shared-catalog에 등록된 모듈, 콤포넌트를 사용하도록 정리한다.
-공통 콤포넌트/모듈 분류 규칙
+
+[Phase A: 전수조사]
+- 수정하지 말고 "수정해야 할 모든 위치 목록"만 작성한다.
+- 코드/문서 변경 금지.
+
+[Phase B: 수정]
+- Phase A 목록에 포함된 항목만 수정한다.
+- 목록에 없는 항목 발견 시 "추가 항목"으로 목록에 먼저 추가한 뒤 함께 처리한다.
+- 이 Phase에서 금지되는 행위: 목록에 없는 항목의 임의 수정, Phase A 목록 외 변경
+
+[Phase C: 재검증]
+- 재검증을 수행한다.
+- 잔여 이슈는 0이 원칙이다.
+- 다만 의도된 예외는 whitelist로만 허용하며, 파일 경로 / 라인 / 예외 사유를 반드시 기록한다.
+- 이 Phase에서 금지되는 행위: whitelist 없이 예외 허용, 검증 생략
+
+++++++++++++++++++++++++++++++++++++++++++++++++++
+
+공통 모듈, 컴포넌트 생성 시 > shared-catalog에 등록이 필요하다. 이후 공통 모듈, 컴포넌트 사용 시 > shared-catalog에 등록된 모듈, 컴포넌트를 사용하도록 정리한다.
+
+shared-catalog 등록은 다음 경우에만 필수:
+- 2개 이상 사용처가 존재하거나
+- 재사용 의도가 명확한 공통 로직인 경우
+
+단일 화면/일회성 로직은 등록 대상이 아니다.
+공통 컴포넌트/모듈 분류 규칙
 UI Core Component: 시각/레이아웃/인터랙션 프리미티브. 비즈니스 규칙 없음. API 호출 없음.
+- 예: 버튼/레이아웃 컴포넌트
 Shared Feature: 여러 페이지에서 재사용되는 사용자 플로우/기능. 상태/정책/에러/로딩 포함 가능.
+- 예: 화면 단위 플로우
 Shared Hook: Feature를 UI에서 쓰기 위한 React Query/상태 캡슐화. UI 렌더링 금지.
+- 예: React Query 훅
 Service: 도메인 로직/데이터 접근. UI/Router 의존 금지.
+- 예: 도메인 로직/API 접근
 Cross-cutting(공통 유틸): 로깅/정책/권한/추적/에러처리처럼 전 영역에 적용.
 
 ++++++++++++++++++++++++++++++++++++++++++++++++++
 
 린트, 타입, 빌드 오류 체크 통합 작업:
-CI Full: eslint → typecheck → test → build: 순차 실행 > Ctrl+Shift+9번 키로 실행 가능
+CI Full 기준:
+- eslint → typecheck → test → build (순차)
+- 실행 방식은 환경에 따라 다를 수 있으며, 단축키(예: Ctrl+Shift+9)는 참고 사항이다.
 
 ++++++++++++++++++++++++++++++++++++++++++++++++++
 
+[Phase A: 전수조사]
 지금은 수정하지 말고, "수정해야 할 모든 위치 목록"만 프롬프트에 바로 만들어줘.
 - 파일 경로 + 라인 + 수정 요지
 - 총 개수 N
-- "전수조사 후 반복 재검증, 최종 재검증" 후 "잔여 0개 확인"하고 종료.
-- md, txt 파일 생성 금지
+- 이 Phase에서 금지되는 행위: 코드/문서 변경, 수정 실행
 
-++++++++++++++++++++++++++++++++++++++++++++++++++
-
+[Phase B: 수정]
 방금 만든 목록의 N개를 전부 업데이트하자
 - 목록에 없는 곳은 임의로 바꾸지 말고, 발견되면 "추가 항목"으로 목록에 먼저 추가한 뒤 함께 처리해줘.
-- 수정 후 "전수검증 후 반복 재검증, 최종 재검증" 후 "잔여 0개 확인"하고 종료.
+- 이 Phase에서 금지되는 행위: 목록에 없는 항목의 임의 수정, Phase A 목록 외 변경
+
+[Phase C: 재검증]
+- 전수검증 후 반복 재검증, 최종 재검증을 수행한다.
+- 잔여 이슈는 0이 원칙이다.
+- 다만 의도된 예외는 whitelist로만 허용하며, 파일 경로 / 라인 / 예외 사유를 반드시 기록한다.
+- 이 Phase에서 금지되는 행위: whitelist 없이 예외 허용, 검증 생략
 - md, txt 파일 생성 금지
 
 ++++++++++++++++++++++++++++++++++++++++++++++++++
 
-문서에서 확인된 하드코딩 금지 범위
-1. CSS 변수 사용 필수 범위 (컴포넌트 디자인.md, 스키마엔진.txt)
+문서에서 확인된 하드코딩 금지 범위 (SSOT 참조: 컴포넌트 디자인.md, 스키마엔진.txt, 전체 기술문서.txt, 디어쌤 아키텍처.md, rules.md)
+
+1. CSS 변수 사용 필수 범위
 금지 항목:
-하드코딩된 px/rem/em 단위 값 (예: 16px, 1rem → var(--spacing-md) 사용)
-하드코딩된 opacity 값 (예: opacity: 0.5 → var(--opacity-disabled) 사용)
-하드코딩된 border 값 (예: 1px solid → var(--border-width-thin) solid 사용)
-하드코딩된 아이콘 크기 (예: size={16} → useIconSize() 훅 사용)
-하드코딩된 색상 값 (예: #3b82f6 → var(--color-primary) 사용)
+- 하드코딩된 px/rem/em 단위 값 (예: 16px, 1rem → var(--spacing-md) 사용)
+- 하드코딩된 opacity 값 (예: opacity: 0.5 → var(--opacity-disabled) 사용)
+- 하드코딩된 border 값 (예: 1px solid → var(--border-width-thin) solid 사용)
+- 하드코딩된 아이콘 크기 (예: size={16} → useIconSize() 훅 사용)
+- 하드코딩된 색상 값 (예: #3b82f6 → var(--color-primary) 사용)
+
 허용 예외:
-레이아웃용 특수 값 (width: 0, minWidth: 0)
-CSS 속성 값 (display: 'flex', flex: 1)
-2. 비즈니스 로직/계산식 하드코딩 (전체 기술문서.txt, 디어쌤 아키텍처.md)
+- 레이아웃용 특수 값 (width: 0, minWidth: 0)
+- CSS 속성 값 (display: 'flex', flex: 1)
+- 3rd-party 라이브러리 요구값
+- SVG viewBox / path 내부 값
+- 브라우저 버그 회피용 상수
+
+예외 시 주석 태그 강제:
+// HARD-CODE-EXCEPTION: reason
+
+2. 비즈니스 로직/계산식 하드코딩
 Automation Config First 원칙:
-자동화 기능의 기본 임계값/조건은 하드코딩 금지
-Policy/Threshold/Toggle로 관리
-단, 이는 자동화 기능에 한정
-3. 더미 데이터 규칙 (rules.md)
+- 자동화 기능의 기본 임계값/조건은 하드코딩 금지
+- Policy/Threshold/Toggle로 관리
+- 단, 이는 자동화 기능에 한정
+
+3. 더미 데이터 규칙
 금지:
-운영 코드(apps/*, services/*, hooks/*)에서 랜덤 더미 데이터 생성
+- 운영 코드(apps/*, services/*, hooks/*)에서 랜덤 더미 데이터 생성
+
 허용:
-테스트 전용 더미 데이터는 dev/test/seed 영역에만 생성
-Mock Data 생성 함수는 허용 (SchemaPreview.tsx의 generateMockData)
+- 테스트 전용 더미 데이터는 dev/test/seed 영역에만 생성
+- Mock Data 생성 함수는 허용 (SchemaPreview.tsx의 generateMockData)
 
 ++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -196,28 +246,3 @@ Mock Data 생성 함수는 허용 (SchemaPreview.tsx의 generateMockData)
 4. eslint selector/message 코드 블록
    - 추가된 규칙의 selector
    - 전체 규칙 코드 블록
-
-++++++++++++++++++++++++++++++++++++++++++++++++++
-
-문서에서 확인된 하드코딩 금지 범위
-1. CSS 변수 사용 필수 범위 (컴포넌트 디자인.md, 스키마엔진.txt)
-금지 항목:
-하드코딩된 px/rem/em 단위 값 (예: 16px, 1rem → var(--spacing-md) 사용)
-하드코딩된 opacity 값 (예: opacity: 0.5 → var(--opacity-disabled) 사용)
-하드코딩된 border 값 (예: 1px solid → var(--border-width-thin) solid 사용)
-하드코딩된 아이콘 크기 (예: size={16} → useIconSize() 훅 사용)
-하드코딩된 색상 값 (예: #3b82f6 → var(--color-primary) 사용)
-허용 예외:
-레이아웃용 특수 값 (width: 0, minWidth: 0)
-CSS 속성 값 (display: 'flex', flex: 1)
-2. 비즈니스 로직/계산식 하드코딩 (전체 기술문서.txt, 디어쌤 아키텍처.md)
-Automation Config First 원칙:
-자동화 기능의 기본 임계값/조건은 하드코딩 금지
-Policy/Threshold/Toggle로 관리
-단, 이는 자동화 기능에 한정
-3. 더미 데이터 규칙 (rules.md)
-금지:
-운영 코드(apps/*, services/*, hooks/*)에서 랜덤 더미 데이터 생성
-허용:
-테스트 전용 더미 데이터는 dev/test/seed 영역에만 생성
-Mock Data 생성 함수는 허용 (SchemaPreview.tsx의 generateMockData)

@@ -996,6 +996,11 @@ if (!timingSafeEqual(sig, expected)) throw new Error('Invalid signature');
 
 idempotency-key 기반 멱등성 인덱스 항상 포함.
 
+⚠️ 참고: automation_actions 테이블의 request_id는 별도 규칙을 따릅니다 (챗봇.md 6.3.1 참조).
+- request_id 형식: `{task_id}:{action}:{attempt_window}` (5분 버킷)
+- automation_actions.request_id와 execution_audit_runs.reference.request_id는 동일한 형식을 사용 (액티비티.md 7.2 참조)
+- idempotency_key는 webhook/event_logs용, request_id는 automation_actions 전용
+
 PG/알림뱅킹 관련 재시도는 지수 백오프 패턴 사용.
 
 고급 (상용화 단계 선택적):
@@ -1013,6 +1018,12 @@ Ordering Guarantee (Late event drop)
 [불변 규칙] 모든 webhook 이벤트는 반드시 idempotency_key 기반 중복 처리 방지를 수행합니다.
 
 [불변 규칙] 동일 idempotency_key로 수신된 이벤트는 첫 번째 이벤트만 처리하고, 이후 이벤트는 무시합니다.
+
+⚠️ 참고: automation_actions 테이블의 request_id는 별도 규칙을 따릅니다 (챗봇.md 6.3.1 참조).
+- request_id 형식: `{task_id}:{action}:{attempt_window}` (5분 버킷)
+- automation_actions 테이블에서 request_id 유니크 제약으로 멱등 강제
+- automation_actions.request_id와 execution_audit_runs.reference.request_id는 동일한 형식을 사용 (액티비티.md 7.2 참조)
+- idempotency_key는 webhook/event_logs용, request_id는 automation_actions 전용
 
 [불변 규칙] 결제/알림뱅킹 webhook과 실제 정산 데이터 간 불일치가 발생하면 자동으로 감지하고 수동 조정 UI를 제공합니다.
 

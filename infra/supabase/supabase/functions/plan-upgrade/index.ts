@@ -50,7 +50,10 @@ const PLAN_FEATURES: Record<string, { messaging: boolean; analytics: boolean; me
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
   }
 
   try {
@@ -128,11 +131,12 @@ serve(async (req) => {
 
     for (const feature of featureUpdates) {
       // 기존 기능 조회
+      // [불변 규칙] SELECT 쿼리는 withTenant() 사용하여 tenant_id 필터 강제
+      // withTenant() 내부에서 이미 tenant_id 필터가 적용되므로 .eq('tenant_id') 중복 사용 금지
       const { data: existingFeature } = await withTenant(
         supabase
           .from('tenant_features')
           .select('id')
-          .eq('tenant_id', tenant_id)
           .eq('feature_key', feature.feature_key)
           .single(),
         tenant_id

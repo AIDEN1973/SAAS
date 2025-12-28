@@ -67,13 +67,12 @@ export function useStudentTaskCards() {
   const context = getApiContext();
   const tenantId = context.tenantId;
 
-  console.log('[useStudentTaskCards] Hook called:', { tenantId, hasContext: !!context });
-
   return useQuery<StudentTaskCard[]>({
     queryKey: ['student-task-cards', tenantId],
+    enabled: !!tenantId,
+    staleTime: 0, // 항상 최신 데이터 확인 (캐시 무효화 시 즉시 리패치)
+    gcTime: 5 * 60 * 1000, // 5분간 캐시 유지
     queryFn: async (): Promise<StudentTaskCard[]> => {
-      console.log('[useStudentTaskCards] Fetching cards for tenant:', tenantId);
-
       // TaskCard는 서버가 배치 작업(06:00) 및 실시간 트리거에서 생성함 (정본)
       // (아키텍처 문서 785-794줄: Daily batch at 06:00 + Real-time generation)
       // StudentTaskCard는 학생용 별칭 (= TaskCard where entity_type='student')
@@ -81,12 +80,6 @@ export function useStudentTaskCards() {
         filters: { entity_type: 'student' }, // 학생용 필터
         orderBy: { column: 'priority', ascending: false },
         limit: 100,
-      });
-
-      console.log('[useStudentTaskCards] Response:', {
-        error: response.error,
-        dataLength: response.data?.length,
-        data: response.data,
       });
 
       if (response.error) {
@@ -127,11 +120,18 @@ export function useStudentTaskCards() {
         return isCreatedToday || isNotExpired;
       });
 
-      console.log('[useStudentTaskCards] Filtered cards (after expiry check):', cards.length);
+      // 필터링 후 잭슨 TaskCard 찾기
+      const jacksonCardAfterFilter = cards.find(card =>
+        card.id === 'c0aee40c-bdd4-4f46-8b33-13073151a6b1' ||
+        card.title?.includes('잭슨') ||
+        (card.suggested_action as any)?.params?.name === '잭슨'
+      );
+
       return cards as StudentTaskCard[];
     },
-    enabled: !!tenantId,
     refetchInterval: REFETCH_INTERVAL_ONE_MINUTE,
+    refetchOnWindowFocus: true, // 윈도우 포커스 시 자동 리패치
+    refetchOnMount: true, // 컴포넌트 마운트 시 자동 리패치
   });
 }
 
@@ -229,22 +229,41 @@ export function useApproveAndExecuteStudentTaskCard() {
 
   return useMutation({
     mutationFn: async (taskId: string) => {
+      console.log('[useApproveAndExecuteStudentTaskCard] 함수 호출 시작:', {
+        task_id: taskId,
+        function_name: 'execute-student-task',
+        action: 'approve-and-execute',
+      });
+
       // Edge Function 호출: approve-and-execute
       // 프론트 자동화 문서 2.4: Admin/Owner는 승인 및 실행 가능, 서버 사이드(Edge Function/DB Trigger/Scheduler)가 SSOT
       // Edge Function은 body로 action과 task_id를 받음
-      const response = await apiClient.invokeFunction<{ status: string; message: string }>(
-        'execute-student-task',
-        {
-          action: 'approve-and-execute',
-          task_id: taskId,
+      try {
+        const response = await apiClient.invokeFunction<{ status: string; message: string }>(
+          'execute-student-task',
+          {
+            action: 'approve-and-execute',
+            task_id: taskId,
+          }
+        );
+
+        console.log('[useApproveAndExecuteStudentTaskCard] 함수 호출 응답:', {
+          success: response.success,
+          has_error: !!response.error,
+          has_data: !!response.data,
+          error_message: response.error?.message,
+        });
+
+        if (response.error) {
+          console.error('[useApproveAndExecuteStudentTaskCard] 함수 호출 실패:', response.error);
+          throw new Error(response.error.message);
         }
-      );
 
-      if (response.error) {
-        throw new Error(response.error.message);
+        return response.data;
+      } catch (error) {
+        console.error('[useApproveAndExecuteStudentTaskCard] 함수 호출 중 예외 발생:', error);
+        throw error;
       }
-
-      return response.data;
     },
     onSuccess: () => {
       // 학생 업무 카드 목록 갱신

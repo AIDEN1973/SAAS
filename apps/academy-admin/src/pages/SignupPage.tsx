@@ -1,6 +1,8 @@
 /**
  * 회원가입 페이지 (B2B)
  *
+ * [LAYER: UI_PAGE]
+ *
  * [기술문서 요구사항]
  * - 회원가입 프로세스: 사용자 계정 생성 + 이메일 인증(선택) + 테넌트 생성 및 정보 및 업종 및 초기 화면 로드
  * - [불변 규칙] 사용자 계정은 생성하며, 테넌트 생성은 core-tenancy/onboarding에서 처리
@@ -12,15 +14,23 @@
  * - 접근성 WCAG 2.1 AAA 목표
  */
 
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Card, useModal, useResponsiveMode, isMobile } from '@ui-core/react';
 import { SchemaForm } from '@schema-engine';
 import { useSignupWithEmail } from '@hooks/use-auth';
 import { signupFormSchema } from '../schemas/signup.schema';
 import type { IndustryType } from '@core/tenancy';
+import { logError, createSafeNavigate } from '../utils';
+import { maskPII } from '@core/pii-utils';
 
 export function SignupPage() {
   const navigate = useNavigate();
+  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
+  const safeNavigate = useMemo(
+    () => createSafeNavigate(navigate),
+    [navigate]
+  );
   const mode = useResponsiveMode();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
@@ -44,18 +54,18 @@ export function SignupPage() {
       showAlert('성공', '회원가입이 완료되었습니다.');
 
       // 테넌트 선택 (자동으로 하나의 테넌트가 생성됨)
-      navigate('/');
+      safeNavigate('/');
     } catch (error) {
       const message = error instanceof Error ? error.message : '회원가입에 실패했습니다.';
 
       // 개발 환경에서 상세 에러 로그
       if (import.meta.env?.DEV) {
-        console.error('회원가입 실패 상세:', {
-          error,
+        logError('SignupPage:SignupFailed', error);
+        logError('SignupPage:SignupFailed:Details', maskPII({
           message,
           email: data.email,
           tenantName: data.tenantName,
-        });
+        }));
       }
 
       // 이메일 인증 필요 오류 처리
@@ -66,7 +76,7 @@ export function SignupPage() {
           '개발 환경에서는 Supabase Dashboard > Authentication > Settings > Email Auth에서\n' +
           '"Enable email confirmations"를 비활성화하거나 "Auto Confirm"을 활성화하세요.'
         );
-        navigate('/auth/login');
+        safeNavigate('/auth/login');
       } else {
         showAlert('오류', message);
       }
@@ -112,13 +122,14 @@ export function SignupPage() {
             이미 계정이 있으신가요?{' '}
           </span>
           <button
-            onClick={() => navigate('/auth/login')}
+            onClick={() => safeNavigate('/auth/login')}
             style={{
               color: 'var(--color-primary)',
               textDecoration: 'none',
               cursor: 'pointer',
               background: 'none',
               border: 'none',
+              // HARD-CODE-EXCEPTION: padding 0은 레이아웃용 특수 값
               padding: 0,
               font: 'inherit'
             }}

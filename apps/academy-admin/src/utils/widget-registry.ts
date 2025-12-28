@@ -1,7 +1,7 @@
 /**
  * Widget Registration Flag Utility (SDUI 위젯 등록 플래그 관리)
  *
- * ⚠️ 중요: 이 파일은 window.__sduiWidgetRegistered 플래그를 관리하는 유틸리티입니다.
+ * 중요: 이 파일은 window.__sduiWidgetRegistered 플래그를 관리하는 유틸리티입니다.
  * 실제 위젯 로더 레지스트리는 packages/schema-engine/src/widgets/registry.ts를 참조하세요.
  *
  * 목적:

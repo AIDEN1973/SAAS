@@ -1,6 +1,8 @@
 /**
  * AI 분석 기능 페이지 (AI Insights)
  *
+ * [LAYER: UI_PAGE]
+ *
  * [Phase 1 MVP 범위] 아키텍처 문서 3.7.1, 3578줄:
  * - 상담일지 자동 요약 (저장 시 즉시 생성 - 아키텍처 문서 4101줄)
  * - 학생 출결 이상 탐지 (실시간 감지 및 업데이트 - 아키텍처 문서 4097줄, Phase 1부터 적용)
@@ -29,7 +31,7 @@
  * - 유아이 문서: 1.1 Zero-Trust UI Layer
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Badge, PageHeader, isMobile } from '@ui-core/react';
@@ -50,6 +52,7 @@ import { studentSelectFormSchema } from '../schemas/student-select.schema';
 import { useUserRole } from '@hooks/use-auth';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES } from '../constants';
+import { createSafeNavigate } from '../utils';
 
 export function AIPage() {
   const { showAlert } = useModal();
@@ -60,6 +63,11 @@ export function AIPage() {
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
   const navigate = useNavigate();
+  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
+  const safeNavigate = useMemo(
+    () => createSafeNavigate(navigate),
+    [navigate]
+  );
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab'); // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
   const { data: userRole } = useUserRole(); // 아키텍처 문서 2.4: Teacher는 요약만 접근 가능
@@ -391,7 +399,7 @@ export function AIPage() {
                     if (element) {
                       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     } else {
-                      navigate(ROUTES.AI_ATTENDANCE);
+                      safeNavigate(ROUTES.AI_ATTENDANCE);
                     }
                   }}
                 >
@@ -406,7 +414,7 @@ export function AIPage() {
                     if (element) {
                       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     } else {
-                      navigate(ROUTES.AI_HOME);
+                      safeNavigate(ROUTES.AI_HOME);
                     }
                   }}
                 >
@@ -425,7 +433,7 @@ export function AIPage() {
                   size="sm"
                   onClick={() => {
                     // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
-                    navigate(ROUTES.AI_CONSULTATION);
+                    safeNavigate(ROUTES.AI_CONSULTATION);
                   }}
                 >
                   상담일지 요약

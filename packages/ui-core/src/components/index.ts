@@ -133,3 +133,20 @@ export type { StatsCardLayoutProps } from './StatsCardLayout';
 
 export { ListCardLayout } from './ListCardLayout';
 export type { ListCardLayoutProps, ListCardItem } from './ListCardLayout';
+
+export { ChatOpsPanel } from './ChatOpsPanel';
+export type { ChatOpsPanelProps, ChatOpsMessage, ChatOpsMessageType } from './ChatOpsPanel';
+
+export { ExecutionAuditPanel } from './ExecutionAuditPanel';
+export type {
+  ExecutionAuditPanelProps,
+  ExecutionAuditRun,
+  ExecutionAuditStep,
+  ExecutionAuditRunStatus,
+  ExecutionAuditStepStatus,
+  ExecutionAuditSource,
+  ExecutionAuditFilters,
+} from './ExecutionAuditPanel';
+
+export { AILayerMenu } from './AILayerMenu';
+export type { AILayerMenuProps, AILayerMenuTab } from './AILayerMenu';

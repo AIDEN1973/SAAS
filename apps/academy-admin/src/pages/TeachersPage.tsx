@@ -1,6 +1,8 @@
 /**
  * 강사 관리 페이지
  *
+ * [LAYER: UI_PAGE]
+ *
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  * [요구사항] 강사 프로필 보기

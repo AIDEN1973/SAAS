@@ -1,6 +1,8 @@
 /**
  * 전체 StudentTaskCard 목록 페이지
  *
+ * [LAYER: UI_PAGE]
+ *
  * 아키텍처 문서 3.7.1 섹션 참조: student_task_card_display_rule
  * 홈 화면에서 3개를 초과하는 StudentTaskCard들을 모두 표시하는 페이지
  *
@@ -67,10 +69,12 @@ export function StudentTasksPage() {
                 onAction={(card) => {
                   // 정본 규칙: 컴포넌트 레벨에서 navigate 호출 (Hook 내부 호출 금지)
                   // [P0-2 수정] SSOT: safeNavigate 사용 (서버에서 온 actionUrl 보호)
+                  // ⚠️ 중요: onAction은 actionUrl을 반환해야 함 (StudentTaskCard에서 사용)
                   const actionUrl = getCardActionUrl(card);
                   if (actionUrl) {
                     safeNavigate(actionUrl);
                   }
+                  return actionUrl;
                 }}
               />
             ))}

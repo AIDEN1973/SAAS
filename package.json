@@ -34,6 +34,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "setup:env": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-env.ps1",
     "check:shared-catalog": "tsx scripts/check-shared-catalog.ts",
+    "test:chatops-intents": "tsx scripts/test-chatops-all-intents.ts",
     "prepare": "node -e \"try { if (!process.env.CI && !process.env.VERCEL && require('fs').existsSync('node_modules/husky')) { require('husky').install(); } } catch(e) {}\" || true"
   },
   "devDependencies": {

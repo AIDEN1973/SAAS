@@ -8,6 +8,8 @@
 
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
+import { useSession } from '@hooks/use-auth';
+import { createExecutionAuditRecord } from '@hooks/use-student/src/execution-audit-utils';
 
 export interface BillingHistoryItem {
   id: string;
@@ -131,14 +133,48 @@ export function useInvoice(invoiceId?: string) {
  * 결제 처리 Hook
  */
 export function useProcessPayment() {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+  const { data: session } = useSession();
+
   return useMutation({
     mutationFn: async (input: PaymentInput): Promise<PaymentResult> => {
+      const startTime = Date.now();
       // TODO: 실제 API 엔드포인트로 교체 필요
       // Edge Function: fns-payment-process 호출
       const response = await apiClient.post<PaymentResult>(
         'functions/v1/fns-payment-process',
         input as unknown as Record<string, unknown>
       );
+
+      // Execution Audit 기록 생성 (액티비티.md 3.2, 3.3, 12 참조)
+      if (session?.user?.id && tenantId) {
+        const durationMs = Date.now() - startTime;
+        const status: 'success' | 'failed' = response.error ? 'failed' : (response.data?.success ? 'success' : 'failed');
+
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'payment.process',
+            status: status,
+            summary: `결제 처리 ${status === 'success' ? '완료' : '실패'} (${input.paymentMethod}, ${input.amount}원)`,
+            details: {
+              invoice_id: input.invoiceId,
+              payment_method: input.paymentMethod,
+              amount: input.amount,
+            },
+            reference: {
+              entity_type: 'invoice',
+              entity_id: input.invoiceId,
+            },
+            duration_ms: durationMs,
+            ...(response.error && {
+              error_code: 'PAYMENT_FAILED',
+              error_summary: response.error.message,
+            }),
+          },
+          session.user.id
+        );
+      }
 
       if (response.error) {
         return { success: false, error: response.error.message };
@@ -148,4 +184,3 @@ export function useProcessPayment() {
     },
   });
 }
-

@@ -72,7 +72,9 @@
       "@industry/academy": ["./packages/industry/industry-academy/src"],
       "@industry/academy/service": ["./packages/industry/industry-academy/src/service"],
       "@industry/academy/types": ["./packages/industry/industry-academy/src/types"],
-      "@payments/*": ["./packages/payments/*/src"]
+      "@payments/*": ["./packages/payments/*/src"],
+      "@chatops-intents/registry": ["./packages/chatops-intents/src"],
+      "@chatops-intents/*": ["./packages/chatops-intents/src/*"]
     }
   },
   "include": ["vite-env.d.ts"],

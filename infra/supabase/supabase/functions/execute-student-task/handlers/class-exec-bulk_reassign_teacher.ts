@@ -1,0 +1,163 @@
+// LAYER: EDGE_FUNCTION_HANDLER
+/**
+ * 반 담임 일괄 변경 Handler
+ *
+ * Intent: class.exec.bulk_reassign_teacher
+ * Action Key: class.bulk_reassign_teacher (Domain Action Catalog)
+ *
+ * 챗봇.md 12.1.3 참조
+ *
+ */
+
+import type {
+  IntentHandler,
+  SuggestedActionChatOpsPlanV1,
+  HandlerContext,
+  HandlerResult,
+} from './types.ts';
+import { maskPII } from '../../_shared/pii-utils.ts';
+import { getTenantSettingByPath } from '../../_shared/policy-utils.ts';
+import { withTenant } from '../../_shared/withTenant.ts';
+import { assertDomainActionKey } from '../../_shared/domain-action-catalog.ts';
+
+export const class_exec_bulk_reassign_teacherHandler: IntentHandler = {
+  intent_key: 'class.exec.bulk_reassign_teacher',
+
+  async execute(
+    plan: SuggestedActionChatOpsPlanV1,
+    context: HandlerContext
+  ): Promise<HandlerResult> {
+    try {
+      // ⚠️ P0: Plan 스냅샷에서만 실행 대상 로드 (클라이언트 입력 무시)
+      const params = plan.params as Record<string, unknown>;
+
+      if (!params || typeof params !== 'object') {
+        return {
+          status: 'failed',
+          error_code: 'INVALID_PARAMS',
+          message: '파라미터가 필요합니다.',
+        };
+      }
+
+      // ⚠️ P0: Domain Action Catalog 검증 (Fail-Closed)
+      assertDomainActionKey('class.bulk_reassign_teacher');
+
+      // ⚠️ P0: Policy 재평가 (실행 시점)
+      // Domain Action 정책 경로: domain_action.class.bulk_reassign_teacher.enabled
+      const policyPath = 'domain_action.class.bulk_reassign_teacher.enabled';
+      const policyEnabled = await getTenantSettingByPath(
+        context.supabase,
+        context.tenant_id,
+        policyPath
+      );
+
+      if (!policyEnabled || policyEnabled !== true) {
+        return {
+          status: 'failed',
+          error_code: 'POLICY_DISABLED',
+          message: '반 담임 일괄 변경 정책이 비활성화되어 있습니다.',
+        };
+      }
+
+      const classIds = params.class_ids as string[];
+      const teacherId = params.teacher_id as string;
+
+      if (!classIds || !Array.isArray(classIds) || classIds.length === 0) {
+        return {
+          status: 'failed',
+          error_code: 'INVALID_PARAMS',
+          message: '반 ID 목록이 필요합니다.',
+        };
+      }
+
+      if (!teacherId || typeof teacherId !== 'string') {
+        return {
+          status: 'failed',
+          error_code: 'INVALID_PARAMS',
+          message: '강사 ID가 필요합니다.',
+        };
+      }
+
+      let successCount = 0;
+      const errors: string[] = [];
+
+      for (const classId of classIds) {
+        if (typeof classId !== 'string') continue;
+
+        try {
+          // 기존 강사 배정 해제
+          const { error: unassignError } = await withTenant(
+            context.supabase
+              .from('class_teachers')
+              .update({
+                is_active: false,
+                unassigned_at: new Date().toISOString().split('T')[0],
+              })
+              .eq('class_id', classId)
+              .eq('is_active', true),
+            context.tenant_id
+          );
+
+          if (unassignError) {
+            const maskedError = maskPII(unassignError);
+            console.error(`[class_exec_bulk_reassign_teacherHandler] Failed to unassign teacher for class ${classId}:`, maskedError);
+          }
+
+          // 새 강사 배정
+          const { error: assignError } = await withTenant(
+            context.supabase
+              .from('class_teachers')
+              .insert({
+                tenant_id: context.tenant_id,
+                class_id: classId,
+                teacher_id: teacherId,
+                role: 'teacher',
+                is_active: true,
+              }),
+            context.tenant_id
+          );
+
+          if (assignError) {
+            const maskedError = maskPII(assignError);
+            console.error(`[class_exec_bulk_reassign_teacherHandler] Failed to assign teacher for class ${classId}:`, maskedError);
+            errors.push(`반 ${classId} 강사 배정 실패`);
+            continue;
+          }
+
+          successCount++;
+        } catch (error) {
+          const maskedError = maskPII(error);
+          console.error(`[class_exec_bulk_reassign_teacherHandler] Error for class ${classId}:`, maskedError);
+          errors.push(`반 ${classId}: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+        }
+      }
+
+      if (successCount === 0) {
+        return {
+          status: 'failed',
+          error_code: 'EXECUTION_FAILED',
+          message: errors.length > 0 ? errors.join(', ') : '강사 일괄 재배정에 실패했습니다.',
+        };
+      }
+
+      return {
+        status: errors.length > 0 ? 'partial' : 'success',
+        result: {
+          total_count: classIds.length,
+          success_count: successCount,
+          error_count: errors.length,
+        },
+        affected_count: successCount,
+        message: `${successCount}개 반의 강사 재배정이 완료되었습니다.${errors.length > 0 ? ` (${errors.length}개 실패)` : ''}`,
+      };
+    } catch (error) {
+      const maskedError = maskPII(error);
+      console.error('[class_exec_bulk_reassign_teacherHandler] Execution failed:', maskedError);
+      return {
+        status: 'failed',
+        error_code: 'EXECUTION_FAILED',
+        message: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.',
+      };
+    }
+  },
+};

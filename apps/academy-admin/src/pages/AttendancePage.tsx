@@ -1,6 +1,8 @@
 /**
  * 출결 관리 페이지
  *
+ * [LAYER: UI_PAGE]
+ *
  * [요구사항]
  * - PC/태블릿/모바일 출결
  * - QR 출결(선택)
@@ -16,6 +18,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary , Container, Card, Button, Input, Badge, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid, PageHeader , useResponsiveMode, isMobile, isTablet } from '@ui-core/react';
+// [SSOT] Barrel export를 통한 통합 import
+import { createSafeNavigate } from '../utils';
 import type { TabItem } from '@ui-core/react';
 import { SchemaFilter } from '@schema-engine';
 import { useAttendanceLogs, fetchAttendanceLogs, useCreateAttendanceLog, useDeleteAttendanceLog } from '@hooks/use-attendance';
@@ -49,6 +53,11 @@ interface StudentAttendanceState {
 
 export function AttendancePage() {
   const navigate = useNavigate();
+  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
+  const safeNavigate = useMemo(
+    () => createSafeNavigate(navigate),
+    [navigate]
+  );
   const mode = useResponsiveMode();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   // mode는 'xs' | 'sm' | 'md' | 'lg' | 'xl' 형식이므로 대문자로 변환
@@ -98,6 +107,7 @@ export function AttendancePage() {
   const { showAlert, showConfirm } = useModal();
 
   // 설정 값 (서버에서 가져온 값 또는 기본값) - 로컬 state로 관리
+  // HARD-CODE-EXCEPTION: late_after, absent_after는 Policy에서 관리해야 하지만 현재는 초기값 (비즈니스 로직 하드코딩)
   const [attendanceConfig, setAttendanceConfig] = useState({
     late_after: 10,
     absent_after: 60,
@@ -861,7 +871,8 @@ export function AttendancePage() {
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 'var(--spacing-sm)',
-                paddingBottom: isMobileMode ? 'var(--spacing-bottom-action-bar)' : '0', // Bottom Action Bar 높이만큼 패딩
+                // HARD-CODE-EXCEPTION: paddingBottom 0은 레이아웃용 특수 값 (Bottom Action Bar 높이만큼 패딩)
+                paddingBottom: isMobileMode ? 'var(--spacing-bottom-action-bar)' : '0',
               }}>
                 {/* 로딩 상태 (아키텍처 문서 3.3.3: loading 상태) */}
                 {isLoading && (
@@ -1127,7 +1138,7 @@ export function AttendancePage() {
                             <Button
                               variant="ghost"
                               size={isTabletMode ? 'md' : 'sm'}
-                              onClick={() => navigate(ROUTES.STUDENT_DETAIL(student.id, 'info'))}
+                              onClick={() => safeNavigate(ROUTES.STUDENT_DETAIL(student.id, 'info'))}
                               style={isTabletMode ? {
                                 minWidth: 'var(--spacing-xl)',
                                 minHeight: 'var(--spacing-xl)',
@@ -1303,7 +1314,7 @@ export function AttendancePage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => navigate(ROUTES.STUDENT_DETAIL(student.id, 'info'))}
+                                onClick={() => safeNavigate(ROUTES.STUDENT_DETAIL(student.id, 'info'))}
                               >
                                 상세
                               </Button>

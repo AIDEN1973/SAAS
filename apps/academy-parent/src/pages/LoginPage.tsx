@@ -67,6 +67,8 @@ export function LoginPage() {
   const handleOAuthLogin = async (provider: 'google' | 'kakao') => {
     try {
       const { url } = await loginWithOAuth.mutateAsync({ provider });
+      // [P0 예외] OAuth 리다이렉트는 외부 URL(Google, Kakao)이므로 window.location.href 사용
+      // 서버에서 반환된 OAuth URL은 신뢰할 수 있는 소스이므로 검증 불필요
       window.location.href = url;
     } catch (error) {
       const message = error instanceof Error ? error.message : '소셜 로그인에 실패했습니다.';

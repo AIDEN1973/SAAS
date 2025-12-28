@@ -1,0 +1,178 @@
+# Handler 구현 가이드
+
+## 개요
+
+이 문서는 Execution Audit 시스템의 Handler 구현 가이드를 제공합니다.
+
+## Handler 구조
+
+모든 Handler는 다음 구조를 따라야 합니다:
+
+```typescript
+import type {
+  IntentHandler,
+  SuggestedActionChatOpsPlanV1,
+  HandlerContext,
+  HandlerResult,
+} from './types.ts';
+import { maskPII } from '../../_shared/pii-utils.ts';
+import { getTenantSettingByPath } from '../../_shared/policy-utils.ts';
+import { withTenant } from '../../_shared/withTenant.ts';
+import { assertDomainActionKey } from '../../_shared/domain-action-catalog.ts';
+import { getTenantTableName, getTenantIndustryType, getFKRelationName } from '../../_shared/industry-adapter.ts';
+
+export const yourHandler: IntentHandler = {
+  intent_key: 'your.intent.key',
+
+  async execute(
+    plan: SuggestedActionChatOpsPlanV1,
+    context: HandlerContext
+  ): Promise<HandlerResult> {
+    try {
+      // 1. Plan 스냅샷에서만 실행 대상 로드 (클라이언트 입력 무시)
+      const params = plan.params as Record<string, unknown>;
+
+      // 2. Domain Action Catalog 검증 (L2-B인 경우)
+      assertDomainActionKey('your.action.key');
+
+      // 3. Policy 재평가 (실행 시점)
+      const policyPath = 'domain_action.your.action.key.enabled';
+      const policyEnabled = await getTenantSettingByPath(
+        context.supabase,
+        context.tenant_id,
+        policyPath
+      );
+
+      if (!policyEnabled || policyEnabled !== true) {
+        return {
+          status: 'failed',
+          error_code: 'POLICY_DISABLED',
+          message: '정책이 비활성화되어 있습니다.',
+        };
+      }
+
+      // 4. 실제 비즈니스 로직 구현
+      // ...
+
+      return {
+        status: 'success',
+        result: { /* 결과 데이터 */ },
+        affected_count: 1,
+        message: '작업이 완료되었습니다.',
+      };
+    } catch (error) {
+      const maskedError = maskPII(error);
+      console.error('[yourHandler] Execution failed:', maskedError);
+      return {
+        status: 'failed',
+        error_code: 'EXECUTION_FAILED',
+        message: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.',
+      };
+    }
+  },
+};
+```
+
+## 필수 구현 사항
+
+### 1. Plan 스냅샷 사용 (P0)
+- 클라이언트 입력을 신뢰하지 않고 `plan.params`만 사용
+- `plan.plan_snapshot`에서 실행 대상 로드
+
+### 2. Domain Action Catalog 검증 (L2-B, P0)
+- L2-B Handler는 반드시 `assertDomainActionKey()` 호출
+- action_key는 Intent Registry에서 가져옴
+
+### 3. Policy 재평가 (P0)
+- 실행 시점에 Policy 재평가 필수
+- 정책 경로: `domain_action.<action_key>.enabled`
+- Policy가 비활성화되어 있으면 실패 반환
+
+### 4. RLS 보호 (P0)
+- 모든 DB 작업은 `withTenant()` 사용
+- tenant_id는 context에서 가져옴
+
+### 4.1 Industry Adapter 사용 (업종별 테이블명 사용 시, P0)
+- ❌ 하드코딩된 테이블명 사용 금지 (예: `'academy_students'`, `'academy_classes'`)
+- ✅ `getTenantTableName()`, `getFKRelationName()`, `getTenantIndustryType()` 함수 사용 필수
+- ✅ Fail-Closed 원칙: 매핑 실패 시 null 반환, fallback 패턴 사용
+
+**사용 예시:**
+```typescript
+// 테이블명 동적 조회
+const studentTableName = await getTenantTableName(context.supabase, context.tenant_id, 'student');
+const classTableName = await getTenantTableName(context.supabase, context.tenant_id, 'class');
+
+// FK 관계명 동적 조회
+const industryType = await getTenantIndustryType(context.supabase, context.tenant_id);
+const classFKName = getFKRelationName('attendance_logs_class_id', industryType) ||
+  'academy_classes!attendance_logs_class_id_fkey'; // Fallback
+
+// 쿼리 실행
+const { data } = await withTenant(
+  context.supabase
+    .from(studentTableName || 'academy_students') // Fallback
+    .select(`*`),
+  context.tenant_id
+);
+```
+
+### 5. PII 마스킹 (P0)
+- 에러 로그에 PII 포함 시 `maskPII()` 사용
+- 콘솔 로그에도 PII 마스킹 필수
+
+### 6. 에러 처리 (P0)
+- try-catch로 모든 에러 처리
+- 적절한 error_code 반환
+
+## Handler 등록
+
+Handler 구현 후 `infra/supabase/functions/execute-student-task/handlers/registry.ts`에 등록:
+
+```typescript
+import { yourHandler } from './your-handler.ts';
+
+export const handlerRegistry: Record<string, IntentHandler> = {
+  // ...
+  'your.intent.key': yourHandler,
+  // ...
+};
+```
+
+## 정책 활성화
+
+Handler 실행을 위해서는 정책을 활성화해야 합니다:
+
+1. 마이그레이션 실행: `132_enable_domain_action_policies.sql`
+2. 또는 수동으로 tenant_settings 설정:
+   ```sql
+   UPDATE tenant_settings
+   SET value = jsonb_set(
+     COALESCE(value, '{}'::jsonb),
+     ARRAY['domain_action', 'your.action.key', 'enabled'],
+     'true'::jsonb
+   )
+   WHERE tenant_id = '<tenant_id>' AND key = 'config';
+   ```
+
+## 테스트
+
+Handler 구현 후 다음 스크립트로 검증:
+
+```bash
+# Handler 등록 확인
+npx tsx scripts/analyze-missing-handlers.ts
+
+# Handler 실행 테스트
+npx tsx scripts/test-handler-execution.ts
+
+# 정밀 검증
+npx tsx scripts/deep-verification.ts
+```
+
+## 참고 문서
+
+- 챗봇.md: Intent Registry 및 Handler Contract
+- 액티비티.md: Execution Audit 시스템
+- 체크리스트.md: 보안 및 멀티테넌트 격리
+

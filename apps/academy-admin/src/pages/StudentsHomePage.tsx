@@ -1,6 +1,8 @@
 /**
  * 학생 관리 홈 페이지
  *
+ * [LAYER: UI_PAGE]
+ *
  * 학생 관리 전용 대시보드 (통계, 빠른 액션, 최근 활동)
  * 아키텍처 문서 3.1.1 섹션 참조
  *
@@ -8,11 +10,12 @@
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES } from '../constants';
 import { ErrorBoundary, Container, Button, PageHeader } from '@ui-core/react';
+import { createSafeNavigate } from '../utils';
 import { StudentStatsCard } from '../components/dashboard-cards/StudentStatsCard';
 import { AttendanceStatsCard } from '../components/dashboard-cards/AttendanceStatsCard';
 import { StudentAlertsCard } from '../components/dashboard-cards/StudentAlertsCard';
@@ -24,8 +27,13 @@ import { CardGridLayout } from '../components/CardGridLayout';
 
 export function StudentsHomePage() {
   const navigate = useNavigate();
+  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
+  const safeNavigate = useMemo(
+    () => createSafeNavigate(navigate),
+    [navigate]
+  );
 
-  // ✅ 통계 Hook 사용 (학생 관리 전용 기능)
+  // 통계 Hook 사용 (학생 관리 전용 기능)
   const { data: studentStats, isLoading: isLoadingStats } = useStudentStats();
   const { data: attendanceStats, isLoading: isLoadingAttendance } = useAttendanceStats(new Date());
   const { data: studentAlerts, isLoading: isLoadingAlerts } = useStudentAlerts();
@@ -33,24 +41,24 @@ export function StudentsHomePage() {
   const { data: recentActivity, isLoading: isLoadingActivity } = useRecentActivity();
 
   const handleViewAllStudents = () => {
-    navigate(ROUTES.STUDENTS_LIST);
+    safeNavigate(ROUTES.STUDENTS_LIST);
   };
 
   const handleStatsClick = () => {
-    navigate(ROUTES.STUDENTS_LIST);
+    safeNavigate(ROUTES.STUDENTS_LIST);
   };
 
   const handleAlertsClick = (type: 'risk' | 'absent' | 'consultation') => {
     // [SSOT] ROUTES 상수 사용
     switch (type) {
       case 'risk':
-        navigate(ROUTES.STUDENTS_RISK);
+        safeNavigate(ROUTES.STUDENTS_RISK);
         break;
       case 'absent':
-        navigate(ROUTES.STUDENTS_ABSENT);
+        safeNavigate(ROUTES.STUDENTS_ABSENT);
         break;
       case 'consultation':
-        navigate(ROUTES.STUDENTS_CONSULTATION);
+        safeNavigate(ROUTES.STUDENTS_CONSULTATION);
         break;
     }
   };
@@ -58,19 +66,19 @@ export function StudentsHomePage() {
   const handleQuickAction = (action: 'register' | 'bulk' | 'list' | 'consultation' | 'attendance') => {
     switch (action) {
       case 'register':
-        navigate(ROUTES.STUDENTS_LIST, { state: { showCreateForm: true } });
+        safeNavigate(ROUTES.STUDENTS_LIST, { state: { showCreateForm: true } });
         break;
       case 'bulk':
-        navigate(ROUTES.STUDENTS_LIST, { state: { showBulkUpload: true } });
+        safeNavigate(ROUTES.STUDENTS_LIST, { state: { showBulkUpload: true } });
         break;
       case 'list':
-        navigate(ROUTES.STUDENTS_LIST);
+        safeNavigate(ROUTES.STUDENTS_LIST);
         break;
       case 'consultation':
-        navigate(ROUTES.STUDENTS_LIST);
+        safeNavigate(ROUTES.STUDENTS_LIST);
         break;
       case 'attendance':
-        navigate(ROUTES.ATTENDANCE);
+        safeNavigate(ROUTES.ATTENDANCE);
         break;
     }
   };
@@ -78,16 +86,16 @@ export function StudentsHomePage() {
   const handleActivityClick = (type: 'student' | 'consultation' | 'attendance' | 'tag', id?: string) => {
     switch (type) {
       case 'student':
-        if (id) navigate(ROUTES.STUDENT_DETAIL(id, 'info'));
+        if (id) safeNavigate(ROUTES.STUDENT_DETAIL(id, 'info'));
         break;
       case 'consultation':
-        if (id) navigate(ROUTES.STUDENT_DETAIL(id, 'consultations'));
+        if (id) safeNavigate(ROUTES.STUDENT_DETAIL(id, 'consultations'));
         break;
       case 'attendance':
-        navigate(ROUTES.ATTENDANCE);
+        safeNavigate(ROUTES.ATTENDANCE);
         break;
       case 'tag':
-        navigate(ROUTES.STUDENTS_LIST);
+        safeNavigate(ROUTES.STUDENTS_LIST);
         break;
     }
   };

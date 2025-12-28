@@ -1,6 +1,8 @@
 /**
  * 로그인 페이지
  *
+ * [LAYER: UI_PAGE]
+ *
  * [기술문서 요구사항]
  * - 인증 로직은 core-auth 모듈에서 공통 관리
  * - 지원 인증 방식: 이메일/비밀번호, 소셜 로그인(Google, Kakao), 전화번호·OTP
@@ -13,7 +15,7 @@
  * - 접근성 WCAG 2.1 AAA 목표
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Card, Button, Input, useModal, useResponsiveMode, isMobile } from '@ui-core/react';
 import { SchemaForm } from '@schema-engine';
@@ -25,11 +27,18 @@ import {
   useSelectTenant,
 } from '@hooks/use-auth';
 import { loginFormSchema, otpLoginFormSchema } from '../schemas/login.schema';
+import { logWarn, logInfo, createSafeNavigate } from '../utils';
+import { maskPII } from '@core/pii-utils';
 
 type LoginMethod = 'email' | 'oauth' | 'otp';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
+  const safeNavigate = useMemo(
+    () => createSafeNavigate(navigate),
+    [navigate]
+  );
   const mode = useResponsiveMode();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
@@ -55,18 +64,14 @@ export function LoginPage() {
       if (result.tenants.length === 0) {
         // 개발 환경에서 상세 정보 표시
         if (import.meta.env?.DEV) {
-          console.warn('경고: 테넌트가 없습니다:', {
+          logWarn('LoginPage:NoTenants', '테넌트가 없습니다', maskPII({
             userId: result.user.id,
             email: result.user.email,
-          });
-          console.log('가능한 원인:');
-          console.log('   1. 회원가입 시 테넌트가 생성되지 않았을 수 있음');
-          console.log('   2. user_tenant_roles에 레코드가 없을 수 있음');
-          console.log('   3. RLS 정책 때문에 조회가 안 될 수 있음');
-          console.log('   → Supabase Dashboard에서 확인:');
-          console.log('      - Authentication > Users: 사용자 확인');
-          console.log('      - Table Editor > user_tenant_roles: 테넌트 관계 확인');
-          console.log('      - Table Editor > tenants: 테넌트 확인');
+          }));
+          logInfo('LoginPage:NoTenants', '가능한 원인: 1. 회원가입 시 테넌트가 생성되지 않았을 수 있음');
+          logInfo('LoginPage:NoTenants', '가능한 원인: 2. user_tenant_roles에 레코드가 없을 수 있음');
+          logInfo('LoginPage:NoTenants', '가능한 원인: 3. RLS 정책 때문에 조회가 안 될 수 있음');
+          logInfo('LoginPage:NoTenants', 'Supabase Dashboard에서 확인: Authentication > Users, Table Editor > user_tenant_roles, Table Editor > tenants');
         }
 
         showAlert(
@@ -77,17 +82,17 @@ export function LoginPage() {
             ? '개발 환경: 브라우저 콘솔에서 상세 정보를 확인하세요.'
             : '')
         );
-        navigate('/auth/signup');
+        safeNavigate('/auth/signup');
         return;
       }
 
       if (result.tenants.length === 1) {
         // 테넌트가 하나면 자동 선택
         await selectTenant.mutateAsync(result.tenants[0].id);
-        navigate('/');
+        safeNavigate('/');
       } else {
         // 여러 테넌트면 선택 페이지로 이동
-        navigate('/auth/tenant-selection');
+        safeNavigate('/auth/tenant-selection');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '로그인에 실패했습니다.';
@@ -98,6 +103,8 @@ export function LoginPage() {
   const handleOAuthLogin = async (provider: 'google' | 'kakao') => {
     try {
       const { url } = await loginWithOAuth.mutateAsync({ provider });
+      // [P0 예외] OAuth 리다이렉트는 외부 URL(Google, Kakao)이므로 window.location.href 사용
+      // 서버에서 반환된 OAuth URL은 신뢰할 수 있는 소스이므로 검증 불필요
       window.location.href = url;
     } catch (error) {
       const message = error instanceof Error ? error.message : '소셜 로그인에 실패했습니다.';
@@ -125,18 +132,14 @@ export function LoginPage() {
       if (result.tenants.length === 0) {
         // 개발 환경에서 상세 정보 표시
         if (import.meta.env?.DEV) {
-          console.warn('경고: 테넌트가 없습니다:', {
+          logWarn('LoginPage:NoTenants:OTP', '테넌트가 없습니다', maskPII({
             userId: result.user.id,
             phone: result.user.phone,
-          });
-          console.log('가능한 원인:');
-          console.log('   1. 회원가입 시 테넌트가 생성되지 않았을 수 있음');
-          console.log('   2. user_tenant_roles에 레코드가 없을 수 있음');
-          console.log('   3. RLS 정책 때문에 조회가 안 될 수 있음');
-          console.log('   → Supabase Dashboard에서 확인:');
-          console.log('      - Authentication > Users: 사용자 확인');
-          console.log('      - Table Editor > user_tenant_roles: 테넌트 관계 확인');
-          console.log('      - Table Editor > tenants: 테넌트 확인');
+          }));
+          logInfo('LoginPage:NoTenants:OTP', '가능한 원인: 1. 회원가입 시 테넌트가 생성되지 않았을 수 있음');
+          logInfo('LoginPage:NoTenants:OTP', '가능한 원인: 2. user_tenant_roles에 레코드가 없을 수 있음');
+          logInfo('LoginPage:NoTenants:OTP', '가능한 원인: 3. RLS 정책 때문에 조회가 안 될 수 있음');
+          logInfo('LoginPage:NoTenants:OTP', 'Supabase Dashboard에서 확인: Authentication > Users, Table Editor > user_tenant_roles, Table Editor > tenants');
         }
 
         showAlert(
@@ -147,15 +150,15 @@ export function LoginPage() {
             ? '개발 환경: 브라우저 콘솔에서 상세 정보를 확인하세요.'
             : '')
         );
-        navigate('/auth/signup');
+        safeNavigate('/auth/signup');
         return;
       }
 
       if (result.tenants.length === 1) {
         await selectTenant.mutateAsync(result.tenants[0].id);
-        navigate('/');
+        safeNavigate('/');
       } else {
-        navigate('/auth/tenant-selection');
+        safeNavigate('/auth/tenant-selection');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'OTP 로그인에 실패했습니다.';
@@ -320,7 +323,7 @@ export function LoginPage() {
           </span>
           <Button
             variant="ghost"
-            onClick={() => navigate('/auth/signup')}
+            onClick={() => safeNavigate('/auth/signup')}
             style={{
               color: 'var(--color-primary)',
               textDecoration: 'none',

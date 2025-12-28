@@ -9,6 +9,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { toKST } from '@lib/date-utils';
+import { useSession } from '@hooks/use-auth';
+import { createExecutionAuditRecord } from '@hooks/use-student/src/execution-audit-utils';
 import type {
   CreateClassInput,
   UpdateClassInput,
@@ -93,9 +95,11 @@ export function useCreateClass() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async (input: CreateClassInput) => {
+      const startTime = Date.now();
       if (!tenantId) {
         throw new Error('Tenant ID is required');
       }
@@ -107,6 +111,27 @@ export function useCreateClass() {
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id && response.data) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'class.register',
+            status: 'success',
+            summary: `${input.name || '반'} 등록 완료`,
+            details: {
+              class_id: response.data.id,
+            },
+            reference: {
+              entity_type: 'class',
+              entity_id: response.data.id,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return response.data!;
@@ -124,6 +149,7 @@ export function useUpdateClass() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({
@@ -133,6 +159,7 @@ export function useUpdateClass() {
       classId: string;
       input: UpdateClassInput;
     }) => {
+      const startTime = Date.now();
       if (!tenantId) {
         throw new Error('Tenant ID is required');
       }
@@ -141,6 +168,29 @@ export function useUpdateClass() {
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id && response.data) {
+        const durationMs = Date.now() - startTime;
+        const changedFields = Object.keys(input).filter((key) => input[key as keyof UpdateClassInput] !== undefined);
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'class.update',
+            status: 'success',
+            summary: `${response.data.name || '반'} 정보 수정 완료 (${changedFields.join(', ')})`,
+            details: {
+              class_id: classId,
+              changed_fields: changedFields,
+            },
+            reference: {
+              entity_type: 'class',
+              entity_id: classId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return response.data!;
@@ -161,9 +211,11 @@ export function useDeleteClass() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async (classId: string) => {
+      const startTime = Date.now();
       if (!tenantId) {
         throw new Error('Tenant ID is required');
       }
@@ -175,6 +227,28 @@ export function useDeleteClass() {
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id && response.data) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'class.delete',
+            status: 'success',
+            summary: `${response.data.name || '반'} 삭제 완료 (archived)`,
+            details: {
+              class_id: classId,
+              new_status: 'archived',
+            },
+            reference: {
+              entity_type: 'class',
+              entity_id: classId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return response.data!;
@@ -388,9 +462,11 @@ export function useCreateTeacher() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async (input: CreateTeacherInput) => {
+      const startTime = Date.now();
       if (!tenantId) {
         throw new Error('Tenant ID is required');
       }
@@ -440,7 +516,7 @@ export function useCreateTeacher() {
         throw new Error(teacherResponse.error.message);
       }
 
-      return {
+      const teacher = {
         id: person.id,
         tenant_id: person.tenant_id,
         name: person.name,
@@ -459,6 +535,29 @@ export function useCreateTeacher() {
         created_by: teacherResponse.data?.created_by,
         updated_by: teacherResponse.data?.updated_by,
       } as Teacher;
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'teacher.register',
+            status: 'success',
+            summary: `${input.name} 강사 등록 완료`,
+            details: {
+              teacher_id: person.id,
+            },
+            reference: {
+              entity_type: 'teacher',
+              entity_id: person.id,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
+      }
+
+      return teacher;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teachers', tenantId] });
@@ -473,6 +572,7 @@ export function useUpdateTeacher() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({
@@ -482,6 +582,7 @@ export function useUpdateTeacher() {
       teacherId: string;
       input: UpdateTeacherInput;
     }) => {
+      const startTime = Date.now();
       if (!tenantId) {
         throw new Error('Tenant ID is required');
       }
@@ -566,7 +667,7 @@ export function useUpdateTeacher() {
 
       const personWithTeachers = person as unknown as Person & { academy_teachers?: Array<Record<string, unknown>> };
       const teacherData = personWithTeachers.academy_teachers?.[0] || {};
-      return {
+      const teacher = {
         id: personWithTeachers.id,
         tenant_id: personWithTeachers.tenant_id,
         name: personWithTeachers.name,
@@ -585,6 +686,31 @@ export function useUpdateTeacher() {
         created_by: teacherData.created_by,
         updated_by: teacherData.updated_by,
       } as Teacher;
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        const changedFields = Object.keys(input).filter((key) => input[key as keyof UpdateTeacherInput] !== undefined);
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'teacher.update',
+            status: 'success',
+            summary: `${teacher.name} 강사 정보 수정 완료 (${changedFields.join(', ')})`,
+            details: {
+              teacher_id: teacherId,
+              changed_fields: changedFields,
+            },
+            reference: {
+              entity_type: 'teacher',
+              entity_id: teacherId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
+      }
+
+      return teacher;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['teachers', tenantId] });
@@ -602,9 +728,11 @@ export function useDeleteTeacher() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async (teacherId: string) => {
+      const startTime = Date.now();
       if (!tenantId) {
         throw new Error('Tenant ID is required');
       }
@@ -630,6 +758,28 @@ export function useDeleteTeacher() {
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'teacher.delete',
+            status: 'success',
+            summary: `강사 퇴직 처리 완료`,
+            details: {
+              teacher_id: teacherId,
+              new_status: 'resigned',
+            },
+            reference: {
+              entity_type: 'teacher',
+              entity_id: teacherId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return response.data!;
@@ -675,9 +825,11 @@ export function useAssignTeacher() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async (input: AssignTeacherInput) => {
+      const startTime = Date.now();
       if (!tenantId) {
         throw new Error('Tenant ID is required');
       }
@@ -691,6 +843,28 @@ export function useAssignTeacher() {
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id && response.data) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'class.assign-teacher',
+            status: 'success',
+            summary: `강사 배정 완료 (class_id: ${input.class_id}, teacher_id: ${input.teacher_id})`,
+            details: {
+              class_id: input.class_id,
+              teacher_id: input.teacher_id,
+            },
+            reference: {
+              entity_type: 'class',
+              entity_id: input.class_id,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return response.data!;
@@ -709,6 +883,7 @@ export function useUnassignTeacher() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({
@@ -718,6 +893,7 @@ export function useUnassignTeacher() {
       classId: string;
       teacherId: string;
     }) => {
+      const startTime = Date.now();
       if (!tenantId) {
         throw new Error('Tenant ID is required');
       }
@@ -745,6 +921,28 @@ export function useUnassignTeacher() {
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'class.unassign-teacher',
+            status: 'success',
+            summary: `강사 배정 제거 완료 (class_id: ${classId}, teacher_id: ${teacherId})`,
+            details: {
+              class_id: classId,
+              teacher_id: teacherId,
+            },
+            reference: {
+              entity_type: 'class',
+              entity_id: classId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return response.data!;

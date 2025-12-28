@@ -81,7 +81,7 @@ BEGIN
       (p_card->>'priority')::integer,
       p_card->>'title',
       p_card->>'description',
-      p_card->>'action_url',
+      COALESCE(NULLIF(p_card->>'action_url', ''), ''), -- NOT NULL 제약조건을 만족하기 위해 빈 문자열 사용
       (p_card->>'expires_at')::timestamptz,
       v_dedup_key,
       v_status,
@@ -135,7 +135,7 @@ BEGIN
     COALESCE((p_card->>'priority')::integer, 50),
     p_card->>'title',
     p_card->>'description',
-    p_card->>'action_url',
+    COALESCE(NULLIF(p_card->>'action_url', ''), ''), -- NOT NULL 제약조건을 만족하기 위해 빈 문자열 사용
     (p_card->>'expires_at')::timestamptz,
     v_dedup_key,
     v_status,

@@ -1,0 +1,100 @@
+// Registry 업데이트를 위한 import 및 entry 목록
+// infra/supabase/functions/execute-student-task/handlers/registry.ts에 추가하세요
+
+// Import 추가:
+import { attendance_exec_correct_recordHandler } from './attendance-exec-correct_record.ts';
+import { attendance_exec_mark_excusedHandler } from './attendance-exec-mark_excused.ts';
+import { attendance_exec_bulk_updateHandler } from './attendance-exec-bulk_update.ts';
+import { attendance_exec_schedule_recheckHandler } from './attendance-exec-schedule_recheck.ts';
+import { billing_exec_issue_invoicesHandler } from './billing-exec-issue_invoices.ts';
+import { billing_exec_reissue_invoiceHandler } from './billing-exec-reissue_invoice.ts';
+import { billing_exec_record_manual_paymentHandler } from './billing-exec-record_manual_payment.ts';
+import { billing_exec_apply_discountHandler } from './billing-exec-apply_discount.ts';
+import { billing_exec_apply_refundHandler } from './billing-exec-apply_refund.ts';
+import { billing_exec_create_installment_planHandler } from './billing-exec-create_installment_plan.ts';
+import { billing_exec_fix_duplicate_invoicesHandler } from './billing-exec-fix_duplicate_invoices.ts';
+import { billing_exec_sync_gatewayHandler } from './billing-exec-sync_gateway.ts';
+import { billing_exec_close_monthHandler } from './billing-exec-close_month.ts';
+import { message_exec_cancel_scheduledHandler } from './message-exec-cancel_scheduled.ts';
+import { message_exec_create_templateHandler } from './message-exec-create_template.ts';
+import { message_exec_update_templateHandler } from './message-exec-update_template.ts';
+import { student_exec_update_profileHandler } from './student-exec-update_profile.ts';
+import { student_exec_change_classHandler } from './student-exec-change_class.ts';
+import { student_exec_pauseHandler } from './student-exec-pause.ts';
+import { student_exec_resumeHandler } from './student-exec-resume.ts';
+import { student_exec_dischargeHandler } from './student-exec-discharge.ts';
+import { student_exec_merge_duplicatesHandler } from './student-exec-merge_duplicates.ts';
+import { student_exec_update_guardian_contactHandler } from './student-exec-update_guardian_contact.ts';
+import { student_exec_assign_tagsHandler } from './student-exec-assign_tags.ts';
+import { student_exec_bulk_registerHandler } from './student-exec-bulk_register.ts';
+import { student_exec_bulk_updateHandler } from './student-exec-bulk_update.ts';
+import { student_exec_data_quality_apply_fixHandler } from './student-exec-data_quality_apply_fix.ts';
+import { student_exec_reactivate_from_dischargedHandler } from './student-exec-reactivate_from_discharged.ts';
+import { class_exec_createHandler } from './class-exec-create.ts';
+import { class_exec_updateHandler } from './class-exec-update.ts';
+import { class_exec_closeHandler } from './class-exec-close.ts';
+import { class_exec_bulk_reassign_teacherHandler } from './class-exec-bulk_reassign_teacher.ts';
+import { schedule_exec_add_sessionHandler } from './schedule-exec-add_session.ts';
+import { schedule_exec_move_sessionHandler } from './schedule-exec-move_session.ts';
+import { schedule_exec_cancel_sessionHandler } from './schedule-exec-cancel_session.ts';
+import { schedule_exec_bulk_shiftHandler } from './schedule-exec-bulk_shift.ts';
+import { note_exec_createHandler } from './note-exec-create.ts';
+import { note_exec_updateHandler } from './note-exec-update.ts';
+import { report_exec_generate_monthly_reportHandler } from './report-exec-generate_monthly_report.ts';
+import { report_exec_generate_daily_briefHandler } from './report-exec-generate_daily_brief.ts';
+import { policy_exec_enable_automationHandler } from './policy-exec-enable_automation.ts';
+import { policy_exec_update_thresholdHandler } from './policy-exec-update_threshold.ts';
+import { rbac_exec_assign_roleHandler } from './rbac-exec-assign_role.ts';
+import { system_exec_run_healthcheckHandler } from './system-exec-run_healthcheck.ts';
+import { system_exec_rebuild_search_indexHandler } from './system-exec-rebuild_search_index.ts';
+import { system_exec_backfill_reportsHandler } from './system-exec-backfill_reports.ts';
+import { system_exec_retry_failed_actionsHandler } from './system-exec-retry_failed_actions.ts';
+
+// Registry entry 추가:
+  'attendance.exec.correct_record': attendance_exec_correct_recordHandler,
+  'attendance.exec.mark_excused': attendance_exec_mark_excusedHandler,
+  'attendance.exec.bulk_update': attendance_exec_bulk_updateHandler,
+  'attendance.exec.schedule_recheck': attendance_exec_schedule_recheckHandler,
+  'billing.exec.issue_invoices': billing_exec_issue_invoicesHandler,
+  'billing.exec.reissue_invoice': billing_exec_reissue_invoiceHandler,
+  'billing.exec.record_manual_payment': billing_exec_record_manual_paymentHandler,
+  'billing.exec.apply_discount': billing_exec_apply_discountHandler,
+  'billing.exec.apply_refund': billing_exec_apply_refundHandler,
+  'billing.exec.create_installment_plan': billing_exec_create_installment_planHandler,
+  'billing.exec.fix_duplicate_invoices': billing_exec_fix_duplicate_invoicesHandler,
+  'billing.exec.sync_gateway': billing_exec_sync_gatewayHandler,
+  'billing.exec.close_month': billing_exec_close_monthHandler,
+  'message.exec.cancel_scheduled': message_exec_cancel_scheduledHandler,
+  'message.exec.create_template': message_exec_create_templateHandler,
+  'message.exec.update_template': message_exec_update_templateHandler,
+  'student.exec.update_profile': student_exec_update_profileHandler,
+  'student.exec.change_class': student_exec_change_classHandler,
+  'student.exec.pause': student_exec_pauseHandler,
+  'student.exec.resume': student_exec_resumeHandler,
+  'student.exec.discharge': student_exec_dischargeHandler,
+  'student.exec.merge_duplicates': student_exec_merge_duplicatesHandler,
+  'student.exec.update_guardian_contact': student_exec_update_guardian_contactHandler,
+  'student.exec.assign_tags': student_exec_assign_tagsHandler,
+  'student.exec.bulk_register': student_exec_bulk_registerHandler,
+  'student.exec.bulk_update': student_exec_bulk_updateHandler,
+  'student.exec.data_quality_apply_fix': student_exec_data_quality_apply_fixHandler,
+  'student.exec.reactivate_from_discharged': student_exec_reactivate_from_dischargedHandler,
+  'class.exec.create': class_exec_createHandler,
+  'class.exec.update': class_exec_updateHandler,
+  'class.exec.close': class_exec_closeHandler,
+  'class.exec.bulk_reassign_teacher': class_exec_bulk_reassign_teacherHandler,
+  'schedule.exec.add_session': schedule_exec_add_sessionHandler,
+  'schedule.exec.move_session': schedule_exec_move_sessionHandler,
+  'schedule.exec.cancel_session': schedule_exec_cancel_sessionHandler,
+  'schedule.exec.bulk_shift': schedule_exec_bulk_shiftHandler,
+  'note.exec.create': note_exec_createHandler,
+  'note.exec.update': note_exec_updateHandler,
+  'report.exec.generate_monthly_report': report_exec_generate_monthly_reportHandler,
+  'report.exec.generate_daily_brief': report_exec_generate_daily_briefHandler,
+  'policy.exec.enable_automation': policy_exec_enable_automationHandler,
+  'policy.exec.update_threshold': policy_exec_update_thresholdHandler,
+  'rbac.exec.assign_role': rbac_exec_assign_roleHandler,
+  'system.exec.run_healthcheck': system_exec_run_healthcheckHandler,
+  'system.exec.rebuild_search_index': system_exec_rebuild_search_indexHandler,
+  'system.exec.backfill_reports': system_exec_backfill_reportsHandler,
+  'system.exec.retry_failed_actions': system_exec_retry_failed_actionsHandler,

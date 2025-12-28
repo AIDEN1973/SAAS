@@ -77,13 +77,16 @@ async function processCheckinReminder(
     return 0;
   }
 
+  // Industry Adapter: 업종별 클래스 테이블명 동적 조회
+  const classTableName = await getTenantTableName(supabase, tenantId, 'class');
+
   const today = toKSTDate(kstTime);
   const currentHour = kstTime.getHours();
   const currentMinute = kstTime.getMinutes();
 
   const { data: classes, error } = await withTenant(
     supabase
-      .from('academy_classes')
+      .from(classTableName || 'academy_classes') // Fallback
       .select('id, start_time, name')
       .gte('start_time', `${today}T00:00:00`)
       .lte('start_time', `${today}T23:59:59`),
@@ -201,13 +204,16 @@ async function processCheckoutMissingAlert(
     return 0;
   }
 
+  // Industry Adapter: 업종별 클래스 테이블명 동적 조회
+  const classTableName = await getTenantTableName(supabase, tenantId, 'class');
+
   const today = toKSTDate(kstTime);
   const currentTime = kstTime.getTime();
 
   // 오늘 종료된 수업 조회
   const { data: classes, error } = await withTenant(
     supabase
-      .from('academy_classes')
+      .from(classTableName || 'academy_classes') // Fallback
       .select('id, start_time, duration_minutes, name')
       .gte('start_time', `${today}T00:00:00`)
       .lte('start_time', `${today}T23:59:59`),
@@ -471,8 +477,12 @@ async function processAnnouncementDigest(
 }
 
 serve(async (req) => {
+  // CORS preflight 요청 처리
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
   }
 
   try {

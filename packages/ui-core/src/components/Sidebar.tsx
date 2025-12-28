@@ -84,6 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       if (value.endsWith('rem')) {
         const remValue = parseFloat(value);
         // ⚠️ 중요: 하드코딩 금지, CSS 변수 사용
+        // HARD-CODE-EXCEPTION: fallback 값 16은 브라우저 기본 폰트 크기 (브라우저 호환성용 상수)
         const baseFontSize = typeof window !== 'undefined'
           ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
           : 16;
@@ -94,6 +95,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return Number(value);
       }
     }
+    // HARD-CODE-EXCEPTION: fallback 값 16은 브라우저 기본 폰트 크기 (브라우저 호환성용 상수)
     return 16; // fallback (CSS 변수를 읽을 수 없는 경우만)
   }, []);
 
@@ -106,6 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       if (value.endsWith('rem')) {
         const remValue = parseFloat(value);
         // ⚠️ 중요: 하드코딩 금지, CSS 변수 사용
+        // HARD-CODE-EXCEPTION: fallback 값 16은 브라우저 기본 폰트 크기 (브라우저 호환성용 상수)
         const baseFontSize = typeof window !== 'undefined'
           ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
           : 16;

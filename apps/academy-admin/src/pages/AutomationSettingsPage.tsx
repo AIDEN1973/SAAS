@@ -1,6 +1,8 @@
 /**
  * 자동화 설정 페이지
  *
+ * [LAYER: UI_PAGE]
+ *
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  * [요구사항] 39개 자동화 항목 카드 스타일 표시, 클릭 시 설정 카드로 변경
@@ -21,7 +23,7 @@ import { AUTOMATION_EVENT_CATALOG } from '@core/core-automation';
 import { AUTOMATION_EVENT_DESCRIPTIONS, POLICY_KEY_V2_CATEGORIES, AUTOMATION_EVENT_CRITERIA_FIELDS } from '../constants';
 import { useTenantSettingByPath, useUpdateConfig, useConfig } from '@hooks/use-config';
 // [SSOT] Barrel export를 통한 통합 import
-import { getPolicyValueFromConfig, getAutomationEventPolicyPath } from '../utils';
+import { getPolicyValueFromConfig, getAutomationEventPolicyPath, logInfo, logWarn } from '../utils';
 
 type AutomationEventType = (typeof AUTOMATION_EVENT_CATALOG)[number];
 
@@ -726,8 +728,8 @@ function AutomationCardWithState({
       if (value !== null && value !== undefined) {
         values[field.field] = value;
         // 디버깅: 값이 있는 경우
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[AutomationCardWithState] 값 있음: ${policyPath}`, {
+        if (import.meta.env?.DEV) {
+          logInfo('AutomationSettingsPage:AutomationCardWithState', `값 있음: ${policyPath}`, {
             field: field.field,
             value: value,
             type: typeof value,
@@ -735,8 +737,8 @@ function AutomationCardWithState({
         }
       } else {
         // 디버깅: 기본값이 설정되어 있어도 null이면 상세 로그 출력
-        if (process.env.NODE_ENV === 'development') {
-          console.warn(`[AutomationCardWithState] 기본값 없음: ${policyPath}`, {
+        if (import.meta.env?.DEV) {
+          logWarn('AutomationSettingsPage:AutomationCardWithState', `기본값 없음: ${policyPath}`, {
             field: field.field,
             policyPath: policyPath,
           });

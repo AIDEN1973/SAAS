@@ -18,6 +18,7 @@
   -ms-overflow-style: none;
 }
 
+/* HARD-CODE-EXCEPTION: 스크롤바 숨기기용 width/height 0 (브라우저 버그 회피용 상수) */
 .academyAdmin-hiddenScrollbar::-webkit-scrollbar {
   width: 0;
   height: 0;

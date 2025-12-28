@@ -59,7 +59,9 @@ export function RegionalMetricCard({ metric, regionalStats, selectedMetric, onSe
     if (metric === 'students') {
       return regionalStats.value.toString();
     } else if (metric === 'revenue') {
-      return regionalStats.value.toLocaleString();
+      // [P1 수정] toLocaleString() 대신 Intl.NumberFormat 사용
+      const formatter = new Intl.NumberFormat('ko-KR');
+      return formatter.format(regionalStats.value);
     } else if (metric === 'attendance' || metric === 'growth') {
       return regionalStats.value.toString();
     }

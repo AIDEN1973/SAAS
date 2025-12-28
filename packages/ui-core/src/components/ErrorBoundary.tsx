@@ -1,3 +1,4 @@
+// LAYER: UI_CORE_COMPONENT
 /**
  * Error Boundary
  *
@@ -11,6 +12,7 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { Card } from './Card';
 import { Button } from './Button';
+import { maskPII } from '@core/pii-utils';
 
 export interface ErrorBoundaryProps {
   children: ReactNode;
@@ -65,7 +67,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     }
 
     // 에러 로깅
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    // P0: PII 마스킹 필수 (체크리스트.md 4. PII 마스킹)
+    const maskedError = maskPII(error);
+    const maskedErrorInfo = maskPII(errorInfo);
+    console.error('ErrorBoundary caught an error:', maskedError, maskedErrorInfo);
   }
 
   render() {

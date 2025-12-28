@@ -14,21 +14,13 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { shouldUseAI, getTenantSettingByPath } from '../_shared/policy-utils.ts';
 import { withTenant } from '../_shared/withTenant.ts';
-
-/**
- * PII 마스킹: 이름 마스킹
- * [불변 규칙] 로그에 PII를 직접 출력하지 않습니다.
- */
-function maskName(name: string | null | undefined): string {
-  if (!name) return '';
-  // 홍길동 → 홍*동
-  if (name.length <= 2) return name.charAt(0) + '*';
-  return name.charAt(0) + '*'.repeat(name.length - 2) + name.charAt(name.length - 1);
-}
+import { envServer } from '../_shared/env-registry.ts';
+import { maskName } from '../_shared/pii-utils.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 interface RiskAnalysisRequest {
@@ -89,7 +81,10 @@ function extractTenantIdFromJWT(authHeader: string | null): string | null {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
   }
 
   try {
@@ -423,7 +418,7 @@ JSON 형식으로만 응답하고, 다른 설명은 포함하지 마세요.`;
     if (riskThreshold == null) {
       console.log('[Risk Analysis] Risk threshold policy not found, skipping task card creation');
     } else if (riskAnalysis.risk_score >= riskThreshold) {
-      // 위험 점수가 정책 임계값 이상이면 task_cards에 카드 생성 (StudentTaskCard는 학생용 별칭)
+      // 위험 점수가 정책 임계값 이상이면 task_cards에 카드 생성 (정본)
       const { error: cardError } = await supabase.rpc('create_risk_task_card', {
         p_tenant_id: tenant_id,
         p_student_id: student_id,
@@ -473,13 +468,10 @@ JSON 형식으로만 응답하고, 다른 설명은 포함하지 마세요.`;
 
     if (existingInsight) {
       // 기존 분석 결과 업데이트
-      const { error: updateError } = await withTenant(
-        supabase
+      const { error: updateError } = await supabase
         .from('ai_insights')
         .update(insightData)
-          .eq('id', existingInsight.id),
-        tenant_id
-      );
+        .eq('id', existingInsight.id);
 
       if (updateError) {
         console.error('[Risk Analysis] Failed to update ai_insights:', updateError);
@@ -521,7 +513,7 @@ JSON 형식으로만 응답하고, 다른 설명은 포함하지 마세요.`;
     return new Response(
       JSON.stringify({
         error: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? errorStack : undefined,
+        details: envServer.NODE_ENV === 'development' ? errorStack : undefined,
       }),
       {
         status: 500,

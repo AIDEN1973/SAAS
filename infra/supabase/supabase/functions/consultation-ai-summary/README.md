@@ -1,8 +1,8 @@
-# 상담일지 AI 요약 생성 Edge Function
+# 상담일지 AI 요약 생성 Edge Function (서버가 생성하며 AI 호출 포함)
 
 ## 개요
 
-ChatGPT API를 사용하여 상담일지 내용을 요약합니다.
+서버가 ChatGPT API를 호출하여 상담일지 내용을 요약합니다.
 
 ## 환경변수 설정
 
@@ -49,7 +49,7 @@ POST /functions/v1/consultation-ai-summary
    - 학원명 → [학원명]
    - 주소 → [주소]
    - 이메일 → u***@example.com
-3. ChatGPT API를 통해 요약 생성
+3. 서버가 ChatGPT API를 호출하여 요약 생성
 4. 상담기록의 `ai_summary` 필드에 저장
 
 ## 모델

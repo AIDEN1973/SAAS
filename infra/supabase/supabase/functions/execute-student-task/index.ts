@@ -77,7 +77,7 @@ serve(async (req) => {
       );
     }
 
-    // TaskCard 조회 (StudentTaskCard는 학생용 별칭)
+    // TaskCard 조회 (정본)
     const { data: taskCard, error: taskError } = await supabase
       .from('task_cards')
       .select('*, tenant_id')
@@ -163,9 +163,8 @@ serve(async (req) => {
         );
       }
 
-      // TaskCard 상태 업데이트 (StudentTaskCard는 학생용 별칭)
-      const { error: updateError } = await withTenant(
-        supabase
+      // TaskCard 상태 업데이트 (정본)
+      const { error: updateError } = await supabase
         .from('task_cards')
         .update({
           status: 'approved',
@@ -173,9 +172,7 @@ serve(async (req) => {
           approved_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-          .eq('id', taskId),
-        taskCard.tenant_id
-      );
+        .eq('id', taskId);
 
       if (updateError) {
         console.error('[execute-student-task] Failed to update task card:', updateError);
@@ -229,13 +226,10 @@ serve(async (req) => {
 
           if (safetyState.executed_count >= safetyState.max_allowed) {
             // 상태를 paused로 변경
-            await withTenant(
-              supabase
+            await supabase
               .from('automation_safety_state')
               .update({ state: 'paused' })
-                .eq('id', safetyState.id),
-              taskCard.tenant_id
-            );
+              .eq('id', safetyState.id);
 
             return new Response(
               JSON.stringify({
@@ -248,16 +242,13 @@ serve(async (req) => {
           }
 
           // 실행 카운트 증가
-          await withTenant(
-            supabase
+          await supabase
             .from('automation_safety_state')
             .update({
               executed_count: safetyState.executed_count + 1,
               updated_at: new Date().toISOString()
             })
-              .eq('id', safetyState.id),
-            taskCard.tenant_id
-          );
+            .eq('id', safetyState.id);
         } else {
           // 초기 상태 생성
           // ⚠️ 중요: max_allowed는 Policy에서 조회 (Fail Closed)
@@ -338,18 +329,15 @@ serve(async (req) => {
         console.error('[execute-student-task] Failed to log execution:', logError);
       }
 
-      // TaskCard 상태를 executed로 업데이트 (StudentTaskCard는 학생용 별칭)
-      await withTenant(
-        supabase
+      // TaskCard 상태를 executed로 업데이트 (정본)
+      await supabase
         .from('task_cards')
         .update({
           status: 'executed',
           executed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-          .eq('id', taskId),
-        taskCard.tenant_id
-      );
+        .eq('id', taskId);
 
       return new Response(
         JSON.stringify({ status: 'executed', result: executionResult }),

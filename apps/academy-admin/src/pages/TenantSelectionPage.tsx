@@ -1,6 +1,8 @@
 /**
  * 테넌트 선택 페이지
  *
+ * [LAYER: UI_PAGE]
+ *
  * [기술문서 요구사항]
  * - 로그인 후 여러 테넌트가 있는 경우 테넌트 선택
  * - 테넌트 선택 시 JWT claim에 tenant_id 포함
@@ -11,13 +13,19 @@
  * - Design System 토큰 사용
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Card, Button, useModal, useResponsiveMode, isMobile } from '@ui-core/react';
 import { useUserTenants, useSelectTenant } from '@hooks/use-auth';
+import { createSafeNavigate } from '../utils';
 
 export function TenantSelectionPage() {
   const navigate = useNavigate();
+  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
+  const safeNavigate = useMemo(
+    () => createSafeNavigate(navigate),
+    [navigate]
+  );
   const mode = useResponsiveMode();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
@@ -32,13 +40,13 @@ export function TenantSelectionPage() {
     try {
       setSelectedTenantId(tenantId);
       await selectTenant.mutateAsync(tenantId);
-      navigate('/');
+      safeNavigate('/');
     } catch (error) {
       const message = error instanceof Error ? error.message : '테넌트 선택에 실패했습니다.';
       showAlert('오류', message);
       setSelectedTenantId(null);
     }
-  }, [navigate, selectTenant, showAlert]);
+  }, [selectTenant, showAlert, safeNavigate]);
 
   // 테넌트가 하나면 자동 선택
   useEffect(() => {
@@ -90,7 +98,7 @@ export function TenantSelectionPage() {
           }}>
             소속된 테넌트가 없습니다.
           </p>
-          <Button onClick={() => navigate('/auth/signup')} variant="solid">
+          <Button onClick={() => safeNavigate('/auth/signup')} variant="solid">
             회원가입
           </Button>
         </Card>

@@ -5,4 +5,5 @@ export { useTheme } from './useTheme';
 export { useIconSize, useIconStrokeWidth } from './useIconSize';
 export { useToast } from './useToast';
 export type { ToastVariant, UseToastReturn } from './useToast';
+export { AILayerMenuProvider, useAILayerMenu } from './useAILayerMenu';
 

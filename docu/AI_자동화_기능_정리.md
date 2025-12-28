@@ -142,6 +142,76 @@ AI 기능은 다음 2계층으로 구성된다.
 
 ⚠️ AI 판단 및 실행 로직은 Core Engine에만 존재한다.
 
+### Edge Functions Industry Adapter 구현 (SSOT)
+
+Edge Functions에서 업종별 테이블명 및 FK 관계명을 동적으로 매핑하기 위한 Industry Adapter가 구현되어 있습니다.
+
+**구현 위치:**
+- `infra/supabase/functions/_shared/industry-adapter.ts`
+
+**주요 기능:**
+1. **테이블명 동적 매핑**
+   - `getTenantTableName(supabase, tenantId, entityType)`: 테넌트의 industry_type에 따라 엔티티 타입('student', 'class' 등)을 업종별 테이블명으로 변환
+   - 예: `academy` → `academy_students`, `salon` → `salon_customers`
+
+2. **FK 관계명 동적 매핑**
+   - `getFKRelationName(fkKey, industryType)`: 업종별 FK 관계명을 레지스트리에서 조회
+   - 지원 FK 키: `attendance_logs_class_id`, `student_classes_class_id`, `student_classes_student_id`, `class_sessions_class_id`, `invoices_student_id`, `student_person_id`, `class_teacher_id`
+
+3. **업종 타입 조회**
+   - `getTenantIndustryType(supabase, tenantId)`: 테넌트의 industry_type 조회
+
+**사용 규칙:**
+- ❌ 하드코딩된 테이블명 사용 금지 (예: `'academy_students'`, `'academy_classes'`)
+- ✅ Industry Adapter 함수 사용 필수
+- ✅ Fail-Closed 원칙: 매핑 실패 시 null 반환, fallback 패턴 사용
+
+**사용 예시:**
+```typescript
+import { getTenantTableName, getTenantIndustryType, getFKRelationName } from '../_shared/industry-adapter.ts';
+
+// 테이블명 동적 조회
+const studentTableName = await getTenantTableName(supabase, tenant_id, 'student');
+const classTableName = await getTenantTableName(supabase, tenant_id, 'class');
+
+// FK 관계명 동적 조회
+const industryType = await getTenantIndustryType(supabase, tenant_id);
+const classFKName = getFKRelationName('attendance_logs_class_id', industryType) ||
+  'academy_classes!attendance_logs_class_id_fkey'; // Fallback
+
+// 쿼리 실행
+const { data } = await withTenant(
+  supabase
+    .from(studentTableName || 'academy_students') // Fallback
+    .select(`*`),
+  tenant_id
+);
+```
+
+**적용 범위:**
+- 모든 Edge Functions에서 업종별 테이블명 사용 시 필수
+- L0 핸들러 (`l0-handlers.ts`): 모든 핸들러에서 적용 완료
+- Task 실행 핸들러 (`execute-student-task/handlers/*`): 모든 핸들러에서 적용 완료
+- 자동화 Edge Functions: 모든 자동화 함수에서 적용 완료
+
+### UI Component Industry-Neutral Rule
+
+AI 관련 UI 컴포넌트(ChatOpsPanel, ExecutionAuditPanel, AILayerMenu)도 업종에 종속되지 않으며, 모든 업종에서 공통으로 사용 가능합니다.
+
+**불변 원칙:**
+- AI UI 컴포넌트는 `packages/ui-core/src/components/`에 위치하며, 업종 독립적으로 설계됩니다.
+- 업종별 차이는 prop을 통한 확장 포인트(`onViewTaskCard`, `onChatOpsViewTaskCard` 등)로 처리됩니다.
+- 업종별 하드코딩된 라우팅 경로나 CSS 클래스는 금지됩니다.
+
+**구현 위치:**
+- `ChatOpsPanel`: `packages/ui-core/src/components/ChatOpsPanel.tsx`
+- `ExecutionAuditPanel`: `packages/ui-core/src/components/ExecutionAuditPanel.tsx`
+- `AILayerMenu`: `packages/ui-core/src/components/AILayerMenu.tsx`
+
+**업종별 확장 방법:**
+- 업종별 라우팅은 `AppLayout`에서 `onChatOpsViewTaskCard` prop을 통해 처리합니다.
+- 업종별 라벨/용어는 Industry Adapter를 통해 변환됩니다.
+
 ### Automation Policy Schema Rule
 
 자동화 설정(Policy)은 업종과 무관한 **중립 스키마**로 정의된다.
@@ -277,6 +347,7 @@ AI 기능은 다음 2계층으로 구성된다.
 5. 프론트엔드 → 승인 요청
    - Teacher: `apiClient.invokeFunction('execute-student-task', { action: 'request-approval', task_id: id })` (요청만 기록, 정본)
    - Admin: `apiClient.invokeFunction('execute-student-task', { action: 'approve-and-execute', task_id: id })` (실행 트리거, SSOT, 정본)
+   - ⚠️ 명칭 정리 (챗봇.md 11.1.1 참조): `execute-student-task`는 레거시 명칭, 정본은 `execute-task-card` 또는 `execute-automation-action`
 6. Edge Function → 정책 재확인 → Role 검증 + 실행 + 로그 기록
 ```
 
@@ -682,6 +753,8 @@ CREATE TABLE IF NOT EXISTS automation_safety_state (
 
 ## 6. 자동화 실행 로그 및 추적
 
+⚠️ 참고: 실행 결과 기록은 Execution Audit 시스템(액티비티.md) 참조
+
 ### 6.1 자동화 실행 로그
 
 **테이블:** `automation_actions`
@@ -698,7 +771,12 @@ CREATE TABLE IF NOT EXISTS automation_actions (
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   -- 감사/추적 필수 필드
   trace_id text,              -- 요청 추적 ID (분산 추적용)
-  request_id text,            -- 요청 ID (멱등성/재시도 추적용)
+  request_id text,            -- 요청 ID (멱등성/재시도 추적용, 챗봇.md 6.3.1 참조)
+  -- ⚠️ request_id 형식 규칙 (챗봇.md 6.3.1): {task_id}:{action}:{attempt_window}
+  --   - attempt_window: 5분 버킷 (floor(now_utc / 5min))
+  --   - automation_actions 테이블에서 request_id 유니크 제약으로 멱등 강제
+  --   - 동일 request_id가 이미 존재하면 기존 automation_actions 레코드를 조회하여 동일한 결과를 반환 (idempotent replay)
+  --   - request_id는 서버/Edge에서만 생성 (클라이언트 입력값 사용 금지)
   policy_version text,        -- RLS 정책 버전 (보안 감사용)
   rule_id text,               -- 실행된 규칙 ID (비즈니스 로직 추적용)
   dedup_key text,             -- 중복 방지 키 (멱등성 검증용)
@@ -712,6 +790,12 @@ CREATE TABLE IF NOT EXISTS automation_actions (
 **⚠️ 중요:**
 - 이 로그 없으면 Zero-Management 아키텍처 위반
 - 감사/추적 필수 필드 표준화 (사건 재현 및 분쟁 대응용)
+
+**⚠️ 참고: automation_actions와 execution_audit_runs의 관계**
+- automation_actions: 워크플로우 이벤트 기록(승인요청/실행 이벤트, 챗봇.md 6.3.2 참조)
+- execution_audit_runs: 실행 결과 기록(실제 실행 결과, 액티비티.md 참조)
+- automation_actions 기록 후 execution_audit_runs도 생성되어야 함(챗봇.md 642줄: "Execution Audit 시스템에 실행 결과 기록" 참조)
+- automation_actions.request_id와 execution_audit_runs.reference.request_id는 동일한 형식을 사용(챗봇.md 6.3.1 참조)
 
 ### 6.2 AI 판단 로그
 
