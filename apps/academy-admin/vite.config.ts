@@ -50,7 +50,7 @@ function enforceReactChunk(): RollupPlugin {
 
             // React 모듈이 실제로 포함되어 있는 경우에만 오류
             if (hasReactModule) {
-              console.error(`\n❌ [enforce-react-chunk] React module detected in ${fileName}!`);
+              console.error(`\n[enforce-react-chunk] React module detected in ${fileName}!`);
               console.error(`   This should not happen. React must be in react-vendor chunk.`);
               console.error(`   Tracked React modules:`, Array.from(reactModuleIds).slice(0, 10));
 
@@ -252,7 +252,7 @@ export default defineConfig(({ mode }) => {
   // 프로덕션 빌드에서는 경고만 출력
   if (!loadedUrl || !loadedKey) {
     if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
-      console.warn('⚠️  Supabase 환경변수가 설정되지 않았습니다. .env.local 파일을 확인하세요.');
+      console.warn('Supabase 환경변수가 설정되지 않았습니다. .env.local 파일을 확인하세요.');
     }
   }
 
@@ -353,6 +353,9 @@ export default defineConfig(({ mode }) => {
       { find: '@industry', replacement: path.resolve(__dirname, '../../packages/industry') },
       { find: '@services', replacement: path.resolve(__dirname, '../../packages/services') },
       { find: '@hooks', replacement: path.resolve(__dirname, '../../packages/hooks') },
+      { find: '@hooks/use-execution-audit', replacement: path.resolve(__dirname, '../../packages/hooks/use-execution-audit/src') },
+      { find: '@hooks/use-chatops', replacement: path.resolve(__dirname, '../../packages/hooks/use-chatops/src') },
+      { find: '@chatops-intents/registry', replacement: path.resolve(__dirname, '../../packages/chatops-intents/src') },
       { find: '@core', replacement: path.resolve(__dirname, '../../packages/core') },
     ],
   },
@@ -421,10 +424,7 @@ export default defineConfig(({ mode }) => {
             ];
 
             if (reactRelatedPackages.includes(packageName)) {
-              // 프로덕션 빌드에서는 로그 최소화
-              if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
-                console.log('[manualChunks] React related package:', packageName, '-> react-vendor');
-              }
+              // 프로덕션 빌드에서는 로그 출력하지 않음
               return 'react-vendor';
             }
 
@@ -436,12 +436,9 @@ export default defineConfig(({ mode }) => {
               '/scheduler/',
               '/use-sync-external-store/'
             ];
-            
+
             if (reactPathPatterns.some(pattern => normalizedId.includes(pattern))) {
-              // 프로덕션 빌드에서는 로그 최소화
-              if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
-                console.log('[manualChunks] React internal path:', normalizedId.substring(normalizedId.indexOf('node_modules')), '-> react-vendor');
-              }
+              // 프로덕션 빌드에서는 로그 출력하지 않음
               return 'react-vendor';
             }
 
@@ -452,7 +449,7 @@ export default defineConfig(({ mode }) => {
               if (normalizedId.includes('react-hook-form')) return 'react-hook-form-vendor';
               if (normalizedId.includes('lucide-react')) return 'lucide-icons-vendor';
               if (normalizedId.includes('@tanstack/react-query')) return 'tanstack-vendor';
-              
+
               // 제외 목록에 없는 react 포함 모듈은 react-vendor로
               const excludedReactLibs = [
                 'react-router',
@@ -463,14 +460,12 @@ export default defineConfig(({ mode }) => {
                 'react-dnd',
                 'react-beautiful-dnd',
                 'react-window',
-                'react-virtual'
+                'react-virtual',
+                'phosphor-react', // 아이콘 라이브러리 - 별도 처리
               ];
-              
+
               if (!excludedReactLibs.some(lib => normalizedId.includes(lib))) {
-                // 프로덕션 빌드에서는 로그 최소화
-                if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
-                  console.log('[manualChunks] React module fallback:', packageName, '-> react-vendor');
-                }
+                // 프로덕션 빌드에서는 로그 출력하지 않음
                 return 'react-vendor';
               }
             }
@@ -492,6 +487,10 @@ export default defineConfig(({ mode }) => {
             // Lucide icons
             if (normalizedId.includes('lucide-react')) {
               return 'lucide-icons-vendor';
+            }
+            // Phosphor icons (React 아이콘 라이브러리)
+            if (normalizedId.includes('phosphor-react')) {
+              return 'lucide-icons-vendor'; // 아이콘 라이브러리는 함께 묶음
             }
             // Radix UI
             if (normalizedId.includes('radix-ui') || normalizedId.includes('@radix-ui')) {
@@ -523,13 +522,10 @@ export default defineConfig(({ mode }) => {
             // vendor-1, 2, 3 대신 명시적인 청크 이름 사용
 
             // React 관련 패키지 최종 안전장치 (위의 모든 체크를 통과한 경우)
-            if (packageName && (packageName === 'react' || packageName === 'react-dom' || 
-                (packageName.startsWith('react') && !packageName.includes('react-router') && 
-                 !packageName.includes('react-hook-form')))) {
-              // 프로덕션 빌드에서는 로그 최소화
-              if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
-                console.log('[manualChunks] React package final fallback:', packageName, '-> react-vendor');
-              }
+            if (packageName && (packageName === 'react' || packageName === 'react-dom' ||
+                (packageName.startsWith('react') && !packageName.includes('react-router') &&
+                 !packageName.includes('react-hook-form') && !packageName.includes('phosphor-react')))) {
+              // 프로덕션 빌드에서는 로그 출력하지 않음
               return 'react-vendor';
             }
 
@@ -546,7 +542,14 @@ export default defineConfig(({ mode }) => {
             // 기타 라이브러리들을 명시적인 청크로
             // lib-a-z를 제거하고 각 라이브러리를 명시적으로 분류
             if (packageName) {
-              // 특정 라이브러리들을 명시적으로 분류
+              // 큰 유틸리티 라이브러리들을 별도 청크로 분리 (lib-utils 크기 감소)
+              if (packageName === 'xlsx') {
+                return 'lib-xlsx'; // 큰 라이브러리는 별도 청크로
+              }
+              if (packageName === 'iceberg-js') {
+                return 'lib-iceberg'; // 큰 라이브러리는 별도 청크로
+              }
+              // 작은 유틸리티 라이브러리들
               if (packageName === 'clsx') {
                 return 'lib-utils';
               }
@@ -556,13 +559,7 @@ export default defineConfig(({ mode }) => {
               if (packageName === 'tslib') {
                 return 'lib-utils';
               }
-              if (packageName === 'xlsx') {
-                return 'lib-utils';
-              }
               if (packageName === 'es-toolkit' || packageName === 'internmap' || packageName === 'decimal.js-light' || packageName === 'eventemitter3' || packageName === 'tiny-invariant') {
-                return 'lib-utils';
-              }
-              if (packageName === 'iceberg-js') {
                 return 'lib-utils';
               }
 
@@ -591,10 +588,7 @@ export default defineConfig(({ mode }) => {
 
             // 패키지 이름을 추출할 수 없는 경우 최종 React 경로 체크
             if (normalizedId.includes('/react/') || normalizedId.includes('/react-dom/')) {
-              // 프로덕션 빌드에서는 로그 최소화
-              if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
-                console.log('[manualChunks] React path final fallback:', normalizedId.substring(normalizedId.indexOf('node_modules')), '-> react-vendor');
-              }
+              // 프로덕션 빌드에서는 로그 출력하지 않음
               return 'react-vendor';
             }
 
@@ -647,5 +641,3 @@ export default defineConfig(({ mode }) => {
   },
   };
 });
-
-
