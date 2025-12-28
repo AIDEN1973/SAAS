@@ -361,6 +361,10 @@ export default defineConfig(({ mode }) => {
   },
   build: {
     outDir: 'dist',
+    // CSS 코드 스플리팅 활성화 (기본값이지만 명시적으로 설정)
+    cssCodeSplit: true,
+    // CSS 파일을 별도 파일로 추출
+    cssMinify: true,
     commonjsOptions: {
       // 순환 의존성 문제 해결을 위한 설정
       include: [/node_modules/],
