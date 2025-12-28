@@ -20,7 +20,7 @@
     "baseUrl": ".",
     "paths": {
       "@env-registry/client": ["../../packages/env-registry/src/client.ts"],
-      "@industry/academy/types": ["../../packages/industry/industry-academy/src/types"],
+      "@industry/academy/types": ["../../packages/industry/industry-academy/src/types.ts"],
       "@hooks/use-tenant-feature": ["../../packages/hooks/use-tenant-feature/src"],
       "@hooks/use-tenant-feature/*": ["../../packages/hooks/use-tenant-feature/src/*"],
       "@hooks/use-auth": ["../../packages/hooks/use-auth/src"],
