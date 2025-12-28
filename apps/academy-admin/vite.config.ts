@@ -275,6 +275,8 @@ export default defineConfig(({ mode }) => {
   envDir,
   // 환경변수를 빌드 타임에 주입
   define,
+  // 프로덕션 빌드에서 정적 자산 경로 문제 해결
+  base: '/',
   plugins: [
     react(),
     excludeServerCode(),
@@ -314,6 +316,14 @@ export default defineConfig(({ mode }) => {
       define: {
         global: 'globalThis',
       },
+    },
+  },
+  css: {
+    // CSS 파일이 제대로 처리되도록 설정
+    devSourcemap: true,
+    // CSS 모듈 처리
+    modules: {
+      localsConvention: 'camelCase',
     },
   },
   resolve: {
@@ -361,6 +371,14 @@ export default defineConfig(({ mode }) => {
   },
   build: {
     outDir: 'dist',
+    // CSS 코드 스플리팅 설정
+    // true: CSS를 청크별로 분리 (기본값, 각 청크와 함께 로드되어 타이밍 문제 방지)
+    // false: CSS를 하나의 파일로 합침 (CSS 로딩 타이밍 문제 발생 가능)
+    cssCodeSplit: true, // 기본값으로 복원 - CSS가 각 청크와 함께 로드되도록
+    // CSS 파일을 별도 파일로 추출
+    cssMinify: true,
+    // CSS 파일이 제대로 포함되도록 명시적으로 설정
+    assetsInlineLimit: 0, // CSS를 인라인하지 않고 별도 파일로 유지
     commonjsOptions: {
       // 순환 의존성 문제 해결을 위한 설정
       include: [/node_modules/],
