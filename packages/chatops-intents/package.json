@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "zod": "^3.22.0",
-    "@core/automation": "workspace:*"
+    "@core/automation": "file:../../packages/core/core-automation"
   },
   "devDependencies": {
     "typescript": "^5.0.0"
