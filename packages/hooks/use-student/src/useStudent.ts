@@ -11,6 +11,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import type { ApiResponse } from '@api-sdk/core';
 import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
+import { useSession } from '@hooks/use-auth';
+import { createExecutionAuditRecord } from './execution-audit-utils';
 import type {
   CreateStudentInput,
   UpdateStudentInput,
@@ -593,9 +595,12 @@ export function useCreateStudent() {
   const context = getApiContext();
   const tenantId = context.tenantId;
   const industryType = context.industryType || 'academy';
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async (input: CreateStudentInput) => {
+      const startTime = Date.now();
+
       // 1. persons 테이블에 생성 (공통 필드)
       const personResponse = await apiClient.post<Person>('persons', {
         name: input.name,
@@ -666,7 +671,28 @@ export function useCreateStudent() {
         }
       }
 
-      // 5. 결과 반환 (persons + academy_students 조합)
+      // 5. Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'student.register',
+            status: 'success',
+            summary: `${input.name} 학생 등록 완료`,
+            details: {
+              student_id: person.id,
+            },
+            reference: {
+              entity_type: 'student',
+              entity_id: person.id,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
+      }
+
+      // 6. 결과 반환 (persons + academy_students 조합)
       return {
         id: person.id,
         tenant_id: person.tenant_id,
@@ -814,6 +840,7 @@ export function useUpdateStudent() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({
@@ -823,6 +850,7 @@ export function useUpdateStudent() {
       studentId: string;
       input: UpdateStudentInput;
     }) => {
+      const startTime = Date.now();
       // 1. persons 테이블 업데이트 (공통 필드)
       const personUpdate: Partial<{ name?: string; email?: string; phone?: string; address?: string }> = {};
       if (input.name !== undefined) personUpdate.name = input.name;
@@ -916,7 +944,7 @@ export function useUpdateStudent() {
       }
 
       const academyData = person.academy_students?.[0] || {};
-      return {
+      const updatedStudent = {
         id: person.id,
         tenant_id: person.tenant_id,
         industry_type: 'academy',
@@ -936,6 +964,43 @@ export function useUpdateStudent() {
         created_by: academyData.created_by,
         updated_by: academyData.updated_by,
       } as Student;
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        // 변경된 필드 추출
+        const changedFields: string[] = [];
+        if (input.name !== undefined) changedFields.push('이름');
+        if (input.phone !== undefined) changedFields.push('전화번호');
+        if (input.email !== undefined) changedFields.push('이메일');
+        if (input.address !== undefined) changedFields.push('주소');
+        if (input.birth_date !== undefined) changedFields.push('생년월일');
+        if (input.gender !== undefined) changedFields.push('성별');
+        if (input.school_name !== undefined) changedFields.push('학교명');
+        if (input.grade !== undefined) changedFields.push('학년');
+        if (input.status !== undefined) changedFields.push('상태');
+        if (input.notes !== undefined) changedFields.push('비고');
+        if (input.profile_image_url !== undefined) changedFields.push('프로필 이미지');
+
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'student.update',
+            status: 'success',
+            summary: `${updatedStudent.name} 학생 정보 수정 완료 (${changedFields.join(', ')})`,
+            details: {
+              student_id: studentId,
+            },
+            reference: {
+              entity_type: 'student',
+              entity_id: studentId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
+      }
+
+      return updatedStudent;
     },
     onSuccess: (data) => {
       // 학생 목록 및 상세 쿼리 무효화
@@ -957,9 +1022,19 @@ export function useDeleteStudent() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async (studentId: string) => {
+      const startTime = Date.now();
+
+      // 학생 정보 조회 (Execution Audit 기록용)
+      const studentResponse = await apiClient.get<Person>('persons', {
+        filters: { id: studentId, person_type: 'student' },
+        limit: 1,
+      });
+
+      const studentName = studentResponse.data?.[0]?.name || '알 수 없음';
       // Soft delete: status를 'withdrawn'으로 변경
       // [불변 규칙] students는 View이므로 academy_students를 직접 업데이트해야 함
       interface AcademyStudent {
@@ -988,6 +1063,27 @@ export function useDeleteStudent() {
 
       if (updateResponse.error) {
         throw new Error(updateResponse.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'student.delete',
+            status: 'success',
+            summary: `${studentName} 학생 퇴원 처리 완료`,
+            details: {
+              student_id: studentId,
+            },
+            reference: {
+              entity_type: 'student',
+              entity_id: studentId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return;
@@ -1191,6 +1287,7 @@ export function useCreateConsultation() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({
@@ -1202,6 +1299,7 @@ export function useCreateConsultation() {
       consultation: Omit<StudentConsultation, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>;
       userId: string;
     }) => {
+      const startTime = Date.now();
       const response = await apiClient.post('student_consultations', {
         student_id: studentId,
         ...consultation,
@@ -1210,6 +1308,31 @@ export function useCreateConsultation() {
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id && response.data) {
+        const durationMs = Date.now() - startTime;
+        const consultationData = response.data as StudentConsultation;
+        const consultationType = (consultation as any).consultation_type || (consultation as any).type || '일반';
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'consultation.create',
+            status: 'success',
+            summary: `상담기록 생성 완료 (${consultationType})`,
+            details: {
+              consultation_id: consultationData.id,
+              student_id: studentId,
+              consultation_type: consultationType,
+            },
+            reference: {
+              entity_type: 'consultation',
+              entity_id: consultationData.id,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return response.data!;
@@ -1227,6 +1350,7 @@ export function useUpdateConsultation() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({
@@ -1238,10 +1362,35 @@ export function useUpdateConsultation() {
       consultation: Partial<StudentConsultation>;
       studentId: string;
     }) => {
+      const startTime = Date.now();
       const response = await apiClient.patch('student_consultations', consultationId, consultation);
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        const changedFields = Object.keys(consultation);
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'consultation.update',
+            status: 'success',
+            summary: `상담기록 수정 완료 (${changedFields.join(', ')})`,
+            details: {
+              consultation_id: consultationId,
+              student_id: studentId,
+              changed_fields: changedFields,
+            },
+            reference: {
+              entity_type: 'consultation',
+              entity_id: consultationId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return response.data!;
@@ -1259,6 +1408,7 @@ export function useDeleteConsultation() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({
@@ -1268,10 +1418,33 @@ export function useDeleteConsultation() {
       consultationId: string;
       studentId: string;
     }) => {
+      const startTime = Date.now();
       const response = await apiClient.delete('student_consultations', consultationId);
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'consultation.delete',
+            status: 'success',
+            summary: `상담기록 삭제 완료`,
+            details: {
+              consultation_id: consultationId,
+              student_id: studentId,
+            },
+            reference: {
+              entity_type: 'consultation',
+              entity_id: consultationId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
     },
     onSuccess: (_, variables) => {
@@ -1300,43 +1473,29 @@ export function useGenerateConsultationAISummary() {
       consultationId: string;
       studentId: string;
     }) => {
-      // [불변 규칙] Edge Function 호출
-      // StudentsPage.tsx의 student-risk-analysis 호출 패턴과 동일하게 구현
-      const { createClient } = await import('@lib/supabase-client');
-      const supabase = createClient();
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
-      if (sessionError || !sessionData.session) {
-        throw new Error('인증이 필요합니다. 로그인해주세요.');
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
       }
 
-      // Supabase URL 가져오기
-      const { envClient } = await import('@env-registry/client');
-      const supabaseUrl = envClient.NEXT_PUBLIC_SUPABASE_URL;
-      if (!supabaseUrl) {
-        throw new Error('Supabase 설정이 완료되지 않았습니다.');
-      }
-
-      // Edge Function 호출
-      // [불변 규칙] Zero-Trust: JWT에서 tenant_id를 추출하므로 실제 사용자 세션의 JWT 토큰을 전달
-      const response = await fetch(`${supabaseUrl}/functions/v1/consultation-ai-summary`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionData.session.access_token}`, // 사용자 JWT (tenant_id 포함)
-        },
-        body: JSON.stringify({
+      // [불변 규칙] Zero-Trust: @api-sdk/core를 통해서만 Edge Function 호출
+      // apiClient.invokeFunction()은 자동으로 JWT 토큰을 포함하여 요청
+      // Edge Function은 JWT에서 tenant_id를 추출합니다 (요청 본문에서 받지 않음)
+      const response = await apiClient.invokeFunction<{ ai_summary: string }>(
+        'consultation-ai-summary',
+        {
           consultation_id: consultationId,
-        }),
-      });
+        }
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: '알 수 없는 오류가 발생했습니다.' }));
-        throw new Error(errorData.error || `서버가 AI 요약 생성 실패: ${response.status}`);
+      if (response.error) {
+        throw new Error(response.error.message || 'AI 요약 생성에 실패했습니다.');
       }
 
-      const data = await response.json();
-      return data.ai_summary;
+      if (!response.data?.ai_summary) {
+        throw new Error('AI 요약 데이터가 없습니다.');
+      }
+
+      return response.data.ai_summary;
     },
     onSuccess: (_, variables) => {
       // 상담기록 목록 쿼리 무효화하여 AI 요약 반영
@@ -1352,6 +1511,7 @@ export function useCreateGuardian() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({
@@ -1361,6 +1521,7 @@ export function useCreateGuardian() {
       studentId: string;
       guardian: Omit<Guardian, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>;
     }) => {
+      const startTime = Date.now();
       console.group('[useCreateGuardian] 학부모 생성 디버깅');
       console.log('입력 데이터:', {
         studentId,
@@ -1395,6 +1556,28 @@ export function useCreateGuardian() {
       console.log('   student_id:', response.data?.student_id);
       console.groupEnd();
 
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id && response.data) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'guardian.register',
+            status: 'success',
+            summary: `${guardian.name || '보호자'} 등록 완료`,
+            details: {
+              guardian_id: response.data.id,
+              student_id: studentId,
+            },
+            reference: {
+              entity_type: 'guardian',
+              entity_id: response.data.id,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
+      }
+
       return response.data!;
     },
     onSuccess: (_, variables) => {
@@ -1410,6 +1593,7 @@ export function useUpdateGuardian() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({
@@ -1421,10 +1605,35 @@ export function useUpdateGuardian() {
       guardian: Partial<Guardian>;
       studentId: string;
     }) => {
+      const startTime = Date.now();
       const response = await apiClient.patch('guardians', guardianId, guardian);
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id && response.data) {
+        const durationMs = Date.now() - startTime;
+        const changedFields = Object.keys(guardian);
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'guardian.update',
+            status: 'success',
+            summary: `보호자 정보 수정 완료 (${changedFields.join(', ')})`,
+            details: {
+              guardian_id: guardianId,
+              student_id: studentId,
+              changed_fields: changedFields,
+            },
+            reference: {
+              entity_type: 'guardian',
+              entity_id: guardianId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return response.data!;
@@ -1442,6 +1651,7 @@ export function useDeleteGuardian() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({
@@ -1451,10 +1661,33 @@ export function useDeleteGuardian() {
       guardianId: string;
       studentId: string;
     }) => {
+      const startTime = Date.now();
       const response = await apiClient.delete('guardians', guardianId);
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'guardian.delete',
+            status: 'success',
+            summary: `보호자 삭제 완료`,
+            details: {
+              guardian_id: guardianId,
+              student_id: studentId,
+            },
+            reference: {
+              entity_type: 'guardian',
+              entity_id: guardianId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
     },
     onSuccess: (_, variables) => {
@@ -1470,6 +1703,7 @@ export function useUpdateStudentTags() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({
@@ -1479,6 +1713,7 @@ export function useUpdateStudentTags() {
       studentId: string;
       tagIds: string[];
     }) => {
+      const startTime = Date.now();
       // 기존 태그 할당 제거
       const existingTags = await apiClient.get<TagAssignment>('tag_assignments', {
         filters: { entity_id: studentId, entity_type: 'student' },
@@ -1499,6 +1734,28 @@ export function useUpdateStudentTags() {
             tag_id: tagId,
           });
         }
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'student.update-tags',
+            status: 'success',
+            summary: `학생 태그 업데이트 완료 (${tagIds.length}개 태그)`,
+            details: {
+              student_id: studentId,
+              tag_count: tagIds.length,
+            },
+            reference: {
+              entity_type: 'student',
+              entity_id: studentId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
     },
     onSuccess: (_, variables) => {
@@ -1572,6 +1829,7 @@ export function useAssignStudentToClass() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({
@@ -1583,6 +1841,7 @@ export function useAssignStudentToClass() {
       classId: string;
       enrolledAt?: string;
     }) => {
+      const startTime = Date.now();
       if (!tenantId) {
         throw new Error('Tenant ID is required');
       }
@@ -1652,6 +1911,28 @@ export function useAssignStudentToClass() {
       // PostgreSQL 트리거로 자동 업데이트되어야 함
       // TODO: Edge Function을 통해 enrollStudentToClass 호출로 변경
 
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id && response.data) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'student.assign-class',
+            status: 'success',
+            summary: `학생 반 배정 완료 (class_id: ${classId})`,
+            details: {
+              student_id: studentId,
+              class_id: classId,
+            },
+            reference: {
+              entity_type: 'student',
+              entity_id: studentId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
+      }
+
       return response.data;
     },
     onSuccess: (_, variables) => {
@@ -1680,6 +1961,7 @@ export function useUnassignStudentFromClass() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({
@@ -1694,6 +1976,8 @@ export function useUnassignStudentFromClass() {
       if (!tenantId) {
         throw new Error('Tenant ID is required');
       }
+
+      const startTime = Date.now();
 
       // student_classes에서 해당 배정 찾기
       const findResponse = await apiClient.get<StudentClass>('student_classes', {
@@ -1730,6 +2014,28 @@ export function useUnassignStudentFromClass() {
       // PostgreSQL 트리거로 자동 업데이트되어야 함
       // TODO: Edge Function을 통해 unenrollStudentFromClass 호출로 변경
 
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'student.unassign-class',
+            status: 'success',
+            summary: `학생 반 배정 제거 완료 (class_id: ${classId})`,
+            details: {
+              student_id: studentId,
+              class_id: classId,
+            },
+            reference: {
+              entity_type: 'student',
+              entity_id: studentId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
+      }
+
       return response.data;
     },
     onSuccess: (_, variables) => {
@@ -1758,6 +2064,7 @@ export function useUpdateStudentClassEnrolledAt() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async ({
@@ -1767,6 +2074,7 @@ export function useUpdateStudentClassEnrolledAt() {
       studentClassId: string;
       enrolledAt: string;
     }) => {
+      const startTime = Date.now();
       if (!tenantId) {
         throw new Error('Tenant ID is required');
       }
@@ -1784,6 +2092,28 @@ export function useUpdateStudentClassEnrolledAt() {
 
       if (!response.data) {
         throw new Error('Failed to update student class enrolled_at: No data returned');
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'student.update-class-enrolled-at',
+            status: 'success',
+            summary: `학생 반 등록일 수정 완료`,
+            details: {
+              student_class_id: studentClassId,
+              new_enrolled_at: enrolledAt,
+            },
+            reference: {
+              entity_type: 'student_class',
+              entity_id: studentClassId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return response.data;

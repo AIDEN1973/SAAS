@@ -1,6 +1,8 @@
 /**
  * 메시지/공지 페이지
  *
+ * [LAYER: UI_PAGE]
+ *
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] SDUI 스키마 기반 화면 자동 생성
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
@@ -13,6 +15,8 @@ import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResp
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
+import { useSession } from '@hooks/use-auth';
+import { createExecutionAuditRecord } from '@hooks/use-student/src/execution-audit-utils';
 import type { Notification, NotificationChannel, NotificationStatus } from '@core/notification';
 import { notificationFormSchema } from '../schemas/notification.schema';
 import { notificationTemplateFormSchema } from '../schemas/notification-template.schema';
@@ -23,12 +27,14 @@ import { useStudentTaskCards } from '@hooks/use-student';
 import { useUpdateConfig } from '@hooks/use-config';
 import { fetchNotificationTemplates } from '@hooks/use-notification-templates';
 import { Sparkles } from 'lucide-react';
+import { logWarn } from '../utils';
 
 export function NotificationsPage() {
   const { showAlert } = useModal();
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: session } = useSession();
   const mode = useResponsiveMode();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
@@ -122,7 +128,7 @@ export function NotificationsPage() {
       // SSOT-3: 'kakao' 저장 금지, 'kakao_at'로 정규화
       let notificationChannel = data.notification_channel || 'sms';
       if (notificationChannel === 'kakao') {
-        console.warn('[NotificationsPage] Legacy channel "kakao" detected, normalizing to "kakao_at"');
+        logWarn('NotificationsPage:LegacyChannel', 'Legacy channel "kakao" detected, normalizing to "kakao_at"');
         notificationChannel = 'kakao_at';
       }
 
@@ -153,6 +159,7 @@ export function NotificationsPage() {
   // 단체문자/예약 발송
   const sendBulkNotification = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
+      const startTime = Date.now();
       const recipients = String(data.recipients ?? '').split('\n').filter((r: string) => r.trim());
 
       // 각 수신자에게 알림 생성
@@ -167,6 +174,38 @@ export function NotificationsPage() {
       );
 
       const results = await Promise.all(promises);
+
+      // Execution Audit 기록 생성 (액티비티.md 3.2, 3.3, 12 참조)
+      if (session?.user?.id && tenantId) {
+        const durationMs = Date.now() - startTime;
+        const errors = results.filter((r) => r.error);
+        const successCount = results.length - errors.length;
+        const status: 'success' | 'partial' = errors.length > 0 ? 'partial' : 'success';
+
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'messaging.send-bulk',
+            status: status,
+            summary: `일괄 메시지 발송 요청 완료 (${successCount}/${results.length}건 성공)`,
+            details: {
+              recipient_count: successCount,
+              total_count: results.length,
+              channel: data.channel as string,
+            },
+            reference: {
+              entity_type: 'notification',
+              entity_id: tenantId || '',
+            },
+            duration_ms: durationMs,
+            ...(errors.length > 0 && {
+              error_code: 'PARTIAL_FAILURE',
+              error_summary: `${errors.length}건 발송 실패`,
+            }),
+          },
+          session.user.id
+        );
+      }
+
       return results;
     },
     onSuccess: () => {
@@ -182,6 +221,7 @@ export function NotificationsPage() {
   // 알림 생성
   const createNotification = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
+      const startTime = Date.now();
       const response = await apiClient.post<Notification>('notifications', {
         channel: data.channel,
         recipient: data.recipient,
@@ -192,6 +232,28 @@ export function NotificationsPage() {
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성 (액티비티.md 3.2, 3.3, 12 참조)
+      if (session?.user?.id && tenantId && response.data) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'messaging.send-sms',
+            status: 'success',
+            summary: `메시지 발송 요청 완료 (${data.channel as string})`,
+            details: {
+              notification_id: response.data.id,
+              channel: data.channel as string,
+            },
+            reference: {
+              entity_type: 'notification',
+              entity_id: response.data.id,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
       }
 
       return response.data!;

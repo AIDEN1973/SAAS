@@ -11,6 +11,7 @@ import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 import type { StudentTaskCard as StudentTaskCardType } from '@hooks/use-student';
 import { useRequestApprovalStudentTaskCard, useApproveAndExecuteStudentTaskCard, useSnoozeStudentTaskCard, useDeleteStudentTaskCard } from '@hooks/use-student';
 import { useUserRole } from '@hooks/use-auth';
+import type { SuggestedActionChatOpsPlanV1 } from '@chatops-intents/types';
 // [SSOT] Barrel export를 통한 통합 import
 import { EMPTY_CARD_ID_PREFIX, DEFAULT_VALUES, TEXT_LINE_LIMITS, DATE_FORMATS, CARD_LABELS } from '../constants';
 import { isSafeInternalPath } from '../utils/navigation-utils';
@@ -76,6 +77,7 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
     if (e) {
       e.stopPropagation();
     }
+
     if (onAction) {
       // onAction이 제공되면 사용 (정본: 컴포넌트 레벨에서 navigate 호출)
       // [P0-2 수정] SSOT: onAction에서 반환된 actionUrl도 검증 (이중 방어)
@@ -96,19 +98,36 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
 
   const handleApprove = async (e?: React.MouseEvent) => {
     if (e) {
-    e.stopPropagation(); // 카드 클릭 이벤트 방지
+      e.stopPropagation(); // 카드 클릭 이벤트 방지
     }
+
+    console.error('[StudentTaskCard] ========================================');
+    console.error('[StudentTaskCard] handleApprove 호출:', {
+      card_id: card.id,
+      is_teacher: isTeacher,
+      is_admin: isAdmin,
+      task_type: card.task_type,
+      intent_key: (card.suggested_action as SuggestedActionChatOpsPlanV1 | undefined)?.intent_key,
+    });
+    console.error('[StudentTaskCard] ========================================');
+
     setIsProcessing(true);
     try {
       if (isTeacher) {
         // Teacher: 승인 요청만
+        console.error('[StudentTaskCard] Teacher: requestApproval 호출');
         await requestApproval.mutateAsync(card.id);
       } else if (isAdmin) {
         // Admin/Owner: 승인 및 실행
+        console.error('[StudentTaskCard] Admin: approveAndExecute 호출');
         await approveAndExecute.mutateAsync(card.id);
+      } else {
+        console.error('[StudentTaskCard] ❌ 권한 없음:', {
+          user_role: userRole,
+        });
       }
     } catch (error) {
-      console.error('Failed to approve task card:', error);
+      console.error('[StudentTaskCard] ❌ 승인 실패:', error);
     } finally {
       setIsProcessing(false);
     }
@@ -279,7 +298,11 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
                       예상 비용
                     </h4>
                     <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
-                      약 {previewData.estimatedCost.toLocaleString()}원
+                      약 {(() => {
+                        // [P1 수정] toLocaleString() 대신 Intl.NumberFormat 사용
+                        const formatter = new Intl.NumberFormat('ko-KR');
+                        return formatter.format(previewData.estimatedCost);
+                      })()}원
                     </p>
                   </div>
                 )}
@@ -310,7 +333,11 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
                       예상 비용
                     </h4>
                     <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
-                      약 {previewData.estimatedCost.toLocaleString()}원
+                      약 {(() => {
+                        // [P1 수정] toLocaleString() 대신 Intl.NumberFormat 사용
+                        const formatter = new Intl.NumberFormat('ko-KR');
+                        return formatter.format(previewData.estimatedCost);
+                      })()}원
                     </p>
                   </div>
                 )}

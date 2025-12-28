@@ -1,12 +1,17 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import { Suspense, lazy, useMemo } from 'react';
-import { AppLayout, Button, useModal, useTheme, AIToggle } from '@ui-core/react';
+import { Suspense, lazy, useMemo, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { AppLayout, Button, useModal, useTheme, AIToggle, useAILayerMenu } from '@ui-core/react';
 import type { SidebarItem } from '@ui-core/react';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleBasedRoute } from './components/RoleBasedRoute';
 import { useLogout, useUserRole } from '@hooks/use-auth';
+import { useExecutionAuditRuns, fetchExecutionAuditSteps } from '@hooks/use-execution-audit';
+import { useChatOps } from '@hooks/use-chatops';
+import { getApiContext } from '@api-sdk/core';
 import type { TenantRole } from '@core/tenancy';
-import { createSafeNavigate } from './utils';
+import { createSafeNavigate, logError, logWarn, logInfo } from './utils';
+import { maskPII } from '@core/pii-utils';
 
 // 핵심 페이지는 즉시 로드 (초기 로딩 속도)
 import { HomePage } from './pages/HomePage';
@@ -44,6 +49,7 @@ function AppContent() {
   useTheme({ mode: 'auto' });
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용 (일관성)
   const safeNavigate = useMemo(
     () => createSafeNavigate(navigate),
@@ -52,6 +58,231 @@ function AppContent() {
   const { showAlert } = useModal();
   const logout = useLogout();
   const { data: userRole } = useUserRole();
+  const aiLayerMenu = useAILayerMenu();
+
+  // ChatOps Hook (챗봇.md 참조)
+  const chatOpsMutation = useChatOps();
+
+  // Execution Audit 데이터 로드 (액티비티.md 10.1 참조)
+  const executionAuditQuery = useExecutionAuditRuns(
+    aiLayerMenu.executionAuditFilters,
+    aiLayerMenu.executionAuditNextCursor
+  );
+
+  // Execution Audit 데이터를 useAILayerMenu 상태에 동기화
+  useEffect(() => {
+    if (!executionAuditQuery.data) {
+      return;
+    }
+
+    const isAdditionalLoad = !!aiLayerMenu.executionAuditNextCursor;
+
+    if (isAdditionalLoad) {
+      // 추가 로드: 기존 데이터에 추가
+      aiLayerMenu.setExecutionAuditRuns([
+        ...aiLayerMenu.executionAuditRuns,
+        ...executionAuditQuery.data.items,
+      ]);
+    } else {
+      // 초기 로드: 데이터 교체
+      aiLayerMenu.setExecutionAuditRuns(executionAuditQuery.data.items);
+    }
+
+    aiLayerMenu.setExecutionAuditHasMore(executionAuditQuery.data.has_more);
+    aiLayerMenu.setExecutionAuditNextCursor(executionAuditQuery.data.next_cursor);
+    aiLayerMenu.setExecutionAuditLoading(false);
+  }, [executionAuditQuery.data, aiLayerMenu]);
+
+  // Execution Audit 로딩 상태 동기화
+  useEffect(() => {
+    aiLayerMenu.setExecutionAuditLoading(executionAuditQuery.isLoading);
+  }, [executionAuditQuery.isLoading, aiLayerMenu]);
+
+  // Execution Audit Steps 로딩 상태 감지 및 실제 API 호출 (액티비티.md 10.2 참조)
+  // AppLayout에서 onExecutionAuditLoadSteps 호출 시 로딩 상태만 설정하고,
+  // 여기서 실제 API 호출을 수행
+  useEffect(() => {
+    const loadingRunIds = Object.entries(aiLayerMenu.executionAuditStepsLoading)
+      .filter(([, loading]) => loading)
+      .map(([runId]) => runId);
+
+    if (loadingRunIds.length === 0) {
+      return;
+    }
+
+    // 중요: forEach 내부 async는 await를 지원하지 않으므로 Promise.all 사용
+    void Promise.all(
+      loadingRunIds.map(async (runId) => {
+        // 이미 Steps가 로드되어 있으면 스킵 (중복 호출 방지)
+        if (aiLayerMenu.executionAuditStepsByRunId[runId]?.length > 0) {
+          aiLayerMenu.setExecutionAuditStepsLoading(runId, false);
+          return;
+        }
+
+        try {
+          const context = getApiContext();
+          const tenantId = context.tenantId;
+          if (!tenantId) {
+            throw new Error('Tenant ID is required');
+          }
+
+          const response = await fetchExecutionAuditSteps(tenantId, runId);
+          aiLayerMenu.setExecutionAuditSteps(runId, response.items);
+        } catch (error) {
+          // P0: PII 마스킹 필수 (체크리스트.md 4. PII 마스킹)
+          const maskedError = maskPII(error);
+          logError('App:ExecutionAudit:LoadSteps', maskedError);
+        } finally {
+          aiLayerMenu.setExecutionAuditStepsLoading(runId, false);
+        }
+      })
+    );
+  }, [aiLayerMenu.executionAuditStepsLoading, aiLayerMenu]);
+
+  // Execution Audit 핸들러 구현 (액티비티.md 10.1, 10.2 참조)
+  // 참고: 현재는 AppLayout에서 직접 aiLayerMenu를 사용하므로 핸들러가 필요 없음
+  // 향후 필요시 핸들러를 추가할 수 있음
+
+  // ChatOps 핸들러 구현 (챗봇.md 참조)
+  const handleChatOpsSendMessage = useCallback(async (message: string) => {
+    if (!message || message.trim().length === 0) {
+      return;
+    }
+
+    try {
+      console.log('[ChatOps:Frontend] ===== 메시지 전송 시작 =====');
+      console.log('[ChatOps:Frontend] 사용자 메시지:', {
+        message_preview: message.substring(0, 100),
+        message_length: message.length,
+      });
+
+      // 사용자 메시지를 ChatOps 메시지로 추가
+      aiLayerMenu.addChatOpsMessage({
+        id: `user-${Date.now()}`,
+        type: 'user_message',
+        content: message,
+        timestamp: new Date(),
+      });
+
+      // 로딩 상태 설정
+      aiLayerMenu.setChatOpsLoading(true);
+
+      // ChatOps API 호출
+      console.log('[ChatOps:Frontend] API 호출 중...');
+      const response = await chatOpsMutation.mutateAsync(message);
+      console.log('[ChatOps:Frontend] API 응답 수신:', {
+        has_intent: !!response.intent,
+        intent_key: response.intent?.intent_key,
+        automation_level: response.intent?.automation_level,
+        has_l0_result: !!response.l0_result,
+        has_task_card: !!response.task_card_id,
+        task_card_id: response.task_card_id,
+        response_length: response.response.length,
+        response_preview: response.response.substring(0, 200), // 응답 내용 미리보기
+      });
+      // Intent가 없는 경우 상세 디버깅
+      if (!response.intent) {
+        console.warn('[ChatOps:Frontend] ⚠️ Intent가 파싱되지 않았습니다:', {
+          full_response: response,
+          response_text: response.response,
+        });
+      }
+
+      // TaskCard가 생성된 경우 (L1/L2 Intent)
+      if (response.task_card_id && response.intent) {
+        console.log('[ChatOps:Frontend] ✅ TaskCard 생성됨, task_created 메시지 추가:', {
+          task_card_id: response.task_card_id,
+          intent_key: response.intent.intent_key,
+          automation_level: response.intent.automation_level,
+        });
+
+        // TaskCard 목록 캐시 무효화 및 강제 리패치 (새로 생성된 TaskCard가 즉시 목록에 반영되도록)
+        const context = getApiContext();
+        const tenantId = context?.tenantId;
+        if (tenantId) {
+          // 캐시 무효화
+          await queryClient.invalidateQueries({ queryKey: ['student-task-cards', tenantId] });
+          // 강제 리패치 (즉시 최신 데이터 가져오기)
+          await queryClient.refetchQueries({ queryKey: ['student-task-cards', tenantId] });
+        }
+
+        // TaskCard 생성 메시지 추가
+        aiLayerMenu.addChatOpsMessage({
+          id: `task-created-${Date.now()}`,
+          type: 'task_created',
+          content: response.response,
+          timestamp: new Date(),
+          metadata: {
+            task_id: response.task_card_id,
+            intent_key: response.intent.intent_key,
+            automation_level: response.intent.automation_level,
+            params: response.intent.params,
+            // L2-B Intent는 Domain Action Catalog 미등록 시 L1로 강등됨 (챗봇.md 7.1.1 참조)
+            is_downgraded_from_l2b: response.intent.automation_level === 'L2' &&
+                                    response.intent.execution_class === 'B',
+            // execution_class는 metadata 타입에 없지만 실제로 사용되므로 타입 단언 사용
+            ...(response.intent.execution_class && { execution_class: response.intent.execution_class }),
+          } as Record<string, unknown>,
+        });
+      } else {
+        // 일반 응답 메시지 (L0 Intent 또는 TaskCard 생성 실패)
+        console.log('[ChatOps:Frontend] 일반 응답 메시지 처리:', {
+          is_l0: response.intent?.automation_level === 'L0',
+          has_l0_result: !!response.l0_result,
+          task_card_missing: !response.task_card_id,
+        });
+        // ⚠️ 중요: L0 실행 결과는 metadata.l0_result로만 전달
+        // messageContent에는 추가하지 않음 (ChatOpsPanel에서 별도로 표시)
+        const messageContent = response.response;
+
+        aiLayerMenu.addChatOpsMessage({
+          id: `assistant-${Date.now()}`,
+          type: 'assistant_message',
+          content: messageContent,
+          timestamp: new Date(),
+          metadata: response.intent ? {
+            intent_key: response.intent.intent_key,
+            automation_level: response.intent.automation_level,
+            params: response.intent.params,
+            l0_result: response.l0_result, // L0 실행 결과 포함
+          } : undefined,
+        });
+      }
+      console.log('[ChatOps:Frontend] ===== 메시지 처리 완료 =====');
+    } catch (error) {
+      console.error('[ChatOps:Frontend] ❌ 에러 발생:', error);
+      // P0: PII 마스킹 필수 (체크리스트.md 4. PII 마스킹)
+      // error 객체는 PII가 포함될 수 있으므로 마스킹 필요
+      const maskedError = maskPII(error);
+      logError('App:ChatOps:SendMessage', maskedError);
+
+      // 에러 메시지 추가
+      // P0: 사용자에게 표시되는 에러 메시지도 PII 마스킹 적용
+      let errorMessage = '메시지 전송에 실패했습니다.';
+      if (error instanceof Error) {
+        // 에러 타입별 사용자 친화적 메시지
+        if (error.message.includes('AI 기능이 비활성화')) {
+          errorMessage = 'AI 기능이 비활성화되어 있습니다. 설정에서 활성화해주세요.';
+        } else if (error.message.includes('인증이 필요')) {
+          errorMessage = '인증이 필요합니다. 다시 로그인해주세요.';
+        } else if (error.message.includes('네트워크') || error.message.includes('fetch')) {
+          errorMessage = '네트워크 오류가 발생했습니다. 연결을 확인하고 다시 시도해주세요.';
+        } else {
+          const maskedErrorMessage = maskPII(error.message);
+          errorMessage = typeof maskedErrorMessage === 'string' ? maskedErrorMessage : '메시지 전송에 실패했습니다.';
+        }
+      }
+
+      aiLayerMenu.addChatOpsMessage({
+        id: `error-${Date.now()}`,
+        type: 'assistant_message',
+        content: errorMessage,
+        timestamp: new Date(),
+      });
+    } finally {
+      aiLayerMenu.setChatOpsLoading(false);
+    }
+  }, [aiLayerMenu, chatOpsMutation, queryClient]);
 
   // Location 변경 추적 (필요시 디버깅용으로 활성화)
   // useEffect(() => {
@@ -288,13 +519,17 @@ function AppContent() {
   const sidebarItems = getSidebarItemsForRole(userRole as TenantRole | undefined);
 
   const handleSidebarItemClick = (item: SidebarItem) => {
-    console.log('[App.tsx] handleSidebarItemClick called:', {
+    // P0: PII 마스킹 필수 (체크리스트.md 4. PII 마스킹)
+    // 개발 환경에서도 PII 마스킹 적용
+    const logData = {
       itemId: item.id,
       itemPath: item.path,
       currentPath: location.pathname,
       isAdvanced: item.isAdvanced,
       hasChildren: !!item.children,
-    });
+    };
+    const maskedLogData = maskPII(logData);
+    logInfo('App:Sidebar:ItemClick', 'handleSidebarItemClick called', maskedLogData);
 
     // Advanced 메뉴는 Sidebar 컴포넌트에서 펼치기/접기 처리하므로 여기서는 무시
     if (item.isAdvanced && item.children && item.children.length > 0) {
@@ -304,11 +539,15 @@ function AppContent() {
     // 일반 메뉴 클릭 시 경로 이동
     // [P0-2 수정] SSOT: safeNavigate 사용 (일관성, 내부적으로 isSafeInternalPath 검증)
     if (item.path) {
-      console.log('[App.tsx] Navigating to:', item.path);
+      // P0: item.path는 내부 경로이므로 PII 마스킹 불필요하지만 일관성을 위해 적용
+      const maskedPath = maskPII(item.path);
+      logInfo('App:Sidebar:Navigate', 'Navigating to', maskedPath);
       safeNavigate(item.path);
-      console.log('[App.tsx] Navigate called, new path should be:', item.path);
+      logInfo('App:Sidebar:Navigate', 'Navigate called, new path should be', maskedPath);
     } else {
-      console.warn('[App.tsx] Sidebar item has no path:', item);
+      // P0: PII 마스킹 필수
+      const maskedItem = maskPII(item);
+      logWarn('App:Sidebar:NoPath', 'Sidebar item has no path', maskedItem);
     }
   };
 
@@ -342,6 +581,14 @@ function AppContent() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
                     <AIToggle />
                     <Button
+                      variant={aiLayerMenu.isOpen ? 'solid' : 'outline'}
+                      size="sm"
+                      onClick={aiLayerMenu.toggle}
+                      aria-label="AI 대화창 열기/닫기"
+                    >
+                      <div>💬</div> AI
+                    </Button>
+                    <Button
                       variant="outline"
                       size="sm"
                       onClick={handleLogout}
@@ -356,6 +603,7 @@ function AppContent() {
                 currentPath: location.pathname,
                 onItemClick: handleSidebarItemClick,
               }}
+              onChatOpsSendMessage={handleChatOpsSendMessage}
             >
               <Routes>
                 <Route path="/home" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><HomePage /></RoleBasedRoute>} />
