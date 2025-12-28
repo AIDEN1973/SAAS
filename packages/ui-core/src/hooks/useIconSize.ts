@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo } from 'react';
 
 /**
  * CSS 변수에서 아이콘 크기를 읽어오는 커스텀 훅
@@ -14,65 +14,27 @@ import { useMemo, useEffect, useState } from 'react';
  * ```
  */
 export function useIconSize(cssVarName: string = '--size-icon-base', fallback: number = 16): number {
-  const [size, setSize] = useState(fallback);
-
-  useEffect(() => {
+  return useMemo(() => {
     if (typeof window !== 'undefined') {
-      // CSS가 로드된 후에 CSS 변수를 읽도록 지연
-      const readCSSVar = () => {
-        const value = getComputedStyle(document.documentElement)
-          .getPropertyValue(cssVarName)
-          .trim();
+      const value = getComputedStyle(document.documentElement)
+        .getPropertyValue(cssVarName)
+        .trim();
 
-        if (value) {
-          // rem 단위를 px로 변환 (기본값 16px = 1rem)
-          if (value.endsWith('rem')) {
-            setSize(parseFloat(value) * 16);
-            return;
-          }
-          // px 단위인 경우
-          if (value.endsWith('px')) {
-            setSize(parseFloat(value));
-            return;
-          }
-          // 단위가 없는 경우 숫자로 변환
-          const numValue = Number(value);
-          if (!isNaN(numValue)) {
-            setSize(numValue);
-            return;
-          }
+      if (value) {
+        // rem 단위를 px로 변환 (기본값 16px = 1rem)
+        if (value.endsWith('rem')) {
+          return parseFloat(value) * 16;
         }
-        setSize(fallback);
-      };
-
-      // 즉시 시도
-      readCSSVar();
-
-      // CSS가 로드될 때까지 대기 (최대 1초)
-      const timeout = setTimeout(() => {
-        readCSSVar();
-      }, 100);
-
-      // CSS 파일 로드 이벤트 리스너
-      const checkCSSLoaded = () => {
-        readCSSVar();
-      };
-
-      // 모든 스타일시트가 로드되었는지 확인
-      if (document.readyState === 'complete') {
-        readCSSVar();
-      } else {
-        window.addEventListener('load', checkCSSLoaded);
+        // px 단위인 경우
+        if (value.endsWith('px')) {
+          return parseFloat(value);
+        }
+        // 단위가 없는 경우 숫자로 변환
+        return Number(value) || fallback;
       }
-
-      return () => {
-        clearTimeout(timeout);
-        window.removeEventListener('load', checkCSSLoaded);
-      };
     }
+    return fallback;
   }, [cssVarName, fallback]);
-
-  return size;
 }
 
 /**
@@ -89,51 +51,14 @@ export function useIconSize(cssVarName: string = '--size-icon-base', fallback: n
  * ```
  */
 export function useIconStrokeWidth(cssVarName: string = '--stroke-width-icon', fallback: number = 1.5): number {
-  const [strokeWidth, setStrokeWidth] = useState(fallback);
-
-  useEffect(() => {
+  return useMemo(() => {
     if (typeof window !== 'undefined') {
-      // CSS가 로드된 후에 CSS 변수를 읽도록 지연
-      const readCSSVar = () => {
-        const value = getComputedStyle(document.documentElement)
-          .getPropertyValue(cssVarName)
-          .trim();
-        if (value) {
-          const numValue = Number(value);
-          if (!isNaN(numValue)) {
-            setStrokeWidth(numValue);
-            return;
-          }
-        }
-        setStrokeWidth(fallback);
-      };
-
-      // 즉시 시도
-      readCSSVar();
-
-      // CSS가 로드될 때까지 대기
-      const timeout = setTimeout(() => {
-        readCSSVar();
-      }, 100);
-
-      // CSS 파일 로드 이벤트 리스너
-      const checkCSSLoaded = () => {
-        readCSSVar();
-      };
-
-      if (document.readyState === 'complete') {
-        readCSSVar();
-      } else {
-        window.addEventListener('load', checkCSSLoaded);
-      }
-
-      return () => {
-        clearTimeout(timeout);
-        window.removeEventListener('load', checkCSSLoaded);
-      };
+      const value = getComputedStyle(document.documentElement)
+        .getPropertyValue(cssVarName)
+        .trim();
+      return value ? Number(value) : fallback;
     }
+    return fallback;
   }, [cssVarName, fallback]);
-
-  return strokeWidth;
 }
 
