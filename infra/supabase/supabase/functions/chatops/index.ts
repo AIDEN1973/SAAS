@@ -138,6 +138,15 @@ serve(async (req: Request) => {
 
     const tenantKey = await tenantLogKey(tenant_id);
 
+    // 성능 최적화: industry_type 조회 (한 번만)
+    const { data: tenantData } = await supabaseSvc
+      .from('tenants')
+      .select('industry_type')
+      .eq('id', tenant_id)
+      .single();
+    
+    const industryType = tenantData?.industry_type || 'academy';
+
     // 요청 파싱
     const body: ChatOpsRequest = await req.json();
     const { session_id, message } = body;
@@ -159,29 +168,20 @@ serve(async (req: Request) => {
       tenant: tenantKey,
     });
 
-    // 세션 조회 또는 생성
-    const { data: existingSession } = await supabaseSvc
-        .from('chatops_sessions')
-      .select('id, summary')
-        .eq('id', session_id)
-        .eq('tenant_id', requireTenantScope(tenant_id))
-        .maybeSingle();
-
-    if (!existingSession) {
-      console.log('[ChatOps] 새 세션 생성 시작');
-      await supabaseSvc.from('chatops_sessions').insert({
-            id: session_id,
-            tenant_id: requireTenantScope(tenant_id),
-            user_id: user_id,
-            summary: null,
+    // 성능 최적화: 세션 upsert (조회 없이 생성/업데이트)
+    await supabaseSvc
+      .from('chatops_sessions')
+      .upsert({
+        id: session_id,
+        tenant_id: requireTenantScope(tenant_id),
+        user_id: user_id,
+        summary: null,
+      }, {
+        onConflict: 'id',
+        ignoreDuplicates: true,  // 기존 세션은 업데이트하지 않음
       });
-      console.log('[ChatOps] 새 세션 생성 성공:', { session_id: session_id.substring(0, 8) + '...' });
-    } else {
-      console.log('[ChatOps] 기존 세션 조회 성공:', {
-          session_id: session_id.substring(0, 8) + '...',
-        has_summary: !!existingSession.summary,
-      });
-    }
+    
+    console.log('[ChatOps] 세션 준비 완료:', { session_id: session_id.substring(0, 8) + '...' });
 
     // 대화 히스토리 조회 (최근 6개로 제한 - 응답 시간 최적화)
     const { data: recentMessages } = await supabaseSvc
@@ -208,11 +208,12 @@ serve(async (req: Request) => {
       message,
       conversationHistory,
       {
-              tenant_id: requireTenantScope(tenant_id),
-              user_id: user_id,
+        tenant_id: requireTenantScope(tenant_id),
+        user_id: user_id,
         session_id: session_id,
-              supabase: supabaseSvc,
+        supabase: supabaseSvc,
         openai_api_key: openaiApiKey,
+        industry_type: industryType,  // 성능 최적화: industry_type 전달
       },
       3 // maxIterations (5→3 감소: 응답 시간 최적화)
     );

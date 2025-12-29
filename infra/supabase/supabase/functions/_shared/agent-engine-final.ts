@@ -61,6 +61,7 @@ export interface AgentContext {
   supabase: any;
   openai_api_key: string;
   _tableCache?: Map<string, string>;  // P2-8: 테이블명 캐시
+  industry_type?: string;  // 성능 최적화: industry_type 캐시 (DB 조회 감소)
 }
 
 export interface AgentResponse {
@@ -199,7 +200,9 @@ async function executeTool(
  */
 
 /**
- * P2-8: 캐시된 테이블명 조회 헬퍼
+ * P2-8: 캐시된 테이블명 조회 헬퍼 (성능 최적화)
+ * 
+ * 성능 개선: context.industry_type이 있으면 DB 조회 없이 바로 매핑
  */
 async function getCachedTableName(
   context: AgentContext,
@@ -216,13 +219,23 @@ async function getCachedTableName(
     return context._tableCache.get(cacheKey)!;
   }
 
-  // 조회 + 캐시 저장
-  const tableName = await getTenantTableName(
-    context.supabase,
-    context.tenant_id,
-    entityType
-  );
+  // 성능 최적화: industry_type이 context에 있으면 DB 조회 생략
+  let tableName: string | null = null;
+  
+  if (context.industry_type) {
+    // industry_type이 있으면 직접 매핑 (DB 조회 불필요)
+    const { getIndustryTableName } = await import('./industry-adapter.ts');
+    tableName = getIndustryTableName(context.industry_type, entityType);
+  } else {
+    // fallback: 기존 방식 (DB 조회)
+    tableName = await getTenantTableName(
+      context.supabase,
+      context.tenant_id,
+      entityType
+    );
+  }
 
+  // 캐시 저장
   if (tableName) {
     context._tableCache.set(cacheKey, tableName);
   }
@@ -364,22 +377,15 @@ async function executeManageStudent(
       }
 
       // persons 테이블과 업종별 학생 테이블 JOIN
+      // 성능 최적화: 단순 조회는 필수 필드만 SELECT
+      const isSimpleQuery = action === 'search' && !email && !address;
+      const selectFields = isSimpleQuery
+        ? `person_id, status, class_name, persons!inner (id, name, phone)`
+        : `person_id, status, class_name, grade, school_name, persons!inner (id, name, phone, email, address)`;
+      
       let query = context.supabase
         .from(studentTable)
-        .select(`
-          person_id,
-          status,
-          class_name,
-          grade,
-          school_name,
-          persons!inner (
-            id,
-            name,
-            phone,
-            email,
-            address
-          )
-        `)
+        .select(selectFields)
         .eq('tenant_id', requireTenantScope(context.tenant_id));
 
       if (student_id) {
