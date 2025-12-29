@@ -1429,11 +1429,33 @@ export async function runAgent(
 - 사용자가 "취소/아니/중단" → cancel_action 호출 (draft_id 포함)
 - 동의/취소가 아닌 추가 정보 제공(날짜/전화/생년월일) → 해당 manage_* 재호출로 Draft 업데이트
 
+**[Tool 선택 규칙]**
+- 학생 이름 언급 → manage_student (조회/등록/수정/휴원/복귀/퇴원/반변경)
+- "전화번호", "정보", "프로필" → manage_student의 action: 'search' 또는 'get_profile'
+- "지각", "결석", "출석", "출결" → query_attendance (조회) 또는 manage_attendance (관리)
+- "메시지", "문자", "알림", "공지" → query_message (이력) / send_message (발송) / draft_message (초안)
+- "수납", "청구", "연체", "미수금", "입금" → query_billing (조회) 또는 manage_billing (처리)
+- "반 목록", "반 명단", "학생 명단" → query_class
+- "통계", "현황", "요약", "대시보드" → get_report
+
 **[학생 관련 규칙]**
-- 학생 이름이 언급되면 무조건 manage_student 호출 (조회/등록/수정/휴원/복귀/퇴원/반변경)
-- "학생 이름 + 전화번호/정보" 질문 → action: 'search' 또는 'get_profile'로 manage_student 호출
 - 필수(등록): 이름, 전화번호, 생년월일
 - 동명이인/식별 불가 시: 전화번호 뒷자리 4자리 또는 생년월일(YYYY-MM-DD) 중 하나를 요청한다.
+
+**[출결 관련 규칙]**
+- "오늘 지각", "결석자" → query_attendance (type: 'late' 또는 'absent')
+- "마이콜 출석" → query_attendance (type: 'by_student', student_name: '마이콜')
+- "결석자에게 알림" → manage_attendance (action: 'notify_absent')
+
+**[메시지 관련 규칙]**
+- "어제 보낸 메시지" → query_message (type: 'sent_log', date: 어제)
+- "마이콜에게 메시지" → send_message (type: 'single', recipient: '마이콜')
+- "공지 초안" → draft_message (type: 'general')
+
+**[수납 관련 규칙]**
+- "연체자", "연체 목록" → query_billing (type: 'overdue_list')
+- "마이콜 수납 내역" → query_billing (type: 'by_student', student_name: '마이콜')
+- "청구서 발행" → manage_billing (action: 'issue_invoice')
 
 **[형식/정규화]**
 - 날짜 입력이 YYYY.MM.DD 또는 YYYY/MM/DD이면 YYYY-MM-DD로 변환해 Tool args에 넣는다.

@@ -111,7 +111,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'query_attendance',
-      description: '출결 조회',
+      description: '출결 기록 조회. 지각/결석/미체크 학생 확인, 특정 반이나 학생의 출결 현황 조회. "오늘 지각", "결석자", "마이콜 출석" 등의 질문에 사용.',
       parameters: {
         type: 'object',
         properties: {
@@ -151,7 +151,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'manage_attendance',
-      description: '출결 관리',
+      description: '출결 관리 작업. 결석/지각 학부모 알림, 사유 요청, 출결 정정, 일괄 수정 등. "결석자에게 알림", "출석 정정" 등의 요청에 사용.',
       parameters: {
         type: 'object',
         properties: {
@@ -193,7 +193,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'query_message',
-      description: '메시지 조회',
+      description: '발송한 메시지 이력 조회. 발송 성공/실패 로그, 특정 날짜나 학생에게 보낸 메시지 확인. "어제 보낸 메시지", "발송 실패" 등의 질문에 사용.',
       parameters: {
         type: 'object',
         properties: {
@@ -227,7 +227,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'send_message',
-      description: '메시지 발송',
+      description: '메시지 발송 실행. 개별/일괄/예약 발송, 실패 메시지 재발송, 예약 취소. "마이콜에게 메시지 보내", "전체 공지" 등의 요청에 사용.',
       parameters: {
         type: 'object',
         properties: {
@@ -272,7 +272,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'draft_message',
-      description: '메시지 초안 작성',
+      description: '메시지 초안 작성 및 미리보기. 일반 공지, 결석 안내, 연체 안내 초안 생성. "결석 안내 초안 작성", "공지 메시지 만들어" 등의 요청에 사용.',
       parameters: {
         type: 'object',
         properties: {
@@ -306,7 +306,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'query_billing',
-      description: '수납 조회',
+      description: '수납 내역 조회. 연체 목록, 청구서 상태, 미발행 청구서, 학생별 수납 현황 확인. "연체자", "마이콜 수납 내역", "이번 달 미수금" 등의 질문에 사용.',
       parameters: {
         type: 'object',
         properties: {
@@ -341,7 +341,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'manage_billing',
-      description: '수납 처리',
+      description: '수납 관리 작업. 청구서 발행, 결제 링크 발송, 연체 안내 예약, 수동 입금 기록. "청구서 발행", "결제 링크 보내", "입금 확인" 등의 요청에 사용.',
       parameters: {
         type: 'object',
         properties: {
@@ -380,7 +380,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'query_class',
-      description: '반 조회',
+      description: '반 정보 조회. 전체 반 목록, 특정 반의 학생 명단 확인. "반 목록", "마이콜 반 명단", "초등 1반 학생들" 등의 질문에 사용.',
       parameters: {
         type: 'object',
         properties: {
@@ -409,7 +409,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'get_report',
-      description: '리포트 조회',
+      description: '통계 리포트 조회. 대시보드 KPI, 출결 요약, 수납 요약 등 집계 데이터 확인. "오늘 통계", "이번 달 출석률", "수납 현황" 등의 질문에 사용.',
       parameters: {
         type: 'object',
         properties: {
@@ -440,7 +440,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'confirm_action',
-      description: '대기 중인 작업 실행 확인',
+      description: '사용자가 "네/예/확인/실행/진행/좋아/응" 등으로 동의했을 때 대기 중인 Draft 작업을 실행. 반드시 사용자의 명시적 동의 후에만 호출.',
       parameters: {
         type: 'object',
         properties: {
@@ -456,7 +456,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'cancel_action',
-      description: '대기 중인 작업 취소',
+      description: '사용자가 "아니/취소/중단/그만/안해" 등으로 거부했을 때 대기 중인 Draft 작업을 취소. 사용자가 명시적으로 취소 의사를 밝혔을 때만 호출.',
       parameters: {
         type: 'object',
         properties: {
@@ -471,16 +471,24 @@ export const AGENT_TOOLS: AgentTool[] = [
 ];
 
 /**
+ * Tool 사용 가이드 (참고용)
+ * 
+ * 1. manage_student: 학생 이름이 언급되면 무조건 사용
+ * 2. query_attendance: "오늘 지각", "결석자", "출석 확인" 등
+ * 3. manage_attendance: "결석자에게 알림", "출석 정정" 등
+ * 4. query_message: "어제 보낸 메시지", "발송 실패" 등
+ * 5. send_message: "메시지 보내", "공지" 등
+ * 6. draft_message: "초안 작성", "메시지 만들어" 등
+ * 7. query_billing: "연체자", "수납 내역", "미수금" 등
+ * 8. manage_billing: "청구서 발행", "결제 링크", "입금 확인" 등
+ * 9. query_class: "반 목록", "반 명단" 등
+ * 10. get_report: "통계", "현황", "요약" 등
+ * 11. confirm_action: 사용자 동의 시에만
+ * 12. cancel_action: 사용자 거부 시에만
+ */
+
+/**
  * Tool 이름으로 Tool 정의 조회
  */
 export function getToolByName(toolName: string): AgentTool | undefined {
-  return AGENT_TOOLS.find(tool => tool.function.name === toolName);
-}
-
-/**
- * Tool 이름 목록
- */
-export function getToolNames(): string[] {
-  return AGENT_TOOLS.map(tool => tool.function.name);
-}
-
+  return AGENT_TOOLS.fin
