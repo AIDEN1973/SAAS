@@ -65,26 +65,43 @@ function validatePlan(plan: unknown): plan is SuggestedActionChatOpsPlanV1 {
 }
 ```
 
-**부족한 부분:**
-- ❌ Apply 입력 스키마 강제 검증 게이트 없음
-  - 현재: Handler 내부에서만 검증, Apply 진입 전 스키마 게이트 없음
-- ❌ Query→ID 해소(Resolve) 없으면 Apply 진입 금지 로직 없음
-  - 현재: `normalizeParams`에서 name→student_id 변환은 있으나, 명시적인 Resolver Gate 없음
+**✅ 구현 완료 (2025-01-29 업데이트):**
+- ✅ Apply 입력 스키마 강제 검증 게이트 구현 완료
+  - 위치: `chatops/index.ts:1282-1327` - UUID 필드 검증
+  - `student.exec.*` Intent 특정 검증 포함
+- ✅ Query→ID 해소(Resolve) 실패 시 Apply 진입 금지 구현 완료
+  - 위치: `chatops/index.ts:626-646` - `_resolve_failed` 검증 게이트
+  - Resolver 실패 시 400 에러 반환, Apply 단계 진입 차단
 
-#### B. Resolver Gate (부분 구현)
+#### B. Resolver Gate (✅ 완전 구현)
 
 **구현 위치:**
-- `infra/supabase/supabase/functions/chatops/index.ts` - `extractIntentCandidates()` 함수
+- `infra/supabase/supabase/functions/_shared/normalize-params.ts:117-184` - `resolveStudentIdByName()` 함수
+- `infra/supabase/supabase/functions/chatops/index.ts:626-680` - Resolver Gate 검증
+- `infra/supabase/supabase/functions/chatops/handlers/ux.ts:49-65` - 메시지 포맷팅
+- `packages/ui-core/src/components/ChatOpsPanel.tsx:347-391` - 후보 선택 UI
 
 **구현 내용:**
-- Registry의 `examples` 필드 기반 후보 추출
-- LLM이 후보 목록에서만 Intent 선택 (자유 생성 금지)
+- ✅ Registry의 `examples` 필드 기반 후보 추출
+- ✅ LLM이 후보 목록에서만 Intent 선택 (자유 생성 금지)
+- ✅ **persons 테이블 SSOT 검색**: Core Party 단일 테이블에서 `person_type='student'` 필터링
+- ✅ **다중 검색 전략**: 정확 일치 → 대소문자 무시 → 공백 제거 → 포함 검색
+- ✅ **3가지 결과 타입 처리**:
+  - `not_found`: "정확한 정보를 입력해주세요" 메시지 + 대화 계속
+  - `one`: student_id 자동 확정
+  - `many`: 후보 목록 표시 + 선택 UI (전화번호 끝 4자리 힌트 포함)
 
-**부족한 부분:**
-- ❌ 다중 후보 시 자동 중단 로직 없음
-  - 현재: LLM이 후보 목록에서 선택하지만, 다중 후보가 유사 점수일 때 자동 중단 없음
-- ❌ Query→ID 해소 없으면 Apply 진입 금지 로직 없음
-  - 현재: `normalizeParams`에서 name→student_id 변환은 있으나, 변환 실패 시에도 Apply 진행 가능
+**✅ 구현 완료 (2025-01-29 업데이트):**
+- ✅ 다중 후보 시 자동 중단 로직 구현 완료
+  - 위치: `chatops/index.ts:648-680` - `_resolve_ambiguous` 검증
+  - 후보 선택 UI 표시, Apply 단계 진입 차단
+- ✅ Query→ID 해소 실패 시 Apply 진입 금지 구현 완료
+  - `normalize-params.ts:235-255` - `attachResolveFailed()` / `attachResolveAmbiguous()` 호출
+  - 다음 단계 진입 완전 차단
+- ✅ **대화형 식별 완성 장치**로 작동
+  - 사용자 관점: "막기"가 아니라 "추가 정보 요청" 또는 "후보 선택"
+  - L0 식별 Confirm: Domain Gate의 `need_more` 규칙 (`chatops/handlers/domain-gate.ts:23-147`)
+  - L2 실행 Confirm: 기존 Confirm 단계 유지
 
 #### C. Auth/Policy Gate (✅ 완전 구현)
 
@@ -164,15 +181,16 @@ if (existingAction) {
 
 ---
 
-### 2.2 ❌ 누락된 항목
+### 2.2 ✅ 구현 완료 항목 (2025-01-29 업데이트)
 
-#### 1. DB Contract Gate (CI 테스트)
+#### 1. DB Contract Gate (CI 테스트) - ✅ 구현 완료
 
-**현재 상태:**
-- ❌ 런타임 컬럼 존재 검사 없음
-- ❌ CI에서 PostgREST 대상 테이블 컬럼 존재 + smoke insert/select 테스트 없음
-- ❌ 마이그레이션 적용 여부 체크 없음
-- ❌ 서버 부팅 시 필수 컬럼/뷰 체크 없음
+**현재 상태 (2025-01-29):**
+- ✅ 런타임 컬럼 존재 검사 구현 완료 (`system-exec-run_healthcheck.ts:287-436`)
+- ✅ CI용 DB Contract 테스트 구현 완료 (`scripts/test-db-contract.ts`)
+- ✅ 마이그레이션 적용 여부 체크 구현 완료 (MIN_REQUIRED_VERSION = 136)
+- ✅ 서버 부팅 시 필수 컬럼/뷰 체크 구현 완료 (`chatops/index.ts:690-724`)
+- ⚠️ **CI/CD 파이프라인 자동 통합 필요** (`package.json`, `turbo.json`, `deploy.ps1/sh`)
 
 **필요한 구현:**
 ```typescript
@@ -201,11 +219,13 @@ describe('DB Contract Gate', () => {
 - 마이그레이션 누락/순서 꼬임 시 런타임 폭발
 - 컬럼 오류 (PGRST204) 발생 가능
 
-#### 2. Preflight 재조회
+#### 2. Preflight 재조회 - ✅ 구현 완료
 
-**현재 상태:**
-- ❌ Apply 직전 상태 재조회 없음
-- ❌ Handler 실행 전 대상 상태 재확인 없음
+**현재 상태 (2025-01-29):**
+- ✅ Apply 직전 상태 재조회 구현 완료 (`execute-task-card/index.ts:541-595`)
+- ✅ Worker 실행 전 대상 상태 재확인 구현 완료 (`worker-process-job/index.ts:68-115`)
+- ✅ 상태 변경 감지 (퇴원한 학생 등) - `CONTRACT_STATE_CHANGED` 에러 반환
+- ✅ 존재하지 않는 대상 감지 - `CONTRACT_TARGET_NOT_FOUND` 에러 반환
 
 **구현 위치:**
 - `infra/supabase/supabase/functions/execute-task-card/index.ts` - Handler 실행 전
@@ -261,25 +281,36 @@ if (plan.plan_snapshot?.targets?.kind === 'student_id_list') {
 - 예: 이미 퇴원한 학생에게 메시지 발송
 - 예: 이미 삭제된 학생 ID로 실행 시도
 
-#### 3. Draft ↔ 실행 대상 고정 토큰
+#### 3. Draft ↔ 실행 대상 고정 토큰 - ✅ 구현 완료
 
-**현재 상태:**
-- ❌ `draft_id`만 사용, 서버 서명 토큰 없음
-- ⚠️ 부분 구현: `draft_confirm` 시 `tenant_id`/`user_id` 검증은 있으나 `session_id` 검증 없음
-- 현재 코드: `infra/supabase/supabase/functions/chatops/index.ts:983-990`
+**현재 상태 (2025-01-29):**
+- ✅ `draft_id` + `session_id` 검증 구현 완료
+- ✅ `draft_confirm` 시 `tenant_id`/`user_id`/`session_id` 모두 검증
+- 구현 위치: `infra/supabase/supabase/functions/chatops/index.ts:1060-1070`
 
-**현재 구현:**
+**구현 완료 코드:**
 ```typescript
-// chatops/index.ts:983-990
+// chatops/index.ts:1060-1070
 const { data: draft } = await supabase
   .from('chatops_drafts')
   .select('*')
   .eq('id', draft_id)
   .eq('tenant_id', tenant_id)  // ✅ tenant_id 검증
   .eq('user_id', user_id)      // ✅ user_id 검증
+  .eq('session_id', session_id) // ✅ session_id 검증 추가 완료
   .eq('status', 'ready')
   .single();
-// ❌ session_id 검증 없음
+
+// ✅ 세션 불일치 시 CONTRACT_SESSION_MISMATCH 에러 반환
+if (!draft) {
+  return new Response(
+    JSON.stringify({
+      error: 'CONTRACT_SESSION_MISMATCH',
+      message: 'Draft 세션이 일치하지 않습니다.',
+    }),
+    { status: 403 }
+  );
+}
 ```
 
 **필요한 구현:**
@@ -495,11 +526,12 @@ CREATE TABLE job_executions (
 - 장애 시 재실행/복구 불가
 - 계약 붕괴 추적 불가
 
-#### 5. 계약 카테고리별 에러 태깅
+#### 5. 계약 카테고리별 에러 태깅 - ✅ 구현 완료
 
-**현재 상태:**
-- ❌ `error_code`는 있으나 계약 카테고리 분류 없음
-- ❌ `HandlerErrorCode` enum만 존재 (POLICY_DISABLED, EXECUTION_FAILED 등)
+**현재 상태 (2025-01-29):**
+- ✅ `ContractErrorCategory` enum 구현 완료 (`types.ts:119-130`)
+- ✅ Handler에서 계약 카테고리 태깅 구현 완료
+- ✅ 에러 반환 시 `contract_category` 필드 추가 완료
 
 **필요한 구현:**
 ```typescript
@@ -526,11 +558,12 @@ return {
 - 인텐트별 에러가 흩어져 원인 추적 어려움
 - 계약 레이어 수정으로 해결 가능한 문제를 인텐트별로 수정해야 함
 
-#### 6. 부분 성공 처리 모델
+#### 6. 부분 성공 처리 모델 - ✅ 구현 완료
 
-**현재 상태:**
+**현재 상태 (2025-01-29):**
 - ✅ Handler에서 `status: 'partial'` 반환 가능
-- ❌ 결과 모델에 성공/실패 리스트 포함 구조 없음
+- ✅ 결과 모델에 성공/실패 리스트 포함 구조 구현 완료 (`types.ts:69-76`)
+- ✅ `success_list`, `failure_list` 필드 추가 완료
 
 **필요한 구현:**
 ```typescript
@@ -1289,22 +1322,29 @@ CREATE INDEX idx_job_executions_created_at ON job_executions(created_at);
    - Worker 아키텍처 구축 (`job_executions` 테이블, Worker 프로세스)
    - 다중 대상 처리 전략 문서화 (`docu/핸들러 구현.md`)
 
-### 6.4 구현 현황 요약
+### 6.4 구현 현황 요약 (2025-01-29 업데이트)
 
-| 게이트 | 구현 상태 | 완성도 | 우선순위 |
-|--------|----------|--------|----------|
-| Schema Gate | 부분 구현 | 60% | P0 |
-| Resolver Gate | 부분 구현 | 50% | P0 |
-| Auth/Policy Gate | 완전 구현 | 100% | - |
-| DB Contract Gate | 완전 구현 | 100% | P0 |
-| Idempotency Gate | 완전 구현 | 100% | - |
-| Preflight 재조회 | 완전 구현 | 100% | P0 |
-| 세션 혼선 방지 | 완전 구현 | 100% | P0 |
-| 계약 에러 태깅 | 완전 구현 | 100% | P1 |
-| 부분 성공 모델 | 완전 구현 | 100% | P1 |
-| 실행 스냅샷 | 완전 구현 | 100% | P1 |
-| Outbox 패턴 | 완전 구현 | 100% | P2 |
-| Worker 아키텍처 | 완전 구현 | 95% | P1 |
+| 게이트 | 구현 상태 | 완성도 | 우선순위 | 비고 |
+|--------|----------|--------|----------|------|
+| Schema Gate | ✅ 완전 구현 | 100% | - | UUID 검증, L2 특정 검증 완료 |
+| Resolver Gate | ✅ 완전 구현 | 100% | - | 대화형 식별 완성 장치, persons SSOT 검색 |
+| Auth/Policy Gate | ✅ 완전 구현 | 100% | - | - |
+| DB Contract Gate | ✅ 완전 구현 | 95% | P0 | CI/CD 파이프라인 통합 필요 |
+| Idempotency Gate | ✅ 완전 구현 | 100% | - | - |
+| Preflight 재조회 | ✅ 완전 구현 | 100% | - | Worker 실행 전 상태 재확인 포함 |
+| 세션 혼선 방지 | ✅ 완전 구현 | 100% | - | session_id 검증 완료 |
+| 계약 에러 태깅 | ✅ 완전 구현 | 100% | - | ContractErrorCategory 분류 체계 |
+| 부분 성공 모델 | ✅ 완전 구현 | 100% | - | success_list/failure_list 구조 |
+| 실행 스냅샷 | ✅ 완전 구현 | 100% | - | resolve_snapshot 저장 완료 |
+| Outbox 패턴 | ✅ 완전 구현 | 100% | - | message_outbox 테이블 활용 |
+| Worker 아키텍처 | ✅ 완전 구현 | 100% | - | job_executions, Worker 프로세스 완료 |
+
+**✅ 핵심 발견 (2025-01-29):**
+- 문서 작성 시점(2025-01-28)에 "부족한 부분"으로 지적된 항목들이 이미 구현 완료됨
+- Resolver Gate는 "차단 장치"가 아니라 "대화형 식별 완성 장치"로 작동 중
+- persons 테이블 SSOT 검색으로 "사람 → 학생" 흐름 구현 완료
+- L0 식별 Confirm (Domain Gate) + L2 실행 Confirm 모두 구현됨
+- 남은 작업: CI/CD 파이프라인 통합, Healthcheck UI 노출 등 인프라 작업
 
 ---
 
@@ -1524,11 +1564,12 @@ CREATE INDEX idx_job_executions_created_at ON job_executions(created_at);
 
 ---
 
-**문서 버전**: 1.7.0
-**최종 업데이트**: 2025-01-28
-**최종 검증 완료**: 2025-01-28 (5차 검증 - 전체 기능 구현 검증 완료)
+**문서 버전**: 1.8.0
+**최종 업데이트**: 2025-01-29
+**최종 검증 완료**: 2025-01-29 (6차 검증 - 실제 구현 상태 반영 완료)
 **Worker 아키텍처 통합**: 2025-01-28
 **구현 완료**: 2025-01-28
+**문서 동기화**: 2025-01-29 (실제 코드와 문서 불일치 해소)
 **검증 내용**:
 - ✅ 함수 위치 및 라인 번호 정확성 확인
   - `validatePlan()`: `execute-task-card/index.ts:82-125` ✅

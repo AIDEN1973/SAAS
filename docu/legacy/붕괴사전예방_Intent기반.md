@@ -191,13 +191,16 @@ const REQUIRED_TABLES: Record<string, string[]> = {
 - `infra/supabase/supabase/functions/execute-task-card/index.ts` - TaskCard 실행 Edge Function 부팅 시
 - `system.exec.run_healthcheck` Handler - 헬스체크 실행
 
-**실패 시 동작 원칙:**
+**실패 시 동작 원칙 (Fail-Open for Observability):**
 - ❌ 서비스 전체 다운 금지
-- ✅ ChatOps L2 실행만 비활성화
+- ✅ ChatOps L2 실행만 비활성화 (DEGRADED 모드)
 - ✅ L0/L1 조회는 가능하면 유지
 - ✅ UI/로그에 명확한 상태 표시
+- ✅ **마이그레이션 체크 실패 시**: `migration_check: skipped` 로그만 기록, 서비스 계속
+  - 예: `PGRST205: public.supabase_migrations.schema_migrations 없음` → 관측용 에러, 서비스 중단 안 함
+  - 실제 테이블 접근 가능 여부는 Layer C 런타임 검증에서 확인
 
-👉 **"조용히 깨진 상태로 운영"을 방지**
+👉 **"조용히 깨진 상태로 운영"을 방지하되, 관측 실패가 서비스를 중단시키지 않음**
 
 **현재 구현 상태:**
 - ✅ **부팅 시 자동 검증 구현 완료** (`chatops/index.ts:690-724`)
@@ -209,10 +212,17 @@ const REQUIRED_TABLES: Record<string, string[]> = {
   - Healthcheck 상태 반환 (`healthy` / `degraded` / `unhealthy`)
   - Policy 검증 구현됨
   - Domain Action Catalog 검증 구현됨
+  - **마이그레이션 체크 Fail-Open**: 실패 시 에러 로그만 기록, 서비스 계속 (`system-exec-run_healthcheck.ts:287-346`)
 - ✅ `system.query.health` L0 Handler 구현 완료
   - `runAllPreflightChecks()` 재사용
   - checks 파라미터 필터링 지원
   - 실제 헬스체크 로직 구현 완료
+
+**✅ 관측용 Healthcheck 원칙 (2025-01-29 명시):**
+- Healthcheck는 **관측(Observability)**을 위한 것이며, 실패가 ChatOps 기능 자체를 중단시키지 않음
+- 마이그레이션 테이블 접근 실패 (예: PGRST205) → `migration_check: skipped` 로그 + 서비스 계속
+- 실제 기능 테이블 접근 실패 → DEGRADED 모드 전환 (L2 실행만 차단, L0/L1 유지)
+- 핵심 원칙: **"관측 실패 ≠ 서비스 실패"**
 
 **구현 완료 사항:**
 ```typescript
@@ -299,6 +309,33 @@ async execute(plan, context): Promise<HandlerResult> {
   return {
     status: 'success',
     result: { health_status: healthStatus },
+  };
+}
+
+// checkLayerC 구현 (관측용 Fail-Open)
+export async function checkLayerC(supabase, tenantId): Promise<{ passed: boolean; errors?: string[] }> {
+  const errors: string[] = [];
+
+  // ✅ 마이그레이션 체크: 실패해도 서비스 계속 (관측용)
+  try {
+    const { data: migrationCheck } = await supabase
+      .from('supabase_migrations')
+      .select('version')
+      .limit(1);
+
+    if (!migrationCheck) {
+      errors.push('migration_check: skipped (table not found)');  // ✅ 로그만 기록
+    }
+  } catch (err) {
+    errors.push(`migration_check: error - ${err.message}`);  // ✅ 로그만 기록
+  }
+
+  // ✅ 실제 기능 테이블 체크: 실패 시 DEGRADED 모드 전환
+  // ... (핵심 테이블 접근 검증)
+
+  return {
+    passed: errors.length === 0,
+    errors: errors.length > 0 ? errors : undefined,
   };
 }
 ```
@@ -552,7 +589,11 @@ if (preflightResult.status === 'DB_CONTRACT_FAILED') {
 
 ---
 
-**문서 버전**: 1.0
-**최종 수정일**: 2025-01-28
+**문서 버전**: 1.1
+**최종 수정일**: 2025-01-29
 **관리자**: SAMDLE 개발팀
+**주요 업데이트 (v1.1)**:
+- Healthcheck 관측용(Observability) 원칙 명시
+- 마이그레이션 체크 Fail-Open 동작 명확화
+- "관측 실패 ≠ 서비스 실패" 원칙 추가
 

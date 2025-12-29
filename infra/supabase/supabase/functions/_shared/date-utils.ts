@@ -42,3 +42,16 @@ export function toKST(date?: Date | string): Date {
   return new Date(d.getTime() + kstOffset * 60 * 1000);
 }
 
+/**
+ * KST 기준 ISO 타임스탬프 생성
+ * P2-10: timestamp 컬럼용 함수 (YYYY-MM-DDTHH:MM:SS.sssZ 형식)
+ * @param date - Date 객체 또는 ISO 문자열 (선택, 기본값: 현재 시간)
+ * @returns KST 기준 ISO 타임스탬프 문자열
+ */
+export function toKSTISOString(date?: Date | string): string {
+  const d = date ? new Date(date) : new Date();
+  const kstOffset = 9 * 60;
+  const kstTime = new Date(d.getTime() + kstOffset * 60 * 1000);
+  return kstTime.toISOString();
+}
+
