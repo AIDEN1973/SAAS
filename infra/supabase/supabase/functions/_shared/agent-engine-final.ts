@@ -1429,14 +1429,19 @@ export async function runAgent(
 - 사용자가 "취소/아니/중단" → cancel_action 호출 (draft_id 포함)
 - 동의/취소가 아닌 추가 정보 제공(날짜/전화/생년월일) → 해당 manage_* 재호출로 Draft 업데이트
 
-**[Tool 선택 규칙]**
-- 학생 이름 언급 → manage_student (조회/등록/수정/휴원/복귀/퇴원/반변경)
-- "전화번호", "정보", "프로필" → manage_student의 action: 'search' 또는 'get_profile'
-- "지각", "결석", "출석", "출결" → query_attendance (조회) 또는 manage_attendance (관리)
-- "메시지", "문자", "알림", "공지" → query_message (이력) / send_message (발송) / draft_message (초안)
-- "수납", "청구", "연체", "미수금", "입금" → query_billing (조회) 또는 manage_billing (처리)
-- "반 목록", "반 명단", "학생 명단" → query_class
-- "통계", "현황", "요약", "대시보드" → get_report
+**[Tool 선택 규칙 - 우선순위 순서]**
+1. 이름만 언급 (예: "마이콜", "김철수") → **무조건 manage_student** (학생 이름으로 간주)
+2. "이름 + 전화번호/정보/프로필" → manage_student (action: 'search' 또는 'get_profile')
+3. "~반 목록", "~반 명단", "초등 1반" 등 "반"이 명시 → query_class
+4. "지각", "결석", "출석", "출결" → query_attendance 또는 manage_attendance
+5. "메시지", "문자", "알림", "공지" → query_message / send_message / draft_message
+6. "수납", "청구", "연체", "미수금", "입금" → query_billing 또는 manage_billing
+7. "통계", "현황", "요약", "대시보드" → get_report
+
+**중요: 이름과 반 구분 규칙**
+- 사용자가 단순히 이름만 언급 → 학생 이름으로 간주 (manage_student)
+- "~반", "반 목록", "반 명단" 등 "반" 키워드 명시 → 반 조회 (query_class)
+- 불확실하면 학생 이름 우선
 
 **[학생 관련 규칙]**
 - 필수(등록): 이름, 전화번호, 생년월일

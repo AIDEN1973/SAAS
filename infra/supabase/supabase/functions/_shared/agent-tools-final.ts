@@ -37,22 +37,22 @@ export const AGENT_TOOLS: AgentTool[] = [
           action: {
             type: 'string',
             enum: [
-              'search',           // student.query.search
-              'get_profile',      // student.query.profile
-              'register',         // student.exec.register
-              'update',           // student.exec.update_profile
-              'update_contact',   // student.exec.update_guardian_contact
-              'pause',            // student.exec.pause
-              'resume',           // student.exec.resume
-              'discharge',        // student.exec.discharge
-              'change_class',     // student.exec.change_class
-              'merge',            // student.exec.merge_duplicates
+              'search',           // student.query.search - 학생 이름으로 검색
+              'get_profile',      // student.query.profile - 학생 상세 정보 조회
+              'register',         // student.exec.register - 신규 학생 등록
+              'update',           // student.exec.update_profile - 학생 정보 수정
+              'update_contact',   // student.exec.update_guardian_contact - 연락처 수정
+              'pause',            // student.exec.pause - 휴원 처리
+              'resume',           // student.exec.resume - 복귀 처리
+              'discharge',        // student.exec.discharge - 퇴원 처리
+              'change_class',     // student.exec.change_class - 반 변경
+              'merge',            // student.exec.merge_duplicates - 중복 병합
             ],
-            description: '수행할 작업',
+            description: '수행할 작업. 학생 이름으로 전화번호나 정보를 조회할 때는 search 또는 get_profile 사용.',
           },
           student_name: {
             type: 'string',
-            description: '학생 이름',
+            description: '학생 이름 (예: "마이콜", "김철수"). 사용자가 언급한 이름이 학생 이름인지 반 이름인지 불확실하면 학생 이름으로 우선 처리.',
           },
           student_id: {
             type: 'string',
@@ -380,21 +380,21 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'query_class',
-      description: '반 정보 조회. 전체 반 목록, 특정 반의 학생 명단 확인. "반 목록", "마이콜 반 명단", "초등 1반 학생들" 등의 질문에 사용.',
+      description: '반 정보 조회. 전체 반 목록 또는 특정 반의 학생 명단 확인. 주의: 사용자가 "반 목록"이나 "~반 명단"처럼 명확히 반을 언급할 때만 사용. 단순히 이름만 언급하면 학생 이름으로 간주하고 manage_student 사용.',
       parameters: {
         type: 'object',
         properties: {
           type: {
             type: 'string',
             enum: [
-              'list',     // class.query.list
-              'roster',   // class.query.roster
+              'list',     // class.query.list - 전체 반 목록
+              'roster',   // class.query.roster - 특정 반의 학생 명단
             ],
-            description: '조회 유형',
+            description: '조회 유형. list: 전체 반 목록, roster: 특정 반의 학생 명단',
           },
           class_name: {
             type: 'string',
-            description: '반 이름 (roster 타입일 때)',
+            description: '반 이름 (roster 타입일 때만 필요). 예: "초등 1반", "중등 A반". 사용자가 "~반"이라고 명확히 언급한 경우에만 사용.',
           },
         },
         required: ['type'],
@@ -472,7 +472,7 @@ export const AGENT_TOOLS: AgentTool[] = [
 
 /**
  * Tool 사용 가이드 (참고용)
- * 
+ *
  * 1. manage_student: 학생 이름이 언급되면 무조건 사용
  * 2. query_attendance: "오늘 지각", "결석자", "출석 확인" 등
  * 3. manage_attendance: "결석자에게 알림", "출석 정정" 등
