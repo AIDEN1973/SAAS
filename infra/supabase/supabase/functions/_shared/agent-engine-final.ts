@@ -1430,7 +1430,8 @@ export async function runAgent(
 - 동의/취소가 아닌 추가 정보 제공(날짜/전화/생년월일) → 해당 manage_* 재호출로 Draft 업데이트
 
 **[학생 관련 규칙]**
-- 학생 등록/수정/휴원/복귀/퇴원/반변경 요청은 즉시 manage_student 호출
+- 학생 이름이 언급되면 무조건 manage_student 호출 (조회/등록/수정/휴원/복귀/퇴원/반변경)
+- "학생 이름 + 전화번호/정보" 질문 → action: 'search' 또는 'get_profile'로 manage_student 호출
 - 필수(등록): 이름, 전화번호, 생년월일
 - 동명이인/식별 불가 시: 전화번호 뒷자리 4자리 또는 생년월일(YYYY-MM-DD) 중 하나를 요청한다.
 

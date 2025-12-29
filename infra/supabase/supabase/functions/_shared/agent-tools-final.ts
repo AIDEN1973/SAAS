@@ -30,7 +30,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'manage_student',
-      description: '학생 관리',
+      description: '학생 검색, 정보 조회, 등록, 수정, 휴원, 복귀, 퇴원 등 학생 관련 모든 작업. 학생 이름으로 전화번호나 프로필을 조회할 때도 이 Tool을 사용.',
       parameters: {
         type: 'object',
         properties: {
