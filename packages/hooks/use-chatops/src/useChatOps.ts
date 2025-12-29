@@ -11,6 +11,8 @@
 import { useMutation } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { maskPII } from '@core/pii-utils';
+import { createClient } from '@lib/supabase-client';
+import { envClient } from '@env-registry/client';
 
 /**
  * ChatOps 요청 인터페이스
@@ -78,6 +80,112 @@ async function sendChatOpsMessage(
 }
 
 /**
+ * ChatOps Streaming 메시지 전송 함수
+ * SSE (Server-Sent Events) 기반
+ */
+export async function sendChatOpsMessageStreaming(
+  tenantId: string,
+  sessionId: string,
+  message: string,
+  onChunk: (chunk: string) => void,
+  onComplete: (fullResponse: string) => void,
+  onError: (error: string) => void
+): Promise<void> {
+  if (!tenantId) {
+    throw new Error('Tenant ID is required');
+  }
+
+  if (!sessionId || sessionId.trim().length === 0) {
+    throw new Error('Session ID is required');
+  }
+
+  if (!message || message.trim().length === 0) {
+    throw new Error('Message is required');
+  }
+
+  try {
+    // SSE를 위해 직접 fetch 사용
+    const supabase = createClient();
+    const context = getApiContext();
+
+    if (!context?.tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    // Supabase URL과 인증 토큰 가져오기
+    const supabaseUrl = envClient.NEXT_PUBLIC_SUPABASE_URL;
+    const { data: { session } } = await supabase.auth.getSession();
+    const authToken = session?.access_token;
+
+    if (!supabaseUrl) {
+      throw new Error('Supabase URL is not configured');
+    }
+
+    if (!authToken) {
+      throw new Error('Authentication token is required');
+    }
+
+    // SSE 엔드포인트 호출
+    const response = await fetch(`${supabaseUrl}/functions/v1/chatops-stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({
+        session_id: sessionId,
+        message: message.trim(),
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Response body is null');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+
+        try {
+          const data = JSON.parse(trimmed.slice(6));
+
+          if (data.type === 'content') {
+            onChunk(data.content);
+          } else if (data.type === 'done') {
+            onComplete(data.fullResponse);
+          } else if (data.type === 'error') {
+            onError(data.error);
+          }
+        } catch (e) {
+          console.error('[useChatOps] JSON 파싱 오류:', e);
+        }
+      }
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    onError(errorMessage);
+    throw error;
+  }
+}
+
+/**
  * useChatOps Hook
  *
  * ChatOps 메시지 전송을 위한 React Query Mutation Hook
@@ -98,4 +206,3 @@ export function useChatOps() {
     },
   });
 }
-
