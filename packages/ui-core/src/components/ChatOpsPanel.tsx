@@ -29,6 +29,7 @@ import { Card } from './Card';
 import { Input } from './Input';
 import { Badge } from './Badge';
 import { Spinner } from './Spinner';
+import { renderMarkdown } from '../utils/markdown-renderer';
 
 /**
  * 메시지 타입 (챗봇.md 7.1 참조)
@@ -66,6 +67,8 @@ export interface ChatOpsMessage {
     params?: Record<string, unknown>;
     l0_result?: unknown; // L0 Intent 실행 결과
     original_message?: string; // 원본 사용자 메시지 (필터링용)
+    isStreaming?: boolean; // 스트리밍 중 여부 (타이핑 커서 표시용)
+    hasError?: boolean; // 에러 발생 여부
   };
 }
 
@@ -539,7 +542,45 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
           {!isPlanPreview && !isDisambiguation && !isTaskCreated && !isApprovalRequested && !isExecutedSuccess && !isExecutedFailed && (
             <div style={{ color: isUser ? 'var(--color-white)' : 'var(--color-text)' }}>
               {typeof message.content === 'string' ? (
-                <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
+                <div
+                  style={{
+                    lineHeight: '1.6',
+                    wordBreak: 'break-word',
+                    fontFamily: isUser
+                      ? 'inherit'
+                      : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                  }}
+                >
+                  {isUser ? (
+                    <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
+                  ) : (
+                    <>
+                      {renderMarkdown(message.content)}
+                      {/* 타이핑 커서 (스트리밍 중) */}
+                      {message.metadata?.isStreaming && (
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            width: '2px',
+                            height: '1em',
+                            marginLeft: '2px',
+                            backgroundColor: 'var(--color-primary-500)',
+                            animation: 'blink 1s infinite',
+                            verticalAlign: 'text-bottom',
+                          }}
+                        />
+                      )}
+                      <style>
+                        {`
+                          @keyframes blink {
+                            0%, 49% { opacity: 1; }
+                            50%, 100% { opacity: 0; }
+                          }
+                        `}
+                      </style>
+                    </>
+                  )}
+                </div>
               ) : (
                 message.content
               )}

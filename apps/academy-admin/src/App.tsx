@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { Suspense, lazy, useMemo, useEffect, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   Button,
   useModal,
@@ -14,7 +13,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleBasedRoute } from './components/RoleBasedRoute';
 import { useLogout, useUserRole } from '@hooks/use-auth';
 import { useExecutionAuditRuns, fetchExecutionAuditSteps } from '@hooks/use-execution-audit';
-import { useChatOps } from '@hooks/use-chatops';
+import { sendChatOpsMessageStreaming } from '@hooks/use-chatops';
 import { getApiContext } from '@api-sdk/core';
 import type { TenantRole } from '@core/tenancy';
 import { createSafeNavigate, logError, logWarn, logInfo } from './utils';
@@ -59,7 +58,6 @@ function AppContent() {
   useTheme({ mode: 'auto' });
   const location = useLocation();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용 (일관성)
   const safeNavigate = useMemo(
     () => createSafeNavigate(navigate),
@@ -69,9 +67,6 @@ function AppContent() {
   const logout = useLogout();
   const { data: userRole } = useUserRole();
   const aiLayerMenu = useAILayerMenu();
-
-  // ChatOps Hook (챗봇.md 참조)
-  const chatOpsMutation = useChatOps();
 
   // Execution Audit 데이터 로드 (액티비티.md 10.1 참조)
   const executionAuditQuery = useExecutionAuditRuns(
@@ -154,13 +149,14 @@ function AppContent() {
   // 향후 필요시 핸들러를 추가할 수 있음
 
   // ChatOps 핸들러 구현 (챗봇.md 참조)
+  // ✅ 수정: 스트리밍 모드로 변경하여 응답 속도 개선
   const handleChatOpsSendMessage = useCallback(async (message: string) => {
     if (!message || message.trim().length === 0) {
       return;
     }
 
     try {
-      console.log('[ChatOps:Frontend] ===== 메시지 전송 시작 =====');
+      console.log('[ChatOps:Frontend] ===== 메시지 전송 시작 (스트리밍 모드) =====');
       console.log('[ChatOps:Frontend] 사용자 메시지:', {
         message_preview: message.substring(0, 100),
         message_length: message.length,
@@ -177,93 +173,86 @@ function AppContent() {
       // 로딩 상태 설정
       aiLayerMenu.setChatOpsLoading(true);
 
-      // ChatOps API 호출
+      // ChatOps API 호출 (스트리밍 모드)
       // session_id 가져오기 (새로고침 시에도 유지)
       const sessionId = getOrCreateChatOpsSessionId();
-      console.log('[ChatOps:Frontend] API 호출 중...', {
+      console.log('[ChatOps:Frontend] API 호출 중 (스트리밍)...', {
         session_id: sessionId.substring(0, 8) + '...',
       });
-      const response = await chatOpsMutation.mutateAsync({ sessionId, message });
-      console.log('[ChatOps:Frontend] API 응답 수신:', {
-        has_intent: !!response.intent,
-        intent_key: response.intent?.intent_key,
-        automation_level: response.intent?.automation_level,
-        has_l0_result: !!response.l0_result,
-        has_task_card: !!response.task_card_id,
-        task_card_id: response.task_card_id,
-        response_length: response.response.length,
-        response_preview: response.response.substring(0, 200), // 응답 내용 미리보기
+
+      const context = getApiContext();
+      const tenantId = context?.tenantId || '';
+
+      // 스트리밍 응답을 저장할 assistant 메시지 ID
+      const assistantMessageId = `assistant-${Date.now()}`;
+      let streamingContent = '';
+
+      // 임시 assistant 메시지 추가 (스트리밍 중)
+      aiLayerMenu.addChatOpsMessage({
+        id: assistantMessageId,
+        type: 'assistant_message',
+        content: '',
+        timestamp: new Date(),
+        metadata: {
+          isStreaming: true, // 타이핑 커서 표시용
+        },
       });
-      // Intent가 없는 경우 상세 디버깅
-      if (!response.intent) {
-        console.warn('[ChatOps:Frontend] ⚠️ Intent가 파싱되지 않았습니다:', {
-          full_response: response,
-          response_text: response.response,
-        });
-      }
 
-      // TaskCard가 생성된 경우 (L1/L2 Intent)
-      if (response.task_card_id && response.intent) {
-        console.log('[ChatOps:Frontend] ✅ TaskCard 생성됨, task_created 메시지 추가:', {
-          task_card_id: response.task_card_id,
-          intent_key: response.intent.intent_key,
-          automation_level: response.intent.automation_level,
-        });
+      await sendChatOpsMessageStreaming(
+        tenantId,
+        sessionId,
+        message,
+        // onChunk: 실시간으로 텍스트 업데이트
+        (chunk: string) => {
+          streamingContent += chunk;
+          // 메시지 업데이트 (여전히 스트리밍 중)
+          aiLayerMenu.updateChatOpsMessage(assistantMessageId, {
+            content: streamingContent,
+            metadata: {
+              isStreaming: true,
+            },
+          });
+        },
+        // onComplete: 스트리밍 완료
+        (fullResponse: string) => {
+          console.log('[ChatOps:Frontend] 스트리밍 완료:', {
+            response_length: fullResponse.length,
+          });
+          // 최종 응답으로 업데이트 (스트리밍 완료)
+          aiLayerMenu.updateChatOpsMessage(assistantMessageId, {
+            content: fullResponse || streamingContent,
+            metadata: {
+              isStreaming: false, // 타이핑 커서 제거
+            },
+          });
+        },
+        // onError: 에러 처리
+        (error: string) => {
+          console.error('[ChatOps:Frontend] 스트리밍 에러:', error);
 
-        // TaskCard 목록 캐시 무효화 및 강제 리패치 (새로 생성된 TaskCard가 즉시 목록에 반영되도록)
-        const context = getApiContext();
-        const tenantId = context?.tenantId;
-        if (tenantId) {
-          // 캐시 무효화
-          await queryClient.invalidateQueries({ queryKey: ['student-task-cards', tenantId] });
-          // 강제 리패치 (즉시 최신 데이터 가져오기)
-          await queryClient.refetchQueries({ queryKey: ['student-task-cards', tenantId] });
+          // 에러 유형별 사용자 친화적 메시지
+          let errorMessage = '응답 처리 중 오류가 발생했습니다.';
+          if (error.includes('network') || error.includes('fetch')) {
+            errorMessage = '네트워크 연결이 불안정합니다. 잠시 후 다시 시도해주세요.';
+          } else if (error.includes('timeout')) {
+            errorMessage = '응답 시간이 초과되었습니다. 다시 시도해주세요.';
+          } else if (error.includes('401') || error.includes('auth')) {
+            errorMessage = '인증이 만료되었습니다. 다시 로그인해주세요.';
+          }
+
+          aiLayerMenu.updateChatOpsMessage(assistantMessageId, {
+            content: `❌ ${errorMessage}\n\n*원본 메시지를 다시 전송하시거나, 문제가 지속되면 관리자에게 문의해주세요.*`,
+            metadata: {
+              isStreaming: false,
+              hasError: true,
+            },
+          });
         }
+      );
 
-        // TaskCard 생성 메시지 추가
-        aiLayerMenu.addChatOpsMessage({
-          id: `task-created-${Date.now()}`,
-          type: 'task_created',
-          content: response.response,
-          timestamp: new Date(),
-          metadata: {
-            task_id: response.task_card_id,
-            intent_key: response.intent.intent_key,
-            automation_level: response.intent.automation_level,
-            params: response.intent.params,
-            // L2-B Intent는 Domain Action Catalog 미등록 시 L1로 강등됨 (챗봇.md 7.1.1 참조)
-            is_downgraded_from_l2b: response.intent.automation_level === 'L2' &&
-                                    response.intent.execution_class === 'B',
-            // execution_class는 metadata 타입에 없지만 실제로 사용되므로 타입 단언 사용
-            ...(response.intent.execution_class && { execution_class: response.intent.execution_class }),
-          } as Record<string, unknown>,
-        });
-      } else {
-        // 일반 응답 메시지 (L0 Intent 또는 TaskCard 생성 실패)
-        console.log('[ChatOps:Frontend] 일반 응답 메시지 처리:', {
-          is_l0: response.intent?.automation_level === 'L0',
-          has_l0_result: !!response.l0_result,
-          task_card_missing: !response.task_card_id,
-        });
-        // ⚠️ 중요: L0 실행 결과는 metadata.l0_result로만 전달
-        // messageContent에는 추가하지 않음 (ChatOpsPanel에서 별도로 표시)
-        const messageContent = response.response;
-
-        aiLayerMenu.addChatOpsMessage({
-          id: `assistant-${Date.now()}`,
-          type: 'assistant_message',
-          content: messageContent,
-          timestamp: new Date(),
-          metadata: response.intent ? {
-            intent_key: response.intent.intent_key,
-            automation_level: response.intent.automation_level,
-            params: response.intent.params,
-            l0_result: response.l0_result, // L0 실행 결과 포함
-            original_message: response.original_message, // 원본 사용자 메시지 (필터링용)
-          } : undefined,
-        });
-      }
-      console.log('[ChatOps:Frontend] ===== 메시지 처리 완료 =====');
+      // ⚠️ 참고: 스트리밍 모드에서는 Intent/TaskCard 정보가 포함되지 않음
+      // 응답 텍스트만 스트리밍되며, Intent 파싱 및 TaskCard 생성은 백엔드에서 완료 후 별도 처리 필요
+      console.log('[ChatOps:Frontend] ===== 스트리밍 응답 처리 완료 =====');
     } catch (error) {
       console.error('[ChatOps:Frontend] ❌ 에러 발생:', error);
       // P0: PII 마스킹 필수 (체크리스트.md 4. PII 마스킹)
@@ -297,7 +286,7 @@ function AppContent() {
     } finally {
       aiLayerMenu.setChatOpsLoading(false);
     }
-  }, [aiLayerMenu, chatOpsMutation, queryClient]);
+  }, [aiLayerMenu]);
 
   // ChatOps 초기화 핸들러
   const handleChatOpsReset = useCallback(() => {

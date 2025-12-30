@@ -11,7 +11,7 @@ import { maskPII } from './pii-utils.ts';
 import { toKSTDate, toKSTISOString, kstDateToUTC, nextKSTDateToUTC, nextKSTMonthToUTC } from './date-utils.ts';
 import { requireTenantScope } from '../chatops/handlers/auth.ts';
 import { getTenantTableName } from './industry-adapter.ts';
-import { getTenantSettingByPath, getAutomationEventPolicyPath } from './policy-utils.ts';
+import { getTenantSettingByPath } from './policy-utils.ts';
 
 /**
  * P0-10: tenant_id 사용 패턴 가이드
@@ -66,8 +66,7 @@ const DRAFT_STATUS = {
  * - tenant_id: UUID (FK)
  * - user_id: UUID (FK)
  * - session_id: TEXT
- * - intent_key: TEXT (예: 'student.exec.register')
- * - event_type: TEXT (예: 'student_registration', automation-event-catalog.ts와 일치)
+ * - intent_key: TEXT (Tool 기반 Draft Key, 예: 'manage_student.register')
  * - draft_params: JSONB (Tool arguments)
  * - status: TEXT (DRAFT_STATUS 참조)
  * - missing_required: TEXT[] (collecting 상태일 때 누락된 필수 파라미터)
@@ -126,53 +125,13 @@ const MESSAGE_STATUS = {
 } as const;
 
 /**
- * Intent Key → Event Type 매핑 테이블 (SSOT)
+ * ⚠️ Intent 기반 로직 제거됨 (Tool 기반 시스템으로 완전 전환)
  *
- * [불변 규칙] 이 매핑은 automation-event-catalog.ts의 event_type과 일치해야 합니다.
- * 새로운 intent가 추가되면 해당하는 event_type을 카탈로그에 등록하고 여기에 매핑을 추가하세요.
+ * - Intent Key, Event Type 매핑 제거
+ * - L2 작업(Draft)은 사용자 승인 기반이므로 자동화 정책 검증 불필요
+ * - Draft Key는 Tool 기반: `tool_name.action` (예: `manage_student.register`)
+ * - Automation Event Catalog는 자동화 트리거 전용으로만 사용
  */
-const INTENT_TO_EVENT_TYPE_MAP: Record<string, string> = {
-  // 학생 관리
-  'student.exec.register': 'student_registration',
-  'student.exec.discharge': 'student_discharge',
-  'student.exec.pause': 'student_pause',
-  'student.exec.resume': 'student_resume',
-  'student.exec.update': 'student_update',
-  'student.exec.update_contact': 'student_update_contact',
-  'student.exec.change_class': 'class_change_or_cancel',  // 이미 카탈로그에 있음
-  'student.exec.merge': 'student_merge',
-
-  // 메시지 발송
-  'message.exec.send_single': 'message_send',
-  'message.exec.send_bulk': 'message_send',
-  'message.exec.send_scheduled': 'message_send',
-  'message.exec.resend_failed': 'message_resend',
-  'message.exec.cancel_scheduled': 'message_cancel',
-
-  // 출결 관리
-  'attendance.exec.notify_absent': 'absence_first_day',  // 이미 카탈로그에 있음
-  'attendance.exec.notify_late': 'attendance_late_notification',
-  'attendance.exec.request_reason': 'attendance_reason_request',
-  'attendance.exec.correct': 'attendance_correct',
-  'attendance.exec.bulk_update': 'attendance_bulk_update',
-  'attendance.exec.mark_excused': 'attendance_mark_excused',
-
-  // 수납 관리
-  'billing.exec.issue_invoice': 'invoice_issue',
-  'billing.exec.send_payment_link': 'payment_link_send',
-  'billing.exec.schedule_notice': 'overdue_outstanding_over_limit',  // 이미 카탈로그에 있음
-  'billing.exec.record_payment': 'payment_record',
-};
-
-/**
- * Intent Key를 Event Type으로 매핑
- *
- * @param intentKey Intent Key (예: 'student.exec.register')
- * @returns Event Type 또는 null (매핑이 없으면 null)
- */
-function mapIntentToEventType(intentKey: string): string | null {
-  return INTENT_TO_EVENT_TYPE_MAP[intentKey] || null;
-}
 
 export interface AgentMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -234,7 +193,7 @@ async function callOpenAIChat(
     model: 'gpt-4o-mini',
     messages: messages,
     temperature: 0.3,
-    max_tokens: 800, // 1500→800 감소: 응답 시간 최적화
+    max_tokens: 500, // 1500→800→500 감소: 응답 시간 추가 최적화 (ChatOps 응답은 대부분 짧음)
   };
 
   if (tools && tools.length > 0) {
@@ -282,7 +241,7 @@ async function* callOpenAIChatStreaming(
     model: 'gpt-4o-mini',
     messages: messages,
     temperature: 0.3,
-    max_tokens: 800,
+    max_tokens: 500, // 800→500 감소: 스트리밍 응답 시간 추가 최적화
     stream: true, // 스트리밍 활성화
   };
 
@@ -910,45 +869,35 @@ async function executeManageStudent(
       }
     }
 
-    // L2 실행은 Draft 생성
+    // L2 실행은 Draft 생성 (사용자 승인 기반 - 자동화 정책 검증 불필요)
     if (['register', 'update', 'update_contact', 'pause', 'resume', 'discharge', 'change_class', 'merge'].includes(action)) {
-      const intentKey = `student.exec.${action}`;
+      // P0-FIX: register가 아닌 액션의 경우, 학생 조회하여 동명이인 체크
+      // 동명이인이 있으면 phone/birth_date를 Draft에 포함시켜야 함
+      if (action !== 'register' && student_name && !student_id && !phone && !birth_date) {
+        const resolveResult = await resolvePersonId(student_name, student_id, context);
 
-      // P0-1: Automation Config First 정책 게이트 (Fail-Closed 엄격 적용, SSOT 경로 사용)
-      const eventType = mapIntentToEventType(intentKey);
+        // 동명이인이 있으면 candidates를 result에 포함하여 반환
+        if (!resolveResult.success && resolveResult.candidates && resolveResult.candidates.length > 1) {
+          return {
+            success: false,
+            result: {
+              candidates: resolveResult.candidates,
+            },
+            error: resolveResult.error,
+          };
+        }
 
-      if (!eventType) {
-        return {
-          success: false,
-          result: null,
-          error: `지원하지 않는 작업입니다: ${action}`,
-        };
-      }
-
-      // SSOT 경로 생성 (자동으로 event_type 검증됨)
-      const policyPath = getAutomationEventPolicyPath(eventType, 'enabled');
-      const policyEnabled = await getTenantSettingByPath(
-        context.supabase,
-        context.tenant_id,
-        policyPath
-      );
-
-      // Fail-Closed: 명시적으로 true가 아니면 차단 (boolean 명시적 검증)
-      if (policyEnabled !== true) {
-        return {
-          success: false,
-          result: null,
-          error: policyEnabled === false
-            ? `${action} 작업이 정책에 의해 비활성화되어 있습니다.`
-            : `${action} 작업 정책이 설정되지 않았습니다. 관리자에게 문의하세요.`,
-        };
+        // 학생이 1명 확정되면 person_id를 args에 추가
+        if (resolveResult.success && resolveResult.person_id) {
+          args.student_id = resolveResult.person_id;
+        }
       }
 
       // ✅ 액션별 필수 파라미터 정의
       const requiredParamsByAction: Record<string, string[]> = {
         register: ['student_name', 'phone', 'birth_date'],  // 필수: 이름, 전화번호, 생년월일
-        discharge: ['student_name', 'date'],                // 필수: 이름, 날짜
-        pause: ['student_name', 'date'],                    // 필수: 이름, 날짜
+        discharge: ['student_name'],                        // 필수: 이름만 (날짜는 자동, 사유 불필요)
+        pause: ['student_name'],                            // 필수: 이름만 (날짜는 자동, 사유 불필요)
         resume: ['student_name'],                           // 필수: 이름
         update: ['student_name'],                           // 필수: 이름
         update_contact: ['student_name', 'phone'],          // 필수: 이름, 전화번호
@@ -958,13 +907,16 @@ async function executeManageStudent(
 
       const requiredParams = requiredParamsByAction[action] || [];
 
-      // P0-3: 기존 COLLECTING draft 확인 (동일 session + intent_key)
+      // Tool 기반 Draft Key: tool_name + action
+      const draftKey = `manage_student.${action}`;
+
+      // P0-3: 기존 COLLECTING draft 확인 (동일 session + draft_key)
       const { data: existingDraft, error: existingError } = await context.supabase
         .from('chatops_drafts')
         .select('*')
         .eq('tenant_id', requireTenantScope(context.tenant_id))
         .eq('session_id', context.session_id)
-        .eq('intent_key', intentKey)
+        .eq('intent_key', draftKey)
         .eq('status', DRAFT_STATUS.COLLECTING)
         .order('updated_at', { ascending: false })
         .limit(1)
@@ -1060,20 +1012,20 @@ async function executeManageStudent(
 
         // ready 상태 - 실행 확인 요청
         const actionMessages: Record<string, string> = {
-          register: `${studentNameForMessage} 학생 등록을 준비했습니다`,
-          discharge: `${studentNameForMessage} 학생 퇴원 처리를 준비했습니다`,
-          pause: `${studentNameForMessage} 학생 휴원 처리를 준비했습니다`,
-          resume: `${studentNameForMessage} 학생 복귀 처리를 준비했습니다`,
-          update: `${studentNameForMessage} 학생 정보 수정을 준비했습니다`,
-          update_contact: `${studentNameForMessage} 학생 연락처 수정을 준비했습니다`,
-          change_class: `${studentNameForMessage} 학생 반 변경을 준비했습니다`,
-          merge: `학생 중복 병합을 준비했습니다`,
+          register: `${studentNameForMessage} 학생을 등록하시겠어요?`,
+          discharge: `${studentNameForMessage} 학생을 퇴원 처리하시겠어요?`,
+          pause: `${studentNameForMessage} 학생을 휴원 처리하시겠어요?`,
+          resume: `${studentNameForMessage} 학생을 복귀 처리하시겠어요?`,
+          update: `${studentNameForMessage} 학생 정보를 수정하시겠어요?`,
+          update_contact: `${studentNameForMessage} 학생 연락처를 수정하시겠어요?`,
+          change_class: `${studentNameForMessage} 학생 반을 변경하시겠어요?`,
+          merge: `학생 중복을 병합하시겠어요?`,
         };
 
       return {
         success: true,
         result: {
-          message: `${actionMessages[action] || `${action} 작업을 준비했습니다`}. 실행하시겠습니까?\n\n(draft_id: ${updatedDraft.id})`,
+          message: `${actionMessages[action] || `${action} 작업을 하시겠어요?`}\n\n(draft_id: ${updatedDraft.id})`,
           draft_id: updatedDraft.id,
           requires_confirmation: true,
         },
@@ -1102,8 +1054,7 @@ async function executeManageStudent(
           tenant_id: requireTenantScope(context.tenant_id),
           user_id: context.user_id,
           session_id: context.session_id,
-          intent_key: intentKey,
-          event_type: eventType,  // P0-16: event_type 명시적 저장
+          intent_key: draftKey,  // Tool 기반: tool_name.action
           draft_params: args,
           status: draftStatus,
           missing_required: missingParams,
@@ -1155,20 +1106,20 @@ async function executeManageStudent(
       // ready 상태 - 실행 확인 요청
       const studentNameForMessage = args.name || args.student_name || '학생';
       const actionMessages: Record<string, string> = {
-        register: `${studentNameForMessage} 학생 등록을 준비했습니다`,
-        discharge: `${studentNameForMessage} 학생 퇴원 처리를 준비했습니다`,
-        pause: `${studentNameForMessage} 학생 휴원 처리를 준비했습니다`,
-        resume: `${studentNameForMessage} 학생 복귀 처리를 준비했습니다`,
-        update: `${studentNameForMessage} 학생 정보 수정을 준비했습니다`,
-        update_contact: `${studentNameForMessage} 학생 연락처 수정을 준비했습니다`,
-        change_class: `${studentNameForMessage} 학생 반 변경을 준비했습니다`,
-        merge: `학생 중복 병합을 준비했습니다`,
+        register: `${studentNameForMessage} 학생을 등록하시겠어요?`,
+        discharge: `${studentNameForMessage} 학생을 퇴원 처리하시겠어요?`,
+        pause: `${studentNameForMessage} 학생을 휴원 처리하시겠어요?`,
+        resume: `${studentNameForMessage} 학생을 복귀 처리하시겠어요?`,
+        update: `${studentNameForMessage} 학생 정보를 수정하시겠어요?`,
+        update_contact: `${studentNameForMessage} 학생 연락처를 수정하시겠어요?`,
+        change_class: `${studentNameForMessage} 학생 반을 변경하시겠어요?`,
+        merge: `학생 중복을 병합하시겠어요?`,
       };
 
     return {
       success: true,
       result: {
-        message: `${actionMessages[action] || `${action} 작업을 준비했습니다`}. 실행하시겠습니까?\n\n(draft_id: ${draft.id})`,
+        message: `${actionMessages[action] || `${action} 작업을 하시겠어요?`}\n\n(draft_id: ${draft.id})`,
         draft_id: draft.id,
         requires_confirmation: true,
       },
@@ -1295,50 +1246,21 @@ async function executeManageAttendance(
   context: AgentContext
 ): Promise<{ success: boolean; result: any; error?: string }> {
   const { action } = args;
-  const intentKey = `attendance.exec.${action}`;
 
-  // P0-12: Automation Config First 정책 게이트 (Fail-Closed 엄격 적용)
-  const eventType = mapIntentToEventType(intentKey);
+  // Tool 기반 Draft Key
+  const draftKey = `manage_attendance.${action}`;
 
-  if (!eventType) {
-    return {
-      success: false,
-      result: null,
-      error: `지원하지 않는 출결 관리 작업입니다: ${action}`,
-    };
-  }
-
-  // SSOT 경로 생성 (자동으로 event_type 검증됨)
-  const policyPath = getAutomationEventPolicyPath(eventType, 'enabled');
-  const policyEnabled = await getTenantSettingByPath(
-    context.supabase,
-    context.tenant_id,
-    policyPath
-  );
-
-  // Fail-Closed: 명시적으로 true가 아니면 차단 (boolean 명시적 검증)
-  if (policyEnabled !== true) {
-    return {
-      success: false,
-      result: null,
-      error: policyEnabled === false
-        ? `${action} 작업이 정책에 의해 비활성화되어 있습니다.`
-        : `${action} 작업 정책이 설정되지 않았습니다. 관리자에게 문의하세요.`,
-    };
-  }
-
-  // Draft 생성
+  // L2 작업: Draft 생성 (사용자 승인 기반 - 자동화 정책 검증 불필요)
   const { data: draft, error: draftError } = await context.supabase
     .from('chatops_drafts')
     .insert({
       tenant_id: requireTenantScope(context.tenant_id),
       user_id: context.user_id,
       session_id: context.session_id,
-      intent_key: intentKey,
-      event_type: eventType,  // P2-10: event_type 명시적 저장
+      intent_key: draftKey,
       draft_params: args,
       status: DRAFT_STATUS.READY,
-      missing_required: [],  // P2-10: ready 상태는 빈 배열
+      missing_required: [],
     })
     .select()
     .single();
@@ -1355,7 +1277,7 @@ async function executeManageAttendance(
   return {
     success: true,
     result: {
-      message: `${action} 작업을 준비했습니다. 실행하시겠습니까?\n\n(draft_id: ${draft.id})`,
+      message: `${action} 작업을 하시겠어요?\n\n(draft_id: ${draft.id})`,
       draft_id: draft.id,
       requires_confirmation: true,
     },
@@ -1445,45 +1367,8 @@ async function executeSendMessage(
 ): Promise<{ success: boolean; result: any; error?: string }> {
   const { type, recipient, recipients, message } = args;
 
-  // Intent Key 매핑 (type에 따라)
-  const intentKeyMap: Record<string, string> = {
-    'single': 'message.exec.send_single',
-    'bulk': 'message.exec.send_bulk',
-    'scheduled': 'message.exec.send_scheduled',
-    'resend_failed': 'message.exec.resend_failed',
-    'cancel_scheduled': 'message.exec.cancel_scheduled',
-  };
-  const intentKey = intentKeyMap[type] || `message.exec.send_${type}`;
-
-  // P0-1: Automation Config First 정책 게이트 (Fail-Closed 엄격 적용, SSOT 경로 사용)
-  const eventType = mapIntentToEventType(intentKey);
-
-  if (!eventType) {
-    return {
-      success: false,
-      result: null,
-      error: `지원하지 않는 메시지 발송 유형입니다: ${type}`,
-    };
-  }
-
-  // SSOT 경로 생성 (자동으로 event_type 검증됨)
-  const policyPath = getAutomationEventPolicyPath(eventType, 'enabled');
-  const policyEnabled = await getTenantSettingByPath(
-    context.supabase,
-    context.tenant_id,
-    policyPath
-  );
-
-  // Fail-Closed: 명시적으로 true가 아니면 차단 (boolean 명시적 검증)
-  if (policyEnabled !== true) {
-    return {
-      success: false,
-      result: null,
-      error: policyEnabled === false
-        ? '메시지 발송이 정책에 의해 비활성화되어 있습니다.'
-        : `메시지 발송 정책이 설정되지 않았습니다. 관리자에게 문의하세요.`,
-    };
-  }
+  // Tool 기반 Draft Key
+  const draftKey = `send_message.${type}`;
 
   // P0-35: 필수값 검증 (message, recipient/recipients)
   if (!message || typeof message !== 'string' || message.trim() === '') {
@@ -1506,18 +1391,17 @@ async function executeSendMessage(
     };
   }
 
-  // Draft 생성 (eventType은 위에서 이미 선언됨)
+  // L2 작업: Draft 생성 (사용자 승인 기반 - 자동화 정책 검증 불필요)
   const { data: draft, error: draftError } = await context.supabase
     .from('chatops_drafts')
     .insert({
       tenant_id: requireTenantScope(context.tenant_id),
       user_id: context.user_id,
       session_id: context.session_id,
-      intent_key: intentKey,
-      event_type: eventType,  // P0-29: null 제거 (위에서 이미 검증됨)
+      intent_key: draftKey,
       draft_params: args,
       status: DRAFT_STATUS.READY,
-      missing_required: [],  // P0-15: confirm_required 제거, status='ready'로 대체
+      missing_required: [],
     })
     .select()
     .single();
@@ -1536,7 +1420,7 @@ async function executeSendMessage(
   return {
     success: true,
     result: {
-      message: `${recipientText}에게 메시지 발송을 준비했습니다. 실행하시겠습니까?\n\n내용: ${message?.substring(0, 50)}${message?.length > 50 ? '...' : ''}\n\n(draft_id: ${draft.id})`,
+      message: `${recipientText}에게 메시지를 발송하시겠어요?\n\n내용: ${message?.substring(0, 50)}${message?.length > 50 ? '...' : ''}\n\n(draft_id: ${draft.id})`,
       draft_id: draft.id,
       requires_confirmation: true,
     },
@@ -1553,8 +1437,7 @@ async function executeDraftMessage(
   // message.draft.*는 "초안 전용(실행 금지)"
   const intentKey = `message.draft.${type}`;
 
-  // P2-10: event_type 매핑
-  const eventType = mapIntentToEventType(intentKey);
+  // P0-FIX: event_type 제거 (Draft는 Tool 기반, automation event 아님)
 
   // P0-38: chatops_drafts에 COLLECTING 상태로 저장 (실행 불가)
   const { data: draft, error: draftError } = await context.supabase
@@ -1564,7 +1447,6 @@ async function executeDraftMessage(
       user_id: context.user_id,
       session_id: context.session_id,
       intent_key: intentKey,
-      event_type: eventType || null,  // P2-10: event_type 명시적 저장 (매핑 없으면 null)
       draft_params: args,
       status: DRAFT_STATUS.COLLECTING,  // P0-38: 초안은 COLLECTING (실행 불가)
       missing_required: ['confirm_send'],  // P0-38: 발송 확인 필요
@@ -1710,50 +1592,21 @@ async function executeManageBilling(
   context: AgentContext
 ): Promise<{ success: boolean; result: any; error?: string }> {
   const { action } = args;
-  const intentKey = `billing.exec.${action}`;
 
-  // P0-12: Automation Config First 정책 게이트 (Fail-Closed 엄격 적용)
-  const eventType = mapIntentToEventType(intentKey);
+  // Tool 기반 Draft Key
+  const draftKey = `manage_billing.${action}`;
 
-  if (!eventType) {
-    return {
-      success: false,
-      result: null,
-      error: `지원하지 않는 수납 관리 작업입니다: ${action}`,
-    };
-  }
-
-  // SSOT 경로 생성 (자동으로 event_type 검증됨)
-  const policyPath = getAutomationEventPolicyPath(eventType, 'enabled');
-  const policyEnabled = await getTenantSettingByPath(
-    context.supabase,
-    context.tenant_id,
-    policyPath
-  );
-
-  // Fail-Closed: 명시적으로 true가 아니면 차단 (boolean 명시적 검증)
-  if (policyEnabled !== true) {
-    return {
-      success: false,
-      result: null,
-      error: policyEnabled === false
-        ? `${action} 작업이 정책에 의해 비활성화되어 있습니다.`
-        : `${action} 작업 정책이 설정되지 않았습니다. 관리자에게 문의하세요.`,
-    };
-  }
-
-  // Draft 생성
+  // L2 작업: Draft 생성 (사용자 승인 기반 - 자동화 정책 검증 불필요)
   const { data: draft, error: draftError } = await context.supabase
     .from('chatops_drafts')
     .insert({
       tenant_id: requireTenantScope(context.tenant_id),
       user_id: context.user_id,
       session_id: context.session_id,
-      intent_key: intentKey,
-      event_type: eventType,  // P2-10: event_type 명시적 저장
+      intent_key: draftKey,
       draft_params: args,
       status: DRAFT_STATUS.READY,
-      missing_required: [],  // P2-10: ready 상태는 빈 배열
+      missing_required: [],
     })
     .select()
     .single();
@@ -1770,7 +1623,7 @@ async function executeManageBilling(
   return {
     success: true,
     result: {
-      message: `${action} 작업을 준비했습니다. 실행하시겠습니까?\n\n(draft_id: ${draft.id})`,
+      message: `${action} 작업을 하시겠어요?\n\n(draft_id: ${draft.id})`,
       draft_id: draft.id,
       requires_confirmation: true,
     },
@@ -2117,7 +1970,15 @@ export async function runAgentStreaming(
 - Tool 결과를 근거로만 말하고, 확인되지 않은 실행 완료를 단정하지 않는다.
 
 **[응답 스타일]**
-짧고 친절하게. 직전 대화 맥락(최근 3턴) 고려.`;
+짧고 친절하게. 직전 대화 맥락(최근 3턴) 고려.
+
+**[응답 포맷 - Markdown 사용]**
+- **여러 항목 조회 시 (2개 이상)**: 반드시 Markdown 테이블로 표시
+  예: 학생 2명 이상 조회 → | 이름 | 전화번호 | 상태 | 형태
+- **단일 항목**: 일반 텍스트 또는 리스트
+- **강조**: **볼드**, *이탤릭* 활용
+- **제목**: ## 검색 결과, ### 상세 정보 등
+- **리스트**: - 항목 또는 1. 번호 사용`;
 
   // P2-8: 동의/취소 패턴 감지 및 draft_id 자동 주입
   const consentPattern = /^(네|예|응|확인|실행|진행|좋아|ok|yes)$/i;
@@ -2128,8 +1989,12 @@ export async function runAgentStreaming(
   if (consentPattern.test(trimmedMessage)) {
     // 동의 패턴: draft_id가 없으면 자동 추출
     const draftId = extractLastDraftId(conversationHistory);
+    console.log('[runAgentStreaming] 동의 패턴 감지:', { trimmedMessage, draftId, historyLength: conversationHistory.length });
     if (draftId) {
       enhancedUserMessage = `${userMessage}\n\n(draft_id: ${draftId})`;
+      console.log('[runAgentStreaming] draft_id 자동 주입 완료:', { enhancedUserMessage });
+    } else {
+      console.log('[runAgentStreaming] draft_id 추출 실패 - 대화 히스토리 확인 필요');
     }
   } else if (cancelPattern.test(trimmedMessage)) {
     // 취소 패턴: draft_id가 없으면 자동 추출
@@ -2141,7 +2006,7 @@ export async function runAgentStreaming(
 
   const messages: AgentMessage[] = [
     { role: 'system', content: systemPrompt },
-    ...conversationHistory.slice(-6),
+    ...conversationHistory.slice(-10), // P0-FIX: 4→10 증가 (Draft ID 유지 보장)
     { role: 'user', content: enhancedUserMessage },
   ];
 
@@ -2297,16 +2162,38 @@ export async function runAgentStreaming(
  * @returns draft_id 또는 null
  */
 function extractLastDraftId(conversationHistory: AgentMessage[]): string | null {
+  console.log('[extractLastDraftId] 대화 히스토리 검색 시작:', { totalMessages: conversationHistory.length });
+
+  // 전체 히스토리 출력 (디버깅용)
+  conversationHistory.forEach((msg, idx) => {
+    console.log('[extractLastDraftId] 히스토리[' + idx + ']:', {
+      role: msg.role,
+      hasContent: !!msg.content,
+      contentLength: msg.content?.length || 0,
+      contentPreview: msg.content?.substring(0, 150)
+    });
+  });
+
   // 최근 10개 메시지에서 draft_id 패턴 검색 (역순)
   for (let i = conversationHistory.length - 1; i >= Math.max(0, conversationHistory.length - 10); i--) {
     const msg = conversationHistory[i];
 
+    console.log('[extractLastDraftId] 검사 시작[' + i + ']:', { role: msg.role, hasContent: !!msg.content });
+
     // P1-12: assistant 메시지와 tool 메시지 모두 검사
     if ((msg.role === 'assistant' || msg.role === 'tool') && msg.content) {
-      // draft_id 패턴: draft_id: uuid 또는 "draft_id": "uuid"
-      const match = msg.content.match(/draft_id["\s:]+([a-f0-9-]{36})/i);
-      if (match) {
-        return match[1];
+      console.log('[extractLastDraftId] 메시지 검사:', { index: i, role: msg.role, contentPreview: msg.content.substring(0, 100) });
+
+      // P1-14: draft_id 추출 - 2단계 검증
+      // 1단계: "draft"라는 단어가 있는지 확인 (대소문자 무시)
+      if (/draft/i.test(msg.content)) {
+        // 2단계: UUID 패턴 찾기 (표준 UUID v4 형식)
+        const uuidMatch = msg.content.match(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
+        if (uuidMatch) {
+          const draftId = uuidMatch[0];
+          console.log('[extractLastDraftId] draft_id 발견:', { draftId, contextPreview: msg.content.substring(Math.max(0, uuidMatch.index! - 20), uuidMatch.index! + 56) });
+          return draftId;
+        }
       }
     }
 
@@ -2396,7 +2283,15 @@ export async function runAgent(
 - Tool 결과를 근거로만 말하고, 확인되지 않은 실행 완료를 단정하지 않는다.
 
 **[응답 스타일]**
-짧고 친절하게. 직전 대화 맥락(최근 3턴) 고려.`;
+짧고 친절하게. 직전 대화 맥락(최근 3턴) 고려.
+
+**[응답 포맷 - Markdown 사용]**
+- **여러 항목 조회 시 (2개 이상)**: 반드시 Markdown 테이블로 표시
+  예: 학생 2명 이상 조회 → | 이름 | 전화번호 | 상태 | 형태
+- **단일 항목**: 일반 텍스트 또는 리스트
+- **강조**: **볼드**, *이탤릭* 활용
+- **제목**: ## 검색 결과, ### 상세 정보 등
+- **리스트**: - 항목 또는 1. 번호 사용`;
 
   // P2-8: 동의/취소 패턴 감지 및 draft_id 자동 주입
   const consentPattern = /^(네|예|응|확인|실행|진행|좋아|ok|yes)$/i;
@@ -2420,7 +2315,7 @@ export async function runAgent(
 
   const messages: AgentMessage[] = [
     { role: 'system', content: systemPrompt },
-    ...conversationHistory.slice(-6), // -10→-6 감소: 최근 3턴만 (응답 시간 최적화)
+    ...conversationHistory.slice(-10), // P0-FIX: 4→10 증가 (Draft ID 유지 보장)
     { role: 'user', content: enhancedUserMessage },
   ];
 
@@ -2614,40 +2509,40 @@ async function executeConfirmAction(
     // Intent에 따라 실제 실행
     let executionResult;
 
-    // P2-11: L2 실행 커버리지 완성
-    if (draft.intent_key === 'student.exec.discharge') {
+    // P0-FIX: Tool 기반 Draft Key로 변경 (manage_student.*, manage_attendance.*, etc.)
+    if (draft.intent_key === 'manage_student.discharge') {
       executionResult = await executeDischarge(draft.draft_params, context);
-    } else if (draft.intent_key === 'student.exec.register') {
+    } else if (draft.intent_key === 'manage_student.register') {
       executionResult = await executeRegister(draft.draft_params, context);
-    } else if (draft.intent_key === 'student.exec.pause') {
+    } else if (draft.intent_key === 'manage_student.pause') {
       executionResult = await executePause(draft.draft_params, context);
-    } else if (draft.intent_key === 'student.exec.resume') {
+    } else if (draft.intent_key === 'manage_student.resume') {
       executionResult = await executeResume(draft.draft_params, context);
-    } else if (draft.intent_key === 'student.exec.update') {
+    } else if (draft.intent_key === 'manage_student.update') {
       executionResult = await executeUpdate(draft.draft_params, context);
-    } else if (draft.intent_key === 'student.exec.update_contact') {
+    } else if (draft.intent_key === 'manage_student.update_contact') {
       executionResult = await executeUpdateContact(draft.draft_params, context);
-    } else if (draft.intent_key === 'student.exec.change_class') {
+    } else if (draft.intent_key === 'manage_student.change_class') {
       executionResult = await executeChangeClass(draft.draft_params, context);
-    } else if (draft.intent_key === 'student.exec.merge') {
+    } else if (draft.intent_key === 'manage_student.merge') {
       executionResult = await executeMerge(draft.draft_params, context);
-    } else if (draft.intent_key.startsWith('message.draft.')) {
-      // P0-31: 초안(message.draft.*)은 실행 금지
+    } else if (draft.intent_key.startsWith('send_message.draft.')) {
+      // P0-31: 초안(send_message.draft.*)은 실행 금지
       executionResult = {
         success: false,
         result: null,
         error: '초안은 실행할 수 없습니다. 먼저 메시지 발송으로 변환해주세요.',
       };
-    } else if (draft.intent_key.startsWith('message.exec.')) {
+    } else if (draft.intent_key.startsWith('send_message.')) {
       executionResult = await executeSendMessageAction(draft.draft_params, context);
-    } else if (draft.intent_key.startsWith('attendance.exec.')) {
+    } else if (draft.intent_key.startsWith('manage_attendance.')) {
       executionResult = await executeAttendanceAction(draft.draft_params, context);
-    } else if (draft.intent_key.startsWith('billing.exec.')) {
+    } else if (draft.intent_key.startsWith('manage_billing.')) {
       executionResult = await executeBillingAction(draft.draft_params, context);
     } else {
       executionResult = {
         success: false,
-        error: `지원하지 않는 Intent: ${draft.intent_key}`,
+        error: `지원하지 않는 Draft Key: ${draft.intent_key}`,
       };
     }
 
@@ -2786,7 +2681,7 @@ async function executeDischarge(
   params: Record<string, any>,
   context: AgentContext
 ): Promise<{ success: boolean; result: any; error?: string }> {
-  const { student_name, student_id, date, reason } = params;
+  const { student_name, student_id, date, reason, phone, birth_date } = params;
 
   // P0-25: L2 실행 함수 필수값 재검증 (Fail-Closed)
   if (!student_name && !student_id) {
@@ -2797,19 +2692,13 @@ async function executeDischarge(
     };
   }
 
-  if (!date || typeof date !== 'string' || date.trim() === '') {
-    return {
-      success: false,
-      result: null,
-      error: '퇴원 날짜는 필수입니다.',
-    };
-  }
+  // P0-FIX: date와 reason은 선택사항으로 변경 (date는 자동으로 오늘)
 
   // 프로덕션 최적화: 로깅 제거
 
   try {
-    // P2 이슈 해결: 공통 헬퍼 함수 사용
-    const resolveResult = await resolvePersonId(student_name, student_id, context);
+    // P0-FIX: phone과 birth_date를 hint로 전달하여 동명이인 구분
+    const resolveResult = await resolvePersonId(student_name, student_id, context, phone, birth_date);
     if (!resolveResult.success) {
       return {
         success: false,
@@ -2819,7 +2708,7 @@ async function executeDischarge(
     }
     const personId = resolveResult.person_id!;
 
-    // P1 이슈 해결: toKSTDate 사용
+    // P0-FIX: 날짜 기본값을 오늘로 설정
     const effectiveDate = date || toKSTDate();
 
     // P2-8: 캐시된 테이블명 조회
@@ -3016,7 +2905,7 @@ async function executePause(
   params: Record<string, any>,
   context: AgentContext
 ): Promise<{ success: boolean; result: any; error?: string }> {
-  const { student_name, student_id, date, reason } = params;
+  const { student_name, student_id, date, reason, phone, birth_date } = params;
 
   // P0-25: L2 실행 함수 필수값 재검증 (Fail-Closed)
   if (!student_name && !student_id) {
@@ -3027,24 +2916,18 @@ async function executePause(
     };
   }
 
-  if (!date || typeof date !== 'string' || date.trim() === '') {
-    return {
-      success: false,
-      result: null,
-      error: '휴원 날짜는 필수입니다.',
-    };
-  }
+  // P0-FIX: date와 reason은 선택사항으로 변경 (date는 자동으로 오늘)
 
   // 프로덕션 최적화: 로깅 제거
 
   try {
-    // P0-2: resolvePersonId에 phone/birth_date 힌트 전달
+    // P0-FIX: phone과 birth_date를 hint로 전달하여 동명이인 구분
     const resolveResult = await resolvePersonId(
       student_name,
       student_id,
       context,
-      params.phone,        // 전화번호 힌트
-      params.birth_date    // 생년월일 힌트
+      phone,        // 전화번호 힌트
+      birth_date    // 생년월일 힌트
     );
     if (!resolveResult.success) {
       return {
@@ -3054,6 +2937,9 @@ async function executePause(
       };
     }
     const personId = resolveResult.person_id!;
+
+    // P0-FIX: 날짜 기본값을 오늘로 설정
+    const effectiveDate = date || toKSTDate();
 
     // P2-8: 캐시된 테이블명 조회
     const studentTable = await getCachedTableName(context, 'student');
@@ -3075,6 +2961,22 @@ async function executePause(
     if (error) {
       console.error('[executePause] 상태 변경 오류:', maskPII(error.message));
       return { success: false, result: null, error: error.message };
+    }
+
+    // 휴원 기록 저장 (student_status_history 테이블이 있다면)
+    try {
+      await context.supabase
+        .from('student_status_history')
+        .insert({
+          tenant_id: requireTenantScope(context.tenant_id),
+          person_id: personId,
+          status: STUDENT_STATUS.ON_LEAVE,
+          effective_date: effectiveDate,
+          reason: reason || '휴원',
+          created_by: context.user_id,
+        });
+    } catch (historyError) {
+      console.warn('[executePause] 히스토리 저장 실패 (무시):', historyError);
     }
 
     // P1 이슈 해결: 에러 메시지 PII 제거
