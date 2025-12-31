@@ -1936,7 +1936,14 @@ export async function runAgentStreaming(
 - manage_* Tool은 실행이 아니라 Draft를 만든다.
 - Draft status:
   - collecting: 필수정보 누락 → 누락 항목만 물어보고, 사용자가 값만 보내면 같은 intent의 Draft를 업데이트한다.
-  - ready: 필수정보 충족 → "요약 + 실행할까요?"로 확인을 받는다. **draft_id를 응답에 포함한다.**
+  - ready: 필수정보 충족 → "요약 + 실행할까요?"로 확인을 받는다.
+
+**[CRITICAL] Draft ID 표시 규칙:**
+Tool 결과에 draft_id가 포함되면 **반드시** 다음 형식으로 응답에 포함:
+  **Draft ID:** {draft_id}
+예시: "루루 학생을 등록하시겠어요?\n\n**Draft ID:** a1b2c3d4-e5f6-7890-abcd-1234567890ab"
+이 규칙은 **절대적**이며, draft_id를 생략하면 사용자가 동의해도 실행되지 않음!
+
 - 사용자가 "실행/진행/확인/응/네/예" 등 동의 표현 → confirm_action 호출 (draft_id 포함)
 - 사용자가 "취소/아니/중단" → cancel_action 호출 (draft_id 포함)
 - 동의/취소가 아닌 추가 정보 제공(날짜/전화/생년월일) → 해당 manage_* 재호출로 Draft 업데이트
@@ -2234,7 +2241,14 @@ export async function runAgent(
 - manage_* Tool은 실행이 아니라 Draft를 만든다.
 - Draft status:
   - collecting: 필수정보 누락 → 누락 항목만 물어보고, 사용자가 값만 보내면 같은 intent의 Draft를 업데이트한다.
-  - ready: 필수정보 충족 → "요약 + 실행할까요?"로 확인을 받는다. **draft_id를 응답에 포함한다.**
+  - ready: 필수정보 충족 → "요약 + 실행할까요?"로 확인을 받는다.
+
+**[CRITICAL] Draft ID 표시 규칙:**
+Tool 결과에 draft_id가 포함되면 **반드시** 다음 형식으로 응답에 포함:
+  **Draft ID:** {draft_id}
+예시: "루루 학생을 등록하시겠어요?\n\n**Draft ID:** a1b2c3d4-e5f6-7890-abcd-1234567890ab"
+이 규칙은 **절대적**이며, draft_id를 생략하면 사용자가 동의해도 실행되지 않음!
+
 - 사용자가 "실행/진행/확인/응/네/예" 등 동의 표현 → confirm_action 호출 (draft_id 포함)
 - 사용자가 "취소/아니/중단" → cancel_action 호출 (draft_id 포함)
 - 동의/취소가 아닌 추가 정보 제공(날짜/전화/생년월일) → 해당 manage_* 재호출로 Draft 업데이트
