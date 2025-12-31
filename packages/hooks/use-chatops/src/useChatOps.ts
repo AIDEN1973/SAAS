@@ -82,6 +82,7 @@ async function sendChatOpsMessage(
 /**
  * ChatOps Streaming 메시지 전송 함수
  * SSE (Server-Sent Events) 기반
+ * ✅ 수정: chatops 엔드포인트에 stream: true 파라미터 전달
  */
 export async function sendChatOpsMessageStreaming(
   tenantId: string,
@@ -125,8 +126,8 @@ export async function sendChatOpsMessageStreaming(
       throw new Error('Authentication token is required');
     }
 
-    // SSE 엔드포인트 호출
-    const response = await fetch(`${supabaseUrl}/functions/v1/chatops-stream`, {
+    // ✅ 수정: chatops 엔드포인트에 stream: true 파라미터 추가
+    const response = await fetch(`${supabaseUrl}/functions/v1/chatops`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -135,6 +136,7 @@ export async function sendChatOpsMessageStreaming(
       body: JSON.stringify({
         session_id: sessionId,
         message: message.trim(),
+        stream: true,  // ✅ 스트리밍 모드 활성화
       }),
     });
 
@@ -149,6 +151,7 @@ export async function sendChatOpsMessageStreaming(
 
     const decoder = new TextDecoder();
     let buffer = '';
+    let fullResponse = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -167,9 +170,10 @@ export async function sendChatOpsMessageStreaming(
           const data = JSON.parse(trimmed.slice(6));
 
           if (data.type === 'content') {
+            fullResponse += data.content;
             onChunk(data.content);
           } else if (data.type === 'done') {
-            onComplete(data.fullResponse);
+            onComplete(fullResponse || data.fullResponse);
           } else if (data.type === 'error') {
             onError(data.error);
           }

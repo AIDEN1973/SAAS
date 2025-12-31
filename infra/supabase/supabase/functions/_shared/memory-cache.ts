@@ -112,7 +112,7 @@ export const memoryCache = new MemoryCache();
  * 캐시 키 생성 헬퍼
  */
 export function createCacheKey(
-  type: 'student' | 'class' | 'attendance' | 'billing',
+  type: 'student' | 'class' | 'attendance' | 'billing' | 'message' | 'dashboard',
   tenantId: string,
   ...params: string[]
 ): string {
@@ -123,7 +123,7 @@ export function createCacheKey(
  * 캐시 무효화 헬퍼
  */
 export function invalidateCache(
-  type: 'student' | 'class' | 'attendance' | 'billing',
+  type: 'student' | 'class' | 'attendance' | 'billing' | 'message' | 'dashboard',
   tenantId: string
 ): void {
   memoryCache.invalidatePattern(`${type}:${tenantId}:*`);

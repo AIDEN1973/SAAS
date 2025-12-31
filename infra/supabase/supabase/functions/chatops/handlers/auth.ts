@@ -8,12 +8,29 @@
 import { maskErr } from './utils.ts';
 
 /**
- * 🔧 FIX: P0-SEC - service role 쿼리는 반드시 tenant_id 조건을 강제한다.
+ * P0-10: tenant_id 검증 함수 (값 변환 없이 검증만 수행)
+ *
+ * [불변 규칙] service role 쿼리는 반드시 tenant_id 조건을 강제합니다.
+ *
+ * @param tenantId 검증할 tenant_id
+ * @returns 검증된 tenant_id (입력값 그대로 반환, 변환 없음)
+ * @throws {Error} tenant_id가 유효하지 않으면 에러 발생
+ *
+ * @example
+ * ```typescript
+ * // ✅ 권장 패턴: 검증과 사용 분리
+ * requireTenantScope(context.tenant_id);  // 검증만
+ * .eq('tenant_id', context.tenant_id)     // 원본 사용
+ *
+ * // ⚠️ 기존 패턴 (작동은 하지만 의도가 불명확)
+ * .eq('tenant_id', requireTenantScope(context.tenant_id))
+ * ```
  */
 export function requireTenantScope(tenantId: string): string {
   if (!tenantId || typeof tenantId !== 'string' || tenantId.length < 10) {
     throw new Error('SECURITY_GUARD: invalid tenant_id for scoped query');
   }
+  // 중요: 입력값을 그대로 반환 (변환 없음)
   return tenantId;
 }
 

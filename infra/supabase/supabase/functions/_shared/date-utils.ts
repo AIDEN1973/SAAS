@@ -55,3 +55,72 @@ export function toKSTISOString(date?: Date | string): string {
   return kstTime.toISOString();
 }
 
+/**
+ * P0-13: KST 날짜 범위 필터용 UTC 타임스탬프 생성
+ *
+ * Postgres timestamptz 컬럼을 KST 날짜 기준으로 필터링하기 위해
+ * KST 00:00:00을 UTC로 변환합니다.
+ *
+ * @param kstDate - KST 기준 날짜 문자열 (YYYY-MM-DD)
+ * @returns UTC 기준 ISO 타임스탬프 (YYYY-MM-DDTHH:MM:SS.sssZ)
+ *
+ * @example
+ * ```typescript
+ * // KST 2024-01-15 00:00:00 → UTC 2024-01-14 15:00:00
+ * const start = kstDateToUTC('2024-01-15');
+ * const end = kstDateToUTC('2024-01-16');
+ * query.gte('created_at', start).lt('created_at', end);
+ * ```
+ */
+export function kstDateToUTC(kstDate: string): string {
+  // KST YYYY-MM-DD 00:00:00을 UTC로 변환
+  const [year, month, day] = kstDate.split('-').map(Number);
+  const kstMidnight = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+
+  // KST는 UTC+9이므로 9시간을 빼서 UTC로 변환
+  const utcTime = new Date(kstMidnight.getTime() - 9 * 60 * 60 * 1000);
+  return utcTime.toISOString();
+}
+
+/**
+ * P0-13: 다음 날짜의 KST 00:00:00을 UTC로 변환
+ *
+ * @param kstDate - KST 기준 날짜 문자열 (YYYY-MM-DD)
+ * @returns 다음 날 00:00:00의 UTC ISO 타임스탬프
+ */
+export function nextKSTDateToUTC(kstDate: string): string {
+  const [year, month, day] = kstDate.split('-').map(Number);
+  const kstMidnight = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+
+  // 다음 날 00:00:00 (KST)
+  const nextDay = new Date(kstMidnight.getTime() + 24 * 60 * 60 * 1000);
+
+  // UTC로 변환 (9시간 빼기)
+  const utcTime = new Date(nextDay.getTime() - 9 * 60 * 60 * 1000);
+  return utcTime.toISOString();
+}
+
+/**
+ * P0-13: 다음 월의 KST 00:00:00을 UTC로 변환
+ *
+ * @param kstMonth - KST 기준 월 문자열 (YYYY-MM)
+ * @returns 다음 월 1일 00:00:00의 UTC ISO 타임스탬프
+ */
+export function nextKSTMonthToUTC(kstMonth: string): string {
+  const [year, month] = kstMonth.split('-').map(Number);
+
+  // 다음 월 1일 00:00:00 (KST)
+  let nextYear = year;
+  let nextMonth = month + 1;
+  if (nextMonth > 12) {
+    nextYear++;
+    nextMonth = 1;
+  }
+
+  const kstFirstDay = new Date(Date.UTC(nextYear, nextMonth - 1, 1, 0, 0, 0, 0));
+
+  // UTC로 변환 (9시간 빼기)
+  const utcTime = new Date(kstFirstDay.getTime() - 9 * 60 * 60 * 1000);
+  return utcTime.toISOString();
+}
+

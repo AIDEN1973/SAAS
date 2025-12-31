@@ -18,11 +18,12 @@ import { getTenantIdFromVerifiedUser, requireTenantScope } from './handlers/auth
 import { getCorsHeaders } from './handlers/cors.ts';
 import { maskErr, tenantLogKey } from './handlers/utils.ts';
 // 🚀 AGENT-MODE: Agent 엔진 import
-import { runAgent, type AgentMessage } from '../_shared/agent-engine-final.ts';
+import { runAgent, runAgentStreaming, type AgentMessage } from '../_shared/agent-engine-final.ts';
 
 interface ChatOpsRequest {
   session_id: string;
   message: string;
+  stream?: boolean;  // 스트리밍 옵션
 }
 
 interface ChatOpsResponse {
@@ -144,12 +145,12 @@ serve(async (req: Request) => {
       .select('industry_type')
       .eq('id', tenant_id)
       .single();
-    
+
     const industryType = tenantData?.industry_type || 'academy';
 
     // 요청 파싱
     const body: ChatOpsRequest = await req.json();
-    const { session_id, message } = body;
+    const { session_id, message, stream = false } = body;
 
     if (!session_id || !message) {
       return new Response(
@@ -180,17 +181,18 @@ serve(async (req: Request) => {
         onConflict: 'id',
         ignoreDuplicates: true,  // 기존 세션은 업데이트하지 않음
       });
-    
+
     console.log('[ChatOps] 세션 준비 완료:', { session_id: session_id.substring(0, 8) + '...' });
 
-    // 대화 히스토리 조회 (최근 6개로 제한 - 응답 시간 최적화)
+    // P0-FIX: 대화 히스토리 조회 (최근 10개로 증가 - Draft ID 유지 보장)
+    // 이유: Draft 생성 + 중간 대화 + 동의 턴을 모두 포함하려면 최소 10개 필요
     const { data: recentMessages } = await supabaseSvc
         .from('chatops_messages')
         .select('role, content')
         .eq('session_id', session_id)
         .eq('tenant_id', requireTenantScope(tenant_id))
         .order('created_at', { ascending: false })
-      .limit(6);
+      .limit(10);
 
     console.log('[ChatOps] 최근 메시지 조회 성공:', { count: recentMessages?.length || 0 });
 
@@ -201,66 +203,166 @@ serve(async (req: Request) => {
         content: msg.content,
       }));
 
-    // 🚀 AGENT-MODE: Agent 실행
-    console.log('[ChatOps] Agent 모드로 처리 시작');
+    // 🚀 AGENT-MODE: Agent 실행 (스트리밍 또는 일반)
+    if (stream) {
+      console.log('[ChatOps] Agent 스트리밍 모드로 처리 시작');
 
-    const agentResult = await runAgent(
-      message,
-      conversationHistory,
-      {
+      // 사용자 메시지 즉시 저장
+      await supabaseSvc.from('chatops_messages').insert({
+        session_id: session_id,
         tenant_id: requireTenantScope(tenant_id),
         user_id: user_id,
-        session_id: session_id,
-        supabase: supabaseSvc,
-        openai_api_key: openaiApiKey,
-        industry_type: industryType,  // 성능 최적화: industry_type 전달
-      },
-      3 // maxIterations (5→3 감소: 응답 시간 최적화)
-    );
+        role: 'user',
+        content: message,
+      });
 
-    console.log('[ChatOps] Agent 처리 완료:', {
-      response_length: agentResult.response.length,
-      tool_count: agentResult.tool_results?.length || 0,
-      usage: agentResult.usage,
-    });
-
-    // 메시지 저장
-    await supabaseSvc.from('chatops_messages').insert([
-      {
-          session_id: session_id,
+      const originalStream = await runAgentStreaming(
+        message,
+        conversationHistory,
+        {
           tenant_id: requireTenantScope(tenant_id),
           user_id: user_id,
-          role: 'user',
-          content: message,
-      },
-      {
           session_id: session_id,
-          tenant_id: requireTenantScope(tenant_id),
-          user_id: user_id,
-          role: 'assistant',
-        content: agentResult.response,
-      },
-    ]);
+          supabase: supabaseSvc,
+          openai_api_key: openaiApiKey,
+          industry_type: industryType,
+        },
+        3
+      );
 
-    console.log('[ChatOps] ===== 최종 응답 반환 =====');
-    console.log('[ChatOps] 최종 응답:', {
-      response_length: agentResult.response.length,
-      agent_mode: true,
-      tool_count: agentResult.tool_results?.length || 0,
-    });
+      // P1-13: 스트리밍 응답을 가로채서 assistant 메시지를 DB에 저장
+      let fullResponse = '';
+      const wrappedStream = new ReadableStream({
+        async start(controller) {
+          const reader = originalStream.getReader();
+          const decoder = new TextDecoder();
 
-    return new Response(
-      JSON.stringify({
-        response: agentResult.response,
-        agent_mode: true,
-        tool_results: agentResult.tool_results,
-        usage: agentResult.usage,
-      } as ChatOpsResponse),
-      {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              // 클라이언트로 전달
+              controller.enqueue(value);
+
+              // 전체 응답 수집
+              const chunk = decoder.decode(value, { stream: true });
+              const lines = chunk.split('\n');
+              for (const line of lines) {
+                if (line.trim().startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.trim().slice(6));
+                    if (data.type === 'content') {
+                      fullResponse += data.content;
+                    } else if (data.type === 'done') {
+                      // 스트리밍 완료 - assistant 메시지 저장
+                      fullResponse = data.fullResponse || fullResponse;
+                    }
+                  } catch {
+                    // JSON 파싱 실패는 무시
+                  }
+                }
+              }
+            }
+
+            // P0-FIX: 스트리밍 완료 - assistant 메시지 DB 저장 (스트림 종료 전)
+            // 중요: controller.close() 전에 DB 저장을 완료해야 다음 요청이 메시지를 볼 수 있음
+            if (fullResponse) {
+              const insertResult = await supabaseSvc.from('chatops_messages').insert({
+                session_id: session_id,
+                tenant_id: requireTenantScope(tenant_id),
+                user_id: user_id,
+                role: 'assistant',
+                content: fullResponse,
+              });
+
+              if (insertResult.error) {
+                console.error('[ChatOps] Assistant 메시지 저장 실패:', insertResult.error);
+              } else {
+                console.log('[ChatOps] Assistant 메시지 저장 완료:', { length: fullResponse.length });
+              }
+            }
+
+            // DB 저장 완료 후 스트림 종료
+            controller.close();
+          } catch (error) {
+            console.error('[ChatOps] 스트리밍 처리 오류:', error);
+            controller.error(error);
+          }
+        },
+      });
+
+      // SSE 헤더 설정
+      return new Response(wrappedStream, {
         status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
+    } else {
+      console.log('[ChatOps] Agent 일반 모드로 처리 시작');
+
+      const agentResult = await runAgent(
+        message,
+        conversationHistory,
+        {
+          tenant_id: requireTenantScope(tenant_id),
+          user_id: user_id,
+          session_id: session_id,
+          supabase: supabaseSvc,
+          openai_api_key: openaiApiKey,
+          industry_type: industryType,  // 성능 최적화: industry_type 전달
+        },
+        3 // maxIterations (5→3 감소: 응답 시간 최적화)
+      );
+
+      console.log('[ChatOps] Agent 처리 완료:', {
+        response_length: agentResult.response.length,
+        tool_count: agentResult.tool_results?.length || 0,
+        usage: agentResult.usage,
+      });
+
+      // 메시지 저장
+      await supabaseSvc.from('chatops_messages').insert([
+        {
+            session_id: session_id,
+            tenant_id: requireTenantScope(tenant_id),
+            user_id: user_id,
+            role: 'user',
+            content: message,
+        },
+        {
+            session_id: session_id,
+            tenant_id: requireTenantScope(tenant_id),
+            user_id: user_id,
+            role: 'assistant',
+          content: agentResult.response,
+        },
+      ]);
+
+      console.log('[ChatOps] ===== 최종 응답 반환 =====');
+      console.log('[ChatOps] 최종 응답:', {
+        response_length: agentResult.response.length,
+        agent_mode: true,
+        tool_count: agentResult.tool_results?.length || 0,
+      });
+
+      return new Response(
+        JSON.stringify({
+          response: agentResult.response,
+          agent_mode: true,
+          tool_results: agentResult.tool_results,
+          usage: agentResult.usage,
+        } as ChatOpsResponse),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
   } catch (error) {
     console.error('[ChatOps] 오류 발생:', maskErr(error));
     const origin = req.headers.get('origin');

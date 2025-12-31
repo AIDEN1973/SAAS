@@ -29,6 +29,7 @@ interface AILayerMenuContextType {
   // ChatOps 상태
   chatOpsMessages: ChatOpsMessage[];
   addChatOpsMessage: (message: ChatOpsMessage) => void;
+  updateChatOpsMessage: (messageId: string, updates: Partial<ChatOpsMessage>) => void;
   clearChatOpsMessages: () => void;
   chatOpsLoading: boolean;
   setChatOpsLoading: (loading: boolean) => void;
@@ -157,6 +158,12 @@ export function AILayerMenuProvider({ children }: { children: ReactNode }) {
     setChatOpsMessages((prev) => [...prev, message]);
   }, []);
 
+  const updateChatOpsMessage = useCallback((messageId: string, updates: Partial<ChatOpsMessage>) => {
+    setChatOpsMessages((prev) =>
+      prev.map((msg) => (msg.id === messageId ? { ...msg, ...updates } : msg))
+    );
+  }, []);
+
   const clearChatOpsMessages = useCallback(() => {
     setChatOpsMessages([]);
     // session_id도 초기화 (새 대화 시작)
@@ -199,6 +206,7 @@ export function AILayerMenuProvider({ children }: { children: ReactNode }) {
         setActiveTab,
         chatOpsMessages,
         addChatOpsMessage,
+        updateChatOpsMessage,
         clearChatOpsMessages,
         chatOpsLoading,
         setChatOpsLoading,

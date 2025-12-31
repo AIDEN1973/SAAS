@@ -491,4 +491,5 @@ export const AGENT_TOOLS: AgentTool[] = [
  * Tool 이름으로 Tool 정의 조회
  */
 export function getToolByName(toolName: string): AgentTool | undefined {
-  return AGENT_TOOLS.fin
+  return AGENT_TOOLS.find(tool => tool.function.name === toolName);
+}
