@@ -16,14 +16,16 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, Container, Card, PageHeader, Switch, useResponsiveMode, isMobile, isTablet } from '@ui-core/react';
+import { ErrorBoundary, useModal, Container, Card, PageHeader, Switch, NotificationCardLayout, Badge } from '@ui-core/react';
 import { getApiContext } from '@api-sdk/core';
-import { AUTOMATION_EVENT_CATALOG } from '@core/core-automation';
+import { AUTOMATION_EVENT_CATALOG, AUTOMATION_EVENT_PLANNED } from '@core/core-automation';
 // [SSOT] Barrel export를 통한 통합 import
 import { AUTOMATION_EVENT_DESCRIPTIONS, POLICY_KEY_V2_CATEGORIES, AUTOMATION_EVENT_CRITERIA_FIELDS } from '../constants';
+import { Zap, Settings } from 'lucide-react';
 import { useTenantSettingByPath, useUpdateConfig, useConfig } from '@hooks/use-config';
 // [SSOT] Barrel export를 통한 통합 import
-import { getPolicyValueFromConfig, getAutomationEventPolicyPath, logInfo, logWarn } from '../utils';
+import { getPolicyValueFromConfig, getAutomationEventPolicyPath, extractFieldPathFromPolicyPath, setPolicyValueByPath, logInfo, logWarn } from '../utils';
+import { CardGridLayout } from '../components/CardGridLayout';
 
 type AutomationEventType = (typeof AUTOMATION_EVENT_CATALOG)[number];
 
@@ -51,105 +53,73 @@ function AutomationCard({ eventType, isEnabled, criteriaValues, isEditing, onEdi
     );
   }
 
-  // 일반 모드: 카드 표시
+  // 기준 필드 표시 텍스트 생성
+  const criteriaText = criteriaFields.length > 0 ? criteriaFields.map((field) => {
+    const value = criteriaValues?.[field.field];
+    if (value === null || value === undefined) return null;
+
+    let displayValue: string;
+    if (field.type === 'select' && field.options) {
+      const option = field.options.find((opt) => String(opt.value) === String(value));
+      displayValue = option ? option.label : String(value);
+    } else if (field.type === 'boolean') {
+      displayValue = value ? '예' : '아니오';
+    } else {
+      displayValue = String(value);
+    }
+
+    // 단위 추가
+    let unit = '';
+    if (field.type === 'number') {
+      if (field.label.includes('일')) unit = '일';
+      else if (field.label.includes('시간')) unit = '시간';
+      else if (field.label.includes('분')) unit = '분';
+      else if (field.label.includes('원')) unit = '원';
+      else if (field.label.includes('%')) unit = '%';
+      else if (field.label.includes('위')) unit = '위';
+      else if (field.label.includes('배수')) unit = '배';
+      else if (field.label.includes('개')) unit = '개';
+    }
+
+    return `${field.label}: ${displayValue}${unit ? ` ${unit}` : ''}`;
+  }).filter(Boolean).join(' · ') : '';
+
+  // 메타 정보: 상태 배지 + 기준 필드
+  const metaContent = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
+      <Badge
+        variant={isEnabled ? 'solid' : 'soft'}
+        color={isEnabled ? 'success' : 'gray'}
+        style={{ fontSize: 'var(--font-size-xs)' }}
+      >
+        {isEnabled ? '사용중' : '사용중단'}
+      </Badge>
+      {criteriaText && (
+        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+          {criteriaText}
+        </span>
+      )}
+    </div>
+  );
+
+  // 일반 모드: NotificationCardLayout 사용
   return (
-    <Card
-      padding="md"
-      variant={isEnabled ? 'default' : 'outlined'}
-      onClick={onClick || onEdit}
+    <div
       style={{
         cursor: 'pointer',
-        transition: 'var(--transition-all)',
         opacity: isEnabled ? 'var(--opacity-full)' : 'var(--opacity-secondary)',
-        borderLeft: `var(--border-width-medium) solid ${isEnabled ? 'var(--color-primary)' : 'var(--color-border)'}`,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = `translateY(calc(var(--spacing-xxs) * -1))`;
-        e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = 'none';
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--spacing-xs)' }}>
-        <h3
-          style={{
-            fontSize: 'var(--font-size-base)',
-            fontWeight: 'var(--font-weight-semibold)',
-            color: 'var(--color-text)',
-            margin: 0,
-            flex: 1,
-          }}
-        >
-          {description.title}
-        </h3>
-        <div
-          style={{
-            padding: 'var(--spacing-xs)',
-            borderRadius: 'var(--radius-sm)',
-            backgroundColor: isEnabled ? 'var(--color-success-light)' : 'var(--color-background-secondary)',
-            color: isEnabled ? 'var(--color-success)' : 'var(--color-text-secondary)',
-            fontSize: 'var(--font-size-xs)',
-            fontWeight: 'var(--font-weight-medium)',
-            whiteSpace: 'nowrap',
-            marginLeft: 'var(--spacing-sm)',
-          }}
-        >
-          {isEnabled ? '사용중' : '사용중단'}
-        </div>
-      </div>
-      <p
-        style={{
-          fontSize: 'var(--font-size-sm)',
-          color: 'var(--color-text-secondary)',
-          margin: 0,
-          lineHeight: 'var(--line-height)',
-          marginBottom: criteriaFields.length > 0 ? 'var(--spacing-xs)' : 0,
-        }}
-      >
-        {description.description}
-      </p>
-      {criteriaFields.length > 0 && (
-        <div style={{ marginTop: 'var(--spacing-xs)', paddingTop: 'var(--spacing-xs)', borderTop: 'var(--border-width-thin) solid var(--color-border)' }}>
-          {criteriaFields.map((field) => {
-            const value = criteriaValues?.[field.field];
-
-            // 값이 없으면 표시하지 않음 (기본값이 설정되어 있으면 표시됨)
-            if (value === null || value === undefined) return null;
-
-            let displayValue: string;
-            if (field.type === 'select' && field.options) {
-              const option = field.options.find((opt) => String(opt.value) === String(value));
-              displayValue = option ? option.label : String(value);
-            } else if (field.type === 'boolean') {
-              displayValue = value ? '예' : '아니오';
-            } else {
-              displayValue = String(value);
-            }
-
-            // 단위 추가
-            let unit = '';
-            if (field.type === 'number') {
-              if (field.label.includes('일')) unit = '일';
-              else if (field.label.includes('시간')) unit = '시간';
-              else if (field.label.includes('분')) unit = '분';
-              else if (field.label.includes('원')) unit = '원';
-              else if (field.label.includes('%')) unit = '%';
-              else if (field.label.includes('위')) unit = '위';
-              else if (field.label.includes('배수')) unit = '배';
-              else if (field.label.includes('개')) unit = '개';
-            }
-
-            return (
-              <div key={field.field} style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-xxs)' }}>
-                {field.label}: {displayValue}{unit && ` ${unit}`}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </Card>
+      <NotificationCardLayout
+        icon={isEnabled ? <Zap /> : <Settings />}
+        title={description.title}
+        description={description.description}
+        meta={metaContent}
+        variant="default"
+        onClick={onClick || onEdit}
+        iconBackgroundColor={isEnabled ? 'var(--color-primary-50)' : 'var(--color-gray-100)'}
+      />
+    </div>
   );
 }
 
@@ -214,36 +184,22 @@ function AutomationSettingsCard({ eventType, onCancel }: AutomationSettingsCardP
       const eventConfig = (autoNotification[eventType] || {}) as Record<string, unknown>;
 
       // enabled 값 업데이트
-      const updatedEventConfig: Record<string, unknown> = {
+      let updatedEventConfig: Record<string, unknown> = {
         ...eventConfig,
         enabled: values.enabled,
       };
 
       // 기준 필드 값 업데이트
+      // [SSOT] setPolicyValueByPath 유틸리티 사용하여 중첩 경로 처리 통일
       criteriaFields.forEach((field) => {
         const value = values.criteria[field.field];
         if (value !== null && value !== undefined) {
-          // [SSOT] Policy 경로를 헬퍼 함수로 생성하여 하드코딩 방지
-          // 중첩 경로 처리 (예: throttle.daily_limit)
-          // field.policyPath는 SSOT 원칙을 준수하는 형식이지만, 경로 파싱을 위해 사용
-          // SSOT 원칙 준수: field.policyPath는 AUTOMATION_EVENT_CRITERIA_FIELDS에 정의된 SSOT 경로
-          const pathParts = field.policyPath.split('.');
-          if (pathParts.length > 3) {
-            // auto_notification.eventType.throttle.daily_limit 같은 경우
-            const nestedKey = pathParts.slice(2).join('.');
-            const keys = nestedKey.split('.');
-            let current = updatedEventConfig;
-            for (let i = 0; i < keys.length - 1; i++) {
-              if (!current[keys[i]]) {
-                current[keys[i]] = {};
-              }
-              current = current[keys[i]] as Record<string, unknown>;
-            }
-            current[keys[keys.length - 1]] = value;
-          } else {
-            // auto_notification.eventType.field 같은 경우
-            const fieldName = pathParts[pathParts.length - 1];
-            updatedEventConfig[fieldName] = value;
+          // [SSOT] extractFieldPathFromPolicyPath를 사용하여 eventType 이후 경로만 추출
+          // 예: 'auto_notification.payment_due_reminder.throttle.daily_limit' -> 'throttle.daily_limit'
+          const fieldPath = extractFieldPathFromPolicyPath(field.policyPath, eventType);
+          if (fieldPath) {
+            // [SSOT] setPolicyValueByPath 사용하여 중첩 경로 안전하게 설정
+            updatedEventConfig = setPolicyValueByPath(updatedEventConfig, fieldPath, value);
           }
         }
       });
@@ -261,15 +217,8 @@ function AutomationSettingsCard({ eventType, onCancel }: AutomationSettingsCardP
       return updateConfig.mutateAsync(updateInput);
     },
     onSuccess: () => {
-      // 모든 관련 쿼리 무효화
-      void queryClient.invalidateQueries({ queryKey: ['config', tenantId, 'path', enabledPolicyPath] });
-      criteriaFields.forEach((field) => {
-        // [SSOT] Policy 경로를 헬퍼 함수로 생성하여 하드코딩 방지
-        // field.policyPath는 SSOT 원칙을 준수하는 형식이지만, 쿼리 무효화를 위해 사용
-        // SSOT 원칙 준수: field.policyPath는 AUTOMATION_EVENT_CRITERIA_FIELDS에 정의된 SSOT 경로
-        const policyPath = field.policyPath;
-        void queryClient.invalidateQueries({ queryKey: ['config', tenantId, 'path', policyPath] });
-      });
+      // [최적화] 상위 쿼리 무효화 시 하위 쿼리도 자동으로 무효화됨 (queryKey prefix matching)
+      // ['config', tenantId] 무효화 → ['config', tenantId, 'path', *] 모두 자동 무효화
       void queryClient.invalidateQueries({ queryKey: ['config', tenantId] });
       showAlert('자동화 설정이 저장되었습니다.', '성공');
       onCancel();
@@ -549,27 +498,46 @@ function AutomationSettingsCard({ eventType, onCancel }: AutomationSettingsCardP
   );
 }
 
-// status='planned' 항목 목록 (문서 Section 11 참조)
-const PLANNED_EVENTS: AutomationEventType[] = [
-  'inquiry_conversion_drop',
-  'birthday_greeting',
-  'enrollment_anniversary',
-  'announcement_urgent',
-  'announcement_digest',
-  'staff_absence_schedule_risk',
-];
+// [SSOT] status='planned' 항목은 @core/core-automation의 AUTOMATION_EVENT_PLANNED에서 가져옴
 
 export function AutomationSettingsPage() {
   const [editingEventType, setEditingEventType] = useState<AutomationEventType | null>(null);
-  const [showPlanned, setShowPlanned] = useState(false);
-  const mode = useResponsiveMode();
+
+  // [P1 개선] showPlanned 상태 지속성: localStorage 기반 상태 관리
+  // 페이지 이탈 후 재방문 시에도 토글 상태 유지
+  const [showPlanned, setShowPlanned] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('automation-settings-show-planned');
+      return stored === 'true';
+    } catch (error) {
+      // localStorage 접근 실패 시 기본값 반환 (SSR 환경 등)
+      if (import.meta.env?.DEV) {
+        logWarn('AutomationSettingsPage', 'localStorage 접근 실패, 기본값 사용', { error });
+      }
+      return false;
+    }
+  });
+
+  // showPlanned 변경 시 localStorage에 저장
+  const handleTogglePlanned = (checked: boolean) => {
+    setShowPlanned(checked);
+    try {
+      localStorage.setItem('automation-settings-show-planned', String(checked));
+    } catch (error) {
+      // localStorage 저장 실패 시 경고 (쿠키 차단, 프라이빗 모드 등)
+      if (import.meta.env?.DEV) {
+        logWarn('AutomationSettingsPage', 'localStorage 저장 실패', { error });
+      }
+    }
+  };
 
   // 표시할 event_type 목록 필터링
   const visibleEvents = useMemo(() => {
     if (showPlanned) {
       return AUTOMATION_EVENT_CATALOG;
     }
-    return AUTOMATION_EVENT_CATALOG.filter((eventType) => !PLANNED_EVENTS.includes(eventType));
+    // [SSOT] AUTOMATION_EVENT_PLANNED는 @core/core-automation에서 가져옴
+    return AUTOMATION_EVENT_CATALOG.filter((eventType) => !AUTOMATION_EVENT_PLANNED.includes(eventType));
   }, [showPlanned]);
 
   // 카테고리별로 그룹화
@@ -600,15 +568,6 @@ export function AutomationSettingsPage() {
       }));
   }, [visibleEvents]);
 
-  // [SSOT] 반응형 그리드 컬럼 수 계산 (3열 기본, 모바일은 1열, 태블릿은 2열)
-  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
-  const gridColumns = useMemo(() => {
-    if (isMobile(modeUpper)) return 1;
-    if (isTablet(modeUpper)) return 2;
-    return 3; // lg, xl (desktop)
-  }, [modeUpper]);
-
-
   return (
     <ErrorBoundary>
       <Container>
@@ -629,7 +588,7 @@ export function AutomationSettingsPage() {
             >
               준비중 포함
             </label>
-            <Switch checked={showPlanned} onChange={(e) => setShowPlanned(e.target.checked)} />
+            <Switch checked={showPlanned} onChange={(e) => handleTogglePlanned(e.target.checked)} />
           </div>
         </div>
 
@@ -664,25 +623,20 @@ export function AutomationSettingsPage() {
               </div>
 
               {/* 반응형 그리드 레이아웃 (3열 기본, 모바일 1열, 태블릿 2열) */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${gridColumns}, 1fr)`,
-                  gap: 'var(--spacing-md)',
-                }}
-              >
-                {events.map((eventType) => {
-                  return (
-                    <AutomationCardWithState
-                      key={eventType}
-                      eventType={eventType}
-                      isEditing={editingEventType === eventType}
-                      onEdit={() => setEditingEventType(eventType)}
-                      onCancel={() => setEditingEventType(null)}
-                    />
-                  );
-                })}
-              </div>
+              <CardGridLayout
+                cards={events.map((eventType) => (
+                  <AutomationCardWithState
+                    key={eventType}
+                    eventType={eventType}
+                    isEditing={editingEventType === eventType}
+                    onEdit={() => setEditingEventType(eventType)}
+                    onCancel={() => setEditingEventType(null)}
+                  />
+                ))}
+                desktopColumns={3}
+                tabletColumns={2}
+                mobileColumns={1}
+              />
             </div>
           );
         })}

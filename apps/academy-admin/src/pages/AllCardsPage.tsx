@@ -297,7 +297,7 @@ export function AllCardsPage() {
               mobileColumns={1}
             />
           ) : (
-            <Card padding="lg" variant="default">
+            <Card padding="lg">
               <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>
                 <p style={{ marginBottom: 'var(--spacing-md)' }}>
                   표시할 카드가 없습니다.

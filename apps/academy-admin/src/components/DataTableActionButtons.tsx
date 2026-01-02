@@ -15,7 +15,7 @@ import { IconButtonGroup, type IconButtonItem } from '@ui-core/react';
 
 // Plus 아이콘 (커스텀 SVG) - LucideIcon과 호환되도록 forwardRef 사용
 export const PlusIcon = forwardRef<SVGSVGElement, LucideProps>(
-  ({ size = 24, strokeWidth = 2, className, ...props }, ref) => (
+  ({ size = 24, strokeWidth = 2, className, style, ...props }, ref) => (
     <svg
       ref={ref}
       xmlns="http://www.w3.org/2000/svg"
@@ -29,7 +29,10 @@ export const PlusIcon = forwardRef<SVGSVGElement, LucideProps>(
       strokeLinejoin="round"
       className={className}
       style={{
-        display: 'block', // 중앙 정렬을 위해 block으로 설정
+        display: 'inline-block', // inline-block으로 변경하여 버튼 내부에서 제대로 표시되도록
+        verticalAlign: 'middle', // 중앙 정렬
+        flexShrink: 0, // 축소 방지
+        ...style,
       }}
       {...props}
     >

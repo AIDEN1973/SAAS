@@ -60,17 +60,24 @@ export const POLICY_KEY_V2_CATEGORIES: Record<
  * 동적 경로 생성 시 `getAutomationEventPolicyPath(eventType, field)` 함수를 사용하세요.
  * 이 상수 정의는 정적이므로 함수 호출이 불가능하나, 경로 형식은 SSOT 원칙을 준수합니다.
  */
+/**
+ * Automation Event Criteria Field 타입 정의
+ */
+export interface AutomationEventCriteriaField {
+  field: string;
+  label: string;
+  type: 'number' | 'string' | 'select' | 'boolean';
+  policyPath: string;
+  options?: Array<{ value: string | number; label: string }>;
+  min?: number;
+  max?: number;
+  /** 기본값 (Policy가 없을 때 UI에 표시할 값) */
+  defaultValue?: string | number | boolean;
+}
+
 export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
   AutomationEventType,
-  Array<{
-    field: string;
-    label: string;
-    type: 'number' | 'string' | 'select' | 'boolean';
-    policyPath: string;
-    options?: Array<{ value: string | number; label: string }>;
-    min?: number;
-    max?: number;
-  }>
+  AutomationEventCriteriaField[]
 > = {
   // financial_health (10)
   payment_due_reminder: [
@@ -83,6 +90,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
     {
       field: 'days_before_first',
@@ -90,6 +98,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.payment_due_reminder.days_before_first',
       min: 1,
+      defaultValue: 3,
     },
     {
       field: 'days_before_second',
@@ -97,6 +106,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.payment_due_reminder.days_before_second',
       min: 1,
+      defaultValue: 1,
     },
   ],
   invoice_partial_balance: [
@@ -109,6 +119,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
   ],
   recurring_payment_failed: [
@@ -121,6 +132,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
   ],
   revenue_target_under: [
@@ -130,6 +142,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.revenue_target_under.monthly_target',
       min: 0,
+      defaultValue: 10000000,
     },
   ],
   collection_rate_drop: [
@@ -139,6 +152,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.collection_rate_drop.threshold',
       min: 0,
+      defaultValue: 90,
     },
   ],
   overdue_outstanding_over_limit: [
@@ -151,6 +165,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
     {
       field: 'limit_amount',
@@ -158,6 +173,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.overdue_outstanding_over_limit.limit_amount',
       min: 0,
+      defaultValue: 500000,
     },
   ],
   revenue_required_per_day: [
@@ -167,6 +183,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.revenue_required_per_day.monthly_target',
       min: 0,
+      defaultValue: 10000000,
     },
   ],
   top_overdue_customers_digest: [],
@@ -177,6 +194,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.refund_spike.threshold',
       min: 1,
+      defaultValue: 2,
     },
   ],
   monthly_business_report: [
@@ -187,6 +205,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       policyPath: 'auto_notification.monthly_business_report.report_day',
       min: 1,
       max: 28,
+      defaultValue: 1,
     },
   ],
 
@@ -199,6 +218,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       policyPath: 'auto_notification.class_fill_rate_low_persistent.threshold',
       min: 0,
       max: 100,
+      defaultValue: 50,
     },
     {
       field: 'persistent_days',
@@ -206,6 +226,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.class_fill_rate_low_persistent.persistent_days',
       min: 1,
+      defaultValue: 7,
     },
   ],
   ai_suggest_class_merge: [],
@@ -217,6 +238,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       policyPath: 'auto_notification.time_slot_fill_rate_low.threshold',
       min: 0,
       max: 100,
+      defaultValue: 30,
     },
   ],
   high_fill_rate_expand_candidate: [
@@ -227,6 +249,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       policyPath: 'auto_notification.high_fill_rate_expand_candidate.threshold',
       min: 0,
       max: 100,
+      defaultValue: 90,
     },
   ],
   unused_class_persistent: [
@@ -236,6 +259,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.unused_class_persistent.persistent_days',
       min: 1,
+      defaultValue: 30,
     },
   ],
   weekly_ops_summary: [
@@ -253,6 +277,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 5, label: '금요일' },
         { value: 6, label: '토요일' },
       ],
+      defaultValue: 1,
     },
   ],
 
@@ -267,6 +292,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
     {
       field: 'minutes_before',
@@ -274,6 +300,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.class_reminder_today.minutes_before',
       min: 1,
+      defaultValue: 30,
     },
   ],
   class_schedule_tomorrow: [
@@ -286,12 +313,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
     {
       field: 'notification_time',
       label: '알림 발송 시간 (HH:mm)',
       type: 'string',
       policyPath: 'auto_notification.class_schedule_tomorrow.notification_time',
+      defaultValue: '20:00',
     },
   ],
   consultation_reminder: [
@@ -304,6 +333,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
     {
       field: 'hours_before_first',
@@ -311,6 +341,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.consultation_reminder.hours_before_first',
       min: 1,
+      defaultValue: 24,
     },
     {
       field: 'hours_before_second',
@@ -318,6 +349,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.consultation_reminder.hours_before_second',
       min: 1,
+      defaultValue: 2,
     },
   ],
   absence_first_day: [
@@ -330,6 +362,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
   ],
   churn_increase: [
@@ -339,6 +372,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.churn_increase.threshold',
       min: 1,
+      defaultValue: 2,
     },
   ],
   ai_suggest_churn_focus: [],
@@ -349,6 +383,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.attendance_rate_drop_weekly.threshold',
       min: 0,
+      defaultValue: 10,
     },
   ],
   risk_students_weekly_kpi: [],
@@ -362,6 +397,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       policyPath: 'auto_notification.new_member_drop.threshold',
       min: 0,
       max: 100,
+      defaultValue: 20,
     },
   ],
   inquiry_conversion_drop: [
@@ -371,6 +407,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.inquiry_conversion_drop.threshold',
       min: 0,
+      defaultValue: 10,
     },
   ],
   birthday_greeting: [
@@ -383,12 +420,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
     {
       field: 'require_approval',
       label: '승인 필요',
       type: 'boolean',
       policyPath: 'auto_notification.birthday_greeting.require_approval',
+      defaultValue: true,
     },
   ],
   enrollment_anniversary: [
@@ -401,12 +440,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
     {
       field: 'require_approval',
       label: '승인 필요',
       type: 'boolean',
       policyPath: 'auto_notification.enrollment_anniversary.require_approval',
+      defaultValue: true,
     },
   ],
   regional_underperformance: [
@@ -416,6 +457,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.regional_underperformance.threshold',
       min: 0,
+      defaultValue: 20,
     },
   ],
   regional_rank_drop: [
@@ -425,6 +467,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.regional_rank_drop.threshold',
       min: 1,
+      defaultValue: 5,
     },
   ],
 
@@ -439,6 +482,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
   ],
   checkin_reminder: [
@@ -451,6 +495,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
     {
       field: 'minutes_before',
@@ -458,6 +503,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.checkin_reminder.minutes_before',
       min: 1,
+      defaultValue: 15,
     },
   ],
   checkout_missing_alert: [
@@ -470,6 +516,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
     {
       field: 'grace_period_minutes',
@@ -477,6 +524,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.checkout_missing_alert.grace_period_minutes',
       min: 0,
+      defaultValue: 10,
     },
   ],
   announcement_urgent: [
@@ -489,12 +537,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
     {
       field: 'require_approval',
       label: '승인 필요',
       type: 'boolean',
       policyPath: 'auto_notification.announcement_urgent.require_approval',
+      defaultValue: false,
     },
   ],
   announcement_digest: [
@@ -507,12 +557,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
     {
       field: 'require_approval',
       label: '승인 필요',
       type: 'boolean',
       policyPath: 'auto_notification.announcement_digest.require_approval',
+      defaultValue: true,
     },
     {
       field: 'digest_period',
@@ -523,6 +575,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'weekly', label: '주간' },
         { value: 'monthly', label: '월간' },
       ],
+      defaultValue: 'weekly',
     },
   ],
   consultation_summary_ready: [
@@ -532,6 +585,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.consultation_summary_ready.min_length',
       min: 1,
+      defaultValue: 50,
     },
     {
       field: 'channel',
@@ -542,12 +596,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
     {
       field: 'require_approval',
       label: '승인 필요',
       type: 'boolean',
       policyPath: 'auto_notification.consultation_summary_ready.require_approval',
+      defaultValue: true,
     },
   ],
   attendance_pattern_anomaly: [
@@ -557,6 +613,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.attendance_pattern_anomaly.threshold',
       min: 1,
+      defaultValue: 3,
     },
     {
       field: 'priority',
@@ -565,6 +622,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       policyPath: 'auto_notification.attendance_pattern_anomaly.priority',
       min: 0,
       max: 100,
+      defaultValue: 50,
     },
     {
       field: 'ttl_days',
@@ -572,6 +630,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.attendance_pattern_anomaly.ttl_days',
       min: 1,
+      defaultValue: 7,
     },
     {
       field: 'throttle_daily_limit',
@@ -579,6 +638,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.attendance_pattern_anomaly.throttle.daily_limit',
       min: 1,
+      defaultValue: 20,
     },
     {
       field: 'throttle_student_limit',
@@ -586,6 +646,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.attendance_pattern_anomaly.throttle.student_limit',
       min: 1,
+      defaultValue: 5,
     },
     {
       field: 'channel',
@@ -596,12 +657,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
         { value: 'sms', label: 'SMS' },
         { value: 'kakao_at', label: '카카오 알림톡' },
       ],
+      defaultValue: 'kakao_at',
     },
     {
       field: 'require_approval',
       label: '승인 필요',
       type: 'boolean',
       policyPath: 'auto_notification.attendance_pattern_anomaly.require_approval',
+      defaultValue: true,
     },
   ],
 
@@ -613,6 +676,7 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'number',
       policyPath: 'auto_notification.teacher_workload_imbalance.threshold',
       min: 1,
+      defaultValue: 5,
     },
   ],
   staff_absence_schedule_risk: [],

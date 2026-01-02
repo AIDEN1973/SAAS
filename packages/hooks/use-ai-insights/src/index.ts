@@ -5,6 +5,7 @@
 export {
   useAIInsights,
   fetchAIInsights,
+  useDismissAIInsight,
 } from './useAIInsights';
 
 export type {

@@ -24,6 +24,7 @@ export const ROUTES = {
   // 출석 관련
   ATTENDANCE: '/attendance',
   ATTENDANCE_BY_CLASS: (classId: string) => `/attendance?class_id=${classId}`,
+  KIOSK_CHECK_IN: '/kiosk-check-in',
 
   // 청구/수납 관련
   BILLING_HOME: '/billing/home',
@@ -35,7 +36,13 @@ export const ROUTES = {
   },
 
   // 반 관련
-  CLASSES_LIST: '/classes/list',
+  CLASSES: '/classes',
+
+  // 강사 관련
+  TEACHERS: '/teachers',
+
+  // 자동화 설정
+  AUTOMATION_SETTINGS: '/automation-settings',
 
   // AI 분석 관련
   AI_HOME: '/ai',

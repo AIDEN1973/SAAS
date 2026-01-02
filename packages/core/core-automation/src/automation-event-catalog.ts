@@ -87,6 +87,47 @@ export const AUTOMATION_EVENT_CATALOG = [
 export type AutomationEventType = (typeof AUTOMATION_EVENT_CATALOG)[number];
 
 /**
+ * Automation Event 상태
+ * - active: 현재 사용 가능한 자동화
+ * - planned: 구현 예정인 자동화 (UI에서 "준비중" 표시)
+ */
+export type AutomationEventStatus = 'active' | 'planned';
+
+/**
+ * 준비중(planned) 상태인 event_type 목록 (SSOT)
+ *
+ * [SSOT] 이 목록은 AutomationSettingsPage에서 "준비중 포함" 토글에 사용됩니다.
+ * 새로운 자동화를 planned 상태로 추가하려면 이 배열에 추가하세요.
+ */
+export const AUTOMATION_EVENT_PLANNED: readonly AutomationEventType[] = [
+  'inquiry_conversion_drop',
+  'birthday_greeting',
+  'enrollment_anniversary',
+  'announcement_urgent',
+  'announcement_digest',
+  'staff_absence_schedule_risk',
+] as const;
+
+/**
+ * event_type의 상태 조회 함수
+ * @param eventType 조회할 event_type
+ * @returns 'active' | 'planned'
+ */
+export function getAutomationEventStatus(eventType: AutomationEventType): AutomationEventStatus {
+  return AUTOMATION_EVENT_PLANNED.includes(eventType) ? 'planned' : 'active';
+}
+
+/**
+ * 활성화된(active) event_type만 필터링
+ * @returns active 상태인 event_type 배열
+ */
+export function getActiveAutomationEvents(): AutomationEventType[] {
+  return AUTOMATION_EVENT_CATALOG.filter(
+    (eventType) => !AUTOMATION_EVENT_PLANNED.includes(eventType)
+  );
+}
+
+/**
  * Automation Event Catalog Set (성능 최적화용)
  *
  * O(1) 검증을 위한 Set 자료구조. 배열의 includes()는 O(n)이지만 Set의 has()는 O(1)입니다.

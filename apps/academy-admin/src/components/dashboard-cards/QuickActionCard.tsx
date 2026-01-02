@@ -22,7 +22,7 @@ export function QuickActionCard({ onAction }: QuickActionCardProps) {
       label: '학생 등록',
       icon: <UserPlus />,
       onClick: () => onAction?.('register'),
-      variant: 'outline',
+      variant: 'solid',
     },
     {
       key: 'bulk',
@@ -56,24 +56,14 @@ export function QuickActionCard({ onAction }: QuickActionCardProps) {
 
   return (
     <Card
-      padding="md"
-      variant="default"
+      padding="lg"
       disableHoverEffect={true}
     >
-      <h3 style={{
-        fontSize: 'var(--font-size-base)',
-        fontWeight: 'var(--font-weight-semibold)',
-        marginBottom: 'var(--spacing-md)',
-        color: 'var(--color-text)',
-      }}>
-        빠른 액션
-      </h3>
       <ActionButtonGroup
         items={actionItems}
-        gap="sm"
+        gap="md"
         marginTop="none"
       />
     </Card>
   );
 }
-

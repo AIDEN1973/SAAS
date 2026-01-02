@@ -91,12 +91,20 @@ export const student_exec_dischargeHandler: IntentHandler = {
 
       // Industry Adapter: 업종별 학생 테이블명 동적 조회
       const studentTableName = await getTenantTableName(context.supabase, context.tenant_id, 'student');
+      // P0-3 수정: Fallback 제거 - 업종별 테이블 조회 실패 시 명시적 에러
+      if (!studentTableName) {
+        return {
+          status: 'failed',
+          error_code: 'INDUSTRY_TABLE_NOT_FOUND',
+          message: '업종별 학생 테이블을 찾을 수 없습니다. 테넌트 설정을 확인해주세요.',
+        };
+      }
 
       if (reason) {
         // notes에 퇴원 사유 추가
         const { data: currentStudent } = await withTenant(
           context.supabase
-            .from(studentTableName || 'academy_students') // Fallback
+            .from(studentTableName)
             .select('notes')
             .eq('person_id', studentId)
             .single(),
@@ -110,7 +118,7 @@ export const student_exec_dischargeHandler: IntentHandler = {
 
       const { error: updateError } = await withTenant(
         context.supabase
-          .from(studentTableName || 'academy_students') // Fallback
+          .from(studentTableName)
           .update(updateData)
           .eq('person_id', studentId),
         context.tenant_id

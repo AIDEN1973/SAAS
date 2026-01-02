@@ -42,7 +42,7 @@ import { toKST } from '@lib/date-utils';
 import { useStudents, useGenerateConsultationAISummary, fetchConsultations, fetchPersons } from '@hooks/use-student';
 import { fetchAttendanceLogs } from '@hooks/use-attendance';
 import { fetchBillingHistory } from '@hooks/use-billing';
-import { fetchAIInsights } from '@hooks/use-ai-insights';
+import { fetchAIInsights, useDismissAIInsight } from '@hooks/use-ai-insights';
 import type { BillingHistoryItem } from '@hooks/use-billing';
 import type { AttendanceLog } from '@services/attendance-service';
 import type { Student, StudentConsultation } from '@services/student-service';
@@ -50,14 +50,17 @@ import type { Class } from '@services/class-service';
 import type { Person } from '@core/party';
 import { studentSelectFormSchema } from '../schemas/student-select.schema';
 import { useUserRole } from '@hooks/use-auth';
+import { useConfig } from '@hooks/use-config';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES } from '../constants';
 import { createSafeNavigate } from '../utils';
+import { LocationWarningBanner } from '../components/LocationWarningBanner';
 
 export function AIPage() {
   const { showAlert } = useModal();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const { data: config } = useConfig();
   const mode = useResponsiveMode();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
@@ -72,6 +75,20 @@ export function AIPage() {
   const tabParam = searchParams.get('tab'); // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
   const { data: userRole } = useUserRole(); // 아키텍처 문서 2.4: Teacher는 요약만 접근 가능
   const isTeacher = userRole === 'teacher'; // Teacher는 요약만 볼 수 있음
+
+  // P0-3: 지역 정보 미설정 경고 배너 상태
+  const [locationBannerDismissed, setLocationBannerDismissed] = useState(false);
+
+  // P0-3: 지역 정보 확인 (지역 인사이트 기능 사용 전 필수)
+  const locationInfo = useMemo(() => {
+    const location = config?.location as { location_code?: string } | undefined;
+    return {
+      location_code: location?.location_code || '',
+    };
+  }, [config]);
+
+  // P0-3: 지역 정보 미설정 시 경고 배너 표시
+  const showLocationBanner = !locationInfo.location_code && !locationBannerDismissed;
 
   // 한 페이지에 하나의 기능 원칙 준수: 종합 인사이트만 메인으로 표시
   // 나머지 기능은 별도 페이지로 분리 (빠른 링크로 접근)
@@ -92,8 +109,42 @@ export function AIPage() {
       // dayjs의 subtract는 immutable이므로 새로운 객체 반환
       const thisWeekMonday = today.subtract(daysSinceMonday, 'day').format('YYYY-MM-DD');
 
-      // 주간 브리핑 조회 (Phase 1 MVP는 주간 브리핑, Phase 2+는 daily_briefing)
-      // 현재는 Phase 1 MVP이므로 weekly_briefing 또는 이번 주 월요일 이후의 daily_briefing 조회
+      // P1-1: N+1 쿼리 최적화 - 모든 AI 인사이트를 한 번에 조회
+      // 5개의 개별 쿼리 대신 1개의 통합 쿼리로 성능 향상
+      interface AIInsightBase {
+        id: string;
+        insight_type: string;
+        title?: string;
+        summary: string;
+        insights?: string;
+        created_at: string;
+        action_url?: string;
+        details?: Record<string, unknown>;
+        metadata?: Record<string, unknown>;
+        related_entity_id?: string;
+        status: string;
+      }
+
+      // 필요한 모든 인사이트 타입을 한 번에 조회
+      const allInsights = await fetchAIInsights(tenantId, {
+        status: 'active',
+        created_at: { gte: `${thisWeekMonday}T00:00:00` },
+        // insight_type은 지정하지 않아 모든 타입 조회
+      });
+
+      // 타입별로 분류
+      const insightsByType = new Map<string, AIInsightBase[]>();
+      if (allInsights && allInsights.length > 0) {
+        for (const insight of allInsights) {
+          const type = insight.insight_type;
+          if (!insightsByType.has(type)) {
+            insightsByType.set(type, []);
+          }
+          insightsByType.get(type)!.push(insight as AIInsightBase);
+        }
+      }
+
+      // 주간 브리핑 추출
       interface WeeklyBriefingInsight {
         id: string;
         insight_type: string;
@@ -104,25 +155,15 @@ export function AIPage() {
         action_url?: string;
         details?: Record<string, unknown>;
       }
-      // 정본 규칙: fetchAIInsights 함수 사용 (Hook의 queryFn 로직 재사용)
-      const weeklyBriefingInsights = await fetchAIInsights(tenantId, {
-        insight_type: 'weekly_briefing', // Phase 1: 주간 브리핑
-        created_at: { gte: `${thisWeekMonday}T00:00:00` },
-        status: 'active',
-      });
 
-      // weekly_briefing이 없으면 daily_briefing으로 fallback (Phase 2+ 호환성)
       let weeklyBriefing: WeeklyBriefingInsight | null = null;
-      if (weeklyBriefingInsights && weeklyBriefingInsights.length > 0) {
+      const weeklyBriefingInsights = insightsByType.get('weekly_briefing') || [];
+      if (weeklyBriefingInsights.length > 0) {
         weeklyBriefing = weeklyBriefingInsights[0] as WeeklyBriefingInsight;
       } else {
         // Phase 2+ 호환: daily_briefing 조회 (이번 주 월요일 이후)
-        const dailyBriefingInsights = await fetchAIInsights(tenantId, {
-          insight_type: 'daily_briefing',
-          created_at: { gte: `${thisWeekMonday}T00:00:00` },
-          status: 'active',
-        });
-        if (dailyBriefingInsights && dailyBriefingInsights.length > 0) {
+        const dailyBriefingInsights = insightsByType.get('daily_briefing') || [];
+        if (dailyBriefingInsights.length > 0) {
           weeklyBriefing = dailyBriefingInsights[0] as WeeklyBriefingInsight;
         }
       }
@@ -136,12 +177,10 @@ export function AIPage() {
         metadata?: { student_name?: string };
         details?: { recommendation?: string };
       }
-      // 정본 규칙: fetchAIInsights 함수 사용 (Hook의 queryFn 로직 재사용)
-      const attendanceAnomalyInsights = await fetchAIInsights(tenantId, {
-        insight_type: 'attendance_anomaly',
-        created_at: { gte: `${todayDate}T00:00:00` },
-        status: 'active',
-      });
+
+      // 오늘 생성된 attendance_anomaly만 필터링
+      const attendanceAnomalyInsights = (insightsByType.get('attendance_anomaly') || [])
+        .filter(insight => insight.created_at >= `${todayDate}T00:00:00`);
 
       const attendanceAnomalies: Array<{ student_id: string; student_name: string; issue: string; recommendation: string }> = [];
       if (attendanceAnomalyInsights && attendanceAnomalyInsights.length > 0) {
@@ -218,19 +257,9 @@ export function AIPage() {
       }
 
       // 2. 반/과목 성과 분석 (performance_analysis) - 아키텍처 문서 3.7.1: 반/과목 성과 분석
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      interface PerformanceAnalysisInsight {
-        id: string;
-        related_entity_id?: string;
-        metadata?: { class_name?: string };
-        details?: { performance?: string; trend?: string; recommendation?: string };
-      }
-      // 정본 규칙: fetchAIInsights 함수 사용 (Hook의 queryFn 로직 재사용)
-      const performanceAnalysisInsights = await fetchAIInsights(tenantId, {
-        insight_type: 'performance_analysis',
-        created_at: { gte: `${todayDate}T00:00:00` },
-        status: 'active',
-      });
+      // P1-1: 통합 쿼리에서 추출 (개별 쿼리 제거)
+      const performanceAnalysisInsights = (insightsByType.get('performance_analysis') || [])
+        .filter(insight => insight.created_at >= `${todayDate}T00:00:00`);
 
       let performanceAnalysis: Array<{ class_id: string; class_name: string; performance: string; trend: string; recommendation: string }> = [];
       if (performanceAnalysisInsights && performanceAnalysisInsights.length > 0) {
@@ -276,20 +305,11 @@ export function AIPage() {
         });
       }
 
-      // 3. 지역 대비 비교 (regional_comparison) - 아키텍처 문서 3.7.1: 지역 대비 부족 영역 분석
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      interface RegionalComparisonInsight {
-        id: string;
-        metadata?: { area?: string; status?: string };
-        summary: string;
-        details?: { recommendation?: string };
-      }
-      // 정본 규칙: fetchAIInsights 함수 사용 (Hook의 queryFn 로직 재사용)
-      const regionalComparisonInsights = await fetchAIInsights(tenantId, {
-        insight_type: 'regional_comparison',
-        created_at: { gte: `${todayDate}T00:00:00` },
-        status: 'active',
-      });
+      // 3. 지역 대비 비교 (regional_analytics) - 아키텍처 문서 3.7.1: 지역 대비 부족 영역 분석
+      // P1-1: 통합 쿼리에서 추출 (개별 쿼리 제거)
+      // P0-1: 지역 인사이트 타입 수정 (regional_comparison → regional_analytics)
+      const regionalComparisonInsights = (insightsByType.get('regional_analytics') || [])
+        .filter(insight => insight.created_at >= `${todayDate}T00:00:00`);
 
       let regionalComparison: Array<{ area: string; status: string; gap: string; recommendation: string }> = [];
       if (regionalComparisonInsights && regionalComparisonInsights.length > 0) {
@@ -325,6 +345,9 @@ export function AIPage() {
       }, 200);
     }
   }, [tabParam, isLoading]);
+
+  // P2-2: AI Dismiss 기능
+  const dismissInsight = useDismissAIInsight();
 
   // 월간 리포트 생성
   const generateReport = useMutation({
@@ -382,10 +405,21 @@ export function AIPage() {
           title="AI 분석"
         />
 
+        {/* P0-3: 지역 정보 미설정 시 안내 배너 표시 */}
+        {showLocationBanner && (
+          <div style={{ marginBottom: 'var(--spacing-md)' }}>
+            <LocationWarningBanner
+              message="지역 인사이트를 사용하려면 위치 정보를 설정하세요"
+              onNavigate={() => navigate('/settings')}
+              onDismiss={() => setLocationBannerDismissed(true)}
+            />
+          </div>
+        )}
+
         {/* 아키텍처 문서 3.7.1: 빠른 분석 링크 (상세 분석은 별도 페이지에서 제공) */}
         {/* 아키텍처 문서 2.4: Teacher는 요약만 접근 가능, 상세 분석 버튼은 숨김 */}
         {!isTeacher && (
-          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+          <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
                   빠른 분석:
@@ -442,7 +476,7 @@ export function AIPage() {
             </Card>
           )}
           {isTeacher && (
-            <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+            <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
               <div style={{ color: 'var(--color-text-secondary)', textAlign: 'center' }}>
                 요약 정보만 제공됩니다. 상세 분석은 관리자에게 문의하세요.
               </div>
@@ -451,7 +485,7 @@ export function AIPage() {
 
           {/* 콘텐츠 영역 */}
           {isLoading ? (
-            <Card padding="lg" variant="default">
+            <Card padding="lg">
               <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
                 로딩 중...
               </div>
@@ -464,14 +498,26 @@ export function AIPage() {
                   {/* Phase 1 MVP: 주간 브리핑 카드 (아키텍처 문서 3581줄: 매주 월요일 07:00 생성) */}
                   {aiInsights.weeklyBriefing && (
                     <div id="weekly-briefing-card">
-                      <Card padding="lg" variant="elevated" style={{ marginBottom: 'var(--spacing-md)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
-                          <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
-                            주간 브리핑
-                          </h2>
-                          <Badge variant="outline" color="info">
-                            Phase 1 MVP
-                          </Badge>
+                      <Card padding="lg" style={{ marginBottom: 'var(--spacing-md)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-md)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                            <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
+                              주간 브리핑
+                            </h2>
+                            <Badge variant="outline" color="info">
+                              Phase 1 MVP
+                            </Badge>
+                          </div>
+                          {/* P2-2: Dismiss 버튼 */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => dismissInsight.mutate(aiInsights.weeklyBriefing!.id)}
+                            disabled={dismissInsight.isPending}
+                            style={{ color: 'var(--color-text-secondary)' }}
+                          >
+                            무시
+                          </Button>
                         </div>
                         <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
                           {aiInsights.weeklyBriefing.title || '이번 주 요약'}
@@ -495,7 +541,7 @@ export function AIPage() {
                   {/* 출결 이상 탐지 요약 카드 - 아키텍처 문서 3.7.1: 학생 출결 이상 탐지 */}
                   {aiInsights.attendanceAnomalies && aiInsights.attendanceAnomalies.length > 0 && (
                     <div id="attendance-card">
-                      <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)', cursor: 'pointer' }} onClick={() => {
+                      <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)', cursor: 'pointer' }} onClick={() => {
                         // TODO: 하위 페이지 구현 시 navigate('/ai/attendance-anomalies')
                         showAlert('알림', '출결 이상 탐지 상세 분석은 준비 중입니다.');
                       }}>
@@ -529,7 +575,7 @@ export function AIPage() {
                   {/* 반/과목 성과 분석 요약 카드 - 아키텍처 문서 3.7.1: 반/과목 성과 분석 */}
                   {aiInsights.performanceAnalysis && aiInsights.performanceAnalysis.length > 0 && (
                     <div id="performance-card">
-                      <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)', cursor: 'pointer' }} onClick={() => {
+                      <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)', cursor: 'pointer' }} onClick={() => {
                         // TODO: 하위 페이지 구현 시 navigate('/ai/performance')
                         showAlert('알림', '성과 분석 상세 화면은 준비 중입니다.');
                       }}>
@@ -568,7 +614,7 @@ export function AIPage() {
                   {/* 지역 대비 부족 영역 분석 요약 카드 - 아키텍처 문서 3.7.1: 지역 대비 부족 영역 분석 */}
                   {aiInsights.regionalComparison && aiInsights.regionalComparison.length > 0 ? (
                     <div id="regional-card">
-                      <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+                      <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
                           <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
                             지역 대비 부족 영역
@@ -599,7 +645,7 @@ export function AIPage() {
                       </Card>
                     </div>
                   ) : (
-                    <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+                    <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
                       <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
                         <p>지역 비교 데이터가 없습니다.</p>
                         <p style={{ marginTop: 'var(--spacing-xs)' }}>
@@ -614,7 +660,7 @@ export function AIPage() {
                    (!aiInsights.attendanceAnomalies || aiInsights.attendanceAnomalies.length === 0) &&
                    (!aiInsights.performanceAnalysis || aiInsights.performanceAnalysis.length === 0) &&
                    (!aiInsights.regionalComparison || aiInsights.regionalComparison.length === 0) && (
-                    <Card padding="lg" variant="default">
+                    <Card padding="lg">
                       <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
                         <p>AI 인사이트 데이터가 없습니다.</p>
                         <p style={{ marginTop: 'var(--spacing-xs)' }}>
@@ -686,7 +732,7 @@ function ConsultationSummaryTab() {
   };
 
   return (
-    <Card padding="lg" variant="default">
+    <Card padding="lg">
       <h2 style={{ marginBottom: 'var(--spacing-md)' }}>상담일지 자동 요약</h2>
 
       {/* 학생 선택 - SchemaForm 사용 */}
@@ -751,7 +797,6 @@ function ConsultationSummaryTab() {
                 <Card
                   key={consultation.id}
                   padding="md"
-                  variant="default"
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>

@@ -127,8 +127,21 @@ export const studentRegisterHandler: IntentHandler = {
       // ⚠️ 중요: academy_students 테이블은 이제 id 컬럼이 PRIMARY KEY이고 person_id는 UNIQUE 제약조건
       //          PostgREST가 자동으로 id 컬럼을 RETURNING 할 수 있으므로 일반 INSERT 사용 가능
       const studentTableName = await getTenantTableName(context.supabase, context.tenant_id, 'student');
+      // P0-3 수정: Fallback 제거 - 업종별 테이블 조회 실패 시 명시적 에러
+      if (!studentTableName) {
+        // 롤백: persons 삭제
+        await withTenant(
+          context.supabase.from('persons').delete().eq('id', person.id),
+          context.tenant_id
+        );
+        return {
+          status: 'failed',
+          error_code: 'INDUSTRY_TABLE_NOT_FOUND',
+          message: '업종별 학생 테이블을 찾을 수 없습니다. 테넌트 설정을 확인해주세요.',
+        };
+      }
       const { data: academyData, error: academyError } = await context.supabase
-        .from(studentTableName || 'academy_students') // Fallback
+        .from(studentTableName)
         .insert({
           person_id: person.id,
           tenant_id: context.tenant_id,
@@ -162,23 +175,39 @@ export const studentRegisterHandler: IntentHandler = {
 
       // 3. 보호자 정보 생성 (있는 경우)
       // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
+      // P1-1 수정: guardians 테이블 NOT NULL 컬럼(name, relationship, phone) 필수 전달
+      const guardianErrors: string[] = [];
       if (formValues.guardians && Array.isArray(formValues.guardians)) {
         for (const guardian of formValues.guardians) {
           if (typeof guardian === 'object' && guardian !== null) {
             const guardianData = guardian as Record<string, unknown>;
-            await context.supabase
+            // NOT NULL 필드 기본값 설정
+            const guardianName = (guardianData.name as string) || `${name} 보호자`;
+            const guardianPhone = (guardianData.phone as string) || '';
+            const guardianRelationship = (guardianData.relationship as string) || 'parent';
+
+            // phone이 없으면 보호자 생성 스킵 (필수 필드)
+            if (!guardianPhone) {
+              guardianErrors.push('보호자 전화번호 누락');
+              continue;
+            }
+
+            const { error: guardianError } = await context.supabase
               .from('guardians')
               .insert({
                 student_id: person.id,
                 tenant_id: context.tenant_id,
-                name: (guardianData.name as string) || null,
-                phone: (guardianData.phone as string) || null,
+                name: guardianName,
+                phone: guardianPhone,
                 email: (guardianData.email as string) || null,
-                relationship: (guardianData.relationship as string) || null,
+                relationship: guardianRelationship,
                 is_primary: (guardianData.is_primary as boolean) || false,
               });
-            // 보호자 생성 실패는 로그만 남기고 계속 진행 (부분 실패 허용)
-            // 필요시 에러를 수집하여 partial 상태로 반환할 수 있음
+
+            if (guardianError) {
+              guardianErrors.push(maskPII(guardianError.message) as string);
+              console.warn('[studentRegisterHandler] Guardian creation failed:', maskPII(guardianError));
+            }
           }
         }
       }

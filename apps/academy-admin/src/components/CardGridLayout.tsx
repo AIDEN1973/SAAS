@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { useResponsiveMode, isDesktop, isTablet } from '@ui-core/react';
+import { useResponsiveMode, isDesktop, isTablet, CardLayoutProvider } from '@ui-core/react';
 
 export interface CardGridLayoutProps {
   /** 카드 배열 */
@@ -41,22 +41,23 @@ export function CardGridLayout({
   const showTopBorder = columnsPerRow > 1;
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: isDesktopMode
-          ? `repeat(${desktopColumns}, 1fr)`
-          : isTabletMode
-            ? `repeat(${tabletColumns}, 1fr)`
-            : `repeat(${mobileColumns}, 1fr)`,
-        ...(showTopBorder && {
-          borderTop: 'var(--border-width-thin) solid var(--color-text)',
-        }),
-        borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)',
-        overflow: 'hidden', // 구분선이 컨테이너 밖으로 나가지 않도록
-      }}
-    >
-      {cards.map((card, cardIndex) => {
+    <CardLayoutProvider type="grid">
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isDesktopMode
+            ? `repeat(${desktopColumns}, 1fr)`
+            : isTabletMode
+              ? `repeat(${tabletColumns}, 1fr)`
+              : `repeat(${mobileColumns}, 1fr)`,
+          ...(showTopBorder && {
+            borderTop: 'var(--border-width-thin) solid var(--color-text)',
+          }),
+          borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)',
+          overflow: 'hidden', // 구분선이 컨테이너 밖으로 나가지 않도록
+        }}
+      >
+        {cards.map((card, cardIndex) => {
         const rowIndex = Math.floor(cardIndex / columnsPerRow);
         const colIndex = cardIndex % columnsPerRow;
         const totalRows = Math.ceil(cards.length / columnsPerRow);
@@ -129,6 +130,7 @@ export function CardGridLayout({
         }
         return null;
       })()}
-    </div>
+      </div>
+    </CardLayoutProvider>
   );
 }

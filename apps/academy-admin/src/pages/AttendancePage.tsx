@@ -17,9 +17,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary , Container, Card, Button, Input, Badge, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid, PageHeader , useResponsiveMode, isMobile, isTablet } from '@ui-core/react';
+import { ErrorBoundary , Container, Card, Button, Input, Badge, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid, PageHeader , useResponsiveMode, isMobile, isTablet, NotificationCardLayout } from '@ui-core/react';
 // [SSOT] Barrel export를 통한 통합 import
 import { createSafeNavigate } from '../utils';
+import { CardGridLayout } from '../components/CardGridLayout';
+import { Users, UserCheck, Clock, UserX } from 'lucide-react';
 import type { TabItem } from '@ui-core/react';
 import { SchemaFilter } from '@schema-engine';
 import { useAttendanceLogs, fetchAttendanceLogs, useCreateAttendanceLog, useDeleteAttendanceLog } from '@hooks/use-attendance';
@@ -40,6 +42,7 @@ import { createAttendanceFilterSchema, createAttendanceHeaderFilterSchema } from
 import { getApiContext } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
 import { useUserRole } from '@hooks/use-auth';
+import { getPolicyValue } from '../utils/policy-registry';
 
 // 학생 출결 상태 인터페이스
 interface StudentAttendanceState {
@@ -75,10 +78,32 @@ export function AttendancePage() {
 
   // 화면 모드: 'today' (오늘 출결하기) 또는 'qr' (QR 출결 실행)
   // 아키텍처 문서 3.3.1: 출결 메인 화면은 "오늘 출결하기"와 "QR 출결 실행(학생용)" 두 개만 있어야 함
-  const [viewMode, setViewMode] = useState<'today' | 'qr'>('today');
+  // localStorage 기반 상태 초기화 (SSR Safe, AutomationSettingsPage 패턴 적용)
+  const [viewMode, setViewMode] = useState<'today' | 'qr'>(() => {
+    try {
+      const stored = localStorage.getItem('attendance-page-view-mode');
+      return stored === 'qr' ? 'qr' : 'today';
+    } catch (error) {
+      if (import.meta.env?.DEV) {
+        console.warn('AttendancePage: localStorage 접근 실패, 기본값 사용', { error });
+      }
+      return 'today';
+    }
+  });
 
   // 오늘 출결하기 관련 상태
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  // localStorage 기반 상태 초기화 (마지막 선택 반 기억)
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(() => {
+    try {
+      const stored = localStorage.getItem('attendance-page-selected-class');
+      return stored || null;
+    } catch (error) {
+      if (import.meta.env?.DEV) {
+        console.warn('AttendancePage: localStorage 접근 실패, 기본값 사용', { error });
+      }
+      return null;
+    }
+  });
   const [selectedDate, setSelectedDate] = useState<string>(toKST().format('YYYY-MM-DD'));
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [studentAttendanceStates, setStudentAttendanceStates] = useState<Record<string, StudentAttendanceState>>({});
@@ -106,25 +131,47 @@ export function AttendancePage() {
   // 전역 모달 훅 사용
   const { showAlert, showConfirm } = useModal();
 
-  // 설정 값 (서버에서 가져온 값 또는 기본값) - 로컬 state로 관리
-  // HARD-CODE-EXCEPTION: late_after, absent_after는 Policy에서 관리해야 하지만 현재는 초기값 (비즈니스 로직 하드코딩)
-  const [attendanceConfig, setAttendanceConfig] = useState({
-    late_after: 10,
-    absent_after: 60,
-    auto_notification: true,
-    notification_channel: 'sms' as 'sms' | 'kakao_at',  // SSOT-3
-  });
-
-  // 서버 설정 로드
-  useEffect(() => {
-    if (config?.attendance) {
-      setAttendanceConfig({
-        late_after: config.attendance.late_after ?? 10,
-        absent_after: config.attendance.absent_after ?? 60,
-        auto_notification: config.attendance.auto_notification ?? true,
-        notification_channel: (config.attendance.notification_channel ?? 'sms') as 'sms' | 'kakao_at',  // SSOT-3
-      });
+  // localStorage 상태 지속성 핸들러 (AutomationSettingsPage 패턴)
+  const handleViewModeChange = useCallback((mode: 'today' | 'qr') => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('attendance-page-view-mode', mode);
+    } catch (error) {
+      if (import.meta.env?.DEV) {
+        console.warn('AttendancePage: localStorage 저장 실패', { error });
+      }
     }
+  }, []);
+
+  const handleClassIdChange = useCallback((classId: string | null) => {
+    setSelectedClassId(classId);
+    try {
+      if (classId) {
+        localStorage.setItem('attendance-page-selected-class', classId);
+      } else {
+        localStorage.removeItem('attendance-page-selected-class');
+      }
+    } catch (error) {
+      if (import.meta.env?.DEV) {
+        console.warn('AttendancePage: localStorage 저장 실패', { error });
+      }
+    }
+  }, []);
+
+  // [P0-FIX] Policy Registry 기반 출결 설정 (Automation Config First 원칙)
+  // Fail Closed: Policy가 없으면 지각/결석 판정 불가 (기본값 null)
+  const attendanceConfig = useMemo(() => {
+    const lateAfter = getPolicyValue<number>('ATTENDANCE_LATE_AFTER', config);
+    const absentAfter = getPolicyValue<number>('ATTENDANCE_ABSENT_AFTER', config);
+    const autoNotification = getPolicyValue<boolean>('ATTENDANCE_AUTO_NOTIFICATION', config) ?? false;
+    const notificationChannel = getPolicyValue<string>('ATTENDANCE_NOTIFICATION_CHANNEL', config) ?? 'sms';
+
+    return {
+      late_after: lateAfter,
+      absent_after: absentAfter,
+      auto_notification: autoNotification,
+      notification_channel: notificationChannel as 'sms' | 'kakao_at',
+    };
   }, [config]);
 
   // 출결 기록 상태
@@ -361,14 +408,20 @@ export function AttendancePage() {
 
 
   // 지각/결석 자동 판정 함수
+  // [P0-FIX] Fail Closed 패턴: Policy가 없으면 자동 판정 불가
   const determineAttendanceStatus = (
     occurredAt: string | Date,
     classInfo: { start_time: string; day_of_week: string } | undefined,
-    lateAfter: number,
-    absentAfter: number
+    lateAfter: number | null,
+    absentAfter: number | null
   ): { status: AttendanceStatus; attendance_type: AttendanceType } => {
     if (!classInfo) {
       // 반 정보가 없으면 수동 입력값 사용
+      return { status: 'present', attendance_type: 'check_in' };
+    }
+
+    // [P0-FIX] Fail Closed: Policy가 없으면 자동 판정 불가 (수동 입력값 사용)
+    if (lateAfter === null || absentAfter === null) {
       return { status: 'present', attendance_type: 'check_in' };
     }
 
@@ -509,19 +562,44 @@ export function AttendancePage() {
     // QR 스캔 완료 후 QR 탭에 머물러 있음 (아키텍처 문서 3.3.5: QR 출결 실행은 별도 화면)
   };
 
-  // QR 코드 스캔 처리 (간단한 텍스트 입력으로 대체)
+  // QR 코드 스캔 처리
+  // [P1-SECURITY] QR 토큰 만료 검증 추가 (아키텍처 문서 3.3.5)
   const handleQRScan = async (qrData: string) => {
     try {
-      // QR 코드 형식: student_id 또는 JSON {student_id, class_id}
+      // QR 코드 형식:
+      // - 레거시: student_id (평문)
+      // - 신규: JSON {student_id, class_id, issued_at, expires_at}
       let studentId: string;
       let classId: string | undefined;
+      let expiresAt: string | undefined;
 
       try {
-        const parsed = JSON.parse(qrData) as { student_id?: string; class_id?: string };
+        const parsed = JSON.parse(qrData) as {
+          student_id?: string;
+          class_id?: string;
+          issued_at?: string;
+          expires_at?: string;
+        };
         studentId = parsed.student_id ?? qrData;
         classId = parsed.class_id;
+        expiresAt = parsed.expires_at;
+
+        // [P1-SECURITY] QR 토큰 만료 검증
+        if (expiresAt) {
+          const nowKST = toKST();
+          const expiresAtKST = toKST(expiresAt);
+
+          if (nowKST.isAfter(expiresAtKST)) {
+            showAlert(
+              'QR 코드가 만료되었습니다. 새로운 QR 코드를 발급받아주세요.',
+              'QR 코드 만료',
+              'warning'
+            );
+            return;
+          }
+        }
       } catch {
-        // JSON이 아니면 student_id로 간주
+        // JSON이 아니면 student_id로 간주 (레거시 호환성)
         studentId = qrData;
       }
 
@@ -827,22 +905,16 @@ export function AttendancePage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
-        {/* 아키텍처 문서 3.3.9: 태블릿 모드 제목 최소 24px */}
         <PageHeader
           title="출결 관리"
-          style={{
-            ...(isTabletMode && {
-              fontSize: 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))',
-            }),
-          }}
         />
 
         {/* 탭 메뉴 */}
         <Tabs
           items={tabItems}
           activeKey={viewMode}
-          onChange={(key) => setViewMode(key as 'today' | 'qr')}
-          style={{ marginBottom: 'var(--spacing-md)' }}
+          onChange={(key) => handleViewModeChange(key as 'today' | 'qr')}
+          style={{ marginBottom: 'var(--spacing-xl)' }}
         />
 
           {/* 오늘 출결하기 화면 */}
@@ -853,7 +925,7 @@ export function AttendancePage() {
                 <SchemaFilter
                   schema={effectiveHeaderFilterSchema}
                   onFilterChange={(filters: Record<string, unknown>) => {
-                    setSelectedClassId(filters.class_id ? String(filters.class_id) : null);
+                    handleClassIdChange(filters.class_id ? String(filters.class_id) : null);
                     setSelectedDate(filters.date ? String(filters.date) : toKST().format('YYYY-MM-DD'));
                     setSearchQuery(filters.search ? String(filters.search) : '');
                   }}
@@ -876,7 +948,7 @@ export function AttendancePage() {
               }}>
                 {/* 로딩 상태 (아키텍처 문서 3.3.3: loading 상태) */}
                 {isLoading && (
-                  <Card padding="md" variant="default">
+                  <Card padding="lg">
                     <div style={{
                       textAlign: 'center',
                       padding: 'var(--spacing-xl)',
@@ -909,7 +981,7 @@ export function AttendancePage() {
 
                 {/* 에러 상태 (아키텍처 문서 3.3.3: error 상태) */}
                 {!isLoading && error && (
-                  <Card padding="md" variant="outlined">
+                  <Card padding="lg">
                     <div style={{
                       textAlign: 'center',
                       padding: 'var(--spacing-lg)',
@@ -942,7 +1014,7 @@ export function AttendancePage() {
 
                 {/* 정상 상태: 학생 리스트 */}
                 {!isLoading && !error && filteredStudents.length === 0 && (
-                  <Card padding="md" variant="outlined">
+                  <Card padding="lg">
                     <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
                       오늘 수업 학생이 없습니다.
                     </div>
@@ -974,7 +1046,7 @@ export function AttendancePage() {
                     const gradeClassInfo = [studentGrade, studentClass].filter(Boolean).join(' ');
 
                     return (
-                      <Card key={student.id} padding="md" variant="default">
+                      <Card key={student.id} padding="lg">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
                           {/* StudentInfo: 이름, 학년/반, 사진 (아키텍처 문서 3.3.3) */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', flex: 1, minWidth: 'var(--width-student-info-min)' }}>
@@ -1171,7 +1243,7 @@ export function AttendancePage() {
                       const gradeClassInfo = [studentGrade, studentClass].filter(Boolean).join(' ');
 
                       return (
-                        <Card key={student.id} padding="md" variant="default">
+                        <Card key={student.id} padding="lg">
                           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
                             {/* StudentInfo: 이름, 학년/반, 사진 (아키텍처 문서 3.3.3) */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', flex: 1, minWidth: 'var(--width-student-info-min)' }}>
@@ -1328,42 +1400,47 @@ export function AttendancePage() {
               </div>
 
               {/* AttendanceSummary: 총원/출석/지각/결석 (아키텍처 문서 3.3.3: StudentList 다음에 Summary) */}
-              <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(var(--width-button-grid-min), 1fr))`, gap: 'var(--spacing-md)' }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                      총원
-                    </div>
-                    <div style={{ fontSize: isTabletMode ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
-                      {attendanceSummary.total}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                      출석
-                    </div>
-                    <div style={{ fontSize: isTabletMode ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
-                      {attendanceSummary.present}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                      지각
-                    </div>
-                    <div style={{ fontSize: isTabletMode ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-warning)' }}>
-                      {attendanceSummary.late}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                      결석
-                    </div>
-                    <div style={{ fontSize: isTabletMode ? 'max(var(--font-size-2xl), var(--tablet-font-size-title-min))' : 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-error)' }}>
-                      {attendanceSummary.absent}
-                    </div>
-                  </div>
-                </div>
-              </Card>
+              <div style={{ marginBottom: 'var(--spacing-xl)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
+                <CardGridLayout
+                  cards={[
+                    <NotificationCardLayout
+                      key="total"
+                      icon={<Users />}
+                      title="총원"
+                      description={`${attendanceSummary.total}명`}
+                      layoutMode="stats"
+                      iconBackgroundColor="var(--color-gray-100)"
+                    />,
+                    <NotificationCardLayout
+                      key="present"
+                      icon={<UserCheck />}
+                      title="출석"
+                      description={`${attendanceSummary.present}명`}
+                      layoutMode="stats"
+                      iconBackgroundColor="var(--color-success-50)"
+                    />,
+                    <NotificationCardLayout
+                      key="late"
+                      icon={<Clock />}
+                      title="지각"
+                      description={`${attendanceSummary.late}명`}
+                      layoutMode="stats"
+                      iconBackgroundColor="var(--color-warning-50)"
+                    />,
+                    <NotificationCardLayout
+                      key="absent"
+                      icon={<UserX />}
+                      title="결석"
+                      description={`${attendanceSummary.absent}명`}
+                      layoutMode="stats"
+                      iconBackgroundColor="var(--color-error-50)"
+                    />,
+                  ]}
+                  desktopColumns={4}
+                  tabletColumns={2}
+                  mobileColumns={2}
+                />
+              </div>
 
               {/* AttendanceActions: 일괄 등원/하원/저장 버튼 (아키텍처 문서 3.3.3: Summary 다음에 Actions) */}
               {/* 모바일: Bottom Action Bar, 태블릿/데스크톱: Card */}
@@ -1398,7 +1475,7 @@ export function AttendancePage() {
                   </Button>
                 </BottomActionBar>
               ) : (
-                <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
+                <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
                   <div style={{ display: 'flex', gap: isTabletMode ? 'max(var(--spacing-md), var(--tablet-spacing-min))' : 'var(--spacing-sm)', flexWrap: 'wrap' }}> {/* 아키텍처 문서 3.3.9: 버튼 간 간격 최소 8px */}
                     <Button
                       variant="outline"
@@ -1453,11 +1530,16 @@ export function AttendancePage() {
             <>
               {/* QR 스캐너 */}
               {!showQRScanner && (
-                <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+                <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', alignItems: 'center' }}>
-                    <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
+                    <h2 style={{
+                      fontSize: 'var(--font-size-xl)',
+                      fontWeight: 'var(--font-weight-semibold)',
+                      color: 'var(--color-text)',
+                      marginBottom: 'var(--spacing-xs)',
+                    }}>
                       QR 출결 실행
-                    </h3>
+                    </h2>
                     <p style={{ color: 'var(--color-text-secondary)', textAlign: 'center' }}>
                       QR 코드를 스캔하여 출결을 기록합니다.
                     </p>
@@ -1476,9 +1558,15 @@ export function AttendancePage() {
 
               {/* QR 스캐너 모달 */}
               {showQRScanner && (
-            <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', position: 'relative' }}>
+            <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)', position: 'relative' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-                <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>QR 출결</h3>
+                <h2 style={{
+                  fontSize: 'var(--font-size-xl)',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  color: 'var(--color-text)',
+                }}>
+                  QR 출결
+                </h2>
                 <Button variant="ghost" size="sm" onClick={handleStopQRScanner}>
                   닫기
                 </Button>

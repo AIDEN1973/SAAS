@@ -198,6 +198,25 @@ export const sharedCatalog: SharedCatalog = {
         'const payments = await fetchPayments(tenantId, { status: "completed" });',
       ],
     },
+    'use-dashboard-stats': {
+      path: '@hooks/use-dashboard-stats',
+      import: 'import { useStudentStatsCards, useAttendanceStatsCards, useRevenueStatsCards, useClassStatsCards } from "@hooks/use-dashboard-stats"',
+      useWhen: '대시보드 KPI 통계 카드 조회가 필요한 모든 페이지',
+      input: 'useStudentStatsCards(params?: UseStudentStatsCardsParams): 선택적 파라미터, useAttendanceStatsCards(params?: UseAttendanceStatsCardsParams): 선택적 파라미터, useRevenueStatsCards(params?: UseRevenueStatsCardsParams): 선택적 파라미터, useClassStatsCards(params?: UseClassStatsCardsParams): 선택적 파라미터',
+      output: 'StatsCard[] (각 Hook별로 해당 도메인 통계 카드 배열)',
+      extensionPoints: ['params (각 Hook별 파라미터)'],
+      doNot: [
+        '직접 apiClient로 persons/attendance_logs/invoices 조회하여 통계 계산',
+        'useQuery로 통계 쿼리 직접 작성',
+        'HomePage에서 queryFn 인라인 작성 (중복)',
+      ],
+      examples: [
+        'const { data: studentCards } = useStudentStatsCards();',
+        'const { data: attendanceCards } = useAttendanceStatsCards();',
+        'const { data: revenueCards } = useRevenueStatsCards();',
+        'const { data: classCards } = useClassStatsCards();',
+      ],
+    },
     'use-invoice-items': {
       path: '@hooks/use-invoice-items',
       import: 'import { useInvoiceItems, fetchInvoiceItems } from "@hooks/use-invoice-items"',

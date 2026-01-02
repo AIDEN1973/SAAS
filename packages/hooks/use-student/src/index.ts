@@ -6,6 +6,7 @@ export {
   useStudents,
   fetchStudents,
   fetchPersons,
+  fetchPersonsCount,
   useStudentsPaged,
   useStudent,
   useCreateStudent,

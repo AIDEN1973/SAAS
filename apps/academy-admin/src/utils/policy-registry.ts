@@ -97,13 +97,10 @@ export function validatePolicyPath(path: string): boolean {
  * SSOT 원칙: 모든 Policy 경로는 이 레지스트리를 통해야 합니다.
  * 하드코딩된 경로 사용을 금지하며, 반드시 POLICY_REGISTRY를 통해 접근해야 합니다.
  *
- * [P1-ARCH-1 수정] Policy 소스 이원화 명확화:
- * - config 기반: tenant_settings.config JSONB에서 조회 (대부분의 Policy)
- * - path 기반: useTenantSettingByPath Hook으로 조회 (AI_RISK_SCORE_THRESHOLD만 예외)
- * - 사용 방법:
- *   * config 기반: getPolicyValue(key, config) 사용
- *   * path 기반: useTenantSettingByPath(POLICY_REGISTRY[key].path) + getPolicyValueWithPath(key, config, pathValue) 사용
- * - 향후 통일 계획: 모든 Policy를 config 기반으로 통일 예정 (마이그레이션 가이드 참조)
+ * [P1-FIX] Policy 소스 통일:
+ * - 모든 Policy는 config 기반: tenant_settings.config JSONB에서 조회
+ * - 사용 방법: getPolicyValue(key, config) 사용
+ * - AI_RISK_SCORE_THRESHOLD도 config 기반으로 통일됨
  *
  * [P1-ARCH-2 수정] Policy 경로 점(.) 이스케이프 규칙:
  * - 운영 규칙: Policy 경로 키에는 점(.) 사용 금지
@@ -113,8 +110,7 @@ export function validatePolicyPath(path: string): boolean {
  * - 예: "auto_notification.payment.due.reminder" ❌ (키에 점 포함, 금지)
  *
  * 사용 방법:
- * - getPolicyValue(key, config): config 기반 Policy 조회
- * - getPolicyValueWithPath(key, config, pathValue): path 기반 Policy 조회
+ * - getPolicyValue(key, config): Policy 조회 (config 기반)
  * - POLICY_REGISTRY[key].path: Policy 경로 참조
  */
 export const POLICY_REGISTRY: Record<string, PolicyDefinition> = {
@@ -149,11 +145,7 @@ export const POLICY_REGISTRY: Record<string, PolicyDefinition> = {
   },
   AI_RISK_SCORE_THRESHOLD: {
     path: 'auto_notification.attendance_pattern_anomaly.priority',
-    source: 'path', // [P1-ARCH-1] 현재는 path 기반이지만, 향후 통일 시 config로 변경 예정
-    // 마이그레이션 계획:
-    // 1. tenant_settings.config에 해당 경로 추가
-    // 2. source를 'config'로 변경
-    // 3. useTenantSettingByPath 대신 getPolicyValue 사용
+    source: 'config', // [P1-FIX] config로 통일 - SSOT 단일 소스 원칙
     type: 'number',
     defaultValue: 90,
     description: 'AI 위험 점수 임계값',
@@ -162,8 +154,8 @@ export const POLICY_REGISTRY: Record<string, PolicyDefinition> = {
     path: 'auto_notification.collection_rate_drop.threshold',
     source: 'config',
     type: 'number',
-    defaultValue: 90,
-    description: '수납률 임계값 (퍼센트)',
+    defaultValue: 0.7,
+    description: '수납률 임계값 (0.0~1.0, 0.7 = 70%)',
   },
   ATTENDANCE_ANOMALY_ABSENT_THRESHOLD: {
     path: 'auto_notification.attendance_pattern_anomaly.absent_threshold',
@@ -178,6 +170,66 @@ export const POLICY_REGISTRY: Record<string, PolicyDefinition> = {
     type: 'number',
     defaultValue: 10,
     description: '출석 이상 패턴 - 지각 임계값 (건수)',
+  },
+  ATTENDANCE_ANOMALY_THROTTLE_DAILY_LIMIT: {
+    path: 'auto_notification.attendance_pattern_anomaly.throttle.daily_limit',
+    source: 'config',
+    type: 'number',
+    defaultValue: 20,
+    description: '출석 이상 패턴 - 하루 최대 생성 건수',
+  },
+  ATTENDANCE_ANOMALY_ENABLED: {
+    path: 'auto_notification.attendance_pattern_anomaly.enabled',
+    source: 'config',
+    type: 'boolean',
+    defaultValue: false, // Medium-Risk: 메시지 발송
+    description: '출석 이상 패턴 자동화 활성화 여부',
+  },
+
+  // Automation Approval Policies (Phase 2)
+  AUTO_APPROVE_ENABLED: {
+    path: 'automation_approval.auto_approve_enabled',
+    source: 'config',
+    type: 'boolean',
+    defaultValue: true,
+    description: 'AI 승인 자동화 활성화 여부 (Low/Medium-Risk 작업 자동 승인)',
+  },
+  AUTO_APPROVE_THRESHOLD: {
+    path: 'automation_approval.auto_approve_threshold',
+    source: 'config',
+    type: 'string',
+    defaultValue: 'medium',
+    description: '자동 승인 임계값 (low: Low만 자동, medium: Low+Medium 자동, high: 모두 자동)',
+  },
+
+  // Attendance Configuration Policies
+  ATTENDANCE_LATE_AFTER: {
+    path: 'attendance.late_after',
+    source: 'config',
+    type: 'number',
+    defaultValue: null, // Fail Closed: Policy가 없으면 지각 판정 불가
+    description: '지각 판정 기준 시간 (수업 시작 후 분)',
+  },
+  ATTENDANCE_ABSENT_AFTER: {
+    path: 'attendance.absent_after',
+    source: 'config',
+    type: 'number',
+    defaultValue: null, // Fail Closed: Policy가 없으면 결석 판정 불가
+    description: '결석 판정 기준 시간 (수업 시작 후 분)',
+  },
+  ATTENDANCE_AUTO_NOTIFICATION: {
+    path: 'attendance.auto_notification',
+    source: 'config',
+    type: 'boolean',
+    defaultValue: false,
+    description: '출결 자동 알림 활성화 여부',
+  },
+  ATTENDANCE_NOTIFICATION_CHANNEL: {
+    path: 'attendance.notification_channel',
+    source: 'config',
+    type: 'string',
+    defaultValue: 'sms',
+    description: '출결 알림 채널 (sms | kakao_at)',
   },
 } as const;
 
@@ -430,32 +482,70 @@ export function getAutomationEventPolicyPath(eventType: string, field: string, n
 }
 
 /**
+ * Policy 경로에서 eventType 이후의 필드 경로만 추출하는 헬퍼 함수 (SSOT)
+ *
+ * policyPath 형식: `auto_notification.{eventType}.{fieldPath}`
+ * 반환값: `{fieldPath}` (예: 'enabled', 'channel', 'throttle.daily_limit')
+ *
+ * SSOT 원칙: 경로 파싱 로직의 단일 정본
+ * 이 함수를 사용하여 하드코딩된 slice(2) 대신 명시적 경로 추출
+ *
+ * @param policyPath 전체 Policy 경로 (예: 'auto_notification.payment_due_reminder.throttle.daily_limit')
+ * @param eventType 이벤트 타입 (예: 'payment_due_reminder')
+ * @returns eventType 이후의 경로 (예: 'throttle.daily_limit'), 잘못된 경로면 null
+ *
+ * @example
+ * ```typescript
+ * // 일반 필드
+ * extractFieldPathFromPolicyPath('auto_notification.payment_due_reminder.enabled', 'payment_due_reminder');
+ * // 결과: 'enabled'
+ *
+ * // 중첩 필드
+ * extractFieldPathFromPolicyPath('auto_notification.payment_due_reminder.throttle.daily_limit', 'payment_due_reminder');
+ * // 결과: 'throttle.daily_limit'
+ * ```
+ */
+export function extractFieldPathFromPolicyPath(policyPath: string, eventType: string): string | null {
+  const prefix = `auto_notification.${eventType}.`;
+
+  if (!policyPath.startsWith(prefix)) {
+    if (import.meta.env?.DEV) {
+      console.warn(
+        `[Policy Registry] policyPath "${policyPath}" does not match expected format: "${prefix}*"`
+      );
+    }
+    return null;
+  }
+
+  const fieldPath = policyPath.slice(prefix.length);
+
+  if (fieldPath.length === 0) {
+    if (import.meta.env?.DEV) {
+      console.warn(
+        `[Policy Registry] policyPath "${policyPath}" has empty field path after prefix`
+      );
+    }
+    return null;
+  }
+
+  return fieldPath;
+}
+
+/**
  * Policy 소스 통일 가이드
  *
- * 현재 Policy 소스가 이원화되어 있습니다:
- * - config: tenant_settings.config JSONB 기반 (대부분의 Policy)
- * - path: useTenantSettingByPath 기반 (AI_RISK_SCORE_THRESHOLD만 예외)
- *
- * 🔄 마이그레이션 계획:
- *
- * **옵션 1: 모든 정책을 config로 통일 (권장)**
- * 1. AI_RISK_SCORE_THRESHOLD의 source를 'config'로 변경
- * 2. tenant_settings.config에 'auto_notification.attendance_pattern_anomaly.priority' 경로 추가
- * 3. useTenantSettingByPath 대신 getPolicyValueFromConfig 사용
- * 4. 기존 path 기반 값이 있으면 config로 마이그레이션 스크립트 실행
- *
- * **옵션 2: 모든 정책을 path로 통일 (비권장)**
- * - 모든 Policy를 useTenantSettingByPath로 조회하도록 변경
- * - 단점: React Hook 의존성 증가, 서버/Edge Function에서 사용 불가
+ * [P1-FIX 완료] 모든 Policy 소스가 config로 통일되었습니다.
+ * - config: tenant_settings.config JSONB 기반 (모든 Policy)
+ * - AI_RISK_SCORE_THRESHOLD도 config 기반으로 통일됨
  *
  * **현재 상태:**
- * - AI_RISK_SCORE_THRESHOLD만 path 기반 (source: 'path')
- * - 나머지 모든 Policy는 config 기반 (source: 'config')
- * - getPolicyValueWithPath() 함수로 두 방식 모두 지원
+ * - 모든 Policy는 config 기반 (source: 'config')
+ * - getPolicyValueFromConfig() 함수 사용 권장
+ * - getPolicyValueWithPath()는 하위 호환성을 위해 유지
  *
- * **마이그레이션 우선순위:**
- * - P0: AI_RISK_SCORE_THRESHOLD를 config로 통일 (옵션 1 권장)
- * - P1: 모든 Policy Registry 항목의 source 일관성 검증
- * - P2: 마이그레이션 스크립트 작성 및 실행
+ * **사용 방법:**
+ * ```typescript
+ * const threshold = getPolicyValue<number>('AI_RISK_SCORE_THRESHOLD', config);
+ * ```
  */
 

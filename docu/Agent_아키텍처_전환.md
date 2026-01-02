@@ -69,6 +69,51 @@ agent-tools-final.ts (15개 Tool)
 
 ---
 
+## ⚠️ 업종 중립성 (Industry Neutrality)
+
+### 핵심 원칙
+
+**이 시스템은 SaaS 관리 플랫폼입니다** - 단일 학원용 SaaS가 아닌, **다양한 업종의 테넌트를 관리하는 플랫폼**입니다.
+
+### Industry Adapter 패턴
+
+Agent Tool 명칭은 고정되어 있지만, **실제 DB 테이블 매핑은 동적**으로 이루어집니다:
+
+| Tool 명칭 (고정) | 업종별 실제 테이블 매핑 | 설명 |
+|-----------------|---------------------|------|
+| `manage_student` | `academy_students` (학원)<br>`salon_customers` (미용실)<br>`nail_members` (네일샵) | Tool 이름은 변경 불필요 |
+| `query_attendance` | `academy_attendance_records` (학원)<br>`salon_visit_logs` (미용실)<br>`nail_check_ins` (네일샵) | Industry Adapter가 자동 매핑 |
+| `send_message` | 모든 업종 동일 (공통 메시징) | 업종 무관 |
+
+**구현 코드**:
+```typescript
+// Industry Adapter 사용 예시
+const tableName = await getTenantTableName(supabase, tenant_id, 'student');
+// academy → academy_students
+// salon → salon_customers
+// nail → nail_members
+
+const { data } = await supabase
+  .from(tableName)
+  .select('*')
+  .eq('tenant_id', tenant_id);
+```
+
+### 테넌트 확장 가이드
+
+**네일샵, 미용실 등 새로운 업종 추가 시**:
+1. ✅ **Agent Tool 코드 수정 불필요** - Tool 명칭은 그대로 유지
+2. ✅ **DB 스키마 추가** - `nail_members`, `nail_check_ins` 등 테이블 생성
+3. ✅ **Industry Adapter 설정** - `industry_type` 컬럼에 `'nail'` 추가
+4. ✅ **즉시 사용 가능** - Agent는 Industry Adapter를 통해 자동으로 올바른 테이블에 접근
+
+**참고 문서**:
+- `docu/디어쌤 아키텍처.md` - Industry Adapter 상세 구현
+- `docu/AI_자동화_기능_정리.md` - Industry Neutrality 원칙
+- `docu/액티비티.md` - 업종 중립적 실행 감사 시스템
+
+---
+
 ## 개요
 
 ### 전환 목표

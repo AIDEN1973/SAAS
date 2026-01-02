@@ -3,11 +3,13 @@
  *
  * [불변 규칙] 스키마에서는 Tailwind 클래스를 직접 사용하지 않습니다.
  * [불변 규칙] 모든 스타일은 design-system 토큰을 사용합니다.
+ * [불변 규칙] variant는 컨텍스트에 따라 자동 결정됩니다 (그리드 내: elevated, 단독: outlined)
  */
 
 import React from 'react';
 import { clsx } from 'clsx';
 import { SpacingToken } from '@design-system/core';
+import { useCardLayout } from '../contexts/CardLayoutContext';
 
 export interface CardProps {
   children: React.ReactNode;
@@ -39,7 +41,7 @@ export const Card: React.FC<CardProps> = ({
   className,
   style,
   onClick,
-  variant = 'default',
+  variant, // variant가 명시되지 않으면 컨텍스트로 자동 결정
   onMouseEnter,
   onMouseLeave,
   onKeyDown,
@@ -51,6 +53,12 @@ export const Card: React.FC<CardProps> = ({
   titleIcon,
   titleRightContent,
 }) => {
+  const layoutType = useCardLayout();
+
+  // variant가 명시되지 않으면 컨텍스트로 자동 결정
+  // 그리드 내: elevated (테두리 없음), 단독: outlined (테두리 있음)
+  const effectiveVariant: 'default' | 'elevated' | 'outlined' =
+    variant ?? (layoutType === 'grid' ? 'elevated' : 'outlined');
   const paddingMap: Record<SpacingToken, string> = {
     xs: 'var(--spacing-xs)',
     sm: 'var(--spacing-sm)',
@@ -89,7 +97,7 @@ export const Card: React.FC<CardProps> = ({
     // 요구사항: 기본보기/수정폼 모두에서 카드 내부 하단 여백을 한 단계 더 확보
     // (하드코딩 금지: spacing 토큰 사용)
     paddingBottom: `calc(${basePadding} + var(--spacing-sm))`,
-    ...variantStyles[variant],
+    ...variantStyles[effectiveVariant],
     ...(onClick && !disableHoverEffect && {
       cursor: 'pointer',
       transition: 'var(--transition-all)', // styles.css 준수: transition 토큰 사용
@@ -213,14 +221,6 @@ export const Card: React.FC<CardProps> = ({
               )}
             </div>
           </div>
-          <div
-            style={{
-              marginLeft: `calc(-1 * ${basePadding})`,
-              marginRight: `calc(-1 * ${basePadding})`,
-              marginBottom: 'var(--spacing-md)',
-              borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)',
-            }}
-          />
         </>
       )}
       {children}

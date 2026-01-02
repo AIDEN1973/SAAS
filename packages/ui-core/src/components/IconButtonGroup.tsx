@@ -8,11 +8,11 @@
 import React, { useMemo } from 'react';
 import { Button } from './Button';
 import { Tooltip } from './Tooltip';
-import type { LucideIcon } from 'lucide-react';
+import type { LucideIcon, LucideProps } from 'lucide-react';
 import type { ColorToken } from '@design-system/core';
 
 export interface IconButtonItem {
-  icon: LucideIcon;
+  icon: LucideIcon | React.ForwardRefExoticComponent<LucideProps & React.RefAttributes<SVGSVGElement>>;
   tooltip: string;
   onClick: () => void;
   variant?: 'solid' | 'outline' | 'ghost';
@@ -92,8 +92,8 @@ export const IconButtonGroup: React.FC<IconButtonGroupProps> = ({
 
         // 업로드, 다운로드, 양식받기 아이콘은 2포인트 작게, 선 가늘게
         const isSmallIcon = ['업로드', '다운로드', '양식받기'].includes(item.tooltip);
-        const finalIconSize = isSmallIcon ? Math.max(iconSize - 2, 12) : iconSize;
-        const finalStrokeWidth = isSmallIcon ? Math.max(strokeWidth - 0.5, 1) : strokeWidth;
+        const finalIconSize = isSmallIcon ? Math.max(iconSize - 2, 12) : Math.max(iconSize, 16);
+        const finalStrokeWidth = isSmallIcon ? Math.max(strokeWidth - 0.5, 1) : Math.max(strokeWidth, 1.5);
 
         return (
           <Tooltip
@@ -115,6 +115,7 @@ export const IconButtonGroup: React.FC<IconButtonGroupProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                overflow: 'visible', // 아이콘이 잘리지 않도록
                 ...(item.variant === 'outline' && !hasColor && {
                   color: 'var(--color-text)',
                   borderColor: 'var(--color-text)',

@@ -53,6 +53,7 @@ export interface AILayerMenuProps {
   onExecutionAuditLoadMore?: (cursor?: string) => void;
   onExecutionAuditLoadSteps?: (runId: string, cursor?: string) => void;
   onExecutionAuditViewRun?: (runId: string) => void;
+  onExecutionAuditRowClick?: (run: ExecutionAuditRun) => void; // 행 클릭 핸들러
   onExecutionAuditFilterChange?: (filters: ExecutionAuditFilters) => void;
   executionAuditInitialFilters?: ExecutionAuditFilters;
   executionAuditAvailableOperationTypes?: string[];
@@ -93,6 +94,7 @@ export const AILayerMenu: React.FC<AILayerMenuProps> = ({
   onExecutionAuditLoadMore,
   onExecutionAuditLoadSteps,
   onExecutionAuditViewRun,
+  onExecutionAuditRowClick,
   onExecutionAuditFilterChange,
   executionAuditInitialFilters,
   executionAuditAvailableOperationTypes = [],
@@ -154,6 +156,7 @@ export const AILayerMenu: React.FC<AILayerMenuProps> = ({
               onLoadMore={onExecutionAuditLoadMore}
               onLoadSteps={onExecutionAuditLoadSteps}
               onViewRun={onExecutionAuditViewRun}
+              onRowClick={onExecutionAuditRowClick}
               onFilterChange={onExecutionAuditFilterChange}
               initialFilters={executionAuditInitialFilters}
               availableOperationTypes={executionAuditAvailableOperationTypes}

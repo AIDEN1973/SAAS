@@ -17,24 +17,28 @@
  *
  * @param current 현재 값
  * @param previous 이전 값
- * @returns 변화율 문자열 (예: "+20%", "-10%") 또는 undefined
+ * @param period 비교 기간 (예: "전월 대비", "전주 대비") - 선택적
+ * @returns 변화율 문자열 (예: "+20%", "-10%", "+20% (전월 대비)") 또는 undefined
  *
  * @example
  * ```typescript
  * const trend = calculateTrend(120, 100); // "+20%"
- * const trend = calculateTrend(80, 100); // "-20%"
+ * const trend = calculateTrend(80, 100, "전월 대비"); // "-20% (전월 대비)"
  * ```
  */
 export function calculateTrend(
   current: number,
-  previous: number
+  previous: number,
+  period?: string
 ): string | undefined {
   if (previous > 0) {
     const change = current - previous;
     const percent = Math.round((change / previous) * 100);
-    return `${change > 0 ? '+' : ''}${percent}%`;
+    const trendValue = `${change > 0 ? '+' : ''}${percent}%`;
+    return period ? `${trendValue} (${period})` : trendValue;
   }
-  return current > 0 ? '+100%' : undefined;
+  const trendValue = current > 0 ? '+100%' : undefined;
+  return trendValue && period ? `${trendValue} (${period})` : trendValue;
 }
 
 /**
@@ -47,21 +51,24 @@ export function calculateTrend(
  *
  * @param current 현재 비율 값
  * @param previous 이전 비율 값
- * @returns 퍼센트포인트 변화 문자열 (예: "+2%p", "-1%p") 또는 undefined
+ * @param period 비교 기간 (예: "전월 대비", "전주 대비") - 선택적
+ * @returns 퍼센트포인트 변화 문자열 (예: "+2%p", "-1%p", "+2%p (전월 대비)") 또는 undefined
  *
  * @example
  * ```typescript
  * const trend = calculateTrendPercentPoint(97, 95); // "+2%p"
- * const trend = calculateTrendPercentPoint(94, 95); // "-1%p"
+ * const trend = calculateTrendPercentPoint(94, 95, "전월 대비"); // "-1%p (전월 대비)"
  * ```
  */
 export function calculateTrendPercentPoint(
   current: number,
-  previous: number
+  previous: number,
+  period?: string
 ): string | undefined {
   if (previous > 0 || current > 0) {
     const change = current - previous;
-    return `${change > 0 ? '+' : ''}${Math.round(change)}%p`;
+    const trendValue = `${change > 0 ? '+' : ''}${Math.round(change)}%p`;
+    return period ? `${trendValue} (${period})` : trendValue;
   }
   return undefined;
 }

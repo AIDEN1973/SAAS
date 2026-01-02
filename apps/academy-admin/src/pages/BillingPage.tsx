@@ -113,13 +113,13 @@ export function BillingPage() {
     },
   });
 
-  // 상품 목록 조회
+  // P2 TODO: 상품 목록 조회
+  // 장기 계획: products 테이블 생성 후 실제 상품 관리 기능 구현
+  // 현재: invoice_items에서 임시로 상품 정보 추출
+  // 우선순위: 중간 (별도 페이지로 분리 권장)
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ['products', tenantId],
     queryFn: async () => {
-      // TODO: products 테이블이 생성되면 실제 조회로 변경
-      // 현재는 invoice_items를 통해 상품 정보 추출
-      // 정본 규칙: fetchInvoiceItems 함수 사용 (Hook의 queryFn 로직 재사용)
       if (!tenantId) return [];
       const items = await fetchInvoiceItems(tenantId, {});
       interface ProductInfo {
@@ -146,8 +146,6 @@ export function BillingPage() {
   });
   void products;
   void productsLoading;
-
-  // 상품 생성 (TODO: products 테이블이 생성되면 구현)
   // const createProduct = useMutation({ ... });
 
   // 매출 통계 조회는 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙)
@@ -170,8 +168,9 @@ export function BillingPage() {
       const paidInvoices = invoices.filter((inv: BillingHistoryItem) => inv.status === 'paid');
       const totalAmount = paidInvoices.reduce((sum: number, inv: BillingHistoryItem) => sum + (inv.amount_paid || 0), 0);
 
-      // TODO: settlements 테이블이 생성되면 실제 정산 기록 저장
-      // 현재는 계산만 수행
+      // P2 TODO: settlements 테이블 생성 후 실제 정산 기록 저장
+      // 장기 계획: 월별 정산 내역 히스토리 관리
+      // 우선순위: 중간 (현재는 계산만 수행)
       return {
         settlement_id: `settlement-${data.year}-${data.month}-${Date.now()}`,
         total_amount: totalAmount,
@@ -219,7 +218,9 @@ export function BillingPage() {
   });
   void saveTeacherRevenueSplit;
 
-  // 인보이스 상태 업데이트 (TODO: 구현 필요)
+  // P1 TODO: 인보이스 상태 업데이트 기능 구현
+  // 우선순위: 높음 (관리자가 수동으로 상태 변경 필요)
+  // 예: draft → pending, pending → paid, paid → cancelled
   // const updateInvoiceStatus = useMutation({
   //   mutationFn: async ({ id, status }: { id: string; status: InvoiceStatus }) => {
   //     const response = await apiClient.patch<Invoice>('invoices', id, { status });
@@ -276,7 +277,7 @@ export function BillingPage() {
         />
 
         {/* 빠른 링크 (한 페이지에 하나의 기능 원칙 준수: 청구서 관리만 메인, 나머지는 별도 페이지) */}
-        <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+        <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
                 관련 기능:
@@ -309,7 +310,7 @@ export function BillingPage() {
           {activeTab === 'invoices' && (
             <>
           {/* 필터 및 액션 */}
-          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+          <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
               <Button
                 variant={!filter.status ? 'solid' : 'outline'}
@@ -365,7 +366,7 @@ export function BillingPage() {
               }}
             />
           ) : (
-            <Card padding="md" variant="default">
+            <Card padding="lg">
               <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center' }}>
                 로딩 중...
               </div>
@@ -447,37 +448,6 @@ export function BillingPage() {
           )}
 
           {/* 상품 관리, 결제 관리, 매출/정산은 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙) */}
-          {/* 빠른 링크 */}
-          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
-                추가 기능:
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => safeNavigate(ROUTES.BILLING_HOME)}
-              >
-                상품 관리
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => safeNavigate(ROUTES.BILLING_HOME)}
-              >
-                결제 관리
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => safeNavigate(ROUTES.BILLING_HOME)}
-              >
-                매출/정산
-              </Button>
-            </div>
-        </Card>
-
-        {/* 결제 관리, 매출/정산은 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙) */}
       </Container>
     </ErrorBoundary>
   );

@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(git push:*)",
+      "Bash(tree:*)",
+      "Bash(supabase functions deploy:*)",
+      "Bash(npx supabase functions deploy:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run build:*)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File deploy.ps1)",
+      "Bash(cat:*)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -Command \"$env:SUPABASE_PROJECT_REF = ''xawypsrotrfoyozhrsbb''; .\\\\supabase\\\\functions\\\\deploy.ps1\")",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File .supabasefunctionsdeploy.ps1 xawypsrotrfoyozhrsbb)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File \"supabase/functions/deploy.ps1\" \"xawypsrotrfoyozhrsbb\")",
+      "Bash(mkdir:*)",
+      "Bash(find:*)",
+      "Bash(git stash:*)",
+      "Bash(psql postgresql://postgres.xawypsrotrfoyozhrsbb:Nqf6tCgDSrXbO8kU@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres -c \"SELECT con.conname, pg_get_constraintdef\\(con.oid\\) FROM pg_constraint con JOIN pg_class rel ON rel.oid = con.conrelid WHERE rel.relname = ''execution_audit_runs'' AND con.contype = ''c'' AND con.conname LIKE ''%operation_type%'';\")",
+      "Bash(supabase functions serve:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx supabase:*)",
+      "Bash(npm cache clean:*)",
+      "Bash(grep:*)",
+      "Bash(dir:*)",
+      "Bash(npm run dev:admin:*)",
+      "Bash(psql:*)",
+      "Bash(claude-code tasks:*)",
+      "Bash(supabase functions invoke:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(git -C \"c:/cursor/SynologyDrive/SAMDLE\" checkout apps/academy-admin/src/pages/StudentsPage.tsx)",
+      "Bash(git -C \"c:/cursor/SynologyDrive/SAMDLE\" show HEAD:apps/academy-admin/src/pages/StudentsPage.tsx)"
+    ]
+  }
+}

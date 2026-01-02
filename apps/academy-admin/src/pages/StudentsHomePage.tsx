@@ -103,11 +103,12 @@ export function StudentsHomePage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
+        {/* 헤더 섹션 */}
         <PageHeader
           title="학생 관리"
           actions={
             <Button
-              variant="outline"
+              variant="solid"
               onClick={handleViewAllStudents}
             >
               전체 학생 보기
@@ -115,8 +116,8 @@ export function StudentsHomePage() {
           }
         />
 
-        {/* 통계 카드 섹션 */}
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+        {/* 통계 카드 그룹 */}
+        <div style={{ marginBottom: 'var(--spacing-2xl)' }}>
           <CardGridLayout
             cards={[
               <StudentStatsCard
@@ -150,36 +151,40 @@ export function StudentsHomePage() {
           />
         </div>
 
-        {/* 빠른 액션 섹션 */}
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <CardGridLayout
-            cards={[
-              <QuickActionCard key="quick-action" onAction={handleQuickAction} />,
-            ]}
-            desktopColumns={1}
-            tabletColumns={1}
-            mobileColumns={1}
-          />
+        {/* 빠른 작업 섹션 */}
+        <div style={{ marginBottom: 'var(--spacing-2xl)' }}>
+          <div style={{ marginBottom: 'var(--spacing-md)' }}>
+            <h2 style={{
+              fontSize: 'var(--font-size-xl)',
+              fontWeight: 'var(--font-weight-semibold)',
+              color: 'var(--color-text)',
+              marginBottom: 'var(--spacing-xs)',
+            }}>
+              빠른 작업
+            </h2>
+          </div>
+          <QuickActionCard onAction={handleQuickAction} />
         </div>
 
         {/* 최근 활동 섹션 */}
-        <div>
-          <CardGridLayout
-            cards={[
-              <RecentActivityCard
-                key="recent-activity"
-                activity={recentActivity}
-                isLoading={isLoadingActivity}
-                onAction={handleActivityClick}
-              />,
-            ]}
-            desktopColumns={1}
-            tabletColumns={1}
-            mobileColumns={1}
+        <div style={{ marginBottom: 'var(--spacing-2xl)' }}>
+          <div style={{ marginBottom: 'var(--spacing-md)' }}>
+            <h2 style={{
+              fontSize: 'var(--font-size-xl)',
+              fontWeight: 'var(--font-weight-semibold)',
+              color: 'var(--color-text)',
+              marginBottom: 'var(--spacing-xs)',
+            }}>
+              최근 활동
+            </h2>
+          </div>
+          <RecentActivityCard
+            activity={recentActivity}
+            isLoading={isLoadingActivity}
+            onAction={handleActivityClick}
           />
         </div>
       </Container>
     </ErrorBoundary>
   );
 }
-

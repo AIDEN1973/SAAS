@@ -50,14 +50,14 @@ export const aiEscalateEmergencyHandler: IntentHandler = {
         };
       }
 
-      // ⚠️ P0: Policy 재평가 (실행 시점)
-      const eventType = plan.event_type || 'announcement_urgent';
+      // [P0-FIX] Fail-Closed: event_type 기본값 제거 - 명시적 실패 처리
+      const eventType = plan.event_type;
 
       if (!eventType) {
         return {
           status: 'failed',
-          error_code: 'INVALID_PARAMS',
-          message: 'event_type이 없습니다.',
+          error_code: 'MISSING_EVENT_TYPE',
+          message: 'event_type이 반드시 필요합니다. (Fail-Closed 원칙)',
         };
       }
 

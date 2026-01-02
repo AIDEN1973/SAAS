@@ -87,7 +87,6 @@ export function AISuggestionCard({
   return (
     <Card
       padding="md"
-      variant="elevated"
       style={{
         borderLeft: `var(--border-width-thick) solid var(--color-${getPriorityVariant(suggestion.priority)})`,
       }}
@@ -151,7 +150,6 @@ export function AISuggestionCard({
                 {showPreview && (
                   <Card
                     padding="sm"
-                    variant="default"
                     style={{
                       marginTop: 'var(--spacing-sm)',
                       backgroundColor: 'var(--color-background-secondary)',

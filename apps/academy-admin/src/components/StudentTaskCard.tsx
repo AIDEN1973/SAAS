@@ -122,12 +122,12 @@ export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
         console.error('[StudentTaskCard] Admin: approveAndExecute 호출');
         await approveAndExecute.mutateAsync(card.id);
       } else {
-        console.error('[StudentTaskCard] ❌ 권한 없음:', {
+        console.error('[StudentTaskCard] 권한 없음:', {
           user_role: userRole,
         });
       }
     } catch (error) {
-      console.error('[StudentTaskCard] ❌ 승인 실패:', error);
+      console.error('[StudentTaskCard] 승인 실패:', error);
     } finally {
       setIsProcessing(false);
     }

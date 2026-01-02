@@ -45,7 +45,7 @@ export function StudentTasksPage() {
         />
 
         {isLoading && (
-          <Card padding="lg" variant="default">
+          <Card padding="lg">
             <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>
               업무 카드를 불러오는 중...
             </div>
@@ -53,7 +53,7 @@ export function StudentTasksPage() {
         )}
 
         {error && (
-          <Card padding="md" variant="outlined">
+          <Card padding="md">
             <div style={{ color: 'var(--color-error)' }}>
               오류: {error instanceof Error ? error.message : '업무 카드를 불러오는데 실패했습니다.'}
             </div>
@@ -85,7 +85,7 @@ export function StudentTasksPage() {
         )}
 
         {cards && cards.length === 0 && !isLoading && (
-          <Card padding="lg" variant="default">
+          <Card padding="lg">
             <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>
               <p style={{ marginBottom: 'var(--spacing-md)' }}>
                 현재 발생한 학생 업무가 없습니다.

@@ -11,6 +11,7 @@ import type { RecentActivity } from '@hooks/use-student';
 import { toKST } from '@lib/date-utils';
 // [SSOT] Barrel export를 통한 통합 import
 import { DATE_FORMATS } from '../../constants';
+import { User, MessageSquare, Calendar, Tag } from 'lucide-react';
 
 export interface RecentActivityCardProps {
   activity: RecentActivity | undefined;
@@ -29,54 +30,101 @@ export function RecentActivityCard({ activity, isLoading, onAction }: RecentActi
     return toKST(dateString).format(DATE_FORMATS.SHORT);
   };
 
+  const getTabIcon = (tab: ActivityTab) => {
+    switch (tab) {
+      case 'students':
+        return <User size={16} />;
+      case 'consultations':
+        return <MessageSquare size={16} />;
+      case 'attendance':
+        return <Calendar size={16} />;
+      case 'tags':
+        return <Tag size={16} />;
+    }
+  };
+
+  const getTabLabel = (tab: ActivityTab) => {
+    switch (tab) {
+      case 'students':
+        return '학생';
+      case 'consultations':
+        return '상담';
+      case 'attendance':
+        return '출결';
+      case 'tags':
+        return '태그';
+    }
+  };
+
   return (
     <Card
-      padding="md"
-      variant="default"
+      padding="lg"
       style={{
         opacity: isEmpty ? 'var(--opacity-inactive)' : 'var(--opacity-full)',
       }}
       disableHoverEffect={true}
     >
-      <h3 style={{
-        fontSize: 'var(--font-size-base)',
-        fontWeight: 'var(--font-weight-semibold)',
-        marginBottom: 'var(--spacing-md)',
-        color: isEmpty ? 'var(--color-text-secondary)' : 'var(--color-text)',
-      }}>
-        최근 활동
-      </h3>
-
       {/* 탭 버튼 */}
-      <div style={{ display: 'flex', gap: 'var(--spacing-xs)', marginBottom: 'var(--spacing-md)', flexWrap: 'wrap' }}>
+      <div style={{
+        display: 'flex',
+        gap: 'var(--spacing-sm)',
+        marginBottom: 'var(--spacing-lg)',
+        flexWrap: 'wrap',
+        borderBottom: '1px solid var(--color-gray-200)',
+        paddingBottom: 'var(--spacing-sm)',
+      }}>
         {(['students', 'consultations', 'attendance', 'tags'] as ActivityTab[]).map((tab) => (
           <Button
             key={tab}
-            variant={activeTab === tab ? 'solid' : 'outline'}
+            variant={activeTab === tab ? 'solid' : 'ghost'}
             size="sm"
             onClick={() => setActiveTab(tab)}
-            style={{ fontSize: 'var(--font-size-sm)' }}
+            style={{
+              fontSize: 'var(--font-size-sm)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--spacing-xs)',
+            }}
           >
-            {tab === 'students' && '학생'}
-            {tab === 'consultations' && '상담'}
-            {tab === 'attendance' && '출결'}
-            {tab === 'tags' && '태그'}
+            {getTabIcon(tab)}
+            {getTabLabel(tab)}
           </Button>
         ))}
       </div>
 
       {/* 활동 목록 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)', minHeight: 'var(--spacing-3xl)' }}>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--spacing-xs)',
+        minHeight: '200px',
+      }}>
         {isEmpty ? (
-          <div style={{ color: 'var(--color-text-secondary)', textAlign: 'center', padding: 'var(--spacing-lg)' }}>
-            활동 없음
+          <div style={{
+            color: 'var(--color-text-secondary)',
+            textAlign: 'center',
+            padding: 'var(--spacing-xl)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: 'var(--spacing-sm)',
+          }}>
+            {getTabIcon(activeTab)}
+            <span>활동 없음</span>
           </div>
         ) : (
           <>
             {activeTab === 'students' && (
               <>
                 {activity.recentStudents.length === 0 ? (
-                  <div style={{ color: 'var(--color-text-secondary)' }}>최근 등록된 학생 없음</div>
+                  <div style={{
+                    color: 'var(--color-text-secondary)',
+                    textAlign: 'center',
+                    padding: 'var(--spacing-xl)',
+                  }}>
+                    최근 등록된 학생 없음
+                  </div>
                 ) : (
                   activity.recentStudents.map((student) => (
                     <div
@@ -85,18 +133,39 @@ export function RecentActivityCard({ activity, isLoading, onAction }: RecentActi
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        padding: 'var(--spacing-xs)',
+                        padding: 'var(--spacing-sm)',
                         cursor: onAction ? 'pointer' : 'default',
+                        borderRadius: 'var(--radius-md)',
+                        transition: 'background-color 0.2s ease',
+                        backgroundColor: 'transparent',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (onAction) {
+                          e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                       onClick={() => onAction?.('student', student.id)}
                     >
                       <div style={{
-                        color: 'var(--color-text)',
-                        fontSize: 'var(--font-size-base)',
-                      }}>{student.name}</div>
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--spacing-sm)',
+                      }}>
+                        <User size={18} style={{ color: 'var(--color-primary)' }} />
+                        <div style={{
+                          color: 'var(--color-text)',
+                          fontSize: 'var(--font-size-base)',
+                          fontWeight: 'var(--font-weight-medium)',
+                        }}>
+                          {student.name}
+                        </div>
+                      </div>
                       <div style={{
                         color: 'var(--color-text-secondary)',
-                        fontSize: 'var(--font-size-base)',
+                        fontSize: 'var(--font-size-sm)',
                       }}>
                         {formatDate(student.created_at)}
                       </div>
@@ -109,7 +178,13 @@ export function RecentActivityCard({ activity, isLoading, onAction }: RecentActi
             {activeTab === 'consultations' && (
               <>
                 {activity.recentConsultations.length === 0 ? (
-                  <div style={{ color: 'var(--color-text-secondary)' }}>최근 상담 기록 없음</div>
+                  <div style={{
+                    color: 'var(--color-text-secondary)',
+                    textAlign: 'center',
+                    padding: 'var(--spacing-xl)',
+                  }}>
+                    최근 상담 기록 없음
+                  </div>
                 ) : (
                   activity.recentConsultations.map((consultation) => (
                     <div
@@ -118,20 +193,39 @@ export function RecentActivityCard({ activity, isLoading, onAction }: RecentActi
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        padding: 'var(--spacing-xs)',
+                        padding: 'var(--spacing-sm)',
                         cursor: onAction ? 'pointer' : 'default',
+                        borderRadius: 'var(--radius-md)',
+                        transition: 'background-color 0.2s ease',
+                        backgroundColor: 'transparent',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (onAction) {
+                          e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                       onClick={() => onAction?.('consultation', consultation.id)}
                     >
                       <div style={{
-                        color: 'var(--color-text)',
-                        fontSize: 'var(--font-size-base)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--spacing-sm)',
                       }}>
-                        {consultation.consultation_type}
+                        <MessageSquare size={18} style={{ color: 'var(--color-primary)' }} />
+                        <div style={{
+                          color: 'var(--color-text)',
+                          fontSize: 'var(--font-size-base)',
+                          fontWeight: 'var(--font-weight-medium)',
+                        }}>
+                          {consultation.consultation_type}
+                        </div>
                       </div>
                       <div style={{
                         color: 'var(--color-text-secondary)',
-                        fontSize: 'var(--font-size-base)',
+                        fontSize: 'var(--font-size-sm)',
                       }}>
                         {formatDate(consultation.consultation_date)}
                       </div>
@@ -144,7 +238,13 @@ export function RecentActivityCard({ activity, isLoading, onAction }: RecentActi
             {activeTab === 'attendance' && (
               <>
                 {activity.recentAttendanceEvents.length === 0 ? (
-                  <div style={{ color: 'var(--color-text-secondary)' }}>최근 출결 이벤트 없음</div>
+                  <div style={{
+                    color: 'var(--color-text-secondary)',
+                    textAlign: 'center',
+                    padding: 'var(--spacing-xl)',
+                  }}>
+                    최근 출결 이벤트 없음
+                  </div>
                 ) : (
                   activity.recentAttendanceEvents.map((event) => (
                     <div
@@ -153,20 +253,39 @@ export function RecentActivityCard({ activity, isLoading, onAction }: RecentActi
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        padding: 'var(--spacing-xs)',
+                        padding: 'var(--spacing-sm)',
                         cursor: onAction ? 'pointer' : 'default',
+                        borderRadius: 'var(--radius-md)',
+                        transition: 'background-color 0.2s ease',
+                        backgroundColor: 'transparent',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (onAction) {
+                          e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                       onClick={() => onAction?.('attendance', event.id)}
                     >
                       <div style={{
-                        color: 'var(--color-text)',
-                        fontSize: 'var(--font-size-base)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--spacing-sm)',
                       }}>
-                        {event.status}
+                        <Calendar size={18} style={{ color: 'var(--color-primary)' }} />
+                        <div style={{
+                          color: 'var(--color-text)',
+                          fontSize: 'var(--font-size-base)',
+                          fontWeight: 'var(--font-weight-medium)',
+                        }}>
+                          {event.status}
+                        </div>
                       </div>
                       <div style={{
                         color: 'var(--color-text-secondary)',
-                        fontSize: 'var(--font-size-base)',
+                        fontSize: 'var(--font-size-sm)',
                       }}>
                         {formatDate(event.occurred_at)}
                       </div>
@@ -179,7 +298,13 @@ export function RecentActivityCard({ activity, isLoading, onAction }: RecentActi
             {activeTab === 'tags' && (
               <>
                 {activity.recentTagChanges.length === 0 ? (
-                  <div style={{ color: 'var(--color-text-secondary)' }}>최근 태그 변경 없음</div>
+                  <div style={{
+                    color: 'var(--color-text-secondary)',
+                    textAlign: 'center',
+                    padding: 'var(--spacing-xl)',
+                  }}>
+                    최근 태그 변경 없음
+                  </div>
                 ) : (
                   activity.recentTagChanges.map((tag) => (
                     <div
@@ -188,20 +313,39 @@ export function RecentActivityCard({ activity, isLoading, onAction }: RecentActi
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        padding: 'var(--spacing-xs)',
+                        padding: 'var(--spacing-sm)',
                         cursor: onAction ? 'pointer' : 'default',
+                        borderRadius: 'var(--radius-md)',
+                        transition: 'background-color 0.2s ease',
+                        backgroundColor: 'transparent',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (onAction) {
+                          e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                       onClick={() => onAction?.('tag', tag.id)}
                     >
                       <div style={{
-                        color: 'var(--color-text)',
-                        fontSize: 'var(--font-size-base)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--spacing-sm)',
                       }}>
-                        태그 추가
+                        <Tag size={18} style={{ color: 'var(--color-primary)' }} />
+                        <div style={{
+                          color: 'var(--color-text)',
+                          fontSize: 'var(--font-size-base)',
+                          fontWeight: 'var(--font-weight-medium)',
+                        }}>
+                          태그 추가
+                        </div>
                       </div>
                       <div style={{
                         color: 'var(--color-text-secondary)',
-                        fontSize: 'var(--font-size-base)',
+                        fontSize: 'var(--font-size-sm)',
                       }}>
                         {formatDate(tag.created_at)}
                       </div>
@@ -216,4 +360,3 @@ export function RecentActivityCard({ activity, isLoading, onAction }: RecentActi
     </Card>
   );
 }
-

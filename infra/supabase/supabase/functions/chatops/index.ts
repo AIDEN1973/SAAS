@@ -18,7 +18,10 @@ import { getTenantIdFromVerifiedUser, requireTenantScope } from './handlers/auth
 import { getCorsHeaders } from './handlers/cors.ts';
 import { maskErr, tenantLogKey } from './handlers/utils.ts';
 // 🚀 AGENT-MODE: Agent 엔진 import
-import { runAgent, runAgentStreaming, type AgentMessage } from '../_shared/agent-engine-final.ts';
+import { runAgent, runAgentWithProgress, type AgentMessage } from '../_shared/agent-engine-final.ts';
+import { runAgentStreaming } from '../_shared/agent-engine-streaming.ts';
+// Execution Audit 유틸리티 import
+import { createExecutionAuditRecord } from '../_shared/execution-audit-utils.ts';
 
 interface ChatOpsRequest {
   session_id: string;
@@ -205,7 +208,7 @@ serve(async (req: Request) => {
 
     // 🚀 AGENT-MODE: Agent 실행 (스트리밍 또는 일반)
     if (stream) {
-      console.log('[ChatOps] Agent 스트리밍 모드로 처리 시작');
+      console.log('[ChatOps] Agent 스트리밍 모드 (진행 상황 포함)로 처리 시작');
 
       // 사용자 메시지 즉시 저장
       await supabaseSvc.from('chatops_messages').insert({
@@ -216,7 +219,8 @@ serve(async (req: Request) => {
         content: message,
       });
 
-      const originalStream = await runAgentStreaming(
+      // ✅ runAgentWithProgress 사용: Tool 실행 + 진행 상황 SSE
+      const originalStream = await runAgentWithProgress(
         message,
         conversationHistory,
         {
@@ -232,6 +236,7 @@ serve(async (req: Request) => {
 
       // P1-13: 스트리밍 응답을 가로채서 assistant 메시지를 DB에 저장
       let fullResponse = '';
+      let toolResults: Array<{ tool: string; success: boolean; result: any }> = [];
       const wrappedStream = new ReadableStream({
         async start(controller) {
           const reader = originalStream.getReader();
@@ -252,11 +257,23 @@ serve(async (req: Request) => {
                 if (line.trim().startsWith('data: ')) {
                   try {
                     const data = JSON.parse(line.trim().slice(6));
+                    console.log('[ChatOps:Wrapper] SSE 이벤트:', { type: data.type, hasResponse: !!data.response, hasContent: !!data.content });
+
                     if (data.type === 'content') {
                       fullResponse += data.content;
+                      console.log('[ChatOps:Wrapper] content 누적:', { length: fullResponse.length });
                     } else if (data.type === 'done') {
                       // 스트리밍 완료 - assistant 메시지 저장
-                      fullResponse = data.fullResponse || fullResponse;
+                      // ✅ FIX: agent-engine-final.ts는 'response' 필드 사용 (line 1944)
+                      const prevLength = fullResponse.length;
+                      fullResponse = data.response || fullResponse;
+                      toolResults = data.tool_results || [];
+                      console.log('[ChatOps:Wrapper] done 이벤트 처리:', {
+                        prevLength,
+                        newLength: fullResponse.length,
+                        hasDataResponse: !!data.response,
+                        toolResultsCount: toolResults.length
+                      });
                     }
                   } catch {
                     // JSON 파싱 실패는 무시
@@ -280,6 +297,98 @@ serve(async (req: Request) => {
                 console.error('[ChatOps] Assistant 메시지 저장 실패:', insertResult.error);
               } else {
                 console.log('[ChatOps] Assistant 메시지 저장 완료:', { length: fullResponse.length });
+              }
+
+              // ✅ ExecutionAudit 기록 생성 - 실제 Tool이 성공한 경우에만
+              // confirm_action, register, discharge 등 L2 작업이 성공한 경우에만 액티비티에 표시
+              const successfulTools = toolResults.filter(t =>
+                t.success &&
+                ['confirm_action', 'register', 'discharge', 'pause', 'resume', 'assign_tags'].includes(t.tool)
+              );
+
+              if (successfulTools.length > 0) {
+                console.log('[ChatOps] 성공한 Tool 실행 발견:', {
+                  tools: successfulTools.map(t => t.tool),
+                  count: successfulTools.length
+                });
+
+                // Tool 실행 결과 기반으로 요약 생성 및 entity 정보 추출
+                let entityType = 'chatops_session';
+                let entityId = session_id;
+
+                const toolSummaries = successfulTools.map(t => {
+                  const toolName = t.tool;
+                  const result = t.result;
+
+                  // Tool별 사용자 친화적 요약 생성
+                  if (toolName === 'register') {
+                    // register의 경우 result에서 학생명, ID 추출
+                    const studentName = result?.student_name || result?.name || '학생';
+                    const studentId = result?.student_id || result?.id;
+                    if (studentId) {
+                      entityType = 'student';
+                      entityId = studentId;
+                    }
+                    return `${studentName} 학생등록 완료`;
+                  } else if (toolName === 'discharge') {
+                    const studentName = result?.student_name || result?.name || '학생';
+                    const studentId = result?.student_id || result?.id;
+                    if (studentId) {
+                      entityType = 'student';
+                      entityId = studentId;
+                    }
+                    return `${studentName} 퇴원 처리 완료`;
+                  } else if (toolName === 'pause') {
+                    const studentName = result?.student_name || result?.name || '학생';
+                    const studentId = result?.student_id || result?.id;
+                    if (studentId) {
+                      entityType = 'student';
+                      entityId = studentId;
+                    }
+                    return `${studentName} 일시정지 처리 완료`;
+                  } else if (toolName === 'resume') {
+                    const studentName = result?.student_name || result?.name || '학생';
+                    const studentId = result?.student_id || result?.id;
+                    if (studentId) {
+                      entityType = 'student';
+                      entityId = studentId;
+                    }
+                    return `${studentName} 재개 처리 완료`;
+                  } else if (toolName === 'assign_tags') {
+                    const studentId = result?.student_id || result?.id;
+                    if (studentId) {
+                      entityType = 'student';
+                      entityId = studentId;
+                    }
+                    return '태그 할당 완료';
+                  } else if (toolName === 'confirm_action') {
+                    // confirm_action은 일반적인 작업 완료
+                    return result?.summary || '작업 처리 완료';
+                  }
+                  return `${toolName} 실행 완료`;
+                }).join(', ');
+
+                const messageHash = message.substring(0, 50).replace(/\s/g, '_');
+                await createExecutionAuditRecord(supabaseSvc, {
+                  tenant_id: requireTenantScope(tenant_id),
+                  operation_type: 'chatops-message',
+                  status: 'success',
+                  source: 'ai',
+                  actor_type: 'user',
+                  actor_id: user_id,
+                  summary: toolSummaries, // 대화 내용 대신 Tool 실행 결과 요약 사용
+                  details: null,
+                  reference: {
+                    entity_type: entityType, // student, chatops_session 등
+                    entity_id: entityId, // student_id 또는 session_id
+                    source_event_id: `ai:chatops:${session_id}:${messageHash}`,
+                  },
+                });
+              } else {
+                console.log('[ChatOps] 성공한 L2 Tool 없음 - ExecutionAudit 생성 생략:', {
+                  totalTools: toolResults.length,
+                  toolList: toolResults.map(t => ({ tool: t.tool, success: t.success }))
+                });
               }
             }
 
@@ -342,6 +451,96 @@ serve(async (req: Request) => {
           content: agentResult.response,
         },
       ]);
+
+      // ✅ ExecutionAudit 기록 생성 - 실제 Tool이 성공한 경우에만
+      // confirm_action, register, discharge 등 L2 작업이 성공한 경우에만 액티비티에 표시
+      const toolResults = agentResult.tool_results || [];
+      const successfulTools = toolResults.filter(t =>
+        t.success &&
+        ['confirm_action', 'register', 'discharge', 'pause', 'resume', 'assign_tags'].includes(t.tool)
+      );
+
+      if (successfulTools.length > 0) {
+        console.log('[ChatOps] 성공한 Tool 실행 발견:', {
+          tools: successfulTools.map(t => t.tool),
+          count: successfulTools.length
+        });
+
+        // Tool 실행 결과 기반으로 요약 생성 및 entity 정보 추출
+        let entityType = 'chatops_session';
+        let entityId = session_id;
+
+        const toolSummaries = successfulTools.map(t => {
+          const toolName = t.tool;
+          const result = t.result;
+
+          // Tool별 사용자 친화적 요약 생성
+          if (toolName === 'register') {
+            const studentName = result?.student_name || result?.name || '학생';
+            const studentId = result?.student_id || result?.id;
+            if (studentId) {
+              entityType = 'student';
+              entityId = studentId;
+            }
+            return `${studentName} 학생등록 완료`;
+          } else if (toolName === 'discharge') {
+            const studentName = result?.student_name || result?.name || '학생';
+            const studentId = result?.student_id || result?.id;
+            if (studentId) {
+              entityType = 'student';
+              entityId = studentId;
+            }
+            return `${studentName} 퇴원 처리 완료`;
+          } else if (toolName === 'pause') {
+            const studentName = result?.student_name || result?.name || '학생';
+            const studentId = result?.student_id || result?.id;
+            if (studentId) {
+              entityType = 'student';
+              entityId = studentId;
+            }
+            return `${studentName} 일시정지 처리 완료`;
+          } else if (toolName === 'resume') {
+            const studentName = result?.student_name || result?.name || '학생';
+            const studentId = result?.student_id || result?.id;
+            if (studentId) {
+              entityType = 'student';
+              entityId = studentId;
+            }
+            return `${studentName} 재개 처리 완료`;
+          } else if (toolName === 'assign_tags') {
+            const studentId = result?.student_id || result?.id;
+            if (studentId) {
+              entityType = 'student';
+              entityId = studentId;
+            }
+            return '태그 할당 완료';
+          } else if (toolName === 'confirm_action') {
+            return result?.summary || '작업 처리 완료';
+          }
+          return `${toolName} 실행 완료`;
+        }).join(', ');
+
+        await createExecutionAuditRecord(supabaseSvc, {
+          tenant_id: requireTenantScope(tenant_id),
+          operation_type: 'chatops-message',
+          status: 'success',
+          source: 'ai',
+          actor_type: 'user',
+          actor_id: user_id,
+          summary: toolSummaries, // 대화 내용 대신 Tool 실행 결과 요약 사용
+          details: null,
+          reference: {
+            entity_type: entityType, // student, chatops_session 등
+            entity_id: entityId, // student_id 또는 session_id
+            source_event_id: `ai:chatops:${session_id}:${Date.now()}`,
+          },
+        });
+      } else {
+        console.log('[ChatOps] 성공한 L2 Tool 없음 - ExecutionAudit 생성 생략:', {
+          totalTools: toolResults.length,
+          toolList: toolResults.map(t => ({ tool: t.tool, success: t.success }))
+        });
+      }
 
       console.log('[ChatOps] ===== 최종 응답 반환 =====');
       console.log('[ChatOps] 최종 응답:', {

@@ -18,6 +18,72 @@
 
 ---
 
+## ⚠️ 업종 중립성 (Industry Neutrality)
+
+### 핵심 원칙
+
+**이 시스템은 SaaS 관리 플랫폼입니다** - 단일 학원용 SaaS가 아닌, **다양한 업종의 테넌트를 관리하는 플랫폼**입니다.
+
+### Industry Adapter를 통한 사전예방
+
+사전예방 검증 시 **업종별 테이블명은 다르지만, 검증 체계는 동일**합니다:
+
+**Deploy-time 검증 (배포 전)**:
+```bash
+#!/bin/bash
+# 업종별 필수 테이블 검증 예시
+
+# 학원 (Academy)
+required_tables_academy=("academy_students" "academy_attendance_records" "academy_classes")
+
+# 미용실 (Salon)
+required_tables_salon=("salon_customers" "salon_visit_logs" "salon_services")
+
+# 네일샵 (Nail)
+required_tables_nail=("nail_members" "nail_check_ins" "nail_treatments")
+
+# Industry Adapter 함수는 모든 업종에서 동일하게 작동
+# → getTenantTableName(), getTenantIndustryType(), getFKRelationName()
+```
+
+**Runtime 검증 (요청 처리 시)**:
+```typescript
+// 1. Tenant ID 검증 (모든 업종 동일)
+const tenantId = requireTenantScope(context.tenant_id);
+
+// 2. Industry Type 확인
+const industryType = await getTenantIndustryType(supabase, tenantId);
+// → 'academy', 'salon', 'nail', etc.
+
+// 3. 동적 테이블명 검증
+const tableName = await getTenantTableName(supabase, tenantId, 'student');
+// → 업종별 올바른 테이블명으로 자동 변환
+
+// 4. 공통 검증 로직 실행
+const { data, error } = await supabase.from(tableName).select('id').limit(1);
+if (error) {
+  // 테이블 존재 여부 검증 실패
+  return { success: false, error: 'DB 스키마 오류' };
+}
+```
+
+### 테넌트 확장 시 사전예방 체크리스트
+
+**새 업종 추가 시 (예: 네일샵)**:
+- [ ] DB 스키마 생성 (`nail_members`, `nail_check_ins` 등)
+- [ ] `industry_type` 컬럼에 `'nail'` 추가
+- [ ] Industry Adapter에 매핑 추가
+- [ ] **Agent Tool 코드 수정 불필요** ✅
+- [ ] **검증 로직 수정 불필요** ✅
+- [ ] Preflight 스크립트에 테이블명만 추가
+
+**참고 문서**:
+- `docu/Agent_아키텍처_전환.md` - Industry Neutrality 개요
+- `docu/디어쌤 아키텍처.md` - Industry Adapter 상세 구현
+- `docu/체크리스트.md` - Industry Adapter 검증 체크리스트
+
+---
+
 ## 개요
 
 ### 전환 배경

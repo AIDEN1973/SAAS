@@ -325,7 +325,7 @@ export function NotificationsPage() {
         />
 
         {/* 탭 선택 */}
-        <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+        <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
               <Button
                 variant={activeTab === 'history' ? 'solid' : 'outline'}
@@ -369,7 +369,7 @@ export function NotificationsPage() {
           {activeTab === 'history' && (
             <>
           {/* 필터 및 액션 */}
-          <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+          <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
               <Button
                 variant={!filter.channel ? 'solid' : 'outline'}
@@ -423,7 +423,7 @@ export function NotificationsPage() {
               }}
             />
           ) : (
-            <Card padding="md" variant="default">
+            <Card padding="lg">
               <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center' }}>
                 로딩 중...
               </div>
@@ -515,7 +515,7 @@ export function NotificationsPage() {
             <>
               {/* AI 초안 제안 배너 (아키텍처 문서 3.5.1: AI 자동 초안 제안 모델) */}
               {messageDraftSuggestions.length > 0 && (
-                <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)', borderLeft: 'var(--border-width-thick) solid var(--color-info)' }}>
+                <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)', borderLeft: 'var(--border-width-thick) solid var(--color-info)' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-md)' }}>
                     <Sparkles size={iconSize} strokeWidth={iconStrokeWidth} style={{ color: 'var(--color-info)', flexShrink: 0, marginTop: 'var(--spacing-xs)' }} />
                     <div style={{ flex: 1 }}>
@@ -530,7 +530,6 @@ export function NotificationsPage() {
                           <Card
                             key={suggestion.id}
                             padding="sm"
-                            variant="outlined"
                             tabIndex={0}
                             aria-label={`${suggestion.title} - ${suggestion.description} 초안 적용`}
                             style={{
@@ -589,7 +588,7 @@ export function NotificationsPage() {
                 </Card>
               )}
 
-              <Card padding="lg" variant="default">
+              <Card padding="lg">
                 <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
                   <Button
                     variant="solid"
@@ -680,7 +679,7 @@ export function NotificationsPage() {
 
           {/* 템플릿 관리 탭 */}
           {activeTab === 'templates' && (
-            <Card padding="lg" variant="default">
+            <Card padding="lg">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
                 <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>템플릿 관리</h3>
                 <Button
@@ -698,7 +697,7 @@ export function NotificationsPage() {
               ) : templates && templates.length > 0 ? (
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(var(--width-card-min), 1fr))`, gap: 'var(--spacing-md)' }}>
                   {(templates as unknown as Array<{ id: string; name: string; channel: string; content: string; created_at: string }>).map((template) => (
-                    <Card key={template.id} padding="md" variant="default">
+                    <Card key={template.id} padding="md">
                       <h4 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
                         {template.name}
                       </h4>
@@ -791,7 +790,7 @@ export function NotificationsPage() {
 
           {/* 단체문자/예약 탭 */}
           {activeTab === 'bulk' && (
-            <Card padding="lg" variant="default">
+            <Card padding="lg">
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
                 단체문자/예약 발송
               </h3>
@@ -826,7 +825,7 @@ export function NotificationsPage() {
 
           {/* 자동 알림 설정 탭 */}
           {activeTab === 'auto-settings' && (
-            <Card padding="lg" variant="default">
+            <Card padding="lg">
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
                 자동 알림 설정
               </h3>

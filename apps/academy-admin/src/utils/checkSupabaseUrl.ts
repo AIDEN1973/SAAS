@@ -68,7 +68,7 @@ export function checkEnvVariables(): void {
   });
 
   if (viteUrl && viteUrl.includes('npferbxuxocbfnfbpcnz')) {
-    console.error('⚠️ 잘못된 URL이 환경변수에 설정되어 있습니다!');
+    console.error('WARNING: 잘못된 URL이 환경변수에 설정되어 있습니다!');
     console.error('   .env.local 파일을 확인하고 개발 서버를 재시작하세요.');
     console.error('   Vite 캐시 삭제: rm -rf node_modules/.vite');
   }

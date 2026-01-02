@@ -30,29 +30,30 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'manage_student',
-      description: '학생 검색, 정보 조회, 등록, 수정, 휴원, 복귀, 퇴원 등 학생 관련 모든 작업. 학생 이름으로 전화번호나 프로필을 조회할 때도 이 Tool을 사용.',
+      description: '학생 관리',
       parameters: {
         type: 'object',
         properties: {
           action: {
             type: 'string',
             enum: [
-              'search',           // student.query.search - 학생 이름으로 검색
-              'get_profile',      // student.query.profile - 학생 상세 정보 조회
-              'register',         // student.exec.register - 신규 학생 등록
-              'update',           // student.exec.update_profile - 학생 정보 수정
-              'update_contact',   // student.exec.update_guardian_contact - 연락처 수정
-              'pause',            // student.exec.pause - 휴원 처리
-              'resume',           // student.exec.resume - 복귀 처리
-              'discharge',        // student.exec.discharge - 퇴원 처리
-              'change_class',     // student.exec.change_class - 반 변경
-              'merge',            // student.exec.merge_duplicates - 중복 병합
+              'search',           // student.query.search
+              'get_profile',      // student.query.profile
+              'register',         // student.exec.register
+              'update',           // student.exec.update_profile
+              'update_contact',   // student.exec.update_guardian_contact
+              'pause',            // student.exec.pause
+              'resume',           // student.exec.resume
+              'discharge',        // student.exec.discharge
+              'change_class',     // student.exec.change_class
+              'merge',            // student.exec.merge_duplicates
+              'assign_tags',      // student.exec.assign_tags
             ],
-            description: '수행할 작업. 학생 이름으로 전화번호나 정보를 조회할 때는 search 또는 get_profile 사용.',
+            description: '수행할 작업',
           },
           student_name: {
             type: 'string',
-            description: '학생 이름 (예: "마이콜", "김철수"). 사용자가 언급한 이름이 학생 이름인지 반 이름인지 불확실하면 학생 이름으로 우선 처리.',
+            description: '학생 이름',
           },
           student_id: {
             type: 'string',
@@ -98,6 +99,20 @@ export const AGENT_TOOLS: AgentTool[] = [
             type: 'string',
             description: '날짜 (YYYY-MM-DD, discharge, pause 시)',
           },
+          tags: {
+            type: 'array',
+            items: {
+              type: 'string',
+            },
+            description: '태그 ID 목록 (assign_tags 시)',
+          },
+          tag_names: {
+            type: 'array',
+            items: {
+              type: 'string',
+            },
+            description: '태그 이름 목록 (assign_tags 시, tags 대신 사용 가능)',
+          },
         },
         required: ['action'],
       },
@@ -111,7 +126,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'query_attendance',
-      description: '출결 기록 조회. 지각/결석/미체크 학생 확인, 특정 반이나 학생의 출결 현황 조회. "오늘 지각", "결석자", "마이콜 출석" 등의 질문에 사용.',
+      description: '출결 조회',
       parameters: {
         type: 'object',
         properties: {
@@ -151,7 +166,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'manage_attendance',
-      description: '출결 관리 작업. 결석/지각 학부모 알림, 사유 요청, 출결 정정, 일괄 수정 등. "결석자에게 알림", "출석 정정" 등의 요청에 사용.',
+      description: '출결 관리',
       parameters: {
         type: 'object',
         properties: {
@@ -193,7 +208,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'query_message',
-      description: '발송한 메시지 이력 조회. 발송 성공/실패 로그, 특정 날짜나 학생에게 보낸 메시지 확인. "어제 보낸 메시지", "발송 실패" 등의 질문에 사용.',
+      description: '메시지 조회',
       parameters: {
         type: 'object',
         properties: {
@@ -227,7 +242,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'send_message',
-      description: '메시지 발송 실행. 개별/일괄/예약 발송, 실패 메시지 재발송, 예약 취소. "마이콜에게 메시지 보내", "전체 공지" 등의 요청에 사용.',
+      description: '메시지 발송',
       parameters: {
         type: 'object',
         properties: {
@@ -272,7 +287,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'draft_message',
-      description: '메시지 초안 작성 및 미리보기. 일반 공지, 결석 안내, 연체 안내 초안 생성. "결석 안내 초안 작성", "공지 메시지 만들어" 등의 요청에 사용.',
+      description: '메시지 초안 작성',
       parameters: {
         type: 'object',
         properties: {
@@ -306,7 +321,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'query_billing',
-      description: '수납 내역 조회. 연체 목록, 청구서 상태, 미발행 청구서, 학생별 수납 현황 확인. "연체자", "마이콜 수납 내역", "이번 달 미수금" 등의 질문에 사용.',
+      description: '수납 조회',
       parameters: {
         type: 'object',
         properties: {
@@ -341,7 +356,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'manage_billing',
-      description: '수납 관리 작업. 청구서 발행, 결제 링크 발송, 연체 안내 예약, 수동 입금 기록. "청구서 발행", "결제 링크 보내", "입금 확인" 등의 요청에 사용.',
+      description: '수납 처리',
       parameters: {
         type: 'object',
         properties: {
@@ -380,21 +395,21 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'query_class',
-      description: '반 정보 조회. 전체 반 목록 또는 특정 반의 학생 명단 확인. 주의: 사용자가 "반 목록"이나 "~반 명단"처럼 명확히 반을 언급할 때만 사용. 단순히 이름만 언급하면 학생 이름으로 간주하고 manage_student 사용.',
+      description: '반 조회',
       parameters: {
         type: 'object',
         properties: {
           type: {
             type: 'string',
             enum: [
-              'list',     // class.query.list - 전체 반 목록
-              'roster',   // class.query.roster - 특정 반의 학생 명단
+              'list',     // class.query.list
+              'roster',   // class.query.roster
             ],
-            description: '조회 유형. list: 전체 반 목록, roster: 특정 반의 학생 명단',
+            description: '조회 유형',
           },
           class_name: {
             type: 'string',
-            description: '반 이름 (roster 타입일 때만 필요). 예: "초등 1반", "중등 A반". 사용자가 "~반"이라고 명확히 언급한 경우에만 사용.',
+            description: '반 이름 (roster 타입일 때)',
           },
         },
         required: ['type'],
@@ -409,7 +424,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'get_report',
-      description: '통계 리포트 조회. 대시보드 KPI, 출결 요약, 수납 요약 등 집계 데이터 확인. "오늘 통계", "이번 달 출석률", "수납 현황" 등의 질문에 사용.',
+      description: '리포트 조회',
       parameters: {
         type: 'object',
         properties: {
@@ -440,15 +455,10 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'confirm_action',
-      description: '사용자가 "네/예/확인/실행/진행/좋아/응" 등으로 동의했을 때 대기 중인 Draft 작업을 실행. 반드시 사용자의 명시적 동의 후에만 호출.',
+      description: '대기 중인 작업 실행 확인',
       parameters: {
         type: 'object',
-        properties: {
-          draft_id: {
-            type: 'string',
-            description: 'Draft ID (선택, 지정하지 않으면 최근 READY draft 실행)',
-          },
-        },
+        properties: {},
       },
     },
   },
@@ -456,36 +466,14 @@ export const AGENT_TOOLS: AgentTool[] = [
     type: 'function',
     function: {
       name: 'cancel_action',
-      description: '사용자가 "아니/취소/중단/그만/안해" 등으로 거부했을 때 대기 중인 Draft 작업을 취소. 사용자가 명시적으로 취소 의사를 밝혔을 때만 호출.',
+      description: '대기 중인 작업 취소',
       parameters: {
         type: 'object',
-        properties: {
-          draft_id: {
-            type: 'string',
-            description: 'Draft ID (선택, 지정하지 않으면 최근 READY draft 취소)',
-          },
-        },
+        properties: {},
       },
     },
   },
 ];
-
-/**
- * Tool 사용 가이드 (참고용)
- *
- * 1. manage_student: 학생 이름이 언급되면 무조건 사용
- * 2. query_attendance: "오늘 지각", "결석자", "출석 확인" 등
- * 3. manage_attendance: "결석자에게 알림", "출석 정정" 등
- * 4. query_message: "어제 보낸 메시지", "발송 실패" 등
- * 5. send_message: "메시지 보내", "공지" 등
- * 6. draft_message: "초안 작성", "메시지 만들어" 등
- * 7. query_billing: "연체자", "수납 내역", "미수금" 등
- * 8. manage_billing: "청구서 발행", "결제 링크", "입금 확인" 등
- * 9. query_class: "반 목록", "반 명단" 등
- * 10. get_report: "통계", "현황", "요약" 등
- * 11. confirm_action: 사용자 동의 시에만
- * 12. cancel_action: 사용자 거부 시에만
- */
 
 /**
  * Tool 이름으로 Tool 정의 조회
@@ -493,3 +481,11 @@ export const AGENT_TOOLS: AgentTool[] = [
 export function getToolByName(toolName: string): AgentTool | undefined {
   return AGENT_TOOLS.find(tool => tool.function.name === toolName);
 }
+
+/**
+ * Tool 이름 목록
+ */
+export function getToolNames(): string[] {
+  return AGENT_TOOLS.map(tool => tool.function.name);
+}
+

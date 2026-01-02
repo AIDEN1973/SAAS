@@ -37,191 +37,195 @@ BEGIN
     (v_tenant_id, 'industry', jsonb_build_object('industry_type', p_industry_type));  -- ⚠️ 하위 호환성용, SSOT는 tenants.industry_type
 
   -- 3. 자동화 기본 정책(Default Policy) 설정
-  -- ⚠️ 중요: 모든 자동화는 기본적으로 비활성화(enabled: false)이며, 사용자가 UI에서 활성화할 수 있음
+  -- ⚠️ 개선: Low-Risk 자동화(조회/분석/리포트)는 enabled: true로 설정하여 즉시 사용 가능
+  -- ⚠️ Medium/High-Risk 자동화(메시지 발송, 금전 관련)는 enabled: false로 설정하여 사용자 활성화 필요
   -- ⚠️ 중요: 기준값(threshold, limit, time 등)은 기본값을 설정하여 사용자가 바로 사용할 수 있도록 함
   v_config := jsonb_build_object(
+    -- AI 승인 자동화 설정 (Phase 2)
+    'automation_approval', jsonb_build_object(
+      'auto_approve_enabled', true,  -- 자동 승인 활성화
+      'auto_approve_threshold', 'medium'  -- medium 이하는 자동 승인 (low, medium 자동 실행)
+    ),
+    -- 키오스크 출석 체크 설정 (Phase 4)
+    'kiosk', jsonb_build_object(
+      'enabled', true,  -- 키오스크 모드 활성화
+      'check_in_method', 'phone_only',  -- phone_only (휴대폰 번호만), phone_auth (SMS 인증), qr_scan
+      'auto_notify_guardian', true,  -- 출석 완료 시 보호자 자동 알림
+      'notification_channel', 'kakao_at',  -- 알림 채널
+      'notification_template', '${student_name} 학생이 ${time}에 출석했습니다.'
+    ),
     'auto_notification', jsonb_build_object(
-      -- financial_health (10)
+      -- financial_health (10개: Low-Risk 6개, Medium-Risk 3개, High-Risk 1개)
       'payment_due_reminder', jsonb_build_object(
-        'enabled', false,
+        'enabled', false,  -- Medium-Risk: 메시지 발송
         'channel', 'sms',
         'days_before_first', 3,
         'days_before_second', 1
       ),
       'invoice_partial_balance', jsonb_build_object(
-        'enabled', false,
+        'enabled', false,  -- Medium-Risk: 메시지 발송
         'channel', 'sms'
       ),
       'recurring_payment_failed', jsonb_build_object(
-        'enabled', false,
+        'enabled', false,  -- High-Risk: 결제 관련
         'channel', 'sms'
       ),
       'revenue_target_under', jsonb_build_object(
-        'enabled', false,
-        'monthly_target', 0
+        'enabled', true,  -- Low-Risk: 내부 알림만
+        'monthly_target', 5000000
       ),
       'collection_rate_drop', jsonb_build_object(
-        'enabled', false,
-        'threshold', 3
+        'enabled', true,  -- Low-Risk: 내부 알림만
+        'threshold', 0.7
       ),
       'overdue_outstanding_over_limit', jsonb_build_object(
-        'enabled', false,
+        'enabled', false,  -- Medium-Risk: 메시지 발송
         'channel', 'sms',
         'limit_amount', 1000000
       ),
       'revenue_required_per_day', jsonb_build_object(
-        'enabled', false,
-        'monthly_target', 0
+        'enabled', true,  -- Low-Risk: 내부 알림만
+        'monthly_target', 5000000
       ),
       'top_overdue_customers_digest', jsonb_build_object(
-        'enabled', false
+        'enabled', true  -- Low-Risk: 리포트 조회만
       ),
       'refund_spike', jsonb_build_object(
-        'enabled', false,
-        'threshold', 2
+        'enabled', true,  -- Low-Risk: 내부 알림만
+        'threshold', 3
       ),
       'monthly_business_report', jsonb_build_object(
-        'enabled', false,
+        'enabled', true,  -- Low-Risk: 리포트 조회만
         'report_day', 1
       ),
-      -- capacity_optimization (6)
+      -- capacity_optimization (6개: 모두 Low-Risk)
       'class_fill_rate_low_persistent', jsonb_build_object(
-        'enabled', false,
-        'threshold', 50,
+        'enabled', true,  -- Low-Risk: 내부 알림만
+        'threshold', 0.5,
         'persistent_days', 7
       ),
       'ai_suggest_class_merge', jsonb_build_object(
-        'enabled', false
+        'enabled', true  -- Low-Risk: AI 제안만
       ),
       'time_slot_fill_rate_low', jsonb_build_object(
-        'enabled', false,
-        'threshold', 50
+        'enabled', true,  -- Low-Risk: 내부 알림만
+        'threshold', 0.4
       ),
       'high_fill_rate_expand_candidate', jsonb_build_object(
-        'enabled', false,
-        'threshold', 80
+        'enabled', true,  -- Low-Risk: AI 제안만
+        'threshold', 0.9
       ),
       'unused_class_persistent', jsonb_build_object(
-        'enabled', false,
-        'persistent_days', 7
+        'enabled', true,  -- Low-Risk: 내부 알림만
+        'persistent_days', 14
       ),
       'weekly_ops_summary', jsonb_build_object(
-        'enabled', false,
+        'enabled', true,  -- Low-Risk: 리포트 조회만
         'report_day_of_week', 1  -- 월요일
       ),
-      -- customer_retention (8)
+      -- customer_retention (8개: Low-Risk 4개, Medium-Risk 4개)
       'class_reminder_today', jsonb_build_object(
-        'enabled', false,
-        'channel', 'sms',
-        'minutes_before', 30
+        'enabled', false,  -- Medium-Risk: 메시지 발송
+        'channel', 'kakao_at',
+        'send_time', '08:00'
       ),
       'class_schedule_tomorrow', jsonb_build_object(
-        'enabled', false,
-        'channel', 'sms',
-        'notification_time', '20:00'
+        'enabled', false,  -- Medium-Risk: 메시지 발송
+        'channel', 'kakao_at',
+        'send_time', '19:00'
       ),
       'consultation_reminder', jsonb_build_object(
-        'enabled', false,
+        'enabled', false,  -- Medium-Risk: 메시지 발송
         'channel', 'sms',
-        'hours_before_first', 24,
-        'hours_before_second', 2
+        'hours_before', 24
       ),
       'absence_first_day', jsonb_build_object(
-        'enabled', false,
+        'enabled', false,  -- Medium-Risk: 메시지 발송
         'channel', 'sms'
       ),
       'churn_increase', jsonb_build_object(
-        'enabled', false,
-        'threshold', 2
+        'enabled', true,  -- Low-Risk: 내부 알림만
+        'threshold', 0.15
       ),
       'ai_suggest_churn_focus', jsonb_build_object(
-        'enabled', false
+        'enabled', true  -- Low-Risk: AI 제안만
       ),
       'attendance_rate_drop_weekly', jsonb_build_object(
-        'enabled', false,
-        'threshold', 10
+        'enabled', true,  -- Low-Risk: 내부 알림만
+        'threshold', 0.7
       ),
       'risk_students_weekly_kpi', jsonb_build_object(
-        'enabled', false
+        'enabled', true  -- Low-Risk: 리포트 조회만
       ),
-      -- growth_marketing (6)
+      -- growth_marketing (6개: Low-Risk 5개, Medium-Risk 1개)
       'new_member_drop', jsonb_build_object(
-        'enabled', false,
-        'threshold', 20
+        'enabled', true,  -- Low-Risk: 내부 알림만
+        'threshold', 0.3
       ),
       'inquiry_conversion_drop', jsonb_build_object(
-        'enabled', false,
-        'threshold', 3
+        'enabled', false,  -- Medium-Risk + planned: 구현 예정
+        'threshold', 0.3
       ),
       'birthday_greeting', jsonb_build_object(
-        'enabled', false,
-        'channel', 'sms',
-        'require_approval', true
+        'enabled', true,  -- Low-Risk: 축하 메시지 (planned)
+        'channel', 'kakao_at'
       ),
       'enrollment_anniversary', jsonb_build_object(
-        'enabled', false,
-        'channel', 'sms',
-        'require_approval', true
+        'enabled', true,  -- Low-Risk: 기념 메시지 (planned)
+        'channel', 'kakao_at'
       ),
       'regional_underperformance', jsonb_build_object(
-        'enabled', false,
-        'threshold', 3
+        'enabled', true,  -- Low-Risk: 내부 알림만
+        'threshold', 0.3
       ),
       'regional_rank_drop', jsonb_build_object(
-        'enabled', false,
+        'enabled', true,  -- Low-Risk: 내부 알림만
         'threshold', 3
       ),
-      -- safety_compliance (7)
+      -- safety_compliance (7개: Low-Risk 2개, Medium-Risk 4개, High-Risk 1개)
       'class_change_or_cancel', jsonb_build_object(
-        'enabled', false,
-        'channel', 'sms'
+        'enabled', false,  -- Medium-Risk: 메시지 발송
+        'channel', 'kakao_at'
       ),
       'checkin_reminder', jsonb_build_object(
-        'enabled', false,
+        'enabled', false,  -- Medium-Risk: 메시지 발송
         'channel', 'sms',
         'minutes_before', 30
       ),
       'checkout_missing_alert', jsonb_build_object(
-        'enabled', false,
+        'enabled', false,  -- Medium-Risk: 메시지 발송
         'channel', 'sms',
-        'grace_period_minutes', 10
+        'hours_after', 2
       ),
       'announcement_urgent', jsonb_build_object(
-        'enabled', false,
-        'channel', 'sms',
-        'require_approval', true
+        'enabled', false,  -- High-Risk: 긴급 대량 발송 (planned)
+        'channel', 'sms'
       ),
       'announcement_digest', jsonb_build_object(
-        'enabled', false,
-        'channel', 'sms',
-        'require_approval', true,
+        'enabled', true,  -- Low-Risk: 리포트 조회만 (planned)
         'digest_period', 'weekly'
       ),
       'consultation_summary_ready', jsonb_build_object(
-        'enabled', false,
-        'channel', 'sms',
-        'min_length', 50,
-        'require_approval', true
+        'enabled', true,  -- Low-Risk: 내부 알림만
+        'min_length', 50
       ),
       'attendance_pattern_anomaly', jsonb_build_object(
-        'enabled', false,
+        'enabled', false,  -- Medium-Risk: 메시지 발송
         'channel', 'sms',
         'threshold', 3,
-        'priority', 75,
+        'priority', 90,
         'ttl_days', 7,
         'throttle', jsonb_build_object(
-          'daily_limit', 20,
-          'student_limit', 5
-        ),
-        'require_approval', true
+          'daily_limit', 20
+        )
       ),
-      -- workforce_ops (2)
+      -- workforce_ops (2개: Low-Risk 1개, Medium-Risk 1개)
       'teacher_workload_imbalance', jsonb_build_object(
-        'enabled', false,
-        'threshold', 3
+        'enabled', true,  -- Low-Risk: 내부 알림만
+        'threshold', 1.5
       ),
       'staff_absence_schedule_risk', jsonb_build_object(
-        'enabled', false
+        'enabled', false  -- Medium-Risk + planned: 구현 예정
       )
     )
   );
@@ -290,47 +294,61 @@ DECLARE
   v_updated_config jsonb;
   v_event_type text;
 BEGIN
-  -- 기본 자동화 정책 구조 (enabled: false만 설정, 기준값은 사용자가 UI에서 설정)
+  -- 기본 자동화 정책 구조 (Low-Risk는 enabled: true, Medium/High-Risk는 enabled: false)
+  -- ⚠️ 주의: 기존 테넌트의 설정값은 보존하며, 누락된 필드만 기본값으로 추가됩니다
   v_default_config := jsonb_build_object(
+    -- AI 승인 자동화 설정 (Phase 2)
+    'automation_approval', jsonb_build_object(
+      'auto_approve_enabled', true,
+      'auto_approve_threshold', 'medium'
+    ),
+    -- 키오스크 출석 체크 설정 (Phase 4)
+    'kiosk', jsonb_build_object(
+      'enabled', true,
+      'check_in_method', 'phone_only',
+      'auto_notify_guardian', true,
+      'notification_channel', 'kakao_at',
+      'notification_template', '${student_name} 학생이 ${time}에 출석했습니다.'
+    ),
     'auto_notification', jsonb_build_object(
       'payment_due_reminder', jsonb_build_object('enabled', false, 'channel', 'sms', 'days_before_first', 3, 'days_before_second', 1),
       'invoice_partial_balance', jsonb_build_object('enabled', false, 'channel', 'sms'),
       'recurring_payment_failed', jsonb_build_object('enabled', false, 'channel', 'sms'),
-      'revenue_target_under', jsonb_build_object('enabled', false, 'monthly_target', 0),
-      'collection_rate_drop', jsonb_build_object('enabled', false, 'threshold', 3),
+      'revenue_target_under', jsonb_build_object('enabled', true, 'monthly_target', 5000000),
+      'collection_rate_drop', jsonb_build_object('enabled', true, 'threshold', 0.7),
       'overdue_outstanding_over_limit', jsonb_build_object('enabled', false, 'channel', 'sms', 'limit_amount', 1000000),
-      'revenue_required_per_day', jsonb_build_object('enabled', false, 'monthly_target', 0),
-      'top_overdue_customers_digest', jsonb_build_object('enabled', false),
-      'refund_spike', jsonb_build_object('enabled', false, 'threshold', 2),
-      'monthly_business_report', jsonb_build_object('enabled', false, 'report_day', 1),
-      'class_fill_rate_low_persistent', jsonb_build_object('enabled', false, 'threshold', 50, 'persistent_days', 7),
-      'ai_suggest_class_merge', jsonb_build_object('enabled', false),
-      'time_slot_fill_rate_low', jsonb_build_object('enabled', false, 'threshold', 50),
-      'high_fill_rate_expand_candidate', jsonb_build_object('enabled', false, 'threshold', 80),
-      'unused_class_persistent', jsonb_build_object('enabled', false, 'persistent_days', 7),
-      'weekly_ops_summary', jsonb_build_object('enabled', false, 'report_day_of_week', 1),
-      'class_reminder_today', jsonb_build_object('enabled', false, 'channel', 'sms', 'minutes_before', 30),
-      'class_schedule_tomorrow', jsonb_build_object('enabled', false, 'channel', 'sms', 'notification_time', '20:00'),
-      'consultation_reminder', jsonb_build_object('enabled', false, 'channel', 'sms', 'hours_before_first', 24, 'hours_before_second', 2),
+      'revenue_required_per_day', jsonb_build_object('enabled', true, 'monthly_target', 5000000),
+      'top_overdue_customers_digest', jsonb_build_object('enabled', true),
+      'refund_spike', jsonb_build_object('enabled', true, 'threshold', 3),
+      'monthly_business_report', jsonb_build_object('enabled', true, 'report_day', 1),
+      'class_fill_rate_low_persistent', jsonb_build_object('enabled', true, 'threshold', 0.5, 'persistent_days', 7),
+      'ai_suggest_class_merge', jsonb_build_object('enabled', true),
+      'time_slot_fill_rate_low', jsonb_build_object('enabled', true, 'threshold', 0.4),
+      'high_fill_rate_expand_candidate', jsonb_build_object('enabled', true, 'threshold', 0.9),
+      'unused_class_persistent', jsonb_build_object('enabled', true, 'persistent_days', 14),
+      'weekly_ops_summary', jsonb_build_object('enabled', true, 'report_day_of_week', 1),
+      'class_reminder_today', jsonb_build_object('enabled', false, 'channel', 'kakao_at', 'send_time', '08:00'),
+      'class_schedule_tomorrow', jsonb_build_object('enabled', false, 'channel', 'kakao_at', 'send_time', '19:00'),
+      'consultation_reminder', jsonb_build_object('enabled', false, 'channel', 'sms', 'hours_before', 24),
       'absence_first_day', jsonb_build_object('enabled', false, 'channel', 'sms'),
-      'churn_increase', jsonb_build_object('enabled', false, 'threshold', 2),
-      'ai_suggest_churn_focus', jsonb_build_object('enabled', false),
-      'attendance_rate_drop_weekly', jsonb_build_object('enabled', false, 'threshold', 10),
-      'risk_students_weekly_kpi', jsonb_build_object('enabled', false),
-      'new_member_drop', jsonb_build_object('enabled', false, 'threshold', 20),
-      'inquiry_conversion_drop', jsonb_build_object('enabled', false, 'threshold', 3),
-      'birthday_greeting', jsonb_build_object('enabled', false, 'channel', 'sms', 'require_approval', true),
-      'enrollment_anniversary', jsonb_build_object('enabled', false, 'channel', 'sms', 'require_approval', true),
-      'regional_underperformance', jsonb_build_object('enabled', false, 'threshold', 3),
-      'regional_rank_drop', jsonb_build_object('enabled', false, 'threshold', 3),
-      'class_change_or_cancel', jsonb_build_object('enabled', false, 'channel', 'sms'),
+      'churn_increase', jsonb_build_object('enabled', true, 'threshold', 0.15),
+      'ai_suggest_churn_focus', jsonb_build_object('enabled', true),
+      'attendance_rate_drop_weekly', jsonb_build_object('enabled', true, 'threshold', 0.7),
+      'risk_students_weekly_kpi', jsonb_build_object('enabled', true),
+      'new_member_drop', jsonb_build_object('enabled', true, 'threshold', 0.3),
+      'inquiry_conversion_drop', jsonb_build_object('enabled', false, 'threshold', 0.3),
+      'birthday_greeting', jsonb_build_object('enabled', true, 'channel', 'kakao_at'),
+      'enrollment_anniversary', jsonb_build_object('enabled', true, 'channel', 'kakao_at'),
+      'regional_underperformance', jsonb_build_object('enabled', true, 'threshold', 0.3),
+      'regional_rank_drop', jsonb_build_object('enabled', true, 'threshold', 3),
+      'class_change_or_cancel', jsonb_build_object('enabled', false, 'channel', 'kakao_at'),
       'checkin_reminder', jsonb_build_object('enabled', false, 'channel', 'sms', 'minutes_before', 30),
-      'checkout_missing_alert', jsonb_build_object('enabled', false, 'channel', 'sms', 'grace_period_minutes', 10),
-      'announcement_urgent', jsonb_build_object('enabled', false, 'channel', 'sms', 'require_approval', true),
-      'announcement_digest', jsonb_build_object('enabled', false, 'channel', 'sms', 'require_approval', true, 'digest_period', 'weekly'),
-      'consultation_summary_ready', jsonb_build_object('enabled', false, 'channel', 'sms', 'min_length', 50, 'require_approval', true),
-      'attendance_pattern_anomaly', jsonb_build_object('enabled', false, 'channel', 'sms', 'threshold', 3, 'priority', 75, 'ttl_days', 7, 'throttle', jsonb_build_object('daily_limit', 20, 'student_limit', 5), 'require_approval', true),
-      'teacher_workload_imbalance', jsonb_build_object('enabled', false, 'threshold', 3),
+      'checkout_missing_alert', jsonb_build_object('enabled', false, 'channel', 'sms', 'hours_after', 2),
+      'announcement_urgent', jsonb_build_object('enabled', false, 'channel', 'sms'),
+      'announcement_digest', jsonb_build_object('enabled', true, 'digest_period', 'weekly'),
+      'consultation_summary_ready', jsonb_build_object('enabled', true, 'min_length', 50),
+      'attendance_pattern_anomaly', jsonb_build_object('enabled', false, 'channel', 'sms', 'threshold', 3, 'priority', 90, 'ttl_days', 7, 'throttle', jsonb_build_object('daily_limit', 20)),
+      'teacher_workload_imbalance', jsonb_build_object('enabled', true, 'threshold', 1.5),
       'staff_absence_schedule_risk', jsonb_build_object('enabled', false)
     )
   );

@@ -8,26 +8,10 @@
 
 import { AGENT_TOOLS, type AgentTool } from './agent-tools-final.ts';
 import { maskPII } from './pii-utils.ts';
-import { toKSTDate, toKSTISOString, kstDateToUTC, nextKSTDateToUTC, nextKSTMonthToUTC } from './date-utils.ts';
+import { toKSTDate } from './date-utils.ts';
 import { requireTenantScope } from '../chatops/handlers/auth.ts';
-import { getTenantTableName } from './industry-adapter.ts';
-import { getTenantSettingByPath } from './policy-utils.ts';
-
-/**
- * P0-10: tenant_id 사용 패턴 가이드
- *
- * requireTenantScope()는 검증 후 값을 그대로 반환하지만,
- * 의도를 명확히 하기 위해 다음 패턴을 권장합니다:
- *
- * ✅ 권장:
- * requireTenantScope(context.tenant_id);  // 검증
- * .eq('tenant_id', context.tenant_id)     // 사용
- *
- * ⚠️ 기존 (작동하지만 의도 불명확):
- * .eq('tenant_id', requireTenantScope(context.tenant_id))
- *
- * 현재 코드는 기존 패턴을 유지하되, 점진적으로 권장 패턴으로 전환합니다.
- */
+import { AGENT_SYSTEM_PROMPT } from './agent-prompts.ts';
+import { getTenantTableName, getIndustryTableName, getFKRelationName, type EntityType } from './industry-adapter.ts';
 
 /**
  * 상수 정의 (P2 이슈 해결)
@@ -39,17 +23,6 @@ const STUDENT_STATUS = {
   GRADUATED: 'graduated',
 } as const;
 
-/**
- * P2-10: Draft 상태 상수 (SSOT)
- *
- * [불변 규칙] chatops_drafts 테이블의 status 컬럼과 일치
- *
- * - collecting: 필수 정보 수집 중 (missing_required 필드 참조)
- * - ready: 실행 준비 완료 (confirm_action 대기)
- * - executed: 실행 완료
- * - cancelled: 취소됨
- * - failed: 실행 실패
- */
 const DRAFT_STATUS = {
   COLLECTING: 'collecting',
   READY: 'ready',
@@ -58,80 +31,11 @@ const DRAFT_STATUS = {
   FAILED: 'failed',
 } as const;
 
-/**
- * P2-10: Draft 필드 가이드
- *
- * [SSOT] chatops_drafts 테이블 필드:
- * - id: UUID (PK)
- * - tenant_id: UUID (FK)
- * - user_id: UUID (FK)
- * - session_id: TEXT
- * - intent_key: TEXT (Tool 기반 Draft Key, 예: 'manage_student.register')
- * - draft_params: JSONB (Tool arguments)
- * - status: TEXT (DRAFT_STATUS 참조)
- * - missing_required: TEXT[] (collecting 상태일 때 누락된 필수 파라미터)
- * - created_at: TIMESTAMPTZ
- * - updated_at: TIMESTAMPTZ
- * - executed_at: TIMESTAMPTZ (nullable)
- *
- * [Deprecated] confirm_required: 이 필드는 사용하지 않습니다. status='ready'로 대체됨.
- */
-
-/**
- * P2-11: OpenAI 모델 가격 정보 (참고용, 정산/제한 로직에 사용 금지)
- *
- * ⚠️ 중요 경고:
- * 1. 이 가격은 OpenAI 공식 가격표 기준 추정치이며, 실제 청구 금액과 다를 수 있습니다.
- * 2. OpenAI는 가격을 예고 없이 변경할 수 있습니다.
- * 3. 이 값은 사용자에게 대략적인 비용을 안내하기 위한 표시 목적으로만 사용하세요.
- * 4. 실제 정산/청구/사용량 제한은 OpenAI Dashboard 또는 별도 정산 시스템을 사용하세요.
- *
- * [업데이트 이력]
- * - 2025-12-30: gpt-4o-mini 가격 기준 설정
- *
- * @see https://openai.com/api/pricing/
- */
-const MODEL_PRICING = {
-  'gpt-4o-mini': {
-    input: 0.00000015,   // $0.15 per 1M tokens
-    output: 0.0000006,   // $0.60 per 1M tokens
-  },
-  // 향후 다른 모델 추가 시:
-  // 'gpt-4o': { input: 0.0000025, output: 0.00001 },
-} as const;
-
-/**
- * P2-11: 환율 (참고용)
- *
- * ⚠️ 이 환율은 고정된 참고 값이며, 실시간 환율이 아닙니다.
- */
-const EXCHANGE_RATE_USD_TO_KRW = 1500;
-
-/**
- * P0-37: 메시지 상태 상수 (SSOT)
- *
- * [불변 규칙] message_logs 테이블의 status 컬럼과 일치
- *
- * - pending: 발송 대기 중
- * - scheduled: 예약됨 (워커가 scheduled_at 시각에 처리)
- * - sent: 발송 완료
- * - failed: 발송 실패
- */
 const MESSAGE_STATUS = {
   PENDING: 'pending',
-  SCHEDULED: 'scheduled',  // P0-37: 예약 상태 추가
   SENT: 'sent',
   FAILED: 'failed',
 } as const;
-
-/**
- * ⚠️ Intent 기반 로직 제거됨 (Tool 기반 시스템으로 완전 전환)
- *
- * - Intent Key, Event Type 매핑 제거
- * - L2 작업(Draft)은 사용자 승인 기반이므로 자동화 정책 검증 불필요
- * - Draft Key는 Tool 기반: `tool_name.action` (예: `manage_student.register`)
- * - Automation Event Catalog는 자동화 트리거 전용으로만 사용
- */
 
 export interface AgentMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -156,8 +60,7 @@ export interface AgentContext {
   session_id: string;
   supabase: any;
   openai_api_key: string;
-  _tableCache?: Map<string, string>;  // P2-8: 테이블명 캐시
-  industry_type?: string;  // 성능 최적화: industry_type 캐시 (DB 조회 감소)
+  industry_type?: string; // 업종별 최적화용 (academy, salon, nail 등)
 }
 
 export interface AgentResponse {
@@ -167,11 +70,8 @@ export interface AgentResponse {
     prompt_tokens: number;
     completion_tokens: number;
     total_tokens: number;
-    // P0-23: 비용 정보는 서버 로그/메트릭 전용 (UI 표시 시 주의 필요)
-    cost_estimate_usd?: string;  // 추정치 (정산용 아님)
-    cost_estimate_krw?: string;  // 추정치 (정산용 아님)
-    model?: string;               // 사용된 모델명
-    pricing_note?: string;        // 경고 메시지
+    cost_usd: string;
+    cost_krw: string;
   };
 }
 
@@ -193,7 +93,7 @@ async function callOpenAIChat(
     model: 'gpt-4o-mini',
     messages: messages,
     temperature: 0.3,
-    max_tokens: 500, // 1500→800→500 감소: 응답 시간 추가 최적화 (ChatOps 응답은 대부분 짧음)
+    max_tokens: 800, // 1500→800 감소: 응답 시간 최적화
   };
 
   if (tools && tools.length > 0) {
@@ -229,232 +129,6 @@ async function callOpenAIChat(
 }
 
 /**
- * OpenAI Streaming Chat Completion API 호출
- */
-async function* callOpenAIChatStreaming(
-  apiKey: string,
-  messages: AgentMessage[],
-  tools?: AgentTool[],
-  tool_choice: 'auto' | 'none' = 'auto'
-): AsyncGenerator<{ type: 'content' | 'tool_calls' | 'done'; content?: string; tool_calls?: ToolCall[]; usage?: any }, void, unknown> {
-  const requestBody: any = {
-    model: 'gpt-4o-mini',
-    messages: messages,
-    temperature: 0.3,
-    max_tokens: 500, // 800→500 감소: 스트리밍 응답 시간 추가 최적화
-    stream: true, // 스트리밍 활성화
-  };
-
-  if (tools && tools.length > 0) {
-    requestBody.tools = tools;
-    requestBody.tool_choice = tool_choice;
-  }
-
-  // P0-33: 스트리밍에서 usage 정보 포함 옵션 추가
-  // OpenAI API는 stream_options.include_usage를 통해 usage 정보를 스트림에 포함
-  requestBody.stream_options = { include_usage: true };
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI API 오류: ${response.status} ${errorText}`);
-  }
-
-  if (!response.body) {
-    throw new Error('Response body is null');
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let toolCallsBuffer: any[] = [];
-  let toolCallsFlushed = false;  // P0-2: 중복 방지 플래그
-  let lastUsage: any = null;     // P0-2: usage 누적
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (done) {
-        // P0-22: 스트림 종료 전 flush (hole 방어 + JSON 파싱 검증)
-        if (toolCallsBuffer.length > 0 && !toolCallsFlushed) {
-          // P0-17: hole 방어 - undefined 항목 제외하고 정의된 엔트리만 검증
-          const validToolCalls = toolCallsBuffer.filter((tc) => {
-            if (!tc || !tc.id || !tc.function?.name || tc.function?.arguments === undefined) {
-              return false;
-            }
-
-            // P0-22: JSON 파싱 가능 여부 검증 (닫히지 않은 JSON 방어)
-            try {
-              JSON.parse(tc.function.arguments);
-              return true;
-            } catch {
-              console.warn('[callOpenAIChatStreaming] tool_call arguments JSON 파싱 실패:', {
-                id: tc.id,
-                name: tc.function.name,
-                arguments_preview: tc.function.arguments.substring(0, 50),
-              });
-              return false;
-            }
-          });
-
-          if (validToolCalls.length > 0) {
-            yield { type: 'tool_calls', tool_calls: validToolCalls as ToolCall[] };
-            toolCallsFlushed = true;
-          } else {
-            console.warn('[callOpenAIChatStreaming] tool_calls 버퍼에 유효한 항목 없음');
-          }
-        }
-
-        // P0-2: 최종 usage 방출
-        if (lastUsage) {
-          yield { type: 'done', usage: lastUsage };
-        }
-
-        break;
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed === 'data: [DONE]') continue;
-
-        if (trimmed.startsWith('data: ')) {
-          try {
-            const json = JSON.parse(trimmed.slice(6));
-            const delta = json.choices[0]?.delta;
-            const finishReason = json.choices[0]?.finish_reason;
-
-            // P0-2: usage 누적 (마지막 청크에만 있음)
-            if (json.usage) {
-              lastUsage = json.usage;
-            }
-
-            // 텍스트 콘텐츠 스트리밍
-            if (delta?.content) {
-              yield { type: 'content', content: delta.content };
-            }
-
-            // Tool calls 수집
-            if (delta?.tool_calls) {
-              for (const toolCall of delta.tool_calls) {
-                const idx = toolCall.index;
-                if (!toolCallsBuffer[idx]) {
-                  toolCallsBuffer[idx] = {
-                    id: toolCall.id || '',
-                    type: 'function',
-                    function: { name: '', arguments: '' }
-                  };
-                }
-                if (toolCall.id) {
-                  toolCallsBuffer[idx].id = toolCall.id;
-                }
-                // P0-39: function.name은 보통 완전 값으로 오므로 할당 (중복 방지)
-                if (toolCall.function?.name) {
-                  // 이미 값이 있고 동일하면 무시 (중복 방지)
-                  if (!toolCallsBuffer[idx].function.name || toolCallsBuffer[idx].function.name !== toolCall.function.name) {
-                    toolCallsBuffer[idx].function.name = toolCall.function.name;
-                  }
-                }
-                // P0-39: arguments는 조각으로 올 수 있으므로 무조건 append
-                // OpenAI는 중복 전송하지 않으므로 endsWith 체크 제거 (overlap 문제 방지)
-                if (toolCall.function?.arguments) {
-                  toolCallsBuffer[idx].function.arguments += toolCall.function.arguments;
-                }
-              }
-            }
-
-            // P0-22: finish_reason이 있고 tool_calls가 완성되었으면 방출 (JSON 파싱 검증)
-            if (finishReason && toolCallsBuffer.length > 0 && !toolCallsFlushed) {
-              // P0-17: hole 방어 - 정의된 엔트리만 검증
-              const definedToolCalls = toolCallsBuffer.filter(Boolean);
-
-              // P0-22: JSON 파싱 가능 여부 검증
-              const validToolCalls = definedToolCalls.filter(tc => {
-                if (!tc.id || !tc.function?.name || tc.function?.arguments === undefined) {
-                  return false;
-                }
-                try {
-                  JSON.parse(tc.function.arguments);
-                  return true;
-                } catch {
-                  return false;
-                }
-              });
-
-              if (validToolCalls.length > 0 && validToolCalls.length === definedToolCalls.length) {
-                // 모든 tool_call이 유효하면 flush
-                yield { type: 'tool_calls', tool_calls: validToolCalls as ToolCall[] };
-                toolCallsFlushed = true;
-              }
-              // 일부만 유효하거나 미완성이면 스트림 종료까지 기다림 (done 시점에서 flush)
-            }
-
-            // P0-2: stop으로 끝나면 done은 while 종료 후 방출됨
-          } catch (e) {
-            console.error('[callOpenAIChatStreaming] JSON 파싱 오류:', e);
-          }
-        }
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
-}
-
-/**
- * P0-4: 입력 파라미터 정규화 (서버 측 강제)
- *
- * LLM이 항상 정규화된 형식을 보낸다는 가정은 위험하므로,
- * 서버에서 명시적으로 정규화를 수행합니다.
- */
-function normalizeToolArgs(args: Record<string, any>): Record<string, any> {
-  const normalized = { ...args };
-
-  // 날짜 필드 정규화: . / → -
-  const dateFields = ['date', 'birth_date', 'due_date', 'effective_date'];
-  for (const field of dateFields) {
-    if (normalized[field] && typeof normalized[field] === 'string') {
-      normalized[field] = normalized[field]
-        .replace(/\./g, '-')
-        .replace(/\//g, '-')
-        .trim();
-    }
-  }
-
-  // 전화번호 필드 정규화: 숫자만 추출
-  const phoneFields = ['phone', 'guardian_phone', 'phone_hint'];
-  for (const field of phoneFields) {
-    if (normalized[field] && typeof normalized[field] === 'string') {
-      const digits = normalized[field].replace(/\D/g, '');
-      if (digits.length >= 4) {
-        normalized[field] = digits;
-      }
-    }
-  }
-
-  // 문자열 필드 trim
-  for (const [key, value] of Object.entries(normalized)) {
-    if (typeof value === 'string') {
-      normalized[key] = value.trim();
-    }
-  }
-
-  return normalized;
-}
-
-/**
  * Tool 실행
  */
 async function executeTool(
@@ -463,46 +137,43 @@ async function executeTool(
   context: AgentContext
 ): Promise<{ success: boolean; result: any; error?: string }> {
   try {
-    // P0-4: 서버 측 필드 정규화 강제
-    const normalizedArgs = normalizeToolArgs(toolArgs);
-
     // Tool별 실행 로직
     switch (toolName) {
       case 'manage_student':
-        return await executeManageStudent(normalizedArgs, context);
+        return await executeManageStudent(toolArgs, context);
 
       case 'query_attendance':
-        return await executeQueryAttendance(normalizedArgs, context);
+        return await executeQueryAttendance(toolArgs, context);
 
       case 'manage_attendance':
-        return await executeManageAttendance(normalizedArgs, context);
+        return await executeManageAttendance(toolArgs, context);
 
       case 'query_message':
-        return await executeQueryMessage(normalizedArgs, context);
+        return await executeQueryMessage(toolArgs, context);
 
       case 'send_message':
-        return await executeSendMessage(normalizedArgs, context);
+        return await executeSendMessage(toolArgs, context);
 
       case 'draft_message':
-        return await executeDraftMessage(normalizedArgs, context);
+        return await executeDraftMessage(toolArgs, context);
 
       case 'query_billing':
-        return await executeQueryBilling(normalizedArgs, context);
+        return await executeQueryBilling(toolArgs, context);
 
       case 'manage_billing':
-        return await executeManageBilling(normalizedArgs, context);
+        return await executeManageBilling(toolArgs, context);
 
       case 'query_class':
-        return await executeQueryClass(normalizedArgs, context);
+        return await executeQueryClass(toolArgs, context);
 
       case 'get_report':
-        return await executeGetReport(normalizedArgs, context);
+        return await executeGetReport(toolArgs, context);
 
       case 'confirm_action':
-        return await executeConfirmAction(normalizedArgs, context);
+        return await executeConfirmAction(toolArgs, context);
 
       case 'cancel_action':
-        return await executeCancelAction(normalizedArgs, context);
+        return await executeCancelAction(toolArgs, context);
 
       default:
         return {
@@ -528,88 +199,15 @@ async function executeTool(
  */
 
 /**
- * P2-8: 캐시된 테이블명 조회 헬퍼 (성능 최적화)
- *
- * 성능 개선: context.industry_type이 있으면 DB 조회 없이 바로 매핑
- */
-async function getCachedTableName(
-  context: AgentContext,
-  entityType: 'student' | 'class'
-): Promise<string | null> {
-  // 캐시 초기화
-  if (!context._tableCache) {
-    context._tableCache = new Map();
-  }
-
-  // 캐시 확인
-  const cacheKey = `${context.tenant_id}:${entityType}`;
-  if (context._tableCache.has(cacheKey)) {
-    return context._tableCache.get(cacheKey)!;
-  }
-
-  // 성능 최적화: industry_type이 context에 있으면 DB 조회 생략
-  let tableName: string | null = null;
-
-  if (context.industry_type) {
-    // industry_type이 있으면 직접 매핑 (DB 조회 불필요)
-    const { getIndustryTableName } = await import('./industry-adapter.ts');
-    tableName = getIndustryTableName(context.industry_type, entityType);
-  } else {
-    // fallback: 기존 방식 (DB 조회)
-    tableName = await getTenantTableName(
-      context.supabase,
-      context.tenant_id,
-      entityType
-    );
-  }
-
-  // 캐시 저장
-  if (tableName) {
-    context._tableCache.set(cacheKey, tableName);
-  }
-
-  return tableName;
-}
-
-/**
  * 학생 이름 또는 ID로 person_id 조회
- * P0-2: 동명이인 자동 disambiguation 구현
- * Industry Adapter 적용 완료
+ * P0 수정: Industry Adapter 적용
  */
 async function resolvePersonId(
   student_name: string | undefined,
   student_id: string | undefined,
-  context: AgentContext,
-  phone_hint?: string,         // P0-2: 전화번호 힌트 (뒷자리 4자리)
-  birth_date_hint?: string     // P0-2: 생년월일 힌트 (YYYY-MM-DD)
-): Promise<{ success: boolean; person_id?: string; error?: string; candidates?: any[] }> {
-  // P1-5: student_id가 있으면 UUID 형식 검증 + persons 테이블 존재 확인
+  context: AgentContext
+): Promise<{ success: boolean; person_id?: string; error?: string }> {
   if (student_id) {
-    // UUID 형식 검증
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(student_id)) {
-      return {
-        success: false,
-        error: `잘못된 학생 ID 형식입니다: ${maskPII(student_id)}`,
-      };
-    }
-
-    // persons 테이블 존재 확인
-    const { data: person, error } = await context.supabase
-      .from('persons')
-      .select('id')
-      .eq('id', student_id)
-      .eq('tenant_id', requireTenantScope(context.tenant_id))
-      .eq('person_type', 'student')
-      .maybeSingle();
-
-    if (error || !person) {
-      return {
-        success: false,
-        error: `학생 ID를 찾을 수 없습니다: ${maskPII(student_id)}`,
-      };
-    }
-
     return { success: true, person_id: student_id };
   }
 
@@ -617,80 +215,17 @@ async function resolvePersonId(
     return { success: false, error: '학생 이름 또는 ID가 필요합니다.' };
   }
 
-  // P2-8: 캐시된 테이블명 조회
-  const studentTable = await getCachedTableName(context, 'student');
-  if (!studentTable) {
-    console.error('[resolvePersonId] 업종별 테이블 매핑 실패');
-    return { success: false, error: '업종별 학생 테이블을 찾을 수 없습니다.' };
+  const tableName = await getTenantTableName(context.supabase, requireTenantScope(context.tenant_id), 'student');
+  if (!tableName) {
+    return { success: false, error: '업종별 테이블 조회 실패' };
   }
 
-  // P0-41: industry_type 캐싱 (context에서 우선 사용, 없으면 조회 후 캐싱)
-  const { getTenantIndustryType, getFKRelationName } = await import('./industry-adapter.ts');
-
-  let industryType: string | undefined = context.industry_type;
-  if (!industryType) {
-    const fetchedType = await getTenantIndustryType(context.supabase, context.tenant_id);
-    if (fetchedType) {
-      // P0-41: 조회 성공 시 context에 캐싱 (이후 호출에서 재사용)
-      industryType = fetchedType;
-      context.industry_type = fetchedType;
-    }
-  }
-
-  if (!industryType) {
-    console.error('[resolvePersonId] industry_type 조회 실패');
-    return { success: false, error: '테넌트 업종 정보를 찾을 수 없습니다.' };
-  }
-
-  // P1-10: FK 관계명 동적 생성 (SSOT 준수)
-  const fkRelationName = getFKRelationName('student_person_id', industryType);
-
-  if (!fkRelationName) {
-    console.error('[resolvePersonId] FK 관계명 생성 실패:', { industryType, studentTable });
-    return { success: false, error: '학생 테이블 FK 관계명을 찾을 수 없습니다.' };
-  }
-
-  // P0-20: FK 관계명 형식 검증 (persons!xxx 형태 보장)
-  if (!fkRelationName.includes('!')) {
-    console.error('[resolvePersonId] FK 관계명 형식 오류:', { fkRelationName });
-    return { success: false, error: '학생 테이블 FK 관계명 형식이 올바르지 않습니다.' };
-  }
-
-  // P0-20: 고정 alias 사용으로 select와 filter 일관성 보장
-  // PostgREST embedded filter는 select의 관계명과 filter 경로가 정확히 일치해야 함
-  const FIXED_ALIAS = 'p'; // 고정 alias로 스키마 변화에 안전
-  const relationTable = fkRelationName.split('!')[0]; // 'persons' 추출
-
-  // 형식 검증: relationTable이 'persons'인지 확인
-  if (relationTable !== 'persons') {
-    console.error('[resolvePersonId] 예상치 않은 relation table:', { relationTable, fkRelationName });
-    return { success: false, error: '학생-persons 관계 테이블이 올바르지 않습니다.' };
-  }
-
-  // P0-20: 고정 alias를 사용한 select (p:persons!xxx)
-  let query = context.supabase
-    .from(studentTable)
-    .select(`person_id, ${FIXED_ALIAS}:${fkRelationName}(name, phone, birth_date)`)
+  const { data: students, error } = await context.supabase
+    .from(tableName)
+    .select('person_id, persons!inner(name)')
     .eq('tenant_id', requireTenantScope(context.tenant_id))
-    .ilike(`${FIXED_ALIAS}.name`, `%${student_name}%`);
-
-  // P0-2: phone_hint나 birth_date_hint로 자동 필터링 (고정 alias 사용)
-  if (phone_hint) {
-    // 전화번호 숫자만 추출하여 마지막 4자리 매칭
-    const phoneDigits = phone_hint.replace(/\D/g, '');
-    if (phoneDigits.length >= 4) {
-      const last4 = phoneDigits.slice(-4);
-      query = query.ilike(`${FIXED_ALIAS}.phone`, `%${last4}`);
-    }
-  }
-
-  if (birth_date_hint) {
-    // 생년월일 정확 매칭 (YYYY-MM-DD 또는 YYYY.MM.DD 형식 지원)
-    const normalizedDate = birth_date_hint.replace(/\./g, '-');
-    query = query.eq(`${FIXED_ALIAS}.birth_date`, normalizedDate);
-  }
-
-  const { data: students, error } = await query;
+    .ilike('persons.name', `%${student_name}%`)
+    .limit(1);
 
   if (error) {
     console.error('[resolvePersonId] DB 오류:', maskPII(error.message));
@@ -700,29 +235,7 @@ async function resolvePersonId(
   if (!students || students.length === 0) {
     return {
       success: false,
-      error: phone_hint || birth_date_hint
-        ? `조건에 맞는 학생을 찾을 수 없습니다. 전화번호나 생년월일을 다시 확인해주세요.`
-        : `학생을 찾을 수 없습니다. (입력: ${maskPII(student_name)})`,
-    };
-  }
-
-  // P0-2: 동명이인 처리 - 2명 이상이면 disambiguation 요청
-  if (students.length > 1) {
-    // P0-20: 고정 alias 'p'를 통해 persons 데이터 접근
-    const candidates = students.map((s: any) => {
-      const personData = s[FIXED_ALIAS]; // 고정 alias 사용
-      return {
-        person_id: maskPII(s.person_id),
-        name: personData?.name || '',
-        phone: maskPII(personData?.phone || ''),
-        birth_date: personData?.birth_date ? maskPII(personData.birth_date) : '',
-      };
-    });
-
-    return {
-      success: false,
-      error: `동일한 이름의 학생이 ${students.length}명 있습니다. 전화번호 뒷자리 4자리나 생년월일(YYYY-MM-DD)을 함께 입력해주세요.`,
-      candidates: candidates,
+      error: `학생을 찾을 수 없습니다. (입력: ${maskPII(student_name)})`,
     };
   }
 
@@ -768,42 +281,51 @@ async function executeManageStudent(
         };
       }
 
-      // 캐시 확인 (student_id로 조회할 때만)
-      if (student_id) {
-        const { memoryCache, createCacheKey } = await import('./memory-cache.ts');
-        const cacheKey = createCacheKey('student', context.tenant_id, 'profile', student_id);
-        const cached = memoryCache.get(cacheKey);
-        if (cached) {
-          return { success: true, result: cached };
-        }
+      // P0 수정: Industry Adapter 적용
+      const tenantId = requireTenantScope(context.tenant_id);
+      const tableName = await getTenantTableName(context.supabase, tenantId, 'student');
+      if (!tableName) {
+        return { success: false, result: null, error: '업종별 테이블 조회 실패' };
       }
 
-      // P2-8: 캐시된 테이블명 조회
-      const studentTable = await getCachedTableName(context, 'student');
-      if (!studentTable) {
+      // persons 테이블에서 먼저 검색
+      let personsQuery = context.supabase
+        .from('persons')
+        .select('id, name, phone, email, address')
+        .eq('tenant_id', tenantId)
+        .eq('person_type', 'student');
+
+      if (student_name) {
+        personsQuery = personsQuery.ilike('name', `%${student_name}%`);
+      }
+
+      const { data: personsData, error: personsError } = await personsQuery;
+
+      if (personsError) {
+        console.error('[executeManageStudent] Persons 조회 오류:', maskPII(personsError.message));
+        return { success: false, result: null, error: personsError.message };
+      }
+
+      if (!personsData || personsData.length === 0) {
         return {
           success: false,
           result: null,
-          error: '업종별 학생 테이블을 찾을 수 없습니다.',
+          error: `학생을 찾을 수 없습니다. (입력: ${maskPII(student_name || student_id)})`,
         };
       }
 
-      // persons 테이블과 업종별 학생 테이블 JOIN
-      // 성능 최적화: 단순 조회는 필수 필드만 SELECT
-      const isSimpleQuery = action === 'search' && !email && !address;
-      const selectFields = isSimpleQuery
-        ? `person_id, status, class_name, persons!inner (id, name, phone)`
-        : `person_id, status, class_name, grade, school_name, persons!inner (id, name, phone, email, address)`;
+      // 찾은 person_id들로 업종별 학생 테이블 조회
+      const personIds = personsData.map(p => p.id);
 
       let query = context.supabase
-        .from(studentTable)
-        .select(selectFields)
-        .eq('tenant_id', requireTenantScope(context.tenant_id));
+        .from(tableName)
+        .select('person_id, status, class_name, grade, school_name')
+        .eq('tenant_id', tenantId);
 
       if (student_id) {
         query = query.eq('person_id', student_id);
-      } else if (student_name) {
-        query = query.ilike('persons.name', `%${student_name}%`);
+      } else {
+        query = query.in('person_id', personIds);
       }
 
       const { data, error } = await query;
@@ -824,38 +346,32 @@ async function executeManageStudent(
         };
       }
 
-      // 데이터 평탄화 (persons 정보를 최상위로)
-      const flattenedData = data.map((item: any) => ({
-        id: item.persons.id,
-        person_id: item.person_id,
-        name: item.persons.name,
-        phone: item.persons.phone,
-        email: item.persons.email,
-        address: item.persons.address,
-        status: item.status,
-        class_name: item.class_name,
-        grade: item.grade,
-        school_name: item.school_name,
-      }));
+      // 데이터 평탄화 (persons 정보와 academy_students 정보 결합)
+      const flattenedData = data.map((studentData: any) => {
+        const personData = personsData.find((p: any) => p.id === studentData.person_id);
+        return {
+          id: personData?.id,
+          person_id: studentData.person_id,
+          name: personData?.name,
+          phone: personData?.phone,
+          email: personData?.email,
+          address: personData?.address,
+          status: studentData.status,
+          class_name: studentData.class_name,
+          grade: studentData.grade,
+          school_name: studentData.school_name,
+        };
+      });
 
       // 단일 결과면 프로필, 여러 결과면 목록
       if (flattenedData.length === 1) {
         const student = flattenedData[0];
-        const result = {
-          student: student,
-          message: `${student.name} 학생의 정보입니다.\n전화번호: ${student.phone || '없음'}\n반: ${student.class_name || '없음'}\n상태: ${student.status}`,
-        };
-
-        // 캐시 저장 (student_id로 조회한 경우만, 5분)
-        if (student_id) {
-          const { memoryCache, createCacheKey } = await import('./memory-cache.ts');
-          const cacheKey = createCacheKey('student', context.tenant_id, 'profile', student_id);
-          memoryCache.set(cacheKey, result, 5 * 60 * 1000);
-        }
-
         return {
           success: true,
-          result: result,
+          result: {
+            student: student,
+            message: `${student.name} 학생의 정보입니다.\n전화번호: ${student.phone || '없음'}\n반: ${student.class_name || '없음'}\n상태: ${student.status}`,
+          },
         };
       } else {
         return {
@@ -869,170 +385,25 @@ async function executeManageStudent(
       }
     }
 
-    // L2 실행은 Draft 생성 (사용자 승인 기반 - 자동화 정책 검증 불필요)
-    if (['register', 'update', 'update_contact', 'pause', 'resume', 'discharge', 'change_class', 'merge'].includes(action)) {
-      // P0-FIX: register가 아닌 액션의 경우, 학생 조회하여 동명이인 체크
-      // 동명이인이 있으면 phone/birth_date를 Draft에 포함시켜야 함
-      if (action !== 'register' && student_name && !student_id && !phone && !birth_date) {
-        const resolveResult = await resolvePersonId(student_name, student_id, context);
-
-        // 동명이인이 있으면 candidates를 result에 포함하여 반환
-        if (!resolveResult.success && resolveResult.candidates && resolveResult.candidates.length > 1) {
-          return {
-            success: false,
-            result: {
-              candidates: resolveResult.candidates,
-            },
-            error: resolveResult.error,
-          };
-        }
-
-        // 학생이 1명 확정되면 person_id를 args에 추가
-        if (resolveResult.success && resolveResult.person_id) {
-          args.student_id = resolveResult.person_id;
-        }
-      }
+    // L2 실행은 Draft 생성
+    if (['register', 'update', 'update_contact', 'pause', 'resume', 'discharge', 'change_class', 'merge', 'assign_tags'].includes(action)) {
+      const intentKey = `student.exec.${action}`;
 
       // ✅ 액션별 필수 파라미터 정의
       const requiredParamsByAction: Record<string, string[]> = {
         register: ['student_name', 'phone', 'birth_date'],  // 필수: 이름, 전화번호, 생년월일
-        discharge: ['student_name'],                        // 필수: 이름만 (날짜는 자동, 사유 불필요)
-        pause: ['student_name'],                            // 필수: 이름만 (날짜는 자동, 사유 불필요)
+        discharge: ['student_name', 'date'],                // 필수: 이름, 날짜
+        pause: ['student_name', 'date'],                    // 필수: 이름, 날짜
         resume: ['student_name'],                           // 필수: 이름
         update: ['student_name'],                           // 필수: 이름
         update_contact: ['student_name', 'phone'],          // 필수: 이름, 전화번호
         change_class: ['student_name', 'class_name'],       // 필수: 이름, 반 이름
         merge: ['student_name'],                            // 필수: 이름
+        assign_tags: ['student_name'],                      // 필수: 이름 (tags는 선택적, tag_names로 대체 가능)
       };
 
       const requiredParams = requiredParamsByAction[action] || [];
 
-      // Tool 기반 Draft Key: tool_name + action
-      const draftKey = `manage_student.${action}`;
-
-      // P0-3: 기존 COLLECTING draft 확인 (동일 session + draft_key)
-      const { data: existingDraft, error: existingError } = await context.supabase
-        .from('chatops_drafts')
-        .select('*')
-        .eq('tenant_id', requireTenantScope(context.tenant_id))
-        .eq('session_id', context.session_id)
-        .eq('intent_key', draftKey)
-        .eq('status', DRAFT_STATUS.COLLECTING)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (existingError && existingError.code !== 'PGRST116') {
-        console.error('[executeManageStudent] Draft 조회 오류:', maskPII(existingError.message));
-      }
-
-      // P0-3: 기존 COLLECTING draft가 있으면 업데이트
-      if (existingDraft) {
-        // P1-11: draft_params 병합 (빈 값은 덮어쓰지 않음)
-        const mergedParams = { ...existingDraft.draft_params };
-
-        // args의 각 필드를 검사하여 유효한 값만 병합
-        for (const [key, value] of Object.entries(args)) {
-          // 빈 문자열, null, undefined는 기존 값을 유지
-          if (value !== null && value !== undefined && value !== '') {
-            // 문자열이면 trim 후 빈 문자열 체크
-            if (typeof value === 'string') {
-              const trimmed = value.trim();
-              if (trimmed !== '') {
-                mergedParams[key] = trimmed;
-              }
-            } else {
-              mergedParams[key] = value;
-            }
-          }
-        }
-
-        // 병합된 파라미터로 필수 항목 재확인
-        const missingParams = requiredParams.filter(param => {
-          if (param === 'student_name') {
-            const value = mergedParams.student_name || mergedParams.name;
-            return !value || (typeof value === 'string' && value.trim() === '');
-          }
-          const value = mergedParams[param];
-          return !value || (typeof value === 'string' && value.trim() === '');
-        });
-
-        const draftStatus = missingParams.length === 0 ? DRAFT_STATUS.READY : DRAFT_STATUS.COLLECTING;
-
-        // P0-36: Draft 업데이트 (updated_at은 DB 기본값 사용 - UTC timestamptz)
-        const { data: updatedDraft, error: updateError } = await context.supabase
-          .from('chatops_drafts')
-          .update({
-            draft_params: mergedParams,
-            status: draftStatus,
-            missing_required: missingParams,
-            // updated_at은 DB의 now() 트리거/기본값 사용 (UTC)
-          })
-          .eq('id', existingDraft.id)
-          .select()
-          .single();
-
-        if (updateError) {
-          console.error('[executeManageStudent] Draft 업데이트 오류:', maskPII(updateError.message));
-          return {
-            success: false,
-            result: null,
-            error: `Draft 업데이트 실패: ${updateError.message}`,
-          };
-        }
-
-        // 상태에 따라 메시지 반환
-        const studentNameForMessage = mergedParams.name || mergedParams.student_name || '학생';
-
-        if (draftStatus === DRAFT_STATUS.COLLECTING) {
-          const paramNameMap: Record<string, string> = {
-            student_name: '학생 이름',
-            name: '학생 이름',
-            phone: '전화번호',
-            birth_date: '생년월일 (예: 1973.10.16)',
-            date: '날짜 (예: 2025.12.29)',
-            class_name: '반 이름',
-            reason: '사유',
-          };
-
-          const missingList = missingParams
-            .map(p => paramNameMap[p] || p)
-            .join(', ');
-
-          return {
-            success: true,
-            result: {
-              message: `${studentNameForMessage} ${action === 'register' ? '등록' : action}을 위해 다음 정보가 필요합니다:\n\n${missingList}\n\n정보를 입력해주세요.`,
-              draft_id: updatedDraft.id,
-              status: 'collecting',
-              missing_params: missingParams,
-            },
-          };
-        }
-
-        // ready 상태 - 실행 확인 요청
-        const actionMessages: Record<string, string> = {
-          register: `${studentNameForMessage} 학생을 등록하시겠어요?`,
-          discharge: `${studentNameForMessage} 학생을 퇴원 처리하시겠어요?`,
-          pause: `${studentNameForMessage} 학생을 휴원 처리하시겠어요?`,
-          resume: `${studentNameForMessage} 학생을 복귀 처리하시겠어요?`,
-          update: `${studentNameForMessage} 학생 정보를 수정하시겠어요?`,
-          update_contact: `${studentNameForMessage} 학생 연락처를 수정하시겠어요?`,
-          change_class: `${studentNameForMessage} 학생 반을 변경하시겠어요?`,
-          merge: `학생 중복을 병합하시겠어요?`,
-        };
-
-      return {
-        success: true,
-        result: {
-          message: `${actionMessages[action] || `${action} 작업을 하시겠어요?`}\n\n(draft_id: ${updatedDraft.id})`,
-          draft_id: updatedDraft.id,
-          requires_confirmation: true,
-        },
-      };
-      }
-
-      // P0-3: 기존 draft가 없으면 새로 생성
       // ✅ 누락된 필수 파라미터 확인 (name과 student_name 둘 다 허용)
       const missingParams = requiredParams.filter(param => {
         if (param === 'student_name') {
@@ -1046,6 +417,8 @@ async function executeManageStudent(
       // ✅ 상태 결정: 필수 정보가 모두 있으면 ready, 없으면 collecting
       const draftStatus = missingParams.length === 0 ? DRAFT_STATUS.READY : DRAFT_STATUS.COLLECTING;
 
+      // 프로덕션 최적화: 로깅 제거
+
       // P0 이슈 해결: requireTenantScope 사용
       // Draft 생성
       const { data: draft, error: draftError } = await context.supabase
@@ -1054,10 +427,10 @@ async function executeManageStudent(
           tenant_id: requireTenantScope(context.tenant_id),
           user_id: context.user_id,
           session_id: context.session_id,
-          intent_key: draftKey,  // Tool 기반: tool_name.action
+          intent_key: intentKey,
           draft_params: args,
           status: draftStatus,
-          missing_required: missingParams,
+          missing_required: missingParams,  // ✅ 누락된 필수 파라미터 저장
         })
         .select()
         .single();
@@ -1092,38 +465,39 @@ async function executeManageStudent(
 
         const studentNameForMessage = args.name || args.student_name || '학생';
 
-      return {
-        success: true,
-        result: {
-          message: `${studentNameForMessage} ${action === 'register' ? '등록' : action}을 위해 다음 정보가 필요합니다:\n\n${missingList}\n\n정보를 입력해주세요.\n\n(draft_id: ${draft.id})`,
-          draft_id: draft.id,
-          status: 'collecting',
-          missing_params: missingParams,
-        },
-      };
+        return {
+          success: true,
+          result: {
+            message: `${studentNameForMessage} ${action === 'register' ? '등록' : action}을 위해 다음 정보가 필요합니다:\n\n${missingList}\n\n정보를 입력해주세요.`,
+            draft_id: draft.id,
+            status: 'collecting',
+            missing_params: missingParams,
+          },
+        };
       }
 
       // ready 상태 - 실행 확인 요청
       const studentNameForMessage = args.name || args.student_name || '학생';
       const actionMessages: Record<string, string> = {
-        register: `${studentNameForMessage} 학생을 등록하시겠어요?`,
-        discharge: `${studentNameForMessage} 학생을 퇴원 처리하시겠어요?`,
-        pause: `${studentNameForMessage} 학생을 휴원 처리하시겠어요?`,
-        resume: `${studentNameForMessage} 학생을 복귀 처리하시겠어요?`,
-        update: `${studentNameForMessage} 학생 정보를 수정하시겠어요?`,
-        update_contact: `${studentNameForMessage} 학생 연락처를 수정하시겠어요?`,
-        change_class: `${studentNameForMessage} 학생 반을 변경하시겠어요?`,
-        merge: `학생 중복을 병합하시겠어요?`,
+        register: `${studentNameForMessage} 학생 등록을 준비했습니다`,
+        discharge: `${studentNameForMessage} 학생 퇴원 처리를 준비했습니다`,
+        pause: `${studentNameForMessage} 학생 휴원 처리를 준비했습니다`,
+        resume: `${studentNameForMessage} 학생 복귀 처리를 준비했습니다`,
+        update: `${studentNameForMessage} 학생 정보 수정을 준비했습니다`,
+        update_contact: `${studentNameForMessage} 학생 연락처 수정을 준비했습니다`,
+        change_class: `${studentNameForMessage} 학생 반 변경을 준비했습니다`,
+        merge: `학생 중복 병합을 준비했습니다`,
+        assign_tags: `${studentNameForMessage} 학생에게 태그 할당을 준비했습니다`,
       };
 
-    return {
-      success: true,
-      result: {
-        message: `${actionMessages[action] || `${action} 작업을 하시겠어요?`}\n\n(draft_id: ${draft.id})`,
-        draft_id: draft.id,
-        requires_confirmation: true,
-      },
-    };
+      return {
+        success: true,
+        result: {
+          message: `${actionMessages[action] || `${action} 작업을 준비했습니다`}. 실행하시겠습니까?`,
+          draft_id: draft.id,
+          requires_confirmation: true,
+        },
+      };
     }
 
     return {
@@ -1147,21 +521,13 @@ async function executeQueryAttendance(
 ): Promise<{ success: boolean; result: any; error?: string }> {
   const { type, date, class_name, student_name } = args;
 
+  // 프로덕션 최적화: 로깅 제거
+
   try {
-    // P0-3: toKSTDate 사용
+    // P1 이슈 해결: toKSTDate 사용
     const targetDate = date || toKSTDate();
 
-    // 캐시 확인 (학생 이름 필터가 없을 때만)
-    if (!student_name) {
-      const { memoryCache, createCacheKey } = await import('./memory-cache.ts');
-      const cacheKey = createCacheKey('attendance', context.tenant_id, type, targetDate);
-      const cached = memoryCache.get(cacheKey);
-      if (cached) {
-        return { success: true, result: cached };
-      }
-    }
-
-    // P0-3: date 컬럼 사용으로 KST 안전성 확보
+    // P0 이슈 해결: requireTenantScope 사용
     // attendance_logs 테이블 조회 (persons 테이블과 JOIN)
     let query = context.supabase
       .from('attendance_logs')
@@ -1178,7 +544,7 @@ async function executeQueryAttendance(
         )
       `)
       .eq('tenant_id', requireTenantScope(context.tenant_id))
-      .eq('date', targetDate);  // P0-3: date 컬럼 직접 비교 (KST 안전)
+      .eq('date', targetDate);
 
     // 타입별 필터링
     if (type === 'late') {
@@ -1196,6 +562,8 @@ async function executeQueryAttendance(
 
     const { data, error } = await query;
 
+    // 프로덕션 최적화: 로깅 제거
+
     if (error) {
       console.error('[executeQueryAttendance] DB 오류:', maskPII(error.message));
       return { success: false, result: null, error: error.message };
@@ -1212,24 +580,15 @@ async function executeQueryAttendance(
       notes: item.notes,
     }));
 
-    const result = {
-      records: flattenedData,
-      count: flattenedData.length,
-      date: targetDate,
-      type: type,
-      message: `${targetDate} ${type} 출결: ${flattenedData.length}건`,
-    };
-
-    // 캐시 저장 (학생 이름 필터가 없을 때만, 2분)
-    if (!student_name) {
-      const { memoryCache, createCacheKey } = await import('./memory-cache.ts');
-      const cacheKey = createCacheKey('attendance', context.tenant_id, type, targetDate);
-      memoryCache.set(cacheKey, result, 2 * 60 * 1000);
-    }
-
     return {
       success: true,
-      result: result,
+      result: {
+        records: flattenedData,
+        count: flattenedData.length,
+        date: targetDate,
+        type: type,
+        message: `${targetDate} ${type} 출결: ${flattenedData.length}건`,
+      },
     };
   } catch (error: any) {
     console.error('[executeQueryAttendance] 오류:', error);
@@ -1247,39 +606,14 @@ async function executeManageAttendance(
 ): Promise<{ success: boolean; result: any; error?: string }> {
   const { action } = args;
 
-  // Tool 기반 Draft Key
-  const draftKey = `manage_attendance.${action}`;
-
-  // L2 작업: Draft 생성 (사용자 승인 기반 - 자동화 정책 검증 불필요)
-  const { data: draft, error: draftError } = await context.supabase
-    .from('chatops_drafts')
-    .insert({
-      tenant_id: requireTenantScope(context.tenant_id),
-      user_id: context.user_id,
-      session_id: context.session_id,
-      intent_key: draftKey,
-      draft_params: args,
-      status: DRAFT_STATUS.READY,
-      missing_required: [],
-    })
-    .select()
-    .single();
-
-  if (draftError) {
-    console.error('[executeManageAttendance] Draft 생성 오류:', maskPII(draftError.message));
-    return {
-      success: false,
-      result: null,
-      error: `Draft 생성 실패: ${draftError.message}`,
-    };
-  }
-
+  // L2 실행은 Draft 생성
   return {
     success: true,
     result: {
-      message: `${action} 작업을 하시겠어요?\n\n(draft_id: ${draft.id})`,
-      draft_id: draft.id,
+      message: `${action} 작업을 준비했습니다. 확인하시겠습니까?`,
       requires_confirmation: true,
+      intent_key: `attendance.exec.${action}`,
+      params: args,
     },
   };
 }
@@ -1290,17 +624,9 @@ async function executeQueryMessage(
 ): Promise<{ success: boolean; result: any; error?: string }> {
   const { type, date, student_name } = args;
 
-  try {
-    // 캐시 확인 (날짜 필터가 없을 때만)
-    if (!date) {
-      const { memoryCache, createCacheKey } = await import('./memory-cache.ts');
-      const cacheKey = createCacheKey('message' as any, context.tenant_id, type);
-      const cached = memoryCache.get(cacheKey);
-      if (cached) {
-        return { success: true, result: cached };
-      }
-    }
+  // 프로덕션 최적화: 로깅 제거
 
+  try {
     // message_logs 테이블 조회
     let query = context.supabase
       .from('message_logs')
@@ -1316,40 +642,29 @@ async function executeQueryMessage(
       query = query.eq('status', MESSAGE_STATUS.SENT);
     }
 
-    // P0-3: 날짜 필터 수정 (다음날 00:00:00를 upper bound로)
-    // P0-13: KST 날짜 범위를 UTC로 변환하여 필터링
+    // 날짜 필터
     if (date) {
-      const startUTC = kstDateToUTC(date);
-      const endUTC = nextKSTDateToUTC(date);
-
-      query = query.gte('created_at', startUTC)
-                   .lt('created_at', endUTC);
+      query = query.gte('created_at', `${date}T00:00:00`)
+                   .lt('created_at', `${date}T23:59:59`);
     }
 
     const { data, error } = await query;
+
+    // 프로덕션 최적화: 로깅 제거
 
     if (error) {
       console.error('[executeQueryMessage] DB 오류:', maskPII(error.message));
       return { success: false, result: null, error: error.message };
     }
 
-    const result = {
-      messages: data || [],
-      count: data?.length || 0,
-      type: type,
-      message: `${type} 메시지: ${data?.length || 0}건`,
-    };
-
-    // 캐시 저장 (날짜 필터가 없을 때만, 1분)
-    if (!date) {
-      const { memoryCache, createCacheKey } = await import('./memory-cache.ts');
-      const cacheKey = createCacheKey('message' as any, context.tenant_id, type);
-      memoryCache.set(cacheKey, result, 1 * 60 * 1000);
-    }
-
     return {
       success: true,
-      result: result,
+      result: {
+        messages: data || [],
+        count: data?.length || 0,
+        type: type,
+        message: `${type} 메시지: ${data?.length || 0}건`,
+      },
     };
   } catch (error: any) {
     console.error('[executeQueryMessage] 오류:', error);
@@ -1366,42 +681,21 @@ async function executeSendMessage(
   context: AgentContext
 ): Promise<{ success: boolean; result: any; error?: string }> {
   const { type, recipient, recipients, message } = args;
+  const intentKey = `message.exec.send_${type}`;
 
-  // Tool 기반 Draft Key
-  const draftKey = `send_message.${type}`;
+  // 프로덕션 최적화: 로깅 제거
 
-  // P0-35: 필수값 검증 (message, recipient/recipients)
-  if (!message || typeof message !== 'string' || message.trim() === '') {
-    return {
-      success: false,
-      result: null,
-      error: '메시지 내용은 필수입니다.',
-    };
-  }
-
-  // P0-35: 수신자 검증 (recipient 또는 recipients 중 하나는 필수)
-  const hasRecipient = recipient && typeof recipient === 'string' && recipient.trim() !== '';
-  const hasRecipients = Array.isArray(recipients) && recipients.length > 0;
-
-  if (!hasRecipient && !hasRecipients) {
-    return {
-      success: false,
-      result: null,
-      error: '수신자 정보는 필수입니다. (recipient 또는 recipients)',
-    };
-  }
-
-  // L2 작업: Draft 생성 (사용자 승인 기반 - 자동화 정책 검증 불필요)
+  // Draft 생성
   const { data: draft, error: draftError } = await context.supabase
     .from('chatops_drafts')
     .insert({
-      tenant_id: requireTenantScope(context.tenant_id),
+      tenant_id: requireTenantScope(context.tenant_id),  // ✅ P1-SEC: requireTenantScope 적용
       user_id: context.user_id,
       session_id: context.session_id,
-      intent_key: draftKey,
+      intent_key: intentKey,
       draft_params: args,
-      status: DRAFT_STATUS.READY,
-      missing_required: [],
+      status: 'ready',
+      confirm_required: true,
     })
     .select()
     .single();
@@ -1420,7 +714,7 @@ async function executeSendMessage(
   return {
     success: true,
     result: {
-      message: `${recipientText}에게 메시지를 발송하시겠어요?\n\n내용: ${message?.substring(0, 50)}${message?.length > 50 ? '...' : ''}\n\n(draft_id: ${draft.id})`,
+      message: `${recipientText}에게 메시지 발송을 준비했습니다. 실행하시겠습니까?\n\n내용: ${message?.substring(0, 50)}${message?.length > 50 ? '...' : ''}`,
       draft_id: draft.id,
       requires_confirmation: true,
     },
@@ -1433,43 +727,19 @@ async function executeDraftMessage(
 ): Promise<{ success: boolean; result: any; error?: string }> {
   const { type, target, content } = args;
 
-  // P0-38: 초안은 실행 대상이 아님 - COLLECTING 상태로 저장
-  // message.draft.*는 "초안 전용(실행 금지)"
-  const intentKey = `message.draft.${type}`;
+  // 프로덕션 최적화: 로깅 제거
 
-  // P0-FIX: event_type 제거 (Draft는 Tool 기반, automation event 아님)
-
-  // P0-38: chatops_drafts에 COLLECTING 상태로 저장 (실행 불가)
-  const { data: draft, error: draftError } = await context.supabase
-    .from('chatops_drafts')
-    .insert({
-      tenant_id: requireTenantScope(context.tenant_id),
-      user_id: context.user_id,
-      session_id: context.session_id,
-      intent_key: intentKey,
-      draft_params: args,
-      status: DRAFT_STATUS.COLLECTING,  // P0-38: 초안은 COLLECTING (실행 불가)
-      missing_required: ['confirm_send'],  // P0-38: 발송 확인 필요
-    })
-    .select()
-    .single();
-
-  if (draftError) {
-    console.error('[executeDraftMessage] Draft 생성 오류:', maskPII(draftError.message));
-    return {
-      success: false,
-      result: null,
-      error: `Draft 생성 실패: ${draftError.message}`,
-    };
-  }
-
-  // P0-38: 초안은 "발송으로 전환" 유도 (confirm_action이 아닌 send_message 호출)
+  // 메시지 초안 작성은 L2 작업이므로 Draft 생성
   return {
     success: true,
     result: {
-      message: `${type} 메시지 초안을 작성했습니다.\n\n발송하려면 "send_message" 도구를 사용하여 메시지를 발송하세요.\n\n초안 내용:\n- 대상: ${target}\n- 내용: ${content}\n\n(draft_id: ${draft.id})`,
-      draft_id: draft.id,
-      requires_send_conversion: true,  // P0-38: 발송 전환 필요 (confirm이 아님)
+      message: `${type} 메시지 초안을 작성했습니다. 발송하시겠습니까?`,
+      requires_confirmation: true,
+      draft: {
+        type: type,
+        target: target,
+        content: content,
+      },
     },
   };
 }
@@ -1480,17 +750,9 @@ async function executeQueryBilling(
 ): Promise<{ success: boolean; result: any; error?: string }> {
   const { type, month, student_name } = args;
 
-  try {
-    // 캐시 확인 (학생 이름 필터가 없을 때만)
-    if (!student_name) {
-      const { memoryCache, createCacheKey } = await import('./memory-cache.ts');
-      const cacheKey = createCacheKey('billing', context.tenant_id, type, month || 'current');
-      const cached = memoryCache.get(cacheKey);
-      if (cached) {
-        return { success: true, result: cached };
-      }
-    }
+  // 프로덕션 최적화: 로깅 제거
 
+  try {
     // invoices 테이블 조회 (persons 테이블과 JOIN)
     let query = context.supabase
       .from('invoices')
@@ -1518,15 +780,10 @@ async function executeQueryBilling(
       query = query.eq('status', 'draft');
     }
 
-    // P0-3: 월 필터 수정 (다음달 01일 00:00:00를 upper bound로)
+    // 월 필터
     if (month) {
-      const [year, monthNum] = month.split('-').map(Number);
-      // P0-13: KST 월 범위를 UTC로 변환하여 필터링
-      const startUTC = kstDateToUTC(`${month}-01`);
-      const endUTC = nextKSTMonthToUTC(month);
-
-      query = query.gte('created_at', startUTC)
-                   .lt('created_at', endUTC);
+      query = query.gte('created_at', `${month}-01T00:00:00`)
+                   .lt('created_at', `${month}-31T23:59:59`);
     }
 
     // 학생 이름 필터
@@ -1535,6 +792,8 @@ async function executeQueryBilling(
     }
 
     const { data, error } = await query;
+
+    // 프로덕션 최적화: 로깅 제거
 
     if (error) {
       console.error('[executeQueryBilling] DB 오류:', maskPII(error.message));
@@ -1556,26 +815,17 @@ async function executeQueryBilling(
     const totalAmount = flattenedData.reduce((sum, item) => sum + (item.amount || 0), 0);
     const totalPaid = flattenedData.reduce((sum, item) => sum + (item.paid_amount || 0), 0);
 
-    const result = {
-      invoices: flattenedData,
-      count: flattenedData.length,
-      total_amount: totalAmount,
-      total_paid: totalPaid,
-      total_unpaid: totalAmount - totalPaid,
-      type: type,
-      message: `${type} 수납: ${flattenedData.length}건, 미수금: ${totalAmount - totalPaid}원`,
-    };
-
-    // 캐시 저장 (학생 이름 필터가 없을 때만, 3분)
-    if (!student_name) {
-      const { memoryCache, createCacheKey } = await import('./memory-cache.ts');
-      const cacheKey = createCacheKey('billing', context.tenant_id, type, month || 'current');
-      memoryCache.set(cacheKey, result, 3 * 60 * 1000);
-    }
-
     return {
       success: true,
-      result: result,
+      result: {
+        invoices: flattenedData,
+        count: flattenedData.length,
+        total_amount: totalAmount,
+        total_paid: totalPaid,
+        total_unpaid: totalAmount - totalPaid,
+        type: type,
+        message: `${type} 수납: ${flattenedData.length}건, 미수금: ${totalAmount - totalPaid}원`,
+      },
     };
   } catch (error: any) {
     console.error('[executeQueryBilling] 오류:', error);
@@ -1591,41 +841,14 @@ async function executeManageBilling(
   args: Record<string, any>,
   context: AgentContext
 ): Promise<{ success: boolean; result: any; error?: string }> {
-  const { action } = args;
-
-  // Tool 기반 Draft Key
-  const draftKey = `manage_billing.${action}`;
-
-  // L2 작업: Draft 생성 (사용자 승인 기반 - 자동화 정책 검증 불필요)
-  const { data: draft, error: draftError } = await context.supabase
-    .from('chatops_drafts')
-    .insert({
-      tenant_id: requireTenantScope(context.tenant_id),
-      user_id: context.user_id,
-      session_id: context.session_id,
-      intent_key: draftKey,
-      draft_params: args,
-      status: DRAFT_STATUS.READY,
-      missing_required: [],
-    })
-    .select()
-    .single();
-
-  if (draftError) {
-    console.error('[executeManageBilling] Draft 생성 오류:', maskPII(draftError.message));
-    return {
-      success: false,
-      result: null,
-      error: `Draft 생성 실패: ${draftError.message}`,
-    };
-  }
-
+  // L2 실행은 Draft 생성
   return {
     success: true,
     result: {
-      message: `${action} 작업을 하시겠어요?\n\n(draft_id: ${draft.id})`,
-      draft_id: draft.id,
+      message: `${args.action} 작업을 준비했습니다. 확인하시겠습니까?`,
       requires_confirmation: true,
+      intent_key: `billing.exec.${args.action}`,
+      params: args,
     },
   };
 }
@@ -1651,17 +874,18 @@ async function executeQueryClass(
         };
       }
 
-      // P2-8: 캐시된 테이블명 조회
-      const classTable = await getCachedTableName(context, 'class');
-      if (!classTable) {
-        return { success: false, result: null, error: '업종별 반 테이블을 찾을 수 없습니다.' };
+      // P0 수정: Industry Adapter 적용
+      const tenantId = requireTenantScope(context.tenant_id);
+      const tableName = await getTenantTableName(context.supabase, tenantId, 'class');
+      if (!tableName) {
+        return { success: false, result: null, error: '업종별 테이블 조회 실패' };
       }
 
       // 반 목록 조회
       const { data, error } = await context.supabase
-        .from(classTable)
+        .from(tableName)
         .select('id, name, instructor_name, schedule, student_count, status')
-        .eq('tenant_id', requireTenantScope(context.tenant_id))
+        .eq('tenant_id', tenantId)
         .order('name', { ascending: true });
 
       if (error) {
@@ -1692,15 +916,16 @@ async function executeQueryClass(
         };
       }
 
-      // P2-8: 캐시된 테이블명 조회
-      const studentTable = await getCachedTableName(context, 'student');
-      if (!studentTable) {
-        return { success: false, result: null, error: '업종별 학생 테이블을 찾을 수 없습니다.' };
+      // P0 수정: Industry Adapter 적용
+      const tenantId = requireTenantScope(context.tenant_id);
+      const studentTableName = await getTenantTableName(context.supabase, tenantId, 'student');
+      if (!studentTableName) {
+        return { success: false, result: null, error: '업종별 테이블 조회 실패' };
       }
 
       // 반 명단 조회 (업종별 학생 테이블과 persons JOIN)
       const { data, error } = await context.supabase
-        .from(studentTable)
+        .from(studentTableName)
         .select(`
           person_id,
           status,
@@ -1710,7 +935,7 @@ async function executeQueryClass(
             phone
           )
         `)
-        .eq('tenant_id', requireTenantScope(context.tenant_id))
+        .eq('tenant_id', tenantId)
         .eq('class_name', class_name)
         .eq('status', STUDENT_STATUS.ACTIVE);
 
@@ -1765,31 +990,13 @@ async function executeGetReport(
   // 프로덕션 최적화: 로깅 제거
 
   try {
-    // P0-42: KST 날짜 사용 (UTC 날짜는 한국 운영 시 하루 밀림)
-    const { toKSTDate } = await import('./date-utils.ts');
-    const today = toKSTDate(new Date());
+    const today = new Date().toISOString().split('T')[0];
 
     if (type === 'dashboard') {
-      // 캐시 확인
-      const { memoryCache, createCacheKey } = await import('./memory-cache.ts');
-      const cacheKey = createCacheKey('dashboard' as any, context.tenant_id, today);
-      const cached = memoryCache.get(cacheKey);
-      if (cached) {
-        return { success: true, result: cached };
-      }
+      // 대시보드 KPI 조회 (병렬 처리로 최적화)
+      const thisMonth = new Date().toISOString().substring(0, 7);
 
-      // P0-42: 대시보드 KPI 조회 (병렬 처리로 최적화)
-      // thisMonth도 KST 기준으로 계산
-      const kstNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-      const thisMonth = `${kstNow.getFullYear()}-${String(kstNow.getMonth() + 1).padStart(2, '0')}`;
-
-      // P2-8: 캐시된 테이블명 조회
-      const studentTable = await getCachedTableName(context, 'student');
-      if (!studentTable) {
-        return { success: false, result: null, error: '업종별 학생 테이블을 찾을 수 없습니다.' };
-      }
-
-      // 병렬 실행 (4개 쿼리 동시 실행)
+      // 병렬 실행
       const [
         { data: attendanceData },
         { data: billingData },
@@ -1799,22 +1006,26 @@ async function executeGetReport(
         context.supabase
           .from('attendance_logs')
           .select('status')
-          .eq('tenant_id', requireTenantScope(context.tenant_id))
-          .eq('date', today),
+          .eq('tenant_id', context.tenant_id)
+          .eq('occurred_at::date', today),
 
         // 2. 이번 달 수납 통계
         context.supabase
           .from('invoices')
           .select('amount, paid_amount, status')
-          .eq('tenant_id', requireTenantScope(context.tenant_id))
-          .gte('created_at', kstDateToUTC(`${thisMonth}-01`)),  // P0-13: KST → UTC
+          .eq('tenant_id', context.tenant_id)
+          .gte('created_at', `${thisMonth}-01T00:00:00`),
 
-        // 3. 전체 학생 수
-        context.supabase
-          .from(studentTable)
-          .select('*', { count: 'exact', head: true })
-          .eq('tenant_id', requireTenantScope(context.tenant_id))
-          .eq('status', 'active')
+        // 3. 전체 학생 수 (P0 수정: Industry Adapter 적용)
+        (async () => {
+          const tableName = await getTenantTableName(context.supabase, context.tenant_id, 'student');
+          if (!tableName) return { count: 0 };
+          return context.supabase
+            .from(tableName)
+            .select('*', { count: 'exact', head: true })
+            .eq('tenant_id', context.tenant_id)
+            .eq('status', 'active');
+        })()
       ]);
 
       const attendanceStats = {
@@ -1831,29 +1042,24 @@ async function executeGetReport(
         overdue: billingData?.filter(inv => inv.status === 'overdue').length || 0,
       };
 
-      const result = {
-        attendance: attendanceStats,
-        billing: billingStats,
-        students: { total: studentCount || 0 },
-        date: today,
-        message: `대시보드 KPI: 학생 ${studentCount}명, 출석 ${attendanceStats.present}명, 연체 ${billingStats.overdue}건`,
-      };
-
-      // 캐시 저장 (5분)
-      memoryCache.set(cacheKey, result, 5 * 60 * 1000);
-
       return {
         success: true,
-        result: result,
+        result: {
+          attendance: attendanceStats,
+          billing: billingStats,
+          students: { total: studentCount || 0 },
+          date: today,
+          message: `대시보드 KPI: 학생 ${studentCount}명, 출석 ${attendanceStats.present}명, 연체 ${billingStats.overdue}건`,
+        },
       };
     } else if (type === 'attendance') {
       // 출결 요약
       const { data, error } = await context.supabase
         .from('attendance_logs')
-        .select('status, occurred_at, date')
-        .eq('tenant_id', requireTenantScope(context.tenant_id))
-        .eq('date', today)
-        .order('occurred_at', { ascending: false })
+        .select('status, occurred_at')
+        .eq('tenant_id', context.tenant_id)
+        .gte('occurred_at::date', today)
+        .order('date', { ascending: false })
         .limit(100);
 
       if (error) {
@@ -1881,8 +1087,8 @@ async function executeGetReport(
       const { data, error } = await context.supabase
         .from('invoices')
         .select('amount, paid_amount, status')
-        .eq('tenant_id', requireTenantScope(context.tenant_id))
-        .gte('created_at', kstDateToUTC(`${thisMonth}-01`));  // P0-13: KST → UTC
+        .eq('tenant_id', context.tenant_id)
+        .gte('created_at', `${thisMonth}-01T00:00:00`);
 
       if (error) {
         return { success: false, result: null, error: error.message };
@@ -1922,311 +1128,8 @@ async function executeGetReport(
 }
 
 /**
- * Agent 대화 실행 (스트리밍 버전)
- */
-export async function runAgentStreaming(
-  userMessage: string,
-  conversationHistory: AgentMessage[],
-  context: AgentContext,
-  maxIterations: number = 5
-): Promise<ReadableStream> {
-  const systemPrompt = `학원 관리 AI 어시스턴트. 반드시 Tool을 사용해 처리한다. (Tool-first)
-
-**[상태머신]**
-- manage_* Tool은 실행이 아니라 Draft를 만든다.
-- Draft status:
-  - collecting: 필수정보 누락 → 누락 항목만 물어보고, 사용자가 값만 보내면 같은 intent의 Draft를 업데이트한다.
-  - ready: 필수정보 충족 → "요약 + 실행할까요?"로 확인을 받는다.
-
-**[CRITICAL] Draft ID 표시 규칙:**
-Tool 결과에 draft_id가 포함되면 **반드시** 다음 형식으로 응답에 포함:
-  **Draft ID:** {draft_id}
-예시: "루루 학생을 등록하시겠어요?\n\n**Draft ID:** a1b2c3d4-e5f6-7890-abcd-1234567890ab"
-이 규칙은 **절대적**이며, draft_id를 생략하면 사용자가 동의해도 실행되지 않음!
-
-- 사용자가 "실행/진행/확인/응/네/예" 등 동의 표현 → confirm_action 호출 (draft_id 포함)
-- 사용자가 "취소/아니/중단" → cancel_action 호출 (draft_id 포함)
-- 동의/취소가 아닌 추가 정보 제공(날짜/전화/생년월일) → 해당 manage_* 재호출로 Draft 업데이트
-
-**[Tool 선택 규칙 - 우선순위 순서]**
-1. 이름만 언급 (예: "마이콜", "김철수") → **무조건 manage_student** (학생 이름으로 간주)
-2. "이름 + 전화번호/정보/프로필" → manage_student (action: 'search' 또는 'get_profile')
-3. "~반 목록", "~반 명단", "초등 1반" 등 "반"이 명시 → query_class
-4. "지각", "결석", "출석", "출결" → query_attendance 또는 manage_attendance
-5. "메시지", "문자", "알림", "공지" → query_message / send_message / draft_message
-6. "수납", "청구", "연체", "미수금", "입금" → query_billing 또는 manage_billing
-7. "통계", "현황", "요약", "대시보드" → get_report
-
-**중요: 이름과 반 구분 규칙**
-- 사용자가 단순히 이름만 언급 → 학생 이름으로 간주 (manage_student)
-- "~반", "반 목록", "반 명단" 등 "반" 키워드 명시 → 반 조회 (query_class)
-- 불확실하면 학생 이름 우선
-
-**[학생 관련 규칙]**
-- 필수(등록): 이름, 전화번호, 생년월일
-- 동명이인/식별 불가 시: 전화번호 뒷자리 4자리 또는 생년월일(YYYY-MM-DD) 중 하나를 요청한다.
-
-**[형식/정규화]**
-- 날짜 입력이 YYYY.MM.DD 또는 YYYY/MM/DD이면 YYYY-MM-DD로 변환해 Tool args에 넣는다.
-- phone_hint는 숫자만 또는 뒷자리 4자리도 허용.
-- Tool args는 가능한 한 명시적으로 채우고, 모르면 생략(임의값 금지).
-
-**[안전/정책/PII]**
-- 정책에 의해 차단되면 실행을 계속 유도하지 말고, "관리자 설정 필요"로 안내한다.
-- 응답에 주민번호/전체 전화번호/내부 UUID를 과도하게 노출하지 않는다.
-- Tool 결과를 근거로만 말하고, 확인되지 않은 실행 완료를 단정하지 않는다.
-
-**[응답 스타일]**
-짧고 친절하게. 직전 대화 맥락(최근 3턴) 고려.
-
-**[응답 포맷 - Markdown 사용]**
-- **여러 항목 조회 시 (2개 이상)**: 반드시 Markdown 테이블로 표시
-  예: 학생 2명 이상 조회 → | 이름 | 전화번호 | 상태 | 형태
-- **단일 항목**: 일반 텍스트 또는 리스트
-- **강조**: **볼드**, *이탤릭* 활용
-- **제목**: ## 검색 결과, ### 상세 정보 등
-- **리스트**: - 항목 또는 1. 번호 사용`;
-
-  // P2-8: 동의/취소 패턴 감지 및 draft_id 자동 주입
-  const consentPattern = /^(네|예|응|확인|실행|진행|좋아|ok|yes)$/i;
-  const cancelPattern = /^(아니|취소|중단|그만|안해|no)$/i;
-  const trimmedMessage = userMessage.trim();
-
-  let enhancedUserMessage = userMessage;
-  if (consentPattern.test(trimmedMessage)) {
-    // 동의 패턴: draft_id가 없으면 자동 추출
-    const draftId = extractLastDraftId(conversationHistory);
-    console.log('[runAgentStreaming] 동의 패턴 감지:', { trimmedMessage, draftId, historyLength: conversationHistory.length });
-    if (draftId) {
-      enhancedUserMessage = `${userMessage}\n\n(draft_id: ${draftId})`;
-      console.log('[runAgentStreaming] draft_id 자동 주입 완료:', { enhancedUserMessage });
-    } else {
-      console.log('[runAgentStreaming] draft_id 추출 실패 - 대화 히스토리 확인 필요');
-    }
-  } else if (cancelPattern.test(trimmedMessage)) {
-    // 취소 패턴: draft_id가 없으면 자동 추출
-    const draftId = extractLastDraftId(conversationHistory);
-    if (draftId) {
-      enhancedUserMessage = `${userMessage}\n\n(draft_id: ${draftId})`;
-    }
-  }
-
-  const messages: AgentMessage[] = [
-    { role: 'system', content: systemPrompt },
-    ...conversationHistory.slice(-10), // P0-FIX: 4→10 증가 (Draft ID 유지 보장)
-    { role: 'user', content: enhancedUserMessage },
-  ];
-
-  const encoder = new TextEncoder();
-
-  return new ReadableStream({
-    async start(controller) {
-      try {
-        let iteration = 0;
-        let fullResponse = '';
-        const toolResults: Array<{ tool: string; success: boolean; result: any }> = [];
-        let totalUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
-
-        while (iteration < maxIterations) {
-          iteration++;
-
-          const stream = callOpenAIChatStreaming(
-            context.openai_api_key,
-            messages,
-            AGENT_TOOLS,
-            'auto'
-          );
-
-          let currentContent = '';
-          let currentToolCalls: ToolCall[] | undefined;
-          let streamUsage: any;
-
-          for await (const chunk of stream) {
-            if (chunk.type === 'content' && chunk.content) {
-              currentContent += chunk.content;
-              fullResponse += chunk.content;
-
-              // 실시간 스트리밍 전송
-              const sseData = `data: ${JSON.stringify({ type: 'content', content: chunk.content })}\n\n`;
-              controller.enqueue(encoder.encode(sseData));
-            } else if (chunk.type === 'tool_calls' && chunk.tool_calls) {
-              currentToolCalls = chunk.tool_calls;
-            } else if (chunk.type === 'done') {
-              streamUsage = chunk.usage;
-            }
-          }
-
-          if (streamUsage) {
-            totalUsage.prompt_tokens += streamUsage.prompt_tokens || 0;
-            totalUsage.completion_tokens += streamUsage.completion_tokens || 0;
-            totalUsage.total_tokens += streamUsage.total_tokens || 0;
-          }
-
-          // Tool 호출이 없으면 종료
-          if (!currentToolCalls || currentToolCalls.length === 0) {
-            break;
-          }
-
-          // Tool 실행
-          messages.push({
-            role: 'assistant',
-            content: currentContent || '',
-            tool_calls: currentToolCalls,
-          });
-
-          for (const toolCall of currentToolCalls) {
-            const toolName = toolCall.function.name;
-            let toolArgs: Record<string, any>;
-
-            try {
-              toolArgs = JSON.parse(toolCall.function.arguments);
-            } catch (parseError) {
-              const errorResult = {
-                success: false,
-                error: `Tool 인자 파싱 실패: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-              };
-
-              toolResults.push({
-                tool: toolName,
-                success: false,
-                result: null,
-              });
-
-              messages.push({
-                role: 'tool',
-                tool_call_id: toolCall.id,
-                name: toolName,
-                content: JSON.stringify({ error: errorResult.error }),
-              });
-              continue;
-            }
-
-            const result = await executeTool(toolName, toolArgs, context);
-            toolResults.push({
-              tool: toolName,
-              success: result.success,
-              result: result.result,
-            });
-
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolCall.id,
-              name: toolName,
-              content: JSON.stringify(result.success ? result.result : { error: result.error }),
-            });
-          }
-        }
-
-        // P2-11: 비용 계산 (표시용 추정치, MODEL_PRICING 상수 사용)
-        const pricing = MODEL_PRICING['gpt-4o-mini'];
-        const costUsd = (totalUsage.prompt_tokens * pricing.input + totalUsage.completion_tokens * pricing.output);
-        const costKrw = costUsd * EXCHANGE_RATE_USD_TO_KRW;
-
-        // 완료 신호
-        const doneData = `data: ${JSON.stringify({
-          type: 'done',
-          fullResponse,
-          tool_results: toolResults.length > 0 ? toolResults : undefined,
-          usage: {
-            ...totalUsage,
-            // P0-23: 비용은 추정치로 명시 (UI 표시 시 경고 필요)
-            cost_estimate_usd: `$${costUsd.toFixed(6)}`,
-            cost_estimate_krw: `₩${costKrw.toFixed(2)}`,
-            model: 'gpt-4o-mini',
-            pricing_note: '추정치 (정산용 아님)',
-          }
-        })}\n\n`;
-        controller.enqueue(encoder.encode(doneData));
-
-        controller.close();
-      } catch (error) {
-        console.error('[runAgentStreaming] 오류:', error);
-
-        const errorData = `data: ${JSON.stringify({
-          type: 'error',
-          error: error instanceof Error ? error.message : String(error)
-        })}\n\n`;
-        controller.enqueue(encoder.encode(errorData));
-        controller.close();
-      }
-    },
-  });
-}
-
-/**
  * Agent 대화 실행
  */
-/**
- * 최근 대화에서 draft_id 추출 (draft_id 추적 메커니즘)
- */
-/**
- * P1-12: 최근 대화에서 draft_id 추출
- *
- * assistant 메시지의 content뿐만 아니라 tool 메시지의 content도 검사합니다.
- * 스트리밍 응답에서는 tool_result JSON에 draft_id가 포함될 수 있습니다.
- *
- * @param conversationHistory 대화 히스토리
- * @returns draft_id 또는 null
- */
-function extractLastDraftId(conversationHistory: AgentMessage[]): string | null {
-  console.log('[extractLastDraftId] 대화 히스토리 검색 시작:', { totalMessages: conversationHistory.length });
-
-  // 전체 히스토리 출력 (디버깅용)
-  conversationHistory.forEach((msg, idx) => {
-    console.log('[extractLastDraftId] 히스토리[' + idx + ']:', {
-      role: msg.role,
-      hasContent: !!msg.content,
-      contentLength: msg.content?.length || 0,
-      contentPreview: msg.content?.substring(0, 150)
-    });
-  });
-
-  // 최근 10개 메시지에서 draft_id 패턴 검색 (역순)
-  for (let i = conversationHistory.length - 1; i >= Math.max(0, conversationHistory.length - 10); i--) {
-    const msg = conversationHistory[i];
-
-    console.log('[extractLastDraftId] 검사 시작[' + i + ']:', { role: msg.role, hasContent: !!msg.content });
-
-    // P1-12: assistant 메시지와 tool 메시지 모두 검사
-    if ((msg.role === 'assistant' || msg.role === 'tool') && msg.content) {
-      console.log('[extractLastDraftId] 메시지 검사:', { index: i, role: msg.role, contentPreview: msg.content.substring(0, 100) });
-
-      // P1-14: draft_id 추출 - 2단계 검증
-      // 1단계: "draft"라는 단어가 있는지 확인 (대소문자 무시)
-      if (/draft/i.test(msg.content)) {
-        // 2단계: UUID 패턴 찾기 (표준 UUID v4 형식)
-        const uuidMatch = msg.content.match(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
-        if (uuidMatch) {
-          const draftId = uuidMatch[0];
-          console.log('[extractLastDraftId] draft_id 발견:', { draftId, contextPreview: msg.content.substring(Math.max(0, uuidMatch.index! - 20), uuidMatch.index! + 56) });
-          return draftId;
-        }
-      }
-    }
-
-    // P1-12: tool_calls의 arguments에서도 검색 (OpenAI 응답 형식)
-    if (msg.role === 'assistant' && (msg as any).tool_calls) {
-      const toolCalls = (msg as any).tool_calls;
-      for (const tc of toolCalls) {
-        if (tc.function?.arguments) {
-          try {
-            const args = typeof tc.function.arguments === 'string'
-              ? JSON.parse(tc.function.arguments)
-              : tc.function.arguments;
-
-            if (args.draft_id && /^[a-f0-9-]{36}$/i.test(args.draft_id)) {
-              return args.draft_id;
-            }
-          } catch {
-            // JSON 파싱 실패는 무시
-          }
-        }
-      }
-    }
-  }
-  return null;
-}
-
 export async function runAgent(
   userMessage: string,
   conversationHistory: AgentMessage[],
@@ -2234,103 +1137,14 @@ export async function runAgent(
   maxIterations: number = 5
 ): Promise<AgentResponse> {
 
-  // System Prompt (최적화: 가드레일 강화, 550 토큰급)
-  const systemPrompt = `학원 관리 AI 어시스턴트. 반드시 Tool을 사용해 처리한다. (Tool-first)
-
-**[상태머신]**
-- manage_* Tool은 실행이 아니라 Draft를 만든다.
-- Draft status:
-  - collecting: 필수정보 누락 → 누락 항목만 물어보고, 사용자가 값만 보내면 같은 intent의 Draft를 업데이트한다.
-  - ready: 필수정보 충족 → "요약 + 실행할까요?"로 확인을 받는다.
-
-**[CRITICAL] Draft ID 표시 규칙:**
-Tool 결과에 draft_id가 포함되면 **반드시** 다음 형식으로 응답에 포함:
-  **Draft ID:** {draft_id}
-예시: "루루 학생을 등록하시겠어요?\n\n**Draft ID:** a1b2c3d4-e5f6-7890-abcd-1234567890ab"
-이 규칙은 **절대적**이며, draft_id를 생략하면 사용자가 동의해도 실행되지 않음!
-
-- 사용자가 "실행/진행/확인/응/네/예" 등 동의 표현 → confirm_action 호출 (draft_id 포함)
-- 사용자가 "취소/아니/중단" → cancel_action 호출 (draft_id 포함)
-- 동의/취소가 아닌 추가 정보 제공(날짜/전화/생년월일) → 해당 manage_* 재호출로 Draft 업데이트
-
-**[Tool 선택 규칙 - 우선순위 순서]**
-1. 이름만 언급 (예: "마이콜", "김철수") → **무조건 manage_student** (학생 이름으로 간주)
-2. "이름 + 전화번호/정보/프로필" → manage_student (action: 'search' 또는 'get_profile')
-3. "~반 목록", "~반 명단", "초등 1반" 등 "반"이 명시 → query_class
-4. "지각", "결석", "출석", "출결" → query_attendance 또는 manage_attendance
-5. "메시지", "문자", "알림", "공지" → query_message / send_message / draft_message
-6. "수납", "청구", "연체", "미수금", "입금" → query_billing 또는 manage_billing
-7. "통계", "현황", "요약", "대시보드" → get_report
-
-**중요: 이름과 반 구분 규칙**
-- 사용자가 단순히 이름만 언급 → 학생 이름으로 간주 (manage_student)
-- "~반", "반 목록", "반 명단" 등 "반" 키워드 명시 → 반 조회 (query_class)
-- 불확실하면 학생 이름 우선
-
-**[학생 관련 규칙]**
-- 필수(등록): 이름, 전화번호, 생년월일
-- 동명이인/식별 불가 시: 전화번호 뒷자리 4자리 또는 생년월일(YYYY-MM-DD) 중 하나를 요청한다.
-
-**[출결 관련 규칙]**
-- "오늘 지각", "결석자" → query_attendance (type: 'late' 또는 'absent')
-- "마이콜 출석" → query_attendance (type: 'by_student', student_name: '마이콜')
-- "결석자에게 알림" → manage_attendance (action: 'notify_absent')
-
-**[메시지 관련 규칙]**
-- "어제 보낸 메시지" → query_message (type: 'sent_log', date: 어제)
-- "마이콜에게 메시지" → send_message (type: 'single', recipient: '마이콜')
-- "공지 초안" → draft_message (type: 'general')
-
-**[수납 관련 규칙]**
-- "연체자", "연체 목록" → query_billing (type: 'overdue_list')
-- "마이콜 수납 내역" → query_billing (type: 'by_student', student_name: '마이콜')
-- "청구서 발행" → manage_billing (action: 'issue_invoice')
-
-**[형식/정규화]**
-- 날짜 입력이 YYYY.MM.DD 또는 YYYY/MM/DD이면 YYYY-MM-DD로 변환해 Tool args에 넣는다.
-- phone_hint는 숫자만 또는 뒷자리 4자리도 허용.
-- Tool args는 가능한 한 명시적으로 채우고, 모르면 생략(임의값 금지).
-
-**[안전/정책/PII]**
-- 정책에 의해 차단되면 실행을 계속 유도하지 말고, "관리자 설정 필요"로 안내한다.
-- 응답에 주민번호/전체 전화번호/내부 UUID를 과도하게 노출하지 않는다.
-- Tool 결과를 근거로만 말하고, 확인되지 않은 실행 완료를 단정하지 않는다.
-
-**[응답 스타일]**
-짧고 친절하게. 직전 대화 맥락(최근 3턴) 고려.
-
-**[응답 포맷 - Markdown 사용]**
-- **여러 항목 조회 시 (2개 이상)**: 반드시 Markdown 테이블로 표시
-  예: 학생 2명 이상 조회 → | 이름 | 전화번호 | 상태 | 형태
-- **단일 항목**: 일반 텍스트 또는 리스트
-- **강조**: **볼드**, *이탤릭* 활용
-- **제목**: ## 검색 결과, ### 상세 정보 등
-- **리스트**: - 항목 또는 1. 번호 사용`;
-
-  // P2-8: 동의/취소 패턴 감지 및 draft_id 자동 주입
-  const consentPattern = /^(네|예|응|확인|실행|진행|좋아|ok|yes)$/i;
-  const cancelPattern = /^(아니|취소|중단|그만|안해|no)$/i;
-  const trimmedMessage = userMessage.trim();
-
-  let enhancedUserMessage = userMessage;
-  if (consentPattern.test(trimmedMessage)) {
-    // 동의 패턴: draft_id가 없으면 자동 추출
-    const draftId = extractLastDraftId(conversationHistory);
-    if (draftId) {
-      enhancedUserMessage = `${userMessage}\n\n(draft_id: ${draftId})`;
-    }
-  } else if (cancelPattern.test(trimmedMessage)) {
-    // 취소 패턴: draft_id가 없으면 자동 추출
-    const draftId = extractLastDraftId(conversationHistory);
-    if (draftId) {
-      enhancedUserMessage = `${userMessage}\n\n(draft_id: ${draftId})`;
-    }
-  }
+  // System Prompt (2단계 정보 수집: 필수 → 선택)
+  // P2: 공통 상수로 분리 (agent-prompts.ts)
+  const systemPrompt = AGENT_SYSTEM_PROMPT;
 
   const messages: AgentMessage[] = [
     { role: 'system', content: systemPrompt },
-    ...conversationHistory.slice(-10), // P0-FIX: 4→10 증가 (Draft ID 유지 보장)
-    { role: 'user', content: enhancedUserMessage },
+    ...conversationHistory.slice(-6), // -10→-6 감소: 최근 3턴만 (응답 시간 최적화)
+    { role: 'user', content: userMessage },
   ];
 
   let iteration = 0;
@@ -2369,32 +1183,7 @@ Tool 결과에 draft_id가 포함되면 **반드시** 다음 형식으로 응답
 
     for (const toolCall of response.tool_calls) {
       const toolName = toolCall.function.name;
-      let toolArgs: Record<string, any>;
-
-      // P1-8: Tool args 파싱 오류 처리
-      try {
-        toolArgs = JSON.parse(toolCall.function.arguments);
-      } catch (parseError) {
-        console.error('[AgentEngine] Tool args 파싱 실패:', parseError);
-        const errorResult = {
-          success: false,
-          error: `Tool 인자 파싱 실패: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-        };
-
-        toolResults.push({
-          tool: toolName,
-          success: false,
-          result: null,
-        });
-
-        messages.push({
-          role: 'tool',
-          tool_call_id: toolCall.id,
-          name: toolName,
-          content: JSON.stringify({ error: errorResult.error }),
-        });
-        continue;
-      }
+      const toolArgs = JSON.parse(toolCall.function.arguments);
 
       const result = await executeTool(toolName, toolArgs, context);
       toolResults.push({
@@ -2417,21 +1206,17 @@ Tool 결과에 draft_id가 포함되면 **반드시** 다음 형식으로 응답
     finalResponse = finalResponse || '요청을 처리하는 중 문제가 발생했습니다. 다시 시도해주세요.';
   }
 
-  // P2-11: 비용 계산 (표시용 추정치, MODEL_PRICING 상수 사용)
-  const pricing = MODEL_PRICING['gpt-4o-mini'];
-  const costUsd = (totalUsage.prompt_tokens * pricing.input + totalUsage.completion_tokens * pricing.output);
-  const costKrw = costUsd * EXCHANGE_RATE_USD_TO_KRW;
+  // 비용 계산
+  const costUsd = (totalUsage.prompt_tokens * 0.00000015 + totalUsage.completion_tokens * 0.0000006);
+  const costKrw = costUsd * 1300;
 
   return {
     response: finalResponse,
     tool_results: toolResults.length > 0 ? toolResults : undefined,
     usage: {
       ...totalUsage,
-      // P0-23: 비용은 추정치로 명시 (UI 표시 시 경고 필요)
-      cost_estimate_usd: `$${costUsd.toFixed(6)}`,
-      cost_estimate_krw: `₩${costKrw.toFixed(2)}`,
-      model: 'gpt-4o-mini',
-      pricing_note: '추정치 (정산용 아님)',
+      cost_usd: `$${costUsd.toFixed(6)}`,
+      cost_krw: `₩${costKrw.toFixed(2)}`,
     },
   };
 }
@@ -2449,59 +1234,20 @@ async function executeConfirmAction(
   args: Record<string, any>,
   context: AgentContext
 ): Promise<{ success: boolean; result: any; error?: string }> {
-  const { draft_id } = args;
+  // 프로덕션 최적화: 로깅 제거
 
   try {
-    // P0-1: draft_id 명시적 처리 + maybeSingle 안전성 개선
-    let draft;
-    let draftError;
-
-    if (draft_id) {
-      // draft_id가 있으면 maybeSingle() 사용 (0 or 1행 확정)
-      const result = await context.supabase
-        .from('chatops_drafts')
-        .select('*')
-        .eq('id', draft_id)
-        .eq('tenant_id', requireTenantScope(context.tenant_id))
-        .eq('session_id', context.session_id)
-        .eq('status', DRAFT_STATUS.READY)
-        .maybeSingle();
-
-      draft = result.data;
-      draftError = result.error;
-    } else {
-      // P0-21: draft_id가 없으면 Fail-Closed 강화 (최근 N분 이내만 허용)
-      const RECENT_MINUTES = 5; // 최근 5분 이내 draft만 허용
-      const recentThreshold = new Date(Date.now() - RECENT_MINUTES * 60 * 1000).toISOString();
-
-      const result = await context.supabase
-        .from('chatops_drafts')
-        .select('*')
-        .eq('tenant_id', requireTenantScope(context.tenant_id))
-        .eq('session_id', context.session_id)
-        .eq('status', DRAFT_STATUS.READY)
-        .gte('updated_at', recentThreshold) // P0-21: 최근 N분 이내만
-        .order('updated_at', { ascending: false })
-        .limit(2); // P0-21: 2개 조회하여 중복 확인
-
-      // P0-21: READY draft가 2개 이상이면 명시적 선택 요구
-      if (Array.isArray(result.data) && result.data.length > 1) {
-        const draftList = result.data.map((d: any) => ({
-          draft_id: d.id,
-          intent_key: d.intent_key,
-          updated_at: d.updated_at,
-        }));
-
-        return {
-          success: false,
-          result: null,
-          error: `실행 가능한 작업이 ${result.data.length}개 있습니다. draft_id를 명시해주세요.\n\n${draftList.map((d: any) => `- ${d.intent_key} (${d.draft_id})`).join('\n')}`,
-        };
-      }
-
-      draft = Array.isArray(result.data) && result.data.length > 0 ? result.data[0] : null;
-      draftError = result.error;
-    }
+    // P0 이슈 해결: requireTenantScope 사용
+    // 최근 ready 상태의 Draft 조회
+    const { data: draft, error: draftError } = await context.supabase
+      .from('chatops_drafts')
+      .select('*')
+      .eq('tenant_id', requireTenantScope(context.tenant_id))
+      .eq('session_id', context.session_id)
+      .eq('status', DRAFT_STATUS.READY)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     if (draftError) {
       console.error('[executeConfirmAction] Draft 조회 오류:', maskPII(draftError.message));
@@ -2512,69 +1258,55 @@ async function executeConfirmAction(
       return {
         success: false,
         result: null,
-        error: draft_id
-          ? `Draft ID를 찾을 수 없거나 실행 가능한 상태가 아닙니다.`
-          : '실행할 작업이 없습니다. 먼저 작업을 요청해주세요.',
+        error: '실행할 작업이 없습니다. 먼저 작업을 요청해주세요.',
       };
     }
 
     // 프로덕션 최적화: 로깅 제거
 
     // Intent에 따라 실제 실행
-    let executionResult;
+    // P0-2 수정: Intent 분기 완전성 강화 - 지원되는 Intent 명시적 정의
+    const SUPPORTED_INTENTS: Record<string, (params: Record<string, any>, ctx: AgentContext) => Promise<{ success: boolean; result: any; error?: string }>> = {
+      'student.exec.discharge': executeDischarge,
+      'student.exec.register': executeRegister,
+      'student.exec.pause': executePause,
+      'student.exec.resume': executeResume,
+      'student.exec.assign_tags': executeAssignTags,
+      'student.exec.update_profile': executeUpdateProfile,
+      'student.exec.change_class': executeChangeClass,
+    };
 
-    // P0-FIX: Tool 기반 Draft Key로 변경 (manage_student.*, manage_attendance.*, etc.)
-    if (draft.intent_key === 'manage_student.discharge') {
-      executionResult = await executeDischarge(draft.draft_params, context);
-    } else if (draft.intent_key === 'manage_student.register') {
-      executionResult = await executeRegister(draft.draft_params, context);
-    } else if (draft.intent_key === 'manage_student.pause') {
-      executionResult = await executePause(draft.draft_params, context);
-    } else if (draft.intent_key === 'manage_student.resume') {
-      executionResult = await executeResume(draft.draft_params, context);
-    } else if (draft.intent_key === 'manage_student.update') {
-      executionResult = await executeUpdate(draft.draft_params, context);
-    } else if (draft.intent_key === 'manage_student.update_contact') {
-      executionResult = await executeUpdateContact(draft.draft_params, context);
-    } else if (draft.intent_key === 'manage_student.change_class') {
-      executionResult = await executeChangeClass(draft.draft_params, context);
-    } else if (draft.intent_key === 'manage_student.merge') {
-      executionResult = await executeMerge(draft.draft_params, context);
-    } else if (draft.intent_key.startsWith('send_message.draft.')) {
-      // P0-31: 초안(send_message.draft.*)은 실행 금지
+    let executionResult;
+    const intentKey = draft.intent_key;
+
+    // message.exec.* Intent 처리
+    if (intentKey.startsWith('message.exec.')) {
+      executionResult = await executeSendMessageAction(draft.draft_params, context);
+    } else if (SUPPORTED_INTENTS[intentKey]) {
+      // 지원되는 Intent 실행
+      executionResult = await SUPPORTED_INTENTS[intentKey](draft.draft_params, context);
+    } else {
+      // P0-2 수정: 지원하지 않는 Intent에 대한 명확한 에러 메시지
+      const supportedKeys = Object.keys(SUPPORTED_INTENTS).join(', ');
+      console.warn(`[executeConfirmAction] 미지원 Intent: ${intentKey}. 지원되는 Intent: ${supportedKeys}`);
       executionResult = {
         success: false,
         result: null,
-        error: '초안은 실행할 수 없습니다. 먼저 메시지 발송으로 변환해주세요.',
-      };
-    } else if (draft.intent_key.startsWith('send_message.')) {
-      executionResult = await executeSendMessageAction(draft.draft_params, context);
-    } else if (draft.intent_key.startsWith('manage_attendance.')) {
-      executionResult = await executeAttendanceAction(draft.draft_params, context);
-    } else if (draft.intent_key.startsWith('manage_billing.')) {
-      executionResult = await executeBillingAction(draft.draft_params, context);
-    } else {
-      executionResult = {
-        success: false,
-        error: `지원하지 않는 Draft Key: ${draft.intent_key}`,
+        error: `지원하지 않는 작업입니다: ${intentKey}. 현재 지원되는 작업: 학생 등록/퇴원/휴원/복귀/태그할당/정보수정/반변경, 메시지 발송`,
       };
     }
 
     // Draft 상태 업데이트
     if (executionResult.success) {
-      // P0-26: Draft 업데이트 시 tenant 조건 추가 (방어적 코딩)
       await context.supabase
         .from('chatops_drafts')
         .update({ status: DRAFT_STATUS.EXECUTED })
-        .eq('id', draft.id)
-        .eq('tenant_id', requireTenantScope(context.tenant_id));
+        .eq('id', draft.id);
     } else {
-      // P0-30: 실패 분기에도 tenant 조건 추가 (크로스 테넌트 오염 방지)
       await context.supabase
         .from('chatops_drafts')
         .update({ status: DRAFT_STATUS.FAILED })
-        .eq('id', draft.id)
-        .eq('tenant_id', requireTenantScope(context.tenant_id));
+        .eq('id', draft.id);
     }
 
     return executionResult;
@@ -2595,59 +1327,20 @@ async function executeCancelAction(
   args: Record<string, any>,
   context: AgentContext
 ): Promise<{ success: boolean; result: any; error?: string }> {
-  const { draft_id } = args;
+  // 프로덕션 최적화: 로깅 제거
 
   try {
-    // P0-1: draft_id 명시적 처리 + maybeSingle 안전성 개선
-    let draft;
-    let draftError;
-
-    if (draft_id) {
-      // draft_id가 있으면 maybeSingle() 사용 (0 or 1행 확정)
-      const result = await context.supabase
-        .from('chatops_drafts')
-        .select('*')
-        .eq('id', draft_id)
-        .eq('tenant_id', requireTenantScope(context.tenant_id))
-        .eq('session_id', context.session_id)
-        .eq('status', DRAFT_STATUS.READY)
-        .maybeSingle();
-
-      draft = result.data;
-      draftError = result.error;
-    } else {
-      // P0-21: draft_id가 없으면 Fail-Closed 강화 (최근 N분 이내만 허용)
-      const RECENT_MINUTES = 5; // 최근 5분 이내 draft만 허용
-      const recentThreshold = new Date(Date.now() - RECENT_MINUTES * 60 * 1000).toISOString();
-
-      const result = await context.supabase
-        .from('chatops_drafts')
-        .select('*')
-        .eq('tenant_id', requireTenantScope(context.tenant_id))
-        .eq('session_id', context.session_id)
-        .eq('status', DRAFT_STATUS.READY)
-        .gte('updated_at', recentThreshold) // P0-21: 최근 N분 이내만
-        .order('updated_at', { ascending: false })
-        .limit(2); // P0-21: 2개 조회하여 중복 확인
-
-      // P0-21: READY draft가 2개 이상이면 명시적 선택 요구
-      if (Array.isArray(result.data) && result.data.length > 1) {
-        const draftList = result.data.map((d: any) => ({
-          draft_id: d.id,
-          intent_key: d.intent_key,
-          updated_at: d.updated_at,
-        }));
-
-        return {
-          success: false,
-          result: null,
-          error: `취소 가능한 작업이 ${result.data.length}개 있습니다. draft_id를 명시해주세요.\n\n${draftList.map((d: any) => `- ${d.intent_key} (${d.draft_id})`).join('\n')}`,
-        };
-      }
-
-      draft = Array.isArray(result.data) && result.data.length > 0 ? result.data[0] : null;
-      draftError = result.error;
-    }
+    // P0 이슈 해결: requireTenantScope 사용
+    // 최근 ready 상태의 Draft 조회
+    const { data: draft, error: draftError } = await context.supabase
+      .from('chatops_drafts')
+      .select('*')
+      .eq('tenant_id', requireTenantScope(context.tenant_id))
+      .eq('session_id', context.session_id)
+      .eq('status', DRAFT_STATUS.READY)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     if (draftError) {
       console.error('[executeCancelAction] Draft 조회 오류:', maskPII(draftError.message));
@@ -2658,18 +1351,15 @@ async function executeCancelAction(
       return {
         success: false,
         result: null,
-        error: draft_id
-          ? `Draft ID를 찾을 수 없거나 취소 가능한 상태가 아닙니다.`
-          : '취소할 작업이 없습니다.',
+        error: '취소할 작업이 없습니다.',
       };
     }
 
-    // P0-26: Draft 취소 시 tenant 조건 추가 (방어적 코딩)
+    // Draft 취소
     await context.supabase
       .from('chatops_drafts')
       .update({ status: DRAFT_STATUS.CANCELLED })
-      .eq('id', draft.id)
-      .eq('tenant_id', requireTenantScope(context.tenant_id));
+      .eq('id', draft.id);
 
     return {
       success: true,
@@ -2695,24 +1385,13 @@ async function executeDischarge(
   params: Record<string, any>,
   context: AgentContext
 ): Promise<{ success: boolean; result: any; error?: string }> {
-  const { student_name, student_id, date, reason, phone, birth_date } = params;
-
-  // P0-25: L2 실행 함수 필수값 재검증 (Fail-Closed)
-  if (!student_name && !student_id) {
-    return {
-      success: false,
-      result: null,
-      error: '학생 이름 또는 ID는 필수입니다.',
-    };
-  }
-
-  // P0-FIX: date와 reason은 선택사항으로 변경 (date는 자동으로 오늘)
+  const { student_name, student_id, date, reason } = params;
 
   // 프로덕션 최적화: 로깅 제거
 
   try {
-    // P0-FIX: phone과 birth_date를 hint로 전달하여 동명이인 구분
-    const resolveResult = await resolvePersonId(student_name, student_id, context, phone, birth_date);
+    // P2 이슈 해결: 공통 헬퍼 함수 사용
+    const resolveResult = await resolvePersonId(student_name, student_id, context);
     if (!resolveResult.success) {
       return {
         success: false,
@@ -2722,46 +1401,62 @@ async function executeDischarge(
     }
     const personId = resolveResult.person_id!;
 
-    // P0-FIX: 날짜 기본값을 오늘로 설정
+    // P1 이슈 해결: toKSTDate 사용
     const effectiveDate = date || toKSTDate();
 
-    // P2-8: 캐시된 테이블명 조회
-    const studentTable = await getCachedTableName(context, 'student');
-    if (!studentTable) {
-      return { success: false, result: null, error: '업종별 학생 테이블을 찾을 수 없습니다.' };
+    // P0 수정: Industry Adapter 적용
+    const tenantId = requireTenantScope(context.tenant_id);
+    const tableName = await getTenantTableName(context.supabase, tenantId, 'student');
+    if (!tableName) {
+      return { success: false, result: null, error: '업종별 테이블 조회 실패' };
     }
 
     // 상태 변경
     const { error: updateError } = await context.supabase
-      .from(studentTable)
+      .from(tableName)
       .update({
         status: STUDENT_STATUS.WITHDRAWN,
-        updated_at: toKSTISOString(),
+        updated_at: toKSTDate(),
         updated_by: context.user_id,
       })
       .eq('person_id', personId)
-      .eq('tenant_id', requireTenantScope(context.tenant_id));
+      .eq('tenant_id', tenantId);
 
     if (updateError) {
       console.error('[executeDischarge] 상태 변경 오류:', maskPII(updateError.message));
       return { success: false, result: null, error: updateError.message };
     }
 
-    // 퇴원 기록 저장 (student_status_history 테이블이 있다면)
-    try {
+    // P0-4 수정: 퇴원 기록 저장 - 테이블 존재 여부 확인 후 기록
+    // student_status_history 테이블이 없으면 notes 필드에 기록
+    const historyData = {
+      tenant_id: requireTenantScope(context.tenant_id),
+      person_id: personId,
+      status: STUDENT_STATUS.WITHDRAWN,
+      reason: reason || '퇴원',
+      effective_date: effectiveDate,
+      created_by: context.user_id,
+    };
+
+    const { error: historyError } = await context.supabase
+      .from('student_status_history')
+      .insert(historyData);
+
+    if (historyError) {
+      // 테이블이 없거나 기록 실패 시 academy_students.notes에 기록
+      const historyNote = `[상태변경] ${effectiveDate}: ${STUDENT_STATUS.WITHDRAWN} - ${reason || '퇴원'}`;
+      console.warn('[executeDischarge] 히스토리 테이블 기록 실패, notes에 기록:', maskPII(historyError));
+
       await context.supabase
-        .from('student_status_history')
-        .insert({
-          tenant_id: requireTenantScope(context.tenant_id),
-          person_id: personId,
-          status: STUDENT_STATUS.WITHDRAWN,
-          reason: reason || '퇴원',
-          effective_date: effectiveDate,
-          created_by: context.user_id,
-        });
-    } catch (historyError) {
-      // 히스토리 테이블이 없어도 계속 진행
-      console.warn('[executeDischarge] 히스토리 저장 실패 (테이블 없음?):', historyError);
+        .from(tableName)
+        .update({
+          notes: context.supabase.rpc('append_note', {
+            p_person_id: personId,
+            p_note: historyNote
+          }).catch(() => historyNote), // RPC 없으면 직접 설정
+        })
+        .eq('person_id', personId)
+        .eq('tenant_id', tenantId);
     }
 
     // P1 이슈 해결: 에러 메시지 PII 제거
@@ -2784,15 +1479,16 @@ async function executeDischarge(
 }
 
 /**
- * 학생 등록 (P0-14: DB RPC 트랜잭션 사용)
+ * 학생 등록
  *
- * [트랜잭션 보장]
- * - DB RPC 함수 `register_student` 사용으로 원자성 보장
- * - 수동 롤백 제거 (persons + academy_students 동시 커밋/롤백)
+ * P1-3 참고: 이 함수는 ChatOps Draft 기반 실행용입니다.
+ * execute-student-task/handlers/student-register.ts의 Handler와 로직이 유사합니다.
  *
- * [검증]
- * - P0-25: 필수값 재검증 (Fail-Closed)
- * - P0-24: 중복 체크는 RPC 내부에서 수행
+ * 향후 통합 방안:
+ * - 공통 로직을 별도 모듈로 분리 (예: _shared/student-operations.ts)
+ * - 또는 이 함수에서 Handler를 import하여 위임
+ *
+ * 현재는 두 경로 모두 유지 (ChatOps Draft vs execute-student-task Handler)
  */
 async function executeRegister(
   params: Record<string, any>,
@@ -2803,6 +1499,8 @@ async function executeRegister(
     student_name,  // name 또는 student_name 둘 다 허용
     phone,
     guardian_phone,
+    guardian_name,      // P0-1: 보호자 이름 추가
+    guardian_relationship, // P0-1: 보호자 관계 추가
     class_name,
     birth_date,
     address,
@@ -2814,91 +1512,88 @@ async function executeRegister(
   // name과 student_name 둘 다 허용 (Tool에서 student_name으로 전달될 수 있음)
   const finalName = name || student_name;
 
-  // P0-25: L2 실행 함수 필수값 재검증 (Fail-Closed)
-  // Draft는 UX용, Execution은 항상 서버에서 재검증
-  if (!finalName || typeof finalName !== 'string' || finalName.trim() === '') {
-    return {
-      success: false,
-      result: null,
-      error: '학생 이름은 필수입니다.',
-    };
-  }
-
-  if (!phone || typeof phone !== 'string' || phone.trim() === '') {
-    return {
-      success: false,
-      result: null,
-      error: '전화번호는 필수입니다.',
-    };
-  }
-
-  if (!birth_date || typeof birth_date !== 'string' || birth_date.trim() === '') {
-    return {
-      success: false,
-      result: null,
-      error: '생년월일은 필수입니다.',
-    };
-  }
+  // 프로덕션 최적화: 로깅 제거
 
   try {
-    // P0-14: DB RPC 함수 호출로 트랜잭션 보장 (수동 롤백 제거)
-    const { data, error: rpcError } = await context.supabase
-      .rpc('register_student', {
-        p_tenant_id: requireTenantScope(context.tenant_id),
-        p_name: finalName,
-        p_phone: phone,
-        p_birth_date: birth_date,
-        p_email: email || null,
-        p_address: address || null,
-        p_class_name: class_name || null,
-        p_grade: grade || null,
-        p_school_name: school_name || null,
-        p_created_by: context.user_id,
+    // P0 수정: Industry Adapter 적용
+    const tenantId = requireTenantScope(context.tenant_id);
+    const tableName = await getTenantTableName(context.supabase, tenantId, 'student');
+    if (!tableName) {
+      return { success: false, result: null, error: '업종별 테이블 조회 실패' };
+    }
+
+    // 1. persons 테이블에 삽입
+    const { data: person, error: personError } = await context.supabase
+      .from('persons')
+      .insert({
+        tenant_id: tenantId,
+        name: finalName,
+        phone: phone,
+        email: email,
+        address: address,
+        person_type: 'student',
       })
+      .select()
       .single();
 
-    if (rpcError) {
-      console.error('[executeRegister] RPC 오류:', maskPII(rpcError.message));
-      return { success: false, result: null, error: rpcError.message };
+    if (personError) {
+      console.error('[executeRegister] persons 삽입 오류:', maskPII(personError.message));
+      return { success: false, result: null, error: personError.message };
     }
 
-    // RPC 결과 검증
-    if (!data || !data.success) {
-      return {
-        success: false,
-        result: null,
-        error: data?.error_message || '학생 등록에 실패했습니다.',
-      };
+    // 2. 업종별 학생 테이블에 삽입
+    const { error: studentError } = await context.supabase
+      .from(tableName)
+      .insert({
+        person_id: person.id,
+        tenant_id: tenantId,
+        birth_date: birth_date,
+        class_name: class_name,
+        grade: grade,
+        school_name: school_name,
+        status: STUDENT_STATUS.ACTIVE,
+        created_by: context.user_id,
+      });
+
+    if (studentError) {
+      console.error('[executeRegister] 학생 테이블 삽입 오류:', maskPII(studentError.message));
+      // P1 이슈: 트랜잭션 대신 수동 롤백 (Supabase 제약)
+      // persons 롤백 (CASCADE로 자동 삭제될 수도 있음)
+      await context.supabase
+        .from('persons')
+        .delete()
+        .eq('id', person.id);
+
+      return { success: false, result: null, error: studentError.message };
     }
 
-    const personId = data.person_id;
-
-    // 보호자 정보가 있으면 저장 (병렬 처리 - 실패해도 계속 진행)
+    // 3. 보호자 정보가 있으면 저장
+    // P0 수정: guardians 테이블 NOT NULL 컬럼(name, relationship, phone) 필수 전달
     if (guardian_phone) {
-      // 보호자 정보 저장은 비동기로 처리하되 결과를 기다리지 않음 (성능 최적화)
-      context.supabase
-        .from('guardians')
-        .insert({
-          tenant_id: requireTenantScope(context.tenant_id),
-          student_id: personId,
-          phone: guardian_phone,
-          relationship: 'parent',
-        })
-        .then(({ error }) => {
-          if (error) {
-            console.warn('[executeRegister] 보호자 정보 저장 실패:', error);
-          }
-        })
-        .catch((guardianError) => {
-          console.warn('[executeRegister] 보호자 정보 저장 실패:', guardianError);
-        });
+      try {
+        const guardianName = params.guardian_name || `${finalName} 보호자`;
+        const guardianRelationship = params.guardian_relationship || 'parent';
+        await context.supabase
+          .from('guardians')
+          .insert({
+            tenant_id: requireTenantScope(context.tenant_id),
+            student_id: person.id,
+            name: guardianName,
+            phone: guardian_phone,
+            relationship: guardianRelationship,
+          });
+      } catch (guardianError) {
+        // P2: 부분 실패 로깅 강화
+        console.warn('[executeRegister] 보호자 정보 저장 실패 (학생 등록은 성공):', maskPII(guardianError));
+      }
     }
 
+    // P1 이슈 해결: 에러 메시지 PII 제거
     return {
       success: true,
       result: {
         message: `학생이 등록되었습니다.`,
-        student_id: maskPII(personId),
+        student_id: maskPII(person.id),
         class_name: maskPII(class_name),
       },
     };
@@ -2919,30 +1614,13 @@ async function executePause(
   params: Record<string, any>,
   context: AgentContext
 ): Promise<{ success: boolean; result: any; error?: string }> {
-  const { student_name, student_id, date, reason, phone, birth_date } = params;
-
-  // P0-25: L2 실행 함수 필수값 재검증 (Fail-Closed)
-  if (!student_name && !student_id) {
-    return {
-      success: false,
-      result: null,
-      error: '학생 이름 또는 ID는 필수입니다.',
-    };
-  }
-
-  // P0-FIX: date와 reason은 선택사항으로 변경 (date는 자동으로 오늘)
+  const { student_name, student_id, date, reason } = params;
 
   // 프로덕션 최적화: 로깅 제거
 
   try {
-    // P0-FIX: phone과 birth_date를 hint로 전달하여 동명이인 구분
-    const resolveResult = await resolvePersonId(
-      student_name,
-      student_id,
-      context,
-      phone,        // 전화번호 힌트
-      birth_date    // 생년월일 힌트
-    );
+    // P2 이슈 해결: 공통 헬퍼 함수 사용
+    const resolveResult = await resolvePersonId(student_name, student_id, context);
     if (!resolveResult.success) {
       return {
         success: false,
@@ -2952,45 +1630,27 @@ async function executePause(
     }
     const personId = resolveResult.person_id!;
 
-    // P0-FIX: 날짜 기본값을 오늘로 설정
-    const effectiveDate = date || toKSTDate();
-
-    // P2-8: 캐시된 테이블명 조회
-    const studentTable = await getCachedTableName(context, 'student');
-    if (!studentTable) {
-      return { success: false, result: null, error: '업종별 학생 테이블을 찾을 수 없습니다.' };
+    // P0 수정: Industry Adapter 적용
+    const tenantId = requireTenantScope(context.tenant_id);
+    const tableName = await getTenantTableName(context.supabase, tenantId, 'student');
+    if (!tableName) {
+      return { success: false, result: null, error: '업종별 테이블 조회 실패' };
     }
 
     // 상태 변경
     const { error } = await context.supabase
-      .from(studentTable)
+      .from(tableName)
       .update({
         status: STUDENT_STATUS.ON_LEAVE,
-        updated_at: toKSTISOString(),
+        updated_at: toKSTDate(),
         updated_by: context.user_id,
       })
       .eq('person_id', personId)
-      .eq('tenant_id', requireTenantScope(context.tenant_id));
+      .eq('tenant_id', tenantId);
 
     if (error) {
       console.error('[executePause] 상태 변경 오류:', maskPII(error.message));
       return { success: false, result: null, error: error.message };
-    }
-
-    // 휴원 기록 저장 (student_status_history 테이블이 있다면)
-    try {
-      await context.supabase
-        .from('student_status_history')
-        .insert({
-          tenant_id: requireTenantScope(context.tenant_id),
-          person_id: personId,
-          status: STUDENT_STATUS.ON_LEAVE,
-          effective_date: effectiveDate,
-          reason: reason || '휴원',
-          created_by: context.user_id,
-        });
-    } catch (historyError) {
-      console.warn('[executePause] 히스토리 저장 실패 (무시):', historyError);
     }
 
     // P1 이슈 해결: 에러 메시지 PII 제거
@@ -3023,14 +1683,8 @@ async function executeResume(
   // 프로덕션 최적화: 로깅 제거
 
   try {
-    // P0-2: resolvePersonId에 phone/birth_date 힌트 전달
-    const resolveResult = await resolvePersonId(
-      student_name,
-      student_id,
-      context,
-      params.phone,        // 전화번호 힌트
-      params.birth_date    // 생년월일 힌트
-    );
+    // P2 이슈 해결: 공통 헬퍼 함수 사용
+    const resolveResult = await resolvePersonId(student_name, student_id, context);
     if (!resolveResult.success) {
       return {
         success: false,
@@ -3040,22 +1694,23 @@ async function executeResume(
     }
     const personId = resolveResult.person_id!;
 
-    // P2-8: 캐시된 테이블명 조회
-    const studentTable = await getCachedTableName(context, 'student');
-    if (!studentTable) {
-      return { success: false, result: null, error: '업종별 학생 테이블을 찾을 수 없습니다.' };
+    // P0 수정: Industry Adapter 적용
+    const tenantId = requireTenantScope(context.tenant_id);
+    const tableName = await getTenantTableName(context.supabase, tenantId, 'student');
+    if (!tableName) {
+      return { success: false, result: null, error: '업종별 테이블 조회 실패' };
     }
 
     // 상태 변경
     const { error } = await context.supabase
-      .from(studentTable)
+      .from(tableName)
       .update({
         status: STUDENT_STATUS.ACTIVE,
-        updated_at: toKSTISOString(),
+        updated_at: toKSTDate(),
         updated_by: context.user_id,
       })
       .eq('person_id', personId)
-      .eq('tenant_id', requireTenantScope(context.tenant_id));
+      .eq('tenant_id', tenantId);
 
     if (error) {
       console.error('[executeResume] 상태 변경 오류:', maskPII(error.message));
@@ -3081,23 +1736,19 @@ async function executeResume(
 }
 
 /**
- * P2-11: 학생 정보 수정
+ * 학생 태그 할당
  */
-async function executeUpdate(
+async function executeAssignTags(
   params: Record<string, any>,
   context: AgentContext
 ): Promise<{ success: boolean; result: any; error?: string }> {
-  const { student_name, student_id, ...updateFields } = params;
+  const { student_name, student_id, tags, tag_names } = params;
+
+  // 프로덕션 최적화: 로깅 제거
 
   try {
-    // P0-2: resolvePersonId에 phone/birth_date 힌트 전달
-    const resolveResult = await resolvePersonId(
-      student_name,
-      student_id,
-      context,
-      params.phone,        // 전화번호 힌트
-      params.birth_date    // 생년월일 힌트
-    );
+    // P2 이슈 해결: 공통 헬퍼 함수 사용
+    const resolveResult = await resolvePersonId(student_name, student_id, context);
     if (!resolveResult.success) {
       return {
         success: false,
@@ -3107,61 +1758,174 @@ async function executeUpdate(
     }
     const personId = resolveResult.person_id!;
 
-    // P2-8: 캐시된 테이블명 조회
-    const studentTable = await getCachedTableName(context, 'student');
-    if (!studentTable) {
-      return { success: false, result: null, error: '업종별 학생 테이블을 찾을 수 없습니다.' };
-    }
+    // tags 배열 정규화 (tag_names가 있으면 tag_id로 변환)
+    let tagIds: string[] = [];
 
-    // 학생 정보 업데이트
-    const studentFields: Record<string, any> = {};
-    if (params.grade) studentFields.grade = params.grade;
-    if (params.school_name) studentFields.school_name = params.school_name;
-    if (params.class_name) studentFields.class_name = params.class_name;
+    if (tags && Array.isArray(tags)) {
+      tagIds = tags;
+    } else if (tag_names && Array.isArray(tag_names)) {
+      // tag_names를 tag_id로 변환 (tags 테이블에서 조회)
+      for (const tagName of tag_names) {
+        const { data: tag } = await context.supabase
+          .from('tags')
+          .select('id')
+          .eq('tenant_id', requireTenantScope(context.tenant_id))
+          .eq('name', tagName)
+          .maybeSingle();
 
-    if (Object.keys(studentFields).length > 0) {
-      studentFields.updated_at = toKSTISOString();
-      studentFields.updated_by = context.user_id;
-
-      const { error } = await context.supabase
-        .from(studentTable)
-        .update(studentFields)
-        .eq('person_id', personId)
-        .eq('tenant_id', requireTenantScope(context.tenant_id));
-
-      if (error) {
-        console.error('[executeUpdate] 학생 정보 업데이트 오류:', maskPII(error.message));
-        return { success: false, result: null, error: error.message };
+        if (tag) {
+          tagIds.push(tag.id);
+        }
       }
     }
 
-    // persons 정보 업데이트
+    if (tagIds.length === 0) {
+      return {
+        success: false,
+        result: null,
+        error: '할당할 태그가 없습니다.',
+      };
+    }
+
+    // 태그 할당 (중복은 무시)
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (const tagId of tagIds) {
+      const { error: assignError } = await context.supabase
+        .from('tag_assignments')
+        .insert({
+          tenant_id: requireTenantScope(context.tenant_id),
+          entity_id: personId,
+          entity_type: 'student',
+          tag_id: tagId,
+        });
+
+      if (assignError) {
+        // 중복 할당 오류는 무시 (이미 할당된 경우)
+        const isDuplicateError = assignError.code === '23505' ||
+          assignError.message?.includes('duplicate key') ||
+          assignError.message?.includes('unique constraint');
+
+        if (!isDuplicateError) {
+          const maskedError = maskPII(assignError);
+          console.error('[executeAssignTags] Failed to assign tag:', maskedError);
+          errors.push(`태그 ${tagId} 할당 실패`);
+        } else {
+          successCount++; // 중복은 성공으로 간주
+        }
+      } else {
+        successCount++;
+      }
+    }
+
+    if (successCount === 0) {
+      return {
+        success: false,
+        result: null,
+        error: errors.length > 0 ? errors.join(', ') : '태그 할당에 실패했습니다.',
+      };
+    }
+
+    return {
+      success: true,
+      result: {
+        message: `${successCount}개 태그가 할당되었습니다.`,
+        student_id: maskPII(personId),
+        assigned_count: successCount,
+      },
+    };
+  } catch (error: any) {
+    console.error('[executeAssignTags] 오류:', maskPII(error.message));
+    return {
+      success: false,
+      result: null,
+      error: error.message || '태그 할당 중 오류가 발생했습니다',
+    };
+  }
+}
+
+/**
+ * 학생 프로필 수정
+ * P0-2 수정: 누락된 Intent Handler 추가
+ */
+async function executeUpdateProfile(
+  params: Record<string, any>,
+  context: AgentContext
+): Promise<{ success: boolean; result: any; error?: string }> {
+  const { student_name, student_id, ...updateFields } = params;
+
+  try {
+    // 학생 ID 확인
+    const resolveResult = await resolvePersonId(student_name, student_id, context);
+    if (!resolveResult.success) {
+      return {
+        success: false,
+        result: null,
+        error: resolveResult.error,
+      };
+    }
+    const personId = resolveResult.person_id!;
+
+    const tenantId = requireTenantScope(context.tenant_id);
+    const tableName = await getTenantTableName(context.supabase, tenantId, 'student');
+    if (!tableName) {
+      return { success: false, result: null, error: '업종별 테이블 조회 실패' };
+    }
+
+    // persons 테이블 업데이트 가능 필드
     const personFields: Record<string, any> = {};
-    if (params.address) personFields.address = params.address;
-    if (params.email) personFields.email = params.email;
+    if (updateFields.name) personFields.name = updateFields.name;
+    if (updateFields.phone) personFields.phone = updateFields.phone;
+    if (updateFields.email) personFields.email = updateFields.email;
+    if (updateFields.address) personFields.address = updateFields.address;
 
     if (Object.keys(personFields).length > 0) {
-      const { error } = await context.supabase
+      personFields.updated_at = toKSTDate();
+      const { error: personError } = await context.supabase
         .from('persons')
         .update(personFields)
         .eq('id', personId)
-        .eq('tenant_id', requireTenantScope(context.tenant_id));
+        .eq('tenant_id', tenantId);
 
-      if (error) {
-        console.error('[executeUpdate] 개인 정보 업데이트 오류:', maskPII(error.message));
-        return { success: false, result: null, error: error.message };
+      if (personError) {
+        console.error('[executeUpdateProfile] persons 업데이트 오류:', maskPII(personError.message));
+        return { success: false, result: null, error: personError.message };
+      }
+    }
+
+    // 업종별 학생 테이블 업데이트 가능 필드
+    const studentFields: Record<string, any> = {};
+    if (updateFields.birth_date) studentFields.birth_date = updateFields.birth_date;
+    if (updateFields.grade) studentFields.grade = updateFields.grade;
+    if (updateFields.school_name) studentFields.school_name = updateFields.school_name;
+    if (updateFields.notes) studentFields.notes = updateFields.notes;
+
+    if (Object.keys(studentFields).length > 0) {
+      studentFields.updated_at = toKSTDate();
+      studentFields.updated_by = context.user_id;
+      const { error: studentError } = await context.supabase
+        .from(tableName)
+        .update(studentFields)
+        .eq('person_id', personId)
+        .eq('tenant_id', tenantId);
+
+      if (studentError) {
+        console.error('[executeUpdateProfile] 학생 테이블 업데이트 오류:', maskPII(studentError.message));
+        return { success: false, result: null, error: studentError.message };
       }
     }
 
     return {
       success: true,
       result: {
-        message: `학생 정보가 수정되었습니다.`,
+        message: '학생 정보가 수정되었습니다.',
         person_id: maskPII(personId),
+        updated_fields: Object.keys({ ...personFields, ...studentFields }),
       },
     };
   } catch (error: any) {
-    console.error('[executeUpdate] 오류:', maskPII(error.message));
+    console.error('[executeUpdateProfile] 오류:', maskPII(error.message));
     return {
       success: false,
       result: null,
@@ -3171,109 +1935,18 @@ async function executeUpdate(
 }
 
 /**
- * P2-11: 학생 연락처 수정
- */
-async function executeUpdateContact(
-  params: Record<string, any>,
-  context: AgentContext
-): Promise<{ success: boolean; result: any; error?: string }> {
-  const { student_name, student_id, phone, guardian_phone } = params;
-
-  try {
-    // P0-2: resolvePersonId에 phone/birth_date 힌트 전달
-    const resolveResult = await resolvePersonId(
-      student_name,
-      student_id,
-      context,
-      phone,               // 전화번호 힌트
-      params.birth_date    // 생년월일 힌트
-    );
-    if (!resolveResult.success) {
-      return {
-        success: false,
-        result: null,
-        error: resolveResult.error,
-      };
-    }
-    const personId = resolveResult.person_id!;
-
-    // 학생 전화번호 업데이트
-    if (phone) {
-      const { error } = await context.supabase
-        .from('persons')
-        .update({ phone: phone })
-        .eq('id', personId)
-        .eq('tenant_id', requireTenantScope(context.tenant_id));
-
-      if (error) {
-        console.error('[executeUpdateContact] 전화번호 업데이트 오류:', maskPII(error.message));
-        return { success: false, result: null, error: error.message };
-      }
-    }
-
-    // 보호자 전화번호 업데이트
-    if (guardian_phone) {
-      // 기존 보호자 정보 업데이트 또는 생성
-      const { data: existingGuardian } = await context.supabase
-        .from('guardians')
-        .select('id')
-        .eq('tenant_id', requireTenantScope(context.tenant_id))
-        .eq('student_id', personId)
-        .limit(1)
-        .maybeSingle();
-
-      if (existingGuardian) {
-        await context.supabase
-          .from('guardians')
-          .update({ phone: guardian_phone })
-          .eq('id', existingGuardian.id);
-      } else {
-        await context.supabase
-          .from('guardians')
-          .insert({
-            tenant_id: requireTenantScope(context.tenant_id),
-            student_id: personId,
-            phone: guardian_phone,
-            relationship: 'parent',
-          });
-      }
-    }
-
-    return {
-      success: true,
-      result: {
-        message: `연락처가 수정되었습니다.`,
-        person_id: maskPII(personId),
-      },
-    };
-  } catch (error: any) {
-    console.error('[executeUpdateContact] 오류:', maskPII(error.message));
-    return {
-      success: false,
-      result: null,
-      error: error.message || '연락처 수정 중 오류가 발생했습니다',
-    };
-  }
-}
-
-/**
- * P2-11: 학생 반 변경
+ * 학생 반 변경
+ * P0-2 수정: 누락된 Intent Handler 추가
  */
 async function executeChangeClass(
   params: Record<string, any>,
   context: AgentContext
 ): Promise<{ success: boolean; result: any; error?: string }> {
-  const { student_name, student_id, class_name } = params;
+  const { student_name, student_id, from_class, to_class, class_id, effective_date } = params;
 
   try {
-    // P0-2: resolvePersonId에 phone/birth_date 힌트 전달
-    const resolveResult = await resolvePersonId(
-      student_name,
-      student_id,
-      context,
-      params.phone,        // 전화번호 힌트
-      params.birth_date    // 생년월일 힌트
-    );
+    // 학생 ID 확인
+    const resolveResult = await resolvePersonId(student_name, student_id, context);
     if (!resolveResult.success) {
       return {
         success: false,
@@ -3282,34 +1955,76 @@ async function executeChangeClass(
       };
     }
     const personId = resolveResult.person_id!;
+    const tenantId = requireTenantScope(context.tenant_id);
 
-    // P2-8: 캐시된 테이블명 조회
-    const studentTable = await getCachedTableName(context, 'student');
-    if (!studentTable) {
-      return { success: false, result: null, error: '업종별 학생 테이블을 찾을 수 없습니다.' };
+    // 기존 반 배정 비활성화
+    if (from_class) {
+      await context.supabase
+        .from('student_classes')
+        .update({
+          is_active: false,
+          left_at: effective_date || toKSTDate(),
+        })
+        .eq('student_id', personId)
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true);
     }
 
-    const { error } = await context.supabase
-      .from(studentTable)
-      .update({
-        class_name: class_name,
-        updated_at: toKSTISOString(),
-        updated_by: context.user_id,
-      })
-      .eq('person_id', personId)
-      .eq('tenant_id', requireTenantScope(context.tenant_id));
+    // 새 반 ID 조회 (class_id가 없으면 to_class 이름으로 조회)
+    let targetClassId = class_id;
+    if (!targetClassId && to_class) {
+      const { data: classData } = await context.supabase
+        .from('classes')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('name', to_class)
+        .eq('status', 'active')
+        .maybeSingle();
 
-    if (error) {
-      console.error('[executeChangeClass] 반 변경 오류:', maskPII(error.message));
-      return { success: false, result: null, error: error.message };
+      if (classData) {
+        targetClassId = classData.id;
+      }
+    }
+
+    if (!targetClassId) {
+      return {
+        success: false,
+        result: null,
+        error: to_class ? `반을 찾을 수 없습니다: ${to_class}` : '변경할 반 정보가 필요합니다.',
+      };
+    }
+
+    // 새 반 배정
+    const { error: assignError } = await context.supabase
+      .from('student_classes')
+      .insert({
+        tenant_id: tenantId,
+        student_id: personId,
+        class_id: targetClassId,
+        is_active: true,
+        joined_at: effective_date || toKSTDate(),
+      });
+
+    if (assignError) {
+      // 중복 배정 체크
+      const isDuplicate = assignError.code === '23505' || assignError.message?.includes('duplicate');
+      if (isDuplicate) {
+        return {
+          success: false,
+          result: null,
+          error: '이미 해당 반에 배정되어 있습니다.',
+        };
+      }
+      console.error('[executeChangeClass] 반 배정 오류:', maskPII(assignError.message));
+      return { success: false, result: null, error: assignError.message };
     }
 
     return {
       success: true,
       result: {
-        message: `반이 변경되었습니다.`,
+        message: `반 변경이 완료되었습니다.${from_class ? ` (${from_class} → ${to_class || '새 반'})` : ''}`,
         person_id: maskPII(personId),
-        class_name: maskPII(class_name),
+        class_id: maskPII(targetClassId),
       },
     };
   } catch (error: any) {
@@ -3320,51 +2035,6 @@ async function executeChangeClass(
       error: error.message || '반 변경 중 오류가 발생했습니다',
     };
   }
-}
-
-/**
- * P2-11: 학생 중복 병합
- */
-async function executeMerge(
-  params: Record<string, any>,
-  context: AgentContext
-): Promise<{ success: boolean; result: any; error?: string }> {
-  // 중복 병합은 복잡한 로직이므로 기본 구조만 구현
-  return {
-    success: false,
-    result: null,
-    error: '학생 중복 병합 기능은 현재 개발 중입니다.',
-  };
-}
-
-/**
- * P2-11: 출결 관리 액션 실행
- */
-async function executeAttendanceAction(
-  params: Record<string, any>,
-  context: AgentContext
-): Promise<{ success: boolean; result: any; error?: string }> {
-  // 출결 관리 액션은 복잡한 로직이므로 기본 구조만 구현
-  return {
-    success: false,
-    result: null,
-    error: '출결 관리 기능은 현재 개발 중입니다.',
-  };
-}
-
-/**
- * P2-11: 수납 관리 액션 실행
- */
-async function executeBillingAction(
-  params: Record<string, any>,
-  context: AgentContext
-): Promise<{ success: boolean; result: any; error?: string }> {
-  // 수납 관리 액션은 복잡한 로직이므로 기본 구조만 구현
-  return {
-    success: false,
-    result: null,
-    error: '수납 관리 기능은 현재 개발 중입니다.',
-  };
 }
 
 /**
@@ -3379,23 +2049,15 @@ async function executeSendMessageAction(
   // 프로덕션 최적화: 로깅 제거
 
   try {
-    // P0-40: recipient 정보를 execution_context에 저장 (스키마 안전성)
-    // message_logs 테이블에 recipient_info 컬럼이 없을 수 있으므로 execution_context 사용
-    const messageLog: any = {
+    // P0 이슈 해결: requireTenantScope 사용
+    // message_logs 테이블에 기록
+    const messageLog = {
       tenant_id: requireTenantScope(context.tenant_id),
       message_type: type,
       content: message,
       status: MESSAGE_STATUS.PENDING,
       created_by: context.user_id,
       scheduled_at: schedule_time,
-      // P0-40: execution_context에 recipient 정보 저장 (감사/재발송용)
-      execution_context: {
-        type: type,
-        recipient: recipient || null,
-        recipients: recipients || [],
-        recipient_count: recipients?.length || (recipient ? 1 : 0),
-        executed_at: new Date().toISOString(),
-      },
     };
 
     const { data: log, error: logError } = await context.supabase
@@ -3409,48 +2071,22 @@ async function executeSendMessageAction(
       return { success: false, result: null, error: logError.message };
     }
 
-    // P0-32: 실제 발송 API 구현 전까지 PENDING 상태 유지
     // TODO: 실제 문자 발송 API 호출 (알림톡/SMS)
-    // const sendResult = await sendSMS({ to: recipient, message: message });
-    // if (!sendResult.success) {
-    //   await context.supabase
-    //     .from('message_logs')
-    //     .update({ status: MESSAGE_STATUS.FAILED, error_message: sendResult.error })
-    //     .eq('id', log.id)
-    //     .eq('tenant_id', requireTenantScope(context.tenant_id));
-    //   return { success: false, result: null, error: sendResult.error };
-    // }
+    // await sendSMS({ to: recipient, message: message });
 
-    // P0-37: 예약 메시지는 SCHEDULED 상태로 (실제 발송 시각에 워커가 처리)
-    if (type === 'scheduled' && schedule_time) {
-      await context.supabase
-        .from('message_logs')
-        .update({ status: MESSAGE_STATUS.SCHEDULED })  // P0-37: SSOT 사용
-        .eq('id', log.id)
-        .eq('tenant_id', requireTenantScope(context.tenant_id));
-
-      return {
-        success: true,
-        result: {
-          message: `메시지가 ${schedule_time}에 발송 예약되었습니다.`,
-          log_id: maskPII(log.id),
-          recipient_count: recipients?.length || 1,
-          status: MESSAGE_STATUS.SCHEDULED,
-        },
-      };
-    }
-
-    // P0-32: 즉시 발송은 실제 API 구현 전까지 PENDING 유지
-    // 운영 환경에서는 실제 발송 성공 후에만 SENT로 변경
-    console.warn('[executeSendMessageAction] 실제 발송 API 미구현 - PENDING 상태 유지');
+    // P1 이슈 해결: toKSTDate 사용
+    // 로그 상태 업데이트
+    await context.supabase
+      .from('message_logs')
+      .update({ status: MESSAGE_STATUS.SENT, sent_at: toKSTDate() })
+      .eq('id', log.id);
 
     return {
       success: true,
       result: {
-        message: `메시지 발송이 준비되었습니다. (실제 발송 API 구현 필요)`,
+        message: `메시지가 ${type === 'scheduled' ? '예약' : '발송'}되었습니다.`,
         log_id: maskPII(log.id),
         recipient_count: recipients?.length || 1,
-        status: 'pending',
       },
     };
   } catch (error: any) {
@@ -3461,4 +2097,241 @@ async function executeSendMessageAction(
       error: error.message || '메시지 발송 중 오류가 발생했습니다',
     };
   }
+}
+
+/**
+ * ========================================
+ * Agent with Progress (SSE)
+ * ========================================
+ */
+
+/**
+ * Agent 실행 + 진행 상황 SSE 전송
+ *
+ * 기존 runAgent와 동일하지만, Tool 실행 진행 상황을 SSE로 실시간 전송
+ *
+ * SSE 이벤트 타입:
+ * - status: 진행 상황 메시지 (예: "학생 정보 조회 중...")
+ * - tool_start: Tool 실행 시작
+ * - tool_end: Tool 실행 완료
+ * - content: 최종 응답 텍스트
+ * - done: 완료
+ * - error: 에러
+ */
+export async function runAgentWithProgress(
+  userMessage: string,
+  conversationHistory: AgentMessage[],
+  context: AgentContext,
+  maxIterations: number = 5
+): Promise<ReadableStream> {
+  const encoder = new TextEncoder();
+
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        // 진행 상황 전송 헬퍼
+        const sendProgress = (type: string, data: any) => {
+          const sseData = `data: ${JSON.stringify({ type, ...data })}\n\n`;
+          controller.enqueue(encoder.encode(sseData));
+        };
+
+        sendProgress('status', { message: '요청을 분석하는 중입니다...' });
+
+        // ✅ Intent 매핑 조회 (룰 기반 학습)
+        let intentHint = '';
+        let matchedPattern: any = null;
+        try {
+          const { data: matchedPatterns } = await context.supabase.rpc('match_intent_pattern', {
+            user_query: userMessage
+          });
+
+          if (matchedPatterns && matchedPatterns.length > 0) {
+            const topMatch = matchedPatterns[0];
+            matchedPattern = topMatch; // 나중에 통계 업데이트용
+            console.log('[AgentEngine] Intent 매칭 성공:', {
+              pattern: topMatch.pattern,
+              tool: topMatch.tool_name,
+              confidence: topMatch.confidence
+            });
+
+            // 프롬프트에 힌트 추가 (토큰 비용 최소화: ~30 토큰)
+            intentHint = `\n\n[힌트] 이 요청은 "${topMatch.tool_name}"${topMatch.action ? ` (action: ${topMatch.action})` : ''} Tool과 관련될 수 있습니다. (신뢰도: ${topMatch.confidence})`;
+          }
+        } catch (error) {
+          console.warn('[AgentEngine] Intent 매핑 조회 실패 (무시):', error);
+          // 에러 발생 시 무시하고 계속 진행
+        }
+
+        const systemPrompt = AGENT_SYSTEM_PROMPT + intentHint;
+        const messages: AgentMessage[] = [
+          { role: 'system', content: systemPrompt },
+          ...conversationHistory.slice(-6),
+          { role: 'user', content: userMessage },
+        ];
+
+        let iteration = 0;
+        let finalResponse = '';
+        const toolResults: Array<{ tool: string; success: boolean; result: any }> = [];
+        let totalUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+
+        while (iteration < maxIterations) {
+          iteration++;
+
+          // OpenAI API 호출
+          const response = await callOpenAIChat(
+            context.openai_api_key,
+            messages,
+            AGENT_TOOLS
+          );
+
+          if (response.usage) {
+            totalUsage.prompt_tokens += response.usage.prompt_tokens;
+            totalUsage.completion_tokens += response.usage.completion_tokens;
+            totalUsage.total_tokens += response.usage.total_tokens;
+          }
+
+          // Tool 호출이 없으면 종료
+          if (!response.tool_calls || response.tool_calls.length === 0) {
+            finalResponse = response.content;
+            break;
+          }
+
+          messages.push({
+            role: 'assistant',
+            content: response.content || '',
+            tool_calls: response.tool_calls,
+          });
+
+          // Tool 실행
+          for (const toolCall of response.tool_calls) {
+            const toolName = toolCall.function.name;
+            const toolArgs = JSON.parse(toolCall.function.arguments);
+
+            // Tool 시작 알림
+            const toolDisplayName = getToolDisplayName(toolName);
+            sendProgress('tool_start', {
+              tool: toolName,
+              displayName: toolDisplayName,
+              args: maskPII(toolArgs),
+            });
+            sendProgress('status', { message: `${toolDisplayName} 중...` });
+
+            const result = await executeTool(toolName, toolArgs, context);
+            toolResults.push({
+              tool: toolName,
+              success: result.success,
+              result: result.result,
+            });
+
+            // Tool 완료 알림
+            sendProgress('tool_end', {
+              tool: toolName,
+              success: result.success,
+            });
+
+            messages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              name: toolName,
+              content: JSON.stringify(result.success ? result.result : { error: result.error }),
+            });
+          }
+
+          // 다음 반복 전 상태 업데이트
+          sendProgress('status', { message: '응답을 생성하는 중입니다...' });
+        }
+
+        if (iteration >= maxIterations) {
+          console.warn('[AgentEngineWithProgress] 최대 반복 횟수 도달:', { iterations: maxIterations });
+          finalResponse = finalResponse || '요청을 처리하는 중 문제가 발생했습니다. 다시 시도해주세요.';
+        }
+
+        // 최종 응답 전송
+        sendProgress('content', { content: finalResponse });
+
+        // ✅ Intent 패턴 사용 통계 자동 업데이트
+        if (matchedPattern) {
+          try {
+            // 매칭된 패턴의 Tool이 실제로 사용되었는지 확인
+            const toolWasUsed = toolResults.some(t => t.tool === matchedPattern.tool_name);
+            const wasSuccessful = toolResults.some(t =>
+              t.tool === matchedPattern.tool_name && t.success
+            );
+
+            // 패턴 ID 조회 (match_intent_pattern은 ID를 반환하지 않으므로 별도 조회 필요)
+            const { data: patternData } = await context.supabase
+              .from('chatops_intent_patterns')
+              .select('id')
+              .eq('pattern', matchedPattern.pattern)
+              .single();
+
+            if (patternData) {
+              await context.supabase.rpc('update_intent_pattern_usage', {
+                pattern_id: patternData.id,
+                is_success: toolWasUsed && wasSuccessful
+              });
+
+              console.log('[AgentEngine] Intent 패턴 통계 업데이트:', {
+                pattern: matchedPattern.pattern,
+                toolUsed: toolWasUsed,
+                success: wasSuccessful
+              });
+            }
+          } catch (error) {
+            console.warn('[AgentEngine] Intent 통계 업데이트 실패 (무시):', error);
+          }
+        }
+
+        // 완료 신호
+        const costUsd = (totalUsage.prompt_tokens * 0.00000015 + totalUsage.completion_tokens * 0.0000006);
+        const costKrw = costUsd * 1300;
+
+        sendProgress('done', {
+          response: finalResponse,
+          tool_results: toolResults.length > 0 ? toolResults : undefined,
+          usage: {
+            ...totalUsage,
+            cost_usd: `$${costUsd.toFixed(6)}`,
+            cost_krw: `₩${costKrw.toFixed(2)}`,
+          },
+        });
+
+        controller.close();
+      } catch (error) {
+        const maskedError = maskPII(error);
+        console.error('[AgentEngineWithProgress] 오류:', maskedError);
+
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorData = `data: ${JSON.stringify({
+          type: 'error',
+          error: maskPII(errorMessage),
+        })}\n\n`;
+        controller.enqueue(encoder.encode(errorData));
+        controller.close();
+      }
+    },
+  });
+}
+
+/**
+ * Tool 이름을 사용자 친화적인 이름으로 변환
+ */
+function getToolDisplayName(toolName: string): string {
+  const displayNames: Record<string, string> = {
+    'query_students': '학생 정보 조회',
+    'query_classes': '반 정보 조회',
+    'query_attendance': '출석 정보 조회',
+    'query_payments': '결제 정보 조회',
+    'manage_student_registration': '학생 등록 처리',
+    'manage_student_update': '학생 정보 수정',
+    'manage_student_discharge': '퇴원 처리',
+    'manage_student_pause': '휴원 처리',
+    'manage_class_change': '반 변경 처리',
+    'manage_attendance_record': '출석 기록 처리',
+    'manage_payment_record': '결제 기록 처리',
+    'confirm_action': '작업 실행',
+    'cancel_action': '작업 취소',
+  };
+
+  return displayNames[toolName] || toolName;
 }

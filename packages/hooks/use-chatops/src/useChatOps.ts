@@ -83,6 +83,8 @@ async function sendChatOpsMessage(
  * ChatOps Streaming 메시지 전송 함수
  * SSE (Server-Sent Events) 기반
  * ✅ 수정: chatops 엔드포인트에 stream: true 파라미터 전달
+ * ✅ 진행 상황 콜백 추가: onStatus
+ * [보안] 30초 타임아웃 설정으로 무한 대기 방지
  */
 export async function sendChatOpsMessageStreaming(
   tenantId: string,
@@ -90,8 +92,11 @@ export async function sendChatOpsMessageStreaming(
   message: string,
   onChunk: (chunk: string) => void,
   onComplete: (fullResponse: string) => void,
-  onError: (error: string) => void
+  onError: (error: string) => void,
+  onStatus?: (status: string) => void  // 진행 상황 콜백 (선택)
 ): Promise<void> {
+  // ✅ 보안: 스트리밍 타임아웃 설정 (30초)
+  const STREAMING_TIMEOUT_MS = 30000; // 30초
   if (!tenantId) {
     throw new Error('Tenant ID is required');
   }
@@ -103,6 +108,10 @@ export async function sendChatOpsMessageStreaming(
   if (!message || message.trim().length === 0) {
     throw new Error('Message is required');
   }
+
+  // ✅ 보안: 타임아웃 타이머 설정
+  let timeoutId: NodeJS.Timeout | null = null;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
   try {
     // SSE를 위해 직접 fetch 사용
@@ -144,10 +153,18 @@ export async function sendChatOpsMessageStreaming(
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const reader = response.body?.getReader();
+    reader = response.body?.getReader() || null;
     if (!reader) {
       throw new Error('Response body is null');
     }
+
+    // ✅ 보안: 타임아웃 설정 (30초 후 자동 취소)
+    timeoutId = setTimeout(() => {
+      if (reader) {
+        reader.cancel();
+        onError('응답 시간이 초과되었습니다. (30초)');
+      }
+    }, STREAMING_TIMEOUT_MS);
 
     const decoder = new TextDecoder();
     let buffer = '';
@@ -156,7 +173,14 @@ export async function sendChatOpsMessageStreaming(
     while (true) {
       const { done, value } = await reader.read();
 
-      if (done) break;
+      if (done) {
+        // ✅ 정상 완료 시 타임아웃 제거
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        break;
+      }
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
@@ -168,13 +192,44 @@ export async function sendChatOpsMessageStreaming(
 
         try {
           const data = JSON.parse(trimmed.slice(6));
+          console.log('[useChatOps] SSE 이벤트 수신:', {
+            type: data.type,
+            hasResponse: !!data.response,
+            hasContent: !!data.content,
+            hasMessage: !!data.message
+          });
 
-          if (data.type === 'content') {
+          if (data.type === 'status') {
+            // 진행 상황 업데이트
+            console.log('[useChatOps] status 이벤트:', data.message);
+            if (onStatus) {
+              onStatus(data.message);
+            }
+          } else if (data.type === 'content') {
+            console.log('[useChatOps] content 이벤트:', { contentLength: data.content?.length });
             fullResponse += data.content;
             onChunk(data.content);
           } else if (data.type === 'done') {
-            onComplete(fullResponse || data.fullResponse);
+            // ✅ 완료 시 타임아웃 제거
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+              timeoutId = null;
+            }
+            // runAgentWithProgress는 content를 한 번에 전송하므로 data.response 우선
+            const finalResponse = data.response || fullResponse;
+            console.log('[useChatOps] done 이벤트:', {
+              hasDataResponse: !!data.response,
+              fullResponseLength: fullResponse.length,
+              finalResponseLength: finalResponse.length
+            });
+            onComplete(finalResponse);
           } else if (data.type === 'error') {
+            // ✅ 에러 시 타임아웃 제거
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+              timeoutId = null;
+            }
+            console.error('[useChatOps] error 이벤트:', data.error);
             onError(data.error);
           }
         } catch (e) {
@@ -183,6 +238,12 @@ export async function sendChatOpsMessageStreaming(
       }
     }
   } catch (error) {
+    // ✅ 예외 발생 시 타임아웃 제거
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+
     const errorMessage = error instanceof Error ? error.message : String(error);
     onError(errorMessage);
     throw error;

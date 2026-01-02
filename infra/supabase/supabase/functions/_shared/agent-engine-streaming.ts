@@ -9,6 +9,7 @@
 import { AGENT_TOOLS } from './agent-tools-final.ts';
 import { maskPII } from './pii-utils.ts';
 import { requireTenantScope } from '../chatops/handlers/auth.ts';
+import { AGENT_SYSTEM_PROMPT } from './agent-prompts.ts';
 
 export interface AgentMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -24,6 +25,7 @@ export interface AgentContext {
   session_id: string;
   supabase: any;
   openai_api_key: string;
+  industry_type?: string; // 업종별 최적화용 (academy, salon, nail 등)
 }
 
 /**
@@ -98,7 +100,9 @@ async function* streamOpenAIChat(
               yield delta.content;
             }
           } catch (e) {
-            console.error('[AgentEngineStreaming] JSON 파싱 오류:', e);
+            // P0: PII 마스킹 필수 (체크리스트.md 4. PII 마스킹)
+            const maskedError = maskPII(e);
+            console.error('[AgentEngineStreaming] JSON 파싱 오류:', maskedError);
           }
         }
       }
@@ -111,31 +115,21 @@ async function* streamOpenAIChat(
 /**
  * Streaming Agent 실행
  *
+ * @param userMessage 사용자 메시지
+ * @param conversationHistory 대화 히스토리
+ * @param context Agent 컨텍스트
+ * @param maxIterations 최대 반복 횟수 (현재 스트리밍 모드에서는 Tool 실행 미지원으로 미사용)
  * @returns ReadableStream for SSE
  */
 export async function runAgentStreaming(
   userMessage: string,
   conversationHistory: AgentMessage[],
-  context: AgentContext
+  context: AgentContext,
+  maxIterations: number = 3 // ⚠️ 현재 스트리밍 모드에서는 Tool 실행 미지원
 ): Promise<ReadableStream> {
-  const systemPrompt = `당신은 학원/교육기관 관리 시스템의 AI 어시스턴트입니다.
-
-**역할**:
-- 사용자와 자연스럽게 대화하며 요청을 이해하고 처리합니다
-- 필요시 제공된 Tool을 사용하여 정보를 조회하거나 작업을 생성합니다
-- 복잡한 요청은 여러 Tool을 조합하여 처리합니다
-- 학생, 원생, 회원, 수강생 등 다양한 용어를 이해합니다
-
-**Tool 사용 원칙**:
-1. 조회 요청 → 적절한 query Tool 사용
-2. 알림/메시지 발송 요청 → send_message 또는 manage_attendance 사용
-3. 학생 등록/퇴원/수정 등 중요 작업 → manage_student Tool 사용
-4. Tool 결과를 기반으로 자연스러운 응답 생성
-
-**응답 스타일**:
-- 친절하고 전문적인 톤
-- 간결하고 명확한 정보 전달
-- 이전 대화 문맥을 항상 고려`;
+  // System Prompt (2단계 정보 수집: 필수 → 선택)
+  // P2: 공통 상수로 분리 (agent-prompts.ts)
+  const systemPrompt = AGENT_SYSTEM_PROMPT;
 
   const messages: AgentMessage[] = [
     { role: 'system', content: systemPrompt },
@@ -177,11 +171,14 @@ export async function runAgentStreaming(
 
         controller.close();
       } catch (error) {
-        console.error('[AgentEngineStreaming] 오류:', error);
+        // P0: PII 마스킹 필수 (체크리스트.md 4. PII 마스킹)
+        const maskedError = maskPII(error);
+        console.error('[AgentEngineStreaming] 오류:', maskedError);
 
+        const errorMessage = error instanceof Error ? error.message : String(error);
         const errorData = `data: ${JSON.stringify({
           type: 'error',
-          error: error instanceof Error ? error.message : String(error)
+          error: maskPII(errorMessage) // PII 마스킹 적용
         })}\n\n`;
         controller.enqueue(encoder.encode(errorData));
         controller.close();

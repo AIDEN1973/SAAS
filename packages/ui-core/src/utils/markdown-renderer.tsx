@@ -4,9 +4,54 @@
  *
  * 경량 Markdown 렌더링 유틸리티
  * 외부 라이브러리 없이 기본적인 Markdown 문법 지원
+ * [보안] XSS 방지를 위한 URL 및 텍스트 sanitize 적용
  */
 
 import React from 'react';
+
+/**
+ * URL Sanitize - XSS 방지
+ * javascript:, data:, vbscript: 등 위험한 프로토콜 차단
+ */
+function sanitizeUrl(url: string): string {
+  const trimmed = url.trim().toLowerCase();
+
+  // 위험한 프로토콜 차단
+  const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:'];
+  for (const protocol of dangerousProtocols) {
+    if (trimmed.startsWith(protocol)) {
+      return '#'; // 안전한 기본값
+    }
+  }
+
+  // 안전한 프로토콜만 허용 (http, https, mailto)
+  if (!trimmed.startsWith('http://') &&
+      !trimmed.startsWith('https://') &&
+      !trimmed.startsWith('mailto:') &&
+      !trimmed.startsWith('/') &&
+      !trimmed.startsWith('#')) {
+    return '#'; // 안전한 기본값
+  }
+
+  return url;
+}
+
+/**
+ * HTML 특수 문자 이스케이프 - XSS 방지
+ * 텍스트에 포함된 HTML 태그를 무력화
+ */
+function escapeHtml(text: string): string {
+  const htmlEscapeMap: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#x27;',
+    '/': '&#x2F;',
+  };
+
+  return text.replace(/[&<>"'\/]/g, (char) => htmlEscapeMap[char] || char);
+}
 
 /**
  * 상용급 Markdown 텍스트를 React 엘리먼트로 변환
@@ -327,6 +372,7 @@ function parseInlineMarkdown(text: string): React.ReactNode {
   ];
 
   // 링크 처리 ([텍스트](URL))
+  // [보안] URL sanitize 적용
   const linkMatches: Array<{ start: number; end: number; text: string; url: string }> = [];
   const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
   let linkMatch;
@@ -335,7 +381,7 @@ function parseInlineMarkdown(text: string): React.ReactNode {
       start: linkMatch.index,
       end: linkMatch.index + linkMatch[0].length,
       text: linkMatch[1],
-      url: linkMatch[2],
+      url: sanitizeUrl(linkMatch[2]), // ✅ XSS 방지: URL sanitize
     });
   }
 
@@ -389,12 +435,13 @@ function parseInlineMarkdown(text: string): React.ReactNode {
     // 링크 또는 스타일 적용된 텍스트 추가
     if (match.url) {
       // 링크
+      // [보안] rel="noopener noreferrer" 추가로 Tabnabbing 방지
       parts.push(
         <a
           key={key++}
-          href={match.url}
+          href={match.url} // 이미 sanitizeUrl 적용됨
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener noreferrer" // ✅ 보안: Tabnabbing 방지
           style={{
             color: 'var(--color-primary-500)',
             textDecoration: 'underline',

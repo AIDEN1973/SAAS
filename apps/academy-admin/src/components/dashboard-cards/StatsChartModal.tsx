@@ -6,22 +6,11 @@
  * [불변 규칙] CSS 변수 사용 (하드코딩 금지)
  */
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { Modal } from '@ui-core/react';
 import type { StatsCard } from '../../types/dashboardCard';
 import type { DailyStoreMetric } from '@hooks/use-daily-store-metrics';
-
-// Recharts를 동적 import로 로드 (번들 크기 최적화)
-// recharts는 타입을 export하지 않으므로 React.ElementType을 사용
-type RechartsModule = {
-  LineChart: React.ElementType;
-  Line: React.ElementType;
-  XAxis: React.ElementType;
-  YAxis: React.ElementType;
-  Tooltip: React.ElementType;
-  ResponsiveContainer: React.ElementType;
-  CartesianGrid: React.ElementType;
-};
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export interface StatsChartModalProps {
   isOpen: boolean;
@@ -31,30 +20,6 @@ export interface StatsChartModalProps {
 }
 
 export function StatsChartModal({ isOpen, onClose, card, data }: StatsChartModalProps) {
-  const [recharts, setRecharts] = useState<RechartsModule | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  // 모달이 열릴 때만 recharts 로드
-  useEffect(() => {
-    if (isOpen && !recharts && !isLoading) {
-      setIsLoading(true);
-      import('recharts').then((module) => {
-        setRecharts({
-          LineChart: module.LineChart,
-          Line: module.Line,
-          XAxis: module.XAxis,
-          YAxis: module.YAxis,
-          Tooltip: module.Tooltip,
-          ResponsiveContainer: module.ResponsiveContainer,
-          CartesianGrid: module.CartesianGrid,
-        });
-        setIsLoading(false);
-      }).catch((error) => {
-        console.error('Failed to load recharts:', error);
-        setIsLoading(false);
-      });
-    }
-  }, [isOpen, recharts, isLoading]);
 
   // 카드 ID에 따라 그래프 데이터 변환
   const chartData = useMemo(() => {
@@ -194,8 +159,6 @@ export function StatsChartModal({ isOpen, onClose, card, data }: StatsChartModal
 
   if (!card) return null;
 
-  const { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } = recharts || {};
-
   return (
     <Modal
       isOpen={isOpen}
@@ -208,31 +171,7 @@ export function StatsChartModal({ isOpen, onClose, card, data }: StatsChartModal
         // HARD-CODE-EXCEPTION: minHeight는 calc()로 계산된 값 (레이아웃용 특수 값)
         minHeight: 'calc(var(--spacing-3xl) * 10)',
       }}>
-        {isLoading ? (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            // HARD-CODE-EXCEPTION: height는 calc()로 계산된 값 (레이아웃용 특수 값)
-            height: 'calc(var(--spacing-3xl) * 10)',
-            color: 'var(--color-text-secondary)',
-            fontSize: 'var(--font-size-base)',
-          }}>
-            차트를 불러오는 중...
-          </div>
-        ) : !recharts || !LineChart || !Line || !XAxis || !YAxis || !Tooltip || !ResponsiveContainer || !CartesianGrid ? (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            // HARD-CODE-EXCEPTION: height는 calc()로 계산된 값 (레이아웃용 특수 값)
-            height: 'calc(var(--spacing-3xl) * 10)',
-            color: 'var(--color-text-secondary)',
-            fontSize: 'var(--font-size-base)',
-          }}>
-            차트를 불러올 수 없습니다.
-          </div>
-        ) : chartData.length === 0 ? (
+        {chartData.length === 0 ? (
           <div style={{
             display: 'flex',
             alignItems: 'center',

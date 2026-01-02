@@ -143,6 +143,8 @@ export function AILayerMenuProvider({ children }: { children: ReactNode }) {
   const [executionAuditAvailableOperationTypes, setExecutionAuditAvailableOperationTypes] = useState<string[]>([]);
 
   const open = useCallback(() => {
+    // AI 레이어 열릴 때 기본적으로 챗봇 탭으로 설정
+    setActiveTab('chatops');
     setIsOpen(true);
   }, []);
 
@@ -151,17 +153,36 @@ export function AILayerMenuProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggle = useCallback(() => {
-    setIsOpen((prev) => !prev);
+    setIsOpen((prev) => {
+      const nextOpen = !prev;
+      // 열 때만 챗봇 탭으로 설정
+      if (nextOpen) {
+        setActiveTab('chatops');
+      }
+      return nextOpen;
+    });
   }, []);
 
   const addChatOpsMessage = useCallback((message: ChatOpsMessage) => {
+    console.log('[useAILayerMenu] addChatOpsMessage:', {
+      messageId: message.id,
+      messageType: message.type,
+      contentPreview: typeof message.content === 'string' ? message.content.substring(0, 50) : '[ReactNode]',
+    });
     setChatOpsMessages((prev) => [...prev, message]);
   }, []);
 
   const updateChatOpsMessage = useCallback((messageId: string, updates: Partial<ChatOpsMessage>) => {
-    setChatOpsMessages((prev) =>
-      prev.map((msg) => (msg.id === messageId ? { ...msg, ...updates } : msg))
-    );
+    setChatOpsMessages((prev) => {
+      const found = prev.find((msg) => msg.id === messageId);
+      console.log('[useAILayerMenu] updateChatOpsMessage:', {
+        messageId,
+        found: !!found,
+        totalMessages: prev.length,
+        contentPreview: updates.content && typeof updates.content === 'string' ? updates.content.substring(0, 50) : undefined,
+      });
+      return prev.map((msg) => (msg.id === messageId ? { ...msg, ...updates } : msg));
+    });
   }, []);
 
   const clearChatOpsMessages = useCallback(() => {

@@ -28,6 +28,8 @@ export {
   getPolicyBoolean,
   getPolicyString,
   getPolicyValueWithDefault,
+  setPolicyValueByPath,
+  setPolicyValuesByPaths,
 } from './policy-utils';
 
 export {
@@ -35,6 +37,7 @@ export {
   getPolicyValueWithPath,
   POLICY_REGISTRY,
   getAutomationEventPolicyPath,
+  extractFieldPathFromPolicyPath,
 } from './policy-registry';
 export type { PolicyKey, PolicyDefinition, PolicySource } from './policy-registry';
 
@@ -105,6 +108,19 @@ export {
   logWarn,
   logInfo,
 } from './logger-utils';
+
+// 지역 통계 분석 유틸리티 (QUALITY-1)
+export {
+  findBestComparisonGroup,
+  getComparisonGroupLabel,
+  calculatePercentileRank,
+  calculateRank,
+} from './analytics/regional-comparison-utils';
+export type {
+  LocationInfo,
+  DailyRegionMetrics,
+  ComparisonGroup,
+} from './analytics/regional-comparison-utils';
 
 // 기타 유틸리티 (필요시 추가)
 export { renderCard } from './dashboardCardRenderer';

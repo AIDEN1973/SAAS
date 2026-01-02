@@ -18,6 +18,66 @@
 
 ---
 
+## ⚠️ 업종 중립성 (Industry Neutrality)
+
+### 핵심 원칙
+
+**이 시스템은 SaaS 관리 플랫폼입니다** - 단일 학원용 SaaS가 아닌, **다양한 업종의 테넌트를 관리하는 플랫폼**입니다.
+
+### Industry Adapter를 통한 계약 검증
+
+Tool 계약 검증 시 **업종별 테이블명은 다르지만, 검증 로직은 동일**합니다:
+
+**공통 검증 로직 (업종 무관)**:
+```typescript
+// 1. Tenant Isolation 검증 (모든 업종 동일)
+const tenantId = requireTenantScope(context.tenant_id);
+
+// 2. Industry Adapter로 올바른 테이블명 가져오기
+const tableName = await getTenantTableName(supabase, tenantId, 'student');
+// → academy: "academy_students"
+// → salon: "salon_customers"
+// → nail: "nail_members"
+
+// 3. 공통 쿼리 패턴
+const { data, error } = await supabase
+  .from(tableName)  // 동적 테이블명
+  .select('*')
+  .eq('tenant_id', tenantId)
+  .ilike('name', `%${student_name}%`);
+
+// 4. 공통 검증
+if (!data || data.length === 0) {
+  return { success: false, error: '해당 정보를 찾을 수 없습니다.' };
+}
+```
+
+### 업종별 계약 검증 예시
+
+**학원 (Academy)**:
+- Table: `academy_students`
+- FK: `persons` → `person_id`
+- 필수 컬럼: `name`, `phone`, `birth_date`
+
+**미용실 (Salon)**:
+- Table: `salon_customers`
+- FK: `persons` → `person_id`
+- 필수 컬럼: `name`, `phone`, `preferred_stylist`
+
+**네일샵 (Nail)**:
+- Table: `nail_members`
+- FK: `persons` → `person_id`
+- 필수 컬럼: `name`, `phone`, `membership_tier`
+
+→ **검증 로직은 동일**, Industry Adapter가 테이블명만 변환
+
+**참고 문서**:
+- `docu/Agent_아키텍처_전환.md` - Industry Neutrality 개요
+- `docu/디어쌤 아키텍처.md` - Industry Adapter 상세 구현
+- `docu/체크리스트.md` - Industry Adapter 검증 체크리스트
+
+---
+
 ## 개요
 
 ### 전환 배경

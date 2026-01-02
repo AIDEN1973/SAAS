@@ -22,7 +22,6 @@ import {
   useDeleteClass,
   useClassStatistics,
   useTeachers,
-  useAssignTeacher,
 } from '@hooks/use-class';
 import type { Class, CreateClassInput, UpdateClassInput, ClassFilter, ClassStatus, DayOfWeek , Teacher } from '@services/class-service';
 import { createClassFormSchema } from '../schemas/class.schema';
@@ -46,17 +45,51 @@ export function ClassesPage() {
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
   const isTabletMode = isTablet(modeUpper);
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+
+  // localStorage 기반 상태 초기화 (SSR Safe, AutomationSettingsPage 패턴 적용)
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>(() => {
+    try {
+      const stored = localStorage.getItem('classes-page-view-mode');
+      return stored === 'calendar' ? 'calendar' : 'list';
+    } catch (error) {
+      if (import.meta.env?.DEV) {
+        console.warn('ClassesPage: localStorage 접근 실패, 기본값 사용', { error });
+      }
+      return 'list';
+    }
+  });
+
   const [filter, setFilter] = useState<ClassFilter>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
-  const [showAllClasses, setShowAllClasses] = useState(false); // Today-First 기준: 기본값은 false
+
+  // Today-First 기준: 기본값은 false (localStorage 기반 지속성)
+  const [showAllClasses, setShowAllClasses] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('classes-page-show-all');
+      return stored === 'true';
+    } catch (error) {
+      if (import.meta.env?.DEV) {
+        console.warn('ClassesPage: localStorage 접근 실패, 기본값 사용', { error });
+      }
+      return false;
+    }
+  });
 
   // Today-First 기준: 기본적으로 오늘 수업 있는 반만 필터링
   // 기술문서 5-2: KST 기준 날짜 처리
+  // P0-3: search 필터가 있으면 Today-First 우선순위 해제
   const todayFilter: ClassFilter = useMemo(() => {
     if (showAllClasses) {
       return filter; // 전체 반 보기 모드
+    }
+
+    // P0-3: search 필터가 있으면 day_of_week 필터 적용 안 함
+    if (filter.search && filter.search.trim().length > 0) {
+      return {
+        ...filter,
+        status: 'active', // 활성 반만
+      };
     }
 
     // 오늘 요일 계산 (월요일=1, 일요일=0) - KST 기준
@@ -75,7 +108,7 @@ export function ClassesPage() {
 
     return {
       ...filter,
-      day_of_week: todayDayOfWeek, // 오늘 요일로 필터링
+      day_of_week: filter.day_of_week || todayDayOfWeek, // 사용자 선택 요일 우선, 없으면 오늘 요일
       status: 'active', // 활성 반만
     };
   }, [filter, showAllClasses]);
@@ -88,7 +121,6 @@ export function ClassesPage() {
   const createClass = useCreateClass();
   const updateClass = useUpdateClass();
   const deleteClass = useDeleteClass();
-  const assignTeacher = useAssignTeacher();
 
   // Schema Registry 연동 (아키텍처 문서 S3 참조)
   const { data: classFormSchemaData } = useSchema('class', createClassFormSchema(teachers || []), 'form');
@@ -97,6 +129,30 @@ export function ClassesPage() {
   // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
   const effectiveFormSchema = classFormSchemaData || createClassFormSchema(teachers || []);
   const effectiveFilterSchema = classFilterSchemaData || classFilterSchema;
+
+  // 뷰 모드 토글 핸들러 (localStorage 지속성)
+  const handleToggleViewMode = useCallback((mode: 'list' | 'calendar') => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('classes-page-view-mode', mode);
+    } catch (error) {
+      if (import.meta.env?.DEV) {
+        console.warn('ClassesPage: localStorage 저장 실패', { error });
+      }
+    }
+  }, []);
+
+  // 전체 보기 토글 핸들러 (localStorage 지속성)
+  const handleToggleShowAll = useCallback((checked: boolean) => {
+    setShowAllClasses(checked);
+    try {
+      localStorage.setItem('classes-page-show-all', String(checked));
+    } catch (error) {
+      if (import.meta.env?.DEV) {
+        console.warn('ClassesPage: localStorage 저장 실패', { error });
+      }
+    }
+  }, []);
 
   const handleFilterChange = useCallback((filters: Record<string, unknown>) => {
     setFilter({
@@ -109,24 +165,8 @@ export function ClassesPage() {
 
   const handleCreateClass = async (input: CreateClassInput) => {
     try {
-      // 강사 배정 정보 분리
-      const { teacher_ids, ...classInput } = input;
-
-      // 반 생성
-      const createdClass = await createClass.mutateAsync(classInput);
-
-      // 강사 배정 (teacher_ids가 있는 경우)
-      if (teacher_ids && teacher_ids.length > 0 && createdClass) {
-        for (const teacherId of teacher_ids) {
-          await assignTeacher.mutateAsync({
-            class_id: createdClass.id,
-            teacher_id: teacherId,
-            role: 'teacher', // 기본값: 담임 강사
-            assigned_at: toKST().format('YYYY-MM-DD'),
-          });
-        }
-      }
-
+      // P0-2: useCreateClass Hook이 DB RPC로 트랜잭션 처리하므로 직접 호출만 하면 됨
+      await createClass.mutateAsync(input);
       setShowCreateForm(false);
     } catch (error) {
       // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
@@ -162,23 +202,21 @@ export function ClassesPage() {
               <Button
                 variant={showAllClasses ? 'outline' : 'solid'}
                 size="sm"
-                onClick={() => setShowAllClasses(!showAllClasses)}
+                onClick={() => handleToggleShowAll(!showAllClasses)}
               >
                 {showAllClasses ? '오늘 수업만' : '전체 반 보기'}
               </Button>
               <Button
                 variant={viewMode === 'list' ? 'solid' : 'outline'}
                 size="sm"
-                onClick={() => {
-                  setViewMode('list');
-                }}
+                onClick={() => handleToggleViewMode('list')}
               >
                 리스트
               </Button>
               <Button
                 variant={viewMode === 'calendar' ? 'solid' : 'outline'}
                 size="sm"
-                onClick={() => setViewMode('calendar')}
+                onClick={() => handleToggleViewMode('calendar')}
               >
                 캘린더
               </Button>
@@ -239,13 +277,13 @@ export function ClassesPage() {
 
           {/* 반 목록 또는 캘린더 뷰 */}
           {isLoading ? (
-            <Card padding="lg" variant="default">
+            <Card padding="lg">
               <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
                 로딩 중...
               </div>
             </Card>
           ) : error ? (
-            <Card padding="md" variant="outlined">
+            <Card padding="md">
               <div style={{ color: 'var(--color-error)', padding: 'var(--spacing-md)' }}>
                 오류: {error.message}
               </div>
@@ -532,7 +570,7 @@ function ClassListView({
         <ClassCard key={classItem.id} classItem={classItem} onEdit={onEdit} onDelete={onDelete} />
       ))}
       {classes.length === 0 && (
-        <Card padding="lg" variant="default">
+        <Card padding="lg">
           <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
             등록된 반이 없습니다.
           </div>
@@ -560,7 +598,6 @@ function ClassCard({
   return (
     <Card
       padding="md"
-      variant="default"
       style={{
         borderLeft: `var(--border-width-thick) solid ${classItem.color}`,
       }}
@@ -619,9 +656,9 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
     classes: classes.filter((c) => c.day_of_week === day.value),
   }));
 
-  // 시간대에 반이 있는지 확인하는 함수
-  const getClassAtTime = (dayClasses: Class[], timeSlot: string) => {
-    return dayClasses.find((c) => {
+  // P1-5: 시간대에 해당하는 모든 반 조회 (겹침 표시)
+  const getClassesAtTime = (dayClasses: Class[], timeSlot: string): Class[] => {
+    return dayClasses.filter((c) => {
       const start = c.start_time;
       const end = c.end_time;
       return timeSlot >= start && timeSlot < end;
@@ -630,7 +667,7 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
 
   return (
     <div style={{ overflowX: 'auto' }}>
-      <Card padding="lg" variant="default">
+      <Card padding="lg">
         <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)' }}>
           반 편성표
         </h2>
@@ -670,8 +707,11 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
               </div>
               {DAYS_OF_WEEK.map((day) => {
                 const dayClasses = classesByDay.find((d) => d.day.value === day.value)?.classes || [];
-                const classAtTime = getClassAtTime(dayClasses, timeSlot);
-                const isStartTime = classAtTime?.start_time === timeSlot;
+                const classesAtTime = getClassesAtTime(dayClasses, timeSlot);
+                const hasClasses = classesAtTime.length > 0;
+                const firstClass = classesAtTime[0];
+                const isStartTime = firstClass?.start_time === timeSlot;
+                const hasOverlap = classesAtTime.length > 1;
 
                 return (
                   <div
@@ -680,20 +720,38 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
                       minHeight: 'var(--height-row-min)',
                       // HARD-CODE-EXCEPTION: padding 0은 레이아웃용 특수 값
                       padding: isStartTime ? 'var(--spacing-xs)' : '0',
-                      backgroundColor: classAtTime
-                        ? `${classAtTime.color}20`
+                      backgroundColor: hasClasses
+                        ? `${firstClass.color}20`
                         : 'transparent',
-                      borderLeft: isStartTime ? `var(--border-width-thick) solid ${classAtTime.color}` : 'none',
+                      borderLeft: isStartTime ? `var(--border-width-thick) solid ${firstClass.color}` : 'none',
                       // HARD-CODE-EXCEPTION: borderRadius 0은 레이아웃용 특수 값
                       borderRadius: isStartTime ? 'var(--border-radius-sm)' : '0',
+                      // P1-5: 겹침 표시 (점선 테두리)
+                      border: hasOverlap && isStartTime ? '2px dashed var(--color-warning)' : undefined,
+                      position: 'relative',
                     }}
                   >
-                    {isStartTime && classAtTime && (
-                      <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)' }}>
-                        {classAtTime.name}
+                    {isStartTime && firstClass && (
+                      <>
+                        <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)' }}>
+                          {firstClass.name}
                         </div>
-                      )}
-                    </div>
+                        {/* P1-5: 겹침 개수 표시 */}
+                        {hasOverlap && (
+                          <div
+                            style={{
+                              fontSize: 'var(--font-size-2xs)',
+                              color: 'var(--color-warning)',
+                              fontWeight: 'var(--font-weight-bold)',
+                              marginTop: 'var(--spacing-2xs)',
+                            }}
+                          >
+                            +{classesAtTime.length - 1} 겹침
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 );
               })}
             </React.Fragment>

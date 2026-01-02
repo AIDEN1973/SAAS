@@ -1,0 +1,154 @@
+
+> dearsaam-monorepo@1.0.0 lint
+> turbo run lint
+
+• Packages in scope: @api-sdk/core, @app/academy-admin, @app/academy-parent, @app/public-gateway, @app/super-admin, @chatops-intents/registry, @design-system/core, @env-registry/core, @lib/date-utils, @lib/error-tracking, @lib/supabase-client, @schema-engine/core, @ui-core/react
+• Running lint in 13 packages
+• Remote caching disabled
+@env-registry/core:build: cache hit, replaying logs b30eb3645fab1768
+@env-registry/core:build: 
+@env-registry/core:build: > @env-registry/core@1.0.0 build
+@env-registry/core:build: > tsc
+@env-registry/core:build: 
+@lib/supabase-client:build: cache hit, replaying logs a90884459c761a7d
+@lib/supabase-client:build: 
+@lib/supabase-client:build: > @lib/supabase-client@1.0.0 build
+@lib/supabase-client:build: > tsc
+@lib/supabase-client:build: 
+@app/public-gateway:lint: cache hit, replaying logs c7de6f0bf1eb2dae
+@app/public-gateway:lint: 
+@app/public-gateway:lint: > @app/public-gateway@1.0.0 lint
+@app/public-gateway:lint: > eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0
+@app/public-gateway:lint: 
+@app/super-admin:lint: cache hit, replaying logs b020a5de49c322d4
+@app/super-admin:lint: 
+@app/super-admin:lint: > @app/super-admin@1.0.0 lint
+@app/super-admin:lint: > eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0
+@app/super-admin:lint: 
+@app/academy-parent:lint: cache hit, replaying logs 5a754b2bfa2d7b7a
+@app/academy-parent:lint: 
+@app/academy-parent:lint: > @app/academy-parent@1.0.0 lint
+@app/academy-parent:lint: > eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0
+@app/academy-parent:lint: 
+@api-sdk/core:build: cache hit, replaying logs cf99bfec96c3ee5b
+@api-sdk/core:build: 
+@api-sdk/core:build: > @api-sdk/core@1.0.0 build
+@api-sdk/core:build: > tsc
+@api-sdk/core:build: 
+@app/academy-admin:lint: cache miss, executing 2f46c4f6ae7256e6
+@app/academy-admin:lint: 
+@app/academy-admin:lint: > @app/academy-admin@1.0.0 lint
+@app/academy-admin:lint: > eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0
+@app/academy-admin:lint: 
+@app/academy-admin:lint: 
+@app/academy-admin:lint: C:\cursor\SynologyDrive\SAMDLE\apps\academy-admin\src\App.tsx
+@app/academy-admin:lint:   11:34  warning  'C:\cursor\SynologyDrive\SAMDLE\packages\ui-core\src\index.ts' imported multiple times  import/no-duplicates
+@app/academy-admin:lint:   16:40  warning  'C:\cursor\SynologyDrive\SAMDLE\packages\ui-core\src\index.ts' imported multiple times  import/no-duplicates
+@app/academy-admin:lint: 
+@app/academy-admin:lint: C:\cursor\SynologyDrive\SAMDLE\apps\academy-admin\src\hooks\dashboard-stats\useAttendanceStatsCards.ts
+@app/academy-admin:lint:    28:12  error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+@app/academy-admin:lint:    78:15  error  Unsafe assignment of an `any` value               @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint:    79:44  error  Unsafe call of an `any` typed value               @typescript-eslint/no-unsafe-call
+@app/academy-admin:lint:    79:53  error  Unsafe member access .format on an `any` value    @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint:    80:15  error  Unsafe assignment of an `any` value               @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint:    80:30  error  Unsafe call of an `any` typed value               @typescript-eslint/no-unsafe-call
+@app/academy-admin:lint:    80:30  error  Unsafe call of an `any` typed value               @typescript-eslint/no-unsafe-call
+@app/academy-admin:lint:    80:39  error  Unsafe member access .clone on an `any` value     @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint:    80:47  error  Unsafe member access .subtract on an `any` value  @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint:    81:48  error  Unsafe call of an `any` typed value               @typescript-eslint/no-unsafe-call
+@app/academy-admin:lint:    81:61  error  Unsafe member access .format on an `any` value    @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint:   155:13  error  Unsafe assignment of an `any` value               @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint:   155:22  error  Unsafe call of an `any` typed value               @typescript-eslint/no-unsafe-call
+@app/academy-admin:lint:   155:30  error  Unsafe member access .format on an `any` value    @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint:   191:15  error  Unsafe assignment of an `any` value               @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint:   191:36  error  Unsafe call of an `any` typed value               @typescript-eslint/no-unsafe-call
+@app/academy-admin:lint:   191:36  error  Unsafe call of an `any` typed value               @typescript-eslint/no-unsafe-call
+@app/academy-admin:lint:   191:44  error  Unsafe member access .clone on an `any` value     @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint:   191:52  error  Unsafe member access .format on an `any` value    @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint:   195:13  error  Unsafe assignment of an `any` value               @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint: 
+@app/academy-admin:lint: C:\cursor\SynologyDrive\SAMDLE\apps\academy-admin\src\hooks\dashboard-stats\useRevenueStatsCards.ts
+@app/academy-admin:lint:    31:12  error  Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+@app/academy-admin:lint:   207:15  error  Unsafe assignment of an `any` value                  @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint:   207:24  error  Unsafe call of an `any` typed value                  @typescript-eslint/no-unsafe-call
+@app/academy-admin:lint:   207:32  error  Unsafe member access .toISOString on an `any` value  @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint:   211:50  error  Unsafe assignment of an `any` value                  @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint: 
+@app/academy-admin:lint: C:\cursor\SynologyDrive\SAMDLE\apps\academy-admin\src\pages\AnalyticsPage.tsx
+@app/academy-admin:lint:    41:16  error  'logWarn' is defined but never used  @typescript-eslint/no-unused-vars
+@app/academy-admin:lint:   627:11  error  Unsafe call of an `any` typed value  @typescript-eslint/no-unsafe-call
+@app/academy-admin:lint:   656:11  error  Unsafe call of an `any` typed value  @typescript-eslint/no-unsafe-call
+@app/academy-admin:lint: 
+@app/academy-admin:lint: C:\cursor\SynologyDrive\SAMDLE\apps\academy-admin\src\pages\AttendancePage.tsx
+@app/academy-admin:lint:   586:9  error  'issuedAt' is assigned a value but never used  @typescript-eslint/no-unused-vars
+@app/academy-admin:lint: 
+@app/academy-admin:lint: C:\cursor\SynologyDrive\SAMDLE\apps\academy-admin\src\pages\ClassesPage.tsx
+@app/academy-admin:lint:   125:9  error  'assignTeacher' is assigned a value but never used   @typescript-eslint/no-unused-vars
+@app/academy-admin:lint:   671:9  error  'getClassAtTime' is assigned a value but never used  @typescript-eslint/no-unused-vars
+@app/academy-admin:lint: 
+@app/academy-admin:lint: C:\cursor\SynologyDrive\SAMDLE\apps\academy-admin\src\pages\HomePage.tsx
+@app/academy-admin:lint:    29:51   error  'fetchPersons' is defined but never used                     @typescript-eslint/no-unused-vars
+@app/academy-admin:lint:    29:84   error  'fetchStudentStats' is defined but never used                @typescript-eslint/no-unused-vars
+@app/academy-admin:lint:    29:103  error  'fetchAttendanceStats' is defined but never used             @typescript-eslint/no-unused-vars
+@app/academy-admin:lint:    39:22   error  'fetchClasses' is defined but never used                     @typescript-eslint/no-unused-vars
+@app/academy-admin:lint:    56:43   error  'isInvoicePaid' is defined but never used                    @typescript-eslint/no-unused-vars
+@app/academy-admin:lint:    56:284  error  'calculateTrend' is defined but never used                   @typescript-eslint/no-unused-vars
+@app/academy-admin:lint:    56:300  error  'calculateTrendPercentPoint' is defined but never used       @typescript-eslint/no-unused-vars
+@app/academy-admin:lint:    94:7    error  'formatNumberWithCommas' is assigned a value but never used  @typescript-eslint/no-unused-vars
+@app/academy-admin:lint:   260:17   error  Unsafe assignment of an `any` value                          @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint: 
+@app/academy-admin:lint: C:\cursor\SynologyDrive\SAMDLE\apps\academy-admin\src\pages\IntentPatternsPage.tsx
+@app/academy-admin:lint:    78:7  error    Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+@app/academy-admin:lint:   110:7  error    Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+@app/academy-admin:lint:   117:3  warning  Caution: `React` also has a named export `useEffect`. Check if you meant to write `import {useEffect} from 'react'` instead                                         import/no-named-as-default-member
+@app/academy-admin:lint:   118:5  error    Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+@app/academy-admin:lint:   119:6  warning  React Hook React.useEffect has a missing dependency: 'loadPatterns'. Either include it or remove the dependency array                                               react-hooks/exhaustive-deps
+@app/academy-admin:lint: 
+@app/academy-admin:lint: C:\cursor\SynologyDrive\SAMDLE\apps\academy-admin\src\pages\KioskCheckInPage.tsx
+@app/academy-admin:lint:    48:9   error  'mode' is assigned a value but never used                                                                                                                           @typescript-eslint/no-unused-vars
+@app/academy-admin:lint:   101:13  error  Unsafe assignment of an `any` value                                                                                                                                 @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint:   157:7   error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+@app/academy-admin:lint: 
+@app/academy-admin:lint: C:\cursor\SynologyDrive\SAMDLE\apps\academy-admin\src\pages\students\components\VirtualTagList.tsx
+@app/academy-admin:lint:   26:24  warning  Caution: `React` also has a named export `useMemo`. Check if you meant to write `import {useMemo} from 'react'` instead  import/no-named-as-default-member
+@app/academy-admin:lint:   33:22  error    Unsafe array destructuring of a tuple element with an `any` value                                                        @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint:   33:36  error    Unsafe array destructuring of a tuple element with an `any` value                                                        @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint:   61:10  error    Unsafe call of an `any` typed value                                                                                      @typescript-eslint/no-unsafe-call
+@app/academy-admin:lint:   61:23  error    Unsafe member access .map on an `any` value                                                                              @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint:   62:36  error    Computed name [virtualItem.index] resolves to an any value                                                               @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint:   62:48  error    Unsafe member access .index on an `any` value                                                                            @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint:   67:20  error    Unsafe assignment of an `any` value                                                                                      @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint:   67:32  error    Unsafe member access .key on an `any` value                                                                              @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint:   73:54  error    Unsafe member access .start on an `any` value                                                                            @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint: 
+@app/academy-admin:lint: C:\cursor\SynologyDrive\SAMDLE\apps\academy-admin\src\pages\students\hooks\useVirtualScroll.ts
+@app/academy-admin:lint:    9:32  error  Unable to resolve path to module '@tanstack/react-virtual'  import/no-unresolved
+@app/academy-admin:lint:   59:9   error  Unsafe assignment of an `any` value                         @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint:   59:23  error  Unsafe call of an `any` typed value                         @typescript-eslint/no-unsafe-call
+@app/academy-admin:lint:   69:7   error  Unsafe assignment of an `any` value                         @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint:   70:7   error  Unsafe assignment of an `any` value                         @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint:   70:21  error  Unsafe call of an `any` typed value                         @typescript-eslint/no-unsafe-call
+@app/academy-admin:lint:   70:33  error  Unsafe member access .getVirtualItems on an `any` value     @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint:   71:7   error  Unsafe assignment of an `any` value                         @typescript-eslint/no-unsafe-assignment
+@app/academy-admin:lint:   71:18  error  Unsafe call of an `any` typed value                         @typescript-eslint/no-unsafe-call
+@app/academy-admin:lint:   71:30  error  Unsafe member access .getTotalSize on an `any` value        @typescript-eslint/no-unsafe-member-access
+@app/academy-admin:lint: 
+@app/academy-admin:lint: C:\cursor\SynologyDrive\SAMDLE\apps\academy-admin\src\utils\analytics\regional-comparison-utils.ts
+@app/academy-admin:lint:   64:3  error  'industryType' is assigned a value but never used  @typescript-eslint/no-unused-vars
+@app/academy-admin:lint: 
+@app/academy-admin:lint: ✖ 71 problems (66 errors, 5 warnings)
+@app/academy-admin:lint:   0 errors and 1 warning potentially fixable with the `--fix` option.
+@app/academy-admin:lint: 
+@app/academy-admin:lint: npm error Lifecycle script `lint` failed with error:
+@app/academy-admin:lint: npm error code 1
+@app/academy-admin:lint: npm error path C:\cursor\SynologyDrive\SAMDLE\apps\academy-admin
+@app/academy-admin:lint: npm error workspace @app/academy-admin@1.0.0
+@app/academy-admin:lint: npm error location C:\cursor\SynologyDrive\SAMDLE\apps\academy-admin
+@app/academy-admin:lint: npm error command failed
+@app/academy-admin:lint: npm error command C:\WINDOWS\system32\cmd.exe /d /s /c eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0
+
+ Tasks:    6 successful, 7 total
+Cached:    6 cached, 7 total
+  Time:    58.378s 
+Failed:    @app/academy-admin#lint
+

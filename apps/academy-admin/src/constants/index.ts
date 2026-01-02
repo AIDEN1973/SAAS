@@ -40,4 +40,5 @@ export {
   AUTOMATION_EVENT_DESCRIPTIONS,
   validateAutomationEventDescriptions,
 } from './automation-event-descriptions';
+export type { AutomationEventCriteriaField } from './automation-event-descriptions';
 

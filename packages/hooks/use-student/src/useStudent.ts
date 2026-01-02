@@ -11,8 +11,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import type { ApiResponse } from '@api-sdk/core';
 import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
+import { captureException } from '@lib/error-tracking';
 import { useSession } from '@hooks/use-auth';
 import { createExecutionAuditRecord } from './execution-audit-utils';
+import { createOptimisticUpdate, createListItemUpdater } from './optimistic-utils';
 import type {
   CreateStudentInput,
   UpdateStudentInput,
@@ -242,6 +244,9 @@ export function useStudents(filter?: StudentFilter) {
     enabled: !!tenantId,
     staleTime: 30 * 1000, // 30초간 캐시 유지 (검색 성능 최적화)
     gcTime: 5 * 60 * 1000, // 5분간 가비지 컬렉션 방지 (이전 cacheTime)
+    // [성능 개선] 네트워크 오류 자동 재시도
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 
@@ -279,6 +284,46 @@ export async function fetchPersons(
   }
 
   return (response.data || []) as Person[];
+}
+
+/**
+ * Persons 테이블 레코드 수 조회 (성능 최적화용)
+ * [P2-PERF 추가] 전체 배열 조회 대신 count만 반환하여 네트워크/메모리 비용 절감
+ *
+ * @param tenantId 테넌트 ID
+ * @param filter 필터 조건 (person_type, created_at 등)
+ * @returns 레코드 수
+ *
+ * @example
+ * // 학생 수만 조회 (전체 배열 fetch 없이)
+ * const studentCount = await fetchPersonsCount(tenantId, { person_type: 'student' });
+ */
+export async function fetchPersonsCount(
+  tenantId: string,
+  filter?: { person_type?: string; created_at?: { gte?: string; lte?: string } }
+): Promise<number> {
+  if (!tenantId) return 0;
+
+  const filters: Record<string, unknown> = {};
+  if (filter?.person_type) {
+    filters.person_type = filter.person_type;
+  }
+  if (filter?.created_at) {
+    filters.created_at = filter.created_at;
+  }
+
+  // Supabase count 옵션 사용: limit: 0으로 데이터는 받지 않고 count만 조회
+  const response = await apiClient.get<Person>('persons', {
+    filters,
+    count: 'exact', // 정확한 count 반환
+    limit: 0, // 데이터 없이 count만 받기
+  });
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  return response.count ?? 0;
 }
 
 /**
@@ -497,6 +542,9 @@ export function useStudentsPaged(params: {
     gcTime: 5 * 60 * 1000, // 5분간 가비지 컬렉션 방지
     placeholderData: (previousData) => previousData, // 페이지 전환 시 이전 데이터 유지하여 부드러운 UX (React Query v5)
     refetchOnWindowFocus: false, // 윈도우 포커스 시 자동 리패치 비활성화 (성능 최적화)
+    // [성능 개선] 네트워크 오류 자동 재시도
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 
@@ -510,6 +558,8 @@ export function useStudent(studentId: string | null) {
 
   return useQuery({
     queryKey: ['student', tenantId, studentId],
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     queryFn: async () => {
       if (!studentId) return null;
 
@@ -1139,6 +1189,8 @@ export function useGuardians(studentId: string | null) {
     queryKey: ['guardians', tenantId, studentId],
     queryFn: () => fetchGuardians(tenantId!, studentId ? { student_id: studentId } : undefined),
     enabled: !!tenantId && !!studentId,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 
@@ -1153,6 +1205,8 @@ export function useStudentTags() {
 
   return useQuery<Array<{ id: string; name: string; color: string }>>({
     queryKey: ['tags', tenantId, 'student'],
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     queryFn: async (): Promise<Array<{ id: string; name: string; color: string }>> => {
       if (!tenantId) return [];
 
@@ -1194,6 +1248,8 @@ export function useStudentTagsByStudent(studentId: string | null) {
 
   return useQuery<Array<{ id: string; name: string; color: string }>>({
     queryKey: ['tags', tenantId, 'student', studentId],
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     queryFn: async (): Promise<Array<{ id: string; name: string; color: string }>> => {
       if (!studentId || !tenantId) return [];
 
@@ -1277,6 +1333,8 @@ export function useConsultations(studentId: string | null) {
     queryKey: ['consultations', tenantId, studentId],
     queryFn: () => fetchConsultations(tenantId!, studentId ? { student_id: studentId } : undefined),
     enabled: !!tenantId && !!studentId,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 
@@ -1534,11 +1592,12 @@ export function useCreateGuardian() {
         student_id: studentId,
         ...guardian,
       };
-      console.log('📤 전송 Payload (tenant_id 주입 전):', payload);
+      // [P2-FIX] 이모지 제거 - 코드 내 이모지 사용 금지
+      console.log('[Payload] 전송 Payload (tenant_id 주입 전):', payload);
 
       const response = await apiClient.post<Guardian>('guardians', payload);
 
-      console.log('📥 API 응답:', {
+      console.log('[Response] API 응답:', {
         success: response.success,
         error: response.error,
         data: response.data,
@@ -1778,6 +1837,8 @@ export function useStudentClasses(studentId: string | null) {
 
   return useQuery({
     queryKey: ['student-classes', tenantId, studentId],
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     queryFn: async () => {
       if (!studentId) return [];
 

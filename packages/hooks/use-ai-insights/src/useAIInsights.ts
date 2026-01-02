@@ -6,7 +6,7 @@
  * [불변 규칙] api-sdk를 통해서만 데이터 요청
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 
 export interface AIInsight {
@@ -87,6 +87,42 @@ export function useAIInsights(filter?: AIInsightFilter) {
     queryKey: ['ai-insights', tenantId, filter],
     queryFn: () => fetchAIInsights(tenantId!, filter),
     enabled: !!tenantId,
+  });
+}
+
+/**
+ * AI 인사이트 Dismiss Hook
+ * P2-2: AI Dismiss 기능 구현
+ * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ * [불변 규칙] Mutation 성공 시 자동으로 쿼리 무효화하여 UI 갱신
+ */
+export function useDismissAIInsight() {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (insightId: string) => {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      // AI 인사이트를 dismissed 상태로 업데이트
+      const response = await apiClient.patch<AIInsight>('ai_insights', insightId, {
+        status: 'dismissed',
+        updated_at: new Date().toISOString(),
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      return response.data;
+    },
+    onSuccess: () => {
+      // 모든 AI 인사이트 쿼리 무효화하여 UI 자동 갱신
+      queryClient.invalidateQueries({ queryKey: ['ai-insights', tenantId] });
+    },
   });
 }
 

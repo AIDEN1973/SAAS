@@ -8,7 +8,7 @@ import {
   useAILayerMenu,
   getOrCreateChatOpsSessionId,
 } from '@ui-core/react';
-import type { SidebarItem } from '@ui-core/react';
+import type { SidebarItem, ExecutionAuditRun } from '@ui-core/react';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleBasedRoute } from './components/RoleBasedRoute';
 import { useLogout, useUserRole } from '@hooks/use-auth';
@@ -34,6 +34,7 @@ const StudentsListPage = lazy(() => import('./pages/StudentsListPage').then(m =>
 const ClassesPage = lazy(() => import('./pages/ClassesPage').then(m => ({ default: m.ClassesPage })));
 const TeachersPage = lazy(() => import('./pages/TeachersPage').then(m => ({ default: m.TeachersPage })));
 const AttendancePage = lazy(() => import('./pages/AttendancePage').then(m => ({ default: m.AttendancePage })));
+const KioskCheckInPage = lazy(() => import('./pages/KioskCheckInPage').then(m => ({ default: m.KioskCheckInPage })));
 const BillingPage = lazy(() => import('./pages/BillingPage').then(m => ({ default: m.BillingPage })));
 const BillingHomePage = lazy(() => import('./pages/BillingHomePage').then(m => ({ default: m.BillingHomePage })));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
@@ -42,6 +43,7 @@ const AIPage = lazy(() => import('./pages/AIPage').then(m => ({ default: m.AIPag
 const AllCardsPage = lazy(() => import('./pages/AllCardsPage').then(m => ({ default: m.AllCardsPage })));
 const StudentTasksPage = lazy(() => import('./pages/StudentTasksPage').then(m => ({ default: m.StudentTasksPage })));
 const AutomationSettingsPage = lazy(() => import('./pages/AutomationSettingsPage').then(m => ({ default: m.AutomationSettingsPage })));
+const IntentPatternsPage = lazy(() => import('./pages/IntentPatternsPage').then(m => ({ default: m.IntentPatternsPage })));
 const SchemaEditorPage = lazy(() => import('../../super-admin/src/pages/SchemaEditorPage').then(m => ({ default: m.SchemaEditorPage })));
 const AuthGuard = lazy(() => import('../../super-admin/src/components/AuthGuard').then(m => ({ default: m.AuthGuard })));
 
@@ -96,7 +98,8 @@ function AppContent() {
     aiLayerMenu.setExecutionAuditHasMore(executionAuditQuery.data.has_more);
     aiLayerMenu.setExecutionAuditNextCursor(executionAuditQuery.data.next_cursor);
     aiLayerMenu.setExecutionAuditLoading(false);
-  }, [executionAuditQuery.data, aiLayerMenu]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [executionAuditQuery.data]);
 
   // Execution Audit 로딩 상태 동기화
   useEffect(() => {
@@ -145,8 +148,18 @@ function AppContent() {
   }, [aiLayerMenu.executionAuditStepsLoading, aiLayerMenu]);
 
   // Execution Audit 핸들러 구현 (액티비티.md 10.1, 10.2 참조)
-  // 참고: 현재는 AppLayout에서 직접 aiLayerMenu를 사용하므로 핸들러가 필요 없음
-  // 향후 필요시 핸들러를 추가할 수 있음
+  const handleExecutionAuditRowClick = useCallback((run: ExecutionAuditRun) => {
+    const { entity_type, entity_id } = run.reference;
+
+    // entity_type에 따라 적절한 페이지로 이동
+    if (entity_type === 'student' && entity_id) {
+      safeNavigate(`/students/${entity_id}`);
+    } else if (entity_type === 'chatops_session') {
+      // ChatOps 세션인 경우 ChatOps 탭으로 전환
+      aiLayerMenu.setActiveTab('chatops');
+    }
+    // 필요시 다른 entity_type 추가 가능
+  }, [safeNavigate, aiLayerMenu]);
 
   // ChatOps 핸들러 구현 (챗봇.md 참조)
   // ✅ 수정: 스트리밍 모드로 변경하여 응답 속도 개선
@@ -183,54 +196,103 @@ function AppContent() {
       const context = getApiContext();
       const tenantId = context?.tenantId || '';
 
-      // 스트리밍 응답을 저장할 assistant 메시지 ID
+      // ✅ 스트리밍 모드 복원: Tool 실행 + 진행 상황 표시
       const assistantMessageId = `assistant-${Date.now()}`;
-      let streamingContent = '';
-
-      // 임시 assistant 메시지 추가 (스트리밍 중)
-      aiLayerMenu.addChatOpsMessage({
-        id: assistantMessageId,
-        type: 'assistant_message',
-        content: '',
-        timestamp: new Date(),
-        metadata: {
-          isStreaming: true, // 타이핑 커서 표시용
-        },
-      });
+      const statusMessageId = `status-${Date.now()}`;
+      let assistantContent = '';
+      let messageCreated = false; // 메시지 생성 여부 추적
+      let statusMessageCreated = false; // 진행 상황 메시지 생성 여부
 
       await sendChatOpsMessageStreaming(
         tenantId,
         sessionId,
         message,
-        // onChunk: 실시간으로 텍스트 업데이트
+        // onChunk: 실시간 청크 처리
         (chunk: string) => {
-          streamingContent += chunk;
-          // 메시지 업데이트 (여전히 스트리밍 중)
-          aiLayerMenu.updateChatOpsMessage(assistantMessageId, {
-            content: streamingContent,
-            metadata: {
-              isStreaming: true,
-            },
+          console.log('[ChatOps:Frontend] onChunk 호출:', {
+            chunkLength: chunk.length,
+            totalLength: assistantContent.length + chunk.length,
+            messageCreated,
           });
+
+          // content 이벤트 처리
+          assistantContent += chunk;
+
+          // ✅ 진행 상황 메시지 삭제 (있는 경우)
+          if (statusMessageCreated) {
+            aiLayerMenu.updateChatOpsMessage(statusMessageId, {
+              content: '', // 빈 내용으로 업데이트 (삭제 효과)
+              metadata: {
+                isStreaming: false,
+                hidden: true, // 숨김 플래그
+              },
+            });
+          }
+
+          // ✅ content 이벤트에서 메시지 생성 또는 업데이트
+          if (messageCreated) {
+            // 이미 생성된 경우 업데이트
+            console.log('[ChatOps:Frontend] 메시지 업데이트 (content):', {
+              id: assistantMessageId,
+              contentPreview: assistantContent.substring(0, 50),
+            });
+            aiLayerMenu.updateChatOpsMessage(assistantMessageId, {
+              content: assistantContent,
+              metadata: {
+                isStreaming: true,
+              },
+            });
+          } else {
+            // 첫 content 이벤트에서 메시지 생성
+            messageCreated = true;
+            console.log('[ChatOps:Frontend] 메시지 생성 (content):', {
+              id: assistantMessageId,
+              contentPreview: assistantContent.substring(0, 50),
+            });
+            aiLayerMenu.addChatOpsMessage({
+              id: assistantMessageId,
+              type: 'assistant_message',
+              content: assistantContent,
+              timestamp: new Date(),
+              metadata: {
+                isStreaming: true,
+              },
+            });
+          }
         },
-        // onComplete: 스트리밍 완료
+        // onComplete: 완료
         (fullResponse: string) => {
           console.log('[ChatOps:Frontend] 스트리밍 완료:', {
             response_length: fullResponse.length,
+            messageCreated,
           });
-          // 최종 응답으로 업데이트 (스트리밍 완료)
-          aiLayerMenu.updateChatOpsMessage(assistantMessageId, {
-            content: fullResponse || streamingContent,
-            metadata: {
-              isStreaming: false, // 타이핑 커서 제거
-            },
-          });
+
+          // 메시지가 생성되지 않았다면 생성 (status 이벤트가 없는 경우)
+          if (!messageCreated) {
+            messageCreated = true;
+            aiLayerMenu.addChatOpsMessage({
+              id: assistantMessageId,
+              type: 'assistant_message',
+              content: assistantContent || fullResponse,
+              timestamp: new Date(),
+              metadata: {
+                isStreaming: false,
+              },
+            });
+          } else {
+            // 최종 응답으로 업데이트
+            aiLayerMenu.updateChatOpsMessage(assistantMessageId, {
+              content: assistantContent || fullResponse,
+              metadata: {
+                isStreaming: false,
+              },
+            });
+          }
         },
         // onError: 에러 처리
         (error: string) => {
           console.error('[ChatOps:Frontend] 스트리밍 에러:', error);
 
-          // 에러 유형별 사용자 친화적 메시지
           let errorMessage = '응답 처리 중 오류가 발생했습니다.';
           if (error.includes('network') || error.includes('fetch')) {
             errorMessage = '네트워크 연결이 불안정합니다. 잠시 후 다시 시도해주세요.';
@@ -240,21 +302,62 @@ function AppContent() {
             errorMessage = '인증이 만료되었습니다. 다시 로그인해주세요.';
           }
 
-          aiLayerMenu.updateChatOpsMessage(assistantMessageId, {
-            content: `❌ ${errorMessage}\n\n*원본 메시지를 다시 전송하시거나, 문제가 지속되면 관리자에게 문의해주세요.*`,
-            metadata: {
-              isStreaming: false,
-              hasError: true,
-            },
-          });
+          // 메시지가 생성되지 않았다면 생성
+          if (!messageCreated) {
+            messageCreated = true;
+            aiLayerMenu.addChatOpsMessage({
+              id: assistantMessageId,
+              type: 'assistant_message',
+              content: `[오류] ${errorMessage}`,
+              timestamp: new Date(),
+              metadata: {
+                isStreaming: false,
+                hasError: true,
+              },
+            });
+          } else {
+            aiLayerMenu.updateChatOpsMessage(assistantMessageId, {
+              content: `[오류] ${errorMessage}`,
+              metadata: {
+                isStreaming: false,
+                hasError: true,
+              },
+            });
+          }
+        },
+        // onStatus: 단계별 진행 상황 표시
+        (status: string) => {
+          console.log('[ChatOps:Frontend] onStatus:', status);
+
+          if (!statusMessageCreated) {
+            // 첫 번째 상태: 진행 상황 메시지 생성
+            statusMessageCreated = true;
+            aiLayerMenu.addChatOpsMessage({
+              id: statusMessageId,
+              type: 'assistant_message',
+              content: status,
+              timestamp: new Date(),
+              metadata: {
+                isStreaming: true,
+                isStatusMessage: true, // 진행 상황 메시지 플래그
+              },
+            });
+          } else {
+            // 이후 상태: 진행 상황 메시지 업데이트
+            aiLayerMenu.updateChatOpsMessage(statusMessageId, {
+              content: status,
+              metadata: {
+                isStreaming: true,
+                isStatusMessage: true,
+              },
+            });
+          }
         }
       );
 
-      // ⚠️ 참고: 스트리밍 모드에서는 Intent/TaskCard 정보가 포함되지 않음
-      // 응답 텍스트만 스트리밍되며, Intent 파싱 및 TaskCard 생성은 백엔드에서 완료 후 별도 처리 필요
-      console.log('[ChatOps:Frontend] ===== 스트리밍 응답 처리 완료 =====');
+      console.log('[ChatOps:Frontend] ===== 스트리밍 응답 처리 시작 =====');
     } catch (error) {
-      console.error('[ChatOps:Frontend] ❌ 에러 발생:', error);
+      console.error('[ChatOps:Frontend] 에러 발생:', error);
       // P0: PII 마스킹 필수 (체크리스트.md 4. PII 마스킹)
       // error 객체는 PII가 포함될 수 있으므로 마스킹 필요
       const maskedError = maskPII(error);
@@ -616,6 +719,7 @@ function AppContent() {
               }}
               onChatOpsSendMessage={handleChatOpsSendMessage}
               onChatOpsReset={handleChatOpsReset}
+              onExecutionAuditRowClick={handleExecutionAuditRowClick}
             >
               <Routes>
                 <Route path="/home" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><HomePage /></RoleBasedRoute>} />
@@ -633,6 +737,7 @@ function AppContent() {
                 <Route path="/classes" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><ClassesPage /></Suspense></RoleBasedRoute>} />
                 <Route path="/teachers" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><TeachersPage /></Suspense></RoleBasedRoute>} />
                 <Route path="/attendance" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><AttendancePage /></Suspense></RoleBasedRoute>} />
+                <Route path="/kiosk-check-in" element={<Suspense fallback={<PageLoader />}><KioskCheckInPage /></Suspense>} />
                 <Route path="/billing/home" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><BillingHomePage /></Suspense></RoleBasedRoute>} />
                 <Route path="/billing/list" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><BillingPage /></Suspense></RoleBasedRoute>} />
                 <Route path="/billing" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><BillingHomePage /></Suspense></RoleBasedRoute>} />
@@ -640,6 +745,7 @@ function AppContent() {
                 <Route path="/analytics" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><AnalyticsPage /></Suspense></RoleBasedRoute>} />
                 <Route path="/ai" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><AIPage /></Suspense></RoleBasedRoute>} />
                 <Route path="/settings/automation" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'super_admin']}><Suspense fallback={<PageLoader />}><AutomationSettingsPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/settings/intent-patterns" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'super_admin']}><Suspense fallback={<PageLoader />}><IntentPatternsPage /></Suspense></RoleBasedRoute>} />
                 <Route
                   path="/super-admin"
                   element={

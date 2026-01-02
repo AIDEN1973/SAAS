@@ -156,9 +156,30 @@ serve(async (req) => {
     // Admin의 approve-and-execute: Role 검증 후 실행 (SSOT)
     // ⚠️ approve는 레거시 alias (일몰 예정), approve-and-execute가 SSOT
     if (action === 'approve-and-execute' || action === 'approve') {
-      if (userRole !== 'admin' && userRole !== 'owner') {
+      // Phase 2: AI 승인 자동화 확대
+      // Low/Medium-Risk 작업은 자동 승인 가능 (Policy 기반)
+      const autoApproveEnabled = await getTenantSettingByPath(
+        supabase,
+        taskCard.tenant_id,
+        'automation_approval.auto_approve_enabled'
+      ) as boolean | null;
+
+      const autoApproveThreshold = await getTenantSettingByPath(
+        supabase,
+        taskCard.tenant_id,
+        'automation_approval.auto_approve_threshold'
+      ) as 'low' | 'medium' | 'high' | null;
+
+      const taskRiskLevel = (taskCard.risk_level || 'medium') as 'low' | 'medium' | 'high';
+      const riskLevels = ['low', 'medium', 'high'];
+      const canAutoApprove = autoApproveEnabled === true &&
+        autoApproveThreshold &&
+        riskLevels.indexOf(taskRiskLevel) <= riskLevels.indexOf(autoApproveThreshold);
+
+      // 자동 승인 가능한 경우, Admin/Owner 권한 체크 생략
+      if (!canAutoApprove && userRole !== 'admin' && userRole !== 'owner') {
         return new Response(
-          JSON.stringify({ error: 'Only admins can approve and execute' }),
+          JSON.stringify({ error: 'Only admins can approve and execute this task (auto-approve disabled or high-risk)' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -168,7 +189,7 @@ serve(async (req) => {
         .from('task_cards')
         .update({
           status: 'approved',
-          approved_by: user.id,
+          approved_by: canAutoApprove ? null : user.id, // 자동 승인 시 approved_by는 null (시스템 승인)
           approved_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -180,6 +201,11 @@ serve(async (req) => {
           JSON.stringify({ error: 'Failed to update task card' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      // 자동 승인 로그
+      if (canAutoApprove) {
+        console.log(`[execute-student-task] Auto-approved task ${taskId} (risk_level: ${taskRiskLevel}, threshold: ${autoApproveThreshold})`);
       }
 
       // ⚠️ 중요: 자동 실행 자기 억제 메커니즘 체크 (프론트 자동화 문서 2.5.2 섹션 참조)

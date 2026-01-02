@@ -46,7 +46,7 @@ export function StudentDetailPage() {
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
         <PageHeader title="학생 상세" />
-        <Card padding="lg" variant="default">
+        <Card padding="lg">
           <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
             학생 상세 화면으로 이동 중...
           </div>

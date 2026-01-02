@@ -69,6 +69,8 @@ export interface ChatOpsMessage {
     original_message?: string; // 원본 사용자 메시지 (필터링용)
     isStreaming?: boolean; // 스트리밍 중 여부 (타이핑 커서 표시용)
     hasError?: boolean; // 에러 발생 여부
+    isStatusMessage?: boolean; // 진행 상황 메시지 여부 (ChatOps 스트리밍 중 상태 표시)
+    hidden?: boolean; // 메시지 숨김 여부
   };
 }
 
@@ -236,12 +238,15 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
     e.preventDefault();
     if (inputValue.trim() && !isLoading) {
       const result = onSendMessage(inputValue.trim());
+      setInputValue('');
       // Promise인 경우 await 처리 (타입 일관성)
       if (result instanceof Promise) {
         await result;
       }
-      setInputValue('');
-      inputRef.current?.focus();
+      // 입력창 포커스 복원 (비동기 처리 후에도 확실하게)
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
     }
   };
 
@@ -253,6 +258,11 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
   };
 
   const renderMessage = (message: ChatOpsMessage) => {
+    console.log('[ChatOpsPanel] renderMessage:', {
+      id: message.id,
+      type: message.type,
+      contentPreview: typeof message.content === 'string' ? message.content.substring(0, 50) : '[ReactNode]',
+    });
     const isUser = message.type === 'user_message';
     const isAssistant = message.type === 'assistant_message';
     const isPlanPreview = message.type === 'plan_preview';
@@ -261,8 +271,9 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
     const isApprovalRequested = message.type === 'approval_requested';
     const isExecutedSuccess = message.type === 'executed_success';
     const isExecutedFailed = message.type === 'executed_failed';
+    const isStatusMessage = message.metadata?.isStatusMessage; // 진행 상황 메시지
 
-    // 버블 스타일 (사용자/어시스턴트 구분)
+    // 버블 스타일 (사용자/어시스턴트/진행상황 구분)
     const bubbleStyle: React.CSSProperties = {
       // HARD-CODE-EXCEPTION: maxWidth는 상대값(퍼센트)이므로 CSS 변수로 대체하기 어려움 (CSS 속성 값)
       maxWidth: '80%',
@@ -276,6 +287,16 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
             color: 'var(--color-white)',
             marginLeft: 'auto',
             borderBottomRightRadius: 'var(--border-radius-sm)',
+          }
+        : isStatusMessage
+        ? {
+            // 진행 상황 메시지 스타일
+            backgroundColor: 'var(--color-info-100)',
+            color: 'var(--color-info-700)',
+            marginRight: 'auto',
+            borderBottomLeftRadius: 'var(--border-radius-sm)',
+            fontStyle: 'italic',
+            fontSize: 'var(--font-size-sm)',
           }
         : {
             backgroundColor: 'var(--color-gray-100)',
@@ -1359,6 +1380,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
           padding: 'var(--spacing-lg)',
           display: 'flex',
           flexDirection: 'column',
+          ...(messages.length === 0 ? { justifyContent: 'center' } : {}),
         }}
         className="ui-core-hiddenScrollbar"
       >
@@ -1368,8 +1390,6 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
               color: 'var(--color-text-secondary)',
               textAlign: 'center',
             }}
@@ -1385,7 +1405,13 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
           </div>
         ) : (
           <>
-            {messages.map(renderMessage)}
+            {(() => {
+              console.log('[ChatOpsPanel] 전체 messages 배열:', messages.map(m => ({ id: m.id, type: m.type, contentPreview: typeof m.content === 'string' ? m.content.substring(0, 30) : '[ReactNode]' })));
+              // ✅ hidden 플래그가 있는 메시지는 렌더링하지 않음
+              return messages
+                .filter(m => !m.metadata?.hidden)
+                .map(renderMessage);
+            })()}
             {isLoading && (
               <div
                 style={{
@@ -1396,7 +1422,6 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                 }}
               >
                 <Spinner size="sm" />
-                <span style={{ color: 'var(--color-text-secondary)' }}>처리 중...</span>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -1404,34 +1429,137 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
         )}
       </div>
 
-      {/* 입력 영역 */}
+      {/* 입력 영역 - ChatGPT 스타일 */}
       <div
         style={{
-          borderTop: 'var(--border-width-thin) solid var(--color-gray-200)',
-          padding: 'var(--spacing-md)',
+          padding: 'var(--spacing-lg)',
           backgroundColor: 'var(--color-white)',
         }}
       >
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-            <Input
+          <div
+            style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: 'var(--color-white)',
+              border: '1px solid var(--color-gray-300)',
+              borderRadius: '24px',
+              padding: '12px 16px',
+              boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.05)',
+              transition: 'all 0.2s ease',
+            }}
+            onFocus={(e) => {
+              const target = e.currentTarget;
+              target.style.borderColor = 'var(--color-primary-400)';
+              target.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.1)';
+            }}
+            onBlur={(e) => {
+              const target = e.currentTarget;
+              target.style.borderColor = 'var(--color-gray-300)';
+              target.style.boxShadow = '0 0 0 1px rgba(0, 0, 0, 0.05)';
+            }}
+          >
+            {/* 왼쪽 아이콘 - AI 스파크 아이콘 */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                marginRight: 'var(--spacing-sm)',
+                color: 'var(--color-gray-400)',
+              }}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </div>
+
+            {/* 입력 필드 */}
+            <input
               ref={inputRef}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="메시지를 입력하세요..."
+              placeholder="업무를 요청해 보세요."
               disabled={isLoading}
-              style={{ flex: 1 }}
+              style={{
+                flex: 1,
+                border: 'none',
+                outline: 'none',
+                fontSize: 'var(--font-size-md)',
+                backgroundColor: 'transparent',
+                color: 'var(--color-text)',
+                padding: '4px 0',
+              }}
             />
-            <Button
+
+            {/* 오른쪽 전송 버튼 */}
+            <button
               type="submit"
-              variant="solid"
               disabled={!inputValue.trim() || isLoading}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: inputValue.trim() && !isLoading
+                  ? 'var(--color-primary)'
+                  : 'var(--color-gray-300)',
+                color: 'var(--color-white)',
+                cursor: inputValue.trim() && !isLoading ? 'pointer' : 'not-allowed',
+                transition: 'background-color 0.15s ease, transform 0.1s ease',
+                marginLeft: 'var(--spacing-sm)',
+                flexShrink: 0,
+              }}
+              onMouseDown={(e) => {
+                if (inputValue.trim() && !isLoading) {
+                  e.currentTarget.style.transform = 'scale(0.95)';
+                }
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
             >
-              전송
-            </Button>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                stroke="none"
+              >
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+              </svg>
+            </button>
           </div>
         </form>
+
+        {/* 하단 안내 문구 */}
+        <div
+          style={{
+            marginTop: 'var(--spacing-sm)',
+            textAlign: 'center',
+            fontSize: 'var(--font-size-xs)',
+            color: 'var(--color-text-secondary)',
+          }}
+        >
+          디어쌤 AI는 실수를 할 수 있습니다. 중요한 정보는 재확인하세요.
+        </div>
       </div>
     </div>
   );

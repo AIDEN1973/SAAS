@@ -13,6 +13,7 @@ import { useAILayerMenu } from '../hooks/useAILayerMenu';
 import { Header, HeaderProps } from './Header';
 import { Sidebar, SidebarItem } from './Sidebar';
 import { AILayerMenu } from './AILayerMenu';
+import type { ExecutionAuditRun } from './ExecutionAuditPanel';
 import { maskPII } from '@core/pii-utils';
 
 export interface AppLayoutProps {
@@ -26,6 +27,7 @@ export interface AppLayoutProps {
   className?: string;
   onChatOpsSendMessage?: (message: string) => void | Promise<void>;
   onChatOpsReset?: () => void;
+  onExecutionAuditRowClick?: (run: ExecutionAuditRun) => void;
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({
@@ -35,6 +37,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   className,
   onChatOpsSendMessage,
   onChatOpsReset,
+  onExecutionAuditRowClick,
 }) => {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
@@ -179,6 +182,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           console.log('[AppLayout] Execution Audit view run requested:', maskedRunId);
           // ⚠️ 참고: 실제 Run 상세 조회는 App.tsx의 handleExecutionAuditViewRun에서 처리됨
         }}
+        onExecutionAuditRowClick={onExecutionAuditRowClick}
         onExecutionAuditFilterChange={(filters) => {
           // Execution Audit 필터 변경 (액티비티.md 10.1 참조)
           // 필터 변경 시 cursor 초기화하여 첫 페이지부터 다시 로드

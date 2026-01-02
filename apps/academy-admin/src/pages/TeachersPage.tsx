@@ -144,13 +144,13 @@ export function TeachersPage() {
 
           {/* 강사 목록 */}
           {isLoading ? (
-            <Card padding="lg" variant="default">
+            <Card padding="lg">
               <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
                 로딩 중...
               </div>
             </Card>
           ) : error ? (
-            <Card padding="md" variant="outlined">
+            <Card padding="md">
               <div style={{ color: 'var(--color-error)', padding: 'var(--spacing-md)' }}>
                 오류: {error.message}
               </div>
@@ -180,7 +180,7 @@ export function TeachersPage() {
                 />
               ))}
               {teachers?.length === 0 && (
-                <Card padding="lg" variant="default">
+                <Card padding="lg">
                   <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
                     등록된 강사가 없습니다.
                   </div>
@@ -450,7 +450,6 @@ function TeacherCard({
   return (
     <Card
       padding="md"
-      variant="default"
       style={{
         borderLeft: `var(--border-width-thick) solid ${statusColors[teacher.status]}`,
       }}

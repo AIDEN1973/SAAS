@@ -8,15 +8,15 @@
 export const EMPTY_CARD_MESSAGES = {
   EMERGENCY: {
     TITLE: '긴급 알림 없음',
-    MESSAGE: '현재 긴급 알림이 없습니다.',
+    MESSAGE: '현재 긴급하게 처리해야 할 사항이 없습니다. 학원 운영이 원활하게 진행되고 있습니다.',
   },
   AI_BRIEFING: {
-    TITLE: 'AI 브리핑 없음',
-    SUMMARY: '현재 AI 브리핑 정보가 없습니다.',
+    TITLE: 'AI 브리핑 준비 중',
+    SUMMARY: 'AI 브리핑을 생성 중입니다. 잠시 후 학생 및 매출 현황 인사이트가 표시됩니다.',
   },
   STUDENT_TASK: {
     TITLE: '학생 업무 없음',
-    DESCRIPTION: '현재 처리할 학생 업무가 없습니다.',
+    DESCRIPTION: '현재 처리해야 할 학생 관련 업무가 없습니다. 새로운 상담이나 관리 작업이 필요한 학생이 생기면 여기에 표시됩니다.',
   },
   CLASS: {
     CLASS_NAME: '오늘 수업 없음',
@@ -24,11 +24,11 @@ export const EMPTY_CARD_MESSAGES = {
     ATTENDANCE: '출석: 0/0',
   },
   STATS: {
-    TITLE: '통계 없음',
+    TITLE: '데이터 집계 중',
     VALUE: '-',
   },
   BILLING_SUMMARY: {
-    TITLE: '청구 요약 없음',
+    TITLE: '수납 데이터 없음',
     EXPECTED_COLLECTION_RATE: 0,
     UNPAID_COUNT: 0,
   },

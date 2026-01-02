@@ -15,6 +15,7 @@ import { withTenant } from '../_shared/withTenant.ts';
 import { envServer } from '../_shared/env-registry.ts';
 import { toKSTDate, toKST, toKSTMonth } from '../_shared/date-utils.ts';
 import { checkAndUpdateAutomationSafety } from '../_shared/automation-safety.ts';
+import { logError, createErrorLogEntry } from '../_shared/error-tracking.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -133,7 +134,8 @@ serve(async (req) => {
         // 통계 업데이트 (analytics.daily_store_metrics 테이블 사용, 정본)
         // ⚠️ 참고: analytics.daily_metrics는 구버전/폐기된 네이밍입니다.
         const { error: upsertError } = await supabase
-          .from('analytics.daily_store_metrics')  // 정본: daily_metrics는 구버전
+          .schema('analytics')
+          .from('daily_store_metrics')  // 정본: daily_metrics는 구버전
           .upsert({
             tenant_id: tenant.id,
             date_kst: dateKst,
@@ -220,6 +222,7 @@ serve(async (req) => {
                   title: '월 매출 목표 미달',
                   description: `이번 달 현재 매출이 목표 대비 ${((expectedRevenue - currentRevenue) / expectedRevenue * 100).toFixed(1)}% 부족합니다.`,
                   priority: 75,
+                  risk_level: 'low', // Phase 2: Low-Risk (내부 알림만)
                   dedup_key: dedupKey,
                   expires_at: new Date(kstTime.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
                 }, {
@@ -234,19 +237,235 @@ serve(async (req) => {
 
       } catch (error) {
         console.error(`[Daily Statistics] Error processing tenant ${tenant.id}:`, error);
+        // P0-2: Error Tracking 추가
+        await logError(supabase, createErrorLogEntry(
+          error,
+          'daily-statistics-update',
+          tenant.id,
+          { phase: 'tenant_processing', date_kst: dateKst }
+        ));
       }
+    }
+
+    // ============================================================================
+    // P0-1: 지역별 통계 집계 (analytics.daily_region_metrics)
+    // ============================================================================
+    // [불변 규칙] 통계문서 FR-05, 아키텍처 문서 3.6.5 준수
+    // [요구사항] 동/구/시 단위 지역별 집계, 최소 샘플 수 조건 (>= 3)
+    console.log(`[Daily Statistics] Starting regional aggregation for ${dateKst}`);
+
+    let regionalUpdated = 0;
+    try {
+      // 지역별 집계를 위해 테넌트별로 위치 정보 조회
+      const { data: tenantLocations, error: locationsError } = await supabase
+        .from('tenant_settings')
+        .select('tenant_id, value')
+        .eq('key', 'config');
+
+      if (locationsError) {
+        console.error('[Regional Aggregation] Failed to fetch tenant locations:', locationsError);
+      } else {
+        // 지역 코드별로 그룹화 (location_code, sigungu_code, sido_code)
+        const locationMap = new Map<string, { tenants: string[]; level: 'dong' | 'gu_gun' | 'si' }>();
+
+        for (const setting of tenantLocations || []) {
+          const config = setting.value as { location?: { location_code?: string; sigungu_code?: string; sido_code?: string } };
+          const location = config?.location;
+
+          if (location?.location_code) {
+            // 동 단위
+            const key = `dong:${location.location_code}`;
+            if (!locationMap.has(key)) {
+              locationMap.set(key, { tenants: [], level: 'dong' });
+            }
+            locationMap.get(key)!.tenants.push(setting.tenant_id);
+          }
+
+          if (location?.sigungu_code) {
+            // 구/군 단위
+            const key = `gu_gun:${location.sigungu_code}`;
+            if (!locationMap.has(key)) {
+              locationMap.set(key, { tenants: [], level: 'gu_gun' });
+            }
+            locationMap.get(key)!.tenants.push(setting.tenant_id);
+          }
+
+          if (location?.sido_code) {
+            // 시/도 단위
+            const key = `si:${location.sido_code}`;
+            if (!locationMap.has(key)) {
+              locationMap.set(key, { tenants: [], level: 'si' });
+            }
+            locationMap.get(key)!.tenants.push(setting.tenant_id);
+          }
+        }
+
+        // 각 지역별로 집계
+        for (const [key, { tenants: tenantIds, level }] of locationMap.entries()) {
+          const [regionLevel, regionCode] = key.split(':');
+
+          // 최소 샘플 수 조건 (통계문서 FR-03)
+          if (tenantIds.length < 3) {
+            console.log(`[Regional Aggregation] Skipping ${regionCode} (${regionLevel}): only ${tenantIds.length} tenants`);
+            continue;
+          }
+
+          try {
+            // 해당 지역의 매장 통계 조회
+            const { data: storeMetrics, error: metricsError } = await supabase
+              .schema('analytics')
+              .from('daily_store_metrics')
+              .select('*')
+              .eq('date_kst', dateKst)
+              .in('tenant_id', tenantIds);
+
+            if (metricsError) {
+              console.error(`[Regional Aggregation] Failed to fetch metrics for ${regionCode}:`, metricsError);
+              continue;
+            }
+
+            if (!storeMetrics || storeMetrics.length === 0) {
+              console.log(`[Regional Aggregation] No metrics for ${regionCode}`);
+              continue;
+            }
+
+            // 집계 계산
+            const tenantCount = storeMetrics.length;
+            const studentCount = storeMetrics.reduce((sum: number, m: any) => sum + (m.student_count || 0), 0);
+            const totalRevenue = storeMetrics.reduce((sum: number, m: any) => sum + (m.revenue || 0), 0);
+            const avgArpu = storeMetrics.reduce((sum: number, m: any) => sum + (m.arpu || 0), 0) / tenantCount;
+            const avgAttendanceRate = storeMetrics.reduce((sum: number, m: any) => sum + (m.attendance_rate || 0), 0) / tenantCount;
+
+            // Percentile 계산 (attendance_rate)
+            const attendanceRates = storeMetrics.map((m: any) => m.attendance_rate || 0).sort((a: number, b: number) => a - b);
+            const p25Index = Math.floor(attendanceRates.length * 0.25);
+            const p75Index = Math.floor(attendanceRates.length * 0.75);
+            const attendanceRateP25 = attendanceRates[p25Index] || 0;
+            const attendanceRateP75 = attendanceRates[p75Index] || 0;
+
+            // 성장률 계산 (전월 대비)
+            const lastMonthDate = new Date(yesterday.getTime() - 30 * 24 * 60 * 60 * 1000);
+            const lastMonthDateKst = toKSTDate(lastMonthDate);
+
+            const { data: lastMonthMetrics } = await supabase
+              .schema('analytics')
+              .from('daily_store_metrics')
+              .select('student_count, revenue')
+              .eq('date_kst', lastMonthDateKst)
+              .in('tenant_id', tenantIds);
+
+            let studentGrowthRateAvg = 0;
+            let revenueGrowthRateAvg = 0;
+            let studentGrowthRateP75 = 0;
+            let revenueGrowthRateP75 = 0;
+
+            if (lastMonthMetrics && lastMonthMetrics.length > 0) {
+              const lastMonthStudentCount = lastMonthMetrics.reduce((sum: number, m: any) => sum + (m.student_count || 0), 0);
+              const lastMonthRevenue = lastMonthMetrics.reduce((sum: number, m: any) => sum + (m.revenue || 0), 0);
+
+              if (lastMonthStudentCount > 0) {
+                studentGrowthRateAvg = ((studentCount - lastMonthStudentCount) / lastMonthStudentCount) * 100;
+              }
+              if (lastMonthRevenue > 0) {
+                revenueGrowthRateAvg = ((totalRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
+              }
+
+              // 성장률 분위수 계산
+              const studentGrowthRates = storeMetrics.map((m: any) => {
+                const lastMonth = lastMonthMetrics.find((lm: any) => lm.tenant_id === m.tenant_id);
+                if (!lastMonth || lastMonth.student_count === 0) return 0;
+                return ((m.student_count - lastMonth.student_count) / lastMonth.student_count) * 100;
+              }).sort((a: number, b: number) => a - b);
+
+              const revenueGrowthRates = storeMetrics.map((m: any) => {
+                const lastMonth = lastMonthMetrics.find((lm: any) => lm.tenant_id === m.tenant_id);
+                if (!lastMonth || lastMonth.revenue === 0) return 0;
+                return ((m.revenue - lastMonth.revenue) / lastMonth.revenue) * 100;
+              }).sort((a: number, b: number) => a - b);
+
+              studentGrowthRateP75 = studentGrowthRates[p75Index] || 0;
+              revenueGrowthRateP75 = revenueGrowthRates[p75Index] || 0;
+            }
+
+            // analytics.daily_region_metrics에 저장
+            const { error: regionUpsertError } = await supabase
+              .schema('analytics')
+              .from('daily_region_metrics')
+              .upsert({
+                region_code: regionCode,
+                region_level: level,
+                industry_type: 'academy', // 현재는 academy만 지원
+                tenant_count: tenantCount,
+                student_count: studentCount,
+                avg_arpu: avgArpu,
+                avg_attendance_rate: avgAttendanceRate,
+                attendance_rate_p25: attendanceRateP25,
+                attendance_rate_p75: attendanceRateP75,
+                student_growth_rate_avg: studentGrowthRateAvg,
+                revenue_growth_rate_avg: revenueGrowthRateAvg,
+                student_growth_rate_p75: studentGrowthRateP75,
+                revenue_growth_rate_p75: revenueGrowthRateP75,
+                date_kst: dateKst,
+                updated_at: toKST().toISOString(),
+              }, {
+                onConflict: 'region_code,region_level,industry_type,date_kst',
+              });
+
+            if (!regionUpsertError) {
+              regionalUpdated++;
+              console.log(`[Regional Aggregation] Updated ${regionCode} (${level}): ${tenantCount} tenants`);
+            } else {
+              console.error(`[Regional Aggregation] Failed to update ${regionCode}:`, regionUpsertError);
+            }
+
+          } catch (error) {
+            console.error(`[Regional Aggregation] Error processing ${regionCode}:`, error);
+            // P0-2: Error Tracking 추가
+            await logError(supabase, createErrorLogEntry(
+              error,
+              'daily-statistics-update',
+              undefined,
+              { phase: 'regional_aggregation', region_code: regionCode, region_level: level, date_kst: dateKst }
+            ));
+          }
+        }
+
+        console.log(`[Regional Aggregation] Completed: ${regionalUpdated} regions updated`);
+      }
+    } catch (error) {
+      console.error('[Regional Aggregation] Fatal error:', error);
+      // P0-2: Error Tracking 추가
+      await logError(supabase, createErrorLogEntry(
+        error,
+        'daily-statistics-update',
+        undefined,
+        { phase: 'regional_aggregation_fatal', date_kst: dateKst },
+        'critical'
+      ));
+      // 지역 집계 실패해도 전체 작업은 성공으로 처리 (매장 통계는 이미 업데이트됨)
     }
 
     return new Response(
       JSON.stringify({
         success: true,
         updated_count: totalUpdated,
+        regional_updated_count: regionalUpdated,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('[Daily Statistics] Fatal error:', error);
+
+    // P0-2: Error Tracking 추가 (Fatal Error)
+    await logError(supabase, createErrorLogEntry(
+      error,
+      'daily-statistics-update',
+      undefined,
+      { phase: 'fatal', is_cron_job: true },
+      'critical'
+    ));
+
     return new Response(
       JSON.stringify({
         success: false,

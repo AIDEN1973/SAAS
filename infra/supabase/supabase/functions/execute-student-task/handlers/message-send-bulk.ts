@@ -44,15 +44,15 @@ export const messageSendBulkHandler: IntentHandler = {
         };
       }
 
-      // ⚠️ P0: Policy 재평가 (실행 시점)
-      // event_type은 message_purpose와 동일
-      let eventType = plan.event_type || messagePurpose;
+      // [P0-FIX] Fail-Closed: event_type 기본값 제거 - 명시적 실패 처리
+      // message_purpose는 필수 파라미터이므로 plan.event_type 우선, 없으면 message_purpose 사용
+      const eventType = plan.event_type || messagePurpose;
 
       if (!eventType) {
         return {
           status: 'failed',
-          error_code: 'INVALID_PARAMS',
-          message: 'event_type이 없습니다.',
+          error_code: 'MISSING_EVENT_TYPE',
+          message: 'event_type 또는 message_purpose가 반드시 필요합니다. (Fail-Closed 원칙)',
         };
       }
 
