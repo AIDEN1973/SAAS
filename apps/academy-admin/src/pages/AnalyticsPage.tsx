@@ -22,12 +22,13 @@
  * - 유아이 문서: 6. Responsive UX (반응형 브레이크포인트 표준)
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { ErrorBoundary, useModal , Container, Card, Button, PageHeader , useResponsiveMode, isMobile } from '@ui-core/react';
 import { RegionalMetricCard } from '../components/analytics-cards/RegionalMetricCard';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useConfig } from '@hooks/use-config';
+import { LocationWarningBanner } from '../components/LocationWarningBanner';
 import { CardGridLayout } from '../components/CardGridLayout';
 import { fetchAttendanceLogs } from '@hooks/use-attendance';
 import { fetchBillingHistory } from '@hooks/use-billing';
@@ -37,7 +38,9 @@ import { toKST } from '@lib/date-utils';
 import type { BillingHistoryItem } from '@hooks/use-billing';
 import type { AttendanceLog } from '@services/attendance-service';
 // [SSOT] Barrel export를 통한 통합 import
-import { safe, logWarn } from '../utils';
+import { safe } from '../utils';
+import { logError } from '../utils/logger-utils';
+import { useNavigate } from 'react-router-dom';
 
 // 통계문서 2.4: Percentile Rank 계산을 위한 상수 정의 (하드코딩 제거)
 // Policy 기반 값이 없을 경우 사용하는 fallback 비율 (Default Policy)
@@ -74,9 +77,63 @@ export function AnalyticsPage() {
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
+  const navigate = useNavigate();
 
-  const [selectedMetric, setSelectedMetric] = useState<'students' | 'revenue' | 'attendance' | 'growth'>('students');
-  const [heatmapType, setHeatmapType] = useState<'growth' | 'attendance' | 'students'>('growth');
+  // localStorage 기반 상태 초기화 (SSR Safe, AutomationSettingsPage 패턴 적용)
+  const [selectedMetric, setSelectedMetric] = useState<'students' | 'revenue' | 'attendance' | 'growth'>(() => {
+    try {
+      const stored = localStorage.getItem('analytics-page-selected-metric');
+      if (stored && ['students', 'revenue', 'attendance', 'growth'].includes(stored)) {
+        return stored as 'students' | 'revenue' | 'attendance' | 'growth';
+      }
+      return 'students';
+    } catch (error) {
+      if (import.meta.env?.DEV) {
+        console.warn('AnalyticsPage: localStorage 접근 실패, 기본값 사용', { error });
+      }
+      return 'students';
+    }
+  });
+
+  const [heatmapType, setHeatmapType] = useState<'growth' | 'attendance' | 'students'>(() => {
+    try {
+      const stored = localStorage.getItem('analytics-page-heatmap-type');
+      if (stored && ['growth', 'attendance', 'students'].includes(stored)) {
+        return stored as 'growth' | 'attendance' | 'students';
+      }
+      return 'growth';
+    } catch (error) {
+      if (import.meta.env?.DEV) {
+        console.warn('AnalyticsPage: localStorage 접근 실패, 기본값 사용', { error });
+      }
+      return 'growth';
+    }
+  });
+
+  const [locationBannerDismissed, setLocationBannerDismissed] = useState(false);
+
+  // localStorage 상태 지속성 핸들러 (AutomationSettingsPage 패턴)
+  const handleMetricChange = useCallback((metric: 'students' | 'revenue' | 'attendance' | 'growth') => {
+    setSelectedMetric(metric);
+    try {
+      localStorage.setItem('analytics-page-selected-metric', metric);
+    } catch (error) {
+      if (import.meta.env?.DEV) {
+        console.warn('AnalyticsPage: localStorage 저장 실패', { error });
+      }
+    }
+  }, []);
+
+  const handleHeatmapTypeChange = useCallback((type: 'growth' | 'attendance' | 'students') => {
+    setHeatmapType(type);
+    try {
+      localStorage.setItem('analytics-page-heatmap-type', type);
+    } catch (error) {
+      if (import.meta.env?.DEV) {
+        console.warn('AnalyticsPage: localStorage 저장 실패', { error });
+      }
+    }
+  }, []);
 
   // 지역 정보 추출 (location.* 경로에서 가져오기, 저장 위치는 tenant_settings(key='config').value(JSONB))
   const locationInfo = useMemo(() => {
@@ -420,7 +477,8 @@ export function AnalyticsPage() {
       // 기술문서 5146줄: store_count >= 3 조건 미충족 시 명확한 메시지 표시
       if (comparisonGroup === 'insufficient' || sampleCount < minimumSampleSize) {
         if (!locationInfo.location_code) {
-          insights.push('경고: 지역 정보가 설정되지 않아 정확한 지역 비교가 불가능합니다. 설정 화면에서 위치 정보를 입력해주세요.');
+          // 지역 정보 미설정 시 배너로 표시 (insights에는 추가하지 않음)
+          // 배너는 페이지 상단에 표시됨
         } else {
           // 기술문서 5146줄: "해당 지역의 통계는 매장 수 부족으로 제공되지 않습니다" 출력
           insights.push(`경고: 해당 지역의 통계는 매장 수 부족(현재 ${sampleCount}개, 최소 3개 필요)으로 제공되지 않습니다.`);
@@ -550,7 +608,11 @@ export function AnalyticsPage() {
         );
 
         // 통계문서 253-256줄: ranking_snapshot 테이블에 저장
+        // P0-2→P1: 저장 에러 처리 개선 (logError 사용 및 상세 에러 메시지)
         const today = toKST().format('YYYY-MM-DD');
+        let rankingSaveError = null;
+        let insightSaveError = null;
+
         try {
           await apiClient.post('ranking_snapshot', {
             region_code: locationInfo.location_code || '',
@@ -560,9 +622,11 @@ export function AnalyticsPage() {
             rank: rank,
             date_kst: today,
           });
+          console.log('[AnalyticsPage] Ranking snapshot saved successfully');
         } catch (error) {
-          // 저장 실패는 무시 (선택적 기능)
-          logWarn('AnalyticsPage:SaveRankingSnapshot', 'Failed to save ranking snapshot', error);
+          rankingSaveError = error;
+          logError('AnalyticsPage:SaveRankingSnapshot', error as Error);
+          console.error('[AnalyticsPage] Failed to save ranking snapshot:', error);
         }
 
         // 통계문서 258-260줄: AI 인사이트를 ai_insights 테이블에 저장
@@ -587,9 +651,18 @@ export function AnalyticsPage() {
             related_entity_id: locationInfo.location_code || null,
             status: 'active',
           });
+          console.log('[AnalyticsPage] AI insight saved successfully');
         } catch (error) {
-          // 저장 실패는 무시 (선택적 기능)
-          logWarn('AnalyticsPage:SaveAIInsight', 'Failed to save AI insight', error);
+          insightSaveError = error;
+          logError('AnalyticsPage:SaveAIInsight', error as Error);
+          console.error('[AnalyticsPage] Failed to save AI insight:', error);
+        }
+
+        // 저장 실패 시 경고 표시 (선택적 기능이지만 사용자에게 피드백)
+        if (rankingSaveError || insightSaveError) {
+          // Note: 에러가 발생해도 페이지 동작은 계속됨 (통계 조회는 성공)
+          // 향후 개선: 재시도 버튼 또는 토스트 메시지 표시
+          console.warn('[AnalyticsPage] Some data failed to save, but statistics are still available');
         }
 
         return {
@@ -714,9 +787,23 @@ export function AnalyticsPage() {
     },
   });
 
+  // 지역 정보 미설정 시 경고 배너 표시
+  const showLocationBanner = !locationInfo.location_code && !locationBannerDismissed;
+
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"}>
+        {/* 지역 정보 미설정 시 안내 배너 표시 */}
+        {showLocationBanner && (
+          <div style={{ marginBottom: 'var(--spacing-md)' }}>
+            <LocationWarningBanner
+              message="지역 통계를 사용하려면 위치 정보를 설정하세요"
+              onNavigate={() => navigate('/settings')}
+              onDismiss={() => setLocationBannerDismissed(true)}
+            />
+          </div>
+        )}
+
         <PageHeader
           title="지역 기반 통계"
           actions={
@@ -733,14 +820,14 @@ export function AnalyticsPage() {
 
         {/* 통계문서 3.1: 운영 현황 카드 4개 (학생 수, 매출, 출석률, 성장률 / 지역순위) */}
         {/* 지표 선택 */}
-        <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+        <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
           <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
             {(Object.keys(selectedMetricLabels) as Array<keyof typeof selectedMetricLabels>).map((metric) => (
               <Button
                   key={metric}
                   variant={selectedMetric === metric ? 'solid' : 'outline'}
                   size="sm"
-                  onClick={() => setSelectedMetric(metric)}
+                  onClick={() => handleMetricChange(metric)}
                 >
                   {selectedMetricLabels[metric]}
                 </Button>
@@ -757,28 +844,28 @@ export function AnalyticsPage() {
                   metric="students"
                   regionalStats={regionalStats}
                   selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
+                  onSelect={handleMetricChange}
                 />,
                 <RegionalMetricCard
                   key="revenue"
                   metric="revenue"
                   regionalStats={regionalStats}
                   selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
+                  onSelect={handleMetricChange}
                 />,
                 <RegionalMetricCard
                   key="attendance"
                   metric="attendance"
                   regionalStats={regionalStats}
                   selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
+                  onSelect={handleMetricChange}
                 />,
                 <RegionalMetricCard
                   key="growth"
                   metric="growth"
                   regionalStats={regionalStats}
                   selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
+                  onSelect={handleMetricChange}
                 />,
               ]}
               desktopColumns={3}
@@ -789,7 +876,7 @@ export function AnalyticsPage() {
 
           {/* 지역 순위 카드 */}
           {isLoading ? (
-            <Card padding="lg" variant="default">
+            <Card padding="lg">
               <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
                 로딩 중...
               </div>
@@ -797,7 +884,7 @@ export function AnalyticsPage() {
           ) : regionalStats ? (
             <>
               {/* 아키텍처 문서 3.6.3: AI 해석 문장을 최상단에 배치 */}
-              <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+              <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
                 <h2 style={{ marginBottom: 'var(--spacing-md)', fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)' }}>
                   AI 인사이트
                 </h2>
@@ -830,7 +917,7 @@ export function AnalyticsPage() {
 
               {/* 통계문서 3.1: 지역 비교 차트 (우리 학원 vs 지역 평균 vs 상위 10% 평균) */}
               {regionalStats.comparisonGroup !== 'insufficient' && regionalStats.sampleCount >= 3 && (
-                <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+                <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
                   <h2 style={{ marginBottom: 'var(--spacing-md)' }}>지역 비교 차트</h2>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
                     {/* 통계문서 3.1: 우리 학원 vs 지역 평균 vs 상위 10% 평균 바 차트 */}
@@ -898,7 +985,7 @@ export function AnalyticsPage() {
 
               {/* 지역 순위 카드 (상세 정보, 펼치기 가능) */}
               {regionalStats.comparisonGroup !== 'insufficient' && regionalStats.sampleCount >= 3 && (
-                <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+                <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
                   <h2 style={{ marginBottom: 'var(--spacing-md)' }}>지역 순위</h2>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
@@ -951,7 +1038,7 @@ export function AnalyticsPage() {
               {/* 히트맵 - [요구사항 3.6.9] 히트맵 기능 (아키텍처 문서 352줄: 전용 Dashboard 구현) */}
               <HeatmapCard
                 heatmapType={heatmapType}
-                setHeatmapType={setHeatmapType}
+                setHeatmapType={handleHeatmapTypeChange}
                 locationInfo={{
                   region: locationInfo.region,
                   location_code: locationInfo.location_code || '',
@@ -962,7 +1049,7 @@ export function AnalyticsPage() {
               />
             </>
           ) : (
-            <Card padding="lg" variant="default">
+            <Card padding="lg">
               <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
                 데이터를 불러올 수 없습니다.
               </div>
@@ -1117,7 +1204,7 @@ function HeatmapCard({
   };
 
   return (
-    <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+    <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
       <h2 style={{ marginBottom: 'var(--spacing-md)' }}>지역 히트맵</h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
         {/* 히트맵 타입 선택 */}
@@ -1127,7 +1214,7 @@ function HeatmapCard({
               key={type}
               variant={heatmapType === type ? 'solid' : 'outline'}
               size="sm"
-              onClick={() => setHeatmapType(type)}
+              onClick={() => setHeatmapType(type as 'growth' | 'attendance' | 'students')}
             >
               {heatmapTypeLabels[type]}
             </Button>

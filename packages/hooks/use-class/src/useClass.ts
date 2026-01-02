@@ -90,6 +90,7 @@ export function useClass(classId: string | null) {
 
 /**
  * 반 생성 Hook
+ * [P0-2 수정] DB RPC 함수로 트랜잭션 처리하여 반 생성 + 강사 배정 atomic 보장
  */
 export function useCreateClass() {
   const queryClient = useQueryClient();
@@ -104,6 +105,54 @@ export function useCreateClass() {
         throw new Error('Tenant ID is required');
       }
 
+      // P0-2: teacher_ids가 있는 경우 DB RPC 함수 사용 (트랜잭션 보장)
+      if (input.teacher_ids && input.teacher_ids.length > 0) {
+        const response = await apiClient.callRPC<Class>('create_class_with_teachers', {
+          p_tenant_id: tenantId,
+          p_name: input.name,
+          p_subject: input.subject,
+          p_grade: input.grade,
+          p_day_of_week: input.day_of_week || 'monday',
+          p_start_time: input.start_time || '14:00:00',
+          p_end_time: input.end_time || '15:30:00',
+          p_capacity: input.capacity || 20,
+          p_room: input.room,
+          p_notes: input.notes,
+          p_status: input.status || 'active',
+          p_teacher_ids: input.teacher_ids,
+          p_created_by: session?.user?.id,
+        });
+
+        if (response.error) {
+          throw new Error(response.error.message);
+        }
+
+        // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+        if (session?.user?.id && response.data) {
+          const durationMs = Date.now() - startTime;
+          await createExecutionAuditRecord(
+            {
+              operation_type: 'class.register',
+              status: 'success',
+              summary: `${input.name || '반'} 등록 완료 (강사 ${input.teacher_ids.length}명 배정)`,
+              details: {
+                class_id: response.data.id,
+                teacher_count: input.teacher_ids.length,
+              },
+              reference: {
+                entity_type: 'class',
+                entity_id: response.data.id,
+              },
+              duration_ms: durationMs,
+            },
+            session.user.id
+          );
+        }
+
+        return response.data!;
+      }
+
+      // teacher_ids가 없는 경우 기존 방식 사용
       const response = await apiClient.post<Class>('academy_classes', {
         ...input,
         status: input.status || 'active',
@@ -457,6 +506,7 @@ export function useTeacher(teacherId: string | null) {
 
 /**
  * 강사 생성 Hook
+ * [P0-2 수정] DB RPC 함수로 트랜잭션 처리하여 persons + academy_teachers atomic 보장
  */
 export function useCreateTeacher() {
   const queryClient = useQueryClient();
@@ -471,73 +521,29 @@ export function useCreateTeacher() {
         throw new Error('Tenant ID is required');
       }
 
-      // 1. persons 테이블에 생성
-      const personResponse = await apiClient.post<Person>('persons', {
-        name: input.name,
-        email: input.email,
-        phone: input.phone,
-        address: input.address,
-        person_type: 'teacher',
+      // P0-2: DB RPC 함수 사용 (트랜잭션 보장)
+      const response = await apiClient.callRPC<Teacher>('create_teacher', {
+        p_tenant_id: tenantId,
+        p_name: input.name,
+        p_email: input.email,
+        p_phone: input.phone,
+        p_address: input.address,
+        p_employee_id: input.employee_id,
+        p_specialization: input.specialization,
+        p_hire_date: input.hire_date,
+        p_status: input.status || 'active',
+        p_profile_image_url: input.profile_image_url,
+        p_bio: input.bio,
+        p_notes: input.notes,
+        p_created_by: session?.user?.id,
       });
 
-      if (personResponse.error) {
-        throw new Error(personResponse.error.message);
+      if (response.error) {
+        throw new Error(response.error.message);
       }
-
-      const person = personResponse.data!;
-
-      // 2. academy_teachers 테이블에 확장 정보 추가
-      interface AcademyTeacher {
-        person_id: string;
-        employee_id?: string;
-        specialization?: string;
-        hire_date?: string;
-        status?: string;
-        profile_image_url?: string;
-        bio?: string;
-        notes?: string;
-        created_by?: string;
-        updated_by?: string;
-      }
-      const teacherResponse = await apiClient.post<AcademyTeacher>('academy_teachers', {
-        person_id: person.id,
-        employee_id: input.employee_id,
-        specialization: input.specialization,
-        hire_date: input.hire_date,
-        status: input.status || 'active',
-        profile_image_url: input.profile_image_url,
-        bio: input.bio,
-        notes: input.notes,
-      });
-
-      if (teacherResponse.error) {
-        // 롤백: persons 삭제
-        await apiClient.delete('persons', person.id);
-        throw new Error(teacherResponse.error.message);
-      }
-
-      const teacher = {
-        id: person.id,
-        tenant_id: person.tenant_id,
-        name: person.name,
-        email: person.email,
-        phone: person.phone,
-        address: person.address,
-        employee_id: teacherResponse.data?.employee_id,
-        specialization: teacherResponse.data?.specialization,
-        hire_date: teacherResponse.data?.hire_date,
-        status: teacherResponse.data?.status || 'active',
-        profile_image_url: teacherResponse.data?.profile_image_url,
-        bio: teacherResponse.data?.bio,
-        notes: teacherResponse.data?.notes,
-        created_at: person.created_at,
-        updated_at: person.updated_at,
-        created_by: teacherResponse.data?.created_by,
-        updated_by: teacherResponse.data?.updated_by,
-      } as Teacher;
 
       // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
-      if (session?.user?.id) {
+      if (session?.user?.id && response.data) {
         const durationMs = Date.now() - startTime;
         await createExecutionAuditRecord(
           {
@@ -545,11 +551,11 @@ export function useCreateTeacher() {
             status: 'success',
             summary: `${input.name} 강사 등록 완료`,
             details: {
-              teacher_id: person.id,
+              teacher_id: response.data.id,
             },
             reference: {
               entity_type: 'teacher',
-              entity_id: person.id,
+              entity_id: response.data.id,
             },
             duration_ms: durationMs,
           },
@@ -557,7 +563,7 @@ export function useCreateTeacher() {
         );
       }
 
-      return teacher;
+      return response.data!;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teachers', tenantId] });
@@ -723,6 +729,7 @@ export function useUpdateTeacher() {
 
 /**
  * 강사 삭제 Hook
+ * [P1-3 수정] DB RPC 함수로 소프트 삭제 최적화 (2번 쿼리 → 1번)
  */
 export function useDeleteTeacher() {
   const queryClient = useQueryClient();
@@ -737,23 +744,10 @@ export function useDeleteTeacher() {
         throw new Error('Tenant ID is required');
       }
 
-      // 소프트 삭제: status를 'resigned'로 변경
-      const teacherResponse = await apiClient.get('academy_teachers', {
-        filters: { person_id: teacherId },
-        limit: 1,
-      });
-
-      if (teacherResponse.error) {
-        throw new Error(teacherResponse.error.message);
-      }
-
-      const academyTeacher = teacherResponse.data?.[0] as { person_id?: string } | undefined;
-      if (!academyTeacher || !academyTeacher.person_id) {
-        throw new Error('Teacher not found');
-      }
-
-      const response = await apiClient.patch('academy_teachers', academyTeacher.person_id, {
-        status: 'resigned',
+      // P1-3: DB RPC 함수 사용 (쿼리 횟수 감소)
+      const response = await apiClient.callRPC('delete_teacher', {
+        p_tenant_id: tenantId,
+        p_teacher_id: teacherId,
       });
 
       if (response.error) {
