@@ -14,6 +14,7 @@ import { Header, HeaderProps } from './Header';
 import { Sidebar, SidebarItem } from './Sidebar';
 import { AILayerMenu } from './AILayerMenu';
 import type { ExecutionAuditRun } from './ExecutionAuditPanel';
+import type { ChatOpsIndustryTerms } from './ChatOpsPanel';
 import { maskPII } from '@core/pii-utils';
 
 export interface AppLayoutProps {
@@ -25,6 +26,7 @@ export interface AppLayoutProps {
   };
   children: React.ReactNode;
   className?: string;
+  chatOpsIndustryTerms?: ChatOpsIndustryTerms; // 업종별 용어 (선택사항)
   onChatOpsSendMessage?: (message: string) => void | Promise<void>;
   onChatOpsReset?: () => void;
   onExecutionAuditRowClick?: (run: ExecutionAuditRun) => void;
@@ -35,6 +37,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   sidebar,
   children,
   className,
+  chatOpsIndustryTerms,
   onChatOpsSendMessage,
   onChatOpsReset,
   onExecutionAuditRowClick,
@@ -133,6 +136,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         }}
         chatOpsMessages={aiLayerMenu.chatOpsMessages}
         chatOpsLoading={aiLayerMenu.chatOpsLoading}
+        chatOpsIndustryTerms={chatOpsIndustryTerms}
         onChatOpsSendMessage={onChatOpsSendMessage || (async (message) => {
           // ChatOps API 호출 (챗봇.md 참조)
           // 상위 컴포넌트(App.tsx)에서 useChatOps Hook을 사용하여 처리

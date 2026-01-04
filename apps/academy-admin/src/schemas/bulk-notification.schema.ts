@@ -18,21 +18,7 @@ export const bulkNotificationFormSchema: FormSchema = {
       rowGap: 'md',
     },
     fields: [
-      {
-        name: 'channel',
-        kind: 'select',
-        ui: {
-          label: '채널',
-          colSpan: 1,
-        },
-        options: [
-          { value: 'sms', label: 'SMS' },
-          { value: 'kakao_at', label: '카카오 알림톡' },  // SSOT-3: 저장/실행용 코드는 'kakao_at', UI 표시명은 '카카오 알림톡'
-        ],
-        validation: {
-          required: true,
-        },
-      },
+      // [불변 규칙] 채널 선택 제거됨 - 알림톡 기본, SMS는 폴백으로만 작동
       {
         name: 'scheduled_at',
         kind: 'datetime',

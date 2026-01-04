@@ -14,6 +14,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { fetchAIInsights } from '@hooks/use-ai-insights';
 import { toKST } from '@lib/date-utils';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 
 // 레이어 섹션 본문 카드 스타일
 const layerSectionCardStyle: React.CSSProperties = {};
@@ -32,6 +33,7 @@ export function RiskAnalysisTab({
   isEditable: boolean;
 }) {
   const { toast } = useToast();
+  const terms = useIndustryTerms();
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
@@ -157,7 +159,7 @@ export function RiskAnalysisTab({
           title={
             <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
               <AlertTriangle size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-              이탈위험 분석
+              {terms.EMERGENCY_RISK_LABEL} 분석
             </span>
           }
         />
@@ -178,7 +180,7 @@ export function RiskAnalysisTab({
           title={
             <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
               <AlertTriangle size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-              이탈위험 분석
+              {terms.EMERGENCY_RISK_LABEL} 분석
             </span>
           }
         />
@@ -204,7 +206,7 @@ export function RiskAnalysisTab({
             <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
               분석 데이터가 없습니다.
               <br />
-              아래 버튼을 클릭하여 이탈위험 분석을 시작하세요.
+              아래 버튼을 클릭하여 {terms.EMERGENCY_RISK_LABEL} 분석을 시작하세요.
             </p>
             {isEditable && (
               <div style={{ marginTop: 'var(--spacing-md)', display: 'flex', justifyContent: 'center' }}>
@@ -214,10 +216,10 @@ export function RiskAnalysisTab({
                 onClick={async () => {
                   try {
                     await refetchRiskAnalysis();
-                    toast('이탈위험 분석이 완료되었습니다.', 'success', '알림');
+                    toast(`${terms.EMERGENCY_RISK_LABEL} 분석이 완료되었습니다.`, 'success', '알림');
                   } catch (error) {
                     toast(
-                      error instanceof Error ? error.message : '이탈위험 분석에 실패했습니다.',
+                      error instanceof Error ? error.message : `${terms.EMERGENCY_RISK_LABEL} 분석에 실패했습니다.`,
                       'error'
                     );
                   }
@@ -380,10 +382,10 @@ export function RiskAnalysisTab({
                           await refetchRiskAnalysis();
                           // 새로 분석한 결과로 인해 쿼리가 무효화되므로 저장된 결과도 다시 불러옴
                           void queryClient.invalidateQueries({ queryKey: ['student-risk-analysis-saved', tenantId, studentId] });
-                          toast('이탈위험 분석이 완료되었습니다.', 'success', '알림');
+                          toast(`${terms.EMERGENCY_RISK_LABEL} 분석이 완료되었습니다.`, 'success', '알림');
                         } catch (error) {
                           toast(
-                            error instanceof Error ? error.message : '이탈위험 분석에 실패했습니다.',
+                            error instanceof Error ? error.message : `${terms.EMERGENCY_RISK_LABEL} 분석에 실패했습니다.`,
                             'error'
                           );
                         }

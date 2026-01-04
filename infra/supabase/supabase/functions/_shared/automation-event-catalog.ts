@@ -18,14 +18,14 @@
  */
 
 /**
- * 자동화 event_type 카탈로그 (39개)
+ * 자동화 event_type 카탈로그 (42개)
  *
  * 문서 SSOT: docu/AI_자동화_기능_정리.md Section 11
  * - financial_health (10)
  * - capacity_optimization (6)
  * - customer_retention (8)
  * - growth_marketing (6)
- * - safety_compliance (7)
+ * - safety_compliance (10)
  * - workforce_ops (2)
  */
 export const AUTOMATION_EVENT_CATALOG = [
@@ -67,7 +67,7 @@ export const AUTOMATION_EVENT_CATALOG = [
   'regional_underperformance',
   'regional_rank_drop',
 
-  // safety_compliance (7)
+  // safety_compliance (10)
   'class_change_or_cancel',
   'checkin_reminder',
   'checkout_missing_alert',
@@ -75,6 +75,9 @@ export const AUTOMATION_EVENT_CATALOG = [
   'announcement_digest',
   'consultation_summary_ready',
   'attendance_pattern_anomaly',
+  'student_onboarding_message',
+  'bulk_message_send',
+  'message_approval_workflow',
 
   // workforce_ops (2)
   'teacher_workload_imbalance',

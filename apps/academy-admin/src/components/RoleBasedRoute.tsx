@@ -62,7 +62,7 @@ const roleRouteRules: Record<TenantRole, string[]> = {
     '/students/:id/counsel', // 상담일지 작성 접근 가능
     '/students/:id/attendance', // 출결 조회 접근 가능
     '/ai/insights/summary', // AI 요약 접근 가능 (상세 분석 제한)
-    '/classes', // 반 목록 접근 가능
+    '/classes', // 수업 목록 접근 가능
     // /billing/** 접근 금지
     // /analytics/** 접근 금지 (요약만 제공)
   ],
@@ -75,7 +75,7 @@ const roleRouteRules: Record<TenantRole, string[]> = {
     '/students/:id/counsel', // 상담일지 작성 접근 가능
     '/students/:id/attendance', // 출결 조회 접근 가능
     '/ai/insights/summary', // AI 요약 접근 가능 (상세 분석 제한)
-    '/classes', // 반 목록 접근 가능
+    '/classes', // 수업 목록 접근 가능
     // /billing/** 접근 금지
     // /analytics/** 접근 금지 (요약만 제공)
   ],

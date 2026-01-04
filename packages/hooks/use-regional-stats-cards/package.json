@@ -1,0 +1,15 @@
+{
+  "name": "@hooks/use-regional-stats-cards",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.12",
+    "@api-sdk/core": "workspace:*",
+    "@hooks/use-student": "workspace:*",
+    "@hooks/use-billing": "workspace:*",
+    "@hooks/use-attendance": "workspace:*",
+    "@hooks/use-daily-region-metrics": "workspace:*",
+    "@lib/date-utils": "workspace:*"
+  }
+}

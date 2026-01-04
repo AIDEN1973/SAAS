@@ -26,7 +26,7 @@ export const POLICY_KEY_V2_CATEGORIES: Record<
   },
   capacity_optimization: {
     title: '정원 최적화',
-    description: '정원/시간표/반 운영 최적화',
+    description: '정원/시간표/수업 운영 최적화',
     order: 2,
   },
   customer_retention: {
@@ -186,7 +186,36 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       defaultValue: 10000000,
     },
   ],
-  top_overdue_customers_digest: [],
+  top_overdue_customers_digest: [
+    {
+      field: 'min_amount',
+      label: '최소 미납액 (원)',
+      type: 'number',
+      policyPath: 'auto_notification.top_overdue_customers_digest.min_amount',
+      min: 0,
+      defaultValue: 100000,
+    },
+    {
+      field: 'top_count',
+      label: '상위 고객 수',
+      type: 'number',
+      policyPath: 'auto_notification.top_overdue_customers_digest.top_count',
+      min: 1,
+      max: 50,
+      defaultValue: 10,
+    },
+    {
+      field: 'channel',
+      label: '알림 채널',
+      type: 'select',
+      policyPath: 'auto_notification.top_overdue_customers_digest.channel',
+      options: [
+        { value: 'sms', label: 'SMS' },
+        { value: 'kakao_at', label: '카카오 알림톡' },
+      ],
+      defaultValue: 'kakao_at',
+    },
+  ],
   refund_spike: [
     {
       field: 'threshold',
@@ -229,7 +258,43 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       defaultValue: 7,
     },
   ],
-  ai_suggest_class_merge: [],
+  ai_suggest_class_merge: [
+    {
+      field: 'min_capacity',
+      label: '최소 정원 (명)',
+      type: 'number',
+      policyPath: 'auto_notification.ai_suggest_class_merge.min_capacity',
+      min: 1,
+      defaultValue: 10,
+    },
+    {
+      field: 'fill_rate_threshold',
+      label: '정원률 임계값 (%)',
+      type: 'number',
+      policyPath: 'auto_notification.ai_suggest_class_merge.fill_rate_threshold',
+      min: 0,
+      max: 100,
+      defaultValue: 50,
+    },
+    {
+      field: 'channel',
+      label: '알림 채널',
+      type: 'select',
+      policyPath: 'auto_notification.ai_suggest_class_merge.channel',
+      options: [
+        { value: 'sms', label: 'SMS' },
+        { value: 'kakao_at', label: '카카오 알림톡' },
+      ],
+      defaultValue: 'kakao_at',
+    },
+    {
+      field: 'require_approval',
+      label: '승인 필요',
+      type: 'boolean',
+      policyPath: 'auto_notification.ai_suggest_class_merge.require_approval',
+      defaultValue: true,
+    },
+  ],
   time_slot_fill_rate_low: [
     {
       field: 'threshold',
@@ -375,7 +440,43 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       defaultValue: 2,
     },
   ],
-  ai_suggest_churn_focus: [],
+  ai_suggest_churn_focus: [
+    {
+      field: 'ai_threshold',
+      label: 'AI 위험도 점수 임계값',
+      type: 'number',
+      policyPath: 'auto_notification.ai_suggest_churn_focus.ai_threshold',
+      min: 0,
+      max: 100,
+      defaultValue: 70,
+    },
+    {
+      field: 'risk_window_days',
+      label: '위험 판정 기간 (일)',
+      type: 'number',
+      policyPath: 'auto_notification.ai_suggest_churn_focus.risk_window_days',
+      min: 1,
+      defaultValue: 30,
+    },
+    {
+      field: 'channel',
+      label: '알림 채널',
+      type: 'select',
+      policyPath: 'auto_notification.ai_suggest_churn_focus.channel',
+      options: [
+        { value: 'sms', label: 'SMS' },
+        { value: 'kakao_at', label: '카카오 알림톡' },
+      ],
+      defaultValue: 'kakao_at',
+    },
+    {
+      field: 'require_approval',
+      label: '승인 필요',
+      type: 'boolean',
+      policyPath: 'auto_notification.ai_suggest_churn_focus.require_approval',
+      defaultValue: true,
+    },
+  ],
   attendance_rate_drop_weekly: [
     {
       field: 'threshold',
@@ -386,7 +487,41 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       defaultValue: 10,
     },
   ],
-  risk_students_weekly_kpi: [],
+  risk_students_weekly_kpi: [
+    {
+      field: 'risk_score_threshold',
+      label: '위험도 점수 임계값',
+      type: 'number',
+      policyPath: 'auto_notification.risk_students_weekly_kpi.risk_score_threshold',
+      min: 0,
+      max: 100,
+      defaultValue: 60,
+    },
+    {
+      field: 'include_categories',
+      label: '포함 카테고리',
+      type: 'select',
+      policyPath: 'auto_notification.risk_students_weekly_kpi.include_categories',
+      options: [
+        { value: 'all', label: '전체' },
+        { value: 'attendance', label: '출결' },
+        { value: 'payment', label: '수납' },
+        { value: 'behavioral', label: '행동' },
+      ],
+      defaultValue: 'all',
+    },
+    {
+      field: 'channel',
+      label: '알림 채널',
+      type: 'select',
+      policyPath: 'auto_notification.risk_students_weekly_kpi.channel',
+      options: [
+        { value: 'sms', label: 'SMS' },
+        { value: 'kakao_at', label: '카카오 알림톡' },
+      ],
+      defaultValue: 'kakao_at',
+    },
+  ],
 
   // growth_marketing (6)
   new_member_drop: [
@@ -667,6 +802,74 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       defaultValue: true,
     },
   ],
+  student_onboarding_message: [
+    {
+      field: 'channel',
+      label: '알림 채널',
+      type: 'select',
+      policyPath: 'auto_notification.student_onboarding_message.channel',
+      options: [
+        { value: 'sms', label: 'SMS' },
+        { value: 'kakao_at', label: '카카오 알림톡' },
+      ],
+      defaultValue: 'kakao_at',
+    },
+    {
+      field: 'require_approval',
+      label: '승인 필요',
+      type: 'boolean',
+      policyPath: 'auto_notification.student_onboarding_message.require_approval',
+      defaultValue: false,
+    },
+  ],
+  bulk_message_send: [
+    {
+      field: 'channel',
+      label: '알림 채널',
+      type: 'select',
+      policyPath: 'auto_notification.bulk_message_send.channel',
+      options: [
+        { value: 'sms', label: 'SMS' },
+        { value: 'kakao_at', label: '카카오 알림톡' },
+      ],
+      defaultValue: 'kakao_at',
+    },
+    {
+      field: 'max_per_hour',
+      label: '시간당 최대 발송 건수',
+      type: 'number',
+      policyPath: 'auto_notification.bulk_message_send.max_per_hour',
+      min: 1,
+      defaultValue: 100,
+    },
+    {
+      field: 'require_approval',
+      label: '승인 필요',
+      type: 'boolean',
+      policyPath: 'auto_notification.bulk_message_send.require_approval',
+      defaultValue: true,
+    },
+  ],
+  message_approval_workflow: [
+    {
+      field: 'channel',
+      label: '알림 채널',
+      type: 'select',
+      policyPath: 'auto_notification.message_approval_workflow.channel',
+      options: [
+        { value: 'sms', label: 'SMS' },
+        { value: 'kakao_at', label: '카카오 알림톡' },
+      ],
+      defaultValue: 'kakao_at',
+    },
+    {
+      field: 'require_approval',
+      label: '승인 필요',
+      type: 'boolean',
+      policyPath: 'auto_notification.message_approval_workflow.require_approval',
+      defaultValue: true,
+    },
+  ],
 
   // workforce_ops (2)
   teacher_workload_imbalance: [
@@ -679,7 +882,42 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       defaultValue: 5,
     },
   ],
-  staff_absence_schedule_risk: [],
+  staff_absence_schedule_risk: [
+    {
+      field: 'advance_notice_days',
+      label: '사전 공지 일수 (일 전)',
+      type: 'number',
+      policyPath: 'auto_notification.staff_absence_schedule_risk.advance_notice_days',
+      min: 1,
+      defaultValue: 7,
+    },
+    {
+      field: 'critical_absence_hours',
+      label: '임계 결근 시간 (시간)',
+      type: 'number',
+      policyPath: 'auto_notification.staff_absence_schedule_risk.critical_absence_hours',
+      min: 1,
+      defaultValue: 8,
+    },
+    {
+      field: 'channel',
+      label: '알림 채널',
+      type: 'select',
+      policyPath: 'auto_notification.staff_absence_schedule_risk.channel',
+      options: [
+        { value: 'sms', label: 'SMS' },
+        { value: 'kakao_at', label: '카카오 알림톡' },
+      ],
+      defaultValue: 'kakao_at',
+    },
+    {
+      field: 'require_approval',
+      label: '승인 필요',
+      type: 'boolean',
+      policyPath: 'auto_notification.staff_absence_schedule_risk.require_approval',
+      defaultValue: true,
+    },
+  ],
 };
 
 /**
@@ -743,13 +981,13 @@ export const AUTOMATION_EVENT_DESCRIPTIONS: Record<
 
   // capacity_optimization (6)
   class_fill_rate_low_persistent: {
-    title: '반 정원률 지속 저조',
-    description: '반 정원률이 지속적으로 낮을 때 관리자에게 알림을 발송합니다.',
+    title: '수업 정원률 지속 저조',
+    description: '수업 정원률이 지속적으로 낮을 때 관리자에게 알림을 발송합니다.',
     policyKey: 'capacity_optimization',
   },
   ai_suggest_class_merge: {
-    title: 'AI 반 통합 제안',
-    description: '저정원 반을 감지하여 반 통합을 제안합니다.',
+    title: 'AI 수업 통합 제안',
+    description: '저정원 수업을 감지하여 수업 통합을 제안합니다.',
     policyKey: 'capacity_optimization',
   },
   time_slot_fill_rate_low: {
@@ -758,13 +996,13 @@ export const AUTOMATION_EVENT_DESCRIPTIONS: Record<
     policyKey: 'capacity_optimization',
   },
   high_fill_rate_expand_candidate: {
-    title: '확장 후보 반 추천',
-    description: '정원률이 높은 반을 확장 후보로 추천합니다.',
+    title: '확장 후보 수업 추천',
+    description: '정원률이 높은 수업을 확장 후보로 추천합니다.',
     policyKey: 'capacity_optimization',
   },
   unused_class_persistent: {
-    title: '미사용 반 지속 알림',
-    description: '지속적으로 사용되지 않는 반을 감지하여 관리자에게 알림을 발송합니다.',
+    title: '미사용 수업 지속 알림',
+    description: '지속적으로 사용되지 않는 수업을 감지하여 관리자에게 알림을 발송합니다.',
     policyKey: 'capacity_optimization',
   },
   weekly_ops_summary: {
@@ -881,6 +1119,21 @@ export const AUTOMATION_EVENT_DESCRIPTIONS: Record<
   attendance_pattern_anomaly: {
     title: '출결 패턴 이상 감지',
     description: '학생의 출결 패턴에 이상이 감지되면 학부모에게 알림을 발송합니다.',
+    policyKey: 'safety_compliance',
+  },
+  student_onboarding_message: {
+    title: '신규 학생 환영 메시지',
+    description: '신규 학생 등록 시 자동으로 환영 메시지를 발송합니다.',
+    policyKey: 'safety_compliance',
+  },
+  bulk_message_send: {
+    title: '대량 메시지 발송',
+    description: '대량 메시지를 예약된 시간에 자동으로 발송합니다.',
+    policyKey: 'safety_compliance',
+  },
+  message_approval_workflow: {
+    title: '메시지 승인 워크플로',
+    description: '수신거부 감사 및 메시지 승인 프로세스를 자동화합니다.',
     policyKey: 'safety_compliance',
   },
 

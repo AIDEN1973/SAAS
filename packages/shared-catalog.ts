@@ -65,6 +65,48 @@ export const sharedCatalog: SharedCatalog = {
     //     adapter: 'industryAdapter.taskCards',
     //   },
     // },
+    'use-industry-terms': {
+      path: '@hooks/use-industry-terms',
+      import: 'import { useIndustryTerms } from "@hooks/use-industry-terms"',
+      useWhen: '업종별 용어 (학생/회원, 반/수업, 강사/트레이너 등)가 필요한 모든 UI 컴포넌트',
+      input: '없음 (Context에서 자동으로 tenantId 추출 후 industry_type 조회)',
+      output: 'IndustryTerms (업종별 용어 객체)',
+      extensionPoints: [],
+      doNot: [
+        '업종별 용어를 하드코딩',
+        '"학생", "강사", "반" 등의 문자열 직접 사용',
+        'industry_type을 직접 조회하여 분기 처리',
+      ],
+      examples: [
+        'const terms = useIndustryTerms();',
+        'console.log(terms.PERSON_LABEL_PRIMARY); // "학생" (academy) 또는 "회원" (fitness)',
+        'console.log(terms.STATS_TOTAL_COUNT_TITLE); // "총 학생 수" 또는 "총 회원 수"',
+      ],
+      related: {
+        hook: 'use-industry-config',
+      },
+    },
+    'use-industry-config': {
+      path: '@hooks/use-industry-config',
+      import: 'import { useIndustryConfig } from "@hooks/use-industry-config"',
+      useWhen: '업종별 페이지 가시성, 라우트 경로 등 설정이 필요한 경우 (useIndustryTerms의 편의 Wrapper)',
+      input: '없음 (Context에서 자동으로 tenantId 추출)',
+      output: '{ visiblePages, routes, isPageVisible, getRoutePath, isAnyPageVisible, areAllPagesVisible, terms }',
+      extensionPoints: [],
+      doNot: [
+        '페이지 가시성을 하드코딩으로 분기 처리',
+        'terms.VISIBLE_PAGES를 직접 접근 (isPageVisible 사용 권장)',
+      ],
+      examples: [
+        'const { isPageVisible } = useIndustryConfig();',
+        'if (isPageVisible("attendance")) { /* 출석 페이지 표시 (academy, gym만 true) */ }',
+        'if (isPageVisible("appointments")) { /* 예약 페이지 표시 (salon, nail_salon, real_estate만 true) */ }',
+        'const primaryPath = getRoutePath("PRIMARY_LIST"); // "/students/list" 또는 "/customers/list"',
+      ],
+      related: {
+        hook: 'use-industry-terms',
+      },
+    },
     'use-student-task-cards': {
       path: '@hooks/use-student',
       import: 'import { useStudentTaskCards } from "@hooks/use-student"',

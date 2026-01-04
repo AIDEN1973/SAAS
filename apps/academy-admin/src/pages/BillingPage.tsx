@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 // [SSOT] Barrel export를 통한 통합 import
 import { createSafeNavigate } from '../utils';
 import { ErrorBoundary, useModal, Modal, Container, Card, Button, useResponsiveMode, Drawer, PageHeader, isMobile, isTablet } from '@ui-core/react';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { useBillingHistory , fetchBillingHistory } from '@hooks/use-billing';
@@ -26,11 +27,8 @@ import { toKST } from '@lib/date-utils';
 import type { Invoice, InvoiceStatus } from '@core/billing';
 import type { BillingHistoryItem } from '@hooks/use-billing';
 import { billingFormSchema } from '../schemas/billing.schema';
-import { productFormSchema } from '../schemas/product.schema';
 import { invoiceTableSchema } from '../schemas/invoice.table.schema';
-import { subjectRevenueTableSchema } from '../schemas/subject-revenue.table.schema';
-import { settlementFormSchema } from '../schemas/settlement.schema';
-import { teacherRevenueSplitFormSchema } from '../schemas/teacher-revenue-split.schema';
+import { INVOICE_STATUS_LABELS } from '../utils/billingUtils';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES } from '../constants';
 
@@ -40,6 +38,7 @@ export function BillingPage() {
   const context = getApiContext();
   const tenantId = context.tenantId;
   const mode = useResponsiveMode();
+  const terms = useIndustryTerms();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
@@ -69,17 +68,13 @@ export function BillingPage() {
   // 월 자동 청구 생성은 배치 작업으로 자동 실행됨 (아키텍처 문서 2617줄: 매일 04:00 KST)
   // 수동 실행은 더 이상 필요하지 않음 (Zero-Management Platform 철학)
 
-  // 스키마 조회 (Registry에서 가져오거나 fallback 사용)
-  const { data: schema } = useSchema('invoice', billingFormSchema, 'form');
-  const { data: productSchema } = useSchema('product', productFormSchema, 'form');
+  // Schema Registry 연동 (아키텍처 문서 S3 참조)
+  const { data: schemaData } = useSchema('invoice', billingFormSchema, 'form');
   const { data: invoiceTableSchemaData } = useSchema('invoice_table', invoiceTableSchema, 'table');
-  const { data: subjectRevenueTableSchemaData } = useSchema('subject_revenue_table', subjectRevenueTableSchema, 'table');
-  const { data: settlementSchema } = useSchema('settlement', settlementFormSchema, 'form');
-  const { data: teacherRevenueSplitSchema } = useSchema('teacher_revenue_split', teacherRevenueSplitFormSchema, 'form');
-  void productSchema;
-  void subjectRevenueTableSchemaData;
-  void settlementSchema;
-  void teacherRevenueSplitSchema;
+
+  // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
+  const schema = schemaData || billingFormSchema;
+  const effectiveInvoiceTableSchema = invoiceTableSchemaData || invoiceTableSchema;
 
   // 정본 규칙: useBillingHistory Hook 사용
   // 인보이스 목록 조회
@@ -106,10 +101,10 @@ export function BillingPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['invoices', tenantId] });
       setShowCreateForm(false);
-      showAlert('성공', '인보이스가 생성되었습니다.');
+      showAlert(`${terms.INVOICE_LABEL}가 생성되었습니다.`, terms.MESSAGES.SUCCESS);
     },
     onError: (error: Error) => {
-      showAlert('오류', error.message);
+      showAlert(error.message, terms.MESSAGES.ERROR);
     },
   });
 
@@ -180,15 +175,15 @@ export function BillingPage() {
     onSuccess: (data: { total_amount?: number }) => {
       void queryClient.invalidateQueries({ queryKey: ['revenue-stats', tenantId] });
       setShowSettlementForm(false);
-      showAlert('성공', `정산이 완료되었습니다. (정산 금액: ${new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(data.total_amount || 0)})`);
+      showAlert(`정산이 완료되었습니다. (정산 금액: ${new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(data.total_amount || 0)})`, terms.MESSAGES.SUCCESS);
     },
     onError: (error: Error) => {
-      showAlert('오류', error.message);
+      showAlert(error.message, terms.MESSAGES.ERROR);
     },
   });
   void executeSettlement;
 
-  // 강사 매출 배분 설정 저장 (tenant_settings에 저장)
+  // 스태프 매출 배분 설정 저장 (tenant_settings에 저장)
   // 정본 규칙: apiClient.get('tenant_settings') 직접 호출 금지, useUpdateConfig Hook 사용
   const updateConfig = useUpdateConfig();
   const saveTeacherRevenueSplit = useMutation({
@@ -210,10 +205,10 @@ export function BillingPage() {
     },
     onSuccess: () => {
       setShowTeacherRevenueSplitForm(false);
-      showAlert('성공', '강사 매출 배분 설정이 저장되었습니다.');
+      showAlert(`${terms.STAFF_REVENUE_DISTRIBUTION} 설정이 저장되었습니다.`, terms.MESSAGES.SUCCESS);
     },
     onError: (error: Error) => {
-      showAlert('오류', error.message);
+      showAlert(error.message, terms.MESSAGES.ERROR);
     },
   });
   void saveTeacherRevenueSplit;
@@ -252,28 +247,11 @@ export function BillingPage() {
   // TODO: handleStatusChange 구현 필요 (현재 미사용)
   // const handleStatusChange = async (id: string, newStatus: InvoiceStatus) => { ... };
 
-  const statusColors: Record<InvoiceStatus, string> = {
-    draft: 'gray',
-    pending: 'warning',
-    paid: 'success',
-    overdue: 'error',
-    cancelled: 'gray',
-  };
-  void statusColors;
-
-  const statusLabels: Record<InvoiceStatus, string> = {
-    draft: '초안',
-    pending: '대기',
-    paid: '결제완료',
-    overdue: '연체',
-    cancelled: '취소',
-  };
-
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
         <PageHeader
-          title="수납/청구 관리"
+          title={`${terms.BILLING_LABEL} 관리`}
         />
 
         {/* 빠른 링크 (한 페이지에 하나의 기능 원칙 준수: 청구서 관리만 메인, 나머지는 별도 페이지) */}
@@ -326,7 +304,7 @@ export function BillingPage() {
                   size="sm"
                   onClick={() => handleStatusFilter(status)}
                 >
-                  {statusLabels[status]}
+                  {INVOICE_STATUS_LABELS[status]}
                 </Button>
               ))}
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center' }}>
@@ -342,7 +320,7 @@ export function BillingPage() {
                   size="sm"
                   onClick={() => setShowCreateForm(true)}
                 >
-                  새 인보이스 생성
+                  새 {terms.INVOICE_LABEL} 생성
                 </Button>
               </div>
             </div>
@@ -352,7 +330,7 @@ export function BillingPage() {
           {invoiceTableSchemaData ? (
             <SchemaTable
               key={`invoice-table-${filter.status || 'all'}`}
-              schema={invoiceTableSchemaData}
+              schema={effectiveInvoiceTableSchema}
               apiCall={async (endpoint: string, method: string) => {
                 void method;
                 const response = await apiClient.get<Invoice>(endpoint, {
@@ -380,7 +358,7 @@ export function BillingPage() {
                 <Drawer
                   isOpen={showCreateForm}
                   onClose={() => setShowCreateForm(false)}
-                  title="새 인보이스 생성"
+                  title={`새 ${terms.INVOICE_LABEL} 생성`}
                   position={isMobileMode ? 'bottom' : 'right'}
                   width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
                 >
@@ -404,7 +382,7 @@ export function BillingPage() {
                         return response.data;
                       },
                       showToast: (message: string, variant?: string) => {
-                        showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+                        showAlert(message, variant === 'success' ? terms.MESSAGES.SUCCESS : variant === 'error' ? terms.MESSAGES.ERROR : terms.MESSAGES.ALERT);
                       },
                     }}
                   />
@@ -413,7 +391,7 @@ export function BillingPage() {
                 <Modal
                   isOpen={showCreateForm}
                   onClose={() => setShowCreateForm(false)}
-                  title="새 인보이스 생성"
+                  title={`새 ${terms.INVOICE_LABEL} 생성`}
                   size="md"
                 >
                   <SchemaForm
@@ -436,7 +414,7 @@ export function BillingPage() {
                         return response.data;
                       },
                       showToast: (message: string, variant?: string) => {
-                        showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
+                        showAlert(message, variant === 'success' ? terms.MESSAGES.SUCCESS : variant === 'error' ? terms.MESSAGES.ERROR : terms.MESSAGES.ALERT);
                       },
                     }}
                   />

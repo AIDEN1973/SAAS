@@ -11,6 +11,7 @@ import { useResponsiveMode, useToast, IconButtonGroup, Card, isMobile, isTablet,
 import { Tag as TagIcon, Pencil, X as XIcon, Save } from 'lucide-react';
 import { SchemaFormWithMethods } from '@schema-engine';
 import { useIndustryTranslations } from '@hooks/use-industry-translations';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { LayerSectionHeader } from '../components/LayerSectionHeader';
 import { PlusIcon } from '../../../components/DataTableActionButtons';
 import { useStudentTags } from '@hooks/use-student';
@@ -54,6 +55,7 @@ export interface TagsTabProps {
 export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEditable = true, tagFormSchema }: TagsTabProps) {
   // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter를 통한 translations 생성
   const tagTranslations = useIndustryTranslations(tagFormSchema);
+  const terms = useIndustryTerms();
 
   // [P0-1 수정] tagFormSchema의 actions를 명시적으로 비활성화하여 SchemaFormWithMethods가 자동 API 호출을 하지 않도록 함
   // handleCreateTag에서 직접 처리하므로 스키마의 자동 API 동작을 완전히 차단
@@ -435,7 +437,7 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
             title={
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                 <TagIcon size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-                {isEditMode ? '태그수정' : '태그추가'}
+                {isEditMode ? `${terms.TAG_LABEL} 수정` : `${terms.TAG_LABEL} 추가`}
               </span>
             }
           />
@@ -450,7 +452,7 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
                     setIsEditMode(false);
                     setTempSelectedTagIds([]);
                   }}
-                  title="태그수정"
+                  title={`${terms.TAG_LABEL} 수정`}
                   position={isMobileMode ? 'bottom' : 'right'}
                   width={isTabletMode ? 'var(--width-drawer-tablet)' : 'var(--width-full)'}
                 >
@@ -458,7 +460,7 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
                     <Card
                       padding="md"
                       variant="default"
-                      title="태그 선택"
+                      title={`${terms.TAG_LABEL} 선택`}
                       titleIcon={<TagIcon size={titleIconSize} strokeWidth={titleIconStrokeWidth} />}
                       titlePosition="top-left"
                     >
@@ -498,7 +500,7 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
                           })}
                         </div>
                       ) : (
-                        <p style={{ color: 'var(--color-text-secondary)' }}>등록된 태그가 없습니다.</p>
+                        <p style={{ color: 'var(--color-text-secondary)' }}>{`등록된 ${terms.TAG_LABEL}이(가) 없습니다.`}</p>
                       )}
                       {/* 요구사항: 태그수정 > 취소/저장 버튼은 학생관리 수정폼처럼 텍스트+아이콘 함께 출력 */}
                       <ActionButtonGroup
@@ -567,7 +569,7 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
                       })}
                     </div>
                   ) : (
-                    <p style={{ color: 'var(--color-text-secondary)' }}>등록된 태그가 없습니다.</p>
+                    <p style={{ color: 'var(--color-text-secondary)' }}>{`등록된 ${terms.TAG_LABEL}이(가) 없습니다.`}</p>
                   )}
                   {/* 요구사항: 태그수정 > 취소/저장 버튼은 학생관리 수정폼처럼 텍스트+아이콘 함께 출력 */}
                   <ActionButtonGroup
@@ -626,7 +628,7 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
             title={
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                 <TagIcon size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-                태그관리
+                {`${terms.TAG_LABEL} 관리`}
               </span>
             }
             right={
@@ -635,7 +637,7 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
                   items={[
                     {
                       icon: PlusIcon,
-                      tooltip: '태그추가',
+                      tooltip: `${terms.TAG_LABEL} 추가`,
                       variant: 'solid',
                       color: 'primary',
                       onClick: () => setShowForm(true),
@@ -696,7 +698,7 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
                 display: 'inline-block',
               }}
             />
-            <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>등록된 태그가 없습니다.</p>
+            <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>{`등록된 ${terms.TAG_LABEL}이(가) 없습니다.`}</p>
           </div>
         )}
 

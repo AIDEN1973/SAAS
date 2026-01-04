@@ -1,11 +1,11 @@
 /**
- * 수업/반 통계 카드 Hook
+ * 수업 통계 카드 Hook
  *
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
  *
  * 포함 섹션:
- * - 섹션 11-13: 반당 평균 인원, 평균 정원률, 평균 수납 기간
+ * - 섹션 11-13: 수업당 평균 인원, 평균 정원률, 평균 수납 기간
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -38,16 +38,16 @@ export interface UseClassStatsCardsParams {
 }
 
 /**
- * 수업/반 통계 카드 조회 Hook (섹션 11-13)
+ * 수업 통계 카드 조회 Hook (섹션 11-13)
  *
  * 생성 카드:
- * 1. 반당 평균 인원
+ * 1. 수업당 평균 인원
  * 2. 평균 정원률
  * 3. 평균 수납 기간
  *
  * @param params.tenantId 테넌트 ID
  * @param params.monthlyRange 월간 날짜 범위
- * @param params.studentCount 현재 학생 수 (반당 평균 인원 계산용)
+ * @param params.studentCount 현재 학생 수 (수업당 평균 인원 계산용)
  * @param params.enabled 쿼리 활성화 여부
  * @returns 수업 통계 카드 배열
  */

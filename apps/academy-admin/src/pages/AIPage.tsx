@@ -5,8 +5,8 @@
  *
  * [Phase 1 MVP 범위] 아키텍처 문서 3.7.1, 3578줄:
  * - 상담일지 자동 요약 (저장 시 즉시 생성 - 아키텍처 문서 4101줄)
- * - 학생 출결 이상 탐지 (실시간 감지 및 업데이트 - 아키텍처 문서 4097줄, Phase 1부터 적용)
- * - 반/과목 성과 분석
+ * - 인원 출결 이상 탐지 (실시간 감지 및 업데이트 - 아키텍처 문서 4097줄, Phase 1부터 적용)
+ * - 그룹/과목 성과 분석
  * - 지역 대비 부족 영역 분석
  * - 서버가 월간 운영 리포트 생성 (AI 호출 포함)
  * - 주간 브리핑 (매주 월요일 07:00 - 아키텍처 문서 3581줄, Phase 1)
@@ -18,7 +18,7 @@
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] SDUI 스키마 기반 화면 자동 생성 (아키텍처 문서 352줄: AI 인사이트는 30% SDUI)
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
- * [요구사항] 서버가 상담일지 AI 요약 생성, 출결 이상 탐지, 반/과목 성과 분석, 지역 대비 부족 영역 분석, 서버가 월간 운영 리포트 생성 (AI 호출 포함)
+ * [요구사항] 서버가 상담일지 AI 요약 생성, 출결 이상 탐지, 그룹/과목 성과 분석, 지역 대비 부족 영역 분석, 서버가 월간 운영 리포트 생성 (AI 호출 포함)
  *
  * [문서 준수]
  * - 아키텍처 문서: 3.7.1 (AI 브리핑 카드, AI-First Workflow, 요약 카드 중심)
@@ -34,33 +34,26 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Badge, PageHeader, isMobile } from '@ui-core/react';
+import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Badge, PageHeader, isMobile, Modal, Drawer } from '@ui-core/react';
 import { SchemaForm } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { toKST } from '@lib/date-utils';
-import { useStudents, useGenerateConsultationAISummary, fetchConsultations, fetchPersons } from '@hooks/use-student';
-import { fetchAttendanceLogs } from '@hooks/use-attendance';
-import { fetchBillingHistory } from '@hooks/use-billing';
+import { useStudents, useGenerateConsultationAISummary, fetchConsultations } from '@hooks/use-student';
 import { fetchAIInsights, useDismissAIInsight } from '@hooks/use-ai-insights';
-import type { BillingHistoryItem } from '@hooks/use-billing';
-import type { AttendanceLog } from '@services/attendance-service';
-import type { Student, StudentConsultation } from '@services/student-service';
-import type { Class } from '@services/class-service';
-import type { Person } from '@core/party';
+import type { StudentConsultation } from '@services/student-service';
 import { studentSelectFormSchema } from '../schemas/student-select.schema';
 import { useUserRole } from '@hooks/use-auth';
-import { useConfig } from '@hooks/use-config';
+import { useStoreLocation } from '@hooks/use-config';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES } from '../constants';
 import { createSafeNavigate } from '../utils';
-import { LocationWarningBanner } from '../components/LocationWarningBanner';
 
 export function AIPage() {
   const { showAlert } = useModal();
   const context = getApiContext();
   const tenantId = context.tenantId;
-  const { data: config } = useConfig();
   const mode = useResponsiveMode();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
@@ -75,20 +68,17 @@ export function AIPage() {
   const tabParam = searchParams.get('tab'); // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
   const { data: userRole } = useUserRole(); // 아키텍처 문서 2.4: Teacher는 요약만 접근 가능
   const isTeacher = userRole === 'teacher'; // Teacher는 요약만 볼 수 있음
+  const terms = useIndustryTerms();
 
-  // P0-3: 지역 정보 미설정 경고 배너 상태
-  const [locationBannerDismissed, setLocationBannerDismissed] = useState(false);
-
-  // P0-3: 지역 정보 확인 (지역 인사이트 기능 사용 전 필수)
-  const locationInfo = useMemo(() => {
-    const location = config?.location as { location_code?: string } | undefined;
+  // SSOT: core_stores.region_id → core_regions 조인으로 지역정보 조회
+  const { data: storeLocation } = useStoreLocation();
+  const _locationInfo = useMemo(() => {
     return {
-      location_code: location?.location_code || '',
+      location_code: storeLocation?.location_code || '',
     };
-  }, [config]);
-
-  // P0-3: 지역 정보 미설정 시 경고 배너 표시
-  const showLocationBanner = !locationInfo.location_code && !locationBannerDismissed;
+  }, [storeLocation]);
+  // locationInfo 변수는 향후 지역별 AI 인사이트 필터링에 사용 예정
+  void _locationInfo;
 
   // 한 페이지에 하나의 기능 원칙 준수: 종합 인사이트만 메인으로 표시
   // 나머지 기능은 별도 페이지로 분리 (빠른 링크로 접근)
@@ -182,128 +172,107 @@ export function AIPage() {
       const attendanceAnomalyInsights = (insightsByType.get('attendance_anomaly') || [])
         .filter(insight => insight.created_at >= `${todayDate}T00:00:00`);
 
+      // AI 기반 출결 이상 탐지 (ai_insights 테이블에서만 조회, fallback 없음)
       const attendanceAnomalies: Array<{ student_id: string; student_name: string; issue: string; recommendation: string }> = [];
       if (attendanceAnomalyInsights && attendanceAnomalyInsights.length > 0) {
         attendanceAnomalies.push(...attendanceAnomalyInsights.map((insight) => ({
           student_id: insight.related_entity_id || '',
           student_name: (insight.metadata?.student_name as string) || '알 수 없음',
           issue: insight.summary || '',
-          recommendation: (insight.details?.recommendation as string) || '학생의 출석 패턴을 분석하고 상담을 진행하세요.',
+          recommendation: (insight.details?.recommendation as string) || '',
         })));
       }
+      // [AI 기반 전환] Fallback 로직 제거 - AI 인사이트가 없으면 빈 배열 반환
 
-      // ai_insights 테이블에 데이터가 없는 경우 fallback: 출결 데이터 기반 간단한 분석
-      // 정본 규칙: fetchAttendanceLogs 함수 사용 (Hook의 queryFn 로직 재사용)
-      let attendanceLogs: AttendanceLog[] = [];
-      if (attendanceAnomalies.length === 0) {
-        attendanceLogs = await fetchAttendanceLogs(tenantId, {});
-
-        // 학생별 출결 패턴 분석
-        const studentAttendanceMap = new Map<string, { present: number; absent: number; late: number; total: number }>();
-
-        attendanceLogs.forEach((log: AttendanceLog) => {
-          if (!log.student_id) return;
-
-          if (!studentAttendanceMap.has(log.student_id)) {
-            studentAttendanceMap.set(log.student_id, { present: 0, absent: 0, late: 0, total: 0 });
-          }
-
-          const stats = studentAttendanceMap.get(log.student_id)!;
-          stats.total++;
-
-          if (log.status === 'present') stats.present++;
-          else if (log.status === 'absent') stats.absent++;
-          else if (log.status === 'late') stats.late++;
-        });
-
-        // 출석률이 70% 미만이거나 결석이 3회 이상인 학생 탐지
-        // 최대 10명만 조회하여 성능 최적화
-        const anomalyStudentIds = Array.from(studentAttendanceMap.entries())
-          .filter(([, stats]) => {
-            const attendanceRate = stats.total > 0 ? (stats.present / stats.total) * 100 : 0;
-            return attendanceRate < 70 || stats.absent >= 3;
-          })
-          .slice(0, 10)
-          .map(([studentId]) => studentId);
-
-        // 학생 정보 일괄 조회
-        // 정본 규칙: fetchPersons 함수 사용 (Hook의 queryFn 로직 재사용)
-        if (anomalyStudentIds.length > 0) {
-          const persons = await fetchPersons(tenantId, {
-            id: anomalyStudentIds, // 배열을 직접 전달하면 ApiClient가 자동으로 .in() 처리
-            person_type: 'student',
-          });
-          const studentMap = new Map(persons.map((p: Person) => [p.id, p as unknown as Student]));
-
-          for (const studentId of anomalyStudentIds) {
-            const stats = studentAttendanceMap.get(studentId)!;
-            const attendanceRate = stats.total > 0 ? (stats.present / stats.total) * 100 : 0;
-            const student = studentMap.get(studentId);
-
-            if (student) {
-              attendanceAnomalies.push({
-                student_id: studentId,
-                student_name: student.name || '알 수 없음',
-                issue: attendanceRate < 70
-                  ? `출석률이 ${attendanceRate.toFixed(1)}%로 낮습니다.`
-                  : `최근 결석이 ${stats.absent}회 발생했습니다.`,
-                recommendation: attendanceRate < 70
-                  ? '학생의 출석 패턴을 분석하고 상담을 진행하세요.'
-                  : '결석 원인을 파악하고 학부모와 상의하세요.',
-              });
-            }
-          }
-        }
-      }
-
-      // 2. 반/과목 성과 분석 (performance_analysis) - 아키텍처 문서 3.7.1: 반/과목 성과 분석
+      // 2. 그룹/과목 성과 분석 (performance_analysis) - 아키텍처 문서 3.7.1: 그룹/과목 성과 분석
       // P1-1: 통합 쿼리에서 추출 (개별 쿼리 제거)
       const performanceAnalysisInsights = (insightsByType.get('performance_analysis') || [])
         .filter(insight => insight.created_at >= `${todayDate}T00:00:00`);
 
-      let performanceAnalysis: Array<{ class_id: string; class_name: string; performance: string; trend: string; recommendation: string }> = [];
-      if (performanceAnalysisInsights && performanceAnalysisInsights.length > 0) {
-        performanceAnalysis = performanceAnalysisInsights.map((insight) => ({
-          class_id: insight.related_entity_id || '',
-          class_name: (insight.metadata?.class_name as string) || '알 수 없음',
-          performance: (insight.details?.performance as string) || '보통',
-          trend: (insight.details?.trend as string) || '0%',
-          recommendation: (insight.details?.recommendation as string) || '출석률 개선을 위해 노력하세요.',
-        }));
+      // detail_insights 타입 정의
+      interface DetailInsight {
+        type: 'improvement' | 'strength' | 'pattern' | 'comparison';
+        title: string;
+        description: string;
+        severity?: 'high' | 'medium' | 'low';
       }
 
-      // ai_insights 테이블에 데이터가 없는 경우 fallback
-      if (performanceAnalysis.length === 0) {
-        const classesResponse = await apiClient.get<Class[]>('academy_classes', {
-          filters: { status: 'active' },
-        });
-        const classes = (classesResponse.data as unknown) as Class[] || [];
-
-        // attendanceLogs가 비어있으면 다시 조회
-        // 정본 규칙: fetchAttendanceLogs 함수 사용 (Hook의 queryFn 로직 재사용)
-        if (attendanceLogs.length === 0) {
-          attendanceLogs = await fetchAttendanceLogs(tenantId, {});
-        }
-
-        performanceAnalysis = classes.map((cls: Class) => {
-          const classLogs = attendanceLogs.filter((log: AttendanceLog) => log.class_id === cls.id);
-          const attendanceRate = classLogs.length > 0
-            ? (classLogs.filter((log: AttendanceLog) => log.status === 'present').length / classLogs.length) * 100
-            : 0;
+      let performanceAnalysis: Array<{
+        class_id: string;
+        class_name: string;
+        subject?: string;
+        grade?: string;
+        performance: string;
+        trend: string;
+        recommendation: string;
+        detail_insights?: DetailInsight[];
+        // 출석 관련
+        attendance_rate?: number;
+        absent_rate?: number;
+        late_rate?: number;
+        attendance_trend?: string;
+        // 관리 대상 관련
+        student_count?: number;
+        max_students?: number;
+        capacity_rate?: number;
+        new_enrollments?: number;
+        withdrawals?: number;
+        enrollment_trend?: string;
+        // 상담 관련
+        consultation_count?: number;
+        learning_consultations?: number;
+        behavior_consultations?: number;
+        // 수납 관련
+        billing_collection_rate?: number;
+        overdue_count?: number;
+        total_revenue?: number;
+        // 스태프 관련
+        teacher_count?: number;
+        has_main_teacher?: boolean;
+      }> = [];
+      if (performanceAnalysisInsights && performanceAnalysisInsights.length > 0) {
+        performanceAnalysis = performanceAnalysisInsights.map((insight) => {
+          // Edge Function에서 생성된 details 필드 파싱
+          const details = insight.details as Record<string, unknown> || {};
 
           return {
-            class_id: cls.id,
-            class_name: cls.name,
-            performance: attendanceRate >= 90 ? '우수' : attendanceRate >= 70 ? '보통' : '개선필요',
-            trend: attendanceRate >= 90 ? '+5%' : attendanceRate >= 70 ? '0%' : '-5%',
-            recommendation: attendanceRate >= 90
-              ? '현재 운영 방식을 유지하세요.'
-              : attendanceRate >= 70
-              ? '출석률 개선을 위해 노력하세요.'
-              : '출석률 개선이 시급합니다.',
+            class_id: insight.related_entity_id || (details.class_id as string) || '',
+            class_name: (details.class_name as string) || (insight.metadata?.class_name as string) || '알 수 없음',
+            subject: details.subject as string | undefined,
+            grade: details.grade as string | undefined,
+            performance: (details.performance as string) || '',
+            trend: (details.trend as string) || (details.attendance_trend as string) || '',
+            recommendation: (details.recommendation as string) || '',
+            // AI가 생성한 detail_insights 배열 (generate-performance-insights Edge Function)
+            detail_insights: (details.detail_insights as DetailInsight[]) || undefined,
+            // 출석 관련
+            attendance_rate: details.attendance_rate as number | undefined,
+            absent_rate: details.absent_rate as number | undefined,
+            late_rate: details.late_rate as number | undefined,
+            attendance_trend: details.attendance_trend as string | undefined,
+            // 관리 대상 관련
+            student_count: (details.student_count as number) || (insight.metadata?.student_count as number) || undefined,
+            max_students: details.max_students as number | undefined,
+            capacity_rate: details.capacity_rate as number | undefined,
+            new_enrollments: details.new_enrollments as number | undefined,
+            withdrawals: details.withdrawals as number | undefined,
+            enrollment_trend: details.enrollment_trend as string | undefined,
+            // 상담 관련
+            consultation_count: details.consultation_count as number | undefined,
+            learning_consultations: details.learning_consultations as number | undefined,
+            behavior_consultations: details.behavior_consultations as number | undefined,
+            // 수납 관련
+            billing_collection_rate: details.billing_collection_rate as number | undefined,
+            overdue_count: details.overdue_count as number | undefined,
+            total_revenue: details.total_revenue as number | undefined,
+            // 스태프 관련
+            teacher_count: details.teacher_count as number | undefined,
+            has_main_teacher: details.has_main_teacher as boolean | undefined,
           };
         });
       }
+
+      // [AI 기반 전환] Fallback 로직 제거 - AI 인사이트가 없으면 빈 배열 반환
 
       // 3. 지역 대비 비교 (regional_analytics) - 아키텍처 문서 3.7.1: 지역 대비 부족 영역 분석
       // P1-1: 통합 쿼리에서 추출 (개별 쿼리 제거)
@@ -314,11 +283,127 @@ export function AIPage() {
       let regionalComparison: Array<{ area: string; status: string; gap: string; recommendation: string }> = [];
       if (regionalComparisonInsights && regionalComparisonInsights.length > 0) {
         regionalComparison = regionalComparisonInsights.map((insight) => ({
-          area: (insight.metadata?.area as string) || '알 수 없음',
-          status: (insight.metadata?.status as string) || '보통',
+          area: (insight.metadata?.area as string) || '',
+          status: (insight.metadata?.status as string) || '',
           gap: insight.summary || '',
-          recommendation: (insight.details?.recommendation as string) || '지역 평균과 비교하여 개선이 필요합니다.',
+          recommendation: (insight.details?.recommendation as string) || '',
         }));
+      }
+
+      // 4. Phase 2: 선제적 추천 (proactive_recommendation)
+      const proactiveRecommendationInsights = (insightsByType.get('proactive_recommendation') || [])
+        .filter(insight => insight.created_at >= `${todayDate}T00:00:00`);
+
+      let proactiveRecommendation: {
+        summary: string;
+        recommendations: Array<{
+          type: string;
+          priority: string;
+          title: string;
+          description: string;
+          target_count: number;
+          suggested_action: string;
+        }>;
+        high_priority_count: number;
+      } | null = null;
+
+      if (proactiveRecommendationInsights.length > 0) {
+        const insight = proactiveRecommendationInsights[0];
+        const details = insight.details as Record<string, unknown> || {};
+        proactiveRecommendation = {
+          summary: insight.summary,
+          recommendations: (details.recommendations as Array<{
+            type: string;
+            priority: string;
+            title: string;
+            description: string;
+            target_count: number;
+            suggested_action: string;
+          }>) || [],
+          high_priority_count: (details.high_priority_count as number) || 0,
+        };
+      }
+
+      // 5. Phase 2: 자동화 패턴 분석 (meta_automation_pattern)
+      const metaAutomationPatternInsights = (insightsByType.get('meta_automation_pattern') || [])
+        .filter(insight => insight.created_at >= `${thisWeekMonday}T00:00:00`);
+
+      let metaAutomationPattern: {
+        summary: string;
+        patterns: Array<{
+          type: string;
+          title: string;
+          description: string;
+          metric_value?: number;
+          trend?: string;
+          recommendation?: string;
+        }>;
+        overall_success_rate: number;
+      } | null = null;
+
+      if (metaAutomationPatternInsights.length > 0) {
+        const insight = metaAutomationPatternInsights[0];
+        const details = insight.details as Record<string, unknown> || {};
+        const overallStats = details.overall_stats as Record<string, unknown> || {};
+        metaAutomationPattern = {
+          summary: insight.summary,
+          patterns: (details.patterns as Array<{
+            type: string;
+            title: string;
+            description: string;
+            metric_value?: number;
+            trend?: string;
+            recommendation?: string;
+          }>) || [],
+          overall_success_rate: (overallStats.success_rate as number) || 0,
+        };
+      }
+
+      // 6. Phase 2: 일일 자동화 요약 (daily_automation_digest)
+      const dailyAutomationDigestInsights = (insightsByType.get('daily_automation_digest') || [])
+        .filter(insight => insight.created_at >= `${todayDate}T00:00:00`);
+
+      let dailyAutomationDigest: {
+        summary: string;
+        total_count: number;
+        success_count: number;
+        failed_count: number;
+        success_rate: number;
+        has_failures: boolean;
+      } | null = null;
+
+      if (dailyAutomationDigestInsights.length > 0) {
+        const insight = dailyAutomationDigestInsights[0];
+        const details = insight.details as Record<string, unknown> || {};
+        dailyAutomationDigest = {
+          summary: insight.summary,
+          total_count: (details.total_count as number) || 0,
+          success_count: (details.success_count as number) || 0,
+          failed_count: (details.failed_count as number) || 0,
+          success_rate: (details.success_rate as number) || 0,
+          has_failures: (details.failed_count as number) > 0,
+        };
+      }
+
+      // 7. Phase 2: 일일 브리핑 (daily_briefing)
+      const dailyBriefingInsights = (insightsByType.get('daily_briefing') || [])
+        .filter(insight => insight.created_at >= `${todayDate}T00:00:00`);
+
+      let dailyBriefing: {
+        id: string;
+        title: string;
+        summary: string;
+        details?: Record<string, unknown>;
+      } | null = null;
+
+      if (dailyBriefingInsights.length > 0) {
+        const insight = dailyBriefingInsights[0];
+        dailyBriefing = {
+          id: insight.id,
+          title: insight.title || '오늘의 브리핑',
+          summary: insight.summary,
+          details: insight.details,
+        };
       }
 
       return {
@@ -326,6 +411,11 @@ export function AIPage() {
         attendanceAnomalies,
         performanceAnalysis,
         regionalComparison,
+        // Phase 2 기능
+        dailyBriefing,
+        proactiveRecommendation,
+        metaAutomationPattern,
+        dailyAutomationDigest,
       };
     },
     enabled: !!tenantId,
@@ -349,52 +439,57 @@ export function AIPage() {
   // P2-2: AI Dismiss 기능
   const dismissInsight = useDismissAIInsight();
 
-  // 월간 리포트 생성
+  // 성과 분석 상세 모달 상태
+  const [showPerformanceDetail, setShowPerformanceDetail] = useState(false);
+  // 출결 이상 탐지 상세 모달 상태
+  const [showAttendanceDetail, setShowAttendanceDetail] = useState(false);
+
+  // 월간 리포트 생성 - Edge Function 호출
+  // Edge Function 응답 타입 정의
+  interface GenerateInsightsResponse {
+    success: boolean;
+    generated_count?: number;
+    date?: string;
+    error?: string;
+  }
+
   const generateReport = useMutation({
     mutationFn: async () => {
       if (!tenantId) throw new Error('Tenant ID is required');
 
-      // TODO: Edge Function으로 리포트 생성 요청
-      // 현재는 간단한 리포트 데이터 수집
-      // 정본 규칙: fetch 함수 사용 (Hook의 queryFn 로직 재사용)
-      const currentMonth = toKST().format('YYYY-MM');
+      // [AI 기반 전환] Edge Function 호출로 성과 분석 인사이트 생성
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-performance-insights`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+        }
+      );
 
-      const invoices = await fetchBillingHistory(tenantId, {
-        period_start: { gte: `${currentMonth}-01` },
-      });
+      if (!response.ok) {
+        const errorData = (await response.json().catch(() => ({ success: false }))) as GenerateInsightsResponse;
+        throw new Error(errorData.error ?? 'AI 인사이트 생성에 실패했습니다.');
+      }
 
-      // 정본 규칙: fetchPersons 함수 사용 (Hook의 queryFn 로직 재사용)
-      const students = await fetchPersons(tenantId, {
-        person_type: 'student',
-      });
-
-      const attendanceLogs = await fetchAttendanceLogs(tenantId, {
-        date_from: `${currentMonth}-01T00:00:00`,
-      });
-
-      // 리포트 데이터 생성
-      const reportData = {
-        month: currentMonth,
-        total_students: students.length,
-        total_invoices: invoices.length,
-        total_revenue: invoices.reduce((sum: number, inv: BillingHistoryItem) => sum + (inv.amount_paid || 0), 0),
-        total_attendance: attendanceLogs.filter((log: AttendanceLog) => log.status === 'present').length,
-        generated_at: toKST().toISOString(),
-      };
-
-      // TODO: 리포트를 파일로 저장하거나 다운로드 링크 생성
-      // 현재는 데이터만 반환
+      const result = (await response.json()) as GenerateInsightsResponse;
       return {
-        report_id: `report-${currentMonth}-${Date.now()}`,
-        ...reportData,
+        success: result.success,
+        generated_count: result.generated_count ?? 0,
+        date: result.date ?? toKST().format('YYYY-MM-DD'),
       };
     },
     onSuccess: (data) => {
-      showAlert('성공', `월간 운영 리포트가 생성되었습니다. (${data.report_id})`);
-      // TODO: 리포트 다운로드 링크 제공
+      if (data.generated_count > 0) {
+        showAlert(`${data.generated_count}개의 AI 성과 분석 인사이트가 생성되었습니다.`, '성공');
+      } else {
+        showAlert('AI 인사이트가 이미 최신 상태입니다.', '알림');
+      }
     },
     onError: (error: Error) => {
-      showAlert('오류', error.message);
+      showAlert(error.message, '오류');
     },
   });
 
@@ -404,17 +499,6 @@ export function AIPage() {
         <PageHeader
           title="AI 분석"
         />
-
-        {/* P0-3: 지역 정보 미설정 시 안내 배너 표시 */}
-        {showLocationBanner && (
-          <div style={{ marginBottom: 'var(--spacing-md)' }}>
-            <LocationWarningBanner
-              message="지역 인사이트를 사용하려면 위치 정보를 설정하세요"
-              onNavigate={() => navigate('/settings')}
-              onDismiss={() => setLocationBannerDismissed(true)}
-            />
-          </div>
-        )}
 
         {/* 아키텍처 문서 3.7.1: 빠른 분석 링크 (상세 분석은 별도 페이지에서 제공) */}
         {/* 아키텍처 문서 2.4: Teacher는 요약만 접근 가능, 상세 분석 버튼은 숨김 */}
@@ -429,26 +513,24 @@ export function AIPage() {
                   size="sm"
                   onClick={() => {
                     // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
-                    const element = document.getElementById('attendance-card');
-                    if (element) {
-                      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    if (aiInsights?.attendanceAnomalies && aiInsights.attendanceAnomalies.length > 0) {
+                      setShowAttendanceDetail(true);
                     } else {
-                      safeNavigate(ROUTES.AI_ATTENDANCE);
+                      showAlert(`${terms.ABSENCE_LABEL} 이상 탐지 데이터가 없습니다.\nAI 분석이 완료되면 결과를 확인할 수 있습니다.`, '알림');
                     }
                   }}
                 >
-                  출결 이상 탐지
+                  {terms.ABSENCE_LABEL} 이상 탐지
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
                     // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
-                    const element = document.getElementById('performance-card');
-                    if (element) {
-                      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    if (aiInsights?.performanceAnalysis && aiInsights.performanceAnalysis.length > 0) {
+                      setShowPerformanceDetail(true);
                     } else {
-                      safeNavigate(ROUTES.AI_HOME);
+                      showAlert('성과 분석 데이터가 없습니다.\n"월간 리포트 생성" 버튼을 클릭하여 AI 분석을 실행하세요.', '알림');
                     }
                   }}
                 >
@@ -471,6 +553,89 @@ export function AIPage() {
                   }}
                 >
                   상담일지 요약
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Phase 1 MVP: 주간 브리핑 카드로 스크롤
+                    if (aiInsights?.weeklyBriefing) {
+                      const element = document.getElementById('weekly-briefing-card');
+                      if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    } else {
+                      showAlert('주간 브리핑 데이터가 없습니다.\n매주 월요일 07:00에 자동 생성됩니다.', '알림');
+                    }
+                  }}
+                >
+                  주간 브리핑
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // 지역 비교 카드로 스크롤
+                    if (aiInsights?.regionalComparison && aiInsights.regionalComparison.length > 0) {
+                      const element = document.getElementById('regional-card');
+                      if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    } else {
+                      showAlert('지역 비교 데이터가 없습니다.\n지역 정보를 설정하면 분석을 제공합니다.', '알림');
+                    }
+                  }}
+                >
+                  지역 비교
+                </Button>
+                {/* Phase 2 버튼들 */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (aiInsights?.dailyBriefing) {
+                      const element = document.getElementById('daily-briefing-card');
+                      if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    } else {
+                      showAlert('일일 브리핑 데이터가 없습니다.\n매일 07:00에 자동 생성됩니다.', '알림');
+                    }
+                  }}
+                >
+                  일일 브리핑
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (aiInsights?.proactiveRecommendation) {
+                      const element = document.getElementById('proactive-recommendation-card');
+                      if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    } else {
+                      showAlert('선제적 추천 데이터가 없습니다.\n매일 08:00에 자동 생성됩니다.', '알림');
+                    }
+                  }}
+                >
+                  선제적 추천
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (aiInsights?.dailyAutomationDigest) {
+                      const element = document.getElementById('automation-digest-card');
+                      if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    } else {
+                      showAlert('자동화 요약 데이터가 없습니다.\n매일 23:00에 자동 생성됩니다.', '알림');
+                    }
+                  }}
+                >
+                  자동화 요약
                 </Button>
               </div>
             </Card>
@@ -538,20 +703,19 @@ export function AIPage() {
                     </div>
                   )}
 
-                  {/* 출결 이상 탐지 요약 카드 - 아키텍처 문서 3.7.1: 학생 출결 이상 탐지 */}
+                  {/* 출결 이상 탐지 요약 카드 - 아키텍처 문서 3.7.1: 인원 출결 이상 탐지 */}
                   {aiInsights.attendanceAnomalies && aiInsights.attendanceAnomalies.length > 0 && (
                     <div id="attendance-card">
                       <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)', cursor: 'pointer' }} onClick={() => {
-                        // TODO: 하위 페이지 구현 시 navigate('/ai/attendance-anomalies')
-                        showAlert('알림', '출결 이상 탐지 상세 분석은 준비 중입니다.');
+                        setShowAttendanceDetail(true);
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
                           <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
-                            출결 이상 탐지
+                            {terms.ABSENCE_LABEL} 이상 탐지
                           </h2>
                         </div>
                         <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
-                          {aiInsights.attendanceAnomalies.length}명의 학생에게 출결 이상이 감지되었습니다.
+                          {aiInsights.attendanceAnomalies.length}명의 {terms.PERSON_LABEL_PRIMARY}에게 {terms.ABSENCE_LABEL} 이상이 감지되었습니다.
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
                           {aiInsights.attendanceAnomalies.slice(0, 3).map((anomaly: { student_name: string; issue: string }, index: number) => (
@@ -572,35 +736,41 @@ export function AIPage() {
                     </div>
                   )}
 
-                  {/* 반/과목 성과 분석 요약 카드 - 아키텍처 문서 3.7.1: 반/과목 성과 분석 */}
+                  {/* 그룹/과목 성과 분석 요약 카드 - 아키텍처 문서 3.7.1: 그룹/과목 성과 분석 */}
                   {aiInsights.performanceAnalysis && aiInsights.performanceAnalysis.length > 0 && (
                     <div id="performance-card">
                       <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)', cursor: 'pointer' }} onClick={() => {
-                        // TODO: 하위 페이지 구현 시 navigate('/ai/performance')
-                        showAlert('알림', '성과 분석 상세 화면은 준비 중입니다.');
+                        setShowPerformanceDetail(true);
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
                           <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
-                            반/과목 성과 분석
+                            {terms.GROUP_LABEL}/{terms.SUBJECT_LABEL} 성과 분석
                           </h2>
                         </div>
                         <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
-                          {aiInsights.performanceAnalysis.length}개 반의 성과를 분석했습니다.
+                          {aiInsights.performanceAnalysis.length}개 {terms.GROUP_LABEL}의 성과를 분석했습니다.
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
-                          {aiInsights.performanceAnalysis.slice(0, 3).map((perf: { performance: string; class_name: string; trend: string }, index: number) => (
-                            <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-                              <Badge color={perf.performance === '우수' ? 'success' : perf.performance === '보통' ? 'info' : 'error'}>
-                                {perf.performance}
-                              </Badge>
-                              <span style={{ color: 'var(--color-text-secondary)' }}>
-                                {perf.class_name}: {perf.trend}
-                              </span>
-                            </div>
-                          ))}
+                          {aiInsights.performanceAnalysis.slice(0, 3).map((perf: { performance: string; class_name: string; trend: string }, index: number) => {
+                            // 성과 등급별 색상 결정 (빈 값일 경우 gray)
+                            const perfColor = perf.performance === '우수' ? 'success' :
+                                              perf.performance === '양호' ? 'info' :
+                                              perf.performance === '보통' ? 'warning' :
+                                              perf.performance === '개선 필요' ? 'error' : 'gray';
+                            return (
+                              <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                                <Badge color={perfColor}>
+                                  {perf.performance || '분석 중'}
+                                </Badge>
+                                <span style={{ color: 'var(--color-text-secondary)' }}>
+                                  {perf.class_name}: {perf.trend || '-'}
+                                </span>
+                              </div>
+                            );
+                          })}
                           {aiInsights.performanceAnalysis.length > 3 && (
                             <div style={{ color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
-                              외 {aiInsights.performanceAnalysis.length - 3}개 반...
+                              외 {aiInsights.performanceAnalysis.length - 3}개 {terms.GROUP_LABEL}...
                             </div>
                           )}
                         </div>
@@ -621,26 +791,34 @@ export function AIPage() {
                           </h2>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-                          {aiInsights.regionalComparison.map((item: { area: string; status: string; gap: string; recommendation: string }, index: number) => (
-                            <div
-                              key={index}
-                              style={{
-                                padding: 'var(--spacing-md)',
-                                border: `var(--border-width-thin) solid var(--color-border)`,
-                                borderRadius: 'var(--border-radius-md)',
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
-                                <Badge color={item.status === '부족' ? 'error' : 'success'}>
-                                  {item.area}
-                                </Badge>
-                                <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{item.gap}</span>
+                          {aiInsights.regionalComparison.map((item: { area: string; status: string; gap: string; recommendation: string }, index: number) => {
+                            // 상태별 색상 결정 (빈 값일 경우 gray)
+                            const statusColor = item.status === '부족' ? 'error' :
+                                                item.status === '우수' ? 'success' :
+                                                item.status === '보통' ? 'info' : 'gray';
+                            return (
+                              <div
+                                key={index}
+                                style={{
+                                  padding: 'var(--spacing-md)',
+                                  border: `var(--border-width-thin) solid var(--color-border)`,
+                                  borderRadius: 'var(--border-radius-md)',
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
+                                  <Badge color={statusColor}>
+                                    {item.area || '지역'}
+                                  </Badge>
+                                  <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{item.gap || '-'}</span>
+                                </div>
+                                {item.recommendation && (
+                                  <div style={{ color: 'var(--color-text-secondary)' }}>
+                                    {item.recommendation}
+                                  </div>
+                                )}
                               </div>
-                              <div style={{ color: 'var(--color-text-secondary)' }}>
-                                {item.recommendation}
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </Card>
                     </div>
@@ -655,11 +833,229 @@ export function AIPage() {
                     </Card>
                   )}
 
+                  {/* ========== Phase 2 카드들 ========== */}
+
+                  {/* Phase 2: 일일 브리핑 카드 */}
+                  {aiInsights.dailyBriefing && (
+                    <div id="daily-briefing-card">
+                      <Card padding="lg" style={{ marginBottom: 'var(--spacing-md)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-md)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                            <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
+                              오늘의 브리핑
+                            </h2>
+                            <Badge variant="outline" color="primary">
+                              Phase 2
+                            </Badge>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => dismissInsight.mutate(aiInsights.dailyBriefing!.id)}
+                            disabled={dismissInsight.isPending}
+                            style={{ color: 'var(--color-text-secondary)' }}
+                          >
+                            무시
+                          </Button>
+                        </div>
+                        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
+                          {aiInsights.dailyBriefing.title}
+                        </h3>
+                        <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)', whiteSpace: 'pre-wrap' }}>
+                          {aiInsights.dailyBriefing.summary}
+                        </p>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* Phase 2: 선제적 추천 카드 */}
+                  {aiInsights.proactiveRecommendation && (
+                    <div id="proactive-recommendation-card">
+                      <Card padding="lg" style={{ marginBottom: 'var(--spacing-md)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+                          <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
+                            선제적 추천
+                          </h2>
+                          <Badge variant="outline" color="primary">
+                            Phase 2
+                          </Badge>
+                          {aiInsights.proactiveRecommendation.high_priority_count > 0 && (
+                            <Badge color="error">
+                              긴급 {aiInsights.proactiveRecommendation.high_priority_count}건
+                            </Badge>
+                          )}
+                        </div>
+                        <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-md)', whiteSpace: 'pre-wrap' }}>
+                          {aiInsights.proactiveRecommendation.summary}
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+                          {aiInsights.proactiveRecommendation.recommendations.slice(0, 5).map((rec, index) => {
+                            const priorityColor = rec.priority === 'high' ? 'error' :
+                                                  rec.priority === 'medium' ? 'warning' : 'info';
+                            return (
+                              <div
+                                key={index}
+                                style={{
+                                  padding: 'var(--spacing-md)',
+                                  border: `var(--border-width-thin) solid var(--color-border)`,
+                                  borderRadius: 'var(--border-radius-md)',
+                                  borderLeft: `4px solid var(--color-${priorityColor})`,
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
+                                  <Badge color={priorityColor} size="sm">
+                                    {rec.priority === 'high' ? '긴급' : rec.priority === 'medium' ? '중요' : '참고'}
+                                  </Badge>
+                                  <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{rec.title}</span>
+                                  {rec.target_count > 0 && (
+                                    <span style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                                      ({rec.target_count}건)
+                                    </span>
+                                  )}
+                                </div>
+                                <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', margin: 0 }}>
+                                  {rec.description}
+                                </p>
+                                <p style={{ color: 'var(--color-primary)', fontSize: 'var(--font-size-sm)', margin: 0, marginTop: 'var(--spacing-xs)' }}>
+                                  권장: {rec.suggested_action}
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* Phase 2: 일일 자동화 요약 카드 */}
+                  {aiInsights.dailyAutomationDigest && (
+                    <div id="automation-digest-card">
+                      <Card padding="lg" style={{ marginBottom: 'var(--spacing-md)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+                          <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
+                            오늘의 자동화 요약
+                          </h2>
+                          <Badge variant="outline" color="primary">
+                            Phase 2
+                          </Badge>
+                          {aiInsights.dailyAutomationDigest.has_failures && (
+                            <Badge color="error">
+                              실패 {aiInsights.dailyAutomationDigest.failed_count}건
+                            </Badge>
+                          )}
+                        </div>
+                        <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-md)', whiteSpace: 'pre-wrap' }}>
+                          {aiInsights.dailyAutomationDigest.summary}
+                        </p>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(4, 1fr)',
+                          gap: 'var(--spacing-md)',
+                          padding: 'var(--spacing-md)',
+                          backgroundColor: 'var(--color-background-secondary)',
+                          borderRadius: 'var(--border-radius-md)',
+                        }}>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text)' }}>
+                              {aiInsights.dailyAutomationDigest.total_count}
+                            </div>
+                            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>총 실행</div>
+                          </div>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
+                              {aiInsights.dailyAutomationDigest.success_count}
+                            </div>
+                            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>성공</div>
+                          </div>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-error)' }}>
+                              {aiInsights.dailyAutomationDigest.failed_count}
+                            </div>
+                            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>실패</div>
+                          </div>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{
+                              fontSize: 'var(--font-size-2xl)',
+                              fontWeight: 'var(--font-weight-bold)',
+                              color: aiInsights.dailyAutomationDigest.success_rate >= 90 ? 'var(--color-success)' :
+                                     aiInsights.dailyAutomationDigest.success_rate >= 70 ? 'var(--color-warning)' : 'var(--color-error)'
+                            }}>
+                              {aiInsights.dailyAutomationDigest.success_rate}%
+                            </div>
+                            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>성공률</div>
+                          </div>
+                        </div>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* Phase 2: 자동화 패턴 분석 카드 (주간) */}
+                  {aiInsights.metaAutomationPattern && (
+                    <div id="meta-automation-pattern-card">
+                      <Card padding="lg" style={{ marginBottom: 'var(--spacing-md)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+                          <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
+                            자동화 패턴 분석
+                          </h2>
+                          <Badge variant="outline" color="primary">
+                            Phase 2
+                          </Badge>
+                          <Badge color={aiInsights.metaAutomationPattern.overall_success_rate >= 90 ? 'success' :
+                                        aiInsights.metaAutomationPattern.overall_success_rate >= 70 ? 'warning' : 'error'}>
+                            주간 성공률 {aiInsights.metaAutomationPattern.overall_success_rate}%
+                          </Badge>
+                        </div>
+                        <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-md)', whiteSpace: 'pre-wrap' }}>
+                          {aiInsights.metaAutomationPattern.summary}
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+                          {aiInsights.metaAutomationPattern.patterns.slice(0, 4).map((pattern, index) => {
+                            const trendIcon = pattern.trend === 'up' ? '↑' :
+                                              pattern.trend === 'down' ? '↓' : '→';
+                            const trendColor = pattern.trend === 'up' ? 'var(--color-success)' :
+                                               pattern.trend === 'down' ? 'var(--color-error)' : 'var(--color-text-secondary)';
+                            return (
+                              <div
+                                key={index}
+                                style={{
+                                  padding: 'var(--spacing-sm)',
+                                  backgroundColor: 'var(--color-background-secondary)',
+                                  borderRadius: 'var(--border-radius-md)',
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
+                                  <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{pattern.title}</span>
+                                  {pattern.metric_value !== undefined && (
+                                    <span style={{ color: trendColor, fontWeight: 'var(--font-weight-bold)' }}>
+                                      {trendIcon} {pattern.metric_value}{pattern.type === 'time_distribution' ? '시' : '%'}
+                                    </span>
+                                  )}
+                                </div>
+                                <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', margin: 0 }}>
+                                  {pattern.description}
+                                </p>
+                                {pattern.recommendation && (
+                                  <p style={{ color: 'var(--color-primary)', fontSize: 'var(--font-size-sm)', margin: 0, marginTop: 'var(--spacing-xs)' }}>
+                                    {pattern.recommendation}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </Card>
+                    </div>
+                  )}
+
                   {/* 데이터가 없는 경우 안내 */}
                   {!aiInsights.weeklyBriefing &&
+                   !aiInsights.dailyBriefing &&
                    (!aiInsights.attendanceAnomalies || aiInsights.attendanceAnomalies.length === 0) &&
                    (!aiInsights.performanceAnalysis || aiInsights.performanceAnalysis.length === 0) &&
-                   (!aiInsights.regionalComparison || aiInsights.regionalComparison.length === 0) && (
+                   (!aiInsights.regionalComparison || aiInsights.regionalComparison.length === 0) &&
+                   !aiInsights.proactiveRecommendation &&
+                   !aiInsights.dailyAutomationDigest &&
+                   !aiInsights.metaAutomationPattern && (
                     <Card padding="lg">
                       <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
                         <p>AI 인사이트 데이터가 없습니다.</p>
@@ -680,6 +1076,72 @@ export function AIPage() {
               )}
             </>
           )}
+
+          {/* 성과 분석 상세 모달 */}
+          {isMobileMode ? (
+            <Drawer
+              isOpen={showPerformanceDetail}
+              onClose={() => setShowPerformanceDetail(false)}
+              title={`${terms.GROUP_LABEL}/${terms.SUBJECT_LABEL} 성과 분석 상세`}
+              position="bottom"
+            >
+              <PerformanceDetailContent
+                performanceAnalysis={aiInsights?.performanceAnalysis || []}
+                onNavigateToClass={(classId) => {
+                  setShowPerformanceDetail(false);
+                  safeNavigate(ROUTES.CLASS_DETAIL(classId));
+                }}
+              />
+            </Drawer>
+          ) : (
+            <Modal
+              isOpen={showPerformanceDetail}
+              onClose={() => setShowPerformanceDetail(false)}
+              title={`${terms.GROUP_LABEL}/과목 성과 분석 상세`}
+              size="lg"
+            >
+              <PerformanceDetailContent
+                performanceAnalysis={aiInsights?.performanceAnalysis || []}
+                onNavigateToClass={(classId) => {
+                  setShowPerformanceDetail(false);
+                  safeNavigate(ROUTES.CLASS_DETAIL(classId));
+                }}
+              />
+            </Modal>
+          )}
+
+          {/* 출결 이상 탐지 상세 모달 */}
+          {isMobileMode ? (
+            <Drawer
+              isOpen={showAttendanceDetail}
+              onClose={() => setShowAttendanceDetail(false)}
+              title={`${terms.ABSENCE_LABEL} 이상 탐지 상세`}
+              position="bottom"
+            >
+              <AttendanceAnomalyDetailContent
+                attendanceAnomalies={aiInsights?.attendanceAnomalies || []}
+                onNavigateToStudent={(studentId) => {
+                  setShowAttendanceDetail(false);
+                  safeNavigate(ROUTES.STUDENT_DETAIL(studentId));
+                }}
+              />
+            </Drawer>
+          ) : (
+            <Modal
+              isOpen={showAttendanceDetail}
+              onClose={() => setShowAttendanceDetail(false)}
+              title={`${terms.ABSENCE_LABEL} 이상 탐지 상세`}
+              size="lg"
+            >
+              <AttendanceAnomalyDetailContent
+                attendanceAnomalies={aiInsights?.attendanceAnomalies || []}
+                onNavigateToStudent={(studentId) => {
+                  setShowAttendanceDetail(false);
+                  safeNavigate(ROUTES.STUDENT_DETAIL(studentId));
+                }}
+              />
+            </Modal>
+          )}
       </Container>
     </ErrorBoundary>
   );
@@ -693,13 +1155,19 @@ function ConsultationSummaryTab() {
   const { showAlert } = useModal();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const terms = useIndustryTerms();
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
-  // 학생 목록 조회
+  // 관리 대상 목록 조회
   const { data: students } = useStudents({});
-  const { data: studentSelectSchema } = useSchema('student_select', studentSelectFormSchema, 'form');
 
-  // 선택된 학생의 상담일지 조회
+  // Schema Registry 연동 (아키텍처 문서 S3 참조)
+  const { data: studentSelectSchemaData } = useSchema('student_select', studentSelectFormSchema, 'form');
+
+  // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
+  const studentSelectSchema = studentSelectSchemaData || studentSelectFormSchema;
+
+  // 선택된 관리 대상의 상담일지 조회
   const { data: consultations, isLoading: consultationsLoading } = useQuery({
     queryKey: ['consultations', tenantId, selectedStudentId],
     queryFn: async () => {
@@ -725,9 +1193,9 @@ function ConsultationSummaryTab() {
         consultationId,
         studentId: selectedStudentId,
       });
-      showAlert('성공', 'AI 요약이 생성되었습니다.');
+      showAlert('AI 요약이 생성되었습니다.', '성공');
     } catch (error) {
-      showAlert('오류', error instanceof Error ? error.message : 'AI 요약 생성에 실패했습니다.');
+      showAlert(error instanceof Error ? error.message : 'AI 요약 생성에 실패했습니다.', '오류');
     }
   };
 
@@ -735,7 +1203,7 @@ function ConsultationSummaryTab() {
     <Card padding="lg">
       <h2 style={{ marginBottom: 'var(--spacing-md)' }}>상담일지 자동 요약</h2>
 
-      {/* 학생 선택 - SchemaForm 사용 */}
+      {/* 관리 대상 선택 - SchemaForm 사용 */}
       {studentSelectSchema && studentSelectSchema.type === 'form' && students && (
         <div style={{ marginBottom: 'var(--spacing-md)' }}>
           <SchemaForm
@@ -747,7 +1215,7 @@ function ConsultationSummaryTab() {
                   {
                     ...studentSelectSchema.form.fields[0],
                     options: [
-                      { value: '', label: '학생을 선택하세요' },
+                      { value: '', label: `${terms.PERSON_LABEL_PRIMARY}을 선택하세요` },
                       ...students.map((student) => ({
                         value: student.id,
                         label: student.name,
@@ -847,10 +1315,575 @@ function ConsultationSummaryTab() {
 
       {!selectedStudentId && (
         <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-          학생을 선택하면 상담일지 목록이 표시됩니다.
+          {terms.PERSON_LABEL_PRIMARY}을 선택하면 상담일지 목록이 표시됩니다.
         </div>
       )}
     </Card>
+  );
+}
+
+/**
+ * 성과 분석 상세 모달 내용 컴포넌트
+ *
+ * [아키텍처 문서 4559-4567] AI Insight는 "데이터 분석 인사이트" 레이어
+ * - purpose: 'data_analysis_insights' (데이터 분석 인사이트)
+ * - action_required: false (정보 제공만)
+ * - 클릭 시 그룹 편집이 아닌 상세 인사이트 정보 제공
+ */
+interface DetailInsightItem {
+  type: 'improvement' | 'strength' | 'pattern' | 'comparison' | 'warning' | 'opportunity';
+  title: string;
+  description: string;
+  severity?: 'high' | 'medium' | 'low';
+  category?: 'attendance' | 'enrollment' | 'consultation' | 'billing' | 'capacity' | 'teacher';
+}
+
+interface PerformanceDetailContentProps {
+  performanceAnalysis: Array<{
+    class_id: string;
+    class_name: string;
+    subject?: string;
+    grade?: string;
+    performance: string;
+    trend: string;
+    recommendation: string;
+    detail_insights?: DetailInsightItem[];
+    // 출석 관련
+    attendance_rate?: number;
+    absent_rate?: number;
+    late_rate?: number;
+    attendance_trend?: string;
+    // 관리 대상 관련
+    student_count?: number;
+    max_students?: number;
+    capacity_rate?: number;
+    new_enrollments?: number;
+    withdrawals?: number;
+    enrollment_trend?: string;
+    // 상담 관련
+    consultation_count?: number;
+    learning_consultations?: number;
+    behavior_consultations?: number;
+    // 수납 관련
+    billing_collection_rate?: number;
+    overdue_count?: number;
+    total_revenue?: number;
+    // 스태프 관련
+    teacher_count?: number;
+    has_main_teacher?: boolean;
+  }>;
+  onNavigateToClass: (classId: string) => void;
+}
+
+function PerformanceDetailContent({ performanceAnalysis, onNavigateToClass }: PerformanceDetailContentProps) {
+  const terms = useIndustryTerms();
+  // 선택된 그룹의 상세 인사이트를 보여주는 상태
+  const [selectedClassIndex, setSelectedClassIndex] = useState<number | null>(null);
+
+  if (performanceAnalysis.length === 0) {
+    return (
+      <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+        성과 분석 데이터가 없습니다.
+      </div>
+    );
+  }
+
+  // 성과별 통계 계산
+  const stats = {
+    excellent: performanceAnalysis.filter(p => p.performance === '우수').length,
+    normal: performanceAnalysis.filter(p => p.performance === '보통').length,
+    needsImprovement: performanceAnalysis.filter(p => p.performance === '개선필요').length,
+  };
+
+  // 선택된 그룹의 상세 인사이트 뷰
+  if (selectedClassIndex !== null) {
+    const selectedClass = performanceAnalysis[selectedClassIndex];
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+        {/* 뒤로가기 버튼 */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setSelectedClassIndex(null)}
+          style={{ alignSelf: 'flex-start' }}
+        >
+          ← 전체 목록으로
+        </Button>
+
+        {/* 그룹 정보 헤더 */}
+        <div style={{
+          padding: 'var(--spacing-lg)',
+          backgroundColor: 'var(--color-background-secondary)',
+          borderRadius: 'var(--border-radius-md)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+            <Badge color={selectedClass.performance === '우수' ? 'success' : selectedClass.performance === '보통' ? 'info' : 'error'} style={{ fontSize: 'var(--font-size-base)' }}>
+              {selectedClass.performance}
+            </Badge>
+            <h3 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
+              {selectedClass.class_name}
+            </h3>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+            <span style={{ color: 'var(--color-text-secondary)' }}>추세:</span>
+            <span style={{
+              fontSize: 'var(--font-size-lg)',
+              fontWeight: 'var(--font-weight-bold)',
+              color: selectedClass.trend.startsWith('+') ? 'var(--color-success)' : selectedClass.trend.startsWith('-') ? 'var(--color-error)' : 'var(--color-text)'
+            }}>
+              {selectedClass.trend}
+            </span>
+          </div>
+        </div>
+
+        {/* AI 분석 인사이트 */}
+        <Card padding="lg">
+          <h4 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
+            <span style={{ color: 'var(--color-primary)' }}>✨</span> AI 분석 인사이트
+          </h4>
+
+          {/* 종합 지표 대시보드 */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 'var(--spacing-sm)',
+            marginBottom: 'var(--spacing-md)'
+          }}>
+            {/* 출석률 */}
+            {selectedClass.attendance_rate !== undefined && (
+              <div style={{
+                padding: 'var(--spacing-sm)',
+                backgroundColor: 'var(--color-background-secondary)',
+                borderRadius: 'var(--border-radius-md)',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: selectedClass.attendance_rate >= 90 ? 'var(--color-success)' : selectedClass.attendance_rate >= 70 ? 'var(--color-info)' : 'var(--color-error)' }}>
+                  {selectedClass.attendance_rate}%
+                </div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>출석률</div>
+              </div>
+            )}
+            {/* 정원 충족률 */}
+            {selectedClass.capacity_rate !== undefined && (
+              <div style={{
+                padding: 'var(--spacing-sm)',
+                backgroundColor: 'var(--color-background-secondary)',
+                borderRadius: 'var(--border-radius-md)',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: selectedClass.capacity_rate >= 80 ? 'var(--color-success)' : selectedClass.capacity_rate >= 50 ? 'var(--color-info)' : 'var(--color-warning)' }}>
+                  {selectedClass.capacity_rate}%
+                </div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>{terms.CAPACITY_LABEL} 충족</div>
+              </div>
+            )}
+            {/* 수납률 */}
+            {selectedClass.billing_collection_rate !== undefined && (
+              <div style={{
+                padding: 'var(--spacing-sm)',
+                backgroundColor: 'var(--color-background-secondary)',
+                borderRadius: 'var(--border-radius-md)',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: selectedClass.billing_collection_rate >= 90 ? 'var(--color-success)' : selectedClass.billing_collection_rate >= 70 ? 'var(--color-info)' : 'var(--color-error)' }}>
+                  {selectedClass.billing_collection_rate}%
+                </div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>수납률</div>
+              </div>
+            )}
+            {/* 관리 대상 수 */}
+            {selectedClass.student_count !== undefined && (
+              <div style={{
+                padding: 'var(--spacing-sm)',
+                backgroundColor: 'var(--color-background-secondary)',
+                borderRadius: 'var(--border-radius-md)',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text)' }}>
+                  {selectedClass.student_count}{selectedClass.max_students ? `/${selectedClass.max_students}` : ''}
+                </div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>{terms.PERSON_LABEL_PRIMARY} 수</div>
+              </div>
+            )}
+            {/* 상담 건수 */}
+            {selectedClass.consultation_count !== undefined && selectedClass.consultation_count > 0 && (
+              <div style={{
+                padding: 'var(--spacing-sm)',
+                backgroundColor: 'var(--color-background-secondary)',
+                borderRadius: 'var(--border-radius-md)',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text)' }}>
+                  {selectedClass.consultation_count}건
+                </div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>상담</div>
+              </div>
+            )}
+            {/* 스태프 배정 */}
+            {selectedClass.teacher_count !== undefined && (
+              <div style={{
+                padding: 'var(--spacing-sm)',
+                backgroundColor: 'var(--color-background-secondary)',
+                borderRadius: 'var(--border-radius-md)',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: selectedClass.has_main_teacher ? 'var(--color-success)' : 'var(--color-warning)' }}>
+                  {selectedClass.teacher_count}명
+                </div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>{terms.PERSON_LABEL_SECONDARY}</div>
+              </div>
+            )}
+          </div>
+
+          {/* 세부 현황 */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+            {/* 등록/이탈 현황 */}
+            {(selectedClass.new_enrollments !== undefined || selectedClass.withdrawals !== undefined) && (
+              <div style={{ padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-sm)', fontSize: 'var(--font-size-sm)' }}>
+                <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>등록/이탈</div>
+                <span style={{ color: 'var(--color-success)' }}>+{selectedClass.new_enrollments || 0}</span>
+                <span style={{ color: 'var(--color-text-secondary)' }}> / </span>
+                <span style={{ color: 'var(--color-error)' }}>-{selectedClass.withdrawals || 0}</span>
+                {selectedClass.enrollment_trend && (
+                  <span style={{ marginLeft: 'var(--spacing-xs)', color: 'var(--color-text-secondary)' }}>({selectedClass.enrollment_trend})</span>
+                )}
+              </div>
+            )}
+            {/* 미납 현황 */}
+            {selectedClass.overdue_count !== undefined && selectedClass.overdue_count > 0 && (
+              <div style={{ padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-sm)', fontSize: 'var(--font-size-sm)' }}>
+                <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>미납</div>
+                <span style={{ color: 'var(--color-error)', fontWeight: 'var(--font-weight-semibold)' }}>{selectedClass.overdue_count}건</span>
+              </div>
+            )}
+          </div>
+
+          {/* 핵심 권장 사항 */}
+          <div style={{
+            padding: 'var(--spacing-md)',
+            backgroundColor: 'var(--color-background-secondary)',
+            borderRadius: 'var(--border-radius-md)',
+            borderLeft: '4px solid var(--color-primary)',
+            marginBottom: 'var(--spacing-md)'
+          }}>
+            <p style={{ color: 'var(--color-text)', lineHeight: 1.6, margin: 0 }}>
+              {selectedClass.recommendation}
+            </p>
+          </div>
+
+          {/* 상세 인사이트 목록 */}
+          {selectedClass.detail_insights && selectedClass.detail_insights.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+              <h5 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', margin: 0, marginBottom: 'var(--spacing-xs)' }}>
+                상세 분석
+              </h5>
+              {selectedClass.detail_insights.map((insight, idx) => {
+                // 인사이트 타입별 색상 및 아이콘
+                const getInsightStyle = () => {
+                  switch (insight.type) {
+                    case 'improvement':
+                      return {
+                        borderColor: insight.severity === 'high' ? 'var(--color-error)' : insight.severity === 'medium' ? 'var(--color-warning)' : 'var(--color-info)',
+                        icon: '⚠️',
+                        badgeColor: insight.severity === 'high' ? 'error' : insight.severity === 'medium' ? 'warning' : 'info',
+                      };
+                    case 'strength':
+                      return {
+                        borderColor: 'var(--color-success)',
+                        icon: '✅',
+                        badgeColor: 'success' as const,
+                      };
+                    case 'pattern':
+                      return {
+                        borderColor: 'var(--color-info)',
+                        icon: '📊',
+                        badgeColor: 'info' as const,
+                      };
+                    case 'comparison':
+                      return {
+                        borderColor: 'var(--color-primary)',
+                        icon: '📈',
+                        badgeColor: 'primary' as const,
+                      };
+                    case 'warning':
+                      return {
+                        borderColor: 'var(--color-error)',
+                        icon: '🚨',
+                        badgeColor: 'error' as const,
+                      };
+                    case 'opportunity':
+                      return {
+                        borderColor: 'var(--color-success)',
+                        icon: '💡',
+                        badgeColor: 'success' as const,
+                      };
+                    default:
+                      return {
+                        borderColor: 'var(--color-border)',
+                        icon: '💡',
+                        badgeColor: 'gray' as const,
+                      };
+                  }
+                };
+
+                // 카테고리별 라벨
+                const getCategoryLabel = () => {
+                  switch (insight.category) {
+                    case 'attendance': return terms.PRESENT_LABEL;
+                    case 'enrollment': return '등록';
+                    case 'consultation': return terms.CONSULTATION_LABEL;
+                    case 'billing': return terms.BILLING_LABEL;
+                    case 'capacity': return terms.CAPACITY_LABEL;
+                    case 'teacher': return terms.PERSON_LABEL_SECONDARY;
+                    default: return null;
+                  }
+                };
+                const categoryLabel = getCategoryLabel();
+                const style = getInsightStyle();
+
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      padding: 'var(--spacing-md)',
+                      backgroundColor: 'var(--color-background)',
+                      borderRadius: 'var(--border-radius-md)',
+                      borderLeft: `4px solid ${style.borderColor}`,
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', marginBottom: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
+                      <span>{style.icon}</span>
+                      <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)' }}>
+                        {insight.title}
+                      </span>
+                      {categoryLabel && (
+                        <Badge color="gray" style={{ fontSize: 'var(--font-size-xs)' }}>
+                          {categoryLabel}
+                        </Badge>
+                      )}
+                      {insight.severity && (
+                        <Badge color={style.badgeColor as 'error' | 'warning' | 'info' | 'success'} style={{ fontSize: 'var(--font-size-xs)' }}>
+                          {insight.severity === 'high' ? '높음' : insight.severity === 'medium' ? '중간' : '낮음'}
+                        </Badge>
+                      )}
+                    </div>
+                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5 }}>
+                      {insight.description}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+
+        {/* 그룹 관리 페이지 이동 버튼 - 선택적 액션 */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--spacing-sm)' }}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onNavigateToClass(selectedClass.class_id)}
+          >
+            {terms.GROUP_LABEL} 관리 페이지로 이동 →
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // 전체 목록 뷰
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+      {/* 요약 통계 */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 'var(--spacing-md)',
+        padding: 'var(--spacing-md)',
+        backgroundColor: 'var(--color-background-secondary)',
+        borderRadius: 'var(--border-radius-md)'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
+            {stats.excellent}
+          </div>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>우수</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-info)' }}>
+            {stats.normal}
+          </div>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>보통</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-error)' }}>
+            {stats.needsImprovement}
+          </div>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>개선필요</div>
+        </div>
+      </div>
+
+      {/* 안내 메시지 */}
+      <div style={{
+        padding: 'var(--spacing-sm)',
+        backgroundColor: 'var(--color-info-bg)',
+        borderRadius: 'var(--border-radius-sm)',
+        fontSize: 'var(--font-size-sm)',
+        color: 'var(--color-info)'
+      }}>
+        💡 각 {terms.GROUP_LABEL}을 클릭하면 상세 AI 분석 인사이트를 확인할 수 있습니다.
+      </div>
+
+      {/* 그룹별 상세 목록 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+        {performanceAnalysis.map((perf, index) => (
+          <Card
+            key={index}
+            padding="md"
+            style={{ cursor: 'pointer' }}
+            onClick={() => setSelectedClassIndex(index)}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
+                  <Badge color={perf.performance === '우수' ? 'success' : perf.performance === '보통' ? 'info' : 'error'}>
+                    {perf.performance}
+                  </Badge>
+                  <span style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
+                    {perf.class_name}
+                  </span>
+                  {perf.attendance_rate !== undefined && (
+                    <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                      (출석률 {perf.attendance_rate.toFixed(1)}%)
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-sm)' }}>
+                  <span style={{ color: 'var(--color-text-secondary)' }}>추세:</span>
+                  <span style={{
+                    fontWeight: 'var(--font-weight-semibold)',
+                    color: perf.trend.startsWith('+') ? 'var(--color-success)' : perf.trend.startsWith('-') ? 'var(--color-error)' : 'var(--color-text)'
+                  }}>
+                    {perf.trend}
+                  </span>
+                  {perf.student_count !== undefined && (
+                    <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                      • {perf.student_count}명
+                    </span>
+                  )}
+                </div>
+                <div style={{
+                  padding: 'var(--spacing-sm)',
+                  backgroundColor: 'var(--color-background-secondary)',
+                  borderRadius: 'var(--border-radius-sm)',
+                  fontSize: 'var(--font-size-sm)',
+                  color: 'var(--color-text-secondary)'
+                }}>
+                  {perf.recommendation}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 'var(--spacing-xs)' }}>
+                {perf.detail_insights && perf.detail_insights.length > 0 && (
+                  <Badge color="primary" style={{ fontSize: 'var(--font-size-xs)' }}>
+                    {perf.detail_insights.length}개 인사이트
+                  </Badge>
+                )}
+                <span style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                  상세 보기 →
+                </span>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 출결 이상 탐지 상세 모달 내용 컴포넌트
+ */
+interface AttendanceAnomalyDetailContentProps {
+  attendanceAnomalies: Array<{
+    student_id: string;
+    student_name: string;
+    issue: string;
+    recommendation: string;
+  }>;
+  onNavigateToStudent: (studentId: string) => void;
+}
+
+function AttendanceAnomalyDetailContent({ attendanceAnomalies, onNavigateToStudent }: AttendanceAnomalyDetailContentProps) {
+  const terms = useIndustryTerms();
+
+  if (attendanceAnomalies.length === 0) {
+    return (
+      <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+        {terms.ABSENCE_LABEL} 이상 탐지 데이터가 없습니다.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+      {/* 요약 */}
+      <div style={{
+        padding: 'var(--spacing-md)',
+        backgroundColor: 'var(--color-background-secondary)',
+        borderRadius: 'var(--border-radius-md)',
+        borderLeft: '4px solid var(--color-warning)'
+      }}>
+        <div style={{ fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
+          {attendanceAnomalies.length}명의 {terms.PERSON_LABEL_PRIMARY}에게 {terms.ABSENCE_LABEL} 이상 감지
+        </div>
+        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+          각 {terms.PERSON_LABEL_PRIMARY}을 클릭하면 상세 정보를 확인하고 조치를 취할 수 있습니다.
+        </div>
+      </div>
+
+      {/* 관리 대상별 상세 목록 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+        {attendanceAnomalies.map((anomaly, index) => (
+          <Card
+            key={index}
+            padding="md"
+            style={{ cursor: 'pointer' }}
+            onClick={() => onNavigateToStudent(anomaly.student_id)}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-sm)' }}>
+                  <Badge color="warning">주의</Badge>
+                  <span style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
+                    {anomaly.student_name}
+                  </span>
+                </div>
+                <div style={{
+                  marginBottom: 'var(--spacing-sm)',
+                  color: 'var(--color-text)',
+                  fontWeight: 'var(--font-weight-medium)'
+                }}>
+                  {anomaly.issue}
+                </div>
+                <div style={{
+                  padding: 'var(--spacing-sm)',
+                  backgroundColor: 'var(--color-background-secondary)',
+                  borderRadius: 'var(--border-radius-sm)',
+                  fontSize: 'var(--font-size-sm)',
+                  color: 'var(--color-text-secondary)'
+                }}>
+                  권장 조치: {anomaly.recommendation}
+                </div>
+              </div>
+              <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                상세 보기 →
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
   );
 }
 

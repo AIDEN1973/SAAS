@@ -353,12 +353,12 @@ export const ExecutionAuditPanel: React.FC<ExecutionAuditPanelProps> = ({
                   onClick={() => isClickable && onRowClick(run)}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '80px 140px 1fr',
+                    gridTemplateColumns: 'var(--grid-col-narrow) var(--grid-col-medium) 1fr',
                     gap: 'var(--spacing-lg)',
                     padding: 'var(--spacing-md) var(--spacing-xl)',
                     alignItems: 'center',
                     position: 'relative',
-                    borderBottom: '1px solid var(--color-gray-100)',
+                    borderBottom: 'var(--border-width-thin) solid var(--color-gray-100)',
                     backgroundColor: 'var(--color-white)',
                     transition: 'background-color 0.15s ease',
                     cursor: isClickable ? 'pointer' : 'default',

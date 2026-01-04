@@ -96,7 +96,7 @@ export function LoginPage() {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '로그인에 실패했습니다.';
-      showAlert('오류', message);
+      showAlert(message, '오류');
     }
   };
 
@@ -108,7 +108,7 @@ export function LoginPage() {
       window.location.href = url;
     } catch (error) {
       const message = error instanceof Error ? error.message : '소셜 로그인에 실패했습니다.';
-      showAlert('오류', message);
+      showAlert(message, '오류');
     }
   };
 
@@ -116,10 +116,10 @@ export function LoginPage() {
     try {
       await sendOTP.mutateAsync(phone);
       setOtpSent(true);
-      showAlert('알림', 'OTP가 전송되었습니다.');
+      showAlert('OTP가 전송되었습니다.', '알림');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'OTP 전송에 실패했습니다.';
-      showAlert('오류', message);
+      showAlert(message, '오류');
     }
   };
 
@@ -143,12 +143,12 @@ export function LoginPage() {
         }
 
         showAlert(
-          '알림',
           '소속된 테넌트가 없습니다.\n\n' +
           '회원가입을 진행하시거나, 관리자에게 문의해주세요.\n\n' +
           (import.meta.env?.DEV
             ? '개발 환경: 브라우저 콘솔에서 상세 정보를 확인하세요.'
-            : '')
+            : ''),
+          '알림'
         );
         safeNavigate('/auth/signup');
         return;
@@ -162,7 +162,7 @@ export function LoginPage() {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'OTP 로그인에 실패했습니다.';
-      showAlert('오류', message);
+      showAlert(message, '오류');
     }
   };
 

@@ -36,6 +36,19 @@ BEGIN
     RAISE EXCEPTION '유효하지 않은 상태입니다: %', p_status;
   END IF;
 
+  -- P2-1: 중복 검사 (동일 이름 + 전화번호 + 재직중 상태)
+  IF p_phone IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.persons p
+    JOIN public.academy_teachers at ON at.person_id = p.id
+    WHERE p.tenant_id = p_tenant_id
+      AND p.name = p_name
+      AND p.phone = p_phone
+      AND p.person_type = 'teacher'
+      AND at.status IN ('active', 'on_leave')
+  ) THEN
+    RAISE EXCEPTION '동일한 이름과 전화번호를 가진 강사가 이미 존재합니다. (이름: %, 전화: %)', p_name, p_phone;
+  END IF;
+
   -- 1. persons 테이블에 생성
   INSERT INTO public.persons (
     tenant_id,

@@ -43,7 +43,7 @@ export function TenantSelectionPage() {
       safeNavigate('/');
     } catch (error) {
       const message = error instanceof Error ? error.message : '테넌트 선택에 실패했습니다.';
-      showAlert('오류', message);
+      showAlert(message, '오류');
       setSelectedTenantId(null);
     }
   }, [selectTenant, showAlert, safeNavigate]);

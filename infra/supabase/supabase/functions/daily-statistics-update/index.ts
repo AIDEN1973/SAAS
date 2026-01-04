@@ -131,6 +131,40 @@ serve(async (req) => {
         // ARPU 계산 (학생 1인당 평균 매출)
         const arpu = studentCount > 0 ? revenue / studentCount : 0;
 
+        // Phase 1: 신규 등록 수 계산 (이번 달 등록한 학생 수)
+        const currentMonthStart = toKSTMonth(kstTime);
+        const { data: newStudents, error: newStudentsError } = await withTenant(
+          supabase
+          .from('persons')
+          .select('id')
+          .eq('person_type', 'student')
+          .gte('created_at', `${currentMonthStart}-01T00:00:00`)
+          .lte('created_at', `${dateKst}T23:59:59`),
+          tenant.id
+        );
+        const newEnrollments = newStudentsError ? 0 : (newStudents?.length || 0);
+
+        // Phase 2: 미납률 계산 (미납액 / 전체 청구액)
+        const { data: allInvoices, error: allInvoicesError } = await withTenant(
+          supabase
+          .from('invoices')
+          .select('amount, amount_paid')
+          .gte('period_start', dateKst)
+          .lte('period_start', dateKst),
+          tenant.id
+        );
+        let overdueRate = 0;
+        if (!allInvoicesError && allInvoices && allInvoices.length > 0) {
+          const totalBilled = allInvoices.reduce((sum: number, inv: { amount?: number }) => sum + (inv.amount || 0), 0);
+          const totalPaid = allInvoices.reduce((sum: number, inv: { amount_paid?: number }) => sum + (inv.amount_paid || 0), 0);
+          const overdue = totalBilled - totalPaid;
+          overdueRate = totalBilled > 0 ? (overdue / totalBilled) * 100 : 0;
+        }
+
+        // Phase 3: 퇴원율 계산 (이탈 학생 수 / 전체 학생 수)
+        const churnedStudentCount = allStudentsError ? 0 : (allStudents?.filter((s: { status: string }) => s.status === 'churned' || s.status === 'inactive').length || 0);
+        const churnRate = studentCount > 0 ? (churnedStudentCount / (studentCount + churnedStudentCount)) * 100 : 0;
+
         // 통계 업데이트 (analytics.daily_store_metrics 테이블 사용, 정본)
         // ⚠️ 참고: analytics.daily_metrics는 구버전/폐기된 네이밍입니다.
         const { error: upsertError } = await supabase
@@ -142,7 +176,7 @@ serve(async (req) => {
             student_count: studentCount,
             revenue: revenue,
             attendance_rate: attendanceRate,
-            new_enrollments: 0, // 신규 등록 수는 별도 계산 필요 (현재는 0)
+            new_enrollments: newEnrollments, // Phase 1: 실제 계산값 사용
             late_rate: lateRate,
             absent_rate: absentRate,
             active_student_count: activeStudentCount,
@@ -150,6 +184,9 @@ serve(async (req) => {
             avg_students_per_class: avgStudentsPerClass,
             avg_capacity_rate: avgCapacityRate,
             arpu: arpu,
+            // Phase 2-3: 추가 메트릭 저장
+            overdue_rate: overdueRate,
+            churn_rate: churnRate,
             updated_at: toKST().toISOString(),
           }, {
             onConflict: 'tenant_id,date_kst',
@@ -336,12 +373,42 @@ serve(async (req) => {
             const avgArpu = storeMetrics.reduce((sum: number, m: any) => sum + (m.arpu || 0), 0) / tenantCount;
             const avgAttendanceRate = storeMetrics.reduce((sum: number, m: any) => sum + (m.attendance_rate || 0), 0) / tenantCount;
 
-            // Percentile 계산 (attendance_rate)
-            const attendanceRates = storeMetrics.map((m: any) => m.attendance_rate || 0).sort((a: number, b: number) => a - b);
-            const p25Index = Math.floor(attendanceRates.length * 0.25);
-            const p75Index = Math.floor(attendanceRates.length * 0.75);
-            const attendanceRateP25 = attendanceRates[p25Index] || 0;
-            const attendanceRateP75 = attendanceRates[p75Index] || 0;
+            // Phase 1-3: 추가 메트릭 평균 계산 (마이그레이션 158)
+            const avgNewEnrollments = storeMetrics.reduce((sum: number, m: any) => sum + (m.new_enrollments || 0), 0) / tenantCount;
+            const avgCapacityRate = storeMetrics.reduce((sum: number, m: any) => sum + (m.avg_capacity_rate || 0), 0) / tenantCount;
+            const avgLateRate = storeMetrics.reduce((sum: number, m: any) => sum + (m.late_rate || 0), 0) / tenantCount;
+            const avgAbsentRate = storeMetrics.reduce((sum: number, m: any) => sum + (m.absent_rate || 0), 0) / tenantCount;
+
+            // Phase 2: 미납률, 퇴원율 계산 (store_metrics에 컬럼이 있다고 가정, 없으면 0)
+            const avgOverdueRate = storeMetrics.reduce((sum: number, m: any) => sum + (m.overdue_rate || 0), 0) / tenantCount;
+            const avgChurnRate = storeMetrics.reduce((sum: number, m: any) => sum + (m.churn_rate || 0), 0) / tenantCount;
+
+            // Percentile 계산 도우미 함수
+            const p25Index = Math.floor(storeMetrics.length * 0.25);
+            const p75Index = Math.floor(storeMetrics.length * 0.75);
+
+            const calculatePercentiles = (values: number[]) => {
+              const sorted = [...values].sort((a, b) => a - b);
+              return {
+                p25: sorted[p25Index] || 0,
+                p75: sorted[p75Index] || 0,
+              };
+            };
+
+            // Percentile 계산 (기존 메트릭)
+            const attendanceRates = storeMetrics.map((m: any) => m.attendance_rate || 0);
+            const attendancePercentiles = calculatePercentiles(attendanceRates);
+            const attendanceRateP25 = attendancePercentiles.p25;
+            const attendanceRateP75 = attendancePercentiles.p75;
+
+            // Phase 1-3: 신규 메트릭 Percentile 계산
+            const newEnrollmentsPercentiles = calculatePercentiles(storeMetrics.map((m: any) => m.new_enrollments || 0));
+            const arpuPercentiles = calculatePercentiles(storeMetrics.map((m: any) => m.arpu || 0));
+            const capacityRatePercentiles = calculatePercentiles(storeMetrics.map((m: any) => m.avg_capacity_rate || 0));
+            const overdueRatePercentiles = calculatePercentiles(storeMetrics.map((m: any) => m.overdue_rate || 0));
+            const churnRatePercentiles = calculatePercentiles(storeMetrics.map((m: any) => m.churn_rate || 0));
+            const lateRatePercentiles = calculatePercentiles(storeMetrics.map((m: any) => m.late_rate || 0));
+            const absentRatePercentiles = calculatePercentiles(storeMetrics.map((m: any) => m.absent_rate || 0));
 
             // 성장률 계산 (전월 대비)
             const lastMonthDate = new Date(yesterday.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -405,6 +472,28 @@ serve(async (req) => {
                 revenue_growth_rate_avg: revenueGrowthRateAvg,
                 student_growth_rate_p75: studentGrowthRateP75,
                 revenue_growth_rate_p75: revenueGrowthRateP75,
+                // Phase 1-3 메트릭 추가 (마이그레이션 158)
+                new_enrollments_avg: avgNewEnrollments,
+                new_enrollments_p25: newEnrollmentsPercentiles.p25,
+                new_enrollments_p75: newEnrollmentsPercentiles.p75,
+                arpu_avg: avgArpu, // avg_arpu와 arpu_avg 중복 (마이그레이션 158에서 rename)
+                arpu_p25: arpuPercentiles.p25,
+                arpu_p75: arpuPercentiles.p75,
+                capacity_rate_avg: avgCapacityRate,
+                capacity_rate_p25: capacityRatePercentiles.p25,
+                capacity_rate_p75: capacityRatePercentiles.p75,
+                overdue_rate_avg: avgOverdueRate,
+                overdue_rate_p25: overdueRatePercentiles.p25,
+                overdue_rate_p75: overdueRatePercentiles.p75,
+                churn_rate_avg: avgChurnRate,
+                churn_rate_p25: churnRatePercentiles.p25,
+                churn_rate_p75: churnRatePercentiles.p75,
+                late_rate_avg: avgLateRate,
+                late_rate_p25: lateRatePercentiles.p25,
+                late_rate_p75: lateRatePercentiles.p75,
+                absent_rate_avg: avgAbsentRate,
+                absent_rate_p25: absentRatePercentiles.p25,
+                absent_rate_p75: absentRatePercentiles.p75,
                 date_kst: dateKst,
                 updated_at: toKST().toISOString(),
               }, {

@@ -1,0 +1,43 @@
+{
+  "tenant_id": "4b356e08-55ba-48a5-97af-35db55c872c0",
+  "insight_type": "performance_analysis",
+  "title": "반 이름은 국어 종합 성과 분석",
+  "summary": "종합 등급: 양호 | 출석 85% | 정원 60% | 수납 95%",
+  "insights": "[\"현재 운영 상태가 양호합니다.\"]",
+  "details": {
+    "class_id": "557afcfe-f78d-46cc-a544-19f527315822",
+    "class_name": "반 이름은 국어",
+    "subject": "국어",
+    "grade": "1학년",
+    "performance": "양호",
+    "recommendation": "현재 운영 상태가 양호합니다.",
+    "attendance_rate": 85,
+    "absent_rate": 10,
+    "late_rate": 5,
+    "attendance_trend": "유지",
+    "student_count": 12,
+    "max_students": 20,
+    "capacity_rate": 60,
+    "new_enrollments": 2,
+    "withdrawals": 1,
+    "enrollment_trend": "증가",
+    "consultation_count": 5,
+    "learning_consultations": 3,
+    "behavior_consultations": 2,
+    "billing_collection_rate": 95,
+    "overdue_count": 1,
+    "total_revenue": 1200000,
+    "teacher_count": 1,
+    "has_main_teacher": true,
+    "detail_insights": [
+      {"type": "strength", "title": "우수한 출석률", "description": "출석률 85%로 양호합니다.", "severity": "low", "category": "attendance"},
+      {"type": "opportunity", "title": "정원 여유", "description": "정원 충족률 60%.", "severity": "medium", "category": "capacity"},
+      {"type": "pattern", "title": "학습 상담 활발", "description": "학습 관련 상담 3건. 학생들의 학습 의욕이 높습니다.", "severity": "low", "category": "consultation"}
+    ],
+    "analysis_period": {"start": "2025-12-27", "end": "2026-01-03"}
+  },
+  "related_entity_type": "class",
+  "related_entity_id": "557afcfe-f78d-46cc-a544-19f527315822",
+  "status": "active",
+  "action_url": "/classes/557afcfe-f78d-46cc-a544-19f527315822"
+}

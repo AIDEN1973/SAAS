@@ -20,7 +20,7 @@ import { clsx } from 'clsx';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 import { RightLayerMenu, RightLayerMenuProps } from './RightLayerMenu';
 import { Button } from './Button';
-import { ChatOpsPanel, ChatOpsMessage } from './ChatOpsPanel';
+import { ChatOpsPanel, ChatOpsMessage, ChatOpsIndustryTerms } from './ChatOpsPanel';
 import { ExecutionAuditPanel, ExecutionAuditRun, ExecutionAuditStep, ExecutionAuditFilters } from './ExecutionAuditPanel';
 
 export type AILayerMenuTab = 'activity' | 'chatops';
@@ -35,6 +35,7 @@ export interface AILayerMenuProps {
   // ChatOps Props
   chatOpsMessages?: ChatOpsMessage[];
   chatOpsLoading?: boolean;
+  chatOpsIndustryTerms?: ChatOpsIndustryTerms; // 업종별 용어 (선택사항, 기본값: Academy 용어)
   onChatOpsSendMessage?: (message: string) => void | Promise<void>;
   onChatOpsSelectCandidate?: (candidateId: string, tokenId?: string) => void;
   onChatOpsApprovePlan?: (taskId: string) => void;
@@ -76,6 +77,7 @@ export const AILayerMenu: React.FC<AILayerMenuProps> = ({
   // ChatOps Props
   chatOpsMessages = [],
   chatOpsLoading = false,
+  chatOpsIndustryTerms,
   onChatOpsSendMessage,
   onChatOpsSelectCandidate,
   onChatOpsApprovePlan,
@@ -167,6 +169,7 @@ export const AILayerMenu: React.FC<AILayerMenuProps> = ({
             <ChatOpsPanel
               messages={chatOpsMessages}
               isLoading={chatOpsLoading}
+              industryTerms={chatOpsIndustryTerms}
               onSendMessage={onChatOpsSendMessage || (async () => {})}
               onSelectCandidate={onChatOpsSelectCandidate}
               onApprovePlan={onChatOpsApprovePlan}

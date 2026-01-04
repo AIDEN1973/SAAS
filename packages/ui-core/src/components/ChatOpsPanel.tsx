@@ -74,6 +74,20 @@ export interface ChatOpsMessage {
   };
 }
 
+/**
+ * 업종별 용어 설정 (Industry Neutrality)
+ */
+export interface ChatOpsIndustryTerms {
+  /** 주요 관리 대상 라벨 (학생/회원/고객) */
+  personLabel: string;
+  /** 주요 관리 대상 복수 라벨 (학생들/회원들/고객들) */
+  personLabelPlural?: string;
+  /** 출석/출결/방문 라벨 */
+  attendanceLabel?: string;
+  /** 지각 라벨 */
+  lateLabel?: string;
+}
+
 export interface ChatOpsPanelProps {
   messages: ChatOpsMessage[];
   isLoading?: boolean;
@@ -85,6 +99,8 @@ export interface ChatOpsPanelProps {
   onViewTaskCard?: (taskId: string) => void; // 업종 중립: TaskCard 라우팅 (업종별로 다른 경로 처리)
   onReset?: () => void; // 대화 초기화 콜백
   className?: string;
+  /** 업종별 용어 (선택사항, 기본값: Academy 용어) */
+  industryTerms?: ChatOpsIndustryTerms;
 }
 
 /**
@@ -167,9 +183,12 @@ function extractRequestedFields(originalMessage: string): { requestedFields: Set
 }
 
 /**
- * 필드명을 한글로 변환
+ * 필드명을 한글로 변환 (업종중립)
  */
-function getFieldLabel(field: string): string {
+function getFieldLabel(field: string, industryTerms?: ChatOpsIndustryTerms): string {
+  const personLabel = industryTerms?.personLabel || '학생';
+  const lateLabel = industryTerms?.lateLabel || '지각';
+
   const labels: Record<string, string> = {
     name: '이름',
     phone: '전화번호',
@@ -184,9 +203,9 @@ function getFieldLabel(field: string): string {
     guardian_name: '보호자 이름',
     guardian_contact: '보호자 연락처',
     total_count: '총 개수',
-    student_name: '학생 이름',
-    late_time: '지각 시간',
-    student_id: '학생 ID',
+    student_name: `${personLabel} 이름`,
+    late_time: `${lateLabel} 시간`,
+    student_id: `${personLabel} ID`,
   };
   return labels[field] || field;
 }
@@ -224,6 +243,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
   onViewTaskCard,
   onReset,
   className,
+  industryTerms,
 }) => {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -275,8 +295,8 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
 
     // 버블 스타일 (사용자/어시스턴트/진행상황 구분)
     const bubbleStyle: React.CSSProperties = {
-      // HARD-CODE-EXCEPTION: maxWidth는 상대값(퍼센트)이므로 CSS 변수로 대체하기 어려움 (CSS 속성 값)
-      maxWidth: '80%',
+      // TODO: Design System에 --width-message-bubble-max: 80% 변수 추가 필요
+      maxWidth: 'var(--width-message-bubble-max, 80%)',
       padding: 'var(--spacing-md)',
       borderRadius: 'var(--border-radius-lg)',
       marginBottom: 'var(--spacing-sm)',
@@ -336,7 +356,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
               </div>
               <div style={{ color: 'var(--color-text)' }}>
                 {typeof message.content === 'string' ? (
-                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: 0 }}>
+                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'var(--font-family-base, inherit)', margin: 0 }}>
                     {message.content}
                   </pre>
                 ) : (
@@ -458,41 +478,8 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                         if (onViewTaskCard) {
                           onViewTaskCard(taskId);
                         } else {
-                          // 하위 호환성: onViewTaskCard가 없으면 기본 동작 (학원 전용)
-                          // ⚠️ 경고: 이 경로는 업종별로 다를 수 있으므로 onViewTaskCard prop 사용 권장
-                          // P0: 네비게이션 보안 - window.location.href 직접 사용 시 엄격한 경로 검증 수행
-                          // UI Core Component는 업종 중립이므로 엄격한 검증 수행
-                          const targetPath = `/students/tasks?task_id=${taskId}`;
-                          // 엄격한 경로 검증: 내부 경로만 허용 (오픈 리다이렉트 방지)
-                          // [P0 수정] isSafeInternalPath와 동일한 검증 로직 적용
-                          let decoded = targetPath;
-                          let prevDecoded = '';
-                          // HARD-CODE-EXCEPTION: 무한 루프 방지를 위한 최대 반복 횟수 (브라우저 버그 회피용 상수)
-                          for (let i = 0; i < 10 && decoded !== prevDecoded; i++) {
-                            prevDecoded = decoded;
-                            try {
-                              decoded = decodeURIComponent(decoded);
-                            } catch {
-                              decoded = prevDecoded;
-                              break;
-                            }
-                          }
-                          const normalized = decoded.trim().replace(/[\x00-\x1F\x7F]/g, '');
-                          const lowerNormalized = normalized.toLowerCase();
-                          const isSafe = normalized.startsWith('/') &&
-                            !normalized.startsWith('//') &&
-                            !normalized.includes('://') &&
-                            !lowerNormalized.includes('javascript:') &&
-                            !lowerNormalized.includes('data:') &&
-                            !lowerNormalized.includes('vbscript:') &&
-                            !lowerNormalized.includes('file:') &&
-                            !lowerNormalized.includes('about:') &&
-                            !normalized.includes('\\') &&
-                            !normalized.includes('..');
-                          if (isSafe) {
-                            window.location.href = targetPath;
-                          }
-                          // 외부 URL 또는 잘못된 형식은 무시 (Fail Closed)
+                          // ⚠️ onViewTaskCard prop이 필수입니다 - 업종별 라우팅을 prop으로 주입해야 합니다
+                          console.warn('[ChatOpsPanel] onViewTaskCard prop is required for task card navigation');
                         }
                       }
                     }}
@@ -565,7 +552,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
               {typeof message.content === 'string' ? (
                 <div
                   style={{
-                    lineHeight: '1.6',
+                    lineHeight: 'var(--line-height-relaxed)',
                     wordBreak: 'break-word',
                     fontFamily: isUser
                       ? 'inherit'
@@ -582,9 +569,9 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                         <span
                           style={{
                             display: 'inline-block',
-                            width: '2px',
-                            height: '1em',
-                            marginLeft: '2px',
+                            width: 'var(--spacing-xxs)',
+                            height: 'var(--cursor-height, 1em)',
+                            marginLeft: 'var(--spacing-xxs)',
                             backgroundColor: 'var(--color-primary-500)',
                             animation: 'blink 1s infinite',
                             verticalAlign: 'text-bottom',
@@ -779,7 +766,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                       </div>
                       <div style={{ color: 'var(--color-text)', fontSize: 'var(--font-size-sm)' }}>
                         {records.slice(0, 10).map((record, idx) => (
-                          <div key={idx} style={{ marginBottom: 'var(--spacing-xs)', paddingBottom: 'var(--spacing-xs)', borderBottom: idx < records.length - 1 ? '1px solid var(--color-gray-200)' : 'none' }}>
+                          <div key={idx} style={{ marginBottom: 'var(--spacing-xs)', paddingBottom: 'var(--spacing-xs)', borderBottom: idx < records.length - 1 ? 'var(--border-width-thin) solid var(--color-gray-200)' : 'none' }}>
                             {(showAll || showDate) && <span style={{ marginRight: 'var(--spacing-sm)' }}>{record.date}</span>}
                             {(showAll || showTime) && <span style={{ marginRight: 'var(--spacing-sm)', color: 'var(--color-gray-600)' }}>{record.time}</span>}
                             {(showAll || showStatus) && (
@@ -805,8 +792,9 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                   const originalMessage = (message.metadata?.original_message as string) || '';
                   const messageLower = originalMessage.toLowerCase();
 
-                  // 명시적 필드 요청만 감지 (기본값 제거)
-                  const showName = messageLower.includes('이름') || messageLower.includes('학생');
+                  // 명시적 필드 요청만 감지 (기본값 제거) - 업종중립
+                  const personLabel = (industryTerms?.personLabel || '학생').toLowerCase();
+                  const showName = messageLower.includes('이름') || messageLower.includes(personLabel);
                   const showClass = messageLower.includes('반') || messageLower.includes('클래스');
                   const showTime = messageLower.includes('시간') || messageLower.includes('시각');
                   // 전체 표시: 명시적 요청이 있거나, 아무 필드도 요청하지 않은 경우
@@ -829,7 +817,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                       </div>
                       <div style={{ color: 'var(--color-text)', fontSize: 'var(--font-size-sm)' }}>
                         {students.slice(0, 10).map((student, idx) => (
-                          <div key={student.id} style={{ marginBottom: 'var(--spacing-xs)', paddingBottom: 'var(--spacing-xs)', borderBottom: idx < students.length - 1 ? '1px solid var(--color-gray-200)' : 'none' }}>
+                          <div key={student.id} style={{ marginBottom: 'var(--spacing-xs)', paddingBottom: 'var(--spacing-xs)', borderBottom: idx < students.length - 1 ? 'var(--border-width-thin) solid var(--color-gray-200)' : 'none' }}>
                             {/* 이름은 항상 표시 (식별용) */}
                             <span style={{ fontWeight: 'var(--font-weight-medium)', marginRight: 'var(--spacing-sm)' }}>{student.name}</span>
                             {(showAll || showClass) && student.class_name && <span style={{ color: 'var(--color-gray-600)', marginRight: 'var(--spacing-sm)' }}>{student.class_name}</span>}
@@ -876,7 +864,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                       </div>
                       <div style={{ color: 'var(--color-text)', fontSize: 'var(--font-size-sm)' }}>
                         {invoices.slice(0, 10).map((invoice, idx) => (
-                          <div key={invoice.id} style={{ marginBottom: 'var(--spacing-xs)', paddingBottom: 'var(--spacing-xs)', borderBottom: idx < invoices.length - 1 ? '1px solid var(--color-gray-200)' : 'none' }}>
+                          <div key={invoice.id} style={{ marginBottom: 'var(--spacing-xs)', paddingBottom: 'var(--spacing-xs)', borderBottom: idx < invoices.length - 1 ? 'var(--border-width-thin) solid var(--color-gray-200)' : 'none' }}>
                             {(showAll || showMonth) && <span style={{ marginRight: 'var(--spacing-sm)' }}>{invoice.month}</span>}
                             {(showAll || showAmount) && <span style={{ marginRight: 'var(--spacing-sm)', fontWeight: 'var(--font-weight-medium)' }}>{invoice.amount.toLocaleString()}원</span>}
                             {(showAll || showStatus) && (
@@ -902,8 +890,9 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                   const originalMessage = (message.metadata?.original_message as string) || '';
                   const messageLower = originalMessage.toLowerCase();
 
-                  // 명시적 필드 요청만 감지
-                  const showName = messageLower.includes('이름') || messageLower.includes('학생');
+                  // 명시적 필드 요청만 감지 - 업종중립
+                  const personLabel = (industryTerms?.personLabel || '학생').toLowerCase();
+                  const showName = messageLower.includes('이름') || messageLower.includes(personLabel);
                   const showStatus = messageLower.includes('상태') || messageLower.includes('재학') || messageLower.includes('휴원') || messageLower.includes('퇴원');
                   // 전체 표시: 명시적 요청이 있거나, 아무 필드도 요청하지 않은 경우
                   const showAll = messageLower.includes('전체') || messageLower.includes('모두') || messageLower.includes('명단') || messageLower.includes('상세') || (!showName && !showStatus);
@@ -925,7 +914,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                       </div>
                       <div style={{ color: 'var(--color-text)', fontSize: 'var(--font-size-sm)' }}>
                         {students.slice(0, 20).map((student, idx) => (
-                          <div key={student.id} style={{ marginBottom: 'var(--spacing-xs)', paddingBottom: 'var(--spacing-xs)', borderBottom: idx < students.length - 1 ? '1px solid var(--color-gray-200)' : 'none' }}>
+                          <div key={student.id} style={{ marginBottom: 'var(--spacing-xs)', paddingBottom: 'var(--spacing-xs)', borderBottom: idx < students.length - 1 ? 'var(--border-width-thin) solid var(--color-gray-200)' : 'none' }}>
                             {(showAll || showName) && <span style={{ marginRight: 'var(--spacing-sm)' }}>{student.name}</span>}
                             {(showAll || showStatus) && (
                               <Badge variant="outline" color={student.status === 'active' ? 'success' : 'gray'}>
@@ -1095,7 +1084,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                               style={{
                                 marginBottom: 'var(--spacing-xs)',
                                 paddingBottom: 'var(--spacing-xs)',
-                                borderBottom: idx < Math.min(data.length, 20) - 1 ? '1px solid var(--color-gray-200)' : 'none'
+                                borderBottom: idx < Math.min(data.length, 20) - 1 ? 'var(--border-width-thin) solid var(--color-gray-200)' : 'none'
                               }}
                             >
                               {visibleFields.map((field) => {
@@ -1206,7 +1195,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                             return (
                               <div key={field} style={{ marginBottom: 'var(--spacing-xs)' }}>
                                 <span style={{ fontWeight: 'var(--font-weight-medium)', marginRight: 'var(--spacing-xs)' }}>
-                                  {getFieldLabel(field)}:
+                                  {getFieldLabel(field, industryTerms)}:
                                 </span>
                                 {field === 'status' ? (
                                   <Badge variant="outline" color={
@@ -1247,7 +1236,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                         </Badge>
                       </div>
                       <div style={{ color: 'var(--color-text)', fontSize: 'var(--font-size-sm)' }}>
-                        <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: 0, maxHeight: '400px', overflow: 'auto' }}>
+                        <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'var(--font-family-base, inherit)', margin: 0, maxHeight: 'var(--max-height-content, 400px)', overflow: 'auto' }}>
                           {JSON.stringify(data, null, 2) as string}
                         </pre>
                       </div>
@@ -1312,7 +1301,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                     </div>
                     <div style={{ color: 'var(--color-text)', fontSize: 'var(--font-size-sm)' }}>
                       {/* HARD-CODE-EXCEPTION: 스크롤 가능한 영역의 최대 높이 제한 (레이아웃용 특수 값) */}
-                      <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: 0, maxHeight: '400px', overflow: 'auto' }}>
+                      <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'var(--font-family-base, inherit)', margin: 0, maxHeight: 'var(--max-height-content, 400px)', overflow: 'auto' }}>
                         {JSON.stringify(l0Result, null, 2) as string}
                       </pre>
                     </div>
@@ -1327,8 +1316,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
             style={{
               fontSize: 'var(--font-size-xs)',
               color: isUser ? 'var(--color-white)' : 'var(--color-text-tertiary)',
-              // HARD-CODE-EXCEPTION: opacity 1은 전체 불투명을 의미하는 특수 값, 0.7은 타임스탬프 가독성을 위한 레이아웃용 특수 값
-              opacity: isUser ? 0.7 : 1,
+              opacity: isUser ? 'var(--opacity-secondary)' : 'var(--opacity-full)',
               marginTop: 'var(--spacing-xs)',
               textAlign: isUser ? 'right' : 'left',
             }}
@@ -1443,21 +1431,21 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
               display: 'flex',
               alignItems: 'center',
               backgroundColor: 'var(--color-white)',
-              border: '1px solid var(--color-gray-300)',
-              borderRadius: '24px',
-              padding: '12px 16px',
-              boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.05)',
+              border: 'var(--border-width-thin) solid var(--color-gray-300)',
+              borderRadius: 'var(--border-radius-xl)',
+              padding: 'var(--spacing-md) var(--spacing-md)',
+              boxShadow: 'var(--shadow-sm)',
               transition: 'all 0.2s ease',
             }}
             onFocus={(e) => {
               const target = e.currentTarget;
               target.style.borderColor = 'var(--color-primary-400)';
-              target.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.1)';
+              target.style.boxShadow = 'var(--shadow-focus, 0 0 0 2px rgba(59, 130, 246, 0.1))';
             }}
             onBlur={(e) => {
               const target = e.currentTarget;
               target.style.borderColor = 'var(--color-gray-300)';
-              target.style.boxShadow = '0 0 0 1px rgba(0, 0, 0, 0.05)';
+              target.style.boxShadow = 'var(--shadow-sm)';
             }}
           >
             {/* 왼쪽 아이콘 - AI 스파크 아이콘 */}
@@ -1499,7 +1487,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                 fontSize: 'var(--font-size-md)',
                 backgroundColor: 'transparent',
                 color: 'var(--color-text)',
-                padding: '4px 0',
+                padding: 'var(--spacing-xs) 0',
               }}
             />
 
@@ -1511,9 +1499,9 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
+                width: 'var(--size-avatar-sm)',
+                height: 'var(--size-avatar-sm)',
+                borderRadius: 'var(--border-radius-sm)',
                 border: 'none',
                 backgroundColor: inputValue.trim() && !isLoading
                   ? 'var(--color-primary)'
@@ -1558,7 +1546,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
             color: 'var(--color-text-secondary)',
           }}
         >
-          디어쌤 AI는 실수를 할 수 있습니다. 중요한 정보는 재확인하세요.
+          AI 어시스턴트는 실수를 할 수 있습니다. 중요한 정보는 재확인하세요.
         </div>
       </div>
     </div>

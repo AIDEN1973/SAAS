@@ -12,6 +12,7 @@ import { BookOpen, Trash2, Pencil } from 'lucide-react';
 import { BadgeSelect } from '../../../components/BadgeSelect';
 import { SchemaForm } from '@schema-engine';
 import { useIndustryTranslations } from '@hooks/use-industry-translations';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { LayerSectionHeader } from '../components/LayerSectionHeader';
 import { PlusIcon } from '../../../components/DataTableActionButtons';
 import { toKST } from '@lib/date-utils';
@@ -61,6 +62,7 @@ export function ClassesTab({
 }: ClassesTabProps) {
   // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter를 통한 translations 생성
   const classAssignmentTranslations = useIndustryTranslations(effectiveClassAssignmentFormSchema);
+  const terms = useIndustryTerms();
   const { showConfirm } = useModal();
   const { toast } = useToast();
   const mode = useResponsiveMode();
@@ -283,7 +285,7 @@ export function ClassesTab({
             title={
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                 <BookOpen size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-                반 배정
+                {`${terms.GROUP_LABEL} 배정`}
               </span>
             }
             right={
@@ -307,7 +309,7 @@ export function ClassesTab({
                     items={[
                       {
                         icon: PlusIcon,
-                        tooltip: '반 배정',
+                        tooltip: `${terms.GROUP_LABEL} 배정`,
                         variant: 'solid',
                         color: 'primary',
                         onClick: () => {
@@ -338,7 +340,7 @@ export function ClassesTab({
 
                 // 각 반 정보를 필드 형태로 변환
                 const fields = [
-                  { label: '반명', value: classItem.name },
+                  { label: `${terms.GROUP_LABEL}명`, value: classItem.name },
                   { label: '과목', value: classItem.subject || '-' },
                   { label: '대상', value: classItem.grade || '-' },
                   { label: '요일', value: dayLabel },
@@ -453,8 +455,8 @@ export function ClassesTab({
             />
             <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
               {studentClasses.filter((sc) => sc.class).length === 0
-                ? '배정된 반이 없습니다.'
-                : '필터 조건에 맞는 반이 없습니다.'}
+                ? `배정된 ${terms.GROUP_LABEL}이(가) 없습니다.`
+                : `필터 조건에 맞는 ${terms.GROUP_LABEL}이(가) 없습니다.`}
             </p>
           </div>
         )}

@@ -75,7 +75,7 @@ export function KioskCheckInPage() {
   // 출석 체크 실행
   const handleCheckIn = useCallback(async () => {
     if (!phoneNumber) {
-      showAlert('알림', '휴대폰 번호를 입력해주세요.');
+      showAlert('휴대폰 번호를 입력해주세요.', '알림');
       return;
     }
 

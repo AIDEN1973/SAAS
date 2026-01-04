@@ -16,9 +16,14 @@ import type {
 } from './types.ts';
 import { maskPII } from '../../_shared/pii-utils.ts';
 import { getTenantSettingByPath, getAutomationEventPolicyPath } from '../../_shared/policy-utils.ts';
+// [불변 규칙] 채널 선택 제거됨 - getAutomationEventPolicyPath는 enabled 정책에만 사용
 import { withTenant } from '../../_shared/withTenant.ts';
 import { assertAutomationEventType } from '../../_shared/automation-event-catalog.ts';
 import { getTenantTableName } from '../../_shared/industry-adapter.ts';
+import {
+  sendUnifiedMessageBulk,
+  getAvailableChannels,
+} from '../../_shared/unified-message-sender.ts';
 
 export const messageSendBulkHandler: IntentHandler = {
   intent_key: 'message.exec.send_bulk',
@@ -29,9 +34,9 @@ export const messageSendBulkHandler: IntentHandler = {
   ): Promise<HandlerResult> {
     try {
       // ⚠️ P0: Plan 스냅샷에서만 실행 대상 로드 (클라이언트 입력 무시)
+      // [불변 규칙] 채널 선택 제거됨 - 알림톡 기본, SMS는 폴백으로만 작동
       const params = plan.params as Record<string, unknown>;
       const audience = params.audience as 'all' | 'class' | 'grade';
-      const channel = plan.plan_snapshot.channel || 'sms';
       const templateId = plan.plan_snapshot.template_id;
       const text = params.text as string | undefined;
       const messagePurpose = params.message_purpose as 'announcement_urgent' | 'announcement_digest' | 'class_change_or_cancel';
@@ -86,15 +91,8 @@ export const messageSendBulkHandler: IntentHandler = {
         };
       }
 
-      // 채널 Policy 조회 (SSOT 헬퍼 함수 사용)
-      const channelPolicyPath = getAutomationEventPolicyPath(eventType, 'channel');
-      const channelPolicy = await getTenantSettingByPath(
-        context.supabase,
-        context.tenant_id,
-        channelPolicyPath
-      );
-      const finalChannel = (channelPolicy as string) || channel || 'sms';
-      const normalizedChannel = finalChannel === 'kakao' ? 'kakao_at' : finalChannel;
+      // [불변 규칙] 채널 선택 제거됨 - 알림톡 기본, SMS는 폴백으로만 작동
+      // 더 이상 채널 Policy를 조회하지 않음
 
       // Industry Adapter: 업종별 학생 테이블명 동적 조회
       const studentTableName = await getTenantTableName(context.supabase, context.tenant_id, 'student');
@@ -141,11 +139,11 @@ export const messageSendBulkHandler: IntentHandler = {
         };
       }
 
-      // 보호자 연락처 조회
+      // 보호자 연락처 조회 (전화번호만 사용 - 알림톡/SMS)
       const { data: guardians, error: guardiansError } = await withTenant(
         context.supabase
           .from('guardians')
-          .select('id, student_id, phone, email, is_primary')
+          .select('id, student_id, phone, name, is_primary')
           .in('student_id', studentIds)
           .eq('is_primary', true),
         context.tenant_id
@@ -161,21 +159,14 @@ export const messageSendBulkHandler: IntentHandler = {
         };
       }
 
-      // 알림 생성
+      // [불변 규칙] 채널 선택 제거됨 - 알림톡 기본, SMS는 폴백으로만 작동
+      // 알림 생성 (전화번호 기반)
       const notifications: any[] = [];
       for (const guardian of guardians || []) {
-        let recipient = '';
-        if (normalizedChannel === 'email' && guardian.email) {
-          recipient = guardian.email;
-        } else if ((normalizedChannel === 'sms' || normalizedChannel === 'kakao_at') && guardian.phone) {
-          recipient = guardian.phone;
-        }
-
-        if (recipient) {
+        if (guardian.phone) {
           notifications.push({
             tenant_id: context.tenant_id,
-            channel: normalizedChannel,
-            recipient: recipient,
+            recipient: guardian.phone,
             template_id: templateId || null,
             content: text || plan.plan_snapshot.summary || '일괄 메시지',
             status: 'pending',
@@ -184,6 +175,7 @@ export const messageSendBulkHandler: IntentHandler = {
               intent_key: plan.intent_key,
               student_id: guardian.student_id,
               guardian_id: guardian.id,
+              guardian_name: guardian.name,
               event_type: eventType,
               message_purpose: messagePurpose,
               audience: audience,
@@ -200,33 +192,94 @@ export const messageSendBulkHandler: IntentHandler = {
         };
       }
 
-      // 알림 일괄 생성
-      const { data: createdNotifications, error: notificationError } = await context.supabase
-        .from('notifications')
-        .insert(notifications)
-        .select('id');
+      // [불변 규칙] 통합 메시지 발송: 알림톡 기본, SMS는 폴백으로만 작동
+      const channels = getAvailableChannels();
+      if (channels.any) {
+        const messageContent = text || plan.plan_snapshot.summary || '일괄 메시지';
+        const templateCode = plan.plan_snapshot.template_id;
 
-      if (notificationError) {
-        const maskedError = maskPII(notificationError);
-        console.error('[messageSendBulkHandler] Failed to create notifications:', maskedError);
+        // [불변 규칙] 채널은 항상 'auto' - 알림톡 우선, SMS 폴백
+        const unifiedResult = await sendUnifiedMessageBulk({
+          templateCode: templateCode || undefined,
+          recipients: notifications.map((n: any) => ({
+            receiver: n.recipient,
+            recvname: n.execution_context?.guardian_name,
+            alimtalkMessage: messageContent, // 알림톡용 메시지
+            smsMessage: messageContent, // SMS 폴백용 메시지
+          })),
+          channel: 'auto', // 항상 알림톡 우선, SMS 폴백
+        });
+
+        // 발송 결과 로깅용 알림 레코드 생성
+        const notificationsWithStatus = notifications.map((n: any, idx: number) => ({
+          ...n,
+          status: unifiedResult.success || (unifiedResult.successCount > idx) ? 'sent' : 'failed',
+          channel: unifiedResult.usedChannel === 'alimtalk' ? 'kakao_at' : unifiedResult.usedChannel,
+          external_msg_id: unifiedResult.alimtalkResult?.mid || unifiedResult.smsResult?.msgId?.toString(),
+          sent_at: unifiedResult.success ? new Date().toISOString() : null,
+          execution_context: {
+            ...n.execution_context,
+            provider: unifiedResult.usedChannel === 'alimtalk' ? 'kakao_aligo' : 'aligo_sms',
+            used_fallback: unifiedResult.usedFallback,
+            test_mode: unifiedResult.testMode,
+          },
+        }));
+
+        await context.supabase
+          .from('notifications')
+          .insert(notificationsWithStatus);
+
+        if (!unifiedResult.success && unifiedResult.successCount === 0) {
+          return {
+            status: 'failed',
+            error_code: 'MESSAGE_SEND_FAILED',
+            message: unifiedResult.errorMessage || '메시지 발송에 실패했습니다.',
+            result: {
+              used_channel: unifiedResult.usedChannel,
+              used_fallback: unifiedResult.usedFallback,
+              test_mode: unifiedResult.testMode,
+            },
+          };
+        }
+
+        // 부분 성공 처리
+        if (unifiedResult.errorCount > 0) {
+          return {
+            status: 'partial',
+            result: {
+              total_count: unifiedResult.successCount + unifiedResult.errorCount,
+              success_count: unifiedResult.successCount,
+              error_count: unifiedResult.errorCount,
+              channel: unifiedResult.usedChannel,
+              used_fallback: unifiedResult.usedFallback,
+              audience: audience,
+              test_mode: unifiedResult.testMode,
+            },
+            affected_count: unifiedResult.successCount,
+            message: `${unifiedResult.usedChannel === 'alimtalk' ? '알림톡' : 'SMS'} ${unifiedResult.successCount}건 성공, ${unifiedResult.errorCount}건 실패 ${unifiedResult.usedFallback ? '(폴백 발송)' : ''} ${unifiedResult.testMode ? '(테스트 모드)' : ''}`,
+          };
+        }
+
+        const channelName = unifiedResult.usedChannel === 'alimtalk' ? '알림톡' : 'SMS';
         return {
-          status: 'failed',
-          error_code: 'NOTIFICATION_CREATION_FAILED',
-          message: '알림 생성에 실패했습니다.',
+          status: 'success',
+          result: {
+            message_sent: true,
+            channel: unifiedResult.usedChannel,
+            used_fallback: unifiedResult.usedFallback,
+            audience: audience,
+            test_mode: unifiedResult.testMode,
+          },
+          affected_count: unifiedResult.successCount,
+          message: `${unifiedResult.successCount}명에게 ${channelName} 발송 ${unifiedResult.usedFallback ? '(폴백)' : ''} ${unifiedResult.testMode ? '(테스트 모드)' : '완료'}`,
         };
       }
 
-      const affectedCount = createdNotifications?.length || 0;
-
+      // 채널이 설정되지 않은 경우 에러 반환
       return {
-        status: 'success',
-        result: {
-          message_sent: true,
-          channel: normalizedChannel,
-          audience: audience,
-        },
-        affected_count: affectedCount,
-        message: `${affectedCount}명에게 일괄 메시지를 발송했습니다.`,
+        status: 'failed',
+        error_code: 'NO_CHANNEL_CONFIGURED',
+        message: '알림톡 또는 SMS 채널이 설정되지 않았습니다.',
       };
     } catch (error) {
       const maskedError = maskPII(error);

@@ -212,6 +212,52 @@ export const envServer = {
   get KAKAO_REST_API_KEY(): string | undefined {
     return getDenoEnv()['KAKAO_REST_API_KEY'];
   },
+
+  // 알리고(Aligo) SMS API
+  // 공식 문서: https://smartsms.aligo.in/admin/api/spec.html
+  get ALIGO_API_KEY(): string | undefined {
+    return getDenoEnv()['ALIGO_API_KEY'];
+  },
+
+  get ALIGO_USER_ID(): string | undefined {
+    return getDenoEnv()['ALIGO_USER_ID'];
+  },
+
+  get ALIGO_SENDER(): string | undefined {
+    return getDenoEnv()['ALIGO_SENDER'];
+  },
+
+  /** 알리고 테스트 모드 (true/false, 기본값: true) */
+  get ALIGO_TEST_MODE(): string | undefined {
+    return getDenoEnv()['ALIGO_TEST_MODE'];
+  },
+
+  // 알리고 카카오 알림톡/친구톡 API
+  // 공식 문서: https://smartsms.aligo.in/admin/api/kakao.html
+  /** 카카오 API Key (SMS API와 동일) */
+  get KAKAO_ALIGO_API_KEY(): string | undefined {
+    return getDenoEnv()['KAKAO_ALIGO_API_KEY'];
+  },
+
+  /** 카카오 알리고 사용자 ID (SMS API와 동일) */
+  get KAKAO_ALIGO_USER_ID(): string | undefined {
+    return getDenoEnv()['KAKAO_ALIGO_USER_ID'];
+  },
+
+  /** 카카오 발신 프로필 키 (senderkey) */
+  get KAKAO_ALIGO_SENDER_KEY(): string | undefined {
+    return getDenoEnv()['KAKAO_ALIGO_SENDER_KEY'];
+  },
+
+  /** 카카오 인증 토큰 (프로필 인증 후 발급, 24시간 유효) */
+  get KAKAO_ALIGO_TOKEN(): string | undefined {
+    return getDenoEnv()['KAKAO_ALIGO_TOKEN'];
+  },
+
+  /** 카카오 알림톡 테스트 모드 (true/false, 기본값: true) */
+  get KAKAO_ALIGO_TEST_MODE(): string | undefined {
+    return getDenoEnv()['KAKAO_ALIGO_TEST_MODE'];
+  },
 };
 
 /**
@@ -227,6 +273,114 @@ export function getPlatformAIEnabled(): boolean {
   const value = envServer.PLATFORM_AI_ENABLED;
   // packages/env-registry/src/server.ts와 동일한 로직: 기본값 true
   return value === 'true' || value === '1' || value === undefined;
+}
+
+/**
+ * 알리고 SMS 테스트 모드 확인
+ *
+ * ⚠️ 기본값: true (개발 안전성 - 실수로 실제 발송 방지)
+ * 프로덕션에서 실제 발송하려면 ALIGO_TEST_MODE=false 설정 필요
+ *
+ * @returns 테스트 모드이면 true, 실제 발송 모드이면 false
+ */
+export function getAligoTestMode(): boolean {
+  const value = envServer.ALIGO_TEST_MODE;
+  // 기본값: true (안전) - 명시적으로 false 설정 시에만 실제 발송
+  return value !== 'false' && value !== '0';
+}
+
+/**
+ * 알리고 SMS API 인증 정보 조회
+ *
+ * @throws 필수 환경변수가 설정되지 않은 경우
+ * @returns 알리고 API 인증 정보
+ */
+export function getAligoCredentials(): {
+  key: string;
+  user_id: string;
+  sender: string;
+} {
+  const key = envServer.ALIGO_API_KEY;
+  const userId = envServer.ALIGO_USER_ID;
+  const sender = envServer.ALIGO_SENDER;
+
+  if (!key) {
+    throw new Error('ALIGO_API_KEY 환경변수가 설정되지 않았습니다.');
+  }
+  if (!userId) {
+    throw new Error('ALIGO_USER_ID 환경변수가 설정되지 않았습니다.');
+  }
+  if (!sender) {
+    throw new Error('ALIGO_SENDER 환경변수가 설정되지 않았습니다.');
+  }
+
+  return {
+    key,
+    user_id: userId,
+    sender,
+  };
+}
+
+/**
+ * 카카오 알림톡 테스트 모드 확인
+ *
+ * ⚠️ 기본값: true (개발 안전성 - 실수로 실제 발송 방지)
+ * 프로덕션에서 실제 발송하려면 KAKAO_ALIGO_TEST_MODE=false 설정 필요
+ *
+ * @returns 테스트 모드이면 true, 실제 발송 모드이면 false
+ */
+export function getKakaoAligoTestMode(): boolean {
+  const value = envServer.KAKAO_ALIGO_TEST_MODE;
+  // 기본값: true (안전) - 명시적으로 false 설정 시에만 실제 발송
+  return value !== 'false' && value !== '0';
+}
+
+/**
+ * 카카오 알림톡 API 인증 정보 조회
+ *
+ * @throws 필수 환경변수가 설정되지 않은 경우
+ * @returns 카카오 알림톡 API 인증 정보
+ */
+export function getKakaoAligoCredentials(): {
+  apikey: string;
+  userid: string;
+  senderkey: string;
+  token?: string;
+} {
+  const apikey = envServer.KAKAO_ALIGO_API_KEY;
+  const userid = envServer.KAKAO_ALIGO_USER_ID;
+  const senderkey = envServer.KAKAO_ALIGO_SENDER_KEY;
+  const token = envServer.KAKAO_ALIGO_TOKEN;
+
+  if (!apikey) {
+    throw new Error('KAKAO_ALIGO_API_KEY 환경변수가 설정되지 않았습니다.');
+  }
+  if (!userid) {
+    throw new Error('KAKAO_ALIGO_USER_ID 환경변수가 설정되지 않았습니다.');
+  }
+  if (!senderkey) {
+    throw new Error('KAKAO_ALIGO_SENDER_KEY 환경변수가 설정되지 않았습니다.');
+  }
+
+  return {
+    apikey,
+    userid,
+    senderkey,
+    token: token || undefined,
+  };
+}
+
+/**
+ * 카카오 알림톡 설정 여부 확인
+ *
+ * @returns 카카오 알림톡이 설정되어 있으면 true
+ */
+export function isKakaoAligoConfigured(): boolean {
+  return !!(
+    envServer.KAKAO_ALIGO_API_KEY &&
+    envServer.KAKAO_ALIGO_USER_ID &&
+    envServer.KAKAO_ALIGO_SENDER_KEY
+  );
 }
 
 /**
@@ -266,6 +420,17 @@ export function validateEnvRegistrySync(): string[] {
     'KAKAO_REST_API_KEY',
     'OPENAI_API_KEY',
     'PLATFORM_AI_ENABLED',
+    // 알리고 SMS API
+    'ALIGO_API_KEY',
+    'ALIGO_USER_ID',
+    'ALIGO_SENDER',
+    'ALIGO_TEST_MODE',
+    // 알리고 카카오 알림톡/친구톡 API
+    'KAKAO_ALIGO_API_KEY',
+    'KAKAO_ALIGO_USER_ID',
+    'KAKAO_ALIGO_SENDER_KEY',
+    'KAKAO_ALIGO_TOKEN',
+    'KAKAO_ALIGO_TEST_MODE',
   ];
 
   // envServer 객체의 getter 목록 추출

@@ -3,12 +3,14 @@
  *
  * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
  * [동적 옵션] 강사 목록은 동적으로 채워집니다.
+ * [업종중립성] IndustryTerms를 받아 동적으로 라벨 생성
  */
 
 import type { FormSchema } from '@schema-engine';
 import type { Teacher } from '@services/class-service';
+import type { IndustryTerms } from '@industry/registry';
 
-export function createClassFormSchema(teachers?: Teacher[]): FormSchema {
+export function createClassFormSchema(teachers?: Teacher[], terms?: IndustryTerms): FormSchema {
   return {
   version: '1.0.0',
   minSupportedClient: '1.0.0',
@@ -25,7 +27,7 @@ export function createClassFormSchema(teachers?: Teacher[]): FormSchema {
         name: 'name',
         kind: 'text',
         ui: {
-          label: '반 이름',
+          label: terms ? `${terms.GROUP_LABEL} 이름` : '반 이름',
           colSpan: 2,
         },
         validation: {
@@ -36,7 +38,7 @@ export function createClassFormSchema(teachers?: Teacher[]): FormSchema {
         name: 'subject',
         kind: 'text',
         ui: {
-          label: '과목',
+          label: terms ? terms.SUBJECT_LABEL : '과목',
           colSpan: 1,
         },
       },
@@ -44,7 +46,7 @@ export function createClassFormSchema(teachers?: Teacher[]): FormSchema {
         name: 'grade',
         kind: 'text',
         ui: {
-          label: '대상 학년',
+          label: terms ? terms.GRADE_LABEL : '대상 학년',
           colSpan: 1,
         },
       },
@@ -105,7 +107,7 @@ export function createClassFormSchema(teachers?: Teacher[]): FormSchema {
         name: 'capacity',
         kind: 'number',
         ui: {
-          label: '정원',
+          label: terms ? terms.CAPACITY_LABEL : '정원',
           colSpan: 1,
         },
         defaultValue: 20,
@@ -118,15 +120,31 @@ export function createClassFormSchema(teachers?: Teacher[]): FormSchema {
         name: 'room',
         kind: 'text',
         ui: {
-          label: '강의실',
+          label: terms ? terms.ROOM_LABEL : '강의실',
           colSpan: 1,
+        },
+      },
+      {
+        name: 'color',
+        kind: 'text',
+        ui: {
+          label: terms ? `${terms.GROUP_LABEL} 색상` : '반 색상',
+          colSpan: 1,
+          placeholder: '#3b82f6',
+          description: '자동 할당됩니다. 원하는 색상으로 변경 가능합니다.',
+        },
+        validation: {
+          pattern: {
+            value: '^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$',
+            message: '올바른 색상 코드를 입력하세요 (예: #3b82f6)',
+          },
         },
       },
       {
         name: 'teacher_ids',
         kind: 'multiselect',
         ui: {
-          label: '강사 배정',
+          label: terms ? `${terms.PERSON_LABEL_SECONDARY} 배정` : '강사 배정',
           colSpan: 1,
         },
         options: [
@@ -161,14 +179,14 @@ export function createClassFormSchema(teachers?: Teacher[]): FormSchema {
         event: 'onSubmitSuccess',
         type: 'toast',
         messageKey: 'CLASS.CREATE.SUCCESS',
-        message: '반이 생성되었습니다.',
+        message: terms ? `${terms.GROUP_LABEL}이 생성되었습니다.` : '반이 생성되었습니다.',
         variant: 'success',
       },
       {
         event: 'onSubmitError',
         type: 'toast',
         messageKey: 'CLASS.CREATE.ERROR',
-        message: '반 생성에 실패했습니다.',
+        message: terms ? `${terms.GROUP_LABEL} 생성에 실패했습니다.` : '반 생성에 실패했습니다.',
         variant: 'error',
       },
     ],

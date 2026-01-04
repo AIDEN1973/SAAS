@@ -90,6 +90,8 @@ import { system_exec_run_healthcheckHandler } from './system-exec-run_healthchec
 import { system_exec_rebuild_search_indexHandler } from './system-exec-rebuild_search_index.ts';
 import { system_exec_backfill_reportsHandler } from './system-exec-backfill_reports.ts';
 import { system_exec_retry_failed_actionsHandler } from './system-exec-retry_failed_actions.ts';
+// SMS 도메인 - 알리고(Aligo) SMS 발송
+import { smsSendAligoHandler } from './sms-send-aligo.ts';
 
 /**
  * Handler Registry (intent_key → Handler 매핑)
@@ -183,6 +185,9 @@ export const handlerRegistry: Record<string, IntentHandler> = {
   'system.exec.rebuild_search_index': system_exec_rebuild_search_indexHandler,
   'system.exec.backfill_reports': system_exec_backfill_reportsHandler,
   'system.exec.retry_failed_actions': system_exec_retry_failed_actionsHandler,
+
+  // SMS 도메인 - 알리고(Aligo) SMS 발송
+  'sms.exec.send_aligo': smsSendAligoHandler,
 };
 
 /**

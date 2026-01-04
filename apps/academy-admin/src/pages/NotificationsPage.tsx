@@ -10,24 +10,26 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useOptimizedQuery } from '@hooks/use-optimized-query';
 import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer, PageHeader, useIconSize, useIconStrokeWidth, isMobile, isTablet } from '@ui-core/react';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useSession } from '@hooks/use-auth';
 import { createExecutionAuditRecord } from '@hooks/use-student/src/execution-audit-utils';
-import type { Notification, NotificationChannel, NotificationStatus } from '@core/notification';
+import type { Notification, NotificationStatus } from '@core/notification';
 import { notificationFormSchema } from '../schemas/notification.schema';
 import { notificationTemplateFormSchema } from '../schemas/notification-template.schema';
 import { bulkNotificationFormSchema } from '../schemas/bulk-notification.schema';
 import { notificationTableSchema } from '../schemas/notification.table.schema';
-import { autoNotificationSettingsFormSchema } from '../schemas/auto-notification-settings.schema';
+import { createAutoNotificationSettingsFormSchema } from '../schemas/auto-notification-settings.schema';
 import { useStudentTaskCards } from '@hooks/use-student';
 import { useUpdateConfig } from '@hooks/use-config';
 import { fetchNotificationTemplates } from '@hooks/use-notification-templates';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { Sparkles } from 'lucide-react';
-import { logWarn } from '../utils';
+// logWarn import 제거됨 - 채널 선택 기능 제거로 미사용
 
 export function NotificationsPage() {
   const { showAlert } = useModal();
@@ -35,6 +37,7 @@ export function NotificationsPage() {
   const context = getApiContext();
   const tenantId = context.tenantId;
   const { data: session } = useSession();
+  const terms = useIndustryTerms();
   const mode = useResponsiveMode();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
@@ -43,7 +46,9 @@ export function NotificationsPage() {
   const iconSize = useIconSize('--size-icon-base', 20);
   const iconStrokeWidth = useIconStrokeWidth('--stroke-width-icon', 1.5);
 
-  const [filter, setFilter] = useState<{ channel?: NotificationChannel; status?: NotificationStatus }>({});
+  const [filter, _setFilter] = useState<{ status?: NotificationStatus }>({});
+  // 채널 선택 제거됨 - filter는 상태 필터링에 사용, setFilter는 향후 필터 UI 구현 시 사용 예정
+  void _setFilter;
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [activeTab, setActiveTab] = useState<'history' | 'send' | 'templates' | 'bulk' | 'auto-settings'>('history');
@@ -64,24 +69,31 @@ export function NotificationsPage() {
     );
   }, [studentTaskCards]);
 
-  // 스키마 조회 (Registry에서 가져오거나 fallback 사용)
-  const { data: schema } = useSchema('notification', notificationFormSchema, 'form');
-  const { data: templateSchema } = useSchema('notification_template', notificationTemplateFormSchema, 'form');
-  const { data: bulkSchema } = useSchema('bulk_notification', bulkNotificationFormSchema, 'form');
+  // Schema Registry 연동 (아키텍처 문서 S3 참조)
+  const { data: schemaData } = useSchema('notification', notificationFormSchema, 'form');
+  const { data: templateSchemaData } = useSchema('notification_template', notificationTemplateFormSchema, 'form');
+  const { data: bulkSchemaData } = useSchema('bulk_notification', bulkNotificationFormSchema, 'form');
   const { data: notificationTableSchemaData } = useSchema('notification_table', notificationTableSchema, 'table');
-  const { data: autoNotificationSettingsSchema } = useSchema('auto_notification_settings', autoNotificationSettingsFormSchema, 'form');
+  const { data: autoNotificationSettingsSchemaData } = useSchema('auto_notification_settings', createAutoNotificationSettingsFormSchema(terms), 'form');
+
+  // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
+  const schema = schemaData || notificationFormSchema;
+  const templateSchema = templateSchemaData || notificationTemplateFormSchema;
+  const bulkSchema = bulkSchemaData || bulkNotificationFormSchema;
+  const effectiveTableSchema = notificationTableSchemaData || notificationTableSchema;
+  const autoNotificationSettingsSchema = autoNotificationSettingsSchemaData || createAutoNotificationSettingsFormSchema(terms);
 
   // 템플릿 목록 조회
-  const { data: templates, isLoading: templatesLoading } = useQuery({
-    queryKey: ['notification-templates', tenantId],
-    queryFn: async () => {
+  const { data: templates, isLoading: templatesLoading } = useOptimizedQuery(
+    ['notification-templates', tenantId],
+    async () => {
       if (!tenantId) return [];
 
       // 정본 규칙: fetchNotificationTemplates 함수 사용 (Hook의 queryFn 로직 재사용)
       return fetchNotificationTemplates(tenantId, {});
     },
-    enabled: !!tenantId && activeTab === 'templates', // 템플릿 탭 활성화 시에만 조회
-  });
+    { enabled: !!tenantId && activeTab === 'templates' } // 템플릿 탭 활성화 시에만 조회
+  );
 
   // 템플릿 생성
   const createTemplate = useMutation({
@@ -89,9 +101,10 @@ export function NotificationsPage() {
       if (!tenantId) throw new Error('Tenant ID is required');
 
       try {
+        // [불변 규칙] 채널 선택 제거됨 - 알림톡 기본, SMS는 폴백으로만 작동
         const response = await apiClient.post<{ id: string; name: string; channel: string; content: string }>('notification_templates', {
           name: data.name,
-          channel: data.channel,
+          channel: 'kakao_at', // 알림톡 기본
           content: data.content,
         });
 
@@ -110,10 +123,10 @@ export function NotificationsPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['notification-templates', tenantId] });
       setShowTemplateForm(false);
-      showAlert('성공', '템플릿이 생성되었습니다.');
+      showAlert('템플릿이 생성되었습니다.', terms.MESSAGES.SUCCESS);
     },
     onError: (error: Error) => {
-      showAlert('오류', error.message);
+      showAlert(error.message, terms.MESSAGES.ERROR);
     },
   });
 
@@ -125,13 +138,7 @@ export function NotificationsPage() {
     mutationFn: async (data: Record<string, unknown>) => {
       if (!tenantId) throw new Error('Tenant ID is required');
 
-      // SSOT-3: 'kakao' 저장 금지, 'kakao_at'로 정규화
-      let notificationChannel = data.notification_channel || 'sms';
-      if (notificationChannel === 'kakao') {
-        logWarn('NotificationsPage:LegacyChannel', 'Legacy channel "kakao" detected, normalizing to "kakao_at"');
-        notificationChannel = 'kakao_at';
-      }
-
+      // [불변 규칙] 채널 선택 제거됨 - 알림톡 기본, SMS는 폴백으로만 작동
       // 정본 규칙: useUpdateConfig Hook 사용
       const updateInput = {
         notification: {
@@ -140,7 +147,6 @@ export function NotificationsPage() {
             check_out: data.check_out_notification || false,
             invoice_created: data.invoice_created_notification || false,
             overdue: data.overdue_notification || false,
-            channel: notificationChannel,
           },
         },
       };
@@ -149,10 +155,10 @@ export function NotificationsPage() {
     },
     onSuccess: () => {
       // setShowAutoNotificationSettings(false); // (미사용) 자동 알림 설정 Drawer/Modal 도입 시 사용
-      showAlert('성공', '자동 알림 설정이 저장되었습니다.');
+      showAlert('자동 알림 설정이 저장되었습니다.', terms.MESSAGES.SUCCESS);
     },
     onError: (error: Error) => {
-      showAlert('오류', error.message);
+      showAlert(error.message, terms.MESSAGES.ERROR);
     },
   });
 
@@ -162,10 +168,10 @@ export function NotificationsPage() {
       const startTime = Date.now();
       const recipients = String(data.recipients ?? '').split('\n').filter((r: string) => r.trim());
 
+      // [불변 규칙] 채널 선택 제거됨 - 알림톡 기본, SMS는 폴백으로만 작동
       // 각 수신자에게 알림 생성
       const promises = recipients.map((recipient: string) =>
         apiClient.post<Notification>('notifications', {
-          channel: data.channel,
           recipient: recipient.trim(),
           content: data.content,
           status: 'pending',
@@ -190,7 +196,6 @@ export function NotificationsPage() {
             details: {
               recipient_count: successCount,
               total_count: results.length,
-              channel: data.channel as string,
             },
             reference: {
               entity_type: 'notification',
@@ -211,19 +216,19 @@ export function NotificationsPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['notifications', tenantId] });
       // setShowBulkForm(false); // (미사용) 단체 발송 Drawer/Modal 도입 시 사용
-      showAlert('성공', '메시지가 발송되었습니다.');
+      showAlert(`${terms.MESSAGE_LABEL}가 발송되었습니다.`, terms.MESSAGES.SUCCESS);
     },
     onError: (error: Error) => {
-      showAlert('오류', error.message);
+      showAlert(error.message, terms.MESSAGES.ERROR);
     },
   });
 
   // 알림 생성
   const createNotification = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
+      // [불변 규칙] 채널 선택 제거됨 - 알림톡 기본, SMS는 폴백으로만 작동
       const startTime = Date.now();
       const response = await apiClient.post<Notification>('notifications', {
-        channel: data.channel,
         recipient: data.recipient,
         template_id: data.template_id,
         content: data.content,
@@ -239,12 +244,11 @@ export function NotificationsPage() {
         const durationMs = Date.now() - startTime;
         await createExecutionAuditRecord(
           {
-            operation_type: 'messaging.send-sms',
+            operation_type: 'messaging.send',
             status: 'success',
-            summary: `메시지 발송 요청 완료 (${data.channel as string})`,
+            summary: '메시지 발송 요청 완료',
             details: {
               notification_id: response.data.id,
-              channel: data.channel as string,
             },
             reference: {
               entity_type: 'notification',
@@ -261,16 +265,19 @@ export function NotificationsPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['notifications', tenantId] });
       setShowCreateForm(false);
-      showAlert('성공', '알림이 생성되었습니다.');
+      showAlert(`${terms.MESSAGE_LABEL}이 생성되었습니다.`, terms.MESSAGES.SUCCESS);
     },
     onError: (error: Error) => {
-      showAlert('오류', error.message);
+      showAlert(error.message, terms.MESSAGES.ERROR);
     },
   });
 
-  const channelLabels: Record<NotificationChannel, string> = {
+  // [불변 규칙] 채널 선택 제거됨 - 알림톡 기본, SMS는 폴백으로만 작동
+  // 발송 내역에서 채널을 표시할 때 사용
+  const channelLabels: Record<string, string> = {
     sms: 'SMS',
-    kakao_at: '카카오 알림톡',  // SSOT-3: 저장/실행용 코드는 'kakao_at', UI 표시명은 '카카오 알림톡'
+    kakao_at: '알림톡',
+    alimtalk: '알림톡',
   };
 
   // statusColors/statusLabels는 SchemaTable 스키마 기반 렌더링으로 대체됨 (미사용)
@@ -286,18 +293,18 @@ export function NotificationsPage() {
   // 아키텍처 문서 3.5.1: AI 자동 초안 제안 모델
   // StudentTaskCard의 suggested_action.payload에서 message만 추출하여 폼에 적용
   // recipient는 guardian_id 배열이므로 사용자가 직접 입력하도록 함
+  // [불변 규칙] 채널 선택 제거됨 - 알림톡 기본, SMS는 폴백으로만 작동
   const handleApplyAIDraft = (suggestion: (typeof messageDraftSuggestions)[number]) => {
     const payload = suggestion.suggested_action?.payload;
     if (payload && typeof payload === 'object' && 'message' in payload) {
       const draftValues: Record<string, unknown> = {
         content: String(payload.message || ''),
-        channel: (payload.channel as NotificationChannel) || 'sms', // payload에 channel이 있으면 사용, 없으면 기본값 'sms'
         recipient: '', // recipient_ids는 guardian ID 배열이므로 사용자가 직접 입력하도록 함
       };
       setAiDraftValues(draftValues);
       setShowCreateForm(true);
     } else {
-      showAlert('알림', 'AI 초안에 메시지 내용이 없습니다.');
+      showAlert('AI 초안에 메시지 내용이 없습니다.', '알림');
     }
   };
 
@@ -321,7 +328,7 @@ export function NotificationsPage() {
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
         <PageHeader
-          title="메시지/공지"
+          title={terms.MESSAGE_LABEL}
         />
 
         {/* 탭 선택 */}
@@ -332,14 +339,14 @@ export function NotificationsPage() {
                 size="sm"
                 onClick={() => setActiveTab('history')}
               >
-                발송 내역
+                {terms.MESSAGE_LABEL} 내역
               </Button>
               <Button
                 variant={activeTab === 'send' ? 'solid' : 'outline'}
                 size="sm"
                 onClick={() => setActiveTab('send')}
               >
-                메시지 발송
+                {terms.MESSAGE_LABEL} 발송
               </Button>
               <Button
                 variant={activeTab === 'templates' ? 'solid' : 'outline'}
@@ -368,47 +375,27 @@ export function NotificationsPage() {
           {/* 발송 내역 탭 */}
           {activeTab === 'history' && (
             <>
-          {/* 필터 및 액션 */}
+          {/* 액션 버튼 */}
           <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
               <Button
-                variant={!filter.channel ? 'solid' : 'outline'}
+                variant="solid"
                 size="sm"
-                onClick={() => setFilter({ ...filter, channel: undefined })}
+                onClick={() => setShowCreateForm(true)}
               >
-                전체 채널
+                새 {terms.MESSAGE_LABEL} 발송
               </Button>
-              {(['sms', 'kakao_at'] as NotificationChannel[]).map((channel) => (
-                <Button
-                  key={channel}
-                  variant={filter.channel === channel ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilter({ ...filter, channel })}
-                >
-                  {channelLabels[channel]}
-                </Button>
-              ))}
-              <div style={{ marginLeft: 'auto' }}>
-                <Button
-                  variant="solid"
-                  size="sm"
-                  onClick={() => setShowCreateForm(true)}
-                >
-                  새 메시지 발송
-                </Button>
-              </div>
             </div>
           </Card>
 
           {/* 알림 목록 - SchemaTable 사용 */}
           {notificationTableSchemaData ? (
             <SchemaTable
-              key={`notification-table-${filter.channel || 'all'}-${filter.status || 'all'}`}
-              schema={notificationTableSchemaData}
+              key={`notification-table-${filter.status || 'all'}`}
+              schema={effectiveTableSchema}
               apiCall={async (endpoint: string, method: string) => {
                 void method;
                 const filters: Record<string, unknown> = {};
-                if (filter.channel) filters.channel = filter.channel;
                 if (filter.status) filters.status = filter.status;
 
                 const response = await apiClient.get<Notification>(endpoint, {
@@ -425,7 +412,7 @@ export function NotificationsPage() {
           ) : (
             <Card padding="lg">
               <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center' }}>
-                로딩 중...
+                {terms.MESSAGES.LOADING}
               </div>
             </Card>
           )}
@@ -440,7 +427,7 @@ export function NotificationsPage() {
                     setShowCreateForm(false);
                     setAiDraftValues(null);
                   }}
-                  title="새 메시지 발송"
+                  title={`새 ${terms.MESSAGE_LABEL} 발송`}
                   position={isMobileMode ? 'bottom' : 'right'}
                   width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
                 >
@@ -476,7 +463,7 @@ export function NotificationsPage() {
                     setShowCreateForm(false);
                     setAiDraftValues(null);
                   }}
-                  title="새 메시지 발송"
+                  title={`새 ${terms.MESSAGE_LABEL} 발송`}
                   size="md"
                 >
                   <SchemaForm
@@ -520,10 +507,10 @@ export function NotificationsPage() {
                     <Sparkles size={iconSize} strokeWidth={iconStrokeWidth} style={{ color: 'var(--color-info)', flexShrink: 0, marginTop: 'var(--spacing-xs)' }} />
                     <div style={{ flex: 1 }}>
                       <h4 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
-                        AI 메시지 초안 제안
+                        AI {terms.MESSAGE_LABEL} 초안 제안
                       </h4>
                       <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-sm)' }}>
-                        AI가 상황을 감지하여 메시지 초안을 준비했습니다. 초안을 적용하여 발송하시겠습니까?
+                        AI가 상황을 감지하여 {terms.MESSAGE_LABEL} 초안을 준비했습니다. 초안을 적용하여 발송하시겠습니까?
                       </p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
                         {messageDraftSuggestions.slice(0, 3).map((suggestion) => (
@@ -560,7 +547,7 @@ export function NotificationsPage() {
                                 </div>
                                 {suggestion.source && (
                                   <Badge variant="soft" color="info" style={{ fontSize: 'var(--font-size-xs)' }}>
-                                    {suggestion.source === 'attendance' ? '출결' :
+                                    {suggestion.source === 'attendance' ? terms.ATTENDANCE_LABEL :
                                      suggestion.source === 'weather' ? '날씨' :
                                      suggestion.source === 'billing' ? '청구' :
                                      suggestion.source === 'behavior' ? '행동' :
@@ -597,7 +584,7 @@ export function NotificationsPage() {
                       setShowCreateForm(true);
                     }}
                   >
-                    새 메시지 발송
+                    새 {terms.MESSAGE_LABEL} 발송
                   </Button>
                 </div>
               {schema && (
@@ -609,7 +596,7 @@ export function NotificationsPage() {
                     setShowCreateForm(false);
                     setAiDraftValues(null);
                   }}
-                  title="새 메시지 발송"
+                  title={`새 ${terms.MESSAGE_LABEL} 발송`}
                   position={isMobileMode ? 'bottom' : 'right'}
                   width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
                 >
@@ -642,7 +629,7 @@ export function NotificationsPage() {
                     <Modal
                       isOpen={showCreateForm}
                       onClose={() => setShowCreateForm(false)}
-                      title="새 메시지 발송"
+                      title={`새 ${terms.MESSAGE_LABEL} 발송`}
                       size="md"
                     >
                       <SchemaForm
@@ -692,7 +679,7 @@ export function NotificationsPage() {
               </div>
               {templatesLoading ? (
                 <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
-                  로딩 중...
+                  {terms.MESSAGES.LOADING}
                 </div>
               ) : templates && templates.length > 0 ? (
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(var(--width-card-min), 1fr))`, gap: 'var(--spacing-md)' }}>
@@ -702,7 +689,7 @@ export function NotificationsPage() {
                         {template.name}
                       </h4>
                       <Badge color="blue" style={{ marginBottom: 'var(--spacing-xs)' }}>
-                        {channelLabels[template.channel as NotificationChannel] || template.channel}
+                        {channelLabels[template.channel] || template.channel}
                       </Badge>
                       <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--spacing-xs)' }}>
                         {template.content}
@@ -712,7 +699,7 @@ export function NotificationsPage() {
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
-                  등록된 템플릿이 없습니다.
+                  등록된 템플릿이 {terms.MESSAGES.NO_DATA}
                 </div>
               )}
               {templateSchema && (

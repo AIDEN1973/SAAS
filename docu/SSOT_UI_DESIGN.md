@@ -230,12 +230,14 @@ Theme은 다음 순서로 병합됩니다 (낮은 번호가 우선):
 | **Composite** | 여러 Primitive 조합 (카드, 모달, 테이블 등) | `Card`, `Modal`, `DataTable`, `FormField` |
 | **Pattern** | 특정 패턴 구현 (페이지 헤더, 액션 바 등) | `PageHeader`, `BottomActionBar`, `ContextRecommendationBanner` |
 | **Layout** | 레이아웃 구조 (컨테이너, 그리드, 사이드바 등) | `Container`, `Grid`, `Sidebar`, `AppLayout` |
+| **Industry** | 업종별 라우팅 및 용어 (Phase 3) | `IndustryBasedRoute`, `useIndustryTerms`, `useIndustryConfig` |
 
 **불변 규칙**:
 - **Primitive**: 비즈니스 규칙 없음, 네트워크/DB 호출 직접 금지
 - **Composite**: Primitive 조합, 비즈니스 규칙 없음
 - **Pattern**: 특정 UX 패턴 구현, 비즈니스 규칙 없음
 - **Layout**: 레이아웃 구조만 제공, 콘텐츠는 children으로 받음
+- **Industry**: 업종별 차이를 SSOT(Industry Registry)로 추상화, 하드코딩된 용어 사용 금지
 
 ### E-2. "언제 무엇을 쓰는지" 결정표
 
@@ -290,6 +292,34 @@ Theme은 다음 순서로 병합됩니다 (낮은 번호가 우선):
 | 카드 그리드 레이아웃 | `CardGridLayout` | `apps/academy-admin/src/components/CardGridLayout.tsx` |
 
 **⚠️ 주의**: `CardGridLayout`은 현재 Academy 전용이지만, 향후 `packages/ui-core`로 이동 예정
+
+#### 업종별 라우팅 및 용어 (Phase 3)
+
+| 용도 | 컴포넌트/Hook | 위치 |
+|------|--------------|------|
+| 업종별 용어 가져오기 | `useIndustryTerms` | `packages/hooks/use-industry-terms` |
+| 용어 + 페이지 가시성 체크 | `useIndustryConfig` | `packages/hooks/use-industry-config` |
+| 업종별 라우팅 보호 | `IndustryBasedRoute` | `apps/academy-admin/src/components/IndustryBasedRoute.tsx` |
+| 업종별 용어 레지스트리 (SSOT) | `getIndustryTerms` | `packages/industry/industry-registry.ts` |
+
+**사용 예시**:
+```typescript
+import { useIndustryTerms } from '@hooks/use-industry-terms';
+
+function MyPage() {
+  const terms = useIndustryTerms();
+
+  return (
+    <PageHeader title={`${terms.PERSON_LABEL_PRIMARY} 관리`}>
+      <Button>신규 {terms.PERSON_LABEL_PRIMARY} 등록</Button>
+    </PageHeader>
+  );
+}
+```
+
+**⚠️ 중요**: 모든 업종 특화 용어(학생, 반, 강사 등)는 하드코딩 금지. Industry Registry를 통해서만 참조.
+
+**상세 문서**: `docu/디어쌤_아키텍처.md` 13장 참조
 
 ### E-3. 상태 UI (loading/error/empty) 단일화 규칙
 
@@ -711,8 +741,20 @@ function MyPage() {
 
 ---
 
-**문서 버전**: 1.0.0
-**최종 업데이트**: 2024-12-19
+**문서 버전**: 1.1.0
+**최종 업데이트**: 2026-01-04
 **유지보수 책임**: 프론트엔드 팀
+
+---
+
+## 변경 이력
+
+- **2026-01-04 (v1.1.0)**: Phase 3: Industry-Based Routing 반영
+  - Industry 컴포넌트 분류 추가
+  - useIndustryTerms, useIndustryConfig Hook 문서화
+  - IndustryBasedRoute 컴포넌트 추가
+  - 하드코딩된 업종 특화 용어 사용 금지 규칙 추가
+  - `docu/디어쌤_아키텍처.md` 13장 참조 추가
+- **2024-12-19 (v1.0.0)**: 초기 버전 작성
 
             

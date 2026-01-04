@@ -178,6 +178,13 @@ export const POLICY_REGISTRY: Record<string, PolicyDefinition> = {
     defaultValue: 20,
     description: '출석 이상 패턴 - 하루 최대 생성 건수',
   },
+  ATTENDANCE_ANOMALY_THROTTLE_STUDENT_LIMIT: {
+    path: 'auto_notification.attendance_pattern_anomaly.throttle.student_limit',
+    source: 'config',
+    type: 'number',
+    defaultValue: 5,
+    description: '출석 이상 패턴 - 학생당 최대 생성 횟수',
+  },
   ATTENDANCE_ANOMALY_ENABLED: {
     path: 'auto_notification.attendance_pattern_anomaly.enabled',
     source: 'config',

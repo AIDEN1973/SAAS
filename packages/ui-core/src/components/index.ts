@@ -138,7 +138,7 @@ export { ListCardLayout } from './ListCardLayout';
 export type { ListCardLayoutProps, ListCardItem } from './ListCardLayout';
 
 export { ChatOpsPanel } from './ChatOpsPanel';
-export type { ChatOpsPanelProps, ChatOpsMessage, ChatOpsMessageType } from './ChatOpsPanel';
+export type { ChatOpsPanelProps, ChatOpsMessage, ChatOpsMessageType, ChatOpsIndustryTerms } from './ChatOpsPanel';
 
 export { ExecutionAuditPanel } from './ExecutionAuditPanel';
 export type {
@@ -153,3 +153,12 @@ export type {
 
 export { AILayerMenu } from './AILayerMenu';
 export type { AILayerMenuProps, AILayerMenuTab } from './AILayerMenu';
+
+export { AddressSearchInput } from './AddressSearchInput';
+export type { AddressSearchInputProps, AddressSearchResult } from './AddressSearchInput';
+
+export { SmsComposer } from './SmsComposer';
+export type { SmsComposerProps } from './SmsComposer';
+
+export { VirtualList } from './VirtualList';
+export type { VirtualListProps } from './VirtualList';

@@ -12,7 +12,7 @@ import { apiClient, getApiContext } from '@api-sdk/core';
 export interface DailyRegionMetric {
   id: string;
   industry_type: string;
-  region_level: 'dong' | 'gu_gun' | 'si' | 'nation';
+  region_level: 'dong' | 'gu_gun' | 'si' | 'zone' | 'nation';
   region_code: string;
   date_kst: string;
   store_count?: number;
@@ -39,7 +39,7 @@ export interface DailyRegionMetric {
 
 export interface DailyRegionMetricFilter {
   industry_type?: string;
-  region_level?: 'dong' | 'gu_gun' | 'si' | 'nation';
+  region_level?: 'dong' | 'gu_gun' | 'si' | 'zone' | 'nation';
   region_code?: string;
   date_kst?: { gte?: string; lte?: string };
 }

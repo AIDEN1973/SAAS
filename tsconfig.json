@@ -68,6 +68,7 @@
       "@lib/supabase-client": ["./packages/lib/supabase-client/src"],
       "@lib/supabase-client/server": ["./packages/lib/supabase-client/src/server"],
       "@lib/supabase-client/db": ["./packages/lib/supabase-client/src/db"],
+      "@industry/registry": ["./packages/industry/industry-registry.ts"],
       "@industry/*": ["./packages/industry/*/src"],
       "@industry/academy": ["./packages/industry/industry-academy/src"],
       "@industry/academy/service": ["./packages/industry/industry-academy/src/service"],

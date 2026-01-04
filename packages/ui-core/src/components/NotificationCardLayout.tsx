@@ -66,6 +66,8 @@ export interface NotificationCardLayoutProps {
   iconBackgroundColor?: string;
   /** 타이틀 폰트 굵기 (CSS 변수 사용, 기본값: --font-weight-normal) */
   titleFontWeight?: string;
+  /** 선택 상태 여부 (true일 때 시각적 강조) */
+  isSelected?: boolean;
 }
 
 export function NotificationCardLayout({
@@ -91,6 +93,7 @@ export function NotificationCardLayout({
   onChartClick,
   iconBackgroundColor,
   titleFontWeight = 'var(--font-weight-normal)',
+  isSelected = false,
 }: NotificationCardLayoutProps) {
   // 레이아웃 모드 자동 판단
   const actualLayoutMode = layoutMode === 'auto'
@@ -156,7 +159,6 @@ export function NotificationCardLayout({
 
   return (
     <Card
-      variant={variant}
       padding="md"
       style={{
         backgroundColor: backgroundColor || 'var(--color-white)',
@@ -166,10 +168,6 @@ export function NotificationCardLayout({
         opacity: isEmpty ? 'var(--opacity-inactive)' : 'var(--opacity-full)',
         position: 'relative',
         cursor: cursorStyle,
-        border: 'none', // 알림카드 테두리 제거
-        ...(borderLeftColor && {
-          borderLeft: `var(--border-width-thick) solid ${borderLeftColor}`,
-        }),
       }}
       onClick={handleClick}
       disableHoverEffect={true}
@@ -308,7 +306,9 @@ export function NotificationCardLayout({
               width: 'calc(var(--spacing-3xl) - var(--spacing-xxs))',
               height: 'calc(var(--spacing-3xl) - var(--spacing-xxs))',
               borderRadius: '50%',
-              backgroundColor: iconBackgroundColor || 'var(--color-primary-50)', // 원형 배경 색상 (기본값: 인터스트리 타입 색상, 투명도 10%)
+              backgroundColor: isSelected
+                ? (iconBackgroundColor || 'var(--color-primary)') // 선택된 카드: 인더스트리 타입 색상
+                : 'var(--color-primary-50)', // 비선택 카드: 기본값 (투명도 10%)
               pointerEvents: 'none',
               display: 'flex',
               alignItems: 'center',
@@ -324,7 +324,7 @@ export function NotificationCardLayout({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: isEmpty ? 'var(--color-text-secondary)' : 'var(--color-text)',
+                color: isSelected ? 'var(--color-white)' : (isEmpty ? 'var(--color-text-secondary)' : 'var(--color-text)'), // 선택된 카드만 화이트, 비선택 카드는 기본값
               }}>
                 {React.isValidElement(header) && header.type
                   ? (() => {
@@ -380,7 +380,7 @@ export function NotificationCardLayout({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: isEmpty ? 'var(--color-text-secondary)' : 'var(--color-text)',
+                color: isSelected ? 'var(--color-white)' : (isEmpty ? 'var(--color-text-secondary)' : 'var(--color-text)'), // 선택된 카드만 화이트, 비선택 카드는 기본값
               }}>
                 {React.isValidElement(icon)
                   ? (() => {

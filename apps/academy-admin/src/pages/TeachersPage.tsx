@@ -18,15 +18,19 @@ import {
   useCreateTeacher,
   useUpdateTeacher,
   useDeleteTeacher,
+  useTeacherStatistics,
+  useTeacherClasses,
 } from '@hooks/use-class';
 import type { Teacher, CreateTeacherInput, UpdateTeacherInput, TeacherFilter, TeacherStatus } from '@services/class-service';
 import { apiClient } from '@api-sdk/core';
 import { teacherFormSchema } from '../schemas/teacher.schema';
 import type { FormSchema } from '@schema-engine/types';
 import { teacherFilterSchema } from '../schemas/teacher.filter.schema';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 
 export function TeachersPage() {
   const { showConfirm, showAlert } = useModal();
+  const terms = useIndustryTerms();
   const mode = useResponsiveMode();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
@@ -66,7 +70,7 @@ export function TeachersPage() {
     } catch (error) {
       // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
       showAlert(
-        error instanceof Error ? error.message : '강사 등록에 실패했습니다.',
+        error instanceof Error ? error.message : `${terms.PERSON_LABEL_SECONDARY} 등록에 실패했습니다.`,
         '오류',
         'error'
       );
@@ -80,7 +84,7 @@ export function TeachersPage() {
     } catch (error) {
       // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
       showAlert(
-        error instanceof Error ? error.message : '강사 수정에 실패했습니다.',
+        error instanceof Error ? error.message : `${terms.PERSON_LABEL_SECONDARY} 수정에 실패했습니다.`,
         '오류',
         'error'
       );
@@ -91,14 +95,14 @@ export function TeachersPage() {
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
         <PageHeader
-          title="강사 관리"
+          title={`${terms.PERSON_LABEL_SECONDARY} 관리`}
           actions={
             <Button
               variant="solid"
               size="sm"
               onClick={() => setShowCreateForm(!showCreateForm)}
             >
-              강사 등록
+              {terms.PERSON_LABEL_SECONDARY} 등록
             </Button>
           }
         />
@@ -121,7 +125,7 @@ export function TeachersPage() {
                 <Drawer
                   isOpen={showCreateForm}
                   onClose={() => setShowCreateForm(false)}
-                  title="강사 등록"
+                  title={`${terms.PERSON_LABEL_SECONDARY} 등록`}
                   position={isMobileMode ? 'bottom' : 'right'}
                   width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
                 >
@@ -129,6 +133,7 @@ export function TeachersPage() {
                     onSubmit={handleCreateTeacher}
                     onCancel={() => setShowCreateForm(false)}
                     effectiveFormSchema={effectiveFormSchema}
+                    terms={terms}
                   />
                 </Drawer>
               ) : (
@@ -137,6 +142,7 @@ export function TeachersPage() {
                   onSubmit={handleCreateTeacher}
                   onCancel={() => setShowCreateForm(false)}
                   effectiveFormSchema={effectiveFormSchema}
+                  terms={terms}
                 />
               )}
             </>
@@ -163,26 +169,27 @@ export function TeachersPage() {
                   teacher={teacher}
                   onEdit={(teacherId) => setEditingTeacherId(teacherId)}
                   onDelete={async (teacherId) => {
-                    const confirmed = await showConfirm('정말 이 강사를 삭제하시겠습니까?', '강사 삭제');
+                    const confirmed = await showConfirm(`정말 이 ${terms.PERSON_LABEL_SECONDARY}를 삭제하시겠습니까?`, `${terms.PERSON_LABEL_SECONDARY} 삭제`);
                     if (confirmed) {
                       try {
                       await deleteTeacher.mutateAsync(teacherId);
                       } catch (error) {
                         // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
                         showAlert(
-                          error instanceof Error ? error.message : '강사 삭제에 실패했습니다.',
+                          error instanceof Error ? error.message : `${terms.PERSON_LABEL_SECONDARY} 삭제에 실패했습니다.`,
                           '오류',
                           'error'
                         );
                       }
                     }
                   }}
+                  terms={terms}
                 />
               ))}
               {teachers?.length === 0 && (
                 <Card padding="lg">
                   <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                    등록된 강사가 없습니다.
+                    등록된 {terms.PERSON_LABEL_SECONDARY}가 없습니다.
                   </div>
                 </Card>
               )}
@@ -195,6 +202,7 @@ export function TeachersPage() {
               teacherId={editingTeacherId}
               onSave={handleUpdateTeacher}
               onClose={() => setEditingTeacherId(null)}
+              terms={terms}
             />
           )}
       </Container>
@@ -209,10 +217,12 @@ function CreateTeacherForm({
   onSubmit,
   onCancel,
   effectiveFormSchema,
+  terms,
 }: {
   onSubmit: (input: CreateTeacherInput) => void;
   onCancel: () => void;
   effectiveFormSchema: FormSchema;
+  terms: ReturnType<typeof useIndustryTerms>;
 }) {
   const mode = useResponsiveMode();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
@@ -243,7 +253,7 @@ function CreateTeacherForm({
     <div style={showHeader ? { marginBottom: 'var(--spacing-md)' } : {}}>
       {showHeader && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>강사 등록</h3>
+          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>{terms.PERSON_LABEL_SECONDARY} 등록</h3>
           <Button variant="ghost" size="sm" onClick={onCancel}>
             취소
           </Button>
@@ -283,10 +293,12 @@ function EditTeacherModal({
   teacherId,
   onSave,
   onClose,
+  terms,
 }: {
   teacherId: string;
   onSave: (teacherId: string, input: UpdateTeacherInput) => Promise<void>;
   onClose: () => void;
+  terms: ReturnType<typeof useIndustryTerms>;
 }) {
   const { showAlert } = useModal();
   const mode = useResponsiveMode();
@@ -324,7 +336,7 @@ function EditTeacherModal({
         <Drawer
           isOpen={true}
           onClose={onClose}
-          title="강사 수정"
+          title={`${terms.PERSON_LABEL_SECONDARY} 수정`}
           position={isMobileMode ? 'bottom' : 'right'}
           width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
         >
@@ -333,7 +345,7 @@ function EditTeacherModal({
       );
     }
     return (
-      <Modal isOpen={true} onClose={onClose} title="강사 수정" size="lg">
+      <Modal isOpen={true} onClose={onClose} title={`${terms.PERSON_LABEL_SECONDARY} 수정`} size="lg">
         <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>
       </Modal>
     );
@@ -345,17 +357,17 @@ function EditTeacherModal({
         <Drawer
           isOpen={true}
           onClose={onClose}
-          title="강사 수정"
+          title={`${terms.PERSON_LABEL_SECONDARY} 수정`}
           position={isMobileMode ? 'bottom' : 'right'}
           width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
         >
-          <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>강사를 찾을 수 없습니다.</div>
+          <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>{terms.PERSON_LABEL_SECONDARY}를 찾을 수 없습니다.</div>
         </Drawer>
       );
     }
     return (
-      <Modal isOpen={true} onClose={onClose} title="강사 수정" size="lg">
-        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>강사를 찾을 수 없습니다.</div>
+      <Modal isOpen={true} onClose={onClose} title={`${terms.PERSON_LABEL_SECONDARY} 수정`} size="lg">
+        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>{terms.PERSON_LABEL_SECONDARY}를 찾을 수 없습니다.</div>
       </Modal>
     );
   }
@@ -405,7 +417,7 @@ function EditTeacherModal({
       <Drawer
         isOpen={true}
         onClose={onClose}
-        title="강사 수정"
+        title={`${terms.PERSON_LABEL_SECONDARY} 수정`}
         position={isMobileMode ? 'bottom' : 'right'}
         width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
       >
@@ -416,7 +428,7 @@ function EditTeacherModal({
 
   // 데스크톱: Modal 사용
   return (
-    <Modal isOpen={true} onClose={onClose} title="강사 수정" size="lg">
+    <Modal isOpen={true} onClose={onClose} title={`${terms.PERSON_LABEL_SECONDARY} 수정`} size="lg">
       {formContent}
     </Modal>
   );
@@ -425,26 +437,45 @@ function EditTeacherModal({
 /**
  * 강사 카드 (프로필 보기)
  * [요구사항] 강사 프로필 보기
+ * [P1-1] 담당 반 목록 표시
+ * [P1-3] 강사 통계 표시
  */
 function TeacherCard({
   teacher,
   onEdit,
   onDelete,
+  terms,
 }: {
   teacher: Teacher;
   onEdit: (teacherId: string) => void;
   onDelete: (teacherId: string) => Promise<void>;
+  terms: ReturnType<typeof useIndustryTerms>;
 }) {
+  // P1-3: 강사 통계 조회
+  const { data: stats } = useTeacherStatistics(teacher.id);
+  // P1-1: 담당 반 목록 조회
+  const { data: assignedClasses } = useTeacherClasses(teacher.id);
+
   const statusLabels: Record<TeacherStatus, string> = {
-    active: '재직중',
-    on_leave: '휴직',
-    resigned: '퇴직',
+    active: terms.STAFF_ACTIVE,
+    on_leave: terms.STAFF_LEAVE,
+    resigned: terms.STAFF_RESIGNED,
   };
 
   const statusColors: Record<TeacherStatus, string> = {
     active: 'var(--color-success)',
     on_leave: 'var(--color-warning)',
     resigned: 'var(--color-error)',
+  };
+
+  const dayLabels: Record<string, string> = {
+    monday: '월',
+    tuesday: '화',
+    wednesday: '수',
+    thursday: '목',
+    friday: '금',
+    saturday: '토',
+    sunday: '일',
   };
 
   return (
@@ -474,7 +505,7 @@ function TeacherCard({
           </div>
           {teacher.employee_id && (
             <div style={{ color: 'var(--color-text-secondary)' }}>
-              사원번호: {teacher.employee_id}
+              {terms.STAFF_ID_LABEL}: {teacher.employee_id}
             </div>
           )}
         </div>
@@ -493,6 +524,8 @@ function TeacherCard({
           <img
             src={teacher.profile_image_url}
             alt={teacher.name}
+            loading="lazy"
+            decoding="async"
             style={{
               width: '100%',
               maxWidth: 'var(--width-student-info-min)',
@@ -514,6 +547,85 @@ function TeacherCard({
           </div>
         )}
       </div>
+
+      {/* P1-3: 강사 통계 카드 */}
+      {stats && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-xs)', marginTop: 'var(--spacing-sm)', paddingTop: 'var(--spacing-sm)', borderTop: '1px solid var(--color-border)' }}>
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-bg-secondary)', borderRadius: 'var(--border-radius-sm)' }}>
+            <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
+              {stats.total_classes}
+            </div>
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+              담당 {terms.GROUP_LABEL}
+            </div>
+            {stats.main_teacher_classes > 0 && (
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--spacing-xs)' }}>
+                {terms.HOMEROOM_TEACHER} {stats.main_teacher_classes}개
+              </div>
+            )}
+          </div>
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-bg-secondary)', borderRadius: 'var(--border-radius-sm)' }}>
+            <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
+              {stats.total_students}
+            </div>
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+              담당 {terms.PERSON_LABEL_PRIMARY}
+            </div>
+            {stats.assistant_classes > 0 && (
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--spacing-xs)' }}>
+                {terms.ASSISTANT_TEACHER} {stats.assistant_classes}개
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* P1-1: 담당 반 목록 */}
+      {assignedClasses && assignedClasses.length > 0 && (
+        <div style={{ marginTop: 'var(--spacing-sm)', paddingTop: 'var(--spacing-sm)', borderTop: '1px solid var(--color-border)' }}>
+          <div style={{ fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)' }}>
+            담당 {terms.GROUP_LABEL} 목록 ({assignedClasses.length})
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+            {assignedClasses.map((ct) => (
+              <div
+                key={ct.class_id}
+                style={{
+                  padding: 'var(--spacing-xs)',
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  borderRadius: 'var(--border-radius-sm)',
+                  borderLeft: `3px solid ${ct.academy_classes.color || 'var(--color-border)'}`,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontWeight: 'var(--font-weight-medium)', fontSize: 'var(--font-size-sm)' }}>
+                    {ct.academy_classes.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 'var(--font-size-xs)',
+                      padding: '2px var(--spacing-xs)',
+                      borderRadius: 'var(--border-radius-full)',
+                      backgroundColor: ct.role === 'teacher' ? 'var(--color-primary)20' : 'var(--color-secondary)20',
+                      color: ct.role === 'teacher' ? 'var(--color-primary)' : 'var(--color-secondary)',
+                    }}
+                  >
+                    {ct.role === 'teacher' ? terms.HOMEROOM_TEACHER : terms.ASSISTANT_TEACHER}
+                  </div>
+                </div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                  {dayLabels[ct.academy_classes.day_of_week]} {ct.academy_classes.start_time.substring(0, 5)} ~ {ct.academy_classes.end_time.substring(0, 5)}
+                  {ct.academy_classes.room && ` | ${ct.academy_classes.room}`}
+                  {ct.academy_classes.subject && ` | ${ct.academy_classes.subject}`}
+                </div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginTop: '2px' }}>
+                  {ct.academy_classes.current_count}/{ct.academy_classes.capacity}명
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

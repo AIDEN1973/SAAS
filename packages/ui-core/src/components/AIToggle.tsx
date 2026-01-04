@@ -42,7 +42,7 @@ export const AIToggle: React.FC<AIToggleProps> = ({ className }) => {
 
   const handleToggle = async (checked: boolean) => {
     if (!canToggle) {
-      showAlert('권한 없음', 'AI 기능 토글은 원장/관리자만 변경할 수 있습니다.');
+      showAlert('AI 기능 토글은 원장/관리자만 변경할 수 있습니다.', '권한 없음');
       return;
     }
 
@@ -51,7 +51,7 @@ export const AIToggle: React.FC<AIToggleProps> = ({ className }) => {
       // 성공 시 캐시 무효화는 hook에서 처리
     } catch (error) {
       const message = error instanceof Error ? error.message : 'AI 기능 토글 변경에 실패했습니다.';
-      showAlert('오류', message);
+      showAlert(message, '오류');
     }
   };
 

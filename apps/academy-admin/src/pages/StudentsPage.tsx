@@ -27,6 +27,7 @@ import { useStudentPage } from './hooks/useStudentPage';
 import { apiClient } from '@api-sdk/core';
 import { tagFormSchema } from '../schemas/tag.schema';
 import { isWidgetRegistered, setWidgetRegistered } from '../utils/widget-registry';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
 import { createSafeNavigate } from '../utils';
 import { StudentInfoTab } from './students/tabs/StudentInfoTab';
@@ -122,6 +123,7 @@ export function StudentsPage() {
   const iconSize = useIconSize();
   const iconStrokeWidth = useIconStrokeWidth();
   const { toast } = useToast();
+  const terms = useIndustryTerms();
 
   // [아키텍처] Application Layer와 UI Composition 분리
   // - useStudentPage Hook이 모든 비즈니스 로직, 상태 관리, 데이터 페칭을 담당
@@ -248,7 +250,7 @@ export function StudentsPage() {
           style: {
             zIndex: 'var(--z-modal)', // AI 레이어 메뉴(--z-sticky)보다 높음
           },
-          title: selectedStudentLoading ? '로딩 중...' : selectedStudent ? (
+          title: selectedStudentLoading ? terms.MESSAGES.LOADING : selectedStudent ? (
             <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 'var(--spacing-xs)', minWidth: 0 }}>
               <span
                 style={{
@@ -264,14 +266,14 @@ export function StudentsPage() {
                 {selectedStudent.name}
               </span>
               <span style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', whiteSpace: 'nowrap' }}>
-                학생 상세정보
+                {terms.PERSON_LABEL_PRIMARY} 상세정보
               </span>
             </span>
-          ) : '학생 상세',
+          ) : `${terms.PERSON_LABEL_PRIMARY} 상세`,
           width: isTabletMode ? 'var(--width-layer-menu-tablet)' : 'var(--width-layer-menu)',
           children: selectedStudentLoading ? (
             <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
-              로딩 중...
+              {terms.MESSAGES.LOADING}
             </div>
           ) : selectedStudent ? (
             <div style={{ display: 'flex', flexDirection: 'column', height: 'var(--height-full)' }}>
@@ -282,56 +284,56 @@ export function StudentsPage() {
                   size="sm"
                   onClick={() => handleTabChange('info')}
                 >
-                  기본정보
+                  {terms.PERSON_LABEL_PRIMARY} 기본정보
                 </Button>
                 <Button
                   variant={layerMenuTab === 'guardians' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('guardians')}
                 >
-                  학부모 정보 ({selectedStudentGuardians?.length || 0})
+                  {terms.GUARDIAN_LABEL} 정보 ({selectedStudentGuardians?.length || 0})
                 </Button>
                 <Button
                   variant={layerMenuTab === 'consultations' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('consultations')}
                 >
-                  상담일지 ({selectedStudentConsultations?.length || 0})
+                  {terms.CONSULTATION_LABEL_PLURAL} ({selectedStudentConsultations?.length || 0})
                 </Button>
                 <Button
                   variant={layerMenuTab === 'tags' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('tags')}
                 >
-                  태그관리
+                  {terms.TAG_LABEL} 관리
                 </Button>
                 <Button
                   variant={layerMenuTab === 'classes' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('classes')}
                 >
-                  반배정 ({(selectedStudentClasses ?? []).filter((sc) => sc.is_active).length})
+                  {terms.GROUP_LABEL} 배정 ({(selectedStudentClasses ?? []).filter((sc) => sc.is_active).length})
                 </Button>
                 <Button
                   variant={layerMenuTab === 'attendance' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('attendance')}
                 >
-                  출결기록
+                  {terms.ATTENDANCE_LABEL} 기록
                 </Button>
                 <Button
                   variant={layerMenuTab === 'risk' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('risk')}
                 >
-                  이탈위험
+                  {terms.EMERGENCY_RISK_LABEL}
                 </Button>
                 <Button
                   variant={layerMenuTab === 'message' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('message')}
                 >
-                  메시지 발송
+                  {terms.MESSAGE_LABEL} 발송
                 </Button>
               </div>
               {/* 탭 내용 */}
@@ -349,12 +351,12 @@ export function StudentsPage() {
                     onEdit={() => setIsEditing(true)}
                     onDelete={async () => {
                       const confirmed = await showConfirm(
-                        '정말 삭제하시겠습니까?\n(문서 기준: 학생은 삭제 시 상태가 퇴원(withdrawn)으로 변경됩니다.)',
-                        '학생 삭제'
+                        `정말 삭제하시겠습니까?\n(문서 기준: ${terms.PERSON_LABEL_PRIMARY}은(는) 삭제 시 상태가 퇴원(withdrawn)으로 변경됩니다.)`,
+                        `${terms.PERSON_LABEL_PRIMARY} ${terms.MESSAGES.DELETE_CONFIRM}`
                       );
                       if (!confirmed) return;
                       await deleteStudent.mutateAsync(selectedStudent.id);
-                      toast('학생이 삭제(퇴원 처리)되었습니다.', 'success');
+                      toast(`${terms.PERSON_LABEL_PRIMARY}이(가) 삭제(퇴원 처리)되었습니다.`, 'success');
                       handleStudentSelect(null);
                     }}
                   />
@@ -385,7 +387,7 @@ export function StudentsPage() {
                       setEditingGuardianId(null);
                     }}
                     onDelete={async (guardianId) => {
-                      const confirmed = await showConfirm('정말 삭제하시겠습니까?', '보호자 삭제');
+                      const confirmed = await showConfirm(terms.MESSAGES.DELETE_CONFIRM, `${terms.GUARDIAN_LABEL} 삭제`);
                       if (confirmed) {
                         await deleteGuardian.mutateAsync({ guardianId, studentId: selectedStudent.id });
                       }
@@ -412,7 +414,7 @@ export function StudentsPage() {
                     }}
                     onCreate={async (data) => {
                       if (!userId) {
-                        toast('사용자 정보를 가져올 수 없습니다. 다시 로그인해주세요.', 'error');
+                        toast(`사용자 정보를 가져올 수 없습니다. ${terms.MESSAGES.ALERT}하세요.`, 'error');
                         return;
                       }
                       await createConsultation.mutateAsync({ studentId: selectedStudent.id, consultation: data as Omit<StudentConsultation, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'>, userId });
@@ -424,7 +426,7 @@ export function StudentsPage() {
                       setEditingConsultationId(null);
                     }}
                     onDelete={async (consultationId) => {
-                      const confirmed = await showConfirm('정말 삭제하시겠습니까?', '상담일지 삭제');
+                      const confirmed = await showConfirm(terms.MESSAGES.DELETE_CONFIRM, `${terms.CONSULTATION_LABEL_PLURAL} 삭제`);
                       if (confirmed) {
                         await deleteConsultation.mutateAsync({ consultationId, studentId: selectedStudent.id });
                       }
@@ -434,7 +436,7 @@ export function StudentsPage() {
                         await generateAISummary.mutateAsync({ consultationId, studentId: selectedStudent.id });
                       } catch (error) {
                         toast(
-                          error instanceof Error ? error.message : 'AI 요약에 실패했습니다.',
+                          error instanceof Error ? error.message : `AI ${terms.MESSAGES.SAVE_ERROR}`,
                           'error'
                         );
                       }
@@ -509,7 +511,7 @@ export function StudentsPage() {
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
-              학생 정보를 불러올 수 없습니다.
+              {terms.PERSON_LABEL_PRIMARY} 정보를 불러올 수 없습니다.
             </div>
           ),
         }}
@@ -517,7 +519,7 @@ export function StudentsPage() {
         <Container maxWidth="xl" padding="lg">
         {/* 타이틀과 액션 버튼을 한 줄로 배치 */}
         <PageHeader
-          title="학생관리"
+          title={`${terms.PERSON_LABEL_PRIMARY}관리`}
           actions={
             <DataTableActionButtons
               align="right"
@@ -526,7 +528,7 @@ export function StudentsPage() {
               onDownload={handleDownload}
               onDownloadTemplate={handleDownloadTemplate}
               uploadDisabled={bulkCreateStudents.isPending}
-              createTooltip="학생등록"
+              createTooltip={`${terms.PERSON_LABEL_PRIMARY}등록`}
             />
           }
         />
@@ -595,7 +597,7 @@ export function StudentsPage() {
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    태그
+                    {terms.TAG_LABEL}
                   </div>
                 {tags.map((tag: { id: string; name: string; color: string }) => (
                   <Button
@@ -622,7 +624,7 @@ export function StudentsPage() {
               {showTagListToggle && (
                 <button
                   type="button"
-                  aria-label={isTagListExpanded ? '태그 목록 접기' : '태그 목록 펼치기'}
+                  aria-label={isTagListExpanded ? `${terms.TAG_LABEL} 목록 접기` : `${terms.TAG_LABEL} 목록 펼치기`}
                   onClick={() => setIsTagListExpanded((v: boolean) => !v)}
                   style={{
                     position: 'absolute',
@@ -656,7 +658,7 @@ export function StudentsPage() {
                 <Drawer
                   isOpen={showCreateForm}
                   onClose={() => setShowCreateForm(false)}
-                  title="학생 등록"
+                  title={`${terms.PERSON_LABEL_PRIMARY} 등록`}
                   position={isMobileMode ? 'bottom' : 'right'}
                   width={isTabletMode ? 'var(--width-drawer-tablet)' : 'var(--width-full)'}
                 >
@@ -688,7 +690,7 @@ export function StudentsPage() {
         {isLoading && (
           <Card padding="lg" variant="default">
             <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-              학생 목록을 불러오는 중...
+              {terms.PERSON_LABEL_PRIMARY} 목록 {terms.MESSAGES.LOADING}
             </div>
           </Card>
         )}
@@ -697,7 +699,7 @@ export function StudentsPage() {
         {!isLoading && error && (
             <Card padding="md" variant="outlined">
               <div style={{ color: 'var(--color-error)' }}>
-                오류: {error instanceof Error ? error.message : '학생 목록을 불러오는데 실패했습니다.'}
+                {terms.MESSAGES.ERROR}: {error instanceof Error ? error.message : `${terms.PERSON_LABEL_PRIMARY} 목록 불러오기 ${terms.MESSAGES.SAVE_ERROR}`}
               </div>
           </Card>
         )}
@@ -729,13 +731,13 @@ export function StudentsPage() {
                 padding: 'var(--spacing-xl)'
               }}>
                 <p style={{ marginBottom: 'var(--spacing-md)' }}>
-                  등록된 학생이 없습니다.
+                  등록된 {terms.PERSON_LABEL_PRIMARY}이(가) {terms.MESSAGES.NO_DATA}
                 </p>
                 <Button
                   variant="outline"
                   onClick={() => setShowCreateForm(true)}
                 >
-                  첫 학생 등록하기
+                  첫 {terms.PERSON_LABEL_PRIMARY} 등록
                 </Button>
               </div>
           </Card>
@@ -800,13 +802,15 @@ function CreateStudentForm({ onClose, onSubmit, effectiveFormSchema }: CreateStu
   // 모바일/태블릿에서는 Drawer를 사용하므로 disableCardPadding=true
   const isInDrawer = isMobileMode || isTabletMode;
 
+  const terms = useIndustryTerms();
+
   return (
     <div style={showHeader ? { marginBottom: 'var(--spacing-md)' } : {}}>
       {showHeader && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>학생 등록</h3>
+          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>{terms.PERSON_LABEL_PRIMARY} 등록</h3>
           <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
-            닫기
+            {terms.MESSAGES.CANCEL}
           </Button>
         </div>
       )}

@@ -159,6 +159,7 @@ export interface UpdateClassInput {
   room?: string;
   notes?: string;
   status?: ClassStatus;
+  teacher_ids?: string[];  // 강사 배정 수정 (person_id 배열)
 }
 
 export interface ClassFilter {
@@ -281,5 +282,26 @@ export interface AttendanceFilter {
   date_to?: string;    // date
   attendance_type?: AttendanceType;
   status?: AttendanceStatus;
+}
+
+// 일정 충돌 감지용
+export type ConflictType = 'teacher_conflict' | 'room_conflict';
+
+export interface ScheduleConflict {
+  type: ConflictType;
+  class_id: string;
+  class_name: string;
+  teacher_name?: string;
+  room?: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  message: string;
+}
+
+export interface ScheduleConflictResult {
+  has_conflicts: boolean;
+  conflict_count: number;
+  conflicts: ScheduleConflict[];
 }
 

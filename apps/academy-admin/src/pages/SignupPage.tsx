@@ -14,13 +14,15 @@
  * - 접근성 WCAG 2.1 AAA 목표
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Card, useModal, useResponsiveMode, isMobile } from '@ui-core/react';
+import { Container, Card, useModal, useResponsiveMode, isMobile, AddressSearchInput } from '@ui-core/react';
 import { SchemaForm } from '@schema-engine';
 import { useSignupWithEmail } from '@hooks/use-auth';
 import { signupFormSchema } from '../schemas/signup.schema';
 import type { IndustryType } from '@core/tenancy';
+import type { RegionInfo } from '@core/auth';
+import type { ParsedRegionInfo } from '@lib/kakao-address';
 import { logError, createSafeNavigate } from '../utils';
 import { maskPII } from '@core/pii-utils';
 
@@ -39,6 +41,29 @@ export function SignupPage() {
 
   const signup = useSignupWithEmail();
 
+  // 주소 검색 상태 (SchemaForm 외부에서 관리)
+  const [address, setAddress] = useState('');
+  const [regionInfo, setRegionInfo] = useState<RegionInfo | null>(null);
+
+  // 주소 선택 핸들러
+  const handleAddressChange = useCallback((newAddress: string, parsedInfo: ParsedRegionInfo | null) => {
+    setAddress(newAddress);
+    if (parsedInfo) {
+      setRegionInfo({
+        si: parsedInfo.si,
+        gu: parsedInfo.gu,
+        dong: parsedInfo.dong,
+        sido_code: parsedInfo.sido_code,
+        sigungu_code: parsedInfo.sigungu_code,
+        dong_code: parsedInfo.h_code,
+        latitude: parsedInfo.latitude,
+        longitude: parsedInfo.longitude,
+      });
+    } else {
+      setRegionInfo(null);
+    }
+  }, []);
+
   const handleSignup = async (data: Record<string, unknown>) => {
     try {
       await signup.mutateAsync({
@@ -48,10 +73,12 @@ export function SignupPage() {
         phone: data.phone ? String(data.phone) : undefined,
         tenant_name: String(data.tenantName ?? ''),
         industry_type: data.industryType as IndustryType,
+        address: address || undefined,
+        region_info: regionInfo || undefined,
       });
 
       // 회원가입 성공
-      showAlert('성공', '회원가입이 완료되었습니다.');
+      showAlert('회원가입이 완료되었습니다.', '성공');
 
       // 테넌트 선택 (자동으로 하나의 테넌트가 생성됨)
       safeNavigate('/');
@@ -71,14 +98,14 @@ export function SignupPage() {
       // 이메일 인증 필요 오류 처리
       if (error instanceof Error && message.includes('이메일 인증')) {
         showAlert(
-          '알림',
           '이메일 인증이 필요합니다. 이메일을 확인해주세요.\n\n' +
           '개발 환경에서는 Supabase Dashboard > Authentication > Settings > Email Auth에서\n' +
-          '"Enable email confirmations"를 비활성화하거나 "Auto Confirm"을 활성화하세요.'
+          '"Enable email confirmations"를 비활성화하거나 "Auto Confirm"을 활성화하세요.',
+          '알림'
         );
         safeNavigate('/auth/login');
       } else {
-        showAlert('오류', message);
+        showAlert(message, '오류');
       }
     }
   };
@@ -112,6 +139,27 @@ export function SignupPage() {
           schema={signupFormSchema}
           onSubmit={handleSignup}
         />
+
+        {/* 주소 검색 필드 (SchemaForm 외부) */}
+        <div style={{ marginTop: 'var(--spacing-md)' }}>
+          <AddressSearchInput
+            value={address}
+            onChange={handleAddressChange}
+            label="학원 주소"
+            placeholder="도로명 또는 지번 주소 검색"
+          />
+          {regionInfo && (
+            <div
+              style={{
+                marginTop: 'var(--spacing-xs)',
+                fontSize: 'var(--font-size-xs)',
+                color: 'var(--color-text-secondary)',
+              }}
+            >
+              {regionInfo.si} {regionInfo.gu} {regionInfo.dong}
+            </div>
+          )}
+        </div>
 
         {/* 로그인 링크 */}
         <div style={{

@@ -51,3 +51,4 @@ Thumbs.db
 **/migrations/*_complete.sql
 **/migrations/079_create_cron_jobs_complete.sql
 
+nul

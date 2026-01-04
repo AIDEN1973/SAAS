@@ -5,7 +5,7 @@
  */
 
 import { toKST } from '@lib/date-utils';
-import { EMPTY_CARD_ID_PREFIX, EMPTY_CARD_MESSAGES } from '../constants';
+import { EMPTY_CARD_ID_PREFIX } from '../constants';
 import type { DashboardCard } from '../types/dashboardCard';
 import { normalizeStudentTaskCard } from './dashboard-card-normalization';
 
@@ -51,17 +51,20 @@ export function isValidPlaceholderCard(card: DashboardCard | { id?: string; acti
  * 빈 Student Task 카드 생성
  * [P1-1 수정] placeholder 전용 빌더 함수로 타입을 명확히 고정하여 캐스팅 최소화
  * [SSOT] normalizeStudentTaskCard를 사용하여 타입 단언 제거
+ * [P2-업종중립] 카드 생성 시 하드코딩된 메시지는 기본값 사용, 정확한 업종별 메시지는 컴포넌트에서 처리
  *
  * @returns 빈 Student Task 카드
  */
 export function createEmptyTaskCard(): DashboardCard {
   const base = toKST();
+  // [P2-업종중립] 기본 Academy 용어 사용 (컴포넌트에서 useIndustryTerms로 오버라이드)
+  const FALLBACK_PERSON_LABEL = '학생';
   return normalizeStudentTaskCard({
     id: `${EMPTY_CARD_ID_PREFIX}-student-task`,
     tenant_id: '', // [SSOT] 빈 카드는 tenant_id가 없지만 정규화 함수가 빈 문자열로 처리
     task_type: 'ai_suggested',
-    title: EMPTY_CARD_MESSAGES.STUDENT_TASK.TITLE,
-    description: EMPTY_CARD_MESSAGES.STUDENT_TASK.DESCRIPTION,
+    title: `${FALLBACK_PERSON_LABEL} 업무 없음`,
+    description: `현재 처리해야 할 ${FALLBACK_PERSON_LABEL} 관련 업무가 없습니다. 새로운 상담이나 관리 작업이 필요한 ${FALLBACK_PERSON_LABEL}이 생기면 여기에 표시됩니다.`,
     priority: 0,
     status: 'executed', // [SSOT] StudentTaskCard.status는 'pending' | 'approved' | 'executed' | 'expired' | undefined
     created_at: base.toISOString(),

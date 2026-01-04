@@ -16,10 +16,36 @@ import type { SignupInput, User, LoginResult } from './types';
 // @core/tenancy에서 타입 import (Vite alias 사용)
 import type { IndustryType, Tenant } from '@core/tenancy';
 
+/**
+ * 지역 정보 (카카오 주소 검색 API에서 파싱된 정보)
+ */
+export interface RegionInfo {
+  /** 시도명 */
+  si?: string;
+  /** 시군구명 */
+  gu?: string;
+  /** 읍면동명 */
+  dong?: string;
+  /** 시도 코드 (2자리) */
+  sido_code?: string;
+  /** 시군구 코드 (5자리) */
+  sigungu_code?: string;
+  /** 행정동 코드 (10자리) */
+  dong_code?: string;
+  /** 위도 */
+  latitude?: number;
+  /** 경도 */
+  longitude?: number;
+}
+
 export interface B2BSignupInput extends SignupInput {
   tenant_name: string;
   industry_type: IndustryType;
   referral_code?: string;
+  /** 학원/매장 주소 */
+  address?: string;
+  /** 지역 정보 (카카오 API에서 파싱) */
+  region_info?: RegionInfo;
 }
 
 export interface SignupResult {
@@ -122,7 +148,37 @@ export class SignupService {
         console.warn('[SignupService] 테넌트 생성 실패했지만 사용자는 생성되었습니다. 수동으로 테넌트를 생성해주세요.');
       }
 
-      // 3. 업종별 초기 데이터 시드 (Industry Layer)
+      // 3. 매장(Store) 생성 (주소 정보 포함)
+      // 테넌트 생성 성공 시 매장도 함께 생성
+      if (tenantData && tenantData.tenant && input.address) {
+        const regionInfo = input.region_info || {};
+        const { error: storeError } = await this.supabase.rpc(
+          'create_store_with_address',
+          {
+            p_tenant_id: tenantData.tenant.id,
+            p_name: input.tenant_name,
+            p_industry_type: input.industry_type,
+            p_address: input.address,
+            p_sido_code: regionInfo.sido_code || null,
+            p_sido_name: regionInfo.si || null,
+            p_sigungu_code: regionInfo.sigungu_code || null,
+            p_sigungu_name: regionInfo.gu || null,
+            p_dong_code: regionInfo.dong_code || null,
+            p_dong_name: regionInfo.dong || null,
+            p_latitude: regionInfo.latitude || null,
+            p_longitude: regionInfo.longitude || null,
+          }
+        );
+
+        if (storeError) {
+          console.warn('[SignupService] 매장 생성 실패:', storeError);
+          // 매장 생성 실패해도 회원가입은 성공으로 처리
+        } else {
+          console.log('[SignupService] 매장 및 지역 정보 저장 완료');
+        }
+      }
+
+      // 4. 업종별 초기 데이터 시드 (Industry Layer)
       // ⚠️ 중요: 업종별 seed는 Industry Layer에서 처리합니다.
       if (tenantData && tenantData.tenant && input.industry_type === 'academy') {
         // Industry Layer 의존성 제거 (Core Layer는 Industry 모듈에 의존하지 않음)
@@ -131,7 +187,7 @@ export class SignupService {
         console.log('[SignupService] Tenant created successfully. Seed data should be handled by migrations.');
       }
 
-      // 4. 테넌트 정보 파싱
+      // 5. 테넌트 정보 파싱
       let tenant: Tenant | undefined;
       if (tenantData && tenantData.tenant) {
         tenant = {

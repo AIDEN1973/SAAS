@@ -11,6 +11,12 @@ import { apiClient, getApiContext } from '@api-sdk/core';
 import { useSession } from '@hooks/use-auth';
 import { createExecutionAuditRecord } from '@hooks/use-student/src/execution-audit-utils';
 
+/**
+ * InvoiceStatus 타입
+ * [SSOT] billingUtils.ts와 동기화
+ */
+export type InvoiceStatus = 'draft' | 'pending' | 'paid' | 'overdue' | 'cancelled';
+
 export interface BillingHistoryItem {
   id: string;
   student_id: string;
@@ -19,7 +25,7 @@ export interface BillingHistoryItem {
   amount: number;
   amount_paid: number;
   amount_due: number;
-  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
+  status: InvoiceStatus;
   period_start: string;
   period_end: string;
   created_at: string;
@@ -31,7 +37,7 @@ export interface Invoice extends BillingHistoryItem {}
 export interface BillingHistoryFilter {
   student_id?: string;
   period_start?: { gte?: string; lte?: string };
-  status?: 'pending' | 'paid' | 'overdue' | 'cancelled';
+  status?: InvoiceStatus;
 }
 
 export interface PaymentResult {

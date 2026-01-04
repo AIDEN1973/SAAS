@@ -76,5 +76,12 @@
       "eslint --fix",
       "eslint"
     ]
+  },
+  "dependencies": {
+    "@types/react-window": "^1.8.8",
+    "jspdf": "^3.0.4",
+    "jspdf-autotable": "^5.0.2",
+    "react-virtualized-auto-sizer": "^2.0.1",
+    "react-window": "^2.2.3"
   }
 }

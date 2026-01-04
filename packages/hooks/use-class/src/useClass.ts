@@ -22,6 +22,8 @@ import type {
   TeacherFilter,
   ClassTeacher,
   AssignTeacherInput,
+  ScheduleConflictResult,
+  DayOfWeek,
 } from '@services/class-service';
 import type { Person } from '@core/party';
 
@@ -116,10 +118,12 @@ export function useCreateClass() {
           p_start_time: input.start_time || '14:00:00',
           p_end_time: input.end_time || '15:30:00',
           p_capacity: input.capacity || 20,
+          p_color: input.color,
           p_room: input.room,
           p_notes: input.notes,
           p_status: input.status || 'active',
           p_teacher_ids: input.teacher_ids,
+          p_teacher_roles: null,  // 기본값: 모두 'teacher' 역할
           p_created_by: session?.user?.id,
         });
 
@@ -152,10 +156,23 @@ export function useCreateClass() {
         return response.data!;
       }
 
-      // teacher_ids가 없는 경우 기존 방식 사용
-      const response = await apiClient.post<Class>('academy_classes', {
-        ...input,
-        status: input.status || 'active',
+      // teacher_ids가 없는 경우에도 RPC 사용 (색상 자동 할당 위해)
+      const response = await apiClient.callRPC<Class>('create_class_with_teachers', {
+        p_tenant_id: tenantId,
+        p_name: input.name,
+        p_subject: input.subject,
+        p_grade: input.grade,
+        p_day_of_week: input.day_of_week || 'monday',
+        p_start_time: input.start_time || '14:00:00',
+        p_end_time: input.end_time || '15:30:00',
+        p_capacity: input.capacity || 20,
+        p_color: input.color,
+        p_room: input.room,
+        p_notes: input.notes,
+        p_status: input.status || 'active',
+        p_teacher_ids: null,
+        p_teacher_roles: null,
+        p_created_by: session?.user?.id,
       });
 
       if (response.error) {
@@ -193,6 +210,7 @@ export function useCreateClass() {
 
 /**
  * 반 수정 Hook
+ * [수정] teacher_ids 지원 추가 - 기존 강사 배정 제거 후 신규 배정
  */
 export function useUpdateClass() {
   const queryClient = useQueryClient();
@@ -213,10 +231,46 @@ export function useUpdateClass() {
         throw new Error('Tenant ID is required');
       }
 
-      const response = await apiClient.patch<Class>('academy_classes', classId, input as Record<string, unknown>);
+      // teacher_ids를 제외한 나머지 필드만 PATCH
+      const { teacher_ids, ...classUpdate } = input;
+
+      const response = await apiClient.patch<Class>('academy_classes', classId, classUpdate as Record<string, unknown>);
 
       if (response.error) {
         throw new Error(response.error.message);
+      }
+
+      // teacher_ids가 제공된 경우 강사 배정 업데이트
+      if (teacher_ids !== undefined) {
+        // 1. 기존 배정 모두 비활성화
+        const existingAssignments = await apiClient.get('class_teachers', {
+          filters: { class_id: classId, is_active: true },
+        });
+
+        if (existingAssignments.data) {
+          for (const assignment of existingAssignments.data) {
+            const typedAssignment = assignment as { id?: string };
+            if (typedAssignment.id) {
+              await apiClient.patch('class_teachers', typedAssignment.id, {
+                is_active: false,
+                unassigned_at: toKST().format('YYYY-MM-DD'),
+              });
+            }
+          }
+        }
+
+        // 2. 신규 배정
+        if (teacher_ids.length > 0) {
+          for (const teacherId of teacher_ids) {
+            await apiClient.post('class_teachers', {
+              class_id: classId,
+              teacher_id: teacherId,
+              role: 'teacher',
+              assigned_at: toKST().format('YYYY-MM-DD'),
+              is_active: true,
+            });
+          }
+        }
       }
 
       // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
@@ -249,6 +303,7 @@ export function useUpdateClass() {
       void queryClient.invalidateQueries({
         queryKey: ['class', tenantId, data.id],
       });
+      void queryClient.invalidateQueries({ queryKey: ['class-teachers', tenantId, data.id] });
     },
   });
 }
@@ -871,6 +926,50 @@ export function useAssignTeacher() {
 }
 
 /**
+ * 일정 충돌 감지 Hook
+ * [요구사항] 디어쌤_아키텍처.md 3.2.2: Schedule Conflict Detection
+ */
+export function useCheckScheduleConflicts() {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+
+  return useMutation<
+    ScheduleConflictResult,
+    Error,
+    {
+      classId?: string;
+      dayOfWeek: DayOfWeek;
+      startTime: string;
+      endTime: string;
+      teacherIds?: string[];
+      room?: string;
+    }
+  >({
+    mutationFn: async (params) => {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      const response = await apiClient.callRPC<ScheduleConflictResult>('check_schedule_conflicts', {
+        p_tenant_id: tenantId,
+        p_day_of_week: params.dayOfWeek,
+        p_start_time: params.startTime,
+        p_end_time: params.endTime,
+        p_class_id: params.classId || null,
+        p_teacher_ids: params.teacherIds || null,
+        p_room: params.room || null,
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      return response.data!;
+    },
+  });
+}
+
+/**
  * 강사 배정 제거 Hook
  */
 export function useUnassignTeacher() {
@@ -947,3 +1046,4 @@ export function useUnassignTeacher() {
     },
   });
 }
+

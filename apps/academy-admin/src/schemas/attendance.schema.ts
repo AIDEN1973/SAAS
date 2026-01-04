@@ -2,16 +2,19 @@
  * Attendance Form Schema
  *
  * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
+ * [불변 규칙] Factory Function 패턴으로 업종중립성 지원
  * [동적 옵션] 학생 및 반 목록은 동적으로 채워집니다.
  */
 
 import type { FormSchema } from '@schema-engine';
 import type { Student } from '@services/student-service';
 import type { Class } from '@services/class-service';
+import type { IndustryTerms } from '@industry/registry';
 
 export function createAttendanceFormSchema(
   students?: Student[],
-  classes?: Class[]
+  classes?: Class[],
+  terms?: IndustryTerms
 ): FormSchema {
   return {
     version: '1.0.0',
@@ -29,7 +32,7 @@ export function createAttendanceFormSchema(
           name: 'student_id',
           kind: 'select',
           ui: {
-            label: '학생',
+            label: terms ? terms.PERSON_LABEL_PRIMARY : '학생',
             colSpan: 1,
           },
           options: [
@@ -44,7 +47,7 @@ export function createAttendanceFormSchema(
           name: 'class_id',
           kind: 'select',
           ui: {
-            label: '반 (선택)',
+            label: terms ? `${terms.GROUP_LABEL} (선택)` : '반 (선택)',
             colSpan: 1,
           },
           options: [
@@ -56,7 +59,7 @@ export function createAttendanceFormSchema(
           name: 'occurred_at',
           kind: 'datetime',
           ui: {
-            label: '출결 시간',
+            label: terms ? `${terms.ATTENDANCE_LABEL} 시간` : '출결 시간',
             colSpan: 1,
           },
           validation: {
@@ -67,14 +70,14 @@ export function createAttendanceFormSchema(
           name: 'attendance_type',
           kind: 'select',
           ui: {
-            label: '출결 유형',
+            label: terms ? `${terms.ATTENDANCE_LABEL} 유형` : '출결 유형',
             colSpan: 1,
           },
           options: [
-            { label: '등원', value: 'check_in' },
-            { label: '하원', value: 'check_out' },
-            { label: '지각', value: 'late' },
-            { label: '결석', value: 'absent' },
+            { label: terms ? terms.CHECK_IN_LABEL : '등원', value: 'check_in' },
+            { label: terms ? terms.CHECK_OUT_LABEL : '하원', value: 'check_out' },
+            { label: terms ? terms.LATE_LABEL : '지각', value: 'late' },
+            { label: terms ? terms.ABSENCE_LABEL : '결석', value: 'absent' },
           ],
           defaultValue: 'check_in',
           validation: {
@@ -89,10 +92,10 @@ export function createAttendanceFormSchema(
             colSpan: 1,
           },
           options: [
-            { label: '출석', value: 'present' },
-            { label: '지각', value: 'late' },
-            { label: '결석', value: 'absent' },
-            { label: '사유', value: 'excused' },
+            { label: terms ? terms.PRESENT_LABEL : '출석', value: 'present' },
+            { label: terms ? terms.LATE_LABEL : '지각', value: 'late' },
+            { label: terms ? terms.ABSENCE_LABEL : '결석', value: 'absent' },
+            { label: terms ? terms.EXCUSED_LABEL : '사유', value: 'excused' },
           ],
           defaultValue: 'present',
           validation: {
@@ -127,18 +130,17 @@ export function createAttendanceFormSchema(
           event: 'onSubmitSuccess',
           type: 'toast',
           messageKey: 'ATTENDANCE.SAVE.SUCCESS',
-          message: '출결 기록이 저장되었습니다.',
+          message: terms ? `${terms.ATTENDANCE_LABEL} 기록이 저장되었습니다.` : '출결 기록이 저장되었습니다.',
           variant: 'success',
         },
         {
           event: 'onSubmitError',
           type: 'toast',
           messageKey: 'ATTENDANCE.SAVE.ERROR',
-          message: '출결 기록 저장에 실패했습니다.',
+          message: terms ? `${terms.ATTENDANCE_LABEL} 기록 저장에 실패했습니다.` : '출결 기록 저장에 실패했습니다.',
           variant: 'error',
         },
       ],
     },
   };
 }
-

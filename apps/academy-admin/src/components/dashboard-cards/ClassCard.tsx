@@ -9,9 +9,10 @@
 import React from 'react';
 import { GraduationCap } from 'lucide-react';
 import { NotificationCardLayout } from '@ui-core/react';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 import type { ClassCard as ClassCardType } from '../../types/dashboardCard';
 // [SSOT] Barrel export를 통한 통합 import
-import { EMPTY_CARD_ID_PREFIX, CARD_LABELS } from '../../constants';
+import { EMPTY_CARD_ID_PREFIX } from '../../constants';
 
 export interface ClassCardProps {
   card: ClassCardType;
@@ -19,6 +20,9 @@ export interface ClassCardProps {
 }
 
 export function ClassCard({ card, onAction }: ClassCardProps) {
+  // [P2-업종중립] 업종별 용어 조회
+  const terms = useIndustryTerms();
+
   // 빈 카드 여부 확인 (ID가 empty-로 시작하는 경우)
   const isEmpty = card.id.startsWith(EMPTY_CARD_ID_PREFIX);
 
@@ -26,7 +30,7 @@ export function ClassCard({ card, onAction }: ClassCardProps) {
     <NotificationCardLayout
       key={card.id}
       title={card.class_name}
-      description={`${CARD_LABELS.ATTENDANCE_PREFIX} ${card.attendance_count}/${card.student_count}`}
+      description={`${terms.ATTENDANCE_LABEL}: ${card.attendance_count}/${card.student_count}`}
       meta={card.start_time}
       isEmpty={isEmpty}
       onClick={() => !isEmpty && onAction?.(card)}

@@ -3,32 +3,35 @@
  *
  * [불변 규칙] 하드코딩 금지, 모든 문자열은 상수로 관리
  * [불변 규칙] SSOT 원칙 준수: 빈 카드 메시지는 이 파일에만 존재
+ * [P2-업종중립] 업종별 용어는 IndustryTerms에서 동적으로 가져옴
+ *
+ * 업종별 다이나믹 메시지 생성 함수는 HomePage.tsx와 dashboard 관련 컴포넌트에서 처리
  */
 
 export const EMPTY_CARD_MESSAGES = {
   EMERGENCY: {
     TITLE: '긴급 알림 없음',
-    MESSAGE: '현재 긴급하게 처리해야 할 사항이 없습니다. 학원 운영이 원활하게 진행되고 있습니다.',
+    MESSAGE: '현재 긴급하게 처리해야 할 사항이 없습니다. {ENTITY} 운영이 원활하게 진행되고 있습니다.',
   },
   AI_BRIEFING: {
     TITLE: 'AI 브리핑 준비 중',
-    SUMMARY: 'AI 브리핑을 생성 중입니다. 잠시 후 학생 및 매출 현황 인사이트가 표시됩니다.',
+    SUMMARY: 'AI 브리핑을 생성 중입니다. 잠시 후 {PERSON_LABEL} 및 매출 현황 인사이트가 표시됩니다.',
   },
   STUDENT_TASK: {
-    TITLE: '학생 업무 없음',
-    DESCRIPTION: '현재 처리해야 할 학생 관련 업무가 없습니다. 새로운 상담이나 관리 작업이 필요한 학생이 생기면 여기에 표시됩니다.',
+    TITLE: '{PERSON_LABEL} 업무 없음',
+    DESCRIPTION: '현재 처리해야 할 {PERSON_LABEL} 관련 업무가 없습니다. 새로운 상담이나 관리 작업이 필요한 {PERSON_LABEL}이 생기면 여기에 표시됩니다.',
   },
   CLASS: {
-    CLASS_NAME: '오늘 수업 없음',
+    CLASS_NAME: '오늘 {GROUP_LABEL} 없음',
     START_TIME: '-',
-    ATTENDANCE: '출석: 0/0',
+    ATTENDANCE: '{ATTENDANCE}: 0/0',
   },
   STATS: {
     TITLE: '데이터 집계 중',
     VALUE: '-',
   },
   BILLING_SUMMARY: {
-    TITLE: '수납 데이터 없음',
+    TITLE: '{BILLING_LABEL} 데이터 없음',
     EXPECTED_COLLECTION_RATE: 0,
     UNPAID_COUNT: 0,
   },
@@ -96,11 +99,12 @@ export const TEXT_LINE_LIMITS = {
 
 /**
  * 카드 라벨 (ClassCard, BillingSummaryCard 등)
+ * [P2-업종중립] ATTENDANCE_PREFIX, EXPECTED_COLLECTION_RATE는 IndustryTerms에서 동적으로 가져옴
  */
 export const CARD_LABELS = {
-  ATTENDANCE_PREFIX: '출석:',
-  EXPECTED_COLLECTION_RATE: '예상 수납률',
-  UNPAID_PREFIX: '미납',
+  ATTENDANCE_PREFIX: '{ATTENDANCE}:',
+  EXPECTED_COLLECTION_RATE: '예상 {COLLECTION_RATE}',
+  UNPAID_PREFIX: '{OVERDUE}',
   UNPAID_SUFFIX: '건',
   IMMEDIATE_DELIVERY: '즉시',
   SCOPE_PARTIAL: '일부',

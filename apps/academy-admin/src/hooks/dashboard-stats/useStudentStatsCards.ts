@@ -4,6 +4,7 @@
  *
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ * [불변 규칙] 업종중립: Industry Registry를 통해 용어 접근
  * [SSOT] Shared Catalog 등록 필요: use-dashboard-stats
  *
  * 분리 이유:
@@ -12,9 +13,9 @@
  * - React Query가 독립적 쿼리를 자동으로 병렬 실행
  *
  * 포함 섹션:
- * - 섹션 1: 총 학생 수 (트렌드 포함)
- * - 섹션 2: 학생 상세 통계 (신규/활성/비활성)
- * - 섹션 3: 월간 학생 성장률, 이번 주 신규 등록, 학생 유지율
+ * - 섹션 1: 총 {대상} 수 (트렌드 포함) - 학생/회원 등
+ * - 섹션 2: {대상} 상세 통계 (신규/활성/비활성)
+ * - 섹션 3: 월간 {대상} 성장률, 이번 주 신규 등록, {대상} 유지율
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -25,6 +26,7 @@ import { normalizeStatsCard } from '../../utils/dashboard-card-normalization';
 import { safe, logError } from '../../utils';
 import { createQueryKey } from '@hooks/use-query-key-utils';
 import type { DateRange } from '../../utils/date-range-utils';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 
 // [P2-FIX] 로컬 logError 제거 - SSOT logError 사용 (../../utils)
 
@@ -47,13 +49,13 @@ export interface UseStudentStatsCardsParams {
  * 학생 통계 카드 조회 Hook (섹션 1-4)
  *
  * 생성 카드:
- * 1. 총 학생 수 (트렌드 포함)
+ * 1. 총 {대상} 수 (트렌드 포함)
  * 2. 이번 달 신규 등록
- * 3. 활성 학생 수
- * 4. 비활성 학생 수
- * 5. 월간 학생 성장률
+ * 3. 활성 {대상} 수
+ * 4. 비활성 {대상} 수
+ * 5. 월간 {대상} 성장률
  * 6. 이번 주 신규 등록
- * 7. 학생 유지율
+ * 7. {대상} 유지율
  *
  * @param params.tenantId 테넌트 ID
  * @param params.monthlyRange 월간 날짜 범위
@@ -67,6 +69,9 @@ export function useStudentStatsCards({
   weeklyRange,
   enabled = true,
 }: UseStudentStatsCardsParams) {
+  // 업종별 용어 조회
+  const terms = useIndustryTerms();
+
   return useQuery({
     queryKey: createQueryKey('student-stats-cards', tenantId, monthlyRange.currentMonthStr),
     queryFn: async () => {
@@ -99,11 +104,11 @@ export function useStudentStatsCards({
         cards.push(normalizeStatsCard({
           id: 'stats-students',
           type: 'stats',
-          title: '총 학생 수',
+          title: terms.STATS_TOTAL_COUNT_TITLE,
           value: String(studentCount),
           unit: '명',
           trend: studentTrend,
-          action_url: '/students',
+          action_url: terms.ROUTES.PRIMARY_LIST,
         }));
 
         // ========================================
@@ -123,33 +128,33 @@ export function useStudentStatsCards({
         cards.push(normalizeStatsCard({
           id: 'stats-new-students',
           type: 'stats',
-          title: '이번 달 신규 등록',
+          title: terms.STATS_NEW_THIS_MONTH_TITLE,
           value: studentStats.new_this_month.toString(),
           unit: '명',
           trend: newStudentsTrend,
-          action_url: '/students',
+          action_url: terms.ROUTES.PRIMARY_LIST,
           chartDataKey: 'new_enrollments',
         }));
 
         cards.push(normalizeStatsCard({
           id: 'stats-active-students',
           type: 'stats',
-          title: '활성 학생 수',
+          title: terms.STATS_ACTIVE_COUNT_TITLE,
           value: studentStats.active.toString(),
           unit: '명',
           trend: undefined,
-          action_url: '/students',
+          action_url: terms.ROUTES.PRIMARY_LIST,
           chartDataKey: 'active_student_count',
         }));
 
         cards.push(normalizeStatsCard({
           id: 'stats-inactive-students',
           type: 'stats',
-          title: '비활성 학생 수',
+          title: terms.STATS_INACTIVE_COUNT_TITLE,
           value: studentStats.inactive.toString(),
           unit: '명',
           trend: undefined,
-          action_url: '/students',
+          action_url: terms.ROUTES.PRIMARY_LIST,
           chartDataKey: 'inactive_student_count',
         }));
 
@@ -169,10 +174,10 @@ export function useStudentStatsCards({
         cards.push(normalizeStatsCard({
           id: 'stats-student-growth',
           type: 'stats',
-          title: '월간 학생 성장률',
+          title: terms.STATS_GROWTH_RATE_TITLE,
           value: `${growthRate > 0 ? '+' : ''}${growthRate}`,
           unit: '%',
-          action_url: '/students',
+          action_url: terms.ROUTES.PRIMARY_LIST,
         }));
 
         // 섹션 3-1: 이번 주 신규 등록
@@ -195,15 +200,15 @@ export function useStudentStatsCards({
         cards.push(normalizeStatsCard({
           id: 'stats-weekly-new-students',
           type: 'stats',
-          title: '이번 주 신규 등록',
+          title: terms.STATS_WEEKLY_NEW_TITLE,
           value: weeklyNewCount.toString(),
           unit: '명',
           trend: weeklyNewTrend,
-          action_url: '/students',
+          action_url: terms.ROUTES.PRIMARY_LIST,
           chartDataKey: 'new_enrollments',
         }));
 
-        // 섹션 3-2: 학생 유지율
+        // 섹션 3-2: {대상} 유지율
         const totalCount = studentCount;
         const activeCount = studentStats.active;
         const retentionRate = totalCount > 0
@@ -213,11 +218,11 @@ export function useStudentStatsCards({
         cards.push(normalizeStatsCard({
           id: 'stats-student-retention-rate',
           type: 'stats',
-          title: '학생 유지율',
+          title: terms.STATS_RETENTION_RATE_TITLE,
           value: retentionRate.toString(),
           unit: '%',
           trend: undefined,
-          action_url: '/students',
+          action_url: terms.ROUTES.PRIMARY_LIST,
           chartDataKey: 'active_student_count',
         }));
       } catch (error) {

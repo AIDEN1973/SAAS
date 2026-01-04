@@ -16,6 +16,7 @@ import { PlusIcon } from '../../../components/DataTableActionButtons';
 import { toKST } from '@lib/date-utils';
 import { useAttendanceLogs, useCreateAttendanceLog, useUpdateAttendanceLog } from '@hooks/use-attendance';
 import { useStudentClasses } from '@hooks/use-student';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 import type { Student } from '@services/student-service';
 import type { CreateAttendanceLogInput } from '@services/attendance-service';
 import type { FormSchema } from '@schema-engine/types';
@@ -40,6 +41,7 @@ export function AttendanceTab({
   isEditable: boolean;
 }) {
   const { toast } = useToast();
+  const terms = useIndustryTerms();
   const [attendanceStatusFilter, setAttendanceStatusFilter] = useState<'all' | 'present' | 'late' | 'absent' | 'excused'>('all');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
@@ -118,7 +120,7 @@ export function AttendanceTab({
           name: 'class_id',
           kind: 'select',
           ui: {
-            label: '반 (선택)',
+            label: `${terms.GROUP_LABEL} (선택)`,
             colSpan: 1,
           },
           options: [
@@ -135,7 +137,7 @@ export function AttendanceTab({
           name: 'occurred_at',
           kind: 'datetime',
           ui: {
-            label: '출결 시간',
+            label: `${terms.ATTENDANCE_LABEL} 시간`,
             colSpan: 1,
           },
           // [P1-2] defaultValue는 SchemaForm defaultValues prop으로 동적 전달 (마운트 시점 고정 방지)
@@ -147,12 +149,12 @@ export function AttendanceTab({
           name: 'attendance_type',
           kind: 'select',
           ui: {
-            label: '출결 유형',
+            label: `${terms.ATTENDANCE_LABEL} 유형`,
             colSpan: 1,
           },
           options: [
-            { label: '등원', value: 'check_in' },
-            { label: '하원', value: 'check_out' },
+            { label: terms.CHECK_IN_LABEL, value: 'check_in' },
+            { label: terms.CHECK_OUT_LABEL, value: 'check_out' },
             { label: '지각', value: 'late' },
             { label: '결석', value: 'absent' },
           ],
@@ -195,6 +197,7 @@ export function AttendanceTab({
         size: 'md',
       },
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [studentClasses]);
 
   // [P0-1 수정] 수정 중인 출결 기록 찾기: 조건부 return 이전에 Hook 호출
@@ -221,10 +224,10 @@ export function AttendanceTab({
       };
       await createAttendanceLog.mutateAsync(input);
 
-      toast('출결 기록이 추가되었습니다.', 'success');
+      toast(`${terms.ATTENDANCE_LABEL} 기록이 추가되었습니다.`, 'success');
       setShowAddForm(false);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '출결 기록 추가에 실패했습니다.';
+      const errorMessage = error instanceof Error ? error.message : `${terms.ATTENDANCE_LABEL} 기록 추가에 실패했습니다.`;
       toast(errorMessage, 'error');
     }
   };
@@ -246,10 +249,10 @@ export function AttendanceTab({
         input,
       });
 
-      toast('출결 기록이 수정되었습니다.', 'success');
+      toast(`${terms.ATTENDANCE_LABEL} 기록이 수정되었습니다.`, 'success');
       setEditingLogId(null);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '출결 기록 수정에 실패했습니다.';
+      const errorMessage = error instanceof Error ? error.message : `${terms.ATTENDANCE_LABEL} 기록 수정에 실패했습니다.`;
       toast(errorMessage, 'error');
     }
   };
@@ -268,7 +271,7 @@ export function AttendanceTab({
   // 출결 기록 수정 시작 (출결 기록 목록 표시)
   const handleStartEdit = () => {
     if (filteredAttendanceLogs.length === 0) {
-      toast('수정할 출결 기록이 없습니다.', 'info');
+      toast(`수정할 ${terms.ATTENDANCE_LABEL} 기록이 없습니다.`, 'info');
       return;
     }
     setShowEditList(true);
@@ -288,7 +291,7 @@ export function AttendanceTab({
             title={
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                 <Calendar size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-                출결 기록 추가
+                {terms.ATTENDANCE_LABEL} 기록 추가
               </span>
             }
           />
@@ -324,7 +327,7 @@ export function AttendanceTab({
             title={
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                 <Calendar size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-                출결 기록 수정
+                {terms.ATTENDANCE_LABEL} 기록 수정
               </span>
             }
             right={
@@ -343,7 +346,7 @@ export function AttendanceTab({
                 {filteredAttendanceLogs.map((log, index) => {
                   const statusColor = log.status === 'present' ? 'success' : log.status === 'late' ? 'warning' : 'error';
                   const statusLabel = log.status === 'present' ? '출석' : log.status === 'late' ? '지각' : log.status === 'absent' ? '결석' : '사유';
-                  const typeLabel = log.attendance_type === 'check_in' ? '등원' : log.attendance_type === 'check_out' ? '하원' : log.attendance_type;
+                  const typeLabel = log.attendance_type === 'check_in' ? terms.CHECK_IN_LABEL : log.attendance_type === 'check_out' ? terms.CHECK_OUT_LABEL : log.attendance_type;
 
                   return (
                     <div
@@ -404,7 +407,7 @@ export function AttendanceTab({
                   }}
                 />
                 <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                  수정할 출결 기록이 없습니다.
+                  수정할 {terms.ATTENDANCE_LABEL} 기록이 없습니다.
                 </p>
               </div>
             )}
@@ -418,7 +421,7 @@ export function AttendanceTab({
             title={
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                 <Calendar size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-                출결 기록 수정
+                {terms.ATTENDANCE_LABEL} 기록 수정
               </span>
             }
           />
@@ -460,7 +463,7 @@ export function AttendanceTab({
             title={
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                 <Calendar size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-                출결통계
+                {terms.ATTENDANCE_LABEL}통계
               </span>
             }
             right={
@@ -484,7 +487,7 @@ export function AttendanceTab({
                     items={[
                       {
                         icon: PlusIcon,
-                        tooltip: '출결기록 추가',
+                        tooltip: `${terms.ATTENDANCE_LABEL}기록 추가`,
                         variant: 'solid',
                         color: 'primary',
                         onClick: () => {
@@ -501,7 +504,7 @@ export function AttendanceTab({
           <Card padding="md" variant="default" style={layerSectionCardStyle}>
             {isLoading ? (
               <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
-                출결 정보를 불러오는 중...
+                {terms.ATTENDANCE_LABEL} 정보를 불러오는 중...
               </div>
             ) : stats ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', paddingTop: 'var(--spacing-sm)' }}>
@@ -534,7 +537,7 @@ export function AttendanceTab({
                     textAlign: 'center',
                   }}>
                     <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--spacing-xs)' }}>
-                      총 출결
+                      총 {terms.ATTENDANCE_LABEL}
                     </div>
                     <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
                       {stats.total}
@@ -600,7 +603,7 @@ export function AttendanceTab({
                   }}
                 />
                 <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                  출결 데이터가 없습니다.
+                  {terms.ATTENDANCE_LABEL} 데이터가 없습니다.
                 </p>
               </div>
             )}
@@ -629,21 +632,21 @@ export function AttendanceTab({
             title={
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                 <Calendar size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-                최근 출결내역
+                최근 {terms.ATTENDANCE_LABEL}내역
               </span>
             }
           />
           <Card padding="md" variant="default" style={layerSectionCardStyle}>
             {isLoading ? (
               <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
-                출결 정보를 불러오는 중...
+                {terms.ATTENDANCE_LABEL} 정보를 불러오는 중...
               </div>
             ) : filteredAttendanceLogs.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', paddingTop: 'var(--spacing-sm)' }}>
                 {filteredAttendanceLogs.slice(0, 10).map((log, index) => {
                   const statusColor = log.status === 'present' ? 'success' : log.status === 'late' ? 'warning' : 'error';
                   const statusLabel = log.status === 'present' ? '출석' : log.status === 'late' ? '지각' : log.status === 'absent' ? '결석' : '사유';
-                  const typeLabel = log.attendance_type === 'check_in' ? '등원' : log.attendance_type === 'check_out' ? '하원' : log.attendance_type;
+                  const typeLabel = log.attendance_type === 'check_in' ? terms.CHECK_IN_LABEL : log.attendance_type === 'check_out' ? terms.CHECK_OUT_LABEL : log.attendance_type;
 
                   return (
                     <div
@@ -696,8 +699,8 @@ export function AttendanceTab({
                 />
                 <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
                   {attendanceLogs.length === 0
-                    ? '최근 출결 내역이 없습니다.'
-                    : '필터 조건에 맞는 출결 내역이 없습니다.'}
+                    ? `최근 ${terms.ATTENDANCE_LABEL} 내역이 없습니다.`
+                    : `필터 조건에 맞는 ${terms.ATTENDANCE_LABEL} 내역이 없습니다.`}
                 </p>
               </div>
             )}

@@ -12,6 +12,7 @@ import { Users, Trash2, Pencil } from 'lucide-react';
 import { BadgeSelect } from '../../../components/BadgeSelect';
 import { SchemaForm } from '@schema-engine';
 import { useIndustryTranslations } from '@hooks/use-industry-translations';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { LayerSectionHeader } from '../components/LayerSectionHeader';
 import { PlusIcon } from '../../../components/DataTableActionButtons';
 import type { Guardian } from '@services/student-service';
@@ -58,6 +59,7 @@ export function GuardiansTab({
 
   // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter를 통한 translations 생성
   const guardianTranslations = useIndustryTranslations(effectiveGuardianFormSchema);
+  const terms = useIndustryTerms();
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
@@ -119,7 +121,7 @@ export function GuardiansTab({
             title={
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                 <Users size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-                {isEditable && editingGuardianId ? '학부모 정보 수정' : '학부모 추가'}
+                {isEditable && editingGuardianId ? `${terms.GUARDIAN_LABEL} 정보 수정` : `${terms.GUARDIAN_LABEL} 추가`}
               </span>
             }
           />
@@ -154,7 +156,7 @@ export function GuardiansTab({
             onDelete={
               isEditable && editingGuardianId
                 ? async () => {
-                    const confirmed = await showConfirm('정말 삭제하시겠습니까?', '보호자 삭제');
+                    const confirmed = await showConfirm('정말 삭제하시겠습니까?', `${terms.GUARDIAN_LABEL} 삭제`);
                     if (!confirmed) return;
                     await onDelete(editingGuardianId);
                     onHideForm();
@@ -171,7 +173,7 @@ export function GuardiansTab({
             title={
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                 <Users size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-                학부모 정보
+                {terms.GUARDIAN_LABEL} 정보
               </span>
             }
             right={
@@ -194,7 +196,7 @@ export function GuardiansTab({
                     items={[
                       {
                         icon: PlusIcon,
-                        tooltip: '학부모 추가',
+                        tooltip: `${terms.GUARDIAN_LABEL} 추가`,
                         variant: 'solid',
                         color: 'primary',
                         onClick: onShowForm,
@@ -346,7 +348,7 @@ export function GuardiansTab({
                   }}
                 />
                 <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                  {guardians.length === 0 ? '등록된 학부모가 없습니다.' : '필터 조건에 맞는 학부모가 없습니다.'}
+                  {guardians.length === 0 ? `등록된 ${terms.GUARDIAN_LABEL}이(가) 없습니다.` : `필터 조건에 맞는 ${terms.GUARDIAN_LABEL}이(가) 없습니다.`}
                 </p>
               </div>
             </Card>

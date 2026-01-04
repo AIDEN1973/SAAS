@@ -51,6 +51,7 @@ import { useDailyStoreMetrics } from '@hooks/use-daily-store-metrics';
 import { StatsChartModal } from '../components/dashboard-cards/StatsChartModal';
 import { useTenantSettingByPath } from '@hooks/use-config';
 import { createQueryKey } from '@hooks/use-query-key-utils';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES, EMPTY_CARD_MESSAGES, EMPTY_CARD_ID_PREFIX, DEFAULT_CLASS_START_TIME } from '../constants';
 import { renderCard, createEmptyTaskCard, getPolicyValue, getPolicyValueWithPath, normalizeAIBriefingCard, normalizeDashboardCards, normalizeEmergencyCard, normalizeClassCard, normalizeStatsCard, normalizeBillingSummaryCard, safe, POLICY_REGISTRY, createSafeNavigate, logError } from '../utils';
@@ -128,6 +129,9 @@ export function HomePage() {
 function HomePageInner({ tenantId }: { tenantId: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  // 업종별 용어 조회
+  const terms = useIndustryTerms();
 
   // [P2-QUALITY-2 수정] 공통 로깅 유틸리티 사용 (logError)
 
@@ -395,8 +399,8 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
               cards.push(normalizeEmergencyCard({
               id: 'payment-failed-emergency',
               type: 'emergency',
-              title: '결제 실패 알림',
-                message: `최근 ${lookbackDays}일간 결제 실패가 ${failedCount}건 발생했습니다.`,
+              title: `${terms.PAYMENT_LABEL} 실패 알림`,
+                message: `최근 ${lookbackDays}일간 ${terms.PAYMENT_LABEL} 실패가 ${failedCount}건 발생했습니다.`,
               priority: 1,
                 action_url: ROUTES.BILLING_HOME,
               }));
@@ -432,10 +436,10 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
           cards.push(normalizeEmergencyCard({
             id: 'emergency-risk-students',
             type: 'emergency',
-            title: '이탈 위험 학생',
-            message: `${studentAlerts.risk_count}명의 학생이 이탈 위험 단계입니다.`,
+            title: `${terms.EMERGENCY_RISK_LABEL} ${terms.PERSON_LABEL_PLURAL}`,
+            message: `${studentAlerts.risk_count}명의 ${terms.PERSON_LABEL_PRIMARY}이(가) ${terms.EMERGENCY_RISK_LABEL}입니다.`,
             priority: 4,
-            action_url: ROUTES.STUDENTS_RISK,
+            action_url: terms.ROUTES.PRIMARY_RISK,
           }));
         }
         if (studentAlerts.absent_count > 0) {
@@ -443,10 +447,10 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
           cards.push(normalizeEmergencyCard({
             id: 'emergency-absent-students',
             type: 'emergency',
-            title: '결석 학생 알림',
-            message: `${studentAlerts.absent_count}명의 학생이 결석 상태입니다.`,
+            title: `${terms.ABSENCE_LABEL} ${terms.PERSON_LABEL_PLURAL} 알림`,
+            message: `${studentAlerts.absent_count}명의 ${terms.PERSON_LABEL_PRIMARY}이(가) ${terms.EMERGENCY_ABSENT_LABEL}입니다.`,
             priority: 5,
-            action_url: ROUTES.STUDENTS_ABSENT,
+            action_url: terms.ROUTES.PRIMARY_ABSENT,
           }));
         }
         if (studentAlerts.consultation_pending_count > 0) {
@@ -454,10 +458,10 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
           cards.push(normalizeEmergencyCard({
             id: 'emergency-consultation-pending',
             type: 'emergency',
-            title: '상담 대기 학생',
-            message: `${studentAlerts.consultation_pending_count}명의 학생이 상담 대기 중입니다.`,
+            title: `${terms.CONSULTATION_LABEL} 대기 ${terms.PERSON_LABEL_PLURAL}`,
+            message: `${studentAlerts.consultation_pending_count}명의 ${terms.PERSON_LABEL_PRIMARY}이(가) ${terms.EMERGENCY_CONSULTATION_PENDING_LABEL}입니다.`,
             priority: 6,
-            action_url: ROUTES.STUDENTS_CONSULTATION,
+            action_url: terms.ROUTES.PRIMARY_CONSULTATION,
           }));
         }
       } catch (error) {
@@ -529,7 +533,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
         id: 'ai-risk-emergency',
         type: 'emergency',
         title: 'AI 위험 감지',
-        message: '높은 위험 점수를 가진 학생이 감지되었습니다.',
+        message: `높은 위험 점수를 가진 ${terms.PERSON_LABEL_PRIMARY}이(가) 감지되었습니다.`,
         priority: 3,
         action_url: highRiskCard.action_url, // 정본: 서버에서 제공된 action_url 사용
       });
@@ -539,6 +543,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
     }
 
     return emergencyCards;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emergencyCards, studentTaskCards, aiRiskScoreThresholdValue]);
 
   // AI Briefing Cards 조회
@@ -622,11 +627,11 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
             cards.push(normalizeAIBriefingCard({
             id: 'briefing-consultations',
             type: 'ai_briefing',
-            title: '오늘의 상담 일정',
-            summary: `오늘 ${safeTodayConsultations.length}건의 상담이 예정되어 있습니다.`,
+            title: `오늘의 ${terms.CONSULTATION_LABEL} 일정`,
+            summary: `오늘 ${safeTodayConsultations.length}건의 ${terms.CONSULTATION_LABEL}이(가) 예정되어 있습니다.`,
             insights: [
-              '상담일지를 작성하여 학생 관리를 강화하세요.',
-              '상담 내용을 바탕으로 학생의 학습 방향을 조정할 수 있습니다.',
+              `${terms.CONSULTATION_LABEL}일지를 작성하여 ${terms.PERSON_LABEL_PRIMARY} 관리를 강화하세요.`,
+              `${terms.CONSULTATION_LABEL} 내용을 바탕으로 ${terms.PERSON_LABEL_PRIMARY}의 학습 방향을 조정할 수 있습니다.`,
             ],
               created_at: baseKST.toISOString(),
               action_url: ROUTES.AI_CONSULTATION, // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
@@ -666,12 +671,12 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
               cards.push(normalizeAIBriefingCard({
                 id: 'briefing-billing',
                 type: 'ai_briefing',
-                title: '이번 달 수납 현황',
-                summary: `이번 달 청구서가 자동 발송되었습니다. 예상 수납률은 ${expectedCollectionRate}%입니다.`,
+                title: `이번 달 ${terms.BILLING_LABEL} 현황`,
+                summary: `이번 달 ${terms.INVOICE_LABEL}이(가) 자동 발송되었습니다. 예상 ${terms.COLLECTION_RATE_LABEL}은(는) ${expectedCollectionRate}%입니다.`,
                 insights: [
                   expectedCollectionRate >= collectionRateThreshold
-                    ? '수납률이 양호합니다. 현재 운영 방식을 유지하세요.'
-                    : '수납률 개선이 필요합니다. 미납 학생에게 연락을 취하세요.',
+                    ? `${terms.COLLECTION_RATE_LABEL}이(가) 양호합니다. 현재 운영 방식을 유지하세요.`
+                    : `${terms.COLLECTION_RATE_LABEL} 개선이 필요합니다. 미납 ${terms.PERSON_LABEL_PRIMARY}에게 연락을 취하세요.`,
                 ],
                 created_at: baseKST.toISOString(),
                 action_url: ROUTES.BILLING_HOME, // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
@@ -708,11 +713,11 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
               cards.push(normalizeAIBriefingCard({
                 id: 'briefing-attendance',
                 type: 'ai_briefing',
-                title: '출결 이상 패턴 감지',
-                summary: `최근 7일간 결석 ${absentCount}건, 지각 ${lateCount}건이 발생했습니다.`,
+                title: `${terms.ATTENDANCE_LABEL} 이상 패턴 감지`,
+                summary: `최근 7일간 ${terms.ABSENCE_LABEL} ${absentCount}건, ${terms.LATE_LABEL} ${lateCount}건이 발생했습니다.`,
                 insights: [
-                  '출결 패턴을 분석하여 원인을 파악하세요.',
-                  '지각이 많은 학생들에게 사전 안내를 제공하세요.',
+                  `${terms.ATTENDANCE_LABEL} 패턴을 분석하여 원인을 파악하세요.`,
+                  `${terms.LATE_LABEL}이(가) 많은 ${terms.PERSON_LABEL_PLURAL}에게 사전 안내를 제공하세요.`,
                 ],
                 created_at: baseKST.toISOString(),
                 action_url: ROUTES.AI_ATTENDANCE, // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
@@ -761,7 +766,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
     return dayOfWeekMap[dayOfWeek] ?? 'monday'; // Fail Closed: 예상치 못한 값이면 'monday' 반환
   })();
 
-  // 오늘 수업 반 목록 조회
+  // 오늘 수업 목록 조회
   // [P1-1 수정] 파라미터 객체를 useMemo로 고정하여 queryKey 불안정 방지
   const classesParams = useMemo(() => ({
     day_of_week: todayDayOfWeek,
@@ -826,7 +831,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
   // - 섹션 1-4: 학생 통계 (useStudentStatsCards)
   // - 섹션 5-7: 출석 통계 (useAttendanceStatsCards)
   // - 섹션 8-10: 매출/ARPU 통계 (useRevenueStatsCards)
-  // - 섹션 11-13: 수업/반 통계 (useClassStatsCards)
+  // - 섹션 11-13: 수업 통계 (useClassStatsCards)
   // React Query가 이 4개 쿼리를 자동으로 병렬 실행
 
   // 공유 변수: studentCount는 여러 Hook에서 사용되므로 먼저 조회
@@ -939,7 +944,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
         return normalizeBillingSummaryCard({
           id: 'billing-summary',
           type: 'billing_summary',
-          title: '이번 달 수납 현황',
+          title: `이번 달 ${terms.BILLING_LABEL} 현황`,
           expected_collection_rate: expectedCollectionRate,
           unpaid_count: unpaidCount,
           action_url: ROUTES.BILLING_HOME,
@@ -994,11 +999,11 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
         const riskBriefingCard = normalizeAIBriefingCard({
           id: 'briefing-risk',
           type: 'ai_briefing',
-          title: '이탈 위험 학생 알림',
-          summary: `${riskCount}명의 학생이 이탈 위험 단계입니다.`,
+          title: `${terms.EMERGENCY_RISK_LABEL} ${terms.PERSON_LABEL_PLURAL} 알림`,
+          summary: `${riskCount}명의 ${terms.PERSON_LABEL_PRIMARY}이(가) ${terms.EMERGENCY_RISK_LABEL}입니다.`,
           insights: [
-            '이탈 위험 학생들에게 즉시 상담을 진행하세요.',
-            '학생의 학습 동기를 높이기 위한 방안을 모색하세요.',
+            `${terms.EMERGENCY_RISK_LABEL} ${terms.PERSON_LABEL_PLURAL}에게 즉시 ${terms.CONSULTATION_LABEL}을(를) 진행하세요.`,
+            `${terms.PERSON_LABEL_PRIMARY}의 학습 동기를 높이기 위한 방안을 모색하세요.`,
           ],
           created_at: riskCardCreatedAt, // [P0-2 수정] 원천 데이터 기준으로 고정
           action_url: riskActionUrl, // 정본: 서버에서 제공된 action_url 사용
@@ -1009,6 +1014,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
     }
 
     return aiBriefingCards;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiBriefingCards, studentTaskCards]);
 
   // 카드 우선순위 정렬 (아키텍처 문서 3.7.1 섹션 참조)
@@ -1041,11 +1047,12 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
       // 빈 Emergency 카드 생성 (1개만)
       // [불변 규칙] 하드코딩 금지, 상수 사용
       // [SSOT] 입력 정규화 레이어 사용
+      // [P2-업종중립] 업종별 용어 적용
       cards.push(normalizeEmergencyCard({
         id: `${EMPTY_CARD_ID_PREFIX}-emergency`,
         type: 'emergency',
         title: EMPTY_CARD_MESSAGES.EMERGENCY.TITLE,
-        message: EMPTY_CARD_MESSAGES.EMERGENCY.MESSAGE,
+        message: EMPTY_CARD_MESSAGES.EMERGENCY.MESSAGE.replace('{ENTITY}', '기관'),
         priority: 0,
       }));
     }
@@ -1074,11 +1081,12 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
       // [P2-3 수정] 빈 카드 created_at은 useMemo 실행 시점의 시간 사용 (nowKST 의존성 제거)
       // [P2-QUALITY-1] 빈 카드 created_at 고정: useRef 패턴 사용
       // [SSOT] 입력 정규화 레이어 사용
+      // [P2-업종중립] 업종별 용어 적용
       cards.push(normalizeAIBriefingCard({
         id: `${EMPTY_CARD_ID_PREFIX}-ai-briefing`,
         type: 'ai_briefing',
         title: EMPTY_CARD_MESSAGES.AI_BRIEFING.TITLE,
-        summary: EMPTY_CARD_MESSAGES.AI_BRIEFING.SUMMARY,
+        summary: EMPTY_CARD_MESSAGES.AI_BRIEFING.SUMMARY.replace('{PERSON_LABEL}', terms.PERSON_LABEL_PRIMARY),
         insights: [],
         created_at: emptyCardTimestampRef.current,
       }));
@@ -1120,10 +1128,11 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
       // 빈 Class 카드 생성 (1개만)
       // [불변 규칙] 하드코딩 금지, 상수 사용
       // [SSOT] 입력 정규화 레이어 사용
+      // [P2-업종중립] 업종별 용어 적용
       cards.push(normalizeClassCard({
         id: `${EMPTY_CARD_ID_PREFIX}-class`,
         type: 'class',
-        class_name: EMPTY_CARD_MESSAGES.CLASS.CLASS_NAME,
+        class_name: `오늘 ${terms.GROUP_LABEL} 없음`,
         start_time: EMPTY_CARD_MESSAGES.CLASS.START_TIME,
         student_count: 0,
         attendance_count: 0,
@@ -1163,10 +1172,11 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
       // 빈 Billing Summary 카드 생성 (1개만)
       // [불변 규칙] 하드코딩 금지, 상수 사용
       // [SSOT] 입력 정규화 레이어 사용
+      // [P2-업종중립] 업종별 용어 적용
       cards.push(normalizeBillingSummaryCard({
         id: `${EMPTY_CARD_ID_PREFIX}-billing`,
         type: 'billing_summary',
-        title: EMPTY_CARD_MESSAGES.BILLING_SUMMARY.TITLE,
+        title: `${terms.BILLING_LABEL} 데이터 없음`,
         expected_collection_rate: EMPTY_CARD_MESSAGES.BILLING_SUMMARY.EXPECTED_COLLECTION_RATE,
         unpaid_count: EMPTY_CARD_MESSAGES.BILLING_SUMMARY.UNPAID_COUNT,
         action_url: ROUTES.BILLING_HOME,
@@ -1181,6 +1191,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
     // 모든 카드 반환 (제한 없음)
     return cards;
     // [P2-2 수정] nowKST 의존성 제거: 빈 카드 생성 시 toKST() 직접 호출로 변경
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enhancedEmergencyCards, enhancedAiBriefingCards, studentTaskCards, todayClasses, statsCards, billingSummary, shouldPrioritizeBilling]);
 
   // [P0-1 수정] groupedCards를 return 위로 이동하여 React Hooks 규칙 준수
@@ -1217,7 +1228,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
       normalizeStatsCard({
               id: `${EMPTY_CARD_ID_PREFIX}-attendance-stats`,
               type: 'stats',
-              title: '출석 관련 지표',
+              title: terms.CARD_GROUP_LABELS.attendance_stats,
               value: '-',
       })
           );
@@ -1237,7 +1248,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
       normalizeStatsCard({
               id: `${EMPTY_CARD_ID_PREFIX}-student-growth-stats`,
               type: 'stats',
-              title: '학생 성장 지표',
+              title: terms.CARD_GROUP_LABELS.student_growth_stats,
               value: '-',
       })
           );
@@ -1254,7 +1265,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
       normalizeStatsCard({
               id: `${EMPTY_CARD_ID_PREFIX}-revenue-stats`,
               type: 'stats',
-              title: '매출 관련 지표',
+              title: terms.CARD_GROUP_LABELS.revenue_stats,
               value: '-',
       })
           );
@@ -1272,7 +1283,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
       normalizeStatsCard({
               id: `${EMPTY_CARD_ID_PREFIX}-collection-stats`,
               type: 'stats',
-              title: '수납 관련 지표',
+              title: terms.CARD_GROUP_LABELS.collection_stats,
               value: '-',
       })
           );
@@ -1280,40 +1291,41 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
     return [
             {
               type: 'briefing',
-              label: '브리핑',
+              label: terms.CARD_GROUP_LABELS.briefing,
               cards: briefingCards,
             },
             {
               type: 'student_task',
-              label: '학생 업무',
+              label: terms.CARD_GROUP_LABELS.student_task,
               cards: taskCardsInView,
             },
             {
               type: 'class',
-              label: '오늘 수업',
+              label: terms.CARD_GROUP_LABELS.class,
               cards: classCards,
             },
             {
               type: 'attendance_stats',
-              label: '출석 관련 지표',
+              label: terms.CARD_GROUP_LABELS.attendance_stats,
               cards: attendanceStatsCards,
             },
             {
               type: 'student_growth_stats',
-              label: '학생 성장 지표',
+              label: terms.CARD_GROUP_LABELS.student_growth_stats,
               cards: studentGrowthStatsCards,
             },
             {
               type: 'revenue_stats',
-              label: '매출 관련 지표',
+              label: terms.CARD_GROUP_LABELS.revenue_stats,
               cards: revenueStatsCards,
             },
             {
               type: 'collection_stats',
-              label: '수납 관련 지표',
+              label: terms.CARD_GROUP_LABELS.collection_stats,
               cards: collectionStatsCards,
             },
           ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortedCards]);
 
           return (
@@ -1334,9 +1346,9 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
           lineHeight: 'var(--line-height-relaxed)',
         }}>
           <p style={{ margin: 0 }}>
-            이 대시보드에서는 <strong style={{ color: 'var(--color-text)' }}>긴급 알림, AI 브리핑, 학생 업무, 출석 통계, 매출 현황</strong> 등 학원 운영에 필요한 핵심 정보를 한눈에 확인할 수 있습니다.
-            긴급 알림을 통해 즉시 대응이 필요한 사항을 파악하고, AI 브리핑으로 학생들의 상태와 트렌드를 분석하며,
-            실시간 통계를 통해 출석률과 매출을 모니터링하여 더욱 효율적으로 학원을 운영하세요.
+            이 대시보드에서는 <strong style={{ color: 'var(--color-text)' }}>긴급 알림, AI 브리핑, {terms.PERSON_LABEL_PRIMARY} 업무, {terms.ATTENDANCE_LABEL} 통계, 매출 현황</strong> 등 운영에 필요한 핵심 정보를 한눈에 확인할 수 있습니다.
+            긴급 알림을 통해 즉시 대응이 필요한 사항을 파악하고, AI 브리핑으로 {terms.PERSON_LABEL_PLURAL}의 상태와 트렌드를 분석하며,
+            실시간 통계를 통해 {terms.ATTENDANCE_LABEL}률과 매출을 모니터링하여 더욱 효율적으로 운영하세요.
           </p>
         </div>
 

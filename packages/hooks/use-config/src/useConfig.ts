@@ -13,6 +13,33 @@ import { createExecutionAuditRecord } from '@hooks/use-student/src/execution-aud
 import type { TenantConfig, UpdateConfigInput } from '@core/config';
 
 /**
+ * 지역 정보 타입
+ * SSOT: core_stores.region_id → core_regions 조인으로 지역정보 조회
+ */
+export interface StoreLocationInfo {
+  /** 전체 지역명 (예: "서울시 강남구 역삼동") */
+  region: string;
+  /** 시/도 이름 */
+  si: string;
+  /** 시군구 이름 */
+  gu: string;
+  /** 동/읍/면 이름 */
+  dong: string;
+  /** 행정동 코드 (dong level) */
+  location_code: string;
+  /** 시군구 코드 */
+  sigungu_code: string;
+  /** 시도 코드 */
+  sido_code: string;
+  /** 권역 코드 (예: "CAPITAL", "YEONGNAM") */
+  zone_code: string;
+  /** 권역 이름 (예: "수도권", "영남권") */
+  zone_name: string;
+  /** 매장 주소 */
+  address: string;
+}
+
+/**
  * 테넌트 설정 조회 Hook
  */
 export function useConfig() {
@@ -293,5 +320,108 @@ export function useUpdateConfig() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['config', tenantId] });
     },
+  });
+}
+
+/**
+ * 매장 지역 정보 조회 Hook
+ *
+ * SSOT: core_stores 테이블에 지역 코드가 직접 저장됨 (카카오 API 연동)
+ * 조인 없이 단일 쿼리로 지역 정보 조회
+ *
+ * @returns 매장 지역 정보 (si, gu, dong, location_code 등)
+ */
+export function useStoreLocation() {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+
+  return useQuery({
+    queryKey: ['store-location', tenantId],
+    queryFn: async (): Promise<StoreLocationInfo> => {
+      const emptyLocation: StoreLocationInfo = {
+        region: '',
+        si: '',
+        gu: '',
+        dong: '',
+        location_code: '',
+        sigungu_code: '',
+        sido_code: '',
+        zone_code: '',
+        zone_name: '',
+        address: '',
+      };
+
+      if (!tenantId) {
+        return emptyLocation;
+      }
+
+      // core_stores에서 현재 테넌트의 매장 정보 조회 (지역 코드 직접 포함)
+      const storeResponse = await apiClient.get<{
+        id: string;
+        address: string | null;
+        sido_code: string | null;
+        sido_name: string | null;
+        sigungu_code: string | null;
+        sigungu_name: string | null;
+        dong_code: string | null;
+        dong_name: string | null;
+      }>('core_stores', {
+        select: 'id,address,sido_code,sido_name,sigungu_code,sigungu_name,dong_code,dong_name',
+      });
+
+      if (storeResponse.error || !storeResponse.data || storeResponse.data.length === 0) {
+        return emptyLocation;
+      }
+
+      const store = storeResponse.data[0];
+
+      // 지역 코드가 없으면 빈 정보 반환
+      if (!store.dong_code) {
+        return emptyLocation;
+      }
+
+      const si = store.sido_name || '';
+      const gu = store.sigungu_name || '';
+      const dong = store.dong_name || '';
+      const sidoCode = store.sido_code || '';
+
+      // 권역 정보 조회 (시도 코드 → 권역 매핑)
+      let zoneCode = '';
+      let zoneName = '';
+
+      if (sidoCode) {
+        // core_sido_zone_mappings 테이블에서 권역 조회
+        const mappingResponse = await apiClient.get<{
+          zone_id: string;
+          core_region_zones: {
+            zone_code: string;
+            zone_name: string;
+          } | null;
+        }>('core_sido_zone_mappings', {
+          select: 'zone_id,core_region_zones(zone_code,zone_name)',
+          filters: { sido_code: sidoCode },
+        });
+
+        if (mappingResponse.data && mappingResponse.data.length > 0 && mappingResponse.data[0].core_region_zones) {
+          zoneCode = mappingResponse.data[0].core_region_zones.zone_code;
+          zoneName = mappingResponse.data[0].core_region_zones.zone_name;
+        }
+      }
+
+      return {
+        region: [si, gu, dong].filter(Boolean).join(' '),
+        si,
+        gu,
+        dong,
+        location_code: store.dong_code || '',
+        sigungu_code: store.sigungu_code || '',
+        sido_code: sidoCode,
+        zone_code: zoneCode,
+        zone_name: zoneName,
+        address: store.address || '',
+      };
+    },
+    enabled: !!tenantId,
+    staleTime: 10 * 60 * 1000, // 10분 (지역 정보는 자주 변경되지 않음)
   });
 }

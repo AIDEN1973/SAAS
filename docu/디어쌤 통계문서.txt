@@ -246,6 +246,17 @@ student_count	전체 학생 수
 avg_arpu	지역 ARPU
 avg_attendance_rate	출석률 평균
 date_kst	KST 기준 날짜
+
+⚠️ Phase 1-3 추가 메트릭 (2026-01-04 배포):
+new_enrollments_avg, new_enrollments_p25, new_enrollments_p75	신규 등록 수 (평균, 25분위, 75분위)
+arpu_avg, arpu_p25, arpu_p75	학생 1인당 평균 매출 (평균, 25분위, 75분위)
+capacity_rate_avg, capacity_rate_p25, capacity_rate_p75	정원 대비 재원율 (평균, 25분위, 75분위)
+overdue_rate_avg, overdue_rate_p25, overdue_rate_p75	연체율 (평균, 25분위, 75분위)
+churn_rate_avg, churn_rate_p25, churn_rate_p75	이탈률 (평균, 25분위, 75분위)
+late_rate_avg, late_rate_p25, late_rate_p75	지각률 (평균, 25분위, 75분위)
+absent_rate_avg, absent_rate_p25, absent_rate_p75	결석률 (평균, 25분위, 75분위)
+
+총 21개 컬럼 추가 (7개 메트릭 × 3개 통계값)
 ...
 
 📌 analytics.daily_store_metrics (정본)

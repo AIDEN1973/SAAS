@@ -19,6 +19,7 @@ import { useSession } from '@hooks/use-auth';
 import { createExecutionAuditRecord } from '@hooks/use-student/src/execution-audit-utils';
 import { useSchema } from '@hooks/use-schema';
 import { useCompleteStudentTaskCard, useStudentTaskCards, useGuardians } from '@hooks/use-student';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { logError } from '../../../utils';
 import type { Student, Guardian } from '@services/student-service';
 import type { NotificationChannel } from '@core/notification';
@@ -29,20 +30,20 @@ const layerSectionCardStyle: React.CSSProperties = {};
 
 // [P2 수정] MESSAGE_CONSTANTS를 컴포넌트 외부로 이동하여 매 렌더마다 재생성 방지
 const MESSAGE_CONSTANTS = {
-  TAB_TITLE: '메시지 발송',
-  STUDENT_DEFAULT: '학생',
+  TAB_TITLE: '', // Will be replaced by terms.MESSAGE_LABEL
+  STUDENT_DEFAULT: '', // Will be replaced by terms.PERSON_LABEL_PRIMARY
   PHONE_NOT_AVAILABLE: '전화번호 없음',
   LOADING_GUARDIANS: '보호자 정보를 불러오는 중...',
   TARGET_STUDENT_LABEL: '학생',
-  NO_GUARDIANS_MESSAGE: '보호자 정보가 없습니다. 보호자를 먼저 등록해주세요.',
-  NO_STUDENT_PHONE_MESSAGE: '학생 전화번호가 없습니다.',
+  NO_GUARDIANS_MESSAGE: '', // Will be replaced by terms.GUARDIAN_LABEL
+  NO_STUDENT_PHONE_MESSAGE: '', // Will be replaced by terms.PERSON_LABEL_PRIMARY
   NO_RECIPIENTS_SELECTED: '발송 대상을 선택해주세요.',
   SEND_SUCCESS_TITLE: '성공',
   SEND_SUCCESS_MESSAGE: '메시지가 발송되었습니다.',
   ERROR_TITLE: '오류',
-  ERROR_STUDENT_NOT_FOUND: '학생 정보가 없습니다.',
-  ERROR_GUARDIAN_NOT_FOUND: '보호자 정보를 찾을 수 없습니다.',
-  ERROR_PHONE_NOT_FOUND: '보호자 전화번호를 찾을 수 없습니다.',
+  ERROR_STUDENT_NOT_FOUND: '', // Will be replaced by terms.PERSON_LABEL_PRIMARY
+  ERROR_GUARDIAN_NOT_FOUND: '', // Will be replaced by terms.GUARDIAN_LABEL
+  ERROR_PHONE_NOT_FOUND: '', // Will be replaced by terms.GUARDIAN_LABEL
   ERROR_CONTENT_REQUIRED: '메시지 내용을 입력해주세요.',
   ERROR_SEND_PARTIAL_FAILED: '일부 메시지 발송에 실패했습니다:',
   ERROR_UNKNOWN: '알 수 없는 오류',
@@ -70,6 +71,7 @@ export function MessageSendTab({
   isEditable: boolean;
 }) {
   const { toast } = useToast();
+  const terms = useIndustryTerms();
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
@@ -247,7 +249,7 @@ export function MessageSendTab({
   const handleSendMessage = async (data: Record<string, unknown>) => {
     try {
       if (!tenantId || !studentId || !student) {
-        throw new Error(MESSAGE_CONSTANTS.ERROR_STUDENT_NOT_FOUND);
+        throw new Error(`${terms.PERSON_LABEL_PRIMARY} 정보가 없습니다.`);
       }
 
       const content = String(data.content || '').trim();
@@ -256,7 +258,7 @@ export function MessageSendTab({
       }
 
       // 템플릿 변수 치환 (예: {{student_name}} -> 실제 학생 이름)
-      const finalContent = content.replace(/\{\{student_name\}\}/g, student.name || MESSAGE_CONSTANTS.STUDENT_DEFAULT);
+      const finalContent = content.replace(/\{\{student_name\}\}/g, student.name || terms.PERSON_LABEL_PRIMARY);
 
       // 수신자 전화번호 수집 (학생 + 선택된 보호자)
       const recipientPhones: string[] = [];
@@ -269,10 +271,10 @@ export function MessageSendTab({
           if (trimmedPhone.length > 0) {
             recipientPhones.push(trimmedPhone);
           } else {
-            throw new Error(MESSAGE_CONSTANTS.NO_STUDENT_PHONE_MESSAGE);
+            throw new Error(`${terms.PERSON_LABEL_PRIMARY} 전화번호가 없습니다.`);
           }
         } else {
-          throw new Error(MESSAGE_CONSTANTS.NO_STUDENT_PHONE_MESSAGE);
+          throw new Error(`${terms.PERSON_LABEL_PRIMARY} 전화번호가 없습니다.`);
         }
       }
 
@@ -412,7 +414,7 @@ export function MessageSendTab({
         title={
           <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
             <MessageSquare size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-            {MESSAGE_CONSTANTS.TAB_TITLE}
+            {terms.MESSAGE_LABEL} 발송
           </span>
         }
       />
@@ -451,7 +453,7 @@ export function MessageSendTab({
                   style={{ width: 'var(--spacing-md)', height: 'var(--spacing-md)', cursor: student?.phone ? 'pointer' : 'not-allowed', flexShrink: 0 }}
                 />
                 <span style={{ fontSize: 'var(--font-size-base)', color: selectedStudent ? 'var(--color-primary)' : (student?.phone ? 'var(--color-text)' : 'var(--color-text-secondary)') }}>
-                  {MESSAGE_CONSTANTS.TARGET_STUDENT_LABEL}
+                  {terms.PERSON_LABEL_PRIMARY}
             </span>
               </label>
 
@@ -672,7 +674,7 @@ export function MessageSendTab({
               {guardians && guardians.length === 0 && (
                 <div style={{ padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-warning-50)', borderRadius: 'var(--border-radius-sm)' }}>
                   <p style={{ color: 'var(--color-warning)', fontSize: 'var(--font-size-base)', textAlign: 'center', margin: 0 }}>
-                    {MESSAGE_CONSTANTS.NO_GUARDIANS_MESSAGE}
+                    {terms.GUARDIAN_LABEL} 정보가 없습니다. {terms.GUARDIAN_LABEL}을(를) 먼저 등록해주세요.
                   </p>
                 </div>
               )}

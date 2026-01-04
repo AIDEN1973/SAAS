@@ -1,18 +1,20 @@
 /**
- * 반 관리 페이지
+ * 수업 관리 페이지
  *
  * [LAYER: UI_PAGE]
  *
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
- * [요구사항] 반 리스트 + 캘린더 뷰 생성 (Calendar-like) 제공
+ * [요구사항] 수업 리스트 + 캘린더 뷰 생성 (Calendar-like) 제공
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet } from '@ui-core/react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
 import { apiClient } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { toKST } from '@lib/date-utils';
 import {
   useClasses,
@@ -22,6 +24,8 @@ import {
   useDeleteClass,
   useClassStatistics,
   useTeachers,
+  useCheckScheduleConflicts,
+  useClassTeachers,
 } from '@hooks/use-class';
 import type { Class, CreateClassInput, UpdateClassInput, ClassFilter, ClassStatus, DayOfWeek , Teacher } from '@services/class-service';
 import { createClassFormSchema } from '../schemas/class.schema';
@@ -40,7 +44,10 @@ const DAYS_OF_WEEK: { value: DayOfWeek; label: string }[] = [
 
 export function ClassesPage() {
   const { showConfirm, showAlert } = useModal();
+  const { id: urlClassId } = useParams<{ id?: string }>();
+  const navigate = useNavigate();
   const mode = useResponsiveMode();
+  const terms = useIndustryTerms();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
@@ -63,6 +70,22 @@ export function ClassesPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
 
+  // URL 파라미터로 클래스 ID가 전달되면 자동으로 상세 모달 열기
+  useEffect(() => {
+    if (urlClassId) {
+      setEditingClassId(urlClassId);
+    }
+  }, [urlClassId]);
+
+  // 상세 모달 닫을 때 URL도 업데이트
+  const handleCloseEditModal = useCallback(() => {
+    setEditingClassId(null);
+    // URL에서 ID가 있었다면 기본 classes 페이지로 이동
+    if (urlClassId) {
+      navigate('/classes', { replace: true });
+    }
+  }, [urlClassId, navigate]);
+
   // Today-First 기준: 기본값은 false (localStorage 기반 지속성)
   const [showAllClasses, setShowAllClasses] = useState<boolean>(() => {
     try {
@@ -81,7 +104,7 @@ export function ClassesPage() {
   // P0-3: search 필터가 있으면 Today-First 우선순위 해제
   const todayFilter: ClassFilter = useMemo(() => {
     if (showAllClasses) {
-      return filter; // 전체 반 보기 모드
+      return filter; // 전체 수업 보기 모드
     }
 
     // P0-3: search 필터가 있으면 day_of_week 필터 적용 안 함
@@ -123,11 +146,11 @@ export function ClassesPage() {
   const deleteClass = useDeleteClass();
 
   // Schema Registry 연동 (아키텍처 문서 S3 참조)
-  const { data: classFormSchemaData } = useSchema('class', createClassFormSchema(teachers || []), 'form');
+  const { data: classFormSchemaData } = useSchema('class', createClassFormSchema(teachers || [], terms), 'form');
   const { data: classFilterSchemaData } = useSchema('class_filter', classFilterSchema, 'filter');
 
   // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
-  const effectiveFormSchema = classFormSchemaData || createClassFormSchema(teachers || []);
+  const effectiveFormSchema = classFormSchemaData || createClassFormSchema(teachers || [], terms);
   const effectiveFilterSchema = classFilterSchemaData || classFilterSchema;
 
   // 뷰 모드 토글 핸들러 (localStorage 지속성)
@@ -163,15 +186,44 @@ export function ClassesPage() {
     // Promise 반환 없음
   }, []);
 
+  const checkConflicts = useCheckScheduleConflicts();
+
   const handleCreateClass = async (input: CreateClassInput) => {
     try {
+      // 시간 범위 검증
+      if (input.start_time >= input.end_time) {
+        showAlert('시작 시간은 종료 시간보다 빨라야 합니다.', '입력 오류', 'error');
+        return;
+      }
+
+      // 일정 충돌 감지 (디어쌤_아키텍처.md 3.2.2)
+      const conflictResult = await checkConflicts.mutateAsync({
+        dayOfWeek: input.day_of_week,
+        startTime: input.start_time,
+        endTime: input.end_time,
+        teacherIds: input.teacher_ids,
+        room: input.room,
+      });
+
+      // 충돌이 있으면 사용자 확인
+      if (conflictResult.has_conflicts) {
+        const conflictMessages = conflictResult.conflicts.map((c) => c.message).join('\n');
+        const confirmed = await showConfirm(
+          `다음 충돌이 발견되었습니다:\n\n${conflictMessages}\n\n그래도 생성하시겠습니까?`,
+          '일정 충돌 감지'
+        );
+        if (!confirmed) {
+          return;
+        }
+      }
+
       // P0-2: useCreateClass Hook이 DB RPC로 트랜잭션 처리하므로 직접 호출만 하면 됨
       await createClass.mutateAsync(input);
       setShowCreateForm(false);
     } catch (error) {
       // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
       showAlert(
-        error instanceof Error ? error.message : '반 생성에 실패했습니다.',
+        error instanceof Error ? error.message : `${terms.GROUP_LABEL} 생성에 실패했습니다.`,
         '오류',
         'error'
       );
@@ -180,12 +232,44 @@ export function ClassesPage() {
 
   const handleUpdateClass = async (classId: string, input: UpdateClassInput) => {
     try {
+      // 시간 범위 검증
+      if (input.start_time && input.end_time && input.start_time >= input.end_time) {
+        showAlert('시작 시간은 종료 시간보다 빨라야 합니다.', '입력 오류', 'error');
+        return;
+      }
+
+      // 일정 변경이 있으면 충돌 감지
+      if (input.day_of_week || input.start_time || input.end_time || input.teacher_ids || input.room) {
+        const classData = classes?.find((c) => c.id === classId);
+        if (classData) {
+          const conflictResult = await checkConflicts.mutateAsync({
+            classId,
+            dayOfWeek: input.day_of_week || classData.day_of_week,
+            startTime: input.start_time || classData.start_time,
+            endTime: input.end_time || classData.end_time,
+            teacherIds: input.teacher_ids,
+            room: input.room || classData.room,
+          });
+
+          if (conflictResult.has_conflicts) {
+            const conflictMessages = conflictResult.conflicts.map((c) => c.message).join('\n');
+            const confirmed = await showConfirm(
+              `다음 충돌이 발견되었습니다:\n\n${conflictMessages}\n\n그래도 수정하시겠습니까?`,
+              '일정 충돌 감지'
+            );
+            if (!confirmed) {
+              return;
+            }
+          }
+        }
+      }
+
       await updateClass.mutateAsync({ classId, input });
-      setEditingClassId(null);
+      handleCloseEditModal();
     } catch (error) {
       // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
       showAlert(
-        error instanceof Error ? error.message : '반 수정에 실패했습니다.',
+        error instanceof Error ? error.message : `${terms.GROUP_LABEL} 수정에 실패했습니다.`,
         '오류',
         'error'
       );
@@ -196,7 +280,7 @@ export function ClassesPage() {
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
         <PageHeader
-          title="반 관리"
+          title={`${terms.GROUP_LABEL} 관리`}
           actions={
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
               <Button
@@ -204,7 +288,7 @@ export function ClassesPage() {
                 size="sm"
                 onClick={() => handleToggleShowAll(!showAllClasses)}
               >
-                {showAllClasses ? '오늘 수업만' : '전체 반 보기'}
+                {showAllClasses ? `오늘 ${terms.GROUP_LABEL}만` : `전체 ${terms.GROUP_LABEL_PLURAL} 보기`}
               </Button>
               <Button
                 variant={viewMode === 'list' ? 'solid' : 'outline'}
@@ -225,7 +309,7 @@ export function ClassesPage() {
                 size="sm"
                 onClick={() => setShowCreateForm(!showCreateForm)}
               >
-                반 생성
+                {terms.GROUP_LABEL} 생성
               </Button>
             </div>
           }
@@ -244,7 +328,7 @@ export function ClassesPage() {
           }}
         />
 
-          {/* 반 생성 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
+          {/* 수업 생성 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
           {showCreateForm && (
             <>
               {isMobileMode || isTabletMode ? (
@@ -252,7 +336,7 @@ export function ClassesPage() {
                 <Drawer
                   isOpen={showCreateForm}
                   onClose={() => setShowCreateForm(false)}
-                  title="반 생성"
+                  title={`${terms.GROUP_LABEL} 생성`}
                   position={isMobileMode ? 'bottom' : 'right'}
                   width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
                 >
@@ -275,7 +359,7 @@ export function ClassesPage() {
             </>
           )}
 
-          {/* 반 목록 또는 캘린더 뷰 */}
+          {/* 수업 목록 또는 캘린더 뷰 */}
           {isLoading ? (
             <Card padding="lg">
               <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
@@ -293,14 +377,14 @@ export function ClassesPage() {
               classes={classes || []}
               onEdit={(classId) => setEditingClassId(classId)}
               onDelete={async (classId) => {
-                const confirmed = await showConfirm('정말 이 반을 삭제하시겠습니까?', '반 삭제');
+                const confirmed = await showConfirm(`정말 이 ${terms.GROUP_LABEL}을(를) 삭제하시겠습니까?`, `${terms.GROUP_LABEL} 삭제`);
                 if (confirmed) {
                   try {
                   await deleteClass.mutateAsync(classId);
                   } catch (error) {
                     // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
                     showAlert(
-                      error instanceof Error ? error.message : '반 삭제에 실패했습니다.',
+                      error instanceof Error ? error.message : `${terms.GROUP_LABEL} 삭제에 실패했습니다.`,
                       '오류',
                       'error'
                     );
@@ -312,13 +396,13 @@ export function ClassesPage() {
             <ClassCalendarView classes={classes || []} />
           )}
 
-          {/* 반 수정 모달 */}
+          {/* 수업 수정 모달 */}
           {editingClassId && (
             <EditClassModal
               classId={editingClassId}
               teachers={teachers || []}
               onSave={handleUpdateClass}
-              onClose={() => setEditingClassId(null)}
+              onClose={handleCloseEditModal}
             />
         )}
       </Container>
@@ -327,7 +411,7 @@ export function ClassesPage() {
 }
 
 /**
- * 반 생성 폼
+ * 수업 생성 폼
  */
 function CreateClassForm({
   effectiveFormSchema,
@@ -339,6 +423,7 @@ function CreateClassForm({
   onCancel: () => void;
 }) {
   const mode = useResponsiveMode();
+  const terms = useIndustryTerms();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
@@ -355,6 +440,7 @@ function CreateClassForm({
       start_time: String(data.start_time ?? '14:00'),
       end_time: String(data.end_time ?? '15:30'),
       capacity: Number(data.capacity ?? 20),
+      color: data.color ? String(data.color) : undefined,
       room: data.room ? String(data.room) : undefined,
       notes: data.notes ? String(data.notes) : undefined,
       status: (data.status || 'active') as ClassStatus,
@@ -369,7 +455,7 @@ function CreateClassForm({
     <div style={showHeader ? { marginBottom: 'var(--spacing-md)' } : {}}>
       {showHeader && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>반 생성</h3>
+          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>{terms.GROUP_LABEL} 생성</h3>
           <Button variant="ghost" size="sm" onClick={onCancel}>
             취소
           </Button>
@@ -407,7 +493,7 @@ function CreateClassForm({
 }
 
 /**
- * 반 수정 모달
+ * 수업 수정 모달
  */
 function EditClassModal({
   classId,
@@ -422,15 +508,23 @@ function EditClassModal({
 }) {
   const { showAlert } = useModal();
   const mode = useResponsiveMode();
+  const terms = useIndustryTerms();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
   const isTabletMode = isTablet(modeUpper);
   const { data: classData, isLoading } = useClass(classId);
+  const { data: classTeachers } = useClassTeachers(classId);
 
   // Schema Registry 연동 (아키텍처 문서 S3 참조)
-  const { data: classFormSchemaData } = useSchema('class', createClassFormSchema(teachers || []), 'form');
-  const classFormSchema = useMemo(() => classFormSchemaData || createClassFormSchema(teachers || []), [classFormSchemaData, teachers]);
+  const { data: classFormSchemaData } = useSchema('class', createClassFormSchema(teachers || [], terms), 'form');
+  const classFormSchema = useMemo(() => classFormSchemaData || createClassFormSchema(teachers || [], terms), [classFormSchemaData, teachers, terms]);
+
+  // 현재 배정된 강사 ID 목록
+  const currentTeacherIds = useMemo(
+    () => classTeachers?.map((ct) => ct.teacher_id) || [],
+    [classTeachers]
+  );
 
   const handleSubmit = (data: Record<string, unknown>) => {
     const input: UpdateClassInput = {
@@ -441,9 +535,13 @@ function EditClassModal({
       start_time: data.start_time ? String(data.start_time) : undefined,
       end_time: data.end_time ? String(data.end_time) : undefined,
       capacity: data.capacity ? Number(data.capacity) : undefined,
+      color: data.color ? String(data.color) : undefined,
       room: data.room ? String(data.room) : undefined,
       notes: data.notes ? String(data.notes) : undefined,
       status: data.status as ClassStatus | undefined,
+      teacher_ids: data.teacher_ids && Array.isArray(data.teacher_ids) && data.teacher_ids.length > 0
+        ? data.teacher_ids
+        : undefined,
     };
     void onSave(classId, input);
   };
@@ -455,7 +553,7 @@ function EditClassModal({
         <Drawer
           isOpen={true}
           onClose={onClose}
-          title="반 수정"
+          title={`${terms.GROUP_LABEL} 수정`}
           position={isMobileMode ? 'bottom' : 'right'}
           width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
         >
@@ -464,7 +562,7 @@ function EditClassModal({
       );
     }
     return (
-      <Modal isOpen={true} onClose={onClose} title="반 수정" size="lg">
+      <Modal isOpen={true} onClose={onClose} title={`${terms.GROUP_LABEL} 수정`} size="lg">
         <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>
       </Modal>
     );
@@ -476,17 +574,17 @@ function EditClassModal({
         <Drawer
           isOpen={true}
           onClose={onClose}
-          title="반 수정"
+          title={`${terms.GROUP_LABEL} 수정`}
           position={isMobileMode ? 'bottom' : 'right'}
           width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
         >
-          <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>반을 찾을 수 없습니다.</div>
+          <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>{terms.GROUP_LABEL}을(를) 찾을 수 없습니다.</div>
         </Drawer>
       );
     }
     return (
-      <Modal isOpen={true} onClose={onClose} title="반 수정" size="lg">
-        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>반을 찾을 수 없습니다.</div>
+      <Modal isOpen={true} onClose={onClose} title={`${terms.GROUP_LABEL} 수정`} size="lg">
+        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>{terms.GROUP_LABEL}을(를) 찾을 수 없습니다.</div>
       </Modal>
     );
   }
@@ -503,7 +601,9 @@ function EditClassModal({
           start_time: classData.start_time,
           end_time: classData.end_time,
           capacity: classData.capacity,
+          color: classData.color || 'var(--color-primary)',
           room: classData.room || '',
+          teacher_ids: currentTeacherIds,
           notes: classData.notes || '',
           status: classData.status,
         }}
@@ -535,7 +635,7 @@ function EditClassModal({
       <Drawer
         isOpen={true}
         onClose={onClose}
-        title="반 수정"
+        title={`${terms.GROUP_LABEL} 수정`}
         position={isMobileMode ? 'bottom' : 'right'}
         width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
       >
@@ -546,14 +646,14 @@ function EditClassModal({
 
   // 데스크톱: Modal 사용
   return (
-    <Modal isOpen={true} onClose={onClose} title="반 수정" size="lg">
+    <Modal isOpen={true} onClose={onClose} title={`${terms.GROUP_LABEL} 수정`} size="lg">
       {formContent}
     </Modal>
   );
 }
 
 /**
- * 반 리스트 뷰
+ * 수업 리스트 뷰
  */
 function ClassListView({
   classes,
@@ -564,6 +664,8 @@ function ClassListView({
   onEdit: (classId: string) => void;
   onDelete: (classId: string) => Promise<void>;
 }) {
+  const terms = useIndustryTerms();
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(var(--width-card-min), 1fr))`, gap: 'var(--spacing-md)' }}>
       {classes.map((classItem) => (
@@ -572,7 +674,7 @@ function ClassListView({
       {classes.length === 0 && (
         <Card padding="lg">
           <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-            등록된 반이 없습니다.
+            등록된 {terms.GROUP_LABEL}이 없습니다.
           </div>
         </Card>
       )}
@@ -581,7 +683,7 @@ function ClassListView({
 }
 
 /**
- * 반 카드
+ * 수업 카드
  */
 function ClassCard({
   classItem,
@@ -593,6 +695,7 @@ function ClassCard({
   onDelete: (classId: string) => Promise<void>;
 }) {
   const { data: statistics } = useClassStatistics(classItem.id);
+  const terms = useIndustryTerms();
   const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
 
   return (
@@ -617,29 +720,27 @@ function ClassCard({
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)', color: 'var(--color-text-secondary)' }}>
-        {classItem.subject && <div>과목: {classItem.subject}</div>}
-        {classItem.grade && <div>학년: {classItem.grade}</div>}
+        {classItem.subject && <div>{terms.SUBJECT_LABEL}: {classItem.subject}</div>}
+        {classItem.grade && <div>{terms.GRADE_LABEL}: {classItem.grade}</div>}
         <div>요일: {dayLabel}</div>
         <div>시간: {classItem.start_time} ~ {classItem.end_time}</div>
-        <div>정원: {classItem.current_count} / {classItem.capacity}</div>
-        {statistics && (
-          <>
-            <div>정원률: {statistics.capacity_rate.toFixed(1)}%</div>
-            <div>출결률: {statistics.attendance_rate.toFixed(1)}%</div>
-            <div>지각률: {statistics.late_rate.toFixed(1)}%</div>
-          </>
+        <div>{terms.CAPACITY_LABEL}: {classItem.current_count} / {classItem.capacity}</div>
+        {statistics && statistics.capacity_rate > 0 && (
+          <div>{terms.CAPACITY_LABEL}률: {statistics.capacity_rate.toFixed(1)}%</div>
         )}
+        {/* 출결률/지각률은 출결 데이터 구현 후 표시 */}
       </div>
     </Card>
   );
 }
 
 /**
- * 반 캘린더 뷰
- * [요구사항] 반 편성표(Calendar-like) 제공
+ * 수업 캘린더 뷰
+ * [요구사항] 수업 편성표(Calendar-like) 제공
  * 시간대별 그리드 형태로 개선
  */
 function ClassCalendarView({ classes }: { classes: Class[] }) {
+  const terms = useIndustryTerms();
   // 시간대 생성 (08:00 ~ 22:00, 30분 단위)
   const timeSlots = useMemo(() => {
     const slots: string[] = [];
@@ -650,13 +751,13 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
     return slots;
   }, []);
 
-  // 요일별로 반 그룹화
+  // 요일별로 수업 그룹화
   const classesByDay = DAYS_OF_WEEK.map((day) => ({
     day,
     classes: classes.filter((c) => c.day_of_week === day.value),
   }));
 
-  // P1-5: 시간대에 해당하는 모든 반 조회 (겹침 표시)
+  // P1-5: 시간대에 해당하는 모든 수업 조회 (겹침 표시)
   const getClassesAtTime = (dayClasses: Class[], timeSlot: string): Class[] => {
     return dayClasses.filter((c) => {
       const start = c.start_time;
@@ -669,7 +770,7 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
     <div style={{ overflowX: 'auto' }}>
       <Card padding="lg">
         <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)' }}>
-          반 편성표
+          {terms.GROUP_LABEL} 편성표
         </h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'var(--width-grid-column) repeat(7, 1fr)', gap: 'var(--spacing-xs)', minWidth: 'var(--width-grid-min)' }}>
           {/* 헤더 */}
@@ -727,7 +828,7 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
                       // HARD-CODE-EXCEPTION: borderRadius 0은 레이아웃용 특수 값
                       borderRadius: isStartTime ? 'var(--border-radius-sm)' : '0',
                       // P1-5: 겹침 표시 (점선 테두리)
-                      border: hasOverlap && isStartTime ? '2px dashed var(--color-warning)' : undefined,
+                      border: hasOverlap && isStartTime ? 'var(--border-width-base) dashed var(--color-warning)' : undefined,
                       position: 'relative',
                     }}
                   >

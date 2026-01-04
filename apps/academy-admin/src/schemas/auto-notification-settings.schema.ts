@@ -2,12 +2,15 @@
  * Auto Notification Settings Form Schema
  *
  * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
+ * [불변 규칙] Factory Function 패턴으로 업종중립성 지원
  * [요구사항] 자동 알림 설정 (등원/하원, 청구 생성, 미납 알림)
  */
 
 import type { FormSchema } from '@schema-engine';
+import type { IndustryTerms } from '@industry/registry';
 
-export const autoNotificationSettingsFormSchema: FormSchema = {
+export function createAutoNotificationSettingsFormSchema(terms?: IndustryTerms): FormSchema {
+  return {
   version: '1.0.0',
   minSupportedClient: '1.0.0',
   entity: 'auto_notification_settings',
@@ -24,7 +27,9 @@ export const autoNotificationSettingsFormSchema: FormSchema = {
         kind: 'checkbox',
         ui: {
           label: '등원 알림 발송',
-          description: '학생 등원 시 학부모에게 자동으로 알림을 발송합니다.',
+          description: terms
+            ? `${terms.PERSON_LABEL_PRIMARY} 등원 시 ${terms.GUARDIAN_LABEL}에게 자동으로 알림을 발송합니다.`
+            : '학생 등원 시 학부모에게 자동으로 알림을 발송합니다.',
           colSpan: 1,
         },
       },
@@ -33,7 +38,9 @@ export const autoNotificationSettingsFormSchema: FormSchema = {
         kind: 'checkbox',
         ui: {
           label: '하원 알림 발송',
-          description: '학생 하원 시 학부모에게 자동으로 알림을 발송합니다.',
+          description: terms
+            ? `${terms.PERSON_LABEL_PRIMARY} 하원 시 ${terms.GUARDIAN_LABEL}에게 자동으로 알림을 발송합니다.`
+            : '학생 하원 시 학부모에게 자동으로 알림을 발송합니다.',
           colSpan: 1,
         },
       },
@@ -42,7 +49,9 @@ export const autoNotificationSettingsFormSchema: FormSchema = {
         kind: 'checkbox',
         ui: {
           label: '청구 생성 알림 발송',
-          description: '청구서 생성 시 서버가 학부모에게 알림을 발송합니다.',
+          description: terms
+            ? `청구서 생성 시 서버가 ${terms.GUARDIAN_LABEL}에게 알림을 발송합니다.`
+            : '청구서 생성 시 서버가 학부모에게 알림을 발송합니다.',
           colSpan: 1,
         },
       },
@@ -51,26 +60,13 @@ export const autoNotificationSettingsFormSchema: FormSchema = {
         kind: 'checkbox',
         ui: {
           label: '미납 알림 발송',
-          description: '미납 발생 시 학부모에게 자동으로 알림을 발송합니다.',
+          description: terms
+            ? `미납 발생 시 ${terms.GUARDIAN_LABEL}에게 자동으로 알림을 발송합니다.`
+            : '미납 발생 시 학부모에게 자동으로 알림을 발송합니다.',
           colSpan: 1,
         },
       },
-      {
-        name: 'notification_channel',
-        kind: 'select',
-        ui: {
-          label: '기본 알림 채널',
-          colSpan: 1,
-        },
-        options: [
-          { value: 'sms', label: 'SMS' },
-          { value: 'kakao_at', label: '카카오 알림톡' },  // SSOT-3: 저장/실행용 코드는 'kakao_at', UI 표시명은 '카카오 알림톡'
-        ],
-        validation: {
-          required: true,
-        },
-        defaultValue: 'sms',
-      },
+      // [불변 규칙] 채널 선택 제거됨 - 알림톡 기본, SMS는 폴백으로만 작동
     ],
     submit: {
       label: '저장',
@@ -103,5 +99,9 @@ export const autoNotificationSettingsFormSchema: FormSchema = {
       },
     ],
   },
-};
+  };
+}
+
+// Backward compatibility: Export a default constant schema
+export const autoNotificationSettingsFormSchema: FormSchema = createAutoNotificationSettingsFormSchema();
 

@@ -24,23 +24,8 @@ export const notificationTemplateFormSchema: FormSchema = {
         ui: {
           label: '템플릿명',
           placeholder: '템플릿명을 입력하세요',
-          colSpan: 1,
+          colSpan: 2,
         },
-        validation: {
-          required: true,
-        },
-      },
-      {
-        name: 'channel',
-        kind: 'select',
-        ui: {
-          label: '채널',
-          colSpan: 1,
-        },
-        options: [
-          { value: 'sms', label: 'SMS' },
-          { value: 'kakao_at', label: '카카오 알림톡' },  // SSOT-3: 저장/실행용 코드는 'kakao_at', UI 표시명은 '카카오 알림톡'
-        ],
         validation: {
           required: true,
         },
@@ -50,7 +35,7 @@ export const notificationTemplateFormSchema: FormSchema = {
         kind: 'textarea',
         ui: {
           label: '내용',
-          placeholder: '템플릿 내용을 입력하세요. 변수는 {{변수명}} 형식으로 사용하세요.',
+          placeholder: '템플릿 내용을 입력하세요. 변수는 {{변수명}} 형식으로 사용하세요.\n\n알림톡으로 발송되며, 알림톡 발송 실패 시 자동으로 SMS로 폴백됩니다.',
           colSpan: 2,
         },
         validation: {

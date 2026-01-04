@@ -15,8 +15,8 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { useOptimizedQuery } from '@hooks/use-optimized-query';
 import { ErrorBoundary , Container, Card, Button, Input, Badge, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid, PageHeader , useResponsiveMode, isMobile, isTablet, NotificationCardLayout } from '@ui-core/react';
 // [SSOT] Barrel export를 통한 통합 import
 import { createSafeNavigate } from '../utils';
@@ -28,6 +28,7 @@ import { useAttendanceLogs, fetchAttendanceLogs, useCreateAttendanceLog, useDele
 import { useStudents } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
 import { useConfig } from '@hooks/use-config';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES } from '../constants';
 import type { AttendanceFilter, AttendanceType, AttendanceStatus, AttendanceLog } from '@services/attendance-service';
@@ -70,6 +71,7 @@ export function AttendancePage() {
   const { data: userRole } = useUserRole();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const terms = useIndustryTerms();
 
   // 역할별 권한 체크 (아키텍처 문서 2.3, 498-507줄)
   // Assistant: 출결 입력만 가능, 수정 권한 없음
@@ -202,7 +204,7 @@ export function AttendancePage() {
     return { day_of_week: todayDayOfWeek, status: 'active' as const };
   }, []);
 
-  // 오늘 수업 반 목록
+  // 오늘 수업 목록
   const { data: todayClasses } = useClasses(todayClassesFilter);
 
   // 정본 규칙: apiClient.get('student_classes') 직접 조회 제거
@@ -241,7 +243,7 @@ export function AttendancePage() {
 
     let filtered = todayStudents;
 
-    // 반 필터
+    // 수업 필터
     if (selectedClassId && selectedClassStudentIds) {
       filtered = filtered.filter(s => selectedClassStudentIds.has(s.id));
     }
@@ -259,9 +261,10 @@ export function AttendancePage() {
   }, [todayStudents, selectedClassId, selectedClassStudentIds, searchQuery]);
 
   // AI 출석 예측 조회 (초기 상태에만 적용)
-  const { data: aiPredictions, isLoading: isLoadingPredictions } = useQuery({
-    queryKey: ['ai-attendance-predictions', selectedDate, selectedClassId, filteredStudents.map(s => s.id)],
-    queryFn: async () => {
+  // [성능 최적화] useOptimizedQuery 사용
+  const { data: aiPredictions, isLoading: isLoadingPredictions } = useOptimizedQuery(
+    ['ai-attendance-predictions', selectedDate, selectedClassId, filteredStudents.map(s => s.id)],
+    async () => {
       if (!filteredStudents || filteredStudents.length === 0) return {};
 
       try {
@@ -311,9 +314,11 @@ export function AttendancePage() {
         return {};
       }
     },
-    enabled: filteredStudents.length > 0 && viewMode === 'today',
-    staleTime: 1000 * 60 * 5, // 5분간 캐시 유지
-  });
+    {
+      enabled: filteredStudents.length > 0 && viewMode === 'today',
+      // useOptimizedQuery의 기본 staleTime(5분)이 자동 적용됨
+    }
+  );
 
   // 전체 로딩 상태 (아키텍처 문서 3.3.3: loading 상태)
   // isLoadingPredictions 정의 이후에 계산해야 함
@@ -368,18 +373,23 @@ export function AttendancePage() {
 
   // 출결 필터 스키마 생성 (동적 옵션)
   const attendanceFilterSchema = useMemo(
-    () => createAttendanceFilterSchema(students, classes),
-    [students, classes]
+    () => createAttendanceFilterSchema(students, classes, terms),
+    [students, classes, terms]
   );
-  void attendanceFilterSchema;
 
-  // 출결 화면 헤더 필터 스키마 생성 (반 선택, 날짜 선택, 검색)
+  // 출결 화면 헤더 필터 스키마 생성 (수업 선택, 날짜 선택, 검색)
   const attendanceHeaderFilterSchema = useMemo(
-    () => createAttendanceHeaderFilterSchema(todayClasses),
-    [todayClasses]
+    () => createAttendanceHeaderFilterSchema(todayClasses, terms),
+    [todayClasses, terms]
   );
 
   // Schema Registry 연동 (아키텍처 문서 S3 참조)
+  const { data: attendanceFilterSchemaData } = useSchema(
+    'attendance_filter',
+    attendanceFilterSchema,
+    'filter'
+  );
+
   const { data: attendanceHeaderFilterSchemaData } = useSchema(
     'attendance_header_filter',
     attendanceHeaderFilterSchema,
@@ -387,7 +397,9 @@ export function AttendancePage() {
   );
 
   // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
+  const effectiveFilterSchema = attendanceFilterSchemaData || attendanceFilterSchema;
   const effectiveHeaderFilterSchema = attendanceHeaderFilterSchemaData || attendanceHeaderFilterSchema;
+  void effectiveFilterSchema; // Reserved for future use
 
   // 필터 변경 핸들러
   const handleFilterChange = useCallback((filters: Record<string, unknown>) => {
@@ -416,7 +428,7 @@ export function AttendancePage() {
     absentAfter: number | null
   ): { status: AttendanceStatus; attendance_type: AttendanceType } => {
     if (!classInfo) {
-      // 반 정보가 없으면 수동 입력값 사용
+      // 수업 정보가 없으면 수동 입력값 사용
       return { status: 'present', attendance_type: 'check_in' };
     }
 
@@ -439,7 +451,7 @@ export function AttendancePage() {
       return { status: 'present', attendance_type: 'check_in' };
     }
 
-    // 반 시작 시간 파싱
+    // 수업 시작 시간 파싱
     const [startHour, startMinute] = classInfo.start_time.split(':').map(Number);
     const occurredAtKST = typeof occurredAt === 'string' ? toKST(occurredAt) : toKST(occurredAt.toISOString());
     const classStartTime = occurredAtKST.hour(startHour).minute(startMinute).second(0).millisecond(0);
@@ -480,7 +492,7 @@ export function AttendancePage() {
   // 출결 기록 생성
   const handleCreateAttendance = async (data: Record<string, unknown>) => {
     if (!data.student_id) {
-      showAlert('학생을 선택해주세요.', '입력 오류', 'warning');
+      showAlert(`${terms.PERSON_LABEL_PRIMARY}을(를) 선택해주세요.`, terms.MESSAGES.ALERT, 'warning');
       return;
     }
 
@@ -490,7 +502,7 @@ export function AttendancePage() {
         ? classes?.find(c => c.id === data.class_id)
         : undefined;
 
-      // 자동 판정 (반 정보가 있고 등원인 경우)
+      // 자동 판정 (수업 정보가 있고 등원인 경우)
       let finalStatus = data.status;
       let finalType = data.attendance_type;
 
@@ -521,7 +533,7 @@ export function AttendancePage() {
     } catch (error) {
       showAlert(
         `출결 기록 생성 중 오류가 발생했습니다: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        '오류',
+        terms.MESSAGES.ERROR,
         'error'
       );
     }
@@ -529,10 +541,20 @@ export function AttendancePage() {
 
   // 출결 스키마 생성 (동적 옵션)
   const attendanceSchema = useMemo(
-    () => createAttendanceFormSchema(students, classes),
-    [students, classes]
+    () => createAttendanceFormSchema(students, classes, terms),
+    [students, classes, terms]
   );
-  void attendanceSchema;
+
+  // Schema Registry 연동 (아키텍처 문서 S3 참조)
+  const { data: attendanceFormSchemaData } = useSchema(
+    'attendance',
+    attendanceSchema,
+    'form'
+  );
+
+  // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
+  const effectiveFormSchema = attendanceFormSchemaData || attendanceSchema;
+  void effectiveFormSchema; // Reserved for future use
 
   // QR 스캐너 시작
   const handleStartQRScanner = async () => {
@@ -544,7 +566,7 @@ export function AttendancePage() {
       setShowQRScanner(true);
       setQrScanning(true);
     } catch (error) {
-      showAlert('카메라 접근 권한이 필요합니다. 브라우저 설정에서 카메라 권한을 허용해주세요.', '권한 필요', 'warning');
+      showAlert('카메라 접근 권한이 필요합니다. 브라우저 설정에서 카메라 권한을 허용해주세요.', terms.MESSAGES.ALERT, 'warning');
     }
   };
 
@@ -592,7 +614,7 @@ export function AttendancePage() {
           if (nowKST.isAfter(expiresAtKST)) {
             showAlert(
               'QR 코드가 만료되었습니다. 새로운 QR 코드를 발급받아주세요.',
-              'QR 코드 만료',
+              terms.MESSAGES.ALERT,
               'warning'
             );
             return;
@@ -605,7 +627,7 @@ export function AttendancePage() {
 
       const student = students?.find((s) => s.id === studentId);
       if (!student) {
-        showAlert('등록되지 않은 학생입니다.', '알림', 'warning');
+        showAlert(`등록되지 않은 ${terms.PERSON_LABEL_PRIMARY}입니다.`, terms.MESSAGES.ALERT, 'warning');
         return;
       }
 
@@ -620,9 +642,9 @@ export function AttendancePage() {
       });
 
       handleStopQRScanner();
-      showAlert(`${student.name}님의 등원이 기록되었습니다.`, '출결 기록 완료', 'success');
+      showAlert(`${student.name}님의 ${terms.CHECK_IN_LABEL}이(가) 기록되었습니다.`, terms.MESSAGES.SUCCESS, 'success');
     } catch (error) {
-      showAlert('QR 코드를 인식할 수 없습니다.', 'QR 스캔 오류', 'error');
+      showAlert('QR 코드를 인식할 수 없습니다.', terms.MESSAGES.ERROR, 'error');
     }
   };
 
@@ -634,29 +656,29 @@ export function AttendancePage() {
     try {
       // 출결 기록 확인
       if (!attendanceLogs) {
-        showAlert('출결 기록을 불러오는 중입니다. 잠시 후 다시 시도해주세요.', '알림', 'info');
+        showAlert('출결 기록을 불러오는 중입니다. 잠시 후 다시 시도해주세요.', terms.MESSAGES.ALERT, 'info');
         return;
       }
 
       if (attendanceLogs.length === 0) {
-        showAlert('출력할 출결 기록이 없습니다.\n\n먼저 "출결 기록" 버튼을 클릭하여 출결 기록을 추가해주세요.', '알림', 'info');
+        showAlert('출력할 출결 기록이 없습니다.\n\n먼저 "출결 기록" 버튼을 클릭하여 출결 기록을 추가해주세요.', terms.MESSAGES.ALERT, 'info');
         return;
       }
 
       // 학생 정보 확인
       if (!students) {
-        showAlert('학생 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.', '알림', 'info');
+        showAlert(`${terms.PERSON_LABEL_PRIMARY} 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.`, terms.MESSAGES.ALERT, 'info');
         return;
       }
 
       if (students.length === 0) {
-        showAlert('학생 정보가 없습니다.\n\n먼저 학생을 등록해주세요.', '알림', 'info');
+        showAlert(`${terms.PERSON_LABEL_PRIMARY} 정보가 없습니다.\n\n먼저 ${terms.PERSON_LABEL_PRIMARY}을(를) 등록해주세요.`, terms.MESSAGES.ALERT, 'info');
         return;
       }
 
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
-        showAlert('팝업이 차단되어 있습니다. 브라우저 설정에서 팝업을 허용해주세요.', '팝업 차단', 'warning');
+        showAlert('팝업이 차단되어 있습니다. 브라우저 설정에서 팝업을 허용해주세요.', terms.MESSAGES.ALERT, 'warning');
         return;
       }
 
@@ -686,7 +708,7 @@ export function AttendancePage() {
               <thead>
                 <tr>
                   <th>날짜/시간</th>
-                  <th>학생명</th>
+                  <th>${terms.PERSON_LABEL_PRIMARY}명</th>
                   <th>반</th>
                   <th>타입</th>
                   <th>상태</th>
@@ -700,8 +722,8 @@ export function AttendancePage() {
                   const occurredDateKST = toKST(log.occurred_at);
                   const dateStr = occurredDateKST.format('YYYY-MM-DD');
                   const timeStr = occurredDateKST.format('HH:mm');
-                  const typeStr = log.attendance_type === 'check_in' ? '등원' : log.attendance_type === 'check_out' ? '하원' : log.attendance_type === 'late' ? '지각' : '결석';
-                  const statusStr = log.status === 'present' ? '출석' : log.status === 'late' ? '지각' : log.status === 'absent' ? '결석' : '사유';
+                  const typeStr = log.attendance_type === 'check_in' ? terms.CHECK_IN_LABEL : log.attendance_type === 'check_out' ? terms.CHECK_OUT_LABEL : log.attendance_type === 'late' ? terms.LATE_LABEL : terms.ABSENCE_LABEL;
+                  const statusStr = log.status === 'present' ? terms.PRESENT_LABEL : log.status === 'late' ? terms.LATE_LABEL : log.status === 'absent' ? terms.ABSENCE_LABEL : terms.EXCUSED_LABEL;
 
                   return `
                     <tr>
@@ -728,13 +750,13 @@ export function AttendancePage() {
         try {
           printWindow.print();
         } catch (printError) {
-          showAlert('인쇄 대화상자를 열 수 없습니다. 새 창에서 직접 인쇄해주세요.', '인쇄 오류', 'warning');
+          showAlert('인쇄 대화상자를 열 수 없습니다. 새 창에서 직접 인쇄해주세요.', terms.MESSAGES.ERROR, 'warning');
         }
       }, 100);
     } catch (error) {
       showAlert(
         `출석부 출력 중 오류가 발생했습니다: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        '오류',
+        terms.MESSAGES.ERROR,
         'error'
       );
     }
@@ -745,11 +767,11 @@ export function AttendancePage() {
   const handleDeleteAttendance = async (logId: string) => {
     // 역할별 권한 체크
     if (!canModifyAttendance) {
-      showAlert('출결 수정 권한이 없습니다. Teacher 또는 Admin에게 요청해주세요.', '권한 없음', 'warning');
+      showAlert('출결 수정 권한이 없습니다. Teacher 또는 Admin에게 요청해주세요.', terms.MESSAGES.ALERT, 'warning');
       return;
     }
 
-    const confirmed = await showConfirm('정말 삭제하시겠습니까?', '삭제 확인');
+    const confirmed = await showConfirm(terms.MESSAGES.DELETE_CONFIRM, terms.MESSAGES.ALERT);
     if (!confirmed) {
       return;
     }
@@ -759,7 +781,7 @@ export function AttendancePage() {
     } catch (error) {
       showAlert(
         `출결 기록 삭제 중 오류가 발생했습니다: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        '오류',
+        terms.MESSAGES.ERROR,
         'error'
       );
     }
@@ -822,7 +844,7 @@ export function AttendancePage() {
       }
 
       // Success 상태 (아키텍처 문서 3.3.3: success 상태 - 2초 후 자동 닫기)
-      showAlert('출결 정보가 저장되었습니다.', '성공', 'success');
+      showAlert(terms.MESSAGES.SAVE_SUCCESS, terms.MESSAGES.SUCCESS, 'success');
       setStudentAttendanceStates({});
 
       // 2초 후 자동으로 데이터 새로고침 (아키텍처 문서 3.3.3: auto_close_duration: 2000)
@@ -831,11 +853,11 @@ export function AttendancePage() {
         // 이미 setStudentAttendanceStates({})로 초기화했으므로 추가 작업 불필요
       }, 2000);
     } catch (error) {
-      showAlert('출결 저장에 실패했습니다.', '오류', 'error');
+      showAlert(terms.MESSAGES.SAVE_ERROR, terms.MESSAGES.ERROR, 'error');
     } finally {
       setIsSaving(false);
     }
-  }, [studentAttendanceStates, selectedClassId, selectedDate, isSaving, createAttendance, showAlert]);
+  }, [studentAttendanceStates, selectedClassId, selectedDate, isSaving, createAttendance, showAlert, terms]);
 
   // 일괄 등원/하원 핸들러
   const handleBulkCheckIn = useCallback(() => {
@@ -906,7 +928,7 @@ export function AttendancePage() {
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
         <PageHeader
-          title="출결 관리"
+          title={`출결 관리`}
         />
 
         {/* 탭 메뉴 */}
@@ -920,7 +942,7 @@ export function AttendancePage() {
           {/* 오늘 출결하기 화면 */}
           {viewMode === 'today' && (
             <>
-              {/* AttendanceHeader: 반 선택, 날짜 선택, 검색 (아키텍처 문서 3.3.3) - SchemaFilter 사용 */}
+              {/* AttendanceHeader: 수업 선택, 날짜 선택, 검색 (아키텍처 문서 3.3.3) - SchemaFilter 사용 */}
               <div style={{ pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
                 <SchemaFilter
                   schema={effectiveHeaderFilterSchema}
@@ -959,7 +981,7 @@ export function AttendancePage() {
                         color: 'var(--color-text-secondary)',
                         marginBottom: 'var(--spacing-md)'
                       }}>
-                        출결 정보를 불러오는 중...
+                        {`출결 정보를 ${terms.MESSAGES.LOADING}`}
                       </div>
                       {/* 스켈레톤 UI (아키텍처 문서 3.3.3: show_skeleton: true) */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
@@ -1016,7 +1038,7 @@ export function AttendancePage() {
                 {!isLoading && !error && filteredStudents.length === 0 && (
                   <Card padding="lg">
                     <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                      오늘 수업 학생이 없습니다.
+                      오늘 수업 {terms.PERSON_LABEL_PRIMARY}이(가) 없습니다.
                     </div>
                   </Card>
                 )}
@@ -1039,22 +1061,24 @@ export function AttendancePage() {
                       user_modified: false,
                     };
 
-                    // 학생 정보 확장 (아키텍처 문서 3.3.3: 학년/반, 사진 표시)
+                    // 학생 정보 확장 (아키텍처 문서 3.3.3: 학년/수업, 사진 표시)
                     const studentWithExtras = student as Student & { primary_class_name?: string };
-                    const studentGrade = student.grade ? `${student.grade}학년` : '';
+                    const studentGrade = student.grade ? `${student.grade}${terms.GRADE_LABEL}` : '';
                     const studentClass = studentWithExtras.primary_class_name || '';
                     const gradeClassInfo = [studentGrade, studentClass].filter(Boolean).join(' ');
 
                     return (
                       <Card key={student.id} padding="lg">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
-                          {/* StudentInfo: 이름, 학년/반, 사진 (아키텍처 문서 3.3.3) */}
+                          {/* StudentInfo: 이름, 학년/수업, 사진 (아키텍처 문서 3.3.3) */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', flex: 1, minWidth: 'var(--width-student-info-min)' }}>
                             {/* 사진 (선택) */}
                             {student.profile_image_url && (
                               <img
                                 src={student.profile_image_url}
                                 alt={student.name}
+                                loading="lazy"
+                                decoding="async"
                                 style={{
                                   width: 'var(--spacing-xl)',
                                   height: 'var(--spacing-xl)',
@@ -1102,7 +1126,7 @@ export function AttendancePage() {
                                   }));
                                 }}
                               />
-                              <span>등원</span>
+                              <span>{terms.CHECK_IN_LABEL}</span>
                               {state.ai_predicted && !state.user_modified && (
                                 <Badge variant="soft" color="info" style={{ fontSize: 'var(--font-size-xs)' }}>
                                   AI 예측
@@ -1124,17 +1148,17 @@ export function AttendancePage() {
                                   }));
                                 }}
                               />
-                              <span>하원</span>
+                              <span>{terms.CHECK_OUT_LABEL}</span>
                             </label>
                             {/* 지각/결석 배지 (아키텍처 문서 3.3.3) */}
                             {state.status === 'late' && (
-                              <Badge variant="solid" color="warning">지각</Badge>
+                              <Badge variant="solid" color="warning">{terms.LATE_LABEL}</Badge>
                             )}
                             {state.status === 'absent' && (
-                              <Badge variant="solid" color="error">결석</Badge>
+                              <Badge variant="solid" color="error">{terms.ABSENCE_LABEL}</Badge>
                             )}
                             {state.status === 'excused' && (
-                              <Badge variant="solid" color="info">사유</Badge>
+                              <Badge variant="solid" color="info">{terms.EXCUSED_LABEL}</Badge>
                             )}
                             {/* 상태 변경 Select (배지와 함께 사용) */}
                             <Select
@@ -1152,10 +1176,10 @@ export function AttendancePage() {
                               }}
                               style={{ minWidth: 'var(--width-grid-column)' }}
                             >
-                              <option value="present">출석</option>
-                              <option value="late">지각</option>
-                              <option value="absent">결석</option>
-                              <option value="excused">사유</option>
+                              <option value="present">{terms.PRESENT_LABEL}</option>
+                              <option value="late">{terms.LATE_LABEL}</option>
+                              <option value="absent">{terms.ABSENCE_LABEL}</option>
+                              <option value="excused">{terms.EXCUSED_LABEL}</option>
                             </Select>
                           </div>
 
@@ -1183,7 +1207,7 @@ export function AttendancePage() {
                                 fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
                               } : undefined}
                             >
-                              등원
+                              {terms.CHECK_IN_LABEL}
                             </Button>
                             <Button
                               variant="outline"
@@ -1205,7 +1229,7 @@ export function AttendancePage() {
                                 fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
                               } : undefined}
                             >
-                              하원
+                              {terms.CHECK_OUT_LABEL}
                             </Button>
                             <Button
                               variant="ghost"
@@ -1236,22 +1260,24 @@ export function AttendancePage() {
                         user_modified: false,
                       };
 
-                      // 학생 정보 확장 (아키텍처 문서 3.3.3: 학년/반, 사진 표시)
+                      // 학생 정보 확장 (아키텍처 문서 3.3.3: 학년/수업, 사진 표시)
                       const studentWithExtras = student as Student & { primary_class_name?: string };
-                      const studentGrade = student.grade ? `${student.grade}학년` : '';
+                      const studentGrade = student.grade ? `${student.grade}${terms.GRADE_LABEL}` : '';
                       const studentClass = studentWithExtras.primary_class_name || '';
                       const gradeClassInfo = [studentGrade, studentClass].filter(Boolean).join(' ');
 
                       return (
                         <Card key={student.id} padding="lg">
                           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
-                            {/* StudentInfo: 이름, 학년/반, 사진 (아키텍처 문서 3.3.3) */}
+                            {/* StudentInfo: 이름, 학년/수업, 사진 (아키텍처 문서 3.3.3) */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', flex: 1, minWidth: 'var(--width-student-info-min)' }}>
                               {/* 사진 (선택) */}
                               {student.profile_image_url && (
                                 <img
                                   src={student.profile_image_url}
                                   alt={student.name}
+                                  loading="lazy"
+                                  decoding="async"
                                   style={{
                                     width: 'var(--spacing-xl)',
                                     height: 'var(--spacing-xl)',
@@ -1290,7 +1316,7 @@ export function AttendancePage() {
                                     }));
                                   }}
                                 />
-                                <span>등원</span>
+                                <span>{terms.CHECK_IN_LABEL}</span>
                                 {state.ai_predicted && !state.user_modified && (
                                   <Badge variant="soft" color="info" style={{ fontSize: 'var(--font-size-xs)' }}>
                                     AI 예측
@@ -1312,17 +1338,17 @@ export function AttendancePage() {
                                     }));
                                   }}
                                 />
-                                <span>하원</span>
+                                <span>{terms.CHECK_OUT_LABEL}</span>
                               </label>
                               {/* 지각/결석 배지 (아키텍처 문서 3.3.3) */}
                               {state.status === 'late' && (
-                                <Badge variant="solid" color="warning">지각</Badge>
+                                <Badge variant="solid" color="warning">{terms.LATE_LABEL}</Badge>
                               )}
                               {state.status === 'absent' && (
-                                <Badge variant="solid" color="error">결석</Badge>
+                                <Badge variant="solid" color="error">{terms.ABSENCE_LABEL}</Badge>
                               )}
                               {state.status === 'excused' && (
-                                <Badge variant="solid" color="info">사유</Badge>
+                                <Badge variant="solid" color="info">{terms.EXCUSED_LABEL}</Badge>
                               )}
                               {/* 상태 변경 Select (배지와 함께 사용) */}
                               <Select
@@ -1340,10 +1366,10 @@ export function AttendancePage() {
                                 }}
                                 style={{ minWidth: 'var(--width-grid-column)' }}
                               >
-                                <option value="present">출석</option>
-                                <option value="late">지각</option>
-                                <option value="absent">결석</option>
-                                <option value="excused">사유</option>
+                                <option value="present">{terms.PRESENT_LABEL}</option>
+                                <option value="late">{terms.LATE_LABEL}</option>
+                                <option value="absent">{terms.ABSENCE_LABEL}</option>
+                                <option value="excused">{terms.EXCUSED_LABEL}</option>
                               </Select>
                             </div>
 
@@ -1364,7 +1390,7 @@ export function AttendancePage() {
                                   }));
                                 }}
                               >
-                                등원
+                                {terms.CHECK_IN_LABEL}
                               </Button>
                               <Button
                                 variant="outline"
@@ -1381,7 +1407,7 @@ export function AttendancePage() {
                                   }));
                                 }}
                               >
-                                하원
+                                {terms.CHECK_OUT_LABEL}
                               </Button>
                               <Button
                                 variant="ghost"
@@ -1406,32 +1432,36 @@ export function AttendancePage() {
                     <NotificationCardLayout
                       key="total"
                       icon={<Users />}
-                      title="총원"
-                      description={`${attendanceSummary.total}명`}
+                      title={terms.TOTAL_LABEL}
+                      value={attendanceSummary.total}
+                      unit="명"
                       layoutMode="stats"
                       iconBackgroundColor="var(--color-gray-100)"
                     />,
                     <NotificationCardLayout
                       key="present"
                       icon={<UserCheck />}
-                      title="출석"
-                      description={`${attendanceSummary.present}명`}
+                      title={terms.PRESENT_LABEL}
+                      value={attendanceSummary.present}
+                      unit="명"
                       layoutMode="stats"
                       iconBackgroundColor="var(--color-success-50)"
                     />,
                     <NotificationCardLayout
                       key="late"
                       icon={<Clock />}
-                      title="지각"
-                      description={`${attendanceSummary.late}명`}
+                      title={terms.LATE_LABEL}
+                      value={attendanceSummary.late}
+                      unit="명"
                       layoutMode="stats"
                       iconBackgroundColor="var(--color-warning-50)"
                     />,
                     <NotificationCardLayout
                       key="absent"
                       icon={<UserX />}
-                      title="결석"
-                      description={`${attendanceSummary.absent}명`}
+                      title={terms.ABSENCE_LABEL}
+                      value={attendanceSummary.absent}
+                      unit="명"
                       layoutMode="stats"
                       iconBackgroundColor="var(--color-error-50)"
                     />,
@@ -1453,7 +1483,7 @@ export function AttendancePage() {
                     onClick={handleBulkCheckIn}
                     disabled={isSaving || isLoading}
                   >
-                    일괄 등원
+                    일괄 {terms.CHECK_IN_LABEL}
                   </Button>
                   <Button
                     variant="outline"
@@ -1461,7 +1491,7 @@ export function AttendancePage() {
                     onClick={handleBulkCheckOut}
                     disabled={isSaving || isLoading}
                   >
-                    일괄 하원
+                    일괄 {terms.CHECK_OUT_LABEL}
                   </Button>
                   <div style={{ flex: 1 }} />
                   <Button
@@ -1471,7 +1501,7 @@ export function AttendancePage() {
                     onClick={handleSaveAttendance}
                     disabled={isSaving || isLoading}
                   >
-                    {isSaving ? '저장 중...' : '저장'}
+                    {isSaving ? terms.MESSAGES.LOADING : terms.MESSAGES.SAVE}
                   </Button>
                 </BottomActionBar>
               ) : (
@@ -1488,7 +1518,7 @@ export function AttendancePage() {
                         fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
                       } : undefined}
                     >
-                      일괄 등원
+                      일괄 {terms.CHECK_IN_LABEL}
                     </Button>
                     <Button
                       variant="outline"
@@ -1501,7 +1531,7 @@ export function AttendancePage() {
                         fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
                       } : undefined}
                     >
-                      일괄 하원
+                      일괄 {terms.CHECK_OUT_LABEL}
                     </Button>
                     <div style={{ flex: 1 }} />
                     {/* 통계 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8) */}
@@ -1517,7 +1547,7 @@ export function AttendancePage() {
                         fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
                       } : undefined}
                     >
-                      {isSaving ? '저장 중...' : '저장'}
+                      {isSaving ? `${terms.MESSAGES.LOADING}` : terms.MESSAGES.SAVE}
                     </Button>
                   </div>
                 </Card>
@@ -1607,7 +1637,7 @@ export function AttendancePage() {
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)', width: '100%', maxWidth: 'var(--width-drawer-tablet)' }}>
                   <Input
-                    placeholder="QR 코드를 스캔하거나 학생 ID를 직접 입력하세요"
+                    placeholder={`QR 코드를 스캔하거나 ${terms.PERSON_LABEL_PRIMARY} ID를 직접 입력하세요`}
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         const value = (e.target as HTMLInputElement).value.trim();

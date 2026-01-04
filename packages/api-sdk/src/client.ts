@@ -503,21 +503,39 @@ export class ApiClient {
         };
       }
 
+      // 세션 확인 및 대기
+      // [불변 규칙] Edge Function 호출 전 세션이 로드되었는지 확인
+      const { data: { session } } = await this.supabase.auth.getSession();
+
       // 개발 환경에서만 디버그 로그 출력
       if (process.env.NODE_ENV === 'development') {
         console.log('[ApiClient] ========================================');
-        console.log('[ApiClient] Supabase functions.invoke 호출:', {
-          function_name: functionName,
-          url: `/functions/v1/${functionName}`,
-          body: body || {},
-        });
+        console.log(`[ApiClient] Supabase functions.invoke 호출: ${functionName}`);
+        console.log(`[ApiClient] - has_session: ${!!session}`);
+        console.log(`[ApiClient] - access_token_exists: ${!!session?.access_token}`);
+        console.log(`[ApiClient] - token_prefix: ${session?.access_token?.substring(0, 20)}...`);
         console.log('[ApiClient] ========================================');
       }
 
+      if (!session) {
+        console.warn('[ApiClient] 세션이 없습니다. 인증되지 않은 요청으로 진행합니다.');
+        return {
+          success: false,
+          error: {
+            message: '세션이 없습니다. 다시 로그인해주세요.',
+            code: 'SESSION_NOT_FOUND',
+          },
+          data: undefined,
+        };
+      }
+
       // Edge Function 호출
-      // [불변 규칙] JWT 토큰은 supabase client에 자동으로 포함됩니다
+      // [불변 규칙] JWT 토큰을 명시적으로 Authorization 헤더에 포함
       const { data, error } = await this.supabase.functions.invoke<T>(functionName, {
         body: body || {},
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       // 개발 환경에서만 디버그 로그 출력

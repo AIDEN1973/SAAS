@@ -1,0 +1,26 @@
+{
+  "name": "@samdle/aligo-kakao",
+  "version": "1.0.0",
+  "description": "알리고 카카오 알림톡/친구톡 API 클라이언트",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "aligo",
+    "kakao",
+    "alimtalk",
+    "friendtalk",
+    "notification"
+  ],
+  "author": "SAMDLE",
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

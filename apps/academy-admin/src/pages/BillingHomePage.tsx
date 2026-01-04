@@ -28,6 +28,7 @@ import type { BillingHistoryItem } from '@hooks/use-billing';
 import { BillingHomeCard } from '../components/dashboard-cards/BillingHomeCard';
 import type { BillingHomeCard as BillingHomeCardType } from '../components/dashboard-cards/BillingHomeCard';
 import { CardGridLayout } from '../components/CardGridLayout';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES } from '../constants';
 import { createSafeNavigate } from '../utils';
@@ -37,6 +38,7 @@ export function BillingHomePage() {
   const navigate = useNavigate();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const terms = useIndustryTerms();
 
   // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
   const safeNavigate = useMemo(
@@ -46,7 +48,7 @@ export function BillingHomePage() {
 
   // Billing Home Cards 조회
   const { data: cards, isLoading } = useQuery({
-    queryKey: ['billing-home-cards', tenantId],
+    queryKey: ['billing-home-cards', tenantId, terms],
     queryFn: async () => {
       if (!tenantId) return [];
 
@@ -67,8 +69,8 @@ export function BillingHomePage() {
           {
             id: 'ready-placeholder',
             type: 'expected_collection_rate' as const,
-            title: '이번 달 청구서 준비 중',
-            message: '이번 달 청구서가 아직 생성되지 않았습니다.',
+            title: `이번 달 ${terms.INVOICE_LABEL} 준비 중`,
+            message: `이번 달 ${terms.INVOICE_LABEL}가 아직 생성되지 않았습니다.`,
             status: 'ready' as const,
             priority: 3,
           },
@@ -95,7 +97,7 @@ export function BillingHomePage() {
           id: 'urgent-alert',
           type: 'urgent_alert',
           title: '긴급 알림',
-          message: `미납 7일 이상 청구서가 ${overdueInvoices.length}건 있습니다.`,
+          message: `${terms.OVERDUE_LABEL} 7일 이상 ${terms.INVOICE_LABEL}가 ${overdueInvoices.length}건 있습니다.`,
           action_url: ROUTES.BILLING_LIST('overdue'),
           priority: 2,
         });
@@ -109,7 +111,7 @@ export function BillingHomePage() {
       cards.push({
         id: 'expected-collection-rate',
         type: 'expected_collection_rate',
-        title: '이번달 예상 수납률',
+        title: `이번달 예상 ${terms.COLLECTION_RATE_LABEL}`,
         value: expectedCollectionRate,
         action_url: ROUTES.BILLING_LIST(),
         priority: 3,
@@ -136,7 +138,7 @@ export function BillingHomePage() {
       cards.push({
         id: 'payment-summary',
         type: 'payment_summary',
-        title: '결제 현황 요약',
+        title: `${terms.PAYMENT_LABEL} 현황 요약`,
         value: `${paymentCount}건`,
         action_url: ROUTES.BILLING_LIST(),
         priority: 5,
@@ -165,13 +167,13 @@ export function BillingHomePage() {
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
         <PageHeader
-          title="수납/청구 홈"
+          title={`${terms.BILLING_HOME_LABEL}`}
           actions={
             <Button
               variant="outline"
               onClick={() => safeNavigate(ROUTES.BILLING_LIST())}
             >
-              전체 청구서 보기
+              전체 {terms.INVOICE_LABEL} 보기
             </Button>
           }
         />
@@ -213,7 +215,7 @@ export function BillingHomePage() {
                   variant="outline"
                   onClick={() => safeNavigate(ROUTES.BILLING_LIST())}
                 >
-                  전체 청구서 보기
+                  전체 {terms.INVOICE_LABEL} 보기
                 </Button>
               </div>
             </Card>

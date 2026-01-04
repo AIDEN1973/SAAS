@@ -1,0 +1,16 @@
+{
+  "name": "@hooks/use-industry-terms",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {},
+  "dependencies": {
+    "react": "^18.3.1",
+    "@tanstack/react-query": "^5.64.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "typescript": "^5.7.2"
+  }
+}

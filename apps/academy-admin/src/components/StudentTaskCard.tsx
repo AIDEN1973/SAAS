@@ -1,6 +1,7 @@
 /**
  * 학생 업무 카드 컴포넌트
  *
+ * [불변 규칙] 업종중립: Industry Registry를 통해 용어 접근
  * 아키텍처 문서 3.1.2 섹션 참조
  */
 
@@ -42,6 +43,7 @@ const createTaskTypeIcon = (path: string, strokeWidth: number): React.ReactNode 
 
 export function StudentTaskCard({ card, onAction }: StudentTaskCardProps) {
   const navigate = useNavigate();
+
   // 빈 카드 여부 확인 (ID가 empty-로 시작하는 경우)
   const isEmpty = card.id.startsWith(EMPTY_CARD_ID_PREFIX);
 

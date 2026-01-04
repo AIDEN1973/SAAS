@@ -9,6 +9,7 @@
 import React from 'react';
 import { Receipt } from 'lucide-react';
 import { NotificationCardLayout } from '@ui-core/react';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 import type { BillingSummaryCard as BillingSummaryCardType } from '../../types/dashboardCard';
 // [SSOT] Barrel export를 통한 통합 import
 import { EMPTY_CARD_ID_PREFIX, DEFAULT_VALUES, CARD_LABELS } from '../../constants';
@@ -19,6 +20,9 @@ export interface BillingSummaryCardProps {
 }
 
 export function BillingSummaryCard({ card, onAction }: BillingSummaryCardProps) {
+  // [P2-업종중립] 업종별 용어 조회
+  const terms = useIndustryTerms();
+
   // 빈 카드 여부 확인 (ID가 empty-로 시작하는 경우)
   const isEmpty = card.id.startsWith(EMPTY_CARD_ID_PREFIX);
 
@@ -34,7 +38,7 @@ export function BillingSummaryCard({ card, onAction }: BillingSummaryCardProps) 
     >
       {card.unpaid_count > DEFAULT_VALUES.ZERO && (
         <div style={{ color: 'var(--color-error)', marginTop: 'var(--spacing-sm)' }}>
-          {CARD_LABELS.UNPAID_PREFIX} {card.unpaid_count}{CARD_LABELS.UNPAID_SUFFIX}
+          {terms.OVERDUE_LABEL} {card.unpaid_count}{CARD_LABELS.UNPAID_SUFFIX}
         </div>
       )}
     </NotificationCardLayout>

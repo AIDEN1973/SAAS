@@ -12,6 +12,7 @@ import { User, Trash2, Pencil } from 'lucide-react';
 import { SchemaForm } from '@schema-engine';
 import { LayerSectionHeader } from '../components/LayerSectionHeader';
 import { toNullable, logInfo } from '../../../utils';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 import type { Student } from '@services/student-service';
 import type { FormSchema } from '@schema-engine/types';
 
@@ -39,6 +40,7 @@ export interface StudentInfoTabProps {
 
 export function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema, onCancel, onSave, onEdit, onDelete }: StudentInfoTabProps) {
   // 훅은 항상 컴포넌트 최상단에서 호출되어야 함 (React Hooks 규칙)
+  const terms = useIndustryTerms();
   const titleIconSize = useIconSize();
   const titleIconStrokeWidth = useIconStrokeWidth();
   const mode = useResponsiveMode();
@@ -286,7 +288,7 @@ export function StudentInfoTab({ student, isEditing, effectiveStudentFormSchema,
         title={
           <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
             <User size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-            학생정보 수정
+            {terms.PERSON_LABEL_PRIMARY}정보 수정
           </span>
         }
       />

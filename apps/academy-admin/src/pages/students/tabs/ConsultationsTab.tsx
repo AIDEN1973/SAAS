@@ -12,6 +12,7 @@ import { FileText, Trash2, Pencil, RefreshCcw } from 'lucide-react';
 import { BadgeSelect } from '../../../components/BadgeSelect';
 import { SchemaForm } from '@schema-engine';
 import { useIndustryTranslations } from '@hooks/use-industry-translations';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { LayerSectionHeader } from '../components/LayerSectionHeader';
 import { PlusIcon } from '../../../components/DataTableActionButtons';
 import { toKST } from '@lib/date-utils';
@@ -65,6 +66,7 @@ export function ConsultationsTab({
 
   // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter를 통한 translations 생성
   const consultationTranslations = useIndustryTranslations(effectiveConsultationFormSchema);
+  const terms = useIndustryTerms();
 
   // 빈 상태 아이콘 크기 계산 (CSS 변수 사용, 기본 크기의 4배)
   const baseIconSize = useIconSize();
@@ -115,7 +117,7 @@ export function ConsultationsTab({
             title={
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                 <FileText size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-                {editingConsultationId ? '상담일지 수정' : '상담일지 등록'}
+                {editingConsultationId ? `${terms.CONSULTATION_LABEL}일지 수정` : `${terms.CONSULTATION_LABEL}일지 등록`}
               </span>
             }
           />
@@ -147,7 +149,7 @@ export function ConsultationsTab({
             onDelete={
               isEditable && editingConsultationId
                 ? async () => {
-                    const confirmed = await showConfirm('정말 삭제하시겠습니까?', '상담일지 삭제');
+                    const confirmed = await showConfirm('정말 삭제하시겠습니까?', `${terms.CONSULTATION_LABEL}일지 삭제`);
                     if (!confirmed) return;
                     await onDelete(editingConsultationId);
                     onHideForm();
@@ -164,7 +166,7 @@ export function ConsultationsTab({
             title={
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                 <FileText size={titleIconSize} strokeWidth={titleIconStrokeWidth} />
-                상담일지
+                {terms.CONSULTATION_LABEL}일지
               </span>
             }
             right={
@@ -187,7 +189,7 @@ export function ConsultationsTab({
                     items={[
                       {
                         icon: PlusIcon,
-                        tooltip: '일지등록',
+                        tooltip: `${terms.CONSULTATION_LABEL}일지 등록`,
                         variant: 'solid',
                         color: 'primary',
                         onClick: onShowForm,
@@ -340,7 +342,7 @@ export function ConsultationsTab({
                     display: 'inline-block',
                   }}
                 />
-                <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>등록된 상담일지가 없습니다.</p>
+                <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>{`등록된 ${terms.CONSULTATION_LABEL}일지가 없습니다.`}</p>
               </div>
             </Card>
           )}
