@@ -174,12 +174,6 @@ function AppContent() {
     }
 
     try {
-      console.log('[ChatOps:Frontend] ===== 메시지 전송 시작 (스트리밍 모드) =====');
-      console.log('[ChatOps:Frontend] 사용자 메시지:', {
-        message_preview: message.substring(0, 100),
-        message_length: message.length,
-      });
-
       // 사용자 메시지를 ChatOps 메시지로 추가
       aiLayerMenu.addChatOpsMessage({
         id: `user-${Date.now()}`,
@@ -194,9 +188,6 @@ function AppContent() {
       // ChatOps API 호출 (스트리밍 모드)
       // session_id 가져오기 (새로고침 시에도 유지)
       const sessionId = getOrCreateChatOpsSessionId();
-      console.log('[ChatOps:Frontend] API 호출 중 (스트리밍)...', {
-        session_id: sessionId.substring(0, 8) + '...',
-      });
 
       const context = getApiContext();
       const tenantId = context?.tenantId || '';
@@ -214,12 +205,6 @@ function AppContent() {
         message,
         // onChunk: 실시간 청크 처리
         (chunk: string) => {
-          console.log('[ChatOps:Frontend] onChunk 호출:', {
-            chunkLength: chunk.length,
-            totalLength: assistantContent.length + chunk.length,
-            messageCreated,
-          });
-
           // content 이벤트 처리
           assistantContent += chunk;
 
@@ -237,10 +222,6 @@ function AppContent() {
           // ✅ content 이벤트에서 메시지 생성 또는 업데이트
           if (messageCreated) {
             // 이미 생성된 경우 업데이트
-            console.log('[ChatOps:Frontend] 메시지 업데이트 (content):', {
-              id: assistantMessageId,
-              contentPreview: assistantContent.substring(0, 50),
-            });
             aiLayerMenu.updateChatOpsMessage(assistantMessageId, {
               content: assistantContent,
               metadata: {
@@ -250,10 +231,6 @@ function AppContent() {
           } else {
             // 첫 content 이벤트에서 메시지 생성
             messageCreated = true;
-            console.log('[ChatOps:Frontend] 메시지 생성 (content):', {
-              id: assistantMessageId,
-              contentPreview: assistantContent.substring(0, 50),
-            });
             aiLayerMenu.addChatOpsMessage({
               id: assistantMessageId,
               type: 'assistant_message',
@@ -267,11 +244,6 @@ function AppContent() {
         },
         // onComplete: 완료
         (fullResponse: string) => {
-          console.log('[ChatOps:Frontend] 스트리밍 완료:', {
-            response_length: fullResponse.length,
-            messageCreated,
-          });
-
           // 메시지가 생성되지 않았다면 생성 (status 이벤트가 없는 경우)
           if (!messageCreated) {
             messageCreated = true;
@@ -332,8 +304,6 @@ function AppContent() {
         },
         // onStatus: 단계별 진행 상황 표시
         (status: string) => {
-          console.log('[ChatOps:Frontend] onStatus:', status);
-
           if (!statusMessageCreated) {
             // 첫 번째 상태: 진행 상황 메시지 생성
             statusMessageCreated = true;
@@ -359,8 +329,6 @@ function AppContent() {
           }
         }
       );
-
-      console.log('[ChatOps:Frontend] ===== 스트리밍 응답 처리 시작 =====');
     } catch (error) {
       console.error('[ChatOps:Frontend] 에러 발생:', error);
       // P0: PII 마스킹 필수 (체크리스트.md 4. PII 마스킹)
@@ -398,9 +366,7 @@ function AppContent() {
 
   // ChatOps 초기화 핸들러
   const handleChatOpsReset = useCallback(() => {
-    console.log('[ChatOps:Frontend] ===== 대화 초기화 =====');
     aiLayerMenu.clearChatOpsMessages();
-    console.log('[ChatOps:Frontend] 대화 초기화 완료');
   }, [aiLayerMenu]);
 
   // Location 변경 추적 (필요시 디버깅용으로 활성화)

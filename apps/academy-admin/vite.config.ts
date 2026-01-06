@@ -667,8 +667,17 @@ export default defineConfig(({ mode }) => {
     chunkSizeWarningLimit: 500,
     // 소스맵 생성 (디버깅용, 프로덕션에서는 false로 설정 가능)
     sourcemap: false,
-    // minify 옵션
-    minify: 'esbuild',
+    // minify 옵션: 프로덕션 빌드 시 terser를 사용하여 console.log 제거
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        // 프로덕션 빌드에서 console.log, console.debug 제거
+        drop_console: true,
+        drop_debugger: true,
+        // console.error, console.warn은 유지 (에러 추적용)
+        pure_funcs: ['console.log', 'console.debug', 'console.info'],
+      },
+    },
   },
   };
 });

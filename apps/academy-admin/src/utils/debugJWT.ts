@@ -119,8 +119,9 @@ export async function debugCurrentJWT(): Promise<void> {
 
 /**
  * 전역 함수로 등록 (브라우저 콘솔에서 직접 호출 가능)
+ * 개발 환경에서만 활성화
  */
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   (window as unknown as { debugJWT?: typeof debugCurrentJWT }).debugJWT = debugCurrentJWT;
   console.log('JWT 디버깅 함수가 등록되었습니다.');
   console.log('   사용법: await window.debugJWT()');

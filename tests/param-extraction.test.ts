@@ -5,7 +5,7 @@
  * 관련 이슈: "박소영 전화번호" → { name: "전화번호" } 오류
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { deriveMinimalParamsFromMessage } from '../infra/supabase/supabase/functions/chatops/handlers/intent-resolver.ts';
 
 describe('deriveMinimalParamsFromMessage', () => {

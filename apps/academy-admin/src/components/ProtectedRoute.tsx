@@ -33,27 +33,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const context = getApiContext();
   const hasTenantId = !!currentTenantId || !!context?.tenantId;
 
-  console.log('[ProtectedRoute] Rendering:', {
-    pathname: location.pathname,
-    hasSession: !!session,
-    sessionLoading,
-    tenantsCount: tenants?.length || 0,
-    tenantsLoading,
-    hasTenantId,
-    tenantSelected,
-    currentTenantId,
-    contextTenantId: context?.tenantId,
-  });
-
   // Context 변경 감지를 위한 effect (폴링 방식)
   useEffect(() => {
     const checkContext = () => {
       const context = getApiContext();
       if (context?.tenantId && context.tenantId !== currentTenantId) {
-        console.log('[ProtectedRoute] Context tenantId changed:', {
-          old: currentTenantId,
-          new: context.tenantId,
-        });
         setCurrentTenantId(context.tenantId);
       }
     };
@@ -84,7 +68,6 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     const autoSelectTenant = () => {
       isSelectingRef.current = true;
       try {
-        console.log('[ProtectedRoute] Auto-selecting tenant:', tenants[0].id);
         // 세션 새로고침 없이 Context만 설정 (rate limit 방지)
         // 실제로는 세션 새로고침이 필요하지 않을 수 있음
         setApiContext({
@@ -101,7 +84,6 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         console.error('테넌트 자동 선택 실패:', error);
         // Rate limit 에러인 경우 Context만 설정하고 계속 진행
         if (error instanceof Error && error.message.includes('rate limit')) {
-          console.warn('Rate limit 도달: Context만 설정하고 계속 진행합니다.');
           setApiContext({
             tenantId: tenants[0].id,
             industryType: tenants[0].industry_type as 'academy' | 'salon' | 'real_estate' | 'gym' | 'ngo',  // 정본: real_estate
@@ -193,11 +175,6 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // 테넌트가 하나인데 tenantId가 아직 설정되지 않은 경우 대기
   // setApiContext가 호출되었지만 아직 반영되지 않았을 수 있음
   if (tenants.length === 1 && !hasTenantId) {
-    console.log('[ProtectedRoute] Waiting for tenantId to be set:', {
-      tenantSelected,
-      currentTenantId,
-      contextTenantId: getApiContext()?.tenantId,
-    });
     return (
       <div
         style={{
@@ -215,10 +192,5 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   // 모든 조건을 만족한 경우 실제 컴포넌트 렌더링
-  console.log('[ProtectedRoute] Rendering children:', {
-    hasTenantId,
-    currentTenantId,
-    contextTenantId: getApiContext()?.tenantId,
-  });
   return <>{children}</>;
 }

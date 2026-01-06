@@ -1,0 +1,10 @@
+{
+  "name": "@lib/react-query-config",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "description": "React Query 캐싱 전략 중앙 관리 (SSOT)",
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.0.0"
+  }
+}

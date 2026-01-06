@@ -5,6 +5,9 @@ node_modules/
 
 # Testing
 coverage/
+playwright-report/
+test-results/
+.playwright/
 
 # Production
 dist/
@@ -24,9 +27,13 @@ yarn-error.log*
 # Local env files
 .env
 .env*.local
+.env.development
 .env.development.local
+.env.test
 .env.test.local
+.env.production
 .env.production.local
+.env.staging
 
 # Vercel
 .vercel
@@ -51,4 +58,26 @@ Thumbs.db
 **/migrations/*_complete.sql
 **/migrations/079_create_cron_jobs_complete.sql
 
-nul
+# Synology Drive 충돌 파일
+*_Conflict*
+
+# Archive and temporary files
+docs/archive/
+*.log
+*.tmp
+*.bak
+
+# Large media files
+*.pdf
+*.webp
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Temporary scripts and test data
+test_*.json
+test-*.sql
+fix-*.ps1
+check-*.js
+*_output.txt

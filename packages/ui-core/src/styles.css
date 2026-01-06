@@ -22,9 +22,9 @@
   --color-text: #2c3e50;
   --color-text-secondary: #2c3e50;
   --color-text-tertiary: #2c3e50;
-  --color-background: #ffffff;
-  --color-surface: #ffffff;
-  --color-white: #ffffff;
+  --color-background: #f8f9fa;
+  --color-surface: #f8f9fa;
+  --color-white: #f8f9fa;
   --color-gray-50: #f8fafc;
   --color-gray-100: #f1f5f9;
   --color-gray-200: #e3e3e3;
@@ -100,8 +100,8 @@
   --backdrop-blur: blur(8px);
   --backdrop-blur-sm: blur(4px);
   --backdrop-blur-lg: blur(16px);
-  --glass-background: rgba(255, 255, 255, 0.8);
-  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-background: rgba(248, 249, 250, 0.8);
+  --glass-border: rgba(248, 249, 250, 0.2);
 
   /* Z-Index Layers */
   --z-base: 0;
@@ -351,9 +351,9 @@
     --glass-border: rgba(255, 255, 255, 0.1);
   }
 
-  body {
+  /* body {
     background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  }
+  } */
 }
 
 /* High Contrast Mode (접근성) */
@@ -390,7 +390,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   color: var(--color-text);
-  background: var(--color-white);
+  background: #f8f9fa;
   background-attachment: fixed;
   transition: background-color 0.3s ease, color 0.3s ease;
   font-size: inherit;  /* html의 font-size 상속 */

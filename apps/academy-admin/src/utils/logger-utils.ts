@@ -36,15 +36,11 @@ export function logError(scope: string, error: unknown): void {
   if (import.meta.env.DEV || import.meta.env.MODE === 'development') {
     // 개발 환경: console.error 사용
     console.error(`[${scope}]`, error);
-  } else {
-    // 운영 환경: logger.error 사용 (있는 경우)
-    // TODO[LOGGER]: 운영 환경 로깅 유틸리티 통합 시 logger.error() 사용
-    // 현재는 logger 유틸리티가 없으므로 개발 환경과 동일하게 처리
-    // 향후 logger 유틸리티 추가 시 아래 코드로 변경:
-    // import { logger } from '@core/logger';
-    // logger.error({ scope, error });
-    console.error(`[${scope}]`, error);
   }
+  // 프로덕션 환경에서는 콘솔 로그를 출력하지 않음
+  // TODO[LOGGER]: 향후 운영 환경 로깅 유틸리티 통합 시 logger.error() 사용
+  // import { logger } from '@core/logger';
+  // logger.error({ scope, error });
 }
 
 /**
@@ -66,11 +62,9 @@ export function logWarn(scope: string, message: string, data?: unknown): void {
   if (import.meta.env.DEV || import.meta.env.MODE === 'development') {
     // 개발 환경: console.warn 사용
     console.warn(`[${scope}] ${message}`, data);
-  } else {
-    // 운영 환경: logger.warn 사용 (있는 경우)
-    // TODO[LOGGER]: 운영 환경 로깅 유틸리티 통합 시 logger.warn() 사용
-    console.warn(`[${scope}] ${message}`, data);
   }
+  // 프로덕션 환경에서는 콘솔 로그를 출력하지 않음
+  // TODO[LOGGER]: 향후 운영 환경 로깅 유틸리티 통합 시 logger.warn() 사용
 }
 
 /**
@@ -92,10 +86,8 @@ export function logInfo(scope: string, message: string, data?: unknown): void {
   if (import.meta.env.DEV || import.meta.env.MODE === 'development') {
     // 개발 환경: console.info 사용
     console.info(`[${scope}] ${message}`, data);
-  } else {
-    // 운영 환경: logger.info 사용 (있는 경우)
-    // TODO[LOGGER]: 운영 환경 로깅 유틸리티 통합 시 logger.info() 사용
-    console.info(`[${scope}] ${message}`, data);
   }
+  // 프로덕션 환경에서는 콘솔 로그를 출력하지 않음
+  // TODO[LOGGER]: 향후 운영 환경 로깅 유틸리티 통합 시 logger.info() 사용
 }
 
