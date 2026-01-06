@@ -203,7 +203,8 @@ export function StatsChartModal({ isOpen, onClose, card, data }: StatsChartModal
                   style={{ fontSize: 'var(--font-size-sm)' }}
                 />
                 <Tooltip
-                  formatter={(value: string | number) => {
+                  formatter={(value: string | number | undefined) => {
+                    if (value === undefined) return ['0', yAxisLabel];
                     const numValue = typeof value === 'string' ? parseFloat(value) : value;
                     return [formatter(numValue), yAxisLabel];
                   }}
