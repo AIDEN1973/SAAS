@@ -15,10 +15,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "@env-registry/core": "file:../../packages/env-registry",
     "@lib/supabase-client": "file:../../packages/lib/supabase-client",
-    "@env-registry/core": "file:../../packages/env-registry"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
@@ -29,8 +29,8 @@
     "eslint": "^8.55.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "terser": "^5.44.1",
     "typescript": "^5.3.3",
     "vite": "^5.0.8"
   }
 }
-
