@@ -9,7 +9,6 @@
 import { useMemo, useRef } from 'react';
 import { useModal, useResponsiveMode, useToast, IconButtonGroup, Card, isMobile, useIconSize, useIconStrokeWidth } from '@ui-core/react';
 import { FileText, Trash2, Pencil, RefreshCcw } from 'lucide-react';
-import { BadgeSelect } from '../../../components/BadgeSelect';
 import { SchemaForm } from '@schema-engine';
 import { useIndustryTranslations } from '@hooks/use-industry-translations';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
@@ -43,6 +42,8 @@ export function ConsultationsTab({
   isLoading,
   showForm,
   editingConsultationId,
+  // consultationTypeFilter and onFilterChange are defined in props but not yet implemented
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   consultationTypeFilter,
   effectiveConsultationFormSchema,
   onShowForm,
@@ -52,6 +53,7 @@ export function ConsultationsTab({
   onUpdate,
   onDelete,
   onGenerateAISummary,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onFilterChange,
   isEditable = true,
 }: ConsultationsTabProps) {
@@ -170,35 +172,20 @@ export function ConsultationsTab({
               </span>
             }
             right={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-                <BadgeSelect
-                  value={consultationTypeFilter}
-                  onChange={(value) => onFilterChange(value as ConsultationType | 'all')}
-                  options={[
-                    { value: 'all', label: '전체' },
-                    { value: 'counseling', label: '상담일지' },
-                    { value: 'learning', label: '학습일지' },
-                    { value: 'behavior', label: '행동일지' },
+              isEditable ? (
+                <IconButtonGroup
+                  items={[
+                    {
+                      icon: PlusIcon,
+                      tooltip: `${terms.CONSULTATION_LABEL}일지 등록`,
+                      variant: 'solid',
+                      color: 'primary',
+                      onClick: onShowForm,
+                    },
                   ]}
-                  size="sm"
-                  selectedColor="var(--color-text)"
-                  unselectedColor="var(--color-text)"
+                  align="right"
                 />
-                {isEditable && (
-                  <IconButtonGroup
-                    items={[
-                      {
-                        icon: PlusIcon,
-                        tooltip: `${terms.CONSULTATION_LABEL}일지 등록`,
-                        variant: 'solid',
-                        color: 'primary',
-                        onClick: onShowForm,
-                      },
-                    ]}
-                    align="right"
-                  />
-                )}
-              </div>
+              ) : undefined
             }
           />
           {consultations.length > 0 ? (
