@@ -9,7 +9,6 @@
 import { useState, useMemo } from 'react';
 import { useModal, useResponsiveMode, useToast, IconButtonGroup, Card, isMobile, useIconSize, useIconStrokeWidth } from '@ui-core/react';
 import { BookOpen, Trash2, Pencil } from 'lucide-react';
-import { BadgeSelect } from '../../../components/BadgeSelect';
 import { SchemaForm } from '@schema-engine';
 import { useIndustryTranslations } from '@hooks/use-industry-translations';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
@@ -70,7 +69,6 @@ export function ClassesTab({
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
   const [showAssignForm, setShowAssignForm] = useState(false);
-  const [classNameFilter, setClassNameFilter] = useState<string>('all');
 
   // 타이틀 아이콘 크기 및 선 두께 계산 (CSS 변수 사용)
   const titleIconSize = useIconSize();
@@ -119,14 +117,6 @@ export function ClassesTab({
     }
   };
 
-  // 필터링된 반 목록 (handleEdit보다 먼저 정의)
-  const filteredStudentClasses = useMemo(() => {
-    if (classNameFilter === 'all') {
-      return studentClasses;
-    }
-    return studentClasses.filter((sc) => sc.class && sc.class.id === classNameFilter);
-  }, [studentClasses, classNameFilter]);
-
   const handleEdit = (studentClass: { id: string; class_id: string; enrolled_at: string; left_at?: string; is_active: boolean; class: Class | null }) => {
     setEditingClassId(studentClass.class_id);
     setEditingStudentClassId(studentClass.id);
@@ -167,17 +157,6 @@ export function ClassesTab({
       toast(errorMessage, 'error');
     }
   };
-
-  // 반 이름 옵션 생성 (중복 제거)
-  const classOptions = useMemo(() => {
-    const uniqueClasses = new Map<string, { id: string; name: string }>();
-    studentClasses.forEach((sc) => {
-      if (sc.class && !uniqueClasses.has(sc.class.id)) {
-        uniqueClasses.set(sc.class.id, { id: sc.class.id, name: sc.class.name });
-      }
-    });
-    return Array.from(uniqueClasses.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [studentClasses]);
 
   if (isLoading) {
     return <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>;
@@ -289,50 +268,34 @@ export function ClassesTab({
               </span>
             }
             right={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-                <BadgeSelect
-                  value={classNameFilter}
-                  onChange={(value) => setClassNameFilter(value as string)}
-                  options={[
-                    { value: 'all', label: '전체' },
-                    ...classOptions.map((classItem) => ({
-                      value: classItem.id,
-                      label: classItem.name,
-                    })),
-                  ]}
-                  size="sm"
-                  selectedColor="var(--color-text)"
-                  unselectedColor="var(--color-text)"
-                />
-                {isEditable && (
-                  <IconButtonGroup
-                    items={[
-                      {
-                        icon: PlusIcon,
-                        tooltip: `${terms.GROUP_LABEL} 배정`,
-                        variant: 'solid',
-                        color: 'primary',
-                        onClick: () => {
-                          setEditingClassId(null);
-                          setEditingEnrolledAt('');
-                          setShowAssignForm(true);
-                        },
-                        disabled: availableClasses.length === 0,
+              isEditable ? (
+                <IconButtonGroup
+                  items={[
+                    {
+                      icon: PlusIcon,
+                      tooltip: `${terms.GROUP_LABEL} 배정`,
+                      variant: 'solid',
+                      color: 'primary',
+                      onClick: () => {
+                        setEditingClassId(null);
+                        setEditingEnrolledAt('');
+                        setShowAssignForm(true);
                       },
-                    ]}
-                    align="right"
-                  />
-                )}
-              </div>
+                      disabled: availableClasses.length === 0,
+                    },
+                  ]}
+                  align="right"
+                />
+              ) : undefined
             }
           />
           <Card
             padding="md"
                       >
-        {filteredStudentClasses.filter((sc) => sc.class).length > 0 ? (
+        {studentClasses.filter((sc) => sc.class).length > 0 ? (
           // 각 반별로 그룹화하여 표시
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
-            {filteredStudentClasses
+            {studentClasses
               .filter((sc) => sc.class)
               .map((studentClass) => {
                 const classItem = studentClass.class!;
@@ -454,9 +417,7 @@ export function ClassesTab({
               }}
             />
             <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-              {studentClasses.filter((sc) => sc.class).length === 0
-                ? `배정된 ${terms.GROUP_LABEL}이(가) 없습니다.`
-                : `필터 조건에 맞는 ${terms.GROUP_LABEL}이(가) 없습니다.`}
+              {`배정된 ${terms.GROUP_LABEL}이(가) 없습니다.`}
             </p>
           </div>
         )}

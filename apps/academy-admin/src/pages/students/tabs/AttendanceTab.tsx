@@ -9,7 +9,6 @@
 import { useState, useMemo } from 'react';
 import { useToast, useIconSize, useIconStrokeWidth, Card, Badge, Button, IconButtonGroup } from '@ui-core/react';
 import { Calendar, Pencil } from 'lucide-react';
-import { BadgeSelect } from '../../../components/BadgeSelect';
 import { SchemaForm } from '@schema-engine';
 import { LayerSectionHeader } from '../components/LayerSectionHeader';
 import { PlusIcon } from '../../../components/DataTableActionButtons';
@@ -42,7 +41,6 @@ export function AttendanceTab({
 }) {
   const { toast } = useToast();
   const terms = useIndustryTerms();
-  const [attendanceStatusFilter, setAttendanceStatusFilter] = useState<'all' | 'present' | 'late' | 'absent' | 'excused'>('all');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const titleIconSize = useIconSize();
@@ -93,13 +91,6 @@ export function AttendanceTab({
     };
   }, [attendanceLogs]);
 
-  // 필터링된 출결 내역
-  const filteredAttendanceLogs = useMemo(() => {
-    if (attendanceStatusFilter === 'all') {
-      return attendanceLogs;
-    }
-    return attendanceLogs.filter((log) => log.status === attendanceStatusFilter);
-  }, [attendanceLogs, attendanceStatusFilter]);
 
   // [P0-1 수정] 출결 기록 추가 폼 스키마 생성: 조건부 return 이전에 Hook 호출
   // React Hooks 규칙 준수: 모든 Hook은 조건부 return보다 위에서 호출되어야 함
@@ -270,7 +261,7 @@ export function AttendanceTab({
 
   // 출결 기록 수정 시작 (출결 기록 목록 표시)
   const handleStartEdit = () => {
-    if (filteredAttendanceLogs.length === 0) {
+    if (attendanceLogs.length === 0) {
       toast(`수정할 ${terms.ATTENDANCE_LABEL} 기록이 없습니다.`, 'info');
       return;
     }
@@ -341,9 +332,9 @@ export function AttendanceTab({
             }
           />
           <Card padding="md" variant="default" style={layerSectionCardStyle}>
-            {filteredAttendanceLogs.length > 0 ? (
+            {attendanceLogs.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {filteredAttendanceLogs.map((log, index) => {
+                {attendanceLogs.map((log, index) => {
                   const statusColor = log.status === 'present' ? 'success' : log.status === 'late' ? 'warning' : 'error';
                   const statusLabel = log.status === 'present' ? '출석' : log.status === 'late' ? '지각' : log.status === 'absent' ? '결석' : '사유';
                   const typeLabel = log.attendance_type === 'check_in' ? terms.CHECK_IN_LABEL : log.attendance_type === 'check_out' ? terms.CHECK_OUT_LABEL : log.attendance_type;
@@ -359,7 +350,7 @@ export function AttendanceTab({
                         paddingBottom: 'var(--spacing-sm)',
                         paddingLeft: 'var(--spacing-md)',
                         paddingRight: 'var(--spacing-md)',
-                        borderBottom: index < filteredAttendanceLogs.length - 1
+                        borderBottom: index < attendanceLogs.length - 1
                           ? 'var(--border-width-thin) solid var(--color-table-row-border)'
                           : 'none',
                         cursor: 'pointer',
@@ -467,38 +458,22 @@ export function AttendanceTab({
               </span>
             }
             right={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-                <BadgeSelect
-                  value={attendanceStatusFilter}
-                  onChange={(value) => setAttendanceStatusFilter(value as typeof attendanceStatusFilter)}
-                  options={[
-                    { value: 'all', label: '전체' },
-                    { value: 'present', label: '출석' },
-                    { value: 'late', label: '지각' },
-                    { value: 'absent', label: '결석' },
-                    { value: 'excused', label: '사유' },
-                  ]}
-                  size="sm"
-                  selectedColor="var(--color-text)"
-                  unselectedColor="var(--color-text)"
-                />
-                {isEditable && (
-                  <IconButtonGroup
-                    items={[
-                      {
-                        icon: PlusIcon,
-                        tooltip: `${terms.ATTENDANCE_LABEL}기록 추가`,
-                        variant: 'solid',
-                        color: 'primary',
-                        onClick: () => {
-                          setShowAddForm(true);
-                        },
+              isEditable ? (
+                <IconButtonGroup
+                  items={[
+                    {
+                      icon: PlusIcon,
+                      tooltip: `${terms.ATTENDANCE_LABEL}기록 추가`,
+                      variant: 'solid',
+                      color: 'primary',
+                      onClick: () => {
+                        setShowAddForm(true);
                       },
-                    ]}
-                    align="right"
-                  />
-                )}
-              </div>
+                    },
+                  ]}
+                  align="right"
+                />
+              ) : undefined
             }
           />
           <Card padding="md" variant="default" style={layerSectionCardStyle}>
@@ -608,7 +583,7 @@ export function AttendanceTab({
               </div>
             )}
 
-            {isEditable && filteredAttendanceLogs.length > 0 && (
+            {isEditable && attendanceLogs.length > 0 && (
               <div style={{ marginTop: 'var(--spacing-md)', display: 'flex', justifyContent: 'flex-end' }}>
                 <IconButtonGroup
                   align="right"
@@ -641,9 +616,9 @@ export function AttendanceTab({
               <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
                 {terms.ATTENDANCE_LABEL} 정보를 불러오는 중...
               </div>
-            ) : filteredAttendanceLogs.length > 0 ? (
+            ) : attendanceLogs.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', paddingTop: 'var(--spacing-sm)' }}>
-                {filteredAttendanceLogs.slice(0, 10).map((log, index) => {
+                {attendanceLogs.slice(0, 10).map((log, index) => {
                   const statusColor = log.status === 'present' ? 'success' : log.status === 'late' ? 'warning' : 'error';
                   const statusLabel = log.status === 'present' ? '출석' : log.status === 'late' ? '지각' : log.status === 'absent' ? '결석' : '사유';
                   const typeLabel = log.attendance_type === 'check_in' ? terms.CHECK_IN_LABEL : log.attendance_type === 'check_out' ? terms.CHECK_OUT_LABEL : log.attendance_type;
@@ -659,7 +634,7 @@ export function AttendanceTab({
                         paddingBottom: 'var(--spacing-sm)',
                         paddingLeft: 'var(--spacing-md)',
                         paddingRight: 'var(--spacing-md)',
-                        borderBottom: index < filteredAttendanceLogs.slice(0, 10).length - 1
+                        borderBottom: index < attendanceLogs.slice(0, 10).length - 1
                           ? 'var(--border-width-thin) solid var(--color-table-row-border)'
                           : 'none',
                       }}

@@ -6,10 +6,9 @@
  * [불변 규칙] CSS 변수만 사용 (하드코딩 금지)
  * [불변 규칙] SSOT UI 디자인 준수
  */
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useModal, useResponsiveMode, useToast, IconButtonGroup, Card, isMobile, useIconSize, useIconStrokeWidth } from '@ui-core/react';
 import { Users, Trash2, Pencil } from 'lucide-react';
-import { BadgeSelect } from '../../../components/BadgeSelect';
 import { SchemaForm } from '@schema-engine';
 import { useIndustryTranslations } from '@hooks/use-industry-translations';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
@@ -55,7 +54,6 @@ export function GuardiansTab({
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
-  const [relationshipFilter, setRelationshipFilter] = useState<'all' | 'parent' | 'guardian' | 'other'>('all');
 
   // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter를 통한 translations 생성
   const guardianTranslations = useIndustryTranslations(effectiveGuardianFormSchema);
@@ -100,14 +98,6 @@ export function GuardiansTab({
   const baseIconSize = useIconSize();
   const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
   const emptyStateIconStrokeWidth = useIconStrokeWidth();
-
-  // 필터링된 학부모 목록
-  const filteredGuardians = useMemo(() => {
-    if (relationshipFilter === 'all') {
-      return guardians;
-    }
-    return guardians.filter((guardian) => guardian.relationship === relationshipFilter);
-  }, [guardians, relationshipFilter]);
 
   if (isLoading) {
     return <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>;
@@ -177,40 +167,25 @@ export function GuardiansTab({
               </span>
             }
             right={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-                <BadgeSelect
-                  value={relationshipFilter}
-                  onChange={(value) => setRelationshipFilter(value as typeof relationshipFilter)}
-                  options={[
-                    { value: 'all', label: '전체' },
-                    { value: 'parent', label: '부모' },
-                    { value: 'guardian', label: '보호자' },
-                    { value: 'other', label: '기타' },
+              isEditable ? (
+                <IconButtonGroup
+                  items={[
+                    {
+                      icon: PlusIcon,
+                      tooltip: `${terms.GUARDIAN_LABEL} 추가`,
+                      variant: 'solid',
+                      color: 'primary',
+                      onClick: onShowForm,
+                    },
                   ]}
-                  size="sm"
-                  selectedColor="var(--color-text)"
-                  unselectedColor="var(--color-text)"
+                  align="right"
                 />
-                {isEditable && (
-                  <IconButtonGroup
-                    items={[
-                      {
-                        icon: PlusIcon,
-                        tooltip: `${terms.GUARDIAN_LABEL} 추가`,
-                        variant: 'solid',
-                        color: 'primary',
-                        onClick: onShowForm,
-                      },
-                    ]}
-                    align="right"
-                  />
-                )}
-              </div>
+              ) : undefined
             }
           />
-          {filteredGuardians.length > 0 ? (
+          {guardians.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              {filteredGuardians.map((guardian) => (
+              {guardians.map((guardian) => (
                 <Card
                   key={guardian.id}
                   padding="md"
@@ -348,7 +323,7 @@ export function GuardiansTab({
                   }}
                 />
                 <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                  {guardians.length === 0 ? `등록된 ${terms.GUARDIAN_LABEL}이(가) 없습니다.` : `필터 조건에 맞는 ${terms.GUARDIAN_LABEL}이(가) 없습니다.`}
+                  {`등록된 ${terms.GUARDIAN_LABEL}이(가) 없습니다.`}
                 </p>
               </div>
             </Card>
