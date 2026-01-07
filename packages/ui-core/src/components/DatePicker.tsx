@@ -978,9 +978,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           style={{
             color: 'var(--color-form-error)', // styles.css 토큰: 폼 필드 에러 메시지 색상
             marginTop: 'var(--spacing-xs)',
-            // 요구사항: 에러 메시지를 2pt 작게 표시 (공통 컴포넌트 기준)
-            // [불변 규칙] CSS 하드코딩 금지: CSS 변수 사용
-            fontSize: 'calc(var(--font-size-sm) - var(--size-font-reduction))',
+            fontSize: 'var(--font-size-xxs)', // 11px - 에러 메시지
           }}
         >
           {error}

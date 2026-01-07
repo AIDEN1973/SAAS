@@ -23,6 +23,10 @@ export function applyThemeToCSS(tokens: ThemeTokens): void {
     root.style.setProperty('--color-primary', colorTokens.primary.DEFAULT);
     root.style.setProperty('--color-primary-light', colorTokens.primary.light);
     root.style.setProperty('--color-primary-dark', colorTokens.primary.dark);
+    // Primary-30 (가장 밝은 호버 배경색)은 light 색상의 투명도 버전으로 생성
+    root.style.setProperty('--color-primary-30', hexToRgba(colorTokens.primary.light, 0.05));
+    // Primary-40 (호버 배경색)은 light 색상의 투명도 버전으로 생성
+    root.style.setProperty('--color-primary-40', hexToRgba(colorTokens.primary.light, 0.08));
     // Primary-50 (배경색용)은 light 색상의 투명도 버전으로 생성
     root.style.setProperty('--color-primary-50', hexToRgba(colorTokens.primary.light, 0.1));
     // Primary-100 (선택된 항목 배경색용)은 light 색상의 투명도 버전으로 생성
@@ -101,6 +105,8 @@ export function resetTheme(): void {
     '--color-primary',
     '--color-primary-light',
     '--color-primary-dark',
+    '--color-primary-30',
+    '--color-primary-40',
     '--color-primary-50',
     '--color-primary-100',
     '--color-secondary',

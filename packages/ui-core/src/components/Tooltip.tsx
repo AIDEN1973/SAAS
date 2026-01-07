@@ -60,10 +60,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
   }, []);
 
   // offset 계산용 - CSS 변수에서 읽기 (하드코딩 제거)
-  const offsetPx = useMemo(() => getCssVarPx('--spacing-tooltip-offset', 4), [getCssVarPx]);
+  // 툴팁과 버튼 사이 간격을 더 넓게 조정 (8px)
+  const offsetPx = useMemo(() => getCssVarPx('--spacing-tooltip-offset', 8), [getCssVarPx]);
 
   // 화살표 크기 - CSS 변수에서 읽기 (하드코딩 제거)
-  const arrowSize = useMemo(() => getCssVarPx('--size-tooltip-arrow', 5), [getCssVarPx]);
   const arrowInnerSize = useMemo(() => getCssVarPx('--size-tooltip-arrow-inner', 4), [getCssVarPx]);
 
   // 정밀한 위치 계산 함수
@@ -87,28 +87,32 @@ export const Tooltip: React.FC<TooltipProps> = ({
       let left = 0;
 
       switch (position) {
-        case 'top':
+        case 'top': {
           // 버튼의 정확한 중앙점 계산 (픽셀 단위)
           const triggerCenterX = triggerRect.left + triggerRect.width / 2;
           top = triggerRect.top - tooltipRect.height - offsetPx;
           // 툴팁의 중앙점이 버튼의 중앙점과 정확히 일치하도록 설정
           left = triggerCenterX;
           break;
-        case 'bottom':
+        }
+        case 'bottom': {
           const triggerCenterXBottom = triggerRect.left + triggerRect.width / 2;
           top = triggerRect.bottom + offsetPx;
           left = triggerCenterXBottom;
           break;
-        case 'left':
+        }
+        case 'left': {
           const triggerCenterYLeft = triggerRect.top + triggerRect.height / 2;
           top = triggerCenterYLeft;
           left = triggerRect.left - tooltipRect.width - offsetPx;
           break;
-        case 'right':
+        }
+        case 'right': {
           const triggerCenterYRight = triggerRect.top + triggerRect.height / 2;
           top = triggerCenterYRight;
           left = triggerRect.right + offsetPx;
           break;
+        }
       }
 
       setTooltipStyle({
@@ -189,114 +193,62 @@ export const Tooltip: React.FC<TooltipProps> = ({
               position: 'fixed', // tooltipStyle에서 이미 설정되지만 명시적으로 유지
               maxWidth: 'var(--size-tooltip-max-width)', // styles.css 준수: 툴팁 최대 너비 토큰 사용
               pointerEvents: 'none',
-              color: useThemeColor ? 'var(--color-white)' : 'var(--color-text)',
-              backgroundColor: useThemeColor ? 'var(--color-primary)' : 'var(--color-white)',
+              color: 'var(--color-white)', // 항상 흰색 텍스트
+              backgroundColor: useThemeColor ? 'var(--color-primary)' : 'var(--color-text)', // 기본 텍스트 색상 배경
               padding: 'var(--spacing-sm)',
               borderRadius: 'var(--border-radius-sm)',
               boxShadow: 'var(--shadow-lg)',
-              border: useThemeColor ? 'none' : 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
+              border: 'none', // 어두운 배경이므로 테두리 제거
               fontSize: 'var(--font-size-sm)', // styles.css 준수: 툴팁 폰트 사이즈
               whiteSpace: 'nowrap', // 한 줄로 표시
               overflow: 'visible', // 화살표가 잘리지 않도록
             }}
           >
-            {/* 하단 삼각형 (position이 'top'일 때 표시, 버튼 쪽을 가리킴) */}
-            {position === 'top' && (
-              <>
-                {/* 테두리 삼각형 (useThemeColor가 false일 때만) */}
-                {!useThemeColor && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      bottom: -arrowSize,
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: 0,
-                      height: 0,
-                      borderLeftWidth: arrowSize,
-                      borderLeftStyle: 'solid',
-                      borderLeftColor: 'transparent',
-                      borderRightWidth: arrowSize,
-                      borderRightStyle: 'solid',
-                      borderRightColor: 'transparent',
-                      borderTopWidth: arrowSize,
-                      borderTopStyle: 'solid',
-                      borderTopColor: 'var(--color-gray-200)',
-                      zIndex: -1,
-                    }}
-                  />
-                )}
-                {/* 배경 삼각형 */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: -arrowInnerSize,
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: 0,
-                    height: 0,
-                    borderLeftWidth: arrowInnerSize,
-                    borderLeftStyle: 'solid',
-                    borderLeftColor: 'transparent',
-                    borderRightWidth: arrowInnerSize,
-                    borderRightStyle: 'solid',
-                    borderRightColor: 'transparent',
-                    borderTopWidth: arrowInnerSize,
-                    borderTopStyle: 'solid',
-                    borderTopColor: useThemeColor ? 'var(--color-primary)' : 'var(--color-white)',
-                    zIndex: 1,
-                  }}
-                />
-              </>
+            {/* 상단 삼각형 (position이 'bottom'일 때 표시, 버튼 쪽을 가리킴) */}
+            {position === 'bottom' && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: -arrowInnerSize,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 0,
+                  height: 0,
+                  borderLeftWidth: arrowInnerSize,
+                  borderLeftStyle: 'solid',
+                  borderLeftColor: 'transparent',
+                  borderRightWidth: arrowInnerSize,
+                  borderRightStyle: 'solid',
+                  borderRightColor: 'transparent',
+                  borderBottomWidth: arrowInnerSize,
+                  borderBottomStyle: 'solid',
+                  borderBottomColor: useThemeColor ? 'var(--color-primary)' : 'var(--color-text)',
+                  zIndex: 1,
+                }}
+              />
             )}
             {/* 왼쪽 삼각형 (position이 'right'일 때 표시, 아이콘 쪽을 가리킴) */}
             {position === 'right' && (
-              <>
-                {/* 테두리 삼각형 (useThemeColor가 false일 때만) */}
-                {!useThemeColor && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: -arrowSize,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      width: 0,
-                      height: 0,
-                      borderTopWidth: arrowSize,
-                      borderTopStyle: 'solid',
-                      borderTopColor: 'transparent',
-                      borderBottomWidth: arrowSize,
-                      borderBottomStyle: 'solid',
-                      borderBottomColor: 'transparent',
-                      borderRightWidth: arrowSize,
-                      borderRightStyle: 'solid',
-                      borderRightColor: 'var(--color-gray-200)',
-                      zIndex: -1,
-                    }}
-                  />
-                )}
-                {/* 배경 삼각형 */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: -arrowInnerSize,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    width: 0,
-                    height: 0,
-                    borderTopWidth: arrowInnerSize,
-                    borderTopStyle: 'solid',
-                    borderTopColor: 'transparent',
-                    borderBottomWidth: arrowInnerSize,
-                    borderBottomStyle: 'solid',
-                    borderBottomColor: 'transparent',
-                    borderRightWidth: arrowInnerSize,
-                    borderRightStyle: 'solid',
-                    borderRightColor: useThemeColor ? 'var(--color-primary)' : 'var(--color-white)',
-                    zIndex: 1,
-                  }}
-                />
-              </>
+              <div
+                style={{
+                  position: 'absolute',
+                  left: -arrowInnerSize,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: 0,
+                  height: 0,
+                  borderTopWidth: arrowInnerSize,
+                  borderTopStyle: 'solid',
+                  borderTopColor: 'transparent',
+                  borderBottomWidth: arrowInnerSize,
+                  borderBottomStyle: 'solid',
+                  borderBottomColor: 'transparent',
+                  borderRightWidth: arrowInnerSize,
+                  borderRightStyle: 'solid',
+                  borderRightColor: useThemeColor ? 'var(--color-primary)' : 'var(--color-text)',
+                  zIndex: 1,
+                }}
+              />
             )}
             {content}
           </div>,

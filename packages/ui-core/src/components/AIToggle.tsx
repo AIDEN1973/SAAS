@@ -10,11 +10,11 @@
  */
 
 import React from 'react';
-import { Switch } from './Switch';
 import { Tooltip } from './Tooltip';
 import { useTenantFeature, useUpdateTenantFeature } from '@hooks/use-tenant-feature';
 import { useUserRole } from '@hooks/use-auth';
 import { useModal } from '../hooks/useModal';
+import { Robot } from 'phosphor-react';
 
 export interface AIToggleProps {
   className?: string;
@@ -59,27 +59,48 @@ export const AIToggle: React.FC<AIToggleProps> = ({ className }) => {
   // TODO: 플랫폼 레벨 체크는 서버 API를 통해 확인해야 함
   // 현재는 테넌트 레벨만 체크
 
+  const [isHovered, setIsHovered] = React.useState(false);
+
   return (
     <Tooltip
       content={
         !canToggle
           ? 'AI 기능 토글은 원장/관리자만 변경할 수 있습니다.'
           : enabled
-          ? 'AI 기능이 켜져 있습니다. 클릭하여 끄세요.'
-          : 'AI 기능이 꺼져 있습니다. 클릭하여 켜세요.'
+          ? 'AI 활성화'
+          : 'AI 비활성화'
       }
+      position="bottom"
     >
-      <div className={className} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-        <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-          AI
-        </span>
-        <Switch
-          checked={enabled}
-          onChange={(e) => handleToggle(e.target.checked)}
-          disabled={!canToggle || isLoading || updateFeature.isPending}
-          aria-label="AI 기능 온오프"
+      <button
+        className={className}
+        onClick={() => handleToggle(!enabled)}
+        disabled={!canToggle || isLoading || updateFeature.isPending}
+        aria-label={enabled ? 'AI 비활성화' : 'AI 활성화'}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--spacing-sm)',
+          backgroundColor: isHovered && !(!canToggle || isLoading || updateFeature.isPending) ? 'var(--color-primary-40)' : 'transparent',
+          border: 'none',
+          borderRadius: 'var(--border-radius-md)',
+          cursor: !canToggle || isLoading || updateFeature.isPending ? 'not-allowed' : 'pointer',
+          opacity: !canToggle || isLoading || updateFeature.isPending ? 0.5 : 1,
+          transition: 'var(--transition-all)',
+        }}
+      >
+        <Robot
+          weight={enabled ? 'bold' : 'regular'}
+          style={{
+            width: 'var(--size-icon-xl)',
+            height: 'var(--size-icon-xl)',
+            color: enabled ? 'var(--color-primary)' : 'var(--color-text-tertiary)',
+          }}
         />
-      </div>
+      </button>
     </Tooltip>
   );
 };

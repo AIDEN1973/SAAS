@@ -5,13 +5,11 @@
  * [불변 규칙] 반응형 Mobile에서 Drawer로 변환, Desktop에서 Persistent Sidebar
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useRef } from 'react';
 import { clsx } from 'clsx';
-import { CaretRight, X } from 'phosphor-react';
+import { X, DotsThree } from 'phosphor-react';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 import { Button } from './Button';
-import { PageHeader } from './PageHeader';
-import { Tooltip } from './Tooltip';
 
 export interface SidebarItem {
   id: string;
@@ -30,9 +28,6 @@ export interface SidebarProps {
   className?: string;
   isOpen?: boolean;
   onClose?: () => void;
-  collapsed?: boolean;
-  pageHeaderTitle?: string; // 사이드바 상단에 표시할 페이지 헤더 제목
-  pageHeaderActions?: React.ReactNode; // 사이드바 페이지 헤더 액션 버튼
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -42,98 +37,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   className,
   isOpen = true,
   onClose,
-  collapsed = false,
-  pageHeaderTitle,
-  pageHeaderActions,
 }) => {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [expandedItems] = useState<Set<string>>(new Set());
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
-
-  // CSS 변수에서 strokeWidth 읽기 (하드코딩 제거) - 기본 선 굵기 사용
-  const strokeWidth = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      const value = getComputedStyle(document.documentElement)
-        .getPropertyValue('--stroke-width-icon')
-        .trim();
-      // 기본 선 굵기 사용 (1.5)
-      return value ? Number(value) : 1.5;
-    }
-    return 1.5;
-  }, []);
-
-  // CSS 변수에서 strokeWidth bold 읽기 (롤오버/선택 시 사용)
-  const strokeWidthBold = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      const value = getComputedStyle(document.documentElement)
-        .getPropertyValue('--stroke-width-icon-bold-sidebar')
-        .trim();
-      // 굵은 선 굵기 사용 (2 - 기본값과 동일)
-      return value ? Number(value) : 2;
-    }
-    return 2;
-  }, []);
-
-  // CSS 변수에서 icon size 읽기 (사이드바 아이콘 크기)
-  const iconSize = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      const value = getComputedStyle(document.documentElement)
-        .getPropertyValue('--size-icon-sidebar')
-        .trim();
-      if (value.endsWith('rem')) {
-        const remValue = parseFloat(value);
-        // ⚠️ 중요: 하드코딩 금지, CSS 변수 사용
-        // HARD-CODE-EXCEPTION: fallback 값 16은 브라우저 기본 폰트 크기 (브라우저 호환성용 상수)
-        const baseFontSize = typeof window !== 'undefined'
-          ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
-          : 16;
-        return remValue * baseFontSize; // rem을 px로 변환
-      } else if (value.endsWith('px')) {
-        return parseFloat(value);
-      } else if (value) {
-        return Number(value);
-      }
-    }
-    // HARD-CODE-EXCEPTION: fallback 값 16은 브라우저 기본 폰트 크기 (브라우저 호환성용 상수)
-    return 16; // fallback (CSS 변수를 읽을 수 없는 경우만)
-  }, []);
-
-  // CSS 변수에서 닫기 버튼 아이콘 크기 읽기
-  const closeIconSize = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      const value = getComputedStyle(document.documentElement)
-        .getPropertyValue('--size-icon-sidebar-close')
-        .trim();
-      if (value.endsWith('rem')) {
-        const remValue = parseFloat(value);
-        // ⚠️ 중요: 하드코딩 금지, CSS 변수 사용
-        // HARD-CODE-EXCEPTION: fallback 값 16은 브라우저 기본 폰트 크기 (브라우저 호환성용 상수)
-        const baseFontSize = typeof window !== 'undefined'
-          ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
-          : 16;
-        return remValue * baseFontSize; // rem을 px로 변환
-      } else if (value.endsWith('px')) {
-        return parseFloat(value);
-      } else if (value) {
-        return Number(value);
-      }
-    }
-    return 20; // fallback (CSS 변수를 읽을 수 없는 경우만)
-  }, []);
+  const [advancedMenuOpen, setAdvancedMenuOpen] = useState(false);
+  const [advancedMenuItems, setAdvancedMenuItems] = useState<SidebarItem[] | null>(null);
+  const advancedButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleItemClick = (item: SidebarItem) => {
-    // Advanced 메뉴이고 children이 있으면 펼치기/접기 토글
+    // Advanced 메뉴이고 children이 있으면 레이어 메뉴 열기
     if (item.isAdvanced && item.children && item.children.length > 0) {
-      setExpandedItems((prev) => {
-        const next = new Set(prev);
-        if (next.has(item.id)) {
-          next.delete(item.id);
-        } else {
-          next.add(item.id);
-        }
-        return next;
-      });
+      setAdvancedMenuItems(item.children);
+      setAdvancedMenuOpen(true);
       return;
     }
 
@@ -192,19 +109,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const renderItem = (item: SidebarItem, level: number = 0) => {
     const isActive = isItemActive(item.path, currentPath);
-    const isDesktop = mode === 'lg' || mode === 'xl';
-    // 들여쓰기 계산: 레벨당 spacing-md (기본 paddingLeft 제거하여 헤더 로고와 좌측 여백 일치)
-    // 헤더 로고 좌측 여백 = 헤더 paddingLeft (모바일: var(--spacing-lg), 태블릿 이상: var(--spacing-xl))
-    // 사이드바 메뉴 좌측 여백 = nav paddingLeft + 메뉴 아이템 paddingLeft
-    // 따라서 메뉴 아이템 paddingLeft는 0으로 설정하여 nav paddingLeft만 사용 (헤더 로고와 동일한 좌측 여백)
     const isExpanded = expandedItems.has(item.id);
     const hasChildren = item.children && item.children.length > 0;
-    const isAdvanced = item.isAdvanced;
     const isHovered = hoveredItemId === item.id;
-    // Advanced 메뉴의 하위 메뉴는 들여쓰기 제거
-    const paddingLeft = collapsed
-      ? 0 // 축소 시 paddingLeft 제거
-      : (isAdvanced && level > 0) ? 0 : (level > 0 ? `calc(${level} * var(--spacing-md))` : 0); // 레벨별 들여쓰기만 적용 (기본 paddingLeft 제거하여 헤더 로고와 좌측 여백 일치), Advanced 메뉴 하위는 들여쓰기 제거
+
+    // Advanced 메뉴는 ... 아이콘만 표시
+    if (item.isAdvanced) {
+      return (
+        <div key={item.id}>
+          <button
+            ref={advancedButtonRef}
+            onClick={() => handleItemClick(item)}
+            onMouseEnter={() => setHoveredItemId(item.id)}
+            onMouseLeave={() => setHoveredItemId(null)}
+            style={{
+              width: '100%',
+              textAlign: 'center',
+              borderRadius: 'var(--border-radius-xl)',
+              padding: 'var(--spacing-sm) var(--spacing-xs)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: isHovered ? 'var(--color-primary-40)' : 'transparent',
+              color: 'var(--color-text)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'var(--transition-all)',
+              minHeight: 'var(--touch-target-min)',
+            }}
+          >
+            <span
+              style={{
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 'var(--spacing-sm)',
+                borderRadius: 'var(--border-radius-lg)',
+              }}
+            >
+              <DotsThree
+                weight="bold"
+                style={{
+                  width: 'var(--size-icon-sidebar-lg)',
+                  height: 'var(--size-icon-sidebar-lg)',
+                  color: 'var(--color-text)',
+                }}
+              />
+            </span>
+          </button>
+        </div>
+      );
+    }
 
     return (
       <div key={item.id}>
@@ -214,49 +171,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onMouseLeave={() => setHoveredItemId(null)}
           style={{
             width: '100%',
-            textAlign: 'left',
-            borderRadius: 'var(--border-radius-sm)',
-            padding: `var(--spacing-xxs) var(--spacing-md)`, // 상하 패딩 줄이기 (2px)
-            paddingLeft: paddingLeft,
+            textAlign: 'center',
+            borderRadius: 'var(--border-radius-xl)',
+            padding: 'var(--spacing-sm) var(--spacing-xs)',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            gap: collapsed
-              ? 'var(--spacing-xs)'
-              : 'var(--spacing-sm)', // 아이콘과 메뉴명 사이 간격 줄이기 (8px)
-            backgroundColor: 'transparent', // 배경 효과 제거
-            color: 'var(--color-text)', // 기본 텍스트 색상 사용
-            fontWeight: (isActive || (isAdvanced && isExpanded)) ? 'var(--font-weight-extrabold)' : 'var(--font-weight-medium)', // 선택된 메뉴 또는 Advanced 메뉴 펼침 시: 엑스트라 볼드
-            fontSize: 'var(--font-size-base)',
+            justifyContent: 'center',
+            gap: 'var(--spacing-xs)',
+            backgroundColor: isHovered ? 'var(--color-primary-40)' : 'transparent', // 롤오버 시 인더스트리 타입 색상
+            color: 'var(--color-text)', // 항상 기본 텍스트 색상
+            fontWeight: isActive ? 'var(--font-weight-bold)' : 'var(--font-weight-medium)',
             border: 'none',
             cursor: 'pointer',
             transition: 'var(--transition-all)',
             position: 'relative',
-            minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+            minHeight: 'var(--touch-target-min)',
           }}
         >
-          {/* 펼치기/접기 아이콘 (children이 있는 경우만 표시, Advanced 메뉴는 제외, 축소 시 숨김) */}
-          {!collapsed && !isAdvanced && hasChildren && (
-            <span
-              style={{
-                flexShrink: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 'var(--spacing-md)', // styles.css 준수: spacing 토큰 사용 (16px)
-                height: 'var(--spacing-md)', // styles.css 준수: spacing 토큰 사용 (16px)
-                transition: 'var(--transition-transform)',
-                transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-              }}
-            >
-              <CaretRight
-                size={iconSize}
-                strokeWidth={strokeWidth}
-                style={{
-                  color: 'currentColor',
-                }}
-              />
-            </span>
-          )}
           {item.icon && React.isValidElement(item.icon) && (
             <span
               style={{
@@ -264,74 +196,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                padding: 'var(--spacing-sm)', // 배경 크기 (선택 여부와 무관하게 동일)
+                borderRadius: 'var(--border-radius-lg)', // 더 둥글게
+                backgroundColor: isActive ? 'var(--color-primary)' : 'transparent',
               }}
             >
-              {(() => {
-                const currentStrokeWidth = (isActive || isHovered || (isAdvanced && isExpanded)) ? strokeWidthBold : strokeWidth;
-                const currentStroke = (isActive || isHovered || (isAdvanced && isExpanded))
-                  ? 'var(--color-primary)' // 롤오버/선택 시 또는 Advanced 메뉴 펼침 시 인더스트리 테마 primary 색상
-                  : 'var(--color-text)'; // 기본 상태: 기본 텍스트 색상
-
-                // SVG 요소 복제 (strokeWidth는 SVG 자체에는 적용되지 않으므로 제거)
-                const iconElement = React.cloneElement(item.icon as React.ReactElement<any>, {
-                  ...(item.icon.props || {}),
-                  // SVG 자체에는 strokeWidth를 전달하지 않음 (자식 요소에만 적용)
-                  strokeLinecap: 'round', // 선 끝 모양 통일 (SVG 전체에 적용)
-                  strokeLinejoin: 'round', // 선 연결 모양 통일 (SVG 전체에 적용)
-                  stroke: currentStroke, // stroke 색상 (SVG 전체에 적용, 자식 요소에 상속)
-                  style: {
-                    ...(item.icon.props?.style || {}),
-                    width: 'var(--size-icon-sidebar)',
-                    height: 'var(--size-icon-sidebar)',
-                    transition: 'var(--transition-all)',
-                  },
-                  children: React.Children.map(item.icon.props?.children || [], (child) => {
-                    // React.isValidElement로 유효한 React 요소인지 확인
-                    if (!React.isValidElement(child)) {
-                      return child;
-                    }
-
-                    // SVG 자식 요소 타입 확인 (string 타입인 경우만 처리)
-                    // React에서 SVG 요소는 type이 문자열로 전달됨 (예: 'path', 'circle')
-                    const childType = typeof child.type === 'string' ? child.type.toLowerCase() : null;
-
-                    // path, circle, line 등 모든 SVG 자식 요소에 strokeWidth 적용
-                    if (childType && ['path', 'circle', 'line', 'rect', 'polygon', 'polyline', 'ellipse'].includes(childType)) {
-                      // 기존 props와 병합하여 strokeWidth, strokeLinecap, strokeLinejoin, stroke 적용
-                      const existingProps = child.props || {};
-                      return React.cloneElement(child as React.ReactElement<any>, {
-                        ...existingProps,
-                        strokeWidth: String(currentStrokeWidth), // SVG 자식 요소에 strokeWidth 명시적으로 적용 (문자열로 전달)
-                        strokeLinecap: 'round', // 자식 요소에도 명시적으로 적용
-                        strokeLinejoin: 'round', // 자식 요소에도 명시적으로 적용
-                        stroke: currentStroke, // stroke 색상도 자식 요소에 명시적으로 적용
-                      });
-                    }
-
-                    // SVG 자식 요소가 아닌 경우 그대로 반환
-                    return child;
-                  }),
-                });
-
-                // 축소 모드일 때만 툴팁 표시
-                if (collapsed) {
-                  return (
-                    <Tooltip content={item.label} position="right">
-                      {iconElement}
-                    </Tooltip>
-                  );
-                }
-
-                return iconElement;
-              })()}
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */}
+              {React.cloneElement(item.icon as React.ReactElement<any>, {
+                ...(item.icon.props || {}),
+                stroke: isActive ? 'var(--color-white)' : 'var(--color-text)',
+                strokeWidth: 2, // 살짝 굵게
+                style: {
+                  /* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */
+                  ...(item.icon.props?.style || {}),
+                  width: 'var(--size-icon-sidebar-lg)',
+                  height: 'var(--size-icon-sidebar-lg)',
+                },
+              })}
             </span>
           )}
-          {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
+          <span style={{
+            lineHeight: 1.2,
+            whiteSpace: 'nowrap',
+            fontSize: 'var(--font-size-sm)',
+          }}>
+            {item.label}
+          </span>
         </button>
-        {/* 하위 메뉴 렌더링 (펼쳐진 경우만, Advanced 메뉴는 축소 상태에서도 표시) */}
-        {hasChildren && isExpanded && (!collapsed || isAdvanced) && (
-          <div style={{ marginLeft: isAdvanced ? 0 : 'var(--spacing-md)', marginTop: 'var(--spacing-xs)' }}>
-            {item.children!.map((child) => renderItem(child, isAdvanced ? level : level + 1))}
+        {/* 하위 메뉴 렌더링 (펼쳐진 경우만) */}
+        {hasChildren && isExpanded && (
+          <div style={{ marginTop: 'var(--spacing-xs)' }}>
+            {item.children!.map((child) => renderItem(child, level + 1))}
           </div>
         )}
       </div>
@@ -343,36 +238,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       style={{
         height: '100%',
         overflowY: 'auto',
-        // 모바일(xs, sm): padding 제거 (Container에서 처리), 태블릿 이상(md+): 바디와 동일한 여백 (유아이 문서 6-1 준수)
-        // 바디 구조: main(padding: var(--spacing-xl)) > Container(paddingTop: var(--spacing-xl) 기본값)
-        // 사이드바 구조: nav(paddingTop: var(--spacing-content-top)) > PageHeader
-        // 바디의 실제 상단 여백 = main의 paddingTop(32px) + Container의 paddingTop(32px) = 64px
-        // 사이드바도 바디와 동일하게 상단 여백을 맞추기 위해 CSS 변수 사용
-        // 좌측 여백: 글로벌 헤더와 동일하게 설정 (모바일: var(--spacing-lg), 태블릿 이상: var(--spacing-xl))
-        paddingLeft: isMobile ? 'var(--spacing-lg)' : 'var(--spacing-xl)', // 모바일: 24px (헤더와 동일), 태블릿 이상: 32px (헤더와 동일)
-        paddingRight: isMobile ? 0 : 'var(--spacing-xl)', // 태블릿 이상: 우측 여백 (32px, main의 paddingRight와 동일)
-        paddingTop: isMobile ? 0 : 'var(--spacing-content-top)', // 태블릿 이상: 상단 여백 (바디와 동일, CSS 변수 사용)
-        paddingBottom: isMobile ? 0 : 'var(--spacing-xl)', // 태블릿 이상: 하단 여백 (32px, main의 paddingBottom과 동일)
+        padding: isMobile ? 'var(--spacing-sm)' : 'var(--spacing-md) var(--spacing-md)',
         transition: 'var(--transition-all)',
       }}
     >
-      {!collapsed && pageHeaderTitle && (
-        <PageHeader
-          title={pageHeaderTitle}
-          actions={pageHeaderActions}
-          style={{
-            marginTop: 0, // nav의 paddingTop이 상단 여백을 제공하므로 marginTop 제거
-            marginBottom: 'var(--spacing-lg)', // PageHeader의 기본 marginBottom 유지
-          }}
-        />
-      )}
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: 'calc(var(--spacing-sm) + var(--spacing-negative-xxs))', // 메뉴명 행간 간격 (8px - 2px = 6px)
-          // 메뉴 리스트 첫 번째 메뉴 상단 여백: PageHeader가 없을 때도 동일한 여백 유지 (모바일만)
-          paddingTop: (isMobile && !pageHeaderTitle) ? 'var(--spacing-lg)' : 0,
+          gap: '1px', // 메뉴 항목 간 간격
         }}
       >
         {items.map((item) => renderItem(item))}
@@ -449,7 +323,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
               >
                 <X
-                  size={closeIconSize}
+                  size={20}
                   style={{
                     color: 'currentColor',
                   }}
@@ -463,22 +337,117 @@ export const Sidebar: React.FC<SidebarProps> = ({
     );
   }
 
+  // 레이어 메뉴 아이템 클릭 핸들러
+  const handleAdvancedMenuItemClick = (item: SidebarItem) => {
+    if (item.onClick) {
+      item.onClick();
+    } else if (onItemClick) {
+      onItemClick(item);
+    }
+    setAdvancedMenuOpen(false);
+    setAdvancedMenuItems(null);
+  };
+
   // Desktop: Persistent Sidebar
   return (
-    <aside
-      className={clsx(className)}
-      style={{
-        height: '100%',
-        width: collapsed ? 'var(--width-sidebar-collapsed)' : 'var(--width-sidebar)', // styles.css 준수: 사이드바 너비 토큰 사용
-        minWidth: collapsed ? 'var(--width-sidebar-collapsed)' : 'var(--width-sidebar)', // styles.css 준수: 사이드바 너비 토큰 사용
-        backgroundColor: 'var(--color-white)',
-        borderRight: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
-        boxShadow: 'var(--shadow-sm)',
-        transition: 'var(--transition-all)',
-      }}
-    >
-      {sidebarContent}
-    </aside>
+    <>
+      <aside
+        className={clsx(className)}
+        style={{
+          height: '100%',
+          width: 'var(--width-sidebar)',
+          minWidth: 'var(--width-sidebar)',
+          backgroundColor: 'var(--color-white)',
+          borderRight: 'var(--border-width-thin) solid var(--color-gray-200)',
+          boxShadow: 'var(--shadow-sm)',
+          transition: 'var(--transition-all)',
+        }}
+      >
+        {sidebarContent}
+      </aside>
+      {/* 더보기 레이어 메뉴 */}
+      {advancedMenuOpen && advancedMenuItems && (
+        <>
+          {/* 오버레이 */}
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 'var(--z-max)',
+            }}
+            onClick={() => {
+              setAdvancedMenuOpen(false);
+              setAdvancedMenuItems(null);
+            }}
+          />
+          {/* 레이어 메뉴 */}
+          <div
+            style={{
+              position: 'fixed',
+              left: 'calc(var(--width-sidebar) - var(--spacing-sm))',
+              top: 'calc(var(--height-header) + var(--spacing-lg))',
+              zIndex: 'calc(var(--z-max) + 1)',
+              backgroundColor: 'var(--color-white)',
+              borderRadius: 'var(--border-radius-lg)',
+              boxShadow: 'var(--shadow-lg)',
+              border: 'var(--border-width-thin) solid var(--color-gray-200)',
+              padding: 'var(--spacing-sm)',
+              minWidth: '160px',
+            }}
+          >
+            {advancedMenuItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleAdvancedMenuItemClick(item)}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: 'var(--spacing-sm) var(--spacing-md)',
+                  borderRadius: 'var(--border-radius-sm)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--color-text)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 'var(--font-size-sm)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--spacing-sm)',
+                  transition: 'var(--transition-all)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                {item.icon && React.isValidElement(item.icon) && (
+                  <span
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */}
+                    {React.cloneElement(item.icon as React.ReactElement<any>, {
+                      ...(item.icon.props || {}),
+                      style: {
+                        /* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */
+                        ...(item.icon.props?.style || {}),
+                        width: 'var(--size-icon-base)',
+                        height: 'var(--size-icon-base)',
+                      },
+                    })}
+                  </span>
+                )}
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </>
   );
 };
 

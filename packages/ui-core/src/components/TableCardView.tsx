@@ -109,8 +109,7 @@ export function TableCardView<T = unknown>({
                         fontSize: 'var(--font-size-xs)',
                         color: 'var(--color-text-secondary)',
                         textTransform: 'uppercase',
-                        // HARD-CODE-EXCEPTION: 텍스트 간격 조정을 위한 상대값 (em 단위는 상대값이므로 CSS 변수로 대체하기 어려움)
-                        letterSpacing: '0.05em',
+                        letterSpacing: 'var(--letter-spacing-table-header)',
                       }}
                     >
                       {column.label}

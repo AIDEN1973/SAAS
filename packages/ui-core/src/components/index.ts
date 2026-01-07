@@ -20,7 +20,7 @@ export { Container, Grid, SidebarLayout } from './Layout';
 export type { ContainerProps, GridProps, SidebarLayoutProps } from './Layout';
 
 export { Header } from './Header';
-export type { HeaderProps } from './Header';
+export type { HeaderProps, UserProfile, HeaderSearchProps } from './Header';
 
 export { Sidebar } from './Sidebar';
 export type { SidebarProps, SidebarItem } from './Sidebar';
@@ -162,3 +162,9 @@ export type { SmsComposerProps } from './SmsComposer';
 
 export { VirtualList } from './VirtualList';
 export type { VirtualListProps } from './VirtualList';
+
+export { GlobalSearchResults } from './GlobalSearchResults';
+export type { GlobalSearchResultsProps, SearchResult, SearchEntityType } from './GlobalSearchResults';
+
+export { GlobalSearchDropdown } from './GlobalSearchDropdown';
+export type { GlobalSearchDropdownProps } from './GlobalSearchDropdown';
