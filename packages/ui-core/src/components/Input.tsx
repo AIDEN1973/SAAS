@@ -35,6 +35,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   placeholder,
   value: valueProp,
   onChange,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   showInlineLabelWhenHasValue = true,
   ...props
 }, ref) => {
@@ -99,7 +100,6 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   }, []);
 
   // 값이 비어있는지 확인 (빈 문자열, 공백만 있는 문자열도 빈 값으로 처리)
-  // valueProp이 있으면 valueProp 사용, 없으면 internalValue 사용 (실시간 업데이트)
   const isEmpty = React.useMemo(() => {
     const currentValue = isControlled ? (valueProp ?? '') : internalValue;
     if (currentValue === undefined || currentValue === null || currentValue === '') return true;
@@ -107,12 +107,6 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
     if (typeof currentValue === 'number') return false; // 숫자는 항상 값이 있음
     return String(currentValue).trim() === '';
   }, [isControlled, valueProp, internalValue]);
-  const hasValue = !isEmpty;
-  // ⚠️ IME 안정성: 입력(포커스/조합) 중에는 레이아웃이 바뀌면 안 됨.
-  // 기존 로직은 값이 1글자라도 들어오면(useInline=true) DOM 구조가 바뀌며(래퍼/placeholder 모드 전환)
-  // 한글 조합이 'ㅅ'에서 끊길 수 있음.
-  // 따라서 포커스 중이거나 조합 중에는 인라인 라벨 모드로 전환하지 않고, 포커스 아웃 이후에만 적용.
-  const useInline = showInlineLabelWhenHasValue && hasValue && !isFocused && !isComposingRef.current;
 
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
@@ -147,69 +141,55 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
     },
   };
 
-  // 수정모드(값이 있을 때): 인라인 라벨 + 입력값을 래퍼로 감싸고 밑줄은 래퍼에 적용
-  // 따라서 input 자체는 밑줄 없이, 래퍼에서 관리
+  // 단순 입력 폼: input 요소의 스타일 (테두리 없음, 래퍼에서 처리)
   const inputStyle: React.CSSProperties = {
     ...sizeStyles[size],
     border: 'none',
-    // 수정모드일 때는 래퍼에 밑줄 적용, 그렇지 않으면 input에 직접 적용
-    borderBottom: useInline ? 'none' : `var(--border-width-form-bottom) solid transparent`,
-    borderRadius: 0,
-    backgroundColor: 'transparent', // 래퍼 배경과 통합
-    color: 'var(--color-text)', // styles.css 토큰: 폼 필드 텍스트 색상
+    borderRadius: 'var(--border-radius-xs)',
+    backgroundColor: 'var(--color-white)',
+    color: 'var(--color-text)',
     outline: 'none',
-    flex: useInline ? 1 : undefined, // 수정모드에서 남은 공간 채우기
-    width: useInline ? 'auto' : (fullWidth ? '100%' : 'auto'),
-    minWidth: useInline ? 0 : undefined, // flex 환경에서 shrink 허용
-    transition: 'var(--transition-all)', // styles.css 토큰: transition
-    fontFamily: 'var(--font-family)', // styles.css 토큰: 폰트 패밀리
-    fontSize: 'var(--font-size-base)', // styles.css 토큰: 폼 필드 폰트 사이즈
-    fontWeight: 'var(--font-weight-normal)', // styles.css 토큰: 폼 필드 폰트 웨이트
-    lineHeight: 'var(--line-height)', // styles.css 토큰: 폼 필드 라인 높이
-    boxSizing: 'border-box', // styles.css 토큰: 폼 필드 box-sizing
-    // 수정모드가 아닐 때만 input에 직접 밑줄 적용
-    boxShadow: useInline ? 'none' : (isFocused
-      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
-      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)')),
+    width: fullWidth ? '100%' : 'auto',
+    transition: 'var(--transition-all)',
+    fontFamily: 'var(--font-family)',
+    fontSize: 'var(--font-size-base)',
+    fontWeight: 'var(--font-weight-normal)',
+    lineHeight: 'var(--line-height)',
+    boxSizing: 'border-box',
   };
 
-  // 수정모드(값이 있을 때) 래퍼 스타일: 인라인 라벨 + 입력값을 감싸고 밑줄 적용
-  const inlineWrapperStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    width: '100%',
+  // 래퍼 스타일: input을 감싸고 사방 테두리 적용 (카드 스타일과 동일)
+  const wrapperStyle: React.CSSProperties = {
+    position: 'relative',
+    width: fullWidth ? '100%' : 'auto',
     backgroundColor: 'var(--color-white)',
-    borderBottom: `var(--border-width-form-bottom) solid transparent`,
-    boxShadow: isFocused
-      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
-      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)'),
+    border: isFocused
+      ? (error ? 'var(--border-width-thin) solid var(--color-form-error)' : 'var(--border-width-thin) solid var(--color-primary)')
+      : (error ? 'var(--border-width-thin) solid var(--color-form-error)' : 'var(--border-width-thin) solid var(--color-gray-200)'),
+    borderRadius: 'var(--border-radius-xs)',
     boxSizing: 'border-box',
     transition: 'var(--transition-all)',
   };
 
-  // 래퍼 ref (수정모드에서 포커스 스타일 적용용)
+  // 래퍼 ref
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
 
-  // React Hook Form의 onBlur와 컴포넌트의 포커스 스타일 관리 병합 (styles.css 토큰 사용)
+  // React Hook Form의 onBlur와 컴포넌트의 포커스 스타일 관리 병합
   const handleFocus = React.useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(true);
-    // 수정모드에서는 래퍼에 스타일 적용, 그렇지 않으면 input에 직접 적용
-    const targetEl = (useInline ? wrapperRef.current : null) || e.currentTarget;
-    targetEl.style.borderBottomColor = 'transparent';
-    targetEl.style.boxShadow = error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)';
+    if (wrapperRef.current) {
+      wrapperRef.current.style.borderColor = error ? 'var(--color-form-error)' : 'var(--color-primary)';
+    }
     onFocus?.(e);
-  }, [error, onFocus, useInline]);
+  }, [error, onFocus]);
 
   const handleBlur = React.useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(false);
-    // 수정모드에서는 래퍼에 스타일 적용, 그렇지 않으면 input에 직접 적용
-    const targetEl = (useInline ? wrapperRef.current : null) || e.currentTarget;
-    targetEl.style.borderBottomColor = 'transparent';
-    targetEl.style.boxShadow = error
-      ? 'var(--shadow-form-bottom-default-error)'
-      : 'var(--shadow-form-bottom-default)';
+    if (wrapperRef.current) {
+      wrapperRef.current.style.borderColor = error ? 'var(--color-form-error)' : 'var(--color-gray-200)';
+    }
     onBlur?.(e);
-  }, [error, onBlur, useInline]);
+  }, [error, onBlur]);
 
   return (
     <div
@@ -219,180 +199,100 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
         width: fullWidth ? '100%' : 'auto',
       }}
     >
-      <div style={{ position: 'relative', width: fullWidth ? '100%' : 'auto' }}>
-        {/* 수정모드(값이 있을 때): 인라인 라벨 + 입력값을 래퍼로 감싸고 밑줄은 래퍼에 적용 */}
-        {useInline ? (
-          <div ref={wrapperRef} style={inlineWrapperStyle}>
-            {/* 인라인 라벨(항목명): 값이 있을 때 좌측에 표시 */}
-            {inputPlaceholder && (
-              <span
-                style={{
-                  color: 'var(--color-form-inline-label)',
-                  marginRight: 'var(--spacing-form-inline-label-gap)',
-                  whiteSpace: 'nowrap',
-                  fontSize: 'var(--font-size-base)',
-                  fontFamily: 'var(--font-family)',
-                  fontWeight: 'var(--font-weight-normal)',
-                  lineHeight: 'var(--line-height)',
-                  paddingTop: sizeStyles[size].paddingTop,
-                  paddingBottom: sizeStyles[size].paddingBottom,
-                  paddingLeft: sizeStyles[size].paddingLeft,
-                  flexShrink: 0,
-                  minWidth: 'var(--width-form-inline-label)', // 고정 너비로 결과값 세로 정렬
-                }}
-              >
-                {inputPlaceholder}
-              </span>
-            )}
-            <input
-              ref={(node) => {
-                inputRef.current = node;
-                if (typeof ref === 'function') {
-                  ref(node);
-                } else if (ref) {
-                  (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
-                }
-              }}
-              className={clsx(className)}
-              style={inputStyle}
-              placeholder=""
-              value={value}
-              onCompositionStart={(e) => {
-                isComposingRef.current = true;
-                if ((import.meta as any).env?.DEV) {
-                  console.log('[IME][Input] compositionstart', {
-                    name: (props as any)?.name,
-                    isControlled,
-                    valueProp,
-                    value,
-                    data: (e as unknown as CompositionEvent).data,
-                  });
-                }
-                (props as any).onCompositionStart?.(e);
-              }}
-              onCompositionEnd={(e) => {
-                isComposingRef.current = false;
-                if ((import.meta as any).env?.DEV) {
-                  console.log('[IME][Input] compositionend', {
-                    name: (props as any)?.name,
-                    isControlled,
-                    valueProp,
-                    value,
-                    data: (e as unknown as CompositionEvent).data,
-                  });
-                }
-                (props as any).onCompositionEnd?.(e);
-              }}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                // controlled 모드에서는 외부(onChange)가 상태를 소유하므로 내부 상태 업데이트 금지
-                if (!isControlled) setInternalValue(newValue);
-                if ((import.meta as any).env?.DEV) {
-                  const nativeIsComposing = (e.nativeEvent as any)?.isComposing;
-                  console.log('[IME][Input] change', {
-                    name: (props as any)?.name,
-                    isControlled,
-                    isComposingRef: isComposingRef.current,
-                    nativeIsComposing,
-                    newValue,
-                    prevValue: value,
-                  });
-                }
-                onChange?.(e);
-                (props as any).onChange?.(e);
-              }}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-              {...props}
-            />
+      <div ref={wrapperRef} style={wrapperStyle}>
+        <input
+          ref={(node) => {
+            inputRef.current = node;
+            if (typeof ref === 'function') {
+              ref(node);
+            } else if (ref) {
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+              (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
+            }
+          }}
+          className={clsx(className)}
+          style={inputStyle}
+          placeholder=""
+          value={value}
+          onCompositionStart={(e) => {
+            isComposingRef.current = true;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+            if ((import.meta as any).env?.DEV) {
+              console.log('[IME][Input] compositionstart', {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+                name: (props as any)?.name,
+                isControlled,
+                valueProp,
+                value,
+                data: (e as unknown as CompositionEvent).data,
+              });
+            }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+            (props as any).onCompositionStart?.(e);
+          }}
+          onCompositionEnd={(e) => {
+            isComposingRef.current = false;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+            if ((import.meta as any).env?.DEV) {
+              console.log('[IME][Input] compositionend', {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+                name: (props as any)?.name,
+                isControlled,
+                valueProp,
+                value,
+                data: (e as unknown as CompositionEvent).data,
+              });
+            }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+            (props as any).onCompositionEnd?.(e);
+          }}
+          onChange={(e) => {
+            const newValue = e.target.value;
+            if (!isControlled) setInternalValue(newValue);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+            if ((import.meta as any).env?.DEV) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+              const nativeIsComposing = (e.nativeEvent as any)?.isComposing;
+              console.log('[IME][Input] change', {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+                name: (props as any)?.name,
+                isControlled,
+                isComposingRef: isComposingRef.current,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                nativeIsComposing,
+                newValue,
+                prevValue: value,
+              });
+            }
+            onChange?.(e);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+            (props as any).onChange?.(e);
+          }}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          {...props}
+        />
+        {isEmpty && !isFocused && inputPlaceholder && (
+          <div
+            style={{
+              position: 'absolute',
+              left: sizeStyles[size].paddingLeft as string,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              pointerEvents: 'none',
+              color: 'var(--color-text-tertiary)',
+              fontSize: 'var(--font-size-base)',
+              fontFamily: 'var(--font-family)',
+              fontWeight: 'var(--font-weight-normal)',
+              lineHeight: 'var(--line-height)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              width: `calc(100% - ${sizeStyles[size].paddingLeft} - ${sizeStyles[size].paddingRight})`,
+            }}
+          >
+            {renderPlaceholderWithBold(inputPlaceholder)}
           </div>
-        ) : (
-          /* 입력모드(값이 없을 때): input에 직접 밑줄 적용 */
-          <>
-            <input
-              ref={(node) => {
-                inputRef.current = node;
-                if (typeof ref === 'function') {
-                  ref(node);
-                } else if (ref) {
-                  (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
-                }
-              }}
-              className={clsx(className)}
-              style={inputStyle}
-              placeholder=""
-              value={value}
-              onCompositionStart={(e) => {
-                isComposingRef.current = true;
-                if ((import.meta as any).env?.DEV) {
-                  console.log('[IME][Input] compositionstart', {
-                    name: (props as any)?.name,
-                    isControlled,
-                    valueProp,
-                    value,
-                    data: (e as unknown as CompositionEvent).data,
-                  });
-                }
-                (props as any).onCompositionStart?.(e);
-              }}
-              onCompositionEnd={(e) => {
-                isComposingRef.current = false;
-                if ((import.meta as any).env?.DEV) {
-                  console.log('[IME][Input] compositionend', {
-                    name: (props as any)?.name,
-                    isControlled,
-                    valueProp,
-                    value,
-                    data: (e as unknown as CompositionEvent).data,
-                  });
-                }
-                (props as any).onCompositionEnd?.(e);
-              }}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                // controlled 모드에서는 외부(onChange)가 상태를 소유하므로 내부 상태 업데이트 금지
-                if (!isControlled) setInternalValue(newValue);
-                if ((import.meta as any).env?.DEV) {
-                  const nativeIsComposing = (e.nativeEvent as any)?.isComposing;
-                  console.log('[IME][Input] change', {
-                    name: (props as any)?.name,
-                    isControlled,
-                    isComposingRef: isComposingRef.current,
-                    nativeIsComposing,
-                    newValue,
-                    prevValue: value,
-                  });
-                }
-                onChange?.(e);
-                (props as any).onChange?.(e);
-              }}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-              {...props}
-            />
-            {isEmpty && !isFocused && inputPlaceholder && (
-              <div
-                style={{
-                  position: 'absolute',
-                  left: sizeStyles[size].paddingLeft as string,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  pointerEvents: 'none',
-                  color: 'var(--color-text-tertiary)',
-                  fontSize: 'var(--font-size-base)',
-                  fontFamily: 'var(--font-family)',
-                  fontWeight: 'var(--font-weight-normal)',
-                  lineHeight: 'var(--line-height)',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  width: `calc(100% - ${sizeStyles[size].paddingLeft} - ${sizeStyles[size].paddingRight})`,
-                }}
-              >
-                {renderPlaceholderWithBold(inputPlaceholder)}
-              </div>
-            )}
-          </>
         )}
       </div>
       {error && (

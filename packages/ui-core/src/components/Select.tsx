@@ -34,6 +34,16 @@ export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectE
    * - 필터/검색 UI: false
    */
   showInlineLabelWhenHasValue?: boolean;
+  /**
+   * 드롭다운 최소 너비 (px)
+   * 지정 시 anchor 너비 대신 옵션 텍스트 기반 동적 너비 계산
+   */
+  dropdownMinWidth?: number;
+  /**
+   * 드롭다운 너비를 옵션 텍스트에 맞게 동적으로 계산할지 여부
+   * true일 경우 가장 긴 옵션 텍스트 너비를 기준으로 설정
+   */
+  autoDropdownWidth?: boolean;
 }
 
 /**
@@ -55,6 +65,9 @@ export const Select: React.FC<SelectProps> = ({
   onFocus,
   onBlur,
   disabled,
+  dropdownMinWidth,
+  autoDropdownWidth = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ...props
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -69,10 +82,19 @@ export const Select: React.FC<SelectProps> = ({
       const opts: SelectOption[] = [];
       React.Children.forEach(children, (child) => {
         if (React.isValidElement(child) && child.type === 'option') {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+          const value = child.props.value;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          const label = child.props.children?.toString() || child.props.value?.toString() || '';
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+          const disabled = child.props.disabled;
           opts.push({
-            value: child.props.value,
-            label: child.props.children?.toString() || child.props.value?.toString() || '',
-            disabled: child.props.disabled,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            value,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            label,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            disabled,
           });
         }
       });
@@ -130,47 +152,53 @@ export const Select: React.FC<SelectProps> = ({
   }, [value, options, multiple]);
 
   const hasValue = selectedLabelsForStyle.length > 0;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const showInlineLabel = showInlineLabelWhenHasValue && hasValue;
 
   const selectStyle: React.CSSProperties = {
     ...sizeStyles[size],
     border: 'none',
-    borderBottom: `var(--border-width-form-bottom) solid transparent`, // styles.css 토큰: 레이아웃 유지를 위해 항상 2px, 색상은 투명
-    borderRadius: 0,
-    backgroundColor: disabled ? 'var(--color-form-disabled-bg)' : 'var(--color-white)', // styles.css 토큰: 폼 필드 배경색
-    color: disabled ? 'var(--color-form-disabled-text)' : 'var(--color-text)', // styles.css 토큰: 폼 필드 텍스트 색상
+    borderRadius: 'var(--border-radius-xs)',
+    backgroundColor: disabled ? 'var(--color-form-disabled-bg)' : 'var(--color-white)',
+    color: disabled ? 'var(--color-form-disabled-text)' : 'var(--color-text)',
     outline: 'none',
     width: fullWidth ? '100%' : 'auto',
-    transition: 'var(--transition-all)', // styles.css 토큰: transition
-    fontFamily: 'var(--font-family)', // styles.css 토큰: 폰트 패밀리
-    fontSize: 'var(--font-size-base)', // styles.css 토큰: 폼 필드 폰트 사이즈
-    fontWeight: 'var(--font-weight-normal)', // styles.css 토큰: 폼 필드 폰트 웨이트
-    lineHeight: 'var(--line-height)', // styles.css 토큰: 폼 필드 라인 높이
-    // 요구사항: 수정모드(값이 있는 상태)에서도 기본(비포커스) 밑줄은 1px로 유지
-    // 오픈/포커스 상태에서만 2px로 변경
-    boxShadow: isOpen
-      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
-      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)'),
+    transition: 'var(--transition-all)',
+    fontFamily: 'var(--font-family)',
+    fontSize: 'var(--font-size-base)',
+    fontWeight: 'var(--font-weight-normal)',
+    lineHeight: 'var(--line-height)',
     cursor: disabled ? 'not-allowed' : 'pointer',
     display: 'flex',
     alignItems: 'center',
-    boxSizing: 'border-box', // styles.css 토큰: 폼 필드 box-sizing
-    // 높이는 fontSize * lineHeight + padding-top + padding-bottom + border로 자동 계산됨
+    boxSizing: 'border-box',
+  };
+
+  // 래퍼 스타일: select를 감싸고 사방 테두리 적용 (카드 스타일과 동일)
+  const wrapperStyle: React.CSSProperties = {
+    position: 'relative',
+    width: fullWidth ? '100%' : 'auto',
+    backgroundColor: disabled ? 'var(--color-form-disabled-bg)' : 'var(--color-white)',
+    border: isOpen
+      ? (error ? 'var(--border-width-thin) solid var(--color-form-error)' : 'var(--border-width-thin) solid var(--color-primary)')
+      : (error ? 'var(--border-width-thin) solid var(--color-form-error)' : 'var(--border-width-thin) solid var(--color-gray-200)'),
+    borderRadius: 'var(--border-radius-xs)',
+    boxSizing: 'border-box',
+    transition: 'var(--transition-all)',
   };
 
   const handleToggle = useCallback((e?: React.MouseEvent) => {
     if (disabled) return;
     if (e) {
-      e.stopPropagation(); // 이벤트 전파 방지 (상위 요소의 클릭 이벤트 트리거 방지)
+      e.stopPropagation();
     }
     setIsOpen((prev) => !prev);
     if (!isOpen) {
       setFocusedIndex(-1);
     }
-    // 클릭 시 포커스 스타일 적용 (styles.css 토큰 사용)
-    if (anchorRef.current) {
-      anchorRef.current.style.borderBottomColor = 'transparent'; // styles.css 토큰: 항상 transparent 유지 (레이아웃 고정)
-      anchorRef.current.style.boxShadow = error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)'; // styles.css 토큰: 포커스 시 시각적 2px 테두리
+    // 클릭 시 래퍼에 포커스 스타일 적용
+    if (anchorRef.current?.parentElement) {
+      anchorRef.current.parentElement.style.borderColor = error ? 'var(--color-form-error)' : 'var(--color-primary)';
     }
   }, [disabled, isOpen, error]);
 
@@ -183,6 +211,7 @@ export const Select: React.FC<SelectProps> = ({
       const valueStr = String(optionValue);
       const newValues = currentValues.includes(valueStr)
         ? currentValues.filter((v) => v !== valueStr)
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         : [...currentValues, valueStr];
       onChange?.(newValues);
     } else {
@@ -244,19 +273,12 @@ export const Select: React.FC<SelectProps> = ({
   }, [disabled, isOpen, focusedIndex, options, handleSelect, handleToggle]);
 
   const handleFocus = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
-    e.currentTarget.style.borderBottomColor = 'transparent'; // styles.css 토큰: 항상 transparent 유지 (레이아웃 고정)
-    e.currentTarget.style.boxShadow = error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)'; // styles.css 토큰: 포커스 시 항상 시각적 2px 테두리
     onFocus?.(e as unknown as React.FocusEvent<HTMLSelectElement>);
-  }, [error, onFocus]);
+  }, [onFocus]);
 
   const handleBlur = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
-    e.currentTarget.style.borderBottomColor = 'transparent'; // styles.css 토큰: 투명으로 변경
-    // 요구사항: blur 시에는 값 유무와 관계없이 1px로 복원
-    e.currentTarget.style.boxShadow = error
-      ? 'var(--shadow-form-bottom-default-error)'
-      : 'var(--shadow-form-bottom-default)';
     onBlur?.(e as unknown as React.FocusEvent<HTMLSelectElement>);
-  }, [error, onBlur]);
+  }, [onBlur]);
 
   // 라벨을 플레이스홀더로 사용
   const placeholder = label || '선택하세요';
@@ -311,14 +333,10 @@ export const Select: React.FC<SelectProps> = ({
       : placeholder
     : selectedLabels[0] || placeholder;
 
-  // 값 변경 시 스타일 업데이트 (값이 있으면 2px, 없으면 1px)
+  // 드롭다운 닫을 때 래퍼 테두리 색상 복원
   useEffect(() => {
-    if (anchorRef.current && !isOpen) {
-      anchorRef.current.style.borderBottomColor = 'transparent';
-      // 요구사항: 닫힌 상태에서는 값 유무와 관계없이 1px
-      anchorRef.current.style.boxShadow = error
-        ? 'var(--shadow-form-bottom-default-error)'
-        : 'var(--shadow-form-bottom-default)';
+    if (anchorRef.current?.parentElement && !isOpen) {
+      anchorRef.current.parentElement.style.borderColor = error ? 'var(--color-form-error)' : 'var(--color-gray-200)';
     }
   }, [error, isOpen]);
 
@@ -330,15 +348,81 @@ export const Select: React.FC<SelectProps> = ({
     }
   }, [isOpen, focusedIndex]);
 
-  // 드롭다운 메뉴 너비를 셀렉트 박스 너비에 맞추기
+  // 드롭다운 메뉴 너비를 셀렉트 박스 너비에 맞추기 (또는 옵션 텍스트 기반 동적 계산)
   useEffect(() => {
     if (isOpen && anchorRef.current) {
-      const anchorWidth = anchorRef.current.getBoundingClientRect().width;
-      setDropdownWidth(anchorWidth);
+      // autoDropdownWidth가 true이거나 dropdownMinWidth가 지정된 경우 옵션 텍스트 기반 동적 계산
+      if (autoDropdownWidth || dropdownMinWidth) {
+        // 임시 요소를 생성하여 텍스트 너비 측정
+        const tempElement = document.createElement('span');
+        tempElement.style.visibility = 'hidden';
+        tempElement.style.position = 'absolute';
+        tempElement.style.whiteSpace = 'nowrap';
+        tempElement.style.pointerEvents = 'none';
+        tempElement.style.top = '-9999px';
+        tempElement.style.left = '-9999px';
+        // CSS 변수를 computed style로 변환하여 실제 값 적용
+        const computedFontSize = getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim() || '16px';
+        const computedFontWeight = getComputedStyle(document.documentElement).getPropertyValue('--font-weight-normal').trim() || '400';
+        const computedFontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-family').trim() || 'sans-serif';
+        tempElement.style.fontSize = computedFontSize;
+        tempElement.style.fontWeight = computedFontWeight;
+        tempElement.style.fontFamily = computedFontFamily;
+        document.body.appendChild(tempElement);
+
+        let maxWidth = 0;
+        options.forEach((option) => {
+          tempElement.textContent = option.label;
+          // DOM에 추가된 후 강제 리플로우
+          void tempElement.offsetWidth;
+          const textWidth = tempElement.getBoundingClientRect().width;
+          maxWidth = Math.max(maxWidth, textWidth);
+        });
+
+        document.body.removeChild(tempElement);
+
+        // CSS 변수에서 패딩 값 읽기
+        const getCSSVariableAsPx = (varName: string, defaultValue: number): number => {
+          if (typeof window === 'undefined') return defaultValue;
+          const cssValue = getComputedStyle(document.documentElement)
+            .getPropertyValue(varName)
+            .trim();
+          if (!cssValue) return defaultValue;
+          if (cssValue.endsWith('rem')) {
+            const remValue = parseFloat(cssValue);
+            const baseFontSize = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16;
+            return remValue * baseFontSize;
+          }
+          if (cssValue.endsWith('px')) {
+            return parseFloat(cssValue);
+          }
+          return defaultValue;
+        };
+
+        const baseFontSize = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16;
+        const spacingMd = getCSSVariableAsPx('--spacing-md', baseFontSize);
+        const spacingXs = getCSSVariableAsPx('--spacing-xs', baseFontSize * 0.25);
+
+        // 패딩과 여백을 고려한 최종 너비 계산
+        const optionHorizontalPadding = spacingMd * 2; // 옵션 좌우 패딩
+        const dropdownHorizontalPadding = spacingXs * 2; // 드롭다운 메뉴 좌우 패딩
+        const totalPadding = optionHorizontalPadding + dropdownHorizontalPadding;
+        const contentWidth = maxWidth + totalPadding + spacingMd; // 여유 공간
+
+        // 최소 너비와 비교하여 최종 너비 결정
+        const minWidth = dropdownMinWidth || 120; // 기본 최소 너비 120px
+        const calculatedWidth = Math.max(contentWidth, minWidth);
+
+        setDropdownWidth(calculatedWidth);
+      } else {
+        // 기본 동작: anchor 너비에 맞추기
+        const anchorWidth = anchorRef.current.getBoundingClientRect().width;
+        setDropdownWidth(anchorWidth);
+      }
     } else {
       setDropdownWidth(undefined);
     }
-  }, [isOpen]);
+  }, [isOpen, autoDropdownWidth, dropdownMinWidth, options]);
 
   return (
     <div
@@ -348,12 +432,7 @@ export const Select: React.FC<SelectProps> = ({
         width: fullWidth ? '100%' : 'auto',
       }}
     >
-      <div
-        style={{
-          position: 'relative',
-          width: fullWidth ? '100%' : 'auto',
-        }}
-      >
+      <div style={wrapperStyle}>
         <div
           ref={anchorRef}
           role="combobox"
@@ -361,31 +440,13 @@ export const Select: React.FC<SelectProps> = ({
           aria-haspopup="listbox"
           aria-disabled={disabled}
           tabIndex={disabled ? -1 : 0}
-        className={clsx(className)}
-        style={selectStyle}
+          className={clsx(className)}
+          style={selectStyle}
           onClick={(e) => handleToggle(e)}
           onKeyDown={handleKeyDown}
           onFocus={handleFocus}
           onBlur={handleBlur}
         >
-          {/* 수정모드(값이 있을 때): 좌측에 인라인 라벨(항목명) 표시 */}
-          {showInlineLabel && label && (
-            <span
-              style={{
-                color: 'var(--color-form-inline-label)',
-                marginRight: 'var(--spacing-form-inline-label-gap)',
-                whiteSpace: 'nowrap',
-                fontSize: 'var(--font-size-base)',
-                fontFamily: 'var(--font-family)',
-                fontWeight: 'var(--font-weight-normal)',
-                lineHeight: 'var(--line-height)',
-                flexShrink: 0,
-                minWidth: 'var(--width-form-inline-label)', // 고정 너비로 결과값 세로 정렬
-              }}
-            >
-              {label}
-            </span>
-          )}
           <span
             style={{
               flex: 1,
@@ -393,7 +454,7 @@ export const Select: React.FC<SelectProps> = ({
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
               color: (multiple ? selectedLabels.length > 0 : selectedLabels.length > 0) ? 'var(--color-text)' : 'var(--color-text-tertiary)',
-              fontWeight: 'var(--font-weight-normal)', // styles.css 준수: 폰트 웨이트 토큰 사용
+              fontWeight: 'var(--font-weight-normal)',
             }}
           >
             {(multiple ? selectedLabels.length > 0 : selectedLabels.length > 0) ? displayText : renderPlaceholderWithBold(displayText)}
@@ -453,7 +514,10 @@ export const Select: React.FC<SelectProps> = ({
               style={{
                 maxHeight: 'var(--height-chart)', // styles.css 준수: 차트 높이 토큰 사용
                 overflowY: 'auto',
+                overflowX: 'hidden', // 가로 스크롤 방지
                 padding: 'var(--spacing-xs)',
+                width: '100%', // 부모(Popover) 너비에 맞춤
+                boxSizing: 'border-box',
               }}
               >
                 {options.map((option, index) => {
@@ -473,9 +537,9 @@ export const Select: React.FC<SelectProps> = ({
                         borderRadius: 'var(--border-radius-sm)',
                         cursor: option.disabled ? 'not-allowed' : 'pointer',
                         backgroundColor: isFocused
-                          ? 'var(--color-primary-50)'
+                          ? 'var(--color-gray-50)'
                           : isSelected
-                          ? 'var(--color-primary-100)'
+                          ? 'var(--color-gray-100)'
                           : 'transparent',
                         color: option.disabled
                           ? 'var(--color-text-tertiary)'
@@ -486,6 +550,7 @@ export const Select: React.FC<SelectProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         gap: 'var(--spacing-sm)',
+                        whiteSpace: 'nowrap', // 텍스트 줄바꿈 방지
                       }}
                       onMouseEnter={() => setFocusedIndex(index)}
                       onMouseLeave={() => setFocusedIndex(-1)}

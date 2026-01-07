@@ -149,33 +149,39 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   };
 
   const hasValue = !!selectedDate;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const showInlineLabel = showInlineLabelWhenHasValue && hasValue;
 
   const inputStyle: React.CSSProperties = {
     ...sizeStyles[size],
     border: 'none',
-    borderBottom: `var(--border-width-form-bottom) solid transparent`, // styles.css 토큰: 레이아웃 유지를 위해 항상 2px, 색상은 투명
-    borderRadius: 0,
-    backgroundColor: disabled ? 'var(--color-form-disabled-bg)' : 'var(--color-white)', // styles.css 토큰: 폼 필드 배경색
-    color: disabled ? 'var(--color-form-disabled-text)' : 'var(--color-text)', // styles.css 토큰: 폼 필드 텍스트 색상
+    borderRadius: 'var(--border-radius-xs)',
+    backgroundColor: disabled ? 'var(--color-form-disabled-bg)' : 'var(--color-white)',
+    color: disabled ? 'var(--color-form-disabled-text)' : 'var(--color-text)',
     outline: 'none',
     width: fullWidth ? '100%' : 'auto',
-    transition: 'var(--transition-all)', // styles.css 토큰: transition
-    fontFamily: 'var(--font-family)', // styles.css 토큰: 폰트 패밀리
-    fontSize: 'var(--font-size-base)', // styles.css 토큰: 폼 필드 폰트 사이즈
-    fontWeight: 'var(--font-weight-normal)', // styles.css 토큰: 폼 필드 폰트 웨이트
-    lineHeight: 'var(--line-height)', // styles.css 토큰: 폼 필드 라인 높이
-    // 요구사항: 수정모드(값이 있는 상태)에서도 기본(비포커스) 밑줄은 1px로 유지
-    // 오픈/포커스 상태에서만 2px로 변경
-    boxShadow: isOpen
-      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
-      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)'),
+    transition: 'var(--transition-all)',
+    fontFamily: 'var(--font-family)',
+    fontSize: 'var(--font-size-base)',
+    fontWeight: 'var(--font-weight-normal)',
+    lineHeight: 'var(--line-height)',
     cursor: disabled ? 'not-allowed' : 'pointer',
     display: 'flex',
     alignItems: 'center',
-    boxSizing: 'border-box', // styles.css 토큰: 폼 필드 box-sizing
-    // position: relative는 외부 컨테이너에 설정
-    // 높이는 fontSize * lineHeight + padding-top + padding-bottom + border로 자동 계산됨
+    boxSizing: 'border-box',
+  };
+
+  // 래퍼 스타일: input을 감싸고 사방 테두리 적용 (카드 스타일과 동일)
+  const wrapperStyle: React.CSSProperties = {
+    position: 'relative',
+    width: fullWidth ? '100%' : 'auto',
+    backgroundColor: disabled ? 'var(--color-form-disabled-bg)' : 'var(--color-white)',
+    border: isOpen
+      ? (error ? 'var(--border-width-thin) solid var(--color-form-error)' : 'var(--border-width-thin) solid var(--color-primary)')
+      : (error ? 'var(--border-width-thin) solid var(--color-form-error)' : 'var(--border-width-thin) solid var(--color-gray-200)'),
+    borderRadius: 'var(--border-radius-xs)',
+    boxSizing: 'border-box',
+    transition: 'var(--transition-all)',
   };
 
   const handleToggle = useCallback(() => {
@@ -184,10 +190,9 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     if (!isOpen && selectedDate) {
       setCurrentMonth(new Date(selectedDate));
     }
-    // 클릭 시 포커스 스타일 적용 (styles.css 토큰 사용)
-    if (anchorRef.current) {
-      anchorRef.current.style.borderBottomColor = 'transparent'; // styles.css 토큰: 항상 transparent 유지 (레이아웃 고정)
-      anchorRef.current.style.boxShadow = error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)'; // styles.css 토큰: 포커스 시 시각적 2px 테두리
+    // 클릭 시 래퍼에 포커스 스타일 적용
+    if (anchorRef.current?.parentElement) {
+      anchorRef.current.parentElement.style.borderColor = error ? 'var(--color-form-error)' : 'var(--color-primary)';
     }
   }, [disabled, isOpen, selectedDate, error]);
 
@@ -222,25 +227,19 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   }, [selectedDate, onChange]);
 
   const handleFocus = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
-    e.currentTarget.style.borderBottomColor = 'transparent'; // styles.css 토큰: 항상 transparent 유지 (레이아웃 고정)
-    e.currentTarget.style.boxShadow = error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)'; // styles.css 토큰: 포커스 시 항상 시각적 2px 테두리
     onFocus?.(e as unknown as React.FocusEvent<HTMLInputElement>);
-  }, [error, onFocus]);
+  }, [onFocus]);
 
   const handleBlur = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
-    e.currentTarget.style.borderBottomColor = 'transparent'; // styles.css 토큰: 투명으로 변경
-    // 요구사항: blur 시에는 값 유무와 관계없이 1px로 복원
-    e.currentTarget.style.boxShadow = error
-      ? 'var(--shadow-form-bottom-default-error)'
-      : 'var(--shadow-form-bottom-default)';
     onBlur?.(e as unknown as React.FocusEvent<HTMLInputElement>);
-  }, [error, onBlur]);
+  }, [onBlur]);
 
   // 달력 그리드 생성
   const calendarDays = useMemo(() => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
     const firstDay = new Date(year, month, 1);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const lastDay = new Date(year, month + 1, 0);
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
@@ -356,14 +355,10 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     );
   }, [selectedDate]);
 
-  // 값 변경 시 스타일 업데이트 (값이 있으면 2px, 없으면 1px)
+  // 달력 닫을 때 래퍼 테두리 색상 복원
   useEffect(() => {
-    if (anchorRef.current && !isOpen) {
-      anchorRef.current.style.borderBottomColor = 'transparent';
-      // 요구사항: 닫힌 상태에서는 값 유무와 관계없이 1px
-      anchorRef.current.style.boxShadow = error
-        ? 'var(--shadow-form-bottom-default-error)'
-        : 'var(--shadow-form-bottom-default)';
+    if (anchorRef.current?.parentElement && !isOpen) {
+      anchorRef.current.parentElement.style.borderColor = error ? 'var(--color-form-error)' : 'var(--color-gray-200)';
     }
   }, [error, isOpen]);
 
@@ -375,12 +370,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
         width: fullWidth ? '100%' : 'auto',
       }}
     >
-      <div
-        style={{
-          position: 'relative', // 아이콘 absolute positioning을 위한 relative (Select와 동일)
-          width: fullWidth ? '100%' : 'auto',
-        }}
-      >
+      <div style={wrapperStyle}>
         <div
           ref={anchorRef}
           role="textbox"
@@ -394,24 +384,6 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           onBlur={handleBlur}
           {...props}
         >
-          {/* 수정모드(값이 있을 때): 좌측에 인라인 라벨(항목명) 표시 */}
-          {showInlineLabel && label && (
-            <span
-              style={{
-                color: 'var(--color-form-inline-label)',
-                marginRight: 'var(--spacing-form-inline-label-gap)',
-                whiteSpace: 'nowrap',
-                fontSize: 'var(--font-size-base)',
-                fontFamily: 'var(--font-family)',
-                fontWeight: 'var(--font-weight-normal)',
-                lineHeight: 'var(--line-height)',
-                flexShrink: 0,
-                minWidth: 'var(--width-form-inline-label)', // 고정 너비로 결과값 세로 정렬
-              }}
-            >
-              {label}
-            </span>
-          )}
           <span
             style={{
               flex: 1,
