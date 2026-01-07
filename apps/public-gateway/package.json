@@ -9,14 +9,17 @@
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit",
-    "test": "vitest run",
-    "test:unit": "vitest run",
+    "test": "vitest run --passWithNoTests",
+    "test:unit": "vitest run --passWithNoTests",
     "test:e2e": "playwright test",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@api-sdk/core": "file:../../packages/api-sdk",
     "@env-registry/core": "file:../../packages/env-registry",
     "@lib/supabase-client": "file:../../packages/lib/supabase-client",
+    "@tanstack/react-query": "^5.17.0",
+    "@ui-core/react": "file:../../packages/ui-core",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

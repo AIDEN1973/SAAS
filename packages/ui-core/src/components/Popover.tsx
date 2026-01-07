@@ -189,21 +189,24 @@ export const Popover: React.FC<PopoverProps> = ({
 
   if (!isOpen || !anchorEl) return null;
 
-  // style prop에 width가 있으면 minWidth를 설정하지 않음 (셀렉트 박스 너비에 맞추기 위함)
-  // 그렇지 않으면 기본 minWidth 적용
+  // style prop에 width가 있으면 minWidth/maxWidth를 설정하지 않음 (셀렉트 박스 너비에 맞추기 위함)
+  // 그렇지 않으면 기본 minWidth/maxWidth 적용
+  const hasCustomWidth = style?.width || style?.minWidth;
   const popoverStyle: React.CSSProperties = {
     position: 'fixed',
     top: `${position.top}px`,
     left: `${position.left}px`,
     zIndex: 'var(--z-popover)',
     backgroundColor: 'var(--color-white)',
-    borderRadius: 'var(--border-radius-md)',
+    borderRadius: 'var(--border-radius-xs)',
     boxShadow: 'var(--shadow-lg)',
     border: 'var(--border-width-thin) solid var(--color-gray-200)',
     padding: 'var(--spacing-xs)',
-    // style에 width가 없을 때만 minWidth 적용
-    ...(style?.width ? {} : { minWidth: 'var(--width-card-min)' }), // styles.css 준수: 카드 최소 너비
-    maxWidth: 'var(--width-content-max)', // styles.css 준수: 콘텐츠 최대 너비
+    // style에 width가 없을 때만 minWidth/maxWidth 적용
+    ...(hasCustomWidth ? {} : {
+      minWidth: 'var(--width-card-min)', // styles.css 준수: 카드 최소 너비
+      maxWidth: 'var(--width-content-max)', // styles.css 준수: 콘텐츠 최대 너비
+    }),
     // overflow와 maxHeight는 자식 컴포넌트에서 처리 (이중 스크롤 방지)
     overflow: 'visible',
     // 위치 계산 완료 전까지 숨김 (번쩍이는 현상 방지)

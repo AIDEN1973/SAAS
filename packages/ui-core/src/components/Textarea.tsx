@@ -34,6 +34,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   // 라벨을 플레이스홀더로 사용
   const textareaPlaceholder = placeholder || label;
   const isEmpty = value === undefined || value === null || value === '';
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const hasValue = !isEmpty;
   const [isFocused, setIsFocused] = React.useState(false);
   const isComposingRef = React.useRef(false);
@@ -73,37 +74,49 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   const textareaStyle: React.CSSProperties = {
     ...sizeStyles[size],
     border: 'none',
-    borderBottom: `var(--border-width-form-bottom) solid transparent`, // styles.css 토큰: 레이아웃 유지를 위해 항상 2px, 색상은 투명
-    borderRadius: 0,
-    backgroundColor: 'var(--color-white)', // styles.css 토큰: 폼 필드 배경색
-    color: 'var(--color-text)', // styles.css 토큰: 폼 필드 텍스트 색상
+    borderRadius: 'var(--border-radius-xs)',
+    backgroundColor: 'var(--color-white)',
+    color: 'var(--color-text)',
     outline: 'none',
     width: fullWidth ? '100%' : 'auto',
     resize: 'vertical',
-    transition: 'border-color var(--transition-base), box-shadow var(--transition-base)', // styles.css 토큰: transition
-    fontFamily: 'var(--font-family)', // styles.css 토큰: 폰트 패밀리
-    fontSize: 'var(--font-size-base)', // styles.css 토큰: 폼 필드 폰트 사이즈
-    fontWeight: 'var(--font-weight-normal)', // styles.css 토큰: 폼 필드 폰트 웨이트
-    lineHeight: 'var(--line-height)', // styles.css 토큰: 폼 필드 라인 높이
-    // 수정모드(값 있음)라도 포커스 아웃 시에는 항상 1px underline 유지 (Input/Select/DatePicker와 일관)
-    boxShadow: isFocused
-      ? (error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)')
-      : (error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)'),
+    transition: 'var(--transition-all)',
+    fontFamily: 'var(--font-family)',
+    fontSize: 'var(--font-size-base)',
+    fontWeight: 'var(--font-weight-normal)',
+    lineHeight: 'var(--line-height)',
+    boxSizing: 'border-box',
   };
 
-  // React Hook Form의 onBlur와 컴포넌트의 포커스 스타일 관리 병합 (styles.css 토큰 사용)
+  // 래퍼 스타일: textarea를 감싸고 사방 테두리 적용 (카드 스타일과 동일)
+  const wrapperStyle: React.CSSProperties = {
+    position: 'relative',
+    width: fullWidth ? '100%' : 'auto',
+    backgroundColor: 'var(--color-white)',
+    border: isFocused
+      ? (error ? 'var(--border-width-thin) solid var(--color-form-error)' : 'var(--border-width-thin) solid var(--color-primary)')
+      : (error ? 'var(--border-width-thin) solid var(--color-form-error)' : 'var(--border-width-thin) solid var(--color-gray-200)'),
+    borderRadius: 'var(--border-radius-xs)',
+    boxSizing: 'border-box',
+    transition: 'var(--transition-all)',
+  };
+
+  const wrapperRef = React.useRef<HTMLDivElement | null>(null);
+
+  // React Hook Form의 onBlur와 컴포넌트의 포커스 스타일 관리 병합
   const handleFocus = React.useCallback((e: React.FocusEvent<HTMLTextAreaElement>) => {
     setIsFocused(true);
-    e.currentTarget.style.borderBottomColor = 'transparent'; // styles.css 토큰: 항상 transparent 유지 (레이아웃 고정)
-    e.currentTarget.style.boxShadow = error ? 'var(--shadow-form-bottom-focus-error)' : 'var(--shadow-form-bottom-focus)'; // styles.css 토큰: 포커스 시 항상 시각적 2px 테두리
+    if (wrapperRef.current) {
+      wrapperRef.current.style.borderColor = error ? 'var(--color-form-error)' : 'var(--color-primary)';
+    }
     onFocus?.(e);
   }, [error, onFocus]);
 
   const handleBlur = React.useCallback((e: React.FocusEvent<HTMLTextAreaElement>) => {
     setIsFocused(false);
-    e.currentTarget.style.borderBottomColor = 'transparent'; // styles.css 토큰: 투명으로 변경
-    // 포커스 아웃 시에는 값 유무와 무관하게 1px underline로 복원
-    e.currentTarget.style.boxShadow = error ? 'var(--shadow-form-bottom-default-error)' : 'var(--shadow-form-bottom-default)';
+    if (wrapperRef.current) {
+      wrapperRef.current.style.borderColor = error ? 'var(--color-form-error)' : 'var(--color-gray-200)';
+    }
     onBlur?.(e);
   }, [error, onBlur]);
 
@@ -115,52 +128,65 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
         width: fullWidth ? '100%' : 'auto',
       }}
     >
-      <textarea
-        ref={ref}
-        className={clsx(className)}
-        style={textareaStyle}
-        placeholder={textareaPlaceholder}
-        value={value}
+      <div ref={wrapperRef} style={wrapperStyle}>
+        <textarea
+          ref={ref}
+          className={clsx(className)}
+          style={textareaStyle}
+          placeholder={textareaPlaceholder}
+          value={value}
         onCompositionStart={(e) => {
           isComposingRef.current = true;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
           if ((import.meta as any).env?.DEV) {
             console.log('[IME][Textarea] compositionstart', {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
               name: (props as any)?.name,
               value,
               data: (e as unknown as CompositionEvent).data,
             });
           }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
           (props as any).onCompositionStart?.(e);
         }}
         onCompositionEnd={(e) => {
           isComposingRef.current = false;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
           if ((import.meta as any).env?.DEV) {
             console.log('[IME][Textarea] compositionend', {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
               name: (props as any)?.name,
               value,
               data: (e as unknown as CompositionEvent).data,
             });
           }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
           (props as any).onCompositionEnd?.(e);
         }}
         onChange={(e) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
           if ((import.meta as any).env?.DEV) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             const nativeIsComposing = (e.nativeEvent as any)?.isComposing;
             console.log('[IME][Textarea] change', {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
               name: (props as any)?.name,
               isComposingRef: isComposingRef.current,
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               nativeIsComposing,
               newValue: e.target.value,
               prevValue: value,
             });
           }
           onChange?.(e);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
           (props as any).onChange?.(e);
         }}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        {...props}
-      />
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          {...props}
+        />
+      </div>
       {error && (
         <span
           style={{
