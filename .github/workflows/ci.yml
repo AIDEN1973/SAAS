@@ -33,12 +33,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Clean install dependencies
-        run: |
-          npm ci || (echo "npm ci failed, trying clean install" && rm -rf node_modules package-lock.json && npm install)
+        run: npm install --legacy-peer-deps
 
       - name: Run ESLint
         run: npm run lint
@@ -63,11 +62,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps
 
       - name: Run unit tests
         run: npm run test:unit || echo "No tests found"
@@ -99,11 +98,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
@@ -141,11 +140,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps
 
       - name: Build ${{ matrix.app }}
         run: cd apps/${{ matrix.app }} && npm run build || echo "Build failed - check configuration"
