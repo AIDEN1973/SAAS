@@ -133,7 +133,7 @@ export class SignupService {
       // 2. 테넌트 생성 (RPC 함수 사용)
       // ⚠️ 중요: 사용자 생성 후 세션이 있어야 RPC 함수가 auth.uid()를 사용할 수 있습니다.
       //          하지만 signUp 직후에는 세션이 없을 수 있으므로 명시적으로 user_id를 전달합니다.
-      const { data: tenantData, error: tenantError } = await this.supabase.rpc<{ tenant: any }>(
+      const { data: tenantData, error: tenantError } = await this.supabase.rpc(
         'create_tenant_with_onboarding',
         {
           p_name: input.tenant_name,
