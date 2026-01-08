@@ -8,9 +8,10 @@ import {
   getOrCreateChatOpsSessionId,
   useGlobalSearch,
   Tooltip,
+  TimelineModal,
 } from '@ui-core/react';
 import type { SearchResult, SidebarItem, ExecutionAuditRun } from '@ui-core/react';
-import { Sparkle } from 'phosphor-react';
+import { ChatsCircle, ClockCounterClockwise } from 'phosphor-react';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleBasedRoute } from './components/RoleBasedRoute';
 import { IndustryBasedRoute } from './components/IndustryBasedRoute';
@@ -28,10 +29,10 @@ const AgentButton: React.FC<{ isOpen: boolean; onClick: () => void }> = ({ isOpe
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <Tooltip content="AI 에이전트" position="bottom">
+    <Tooltip content="에이전트" position="bottom">
       <button
         onClick={onClick}
-        aria-label="AI 에이전트 열기/닫기"
+        aria-label="에이전트 열기/닫기"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         style={{
@@ -46,12 +47,48 @@ const AgentButton: React.FC<{ isOpen: boolean; onClick: () => void }> = ({ isOpe
           transition: 'var(--transition-all)',
         }}
       >
-        <Sparkle
+        <ChatsCircle
           weight={isOpen ? 'bold' : 'regular'}
           style={{
             width: 'var(--size-icon-xl)',
             height: 'var(--size-icon-xl)',
             color: isOpen ? 'var(--color-primary)' : 'var(--color-text-tertiary)',
+          }}
+        />
+      </button>
+    </Tooltip>
+  );
+};
+
+// Timeline Button Component
+const TimelineButton: React.FC<{ onClick: () => void }> = ({ onClick }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <Tooltip content="타임라인" position="bottom">
+      <button
+        onClick={onClick}
+        aria-label="타임라인 열기"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--spacing-sm)',
+          backgroundColor: isHovered ? 'var(--color-primary-40)' : 'transparent',
+          border: 'none',
+          borderRadius: 'var(--border-radius-md)',
+          cursor: 'pointer',
+          transition: 'var(--transition-all)',
+        }}
+      >
+        <ClockCounterClockwise
+          weight="regular"
+          style={{
+            width: 'var(--size-icon-xl)',
+            height: 'var(--size-icon-xl)',
+            color: 'var(--color-text-tertiary)',
           }}
         />
       </button>
@@ -113,6 +150,9 @@ function AppContent() {
   const aiLayerMenu = useAILayerMenu();
   // 업종별 설정 (Phase 3: Industry-Based Page Visibility)
   const { terms, isPageVisible } = useIndustryConfig();
+
+  // 타임라인 모달 상태
+  const [isTimelineOpen, setIsTimelineOpen] = useState(false);
 
   // 글로벌 검색 API 호출 함수
   const handleGlobalSearch = useCallback(async (input: { query: string; entity_types?: string[]; limit?: number }) => {
@@ -325,6 +365,20 @@ function AppContent() {
     // entity_type에 따라 적절한 페이지로 이동
     if (entity_type === 'student' && entity_id) {
       safeNavigate(`/students/${entity_id}`);
+    } else if (entity_type === 'guardian' && entity_id) {
+      // 보호자인 경우: reference에서 student_id 추출하여 학생 페이지의 보호자 탭으로 이동
+      // guardian 등록 시 details에 student_id가 포함되어 있음
+      const studentId = run.details?.student_id as string | undefined;
+      if (studentId) {
+        safeNavigate(`/students/${studentId}?tab=guardians`);
+      } else if (entity_id) {
+        // student_id가 없으면 guardian_id만으로 이동 시도
+        // (향후 guardian 조회 API로 student_id를 가져올 수도 있음)
+        console.warn('[ExecutionAudit] Guardian 클릭: student_id를 찾을 수 없습니다', { run });
+      }
+    } else if (entity_type === 'config' && entity_id) {
+      // 설정인 경우: 설정 페이지로 이동
+      safeNavigate('/settings');
     } else if (entity_type === 'chatops_session') {
       // ChatOps 세션인 경우 ChatOps 탭으로 전환
       aiLayerMenu.setActiveTab('chatops');
@@ -887,11 +941,12 @@ function AppContent() {
   };
 
   return (
-    <Routes>
-      {/* 인증이 필요 없는 라우트 */}
-      <Route path="/auth/login" element={<LoginPage />} />
-      <Route path="/auth/signup" element={<SignupPage />} />
-      <Route path="/auth/select-tenant" element={<TenantSelectionPage />} />
+    <>
+      <Routes>
+        {/* 인증이 필요 없는 라우트 */}
+        <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/auth/signup" element={<SignupPage />} />
+        <Route path="/auth/select-tenant" element={<TenantSelectionPage />} />
 
       {/* 인증이 필요한 라우트 */}
       <Route
@@ -924,11 +979,14 @@ function AppContent() {
                   },
                 },
                 rightContent: (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
                     <AIToggle />
                     <AgentButton
                       isOpen={aiLayerMenu.isOpen}
                       onClick={aiLayerMenu.toggle}
+                    />
+                    <TimelineButton
+                      onClick={() => setIsTimelineOpen(true)}
                     />
                   </div>
                 ),
@@ -1007,7 +1065,31 @@ function AppContent() {
           </ProtectedRoute>
         }
       />
-    </Routes>
+      </Routes>
+
+      {/* 타임라인 모달 */}
+      <TimelineModal
+        isOpen={isTimelineOpen}
+        onClose={() => setIsTimelineOpen(false)}
+        executionAuditRuns={aiLayerMenu.executionAuditRuns}
+        executionAuditLoading={aiLayerMenu.executionAuditLoading}
+        executionAuditHasMore={aiLayerMenu.executionAuditHasMore}
+        executionAuditNextCursor={aiLayerMenu.executionAuditNextCursor}
+        executionAuditStepsByRunId={aiLayerMenu.executionAuditStepsByRunId}
+        executionAuditStepsLoading={aiLayerMenu.executionAuditStepsLoading}
+        onExecutionAuditLoadMore={(cursor) => {
+          aiLayerMenu.setExecutionAuditLoading(true);
+          aiLayerMenu.setExecutionAuditNextCursor(cursor);
+        }}
+        onExecutionAuditLoadSteps={(runId) => {
+          aiLayerMenu.setExecutionAuditStepsLoading(runId, true);
+        }}
+        onExecutionAuditRowClick={handleExecutionAuditRowClick}
+        onExecutionAuditFilterChange={aiLayerMenu.setExecutionAuditFilters}
+        executionAuditInitialFilters={aiLayerMenu.executionAuditFilters}
+        executionAuditAvailableOperationTypes={aiLayerMenu.executionAuditAvailableOperationTypes}
+      />
+    </>
   );
 }
 

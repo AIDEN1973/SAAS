@@ -155,7 +155,7 @@ export const Header: React.FC<HeaderProps> = ({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 'var(--spacing-md)',
+          gap: 'var(--spacing-sm)',
         }}
       >
         {/* 글로벌 검색 */}

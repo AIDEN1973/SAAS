@@ -52,6 +52,12 @@ export const signupFormSchema: FormSchema = {
           placeholder: '010-1234-5678',
           colSpan: 1,
         },
+        validation: {
+          pattern: {
+            value: '^01[0-9]-\\d{4}-\\d{4}$',
+            message: '전화번호 형식이 올바르지 않습니다. (예: 010-1234-5678)',
+          },
+        },
         defaultValue: '',
       },
       {
@@ -64,6 +70,10 @@ export const signupFormSchema: FormSchema = {
         validation: {
           required: '비밀번호를 입력해주세요.',
           minLength: 8,
+          pattern: {
+            value: '^(?=.*[a-zA-Z])(?=.*\\d)[A-Za-z\\d@$!%*?&]{8,}$',
+            message: '비밀번호는 8자 이상, 영문자와 숫자를 포함해야 합니다.',
+          },
         },
         defaultValue: '',
       },

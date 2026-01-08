@@ -154,6 +154,9 @@ export type {
 export { AILayerMenu } from './AILayerMenu';
 export type { AILayerMenuProps, AILayerMenuTab } from './AILayerMenu';
 
+export { TimelineModal } from './TimelineModal';
+export type { TimelineModalProps } from './TimelineModal';
+
 export { AddressSearchInput } from './AddressSearchInput';
 export type { AddressSearchInputProps, AddressSearchResult } from './AddressSearchInput';
 

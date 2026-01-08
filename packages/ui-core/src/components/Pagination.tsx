@@ -38,7 +38,7 @@ export const Pagination: React.FC<PaginationProps> = ({
 
     // 현재 페이지 기준으로 시작/끝 계산
     let start = Math.max(1, currentPage - half);
-    let end = Math.min(totalPages, start + maxVisible - 1);
+    const end = Math.min(totalPages, start + maxVisible - 1);
 
     // 끝에서 시작이 부족하면 시작을 앞으로 당김
     if (end - start < maxVisible - 1) {
@@ -112,7 +112,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         }}
         onMouseEnter={(e) => {
           if (!isFirstPage) {
-            e.currentTarget.style.backgroundColor = 'var(--color-gray-100)';
+            e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
           }
         }}
         onMouseLeave={(e) => {
@@ -166,7 +166,7 @@ export const Pagination: React.FC<PaginationProps> = ({
             }}
             onMouseEnter={(e) => {
               if (!isActive) {
-                e.currentTarget.style.backgroundColor = 'var(--color-gray-100)';
+                e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
               }
             }}
             onMouseLeave={(e) => {
@@ -203,7 +203,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         }}
         onMouseEnter={(e) => {
           if (!isLastPage) {
-            e.currentTarget.style.backgroundColor = 'var(--color-gray-100)';
+            e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
           }
         }}
         onMouseLeave={(e) => {

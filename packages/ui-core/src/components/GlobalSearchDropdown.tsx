@@ -210,8 +210,7 @@ export const GlobalSearchDropdown: React.FC<GlobalSearchDropdownProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: 'var(--spacing-sm)',
-              padding: 'var(--spacing-md)',
-              paddingBottom: 'calc(var(--spacing-md) + var(--border-width-thin))',
+              padding: 'calc(var(--spacing-sm) + 6px) var(--spacing-md)',
               borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)',
             }}
           >

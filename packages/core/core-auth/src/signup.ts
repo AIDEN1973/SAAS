@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Core Auth Signup Service
  *
@@ -130,7 +133,7 @@ export class SignupService {
       // 2. 테넌트 생성 (RPC 함수 사용)
       // ⚠️ 중요: 사용자 생성 후 세션이 있어야 RPC 함수가 auth.uid()를 사용할 수 있습니다.
       //          하지만 signUp 직후에는 세션이 없을 수 있으므로 명시적으로 user_id를 전달합니다.
-      const { data: tenantData, error: tenantError } = await this.supabase.rpc(
+      const { data: tenantData, error: tenantError } = await this.supabase.rpc<{ tenant: any }>(
         'create_tenant_with_onboarding',
         {
           p_name: input.tenant_name,
@@ -143,9 +146,23 @@ export class SignupService {
 
       if (tenantError) {
         console.error('[SignupService] 테넌트 생성 실패:', tenantError);
-        // 테넌트 생성 실패해도 사용자는 생성되었으므로 에러를 던지지 않고 경고만
-        // 사용자가 나중에 수동으로 테넌트를 생성할 수 있도록 함
-        console.warn('[SignupService] 테넌트 생성 실패했지만 사용자는 생성되었습니다. 수동으로 테넌트를 생성해주세요.');
+
+        // P0-2: 테넌트 생성 실패 시 사용자 삭제 (트랜잭션 롤백)
+        try {
+          // Supabase Admin API를 사용하여 사용자 삭제
+          const { error: deleteError } = await this.supabase.auth.admin.deleteUser(
+            signupResult.user.id
+          );
+
+          if (deleteError) {
+            console.error('[SignupService] 사용자 삭제 실패:', deleteError);
+          }
+        } catch (deleteErr) {
+          console.error('[SignupService] 사용자 삭제 중 예외 발생:', deleteErr);
+        }
+
+        // 테넌트 생성 실패를 에러로 전달
+        throw new Error(`테넌트 생성에 실패했습니다: ${tenantError.message}`);
       }
 
       // 3. 매장(Store) 생성 (주소 정보 포함)

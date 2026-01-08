@@ -127,20 +127,20 @@ export const Button: React.FC<ButtonProps> = ({
 
   const variantStyles: Record<'solid' | 'outline' | 'ghost', React.CSSProperties> = {
     solid: {
-      backgroundColor: colorVars.main,
+      backgroundColor: colorVars.main || 'var(--color-white)', // 색상 없으면 화이트
       color: 'var(--color-white)',
       // baseStyle에서 테두리 적용됨 (선택: primary 색상, 미선택: 투명)
     },
     outline: {
-      backgroundColor: 'var(--color-white)',
-      color: defaultTextColor,
+      backgroundColor: 'var(--color-white)', // 배경색 화이트
+      color: defaultTextColor || 'var(--color-text)', // 색상 없으면 기본 텍스트 색상
       // baseStyle에서 테두리 적용됨 (선택: primary 색상, 미선택: 투명)
       // outline variant는 미선택 시 텍스트 색상 테두리로 오버라이드
-      ...(selected ? {} : { border: `var(--border-width-thin) solid ${defaultTextColor}` }),
+      ...(selected ? {} : { border: `var(--border-width-thin) solid ${defaultTextColor || 'var(--color-border)'}` }),
     },
     ghost: {
-      backgroundColor: 'transparent',
-      color: defaultTextColor,
+      backgroundColor: 'transparent', // ghost는 투명 배경 유지
+      color: defaultTextColor || 'var(--color-text)', // 색상 없으면 기본 텍스트 색상
       // baseStyle에서 테두리 적용됨 (선택: primary 색상, 미선택: 투명)
     },
   };
@@ -152,7 +152,8 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   // style prop을 제거하여 중복 전달 방지
-  const { style: _, ...restProps } = props;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { style: _unusedStyle, ...restProps } = props;
 
   return (
     <button
@@ -160,31 +161,29 @@ export const Button: React.FC<ButtonProps> = ({
       style={style}
       onMouseEnter={(e) => {
         if (variant === 'solid') {
-          e.currentTarget.style.backgroundColor = colorVars.dark;
+          e.currentTarget.style.backgroundColor = colorVars.dark || 'var(--color-gray-200)'; // 색상 없으면 연한 회색
           e.currentTarget.style.boxShadow = 'var(--shadow-md)';
         } else if (variant === 'outline') {
-          const hoverBgColor = selected ? colorVars.bg50 : 'var(--color-gray-50)';
-          e.currentTarget.style.backgroundColor = hoverBgColor;
+          e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
         } else if (variant === 'ghost') {
-          const hoverBgColor = selected ? colorVars.bg50 : 'var(--color-gray-50)';
-          e.currentTarget.style.backgroundColor = hoverBgColor;
+          e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
         }
       }}
       onMouseLeave={(e) => {
         if (variant === 'solid') {
-          e.currentTarget.style.backgroundColor = colorVars.main;
+          e.currentTarget.style.backgroundColor = colorVars.main || 'var(--color-white)'; // 색상 없으면 화이트
           e.currentTarget.style.boxShadow = 'none';
         } else if (variant === 'outline') {
-          e.currentTarget.style.backgroundColor = 'var(--color-white)';
+          e.currentTarget.style.backgroundColor = 'var(--color-white)'; // 배경색 화이트
         } else if (variant === 'ghost') {
-          e.currentTarget.style.backgroundColor = 'transparent';
+          e.currentTarget.style.backgroundColor = 'transparent'; // ghost는 투명 배경 유지
         }
       }}
-      onFocus={(e) => {
+      onFocus={() => {
         // 포커스 링 제거: 버튼 클릭 시 테두리 굵어지는 효과 제거 (유아이 문서 준수)
         // 키보드 접근성은 styles.css의 button:focus-visible에서 처리
       }}
-      onBlur={(e) => {
+      onBlur={() => {
         // 포커스 링 제거: 버튼 클릭 시 테두리 굵어지는 효과 제거 (유아이 문서 준수)
       }}
       {...restProps}

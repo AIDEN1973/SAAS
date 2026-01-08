@@ -8,7 +8,6 @@
 import React, { useEffect } from 'react';
 import { clsx } from 'clsx';
 import { Card } from './Card';
-import { Button } from './Button';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 
 export interface ModalProps {
@@ -126,12 +125,14 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Modal Content */}
       <Card
         variant="elevated"
-        padding="lg"
         style={{
           position: 'relative',
           zIndex: 'var(--z-modal)',
           maxHeight: isMobile ? 'var(--height-modal-max-mobile)' : 'var(--height-modal-max)', // styles.css 준수: 모달 높이 토큰 사용
-          overflow: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          padding: 0, // 패딩 제거 (내부 요소에서 관리)
           ...sizeMap[size],
         }}
       >
@@ -142,9 +143,10 @@ export const Modal: React.FC<ModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: 'var(--spacing-md)',
+              padding: 'var(--spacing-lg)',
               paddingBottom: 'var(--spacing-md)',
               borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
+              flexShrink: 0,
             }}
           >
             <h2
@@ -189,7 +191,9 @@ export const Modal: React.FC<ModalProps> = ({
         {/* Content */}
         <div
           style={{
-            marginBottom: footer ? 'var(--spacing-md)' : 0,
+            padding: 'var(--spacing-lg)',
+            overflowY: 'auto',
+            flex: 1,
           }}
         >
           {children}
@@ -203,8 +207,10 @@ export const Modal: React.FC<ModalProps> = ({
               alignItems: 'center',
               justifyContent: 'flex-end',
               gap: 'var(--spacing-sm)',
+              padding: 'var(--spacing-lg)',
               paddingTop: 'var(--spacing-md)',
               borderTop: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
+              flexShrink: 0,
             }}
           >
             {footer}

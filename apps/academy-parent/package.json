@@ -31,6 +31,6 @@
     "eslint-plugin-react-refresh": "^0.4.5",
     "terser": "^5.44.1",
     "typescript": "^5.3.3",
-    "vite": "^5.0.8"
+    "vite": "^5.4.0"
   }
 }

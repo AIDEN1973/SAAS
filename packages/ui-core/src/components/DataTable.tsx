@@ -521,7 +521,7 @@ export function DataTable<T = unknown>({
                     }}
                     onMouseEnter={(e) => {
                       if (onRowClick) {
-                        e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                        e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
                       }
                     }}
                     onMouseLeave={(e) => {

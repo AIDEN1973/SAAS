@@ -63,7 +63,7 @@ const AILayerMenuContext = createContext<AILayerMenuContextType | undefined>(und
  */
 export function AILayerMenuProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<AILayerMenuTab>('activity');
+  const [activeTab, setActiveTab] = useState<AILayerMenuTab>('chatops');
 
   // ChatOps session_id 관리
   const sessionIdRef = useRef<string | null>(null);

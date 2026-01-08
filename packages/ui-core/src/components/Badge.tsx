@@ -97,41 +97,46 @@ export const Badge: React.FC<BadgeProps> = ({
 
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
-      padding: 'var(--spacing-xs) var(--spacing-md)', // 좌우 여백 1포인트 늘림 (sm → md)
+      padding: 'var(--spacing-xs) var(--spacing-sm)', // 패딩 축소
       lineHeight: 'var(--line-height)', // styles.css 준수: line-height 토큰 사용
+      fontSize: 'var(--font-size-xs)', // 폰트 크기 xs
     },
     sm: {
-      padding: 'var(--spacing-xs) var(--spacing-md)', // 좌우 여백 1포인트 늘림 (sm → md)
+      padding: 'var(--spacing-xs) var(--spacing-sm)', // 패딩 축소
       lineHeight: 'var(--line-height)', // styles.css 준수: line-height 토큰 사용
+      fontSize: 'var(--font-size-xs)', // 폰트 크기 xs (한 포인트 작게)
     },
     md: {
       padding: 'var(--spacing-xs) var(--spacing-md)', // 좌우 여백 1포인트 늘림 (sm → md)
       lineHeight: 'var(--line-height)', // styles.css 준수: line-height 토큰 사용
+      fontSize: 'var(--font-size-sm)', // 폰트 크기 sm
     },
     lg: {
       padding: 'var(--spacing-sm) var(--spacing-lg)', // 좌우 여백 1포인트 늘림 (md → lg)
       lineHeight: 'var(--line-height)', // styles.css 준수: line-height 토큰 사용
+      fontSize: 'var(--font-size-base)', // 폰트 크기 base
     },
     xl: {
       padding: 'var(--spacing-sm) var(--spacing-lg)', // 좌우 여백 1포인트 늘림 (md → lg)
       lineHeight: 'var(--line-height)', // styles.css 준수: line-height 토큰 사용
+      fontSize: 'var(--font-size-lg)', // 폰트 크기 lg
     },
   };
 
   const variantStyles: Record<'solid' | 'outline' | 'soft', React.CSSProperties> = {
     solid: {
-      backgroundColor: colorVars.dark, // 배경색 진하게 (dark 사용)
+      backgroundColor: colorVars.dark || 'var(--color-white)', // 배경색 진하게 (dark 사용), 없으면 화이트
       color: 'var(--color-white)', // 폰트 색상 화이트
       border: 'none',
     },
     outline: {
-      backgroundColor: 'transparent',
-      color: colorVars.main,
-      border: `var(--border-width-thin) solid ${colorVars.main}`, // styles.css 준수: border-width 토큰 사용
+      backgroundColor: 'var(--color-white)', // 배경색 화이트
+      color: colorVars.main || 'var(--color-text)',
+      border: `var(--border-width-thin) solid ${colorVars.main || 'var(--color-border)'}`, // styles.css 준수: border-width 토큰 사용
     },
     soft: {
-      backgroundColor: 'var(--color-text)', // 기본 텍스트 컬러를 배경색으로
-      color: 'var(--color-white)', // 폰트 색상 화이트
+      backgroundColor: colorVars.bg50 || 'var(--color-white)', // 연한 배경색, 없으면 화이트
+      color: colorVars.dark || 'var(--color-text)', // 폰트 색상
       border: 'none',
     },
   };
@@ -141,7 +146,6 @@ export const Badge: React.FC<BadgeProps> = ({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 'var(--border-radius-lg)', // 라운드 lg 적용
-    fontSize: 'var(--font-size-sm)', // 폰트 사이즈 한 포인트 작게 (base에서 sm으로)
     fontWeight: 'var(--font-weight-medium)',
     whiteSpace: 'nowrap',
     ...sizeStyles[size],

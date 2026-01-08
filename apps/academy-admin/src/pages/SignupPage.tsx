@@ -66,6 +66,27 @@ export function SignupPage() {
 
   const handleSignup = async (data: Record<string, unknown>) => {
     try {
+      // P0-1: 비밀번호 확인 검증
+      if (data.password !== data.passwordConfirm) {
+        showAlert('비밀번호가 일치하지 않습니다.', '오류');
+        return;
+      }
+
+      // P1-1: 이메일 중복 체크는 Supabase Auth에서 자동 처리
+      // auth.users는 직접 쿼리할 수 없으므로 signUp 시 에러로 처리
+      // 이메일 형식 검증만 수행
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(String(data.email ?? ''))) {
+        showAlert('올바른 이메일 형식이 아닙니다.', '오류');
+        return;
+      }
+
+      // P2-1: 주소 필수 입력 검증
+      if (!address || !regionInfo) {
+        showAlert('사업장 주소를 입력해주세요.', '오류');
+        return;
+      }
+
       await signup.mutateAsync({
         email: String(data.email ?? ''),
         password: String(data.password ?? ''),
@@ -104,6 +125,9 @@ export function SignupPage() {
           '알림'
         );
         safeNavigate('/auth/login');
+      } else if (error instanceof Error && (message.includes('already registered') || message.includes('User already registered'))) {
+        // 이메일 중복 에러 처리
+        showAlert('이미 사용 중인 이메일입니다.', '오류');
       } else {
         showAlert(message, '오류');
       }
@@ -132,7 +156,7 @@ export function SignupPage() {
           marginBottom: 'var(--spacing-lg)',
           textAlign: 'center'
         }}>
-          B2B 학원가입
+          회원가입
         </h1>
 
         <SchemaForm
@@ -140,13 +164,14 @@ export function SignupPage() {
           onSubmit={handleSignup}
         />
 
-        {/* 주소 검색 필드 (SchemaForm 외부) */}
+        {/* 주소 검색 필드 (SchemaForm 외부) - P2-1: 필수 입력 */}
         <div style={{ marginTop: 'var(--spacing-md)' }}>
           <AddressSearchInput
             value={address}
             onChange={handleAddressChange}
-            label="학원 주소"
+            label="사업장 주소 *"
             placeholder="도로명 또는 지번 주소 검색"
+            required
           />
           {regionInfo && (
             <div
