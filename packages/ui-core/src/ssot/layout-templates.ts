@@ -18,7 +18,7 @@ export const BREAKPOINTS = {
   SM: 640,    // 큰 모바일 / 작은 태블릿
   MD: 768,    // 태블릿
   LG: 1024,   // 작은 데스크톱
-  XL: 1280,   // 큰 데스크톱
+  XL: 1400,   // 큰 데스크톱
 } as const;
 
 export type Breakpoint = keyof typeof BREAKPOINTS;

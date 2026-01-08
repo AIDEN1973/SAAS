@@ -1,16 +1,48 @@
 /**
  * Header Component
  *
- * 상단 헤더 메뉴
+ * 상단 헤더 메뉴 (Phase 2: 글로벌 검색 통합)
  * [불변 규칙] 반응형: Mobile에서는 햄버거 메뉴, Desktop에서는 전체 메뉴 표시
+ * [불변 규칙] 검색: Ctrl+K / Cmd+K 단축키 지원
  */
 
 import React, { useState } from 'react';
 import { clsx } from 'clsx';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 import { Button } from './Button';
-import { ArrowLeftFromLine, ArrowRightFromLine } from 'lucide-react';
-import { useIconSize, useIconStrokeWidth } from '../hooks/useIconSize';
+import { useIconStrokeWidth } from '../hooks/useIconSize';
+import { User, Gear, Power, X, MagnifyingGlass } from 'phosphor-react';
+import { GlobalSearchDropdown } from './GlobalSearchDropdown';
+import type { SearchResult, SearchEntityType } from './GlobalSearchResults';
+
+export interface UserProfile {
+  name: string;
+  email: string;
+  avatarUrl?: string;
+}
+
+export interface HeaderSearchProps {
+  /** 검색어 */
+  query: string;
+  /** 검색어 변경 핸들러 */
+  onQueryChange: (query: string) => void;
+  /** 검색 결과 */
+  results: SearchResult[];
+  /** 로딩 상태 */
+  loading?: boolean;
+  /** 에러 메시지 */
+  error?: string | null;
+  /** 결과 클릭 핸들러 */
+  onResultClick?: (result: SearchResult) => void;
+  /** 검색 버튼 placeholder */
+  placeholder?: string;
+  /** 엔티티 타입별 라벨 (업종별 커스터마이징) */
+  entityTypeLabels?: Partial<Record<SearchEntityType, string>>;
+  /** 검색 입력창 placeholder */
+  inputPlaceholder?: string;
+  /** 빈 상태 안내 메시지 */
+  emptyStateMessage?: string;
+}
 
 export interface HeaderProps {
   title?: string;
@@ -18,9 +50,11 @@ export interface HeaderProps {
   onMenuClick?: () => void;
   rightContent?: React.ReactNode;
   className?: string;
-  sidebarCollapsed?: boolean;
-  onSidebarToggle?: () => void;
-  showSidebarToggle?: boolean; // 토글 버튼 표시 여부 (데스크톱에서만)
+  userProfile?: UserProfile;
+  onLogout?: () => void;
+  onSettings?: () => void;
+  /** 글로벌 검색 props (전달 시 검색창 활성화) */
+  search?: HeaderSearchProps;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,21 +63,18 @@ export const Header: React.FC<HeaderProps> = ({
   onMenuClick,
   rightContent,
   className,
-  sidebarCollapsed,
-  onSidebarToggle,
-  showSidebarToggle = true, // 기본값: true (기존 동작 유지)
+  userProfile,
+  onLogout,
+  onSettings,
+  search,
 }) => {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
-  const [isSidebarToggleHovered, setIsSidebarToggleHovered] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
-  const iconSize = useIconSize('--size-icon-base', 16);
-  // 요구사항: 기본 1px, 롤오버 2px (CSS 변수 기반, 하드코딩 금지)
+  // 요구사항: 기본 1px (CSS 변수 기반, 하드코딩 금지)
   const strokeWidthBase = useIconStrokeWidth('--stroke-width-icon-thin', 1);
-  const strokeWidthHover = useIconStrokeWidth('--stroke-width-icon-medium', 2);
-
-  const isTablet = mode === 'md';
-  const isDesktop = mode === 'lg' || mode === 'xl';
 
   return (
     <header
@@ -56,9 +87,7 @@ export const Header: React.FC<HeaderProps> = ({
         position: 'sticky',
         top: 0,
         zIndex: 'var(--z-sticky)',
-        backgroundColor: 'var(--glass-background)',
-        backdropFilter: 'var(--backdrop-blur)',
-        WebkitBackdropFilter: 'var(--backdrop-blur)',
+        backgroundColor: 'var(--color-white)',
         borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
         // 모바일(xs, sm): 바디 영역과 동일한 좌우 여백 (lg = 24px), 태블릿 이상(md+): 넓은 여백 (xl = 32px)
         padding: isMobile
@@ -121,55 +150,332 @@ export const Header: React.FC<HeaderProps> = ({
         >
           {title}
         </h1>
-        {!isMobile && onSidebarToggle && showSidebarToggle && (
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--spacing-md)',
+        }}
+      >
+        {/* 글로벌 검색 */}
+        {search && !isMobile && (
+          <GlobalSearchDropdown
+            query={search.query}
+            onQueryChange={search.onQueryChange}
+            results={search.results}
+            loading={search.loading}
+            error={search.error}
+            isOpen={searchOpen}
+            onOpen={() => setSearchOpen(true)}
+            onClose={() => setSearchOpen(false)}
+            onResultClick={search.onResultClick}
+            placeholder={search.placeholder}
+            entityTypeLabels={search.entityTypeLabels}
+            inputPlaceholder={search.inputPlaceholder}
+            emptyStateMessage={search.emptyStateMessage}
+          />
+        )}
+        {/* 모바일 검색 버튼 */}
+        {search && isMobile && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={onSidebarToggle}
-            onMouseEnter={() => setIsSidebarToggleHovered(true)}
-            onMouseLeave={() => setIsSidebarToggleHovered(false)}
+            onClick={() => setSearchOpen(true)}
             style={{
-              // 요구사항: 아이콘 외부 감싸는 버튼 비지(여백) 제거
-              padding: 0,
+              padding: 'var(--spacing-sm)',
               borderRadius: 'var(--border-radius-sm)',
-              minWidth: 'auto',
-              minHeight: 'auto',
-              width: 'auto',
-              height: 'auto',
-              lineHeight: 0,
+              minWidth: 'var(--touch-target-min)',
+              minHeight: 'var(--touch-target-min)',
             }}
           >
-            {sidebarCollapsed ? (
-              <ArrowRightFromLine
-                size={iconSize}
-                strokeWidth={isSidebarToggleHovered ? strokeWidthHover : strokeWidthBase}
-                style={{
-                  color: 'currentColor',
-                }}
-              />
-            ) : (
-              <ArrowLeftFromLine
-                size={iconSize}
-                strokeWidth={isSidebarToggleHovered ? strokeWidthHover : strokeWidthBase}
-                style={{
-                  color: 'currentColor',
-                }}
-              />
-            )}
+            <MagnifyingGlass
+              weight="regular"
+              style={{
+                width: 'var(--size-icon-base)',
+                height: 'var(--size-icon-base)',
+                color: 'var(--color-text-secondary)',
+              }}
+            />
           </Button>
         )}
+        {rightContent}
+        {/* 사용자 프로필 아이콘 */}
+        {userProfile && (
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              style={{
+                width: 'var(--size-avatar-md)',
+                height: 'var(--size-avatar-md)',
+                borderRadius: 'var(--border-radius-full)',
+                border: 'var(--border-width-thin) solid var(--color-gray-200)',
+                backgroundColor: 'var(--color-gray-100)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                overflow: 'hidden',
+                transition: 'var(--transition-all)',
+              }}
+            >
+              {userProfile.avatarUrl ? (
+                <img
+                  src={userProfile.avatarUrl}
+                  alt={userProfile.name}
+                  style={{
+                    width: 'var(--width-full)',
+                    height: 'var(--height-full)',
+                    objectFit: 'cover',
+                  }}
+                />
+              ) : (
+                <User
+                  weight="regular"
+                  style={{
+                    width: 'var(--size-spinner-md)',
+                    height: 'var(--size-spinner-md)',
+                    color: 'var(--color-text-secondary)',
+                  }}
+                />
+              )}
+            </button>
+
+            {/* 사용자 메뉴 레이어 */}
+            {userMenuOpen && (
+              <>
+                {/* 오버레이 */}
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 'var(--z-max)',
+                  }}
+                  onClick={() => setUserMenuOpen(false)}
+                />
+                {/* 메뉴 */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + var(--spacing-sm))',
+                    right: 0,
+                    zIndex: 'calc(var(--z-max) + 1)',
+                    backgroundColor: 'var(--color-white)',
+                    borderRadius: 'var(--border-radius-lg)',
+                    boxShadow: 'var(--shadow-lg)',
+                    border: 'var(--border-width-thin) solid var(--color-gray-200)',
+                    padding: 'var(--spacing-md)',
+                    minWidth: '280px',
+                  }}
+                >
+                  {/* 닫기 버튼 */}
+                  <button
+                    onClick={() => setUserMenuOpen(false)}
+                    style={{
+                      position: 'absolute',
+                      top: 'var(--spacing-sm)',
+                      right: 'var(--spacing-sm)',
+                      padding: 'var(--spacing-xs)',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      borderRadius: 'var(--border-radius-sm)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'var(--transition-all)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <X
+                      weight="bold"
+                      style={{
+                        width: 'var(--size-icon-base)',
+                        height: 'var(--size-icon-base)',
+                        color: 'var(--color-text-secondary)',
+                      }}
+                    />
+                  </button>
+
+                  {/* 사용자 정보 */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      paddingBottom: 'var(--spacing-md)',
+                      borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)',
+                      marginBottom: 'var(--spacing-sm)',
+                    }}
+                  >
+                    {/* 아바타 */}
+                    <div
+                      style={{
+                        width: 'var(--size-avatar-xl)',
+                        height: 'var(--size-avatar-xl)',
+                        borderRadius: 'var(--border-radius-full)',
+                        backgroundColor: 'var(--color-gray-100)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: 'var(--spacing-sm)',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {userProfile.avatarUrl ? (
+                        <img
+                          src={userProfile.avatarUrl}
+                          alt={userProfile.name}
+                          style={{
+                            width: 'var(--width-full)',
+                            height: 'var(--height-full)',
+                            objectFit: 'cover',
+                          }}
+                        />
+                      ) : (
+                        <User
+                          weight="regular"
+                          style={{
+                            width: 'var(--size-avatar-md)',
+                            height: 'var(--size-avatar-md)',
+                            color: 'var(--color-text-secondary)',
+                          }}
+                        />
+                      )}
+                    </div>
+                    {/* 이름 */}
+                    <div
+                      style={{
+                        fontWeight: 'var(--font-weight-bold)',
+                        fontSize: 'var(--font-size-lg)',
+                        color: 'var(--color-text)',
+                        marginBottom: 'var(--spacing-xs)',
+                      }}
+                    >
+                      {userProfile.name}
+                    </div>
+                    {/* 이메일 */}
+                    <div
+                      style={{
+                        fontSize: 'var(--font-size-sm)',
+                        color: 'var(--color-primary)',
+                      }}
+                    >
+                      {userProfile.email}
+                    </div>
+                  </div>
+
+                  {/* 메뉴 버튼들 */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 'var(--spacing-sm)',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {/* 설정 버튼 */}
+                    {onSettings && (
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          onSettings();
+                        }}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 'var(--spacing-xs)',
+                          padding: 'var(--spacing-md)',
+                          borderRadius: 'var(--border-radius-md)',
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          transition: 'var(--transition-all)',
+                          minWidth: 'var(--size-avatar-xl)',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        <Gear
+                          weight="regular"
+                          style={{
+                            width: 'var(--size-spinner-md)',
+                            height: 'var(--size-spinner-md)',
+                            color: 'var(--color-text)',
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: 'var(--font-size-sm)',
+                            color: 'var(--color-text)',
+                          }}
+                        >
+                          설정
+                        </span>
+                      </button>
+                    )}
+                    {/* 로그아웃 버튼 */}
+                    {onLogout && (
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          onLogout();
+                        }}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 'var(--spacing-xs)',
+                          padding: 'var(--spacing-md)',
+                          borderRadius: 'var(--border-radius-md)',
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          transition: 'var(--transition-all)',
+                          minWidth: 'var(--size-avatar-xl)',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        <Power
+                          weight="regular"
+                          style={{
+                            width: 'var(--size-spinner-md)',
+                            height: 'var(--size-spinner-md)',
+                            color: 'var(--color-text)',
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: 'var(--font-size-sm)',
+                            color: 'var(--color-text)',
+                          }}
+                        >
+                          로그아웃
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
-      {rightContent && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--spacing-md)',
-          }}
-        >
-          {rightContent}
-        </div>
-      )}
     </header>
   );
 };

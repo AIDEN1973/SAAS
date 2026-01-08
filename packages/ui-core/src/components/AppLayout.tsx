@@ -47,7 +47,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   const isTablet = mode === 'md';
   const isDesktop = mode === 'lg' || mode === 'xl';
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(isTablet); // 태블릿 모드에서는 자동으로 축소
+  const [, setSidebarCollapsed] = useState(isTablet); // 태블릿 모드에서는 자동으로 축소
 
   // AI 레이어 메뉴 상태 (전역)
   const aiLayerMenu = useAILayerMenu();
@@ -79,9 +79,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         <Header
           {...header}
           onMenuClick={isMobile && sidebar ? () => setSidebarOpen(true) : undefined}
-          sidebarCollapsed={!isMobile ? sidebarCollapsed : undefined}
-          onSidebarToggle={!isMobile ? () => setSidebarCollapsed((prev) => !prev) : undefined}
-          showSidebarToggle={isDesktop} // 데스크톱에서만 토글 버튼 표시
         />
       )}
 
@@ -102,7 +99,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
             onItemClick={sidebar.onItemClick}
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
-            collapsed={!isMobile ? sidebarCollapsed : false}
           />
         )}
 
@@ -137,7 +133,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         chatOpsMessages={aiLayerMenu.chatOpsMessages}
         chatOpsLoading={aiLayerMenu.chatOpsLoading}
         chatOpsIndustryTerms={chatOpsIndustryTerms}
-        onChatOpsSendMessage={onChatOpsSendMessage || (async (message) => {
+        onChatOpsSendMessage={onChatOpsSendMessage || ((message) => {
           // ChatOps API 호출 (챗봇.md 참조)
           // 상위 컴포넌트(App.tsx)에서 useChatOps Hook을 사용하여 처리
           // AppLayout은 prop으로 받은 핸들러를 호출
@@ -169,7 +165,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           // cursor를 설정하면 상위 컴포넌트(App.tsx)의 useExecutionAuditRuns Hook이 자동으로 추가 데이터 로드
           aiLayerMenu.setExecutionAuditNextCursor(cursor);
         }}
-        onExecutionAuditLoadSteps={async (runId, cursor) => {
+        onExecutionAuditLoadSteps={(runId) => {
           // Execution Audit Steps 로드 (액티비티.md 10.2 참조)
           // 로딩 상태 설정: App.tsx의 useEffect에서 이 상태 변경을 감지하여 실제 API 호출 수행
           if (!aiLayerMenu.executionAuditStepsByRunId[runId] || aiLayerMenu.executionAuditStepsByRunId[runId].length === 0) {

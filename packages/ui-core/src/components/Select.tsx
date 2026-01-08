@@ -615,9 +615,7 @@ export const Select: React.FC<SelectProps> = ({
           style={{
             color: 'var(--color-form-error)', // styles.css 토큰: 폼 필드 에러 메시지 색상
             marginTop: 'var(--spacing-xs)',
-            // 요구사항: 에러 메시지를 2pt 작게 표시 (공통 컴포넌트 기준)
-            // HARD-CODE-EXCEPTION: 에러 메시지 폰트 크기 조정을 위한 고정 오프셋 값 (디자인 시스템 요구사항)
-            fontSize: 'calc(var(--font-size-sm) - 2px)',
+            fontSize: 'var(--font-size-xxs)', // 11px - 에러 메시지
           }}
         >
           {error}

@@ -1,18 +1,20 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import { Suspense, lazy, useMemo, useEffect, useCallback } from 'react';
+import React, { Suspense, lazy, useMemo, useEffect, useCallback, useState } from 'react';
 import {
-  Button,
   useModal,
   useTheme,
   AIToggle,
   useAILayerMenu,
   getOrCreateChatOpsSessionId,
+  useGlobalSearch,
+  Tooltip,
 } from '@ui-core/react';
-import type { SidebarItem, ExecutionAuditRun } from '@ui-core/react';
+import type { SearchResult, SidebarItem, ExecutionAuditRun } from '@ui-core/react';
+import { Sparkle } from 'phosphor-react';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleBasedRoute } from './components/RoleBasedRoute';
 import { IndustryBasedRoute } from './components/IndustryBasedRoute';
-import { useLogout, useUserRole } from '@hooks/use-auth';
+import { useLogout, useUserRole, useSession } from '@hooks/use-auth';
 import { useExecutionAuditRuns, fetchExecutionAuditSteps } from '@hooks/use-execution-audit';
 import { sendChatOpsMessageStreaming } from '@hooks/use-chatops';
 import { useIndustryConfig } from '@hooks/use-industry-config';
@@ -20,6 +22,42 @@ import { getApiContext } from '@api-sdk/core';
 import type { TenantRole } from '@core/tenancy';
 import { createSafeNavigate, logError, logWarn, logInfo } from './utils';
 import { maskPII } from '@core/pii-utils';
+
+// Agent Button Component
+const AgentButton: React.FC<{ isOpen: boolean; onClick: () => void }> = ({ isOpen, onClick }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <Tooltip content="AI 에이전트" position="bottom">
+      <button
+        onClick={onClick}
+        aria-label="AI 에이전트 열기/닫기"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--spacing-sm)',
+          backgroundColor: isHovered ? 'var(--color-primary-40)' : 'transparent',
+          border: 'none',
+          borderRadius: 'var(--border-radius-md)',
+          cursor: 'pointer',
+          transition: 'var(--transition-all)',
+        }}
+      >
+        <Sparkle
+          weight={isOpen ? 'bold' : 'regular'}
+          style={{
+            width: 'var(--size-icon-xl)',
+            height: 'var(--size-icon-xl)',
+            color: isOpen ? 'var(--color-primary)' : 'var(--color-text-tertiary)',
+          }}
+        />
+      </button>
+    </Tooltip>
+  );
+};
 
 // 큰 컴포넌트는 lazy loading으로 전환 (초기 로드 번들 크기 감소)
 const AppLayout = lazy(() => import('@ui-core/react').then(m => ({ default: m.AppLayout })));
@@ -70,10 +108,138 @@ function AppContent() {
   );
   const { showAlert } = useModal();
   const logout = useLogout();
+  const { data: session } = useSession();
   const { data: userRole } = useUserRole();
   const aiLayerMenu = useAILayerMenu();
   // 업종별 설정 (Phase 3: Industry-Based Page Visibility)
   const { terms, isPageVisible } = useIndustryConfig();
+
+  // 글로벌 검색 API 호출 함수
+  const handleGlobalSearch = useCallback(async (input: { query: string; entity_types?: string[]; limit?: number }) => {
+    const context = getApiContext();
+    const tenantId = context?.tenantId;
+    if (!tenantId) {
+      return [];
+    }
+
+    try {
+      const { createClient } = await import('@lib/supabase-client');
+      const supabase = createClient();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const { data, error } = await supabase.rpc('global_search', {
+        p_tenant_id: tenantId,
+        p_query: input.query,
+        p_entity_types: input.entity_types || ['student', 'teacher', 'class', 'guardian', 'consultation', 'announcement', 'tag'],
+        p_limit: input.limit || 20,
+      });
+
+      if (error) {
+        console.error('[GlobalSearch] RPC error:', error);
+        return [];
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const results = data || [];
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      return results.map((item: {
+        id: string;
+        entity_type: string;
+        title: string;
+        subtitle: string;
+        relevance: number;
+        created_at: string;
+      }) => ({
+        id: item.id,
+        entity_type: item.entity_type as SearchResult['entity_type'],
+        title: item.title,
+        subtitle: item.subtitle,
+        relevance: item.relevance,
+        created_at: item.created_at,
+      }));
+    } catch (error) {
+      console.error('[GlobalSearch] Error:', error);
+      return [];
+    }
+  }, []);
+
+  // 글로벌 검색 훅
+  const globalSearch = useGlobalSearch({
+    tenantId: getApiContext()?.tenantId || '',
+    onSearch: handleGlobalSearch,
+  });
+
+  // 검색 결과 클릭 핸들러
+  const handleSearchResultClick = useCallback(async (result: SearchResult) => {
+    // 엔티티 타입별 페이지 이동
+    switch (result.entity_type) {
+      case 'student':
+        safeNavigate(`/students/${result.id}`);
+        break;
+      case 'teacher':
+        safeNavigate(`/teachers/${result.id}`);
+        break;
+      case 'class':
+        safeNavigate(`/classes/${result.id}`);
+        break;
+      case 'guardian':
+        // 보호자 ID로 연결된 학생 찾기
+        try {
+          const { createClient } = await import('@lib/supabase-client');
+          const supabase = createClient();
+          const context = getApiContext();
+          const tenantId = context?.tenantId;
+
+          if (!tenantId) {
+            safeNavigate(`/students/list`);
+            return;
+          }
+
+          // guardians 테이블에서 id로 student_id 찾기
+          const { data: guardian, error } = await supabase
+            .from('guardians')
+            .select('student_id')
+            .eq('tenant_id', tenantId)
+            .eq('id', result.id)
+            .limit(1)
+            .single();
+
+          if (error || !guardian) {
+            console.error('[GlobalSearch] Failed to find student for guardian:', error);
+            safeNavigate(`/students/list`);
+            return;
+          }
+
+          // 학생의 보호자 탭으로 이동 (query parameter 사용)
+          safeNavigate(`/students/list?studentId=${guardian.student_id}&panel=guardians`);
+        } catch (error) {
+          console.error('[GlobalSearch] Error navigating to guardian:', error);
+          safeNavigate(`/students/list`);
+        }
+        break;
+      case 'consultation':
+        // 상담은 학생 상세에서 확인
+        safeNavigate(`/students/list`);
+        break;
+      case 'announcement':
+        safeNavigate(`/notifications`);
+        break;
+      case 'tag':
+        // 태그는 학생 목록에서 필터링
+        safeNavigate(`/students/list`);
+        break;
+      default:
+        safeNavigate(`/home`);
+    }
+  }, [safeNavigate]);
+
+  // 사용자 프로필 정보
+  const userProfile = session?.user ? {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '사용자',
+    email: session.user.email || '',
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    avatarUrl: session.user.user_metadata?.avatar_url,
+  } : undefined;
 
   // Execution Audit 데이터 로드 (액티비티.md 10.1 참조)
   const executionAuditQuery = useExecutionAuditRuns(
@@ -527,7 +693,7 @@ function AppContent() {
     if (isPageVisible('primary')) {
       coreMenuItems.push({
         id: 'students',
-        label: terms.PERSON_LABEL_PRIMARY + ' 관리',
+        label: terms.PERSON_LABEL_PRIMARY + '관리',
         path: terms.ROUTES.PRIMARY_LIST || '/students/home',
         icon: (
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -735,31 +901,49 @@ function AppContent() {
             <AppLayout
               header={{
                 title: '디어쌤 학원관리',
+                search: {
+                  query: globalSearch.query,
+                  onQueryChange: globalSearch.setQuery,
+                  results: globalSearch.results,
+                  loading: globalSearch.loading,
+                  error: globalSearch.error,
+                  onResultClick: (result: SearchResult) => {
+                    void handleSearchResultClick(result);
+                  },
+                  placeholder: '학생, 반, 보호자 검색 (Ctrl+K)',
+                  inputPlaceholder: '학생, 반, 보호자 등을 검색하세요...',
+                  emptyStateMessage: '학생, 반, 보호자, 상담 등을 검색할 수 있습니다.',
+                  entityTypeLabels: {
+                    student: '학생',
+                    teacher: '강사',
+                    class: '반',
+                    guardian: '보호자',
+                    consultation: '상담',
+                    announcement: '공지사항',
+                    tag: '태그',
+                  },
+                },
                 rightContent: (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
                     <AIToggle />
-                    <Button
-                      variant={aiLayerMenu.isOpen ? 'solid' : 'outline'}
-                      size="sm"
+                    <AgentButton
+                      isOpen={aiLayerMenu.isOpen}
                       onClick={aiLayerMenu.toggle}
-                      aria-label="AI 대화창 열기/닫기"
-                    >
-                      <div>💬</div> AI
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleLogout}
-                    >
-                      로그아웃
-                    </Button>
+                    />
                   </div>
                 ),
+                userProfile,
+                onLogout: () => {
+                  void handleLogout();
+                },
+                onSettings: () => safeNavigate('/settings'),
               }}
               sidebar={{
                 items: sidebarItems,
                 currentPath: location.pathname,
-                onItemClick: handleSidebarItemClick,
+                onItemClick: (item: SidebarItem) => {
+                  void handleSidebarItemClick(item);
+                },
               }}
               chatOpsIndustryTerms={{
                 personLabel: terms.PERSON_LABEL_PRIMARY,

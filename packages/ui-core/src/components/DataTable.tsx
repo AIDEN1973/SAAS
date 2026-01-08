@@ -57,7 +57,6 @@ export function DataTable<T = unknown>({
 }: DataTableProps<T>) {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
-  const isDesktop = mode === 'lg' || mode === 'xl';
 
   // React Hooks 규칙 준수: 모든 Hook은 조건부 return 이전에 호출되어야 함
   const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -190,7 +189,6 @@ export function DataTable<T = unknown>({
           const visibleColumns = isExpanded ? columns : columns.slice(0, 2);
           const hasMoreColumns = columns.length > 2;
           const isLastRow = index === paginatedData.length - 1;
-          const isFirstRow = index === 0;
 
           const handleRowClick = () => {
             if (hasMoreColumns) {
@@ -325,17 +323,13 @@ export function DataTable<T = unknown>({
       style={{
         width: '100%',
         overflowX: 'auto',
-        borderTop: 'var(--border-width-thin) solid var(--color-text)', // styles.css 준수: 상단 테두리 (기본 폰트 색상)
-        borderBottom: 'var(--border-width-thin) solid var(--color-text)', // styles.css 준수: 하단 테두리 (기본 폰트 색상)
-        borderLeft: 'var(--border-width-thin) solid var(--color-text)', // styles.css 준수: 좌측 테두리
-        borderRight: 'var(--border-width-thin) solid var(--color-text)', // styles.css 준수: 우측 테두리
+        borderTop: 'var(--border-width-thin) solid var(--color-text)', // 상단 테두리 (폰트 기본색)
+        borderBottom: 'var(--border-width-thin) solid var(--color-text)', // 하단 테두리 (폰트 기본색)
+        borderLeft: 'none', // 좌측 테두리 제거
+        borderRight: 'none', // 우측 테두리 제거
         backgroundColor: 'var(--color-white)',
-        boxShadow: 'var(--shadow-sm)',
         overflow: 'hidden',
-        borderTopLeftRadius: 'var(--border-radius-sm)', // styles.css 준수: 헤더 상단 좌측 라운드
-        borderTopRightRadius: 'var(--border-radius-sm)', // styles.css 준수: 헤더 상단 우측 라운드
-        borderBottomLeftRadius: 'var(--border-radius-sm)', // styles.css 준수: 하단 좌측 라운드
-        borderBottomRightRadius: 'var(--border-radius-sm)', // styles.css 준수: 하단 우측 라운드
+        borderRadius: 0, // 라운드 제거
       }}
     >
       <table
@@ -349,10 +343,10 @@ export function DataTable<T = unknown>({
         {/* Header */}
         <thead
           style={{
-            backgroundColor: 'var(--color-text)', // styles.css 준수: 기본 폰트 색상과 동일한 배경색
+            backgroundColor: 'transparent', // 헤더 배경 제거
             position: stickyHeader ? 'sticky' : 'static',
             top: 0,
-            zIndex: 'var(--z-sticky)',
+            zIndex: 'var(--z-sticky-header)',
           }}
         >
           <tr>
@@ -364,50 +358,39 @@ export function DataTable<T = unknown>({
                 <th
                   key={column.key}
                   style={{
-                    padding: 'var(--spacing-md) var(--spacing-md)', // styles.css 준수: 헤더 높이 줄임
-                    textAlign: 'left', // 헤더는 항상 좌측 정렬
-                    fontWeight: 'var(--font-weight-extrabold)', // styles.css 준수: 엑스트라 볼드 적용
-                    fontSize: 'var(--font-size-base)', // styles.css 준수: 기본 폰트 사이즈 적용
-                    color: 'var(--color-white)', // styles.css 준수: 폰트 화이트 적용
+                    padding: 'var(--spacing-md) var(--spacing-md)',
+                    textAlign: 'center', // 헤더 가운데 정렬
+                    fontWeight: 'var(--font-weight-bold)', // 볼드 적용
+                    fontSize: 'var(--font-size-base)', // 기본 폰트 사이즈 적용
+                    color: 'var(--color-text)', // 기본 텍스트 색상
                     textTransform: 'uppercase',
-                    letterSpacing: 'var(--letter-spacing-table-header)', // styles.css 준수: 테이블 헤더 글자 간격 토큰 사용
-                    borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
+                    letterSpacing: 'var(--letter-spacing-table-header)', // 테이블 헤더 글자 간격 토큰 사용
+                    borderBottom: 'var(--border-width-thin) solid var(--color-text)', // 헤더 하단 테두리 (폰트 기본색)
                     whiteSpace: 'nowrap',
                     width: column.width,
-                    backgroundColor: 'var(--color-text)', // styles.css 준수: 기본 폰트 색상과 동일한 배경색
+                    backgroundColor: 'transparent', // 배경 제거
                     cursor: isSortable ? 'pointer' : 'default',
                     userSelect: 'none',
-                    transition: 'var(--transition-all)',
                     ...(index === 0 && {
                       paddingLeft: 'var(--spacing-lg)',
-                      borderTopLeftRadius: 'var(--border-radius-sm)', // styles.css 준수: 헤더 상단 좌측 라운드
                     }),
                     ...(index === columns.length - 1 && {
                       paddingRight: 'var(--spacing-lg)',
-                      borderTopRightRadius: 'var(--border-radius-sm)', // styles.css 준수: 헤더 상단 우측 라운드
                     }),
                   }}
                   onClick={isSortable ? (e) => handleSortClick(e, column.key) : undefined}
-                  onMouseEnter={(e) => {
-                    if (isSortable) {
-                      e.currentTarget.style.backgroundColor = 'var(--color-gray-700)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--color-text)';
-                  }}
                 >
                   <div
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: 'var(--spacing-xs)',
-                      justifyContent: 'flex-start', // 헤더는 항상 좌측 정렬
+                      justifyContent: 'center', // 헤더 가운데 정렬
                     }}
                   >
                     <span
                       style={{
-                        color: sortColumn === column.key ? 'var(--color-primary-light)' : 'var(--color-white)',
+                        color: sortColumn === column.key ? 'var(--color-primary)' : 'var(--color-text)',
                         transition: 'var(--transition-all)',
                       }}
                     >
@@ -433,7 +416,7 @@ export function DataTable<T = unknown>({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: 'var(--color-white)',
+                            color: 'var(--color-text)',
                             opacity: sortColumn === column.key ? 'var(--opacity-full)' : 'var(--opacity-secondary)',
                             transition: 'var(--transition-all)',
                           }}
@@ -451,7 +434,7 @@ export function DataTable<T = unknown>({
                             style={{
                               width: 'var(--size-icon-md)',
                               height: 'var(--size-icon-md)',
-                              color: sortColumn === column.key ? 'var(--color-primary-light)' : 'var(--color-white)',
+                              color: sortColumn === column.key ? 'var(--color-primary)' : 'var(--color-text)',
                               transition: 'var(--transition-all)',
                             }}
                           >
@@ -480,9 +463,8 @@ export function DataTable<T = unknown>({
                               style={{
                                 width: 'var(--size-icon-md)',
                                 height: 'var(--size-icon-md)',
-                                color: 'var(--color-primary-light)',
+                                color: 'var(--color-primary)',
                                 opacity: 'var(--opacity-full)',
-                                filter: 'var(--filter-icon-glow)',
                                 transition: 'var(--transition-all)',
                               }}
                             />
@@ -492,9 +474,8 @@ export function DataTable<T = unknown>({
                               style={{
                                 width: 'var(--size-icon-md)',
                                 height: 'var(--size-icon-md)',
-                                color: sortColumn === column.key ? 'var(--color-primary-light)' : 'var(--color-white)',
+                                color: sortColumn === column.key ? 'var(--color-primary)' : 'var(--color-text-secondary)',
                                 opacity: sortColumn === column.key ? 'var(--opacity-full)' : 'var(--opacity-inactive)',
-                                filter: sortColumn === column.key && sortDirection === 'desc' ? 'var(--filter-icon-glow)' : 'none',
                                 transition: 'var(--transition-all)',
                               }}
                             />
@@ -529,7 +510,6 @@ export function DataTable<T = unknown>({
             paginatedData.map((row, index) => {
               const key = keyExtractor ? keyExtractor(row) : index;
               const isLastRow = index === paginatedData.length - 1;
-              const isFirstRow = index === 0;
               return (
                 <React.Fragment key={key}>
                   <tr
@@ -587,8 +567,8 @@ export function DataTable<T = unknown>({
                         <div
                           style={{
                             position: 'absolute',
-                            left: 'var(--spacing-lg)',
-                            right: 'var(--spacing-lg)',
+                            left: 0,
+                            right: 0,
                             bottom: 0,
                             height: 0,
                             borderBottom: 'var(--border-width-thin) solid var(--color-table-row-border)',
