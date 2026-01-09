@@ -20,6 +20,7 @@ import {
   Badge,
   DataTable,
   type DataTableColumn,
+  EmptyState,
 } from '@ui-core/react';
 import {
   useAlimtalkSettings,
@@ -255,9 +256,10 @@ const ChannelsTab = memo(function ChannelsTab() {
           {error ? (
             <div style={{ color: 'var(--color-error)' }}>오류: {error.message}</div>
           ) : profiles.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>
-              등록된 채널이 없습니다.
-            </div>
+            <EmptyState
+              icon={MessageSquare}
+              message="등록된 채널이 없습니다."
+            />
           ) : (
             <DataTable columns={columns} data={profiles} />
           )}
@@ -600,9 +602,10 @@ const TemplatesTab = memo(function TemplatesTab() {
           {error ? (
             <div style={{ color: 'var(--color-error)' }}>오류: {error.message}</div>
           ) : templates.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>
-              등록된 템플릿이 없습니다.
-            </div>
+            <EmptyState
+              icon={FileText}
+              message="등록된 템플릿이 없습니다."
+            />
           ) : (
             <DataTable columns={columns} data={templates} />
           )}
@@ -707,9 +710,10 @@ const HistoryTab = memo(function HistoryTab() {
           {error ? (
             <div style={{ color: 'var(--color-error)' }}>오류: {error.message}</div>
           ) : history.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>
-              발송 내역이 없습니다.
-            </div>
+            <EmptyState
+              icon={Clock}
+              message="발송 내역이 없습니다."
+            />
           ) : (
             <>
               <DataTable columns={columns} data={history} />

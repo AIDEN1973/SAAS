@@ -9,7 +9,8 @@
  */
 
 import React, { useState } from 'react';
-import { Card, Button } from '@ui-core/react';
+import { Card, Button, EmptyState } from '@ui-core/react';
+import { Clock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 export interface HourlyAttendanceData {
@@ -153,9 +154,10 @@ export function AttendancePatternCard({ hourlyData, dailyData, isLoading }: Atte
             시간대별 출석 현황
           </h3>
           {hourlyData.length === 0 ? (
-            <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}>
-              데이터가 없습니다.
-            </div>
+            <EmptyState
+              icon={Clock}
+              message="데이터가 없습니다."
+            />
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={hourlyData}>
@@ -177,9 +179,10 @@ export function AttendancePatternCard({ hourlyData, dailyData, isLoading }: Atte
             요일별 출석률 추이
           </h3>
           {dailyData.length === 0 ? (
-            <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}>
-              데이터가 없습니다.
-            </div>
+            <EmptyState
+              icon={Clock}
+              message="데이터가 없습니다."
+            />
           ) : (
             <>
               <ResponsiveContainer width="100%" height={300}>

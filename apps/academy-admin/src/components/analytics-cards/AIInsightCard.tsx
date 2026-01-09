@@ -8,8 +8,13 @@
  * Purpose: AnalyticsPage에서 분리된 AI 인사이트 표시 컴포넌트
  */
 
-import React from 'react';
-import { Card } from '@ui-core/react';
+import { Card, EmptyState } from '@ui-core/react';
+import { Sparkles, MapPin } from 'lucide-react';
+
+// EmptyState 컴포넌트가 제대로 import되었는지 확인
+console.log('[AIInsightCard] EmptyState component:', EmptyState);
+console.log('[AIInsightCard] MapPin icon:', MapPin);
+console.log('[AIInsightCard] Sparkles icon:', Sparkles);
 
 export interface AIInsightCardProps {
   /** AI 인사이트 텍스트 배열 */
@@ -19,6 +24,8 @@ export interface AIInsightCardProps {
 }
 
 export function AIInsightCard({ insights, isLoading }: AIInsightCardProps) {
+  console.log('[AIInsightCard] insights:', insights, 'isLoading:', isLoading);
+
   if (isLoading) {
     return (
       <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
@@ -31,12 +38,28 @@ export function AIInsightCard({ insights, isLoading }: AIInsightCardProps) {
   }
 
   if (!insights || insights.length === 0) {
+    console.log('[AIInsightCard] Rendering EmptyState - no insights');
     return (
       <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
         <h2 style={{ marginBottom: 'var(--spacing-md)' }}>AI 인사이트</h2>
-        <div style={{ padding: 'var(--spacing-md)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-          AI 인사이트 데이터가 없습니다.
-        </div>
+        <EmptyState
+          icon={Sparkles}
+          message="AI 인사이트 데이터가 없습니다."
+        />
+      </Card>
+    );
+  }
+
+  // 지역 정보 설정 메시지만 있는 경우 EmptyState로 표시
+  if (insights.length === 1 && insights[0] === '지역 정보를 설정해주세요.') {
+    console.log('[AIInsightCard] Rendering EmptyState - location setup needed');
+    return (
+      <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+        <h2 style={{ marginBottom: 'var(--spacing-md)' }}>AI 인사이트</h2>
+        <EmptyState
+          icon={MapPin}
+          message="지역 정보를 설정해주세요."
+        />
       </Card>
     );
   }

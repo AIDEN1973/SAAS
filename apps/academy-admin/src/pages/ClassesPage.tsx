@@ -10,7 +10,8 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet } from '@ui-core/react';
+import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet, EmptyState } from '@ui-core/react';
+import { BookOpen } from 'lucide-react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
 import { apiClient } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
@@ -673,9 +674,10 @@ function ClassListView({
       ))}
       {classes.length === 0 && (
         <Card padding="lg">
-          <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-            등록된 {terms.GROUP_LABEL}이 없습니다.
-          </div>
+          <EmptyState
+            icon={BookOpen}
+            message={`등록된 ${terms.GROUP_LABEL}이 없습니다.`}
+          />
         </Card>
       )}
     </div>

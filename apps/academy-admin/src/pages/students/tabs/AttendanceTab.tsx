@@ -7,7 +7,7 @@
  * [불변 규칙] SSOT UI 디자인 준수
  */
 import { useState, useMemo } from 'react';
-import { useToast, useIconSize, useIconStrokeWidth, Card, Badge, Button, IconButtonGroup } from '@ui-core/react';
+import { useToast, useIconSize, useIconStrokeWidth, Card, Badge, Button, IconButtonGroup, EmptyState } from '@ui-core/react';
 import { Calendar, Pencil } from 'lucide-react';
 import { SchemaForm } from '@schema-engine';
 import { LayerSectionHeader } from '../components/LayerSectionHeader';
@@ -59,9 +59,9 @@ export function AttendanceTab({
   const studentClasses = useMemo(() => studentClassesData ?? [], [studentClassesData]);
 
   // 빈 상태 아이콘 크기 계산 (CSS 변수 사용, 기본 크기의 4배)
-  const baseIconSize = useIconSize();
-  const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
-  const emptyStateIconStrokeWidth = useIconStrokeWidth();
+  // const baseIconSize = useIconSize();
+  // const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
+  // const emptyStateIconStrokeWidth = useIconStrokeWidth();
 
   const thirtyDaysAgo = useMemo(() => {
     return toKST().subtract(30, 'day').format('YYYY-MM-DD');
@@ -252,9 +252,10 @@ export function AttendanceTab({
   if (!studentId || !student) {
     return (
       <Card padding="md" variant="default">
-        <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-          학생 정보를 불러올 수 없습니다.
-        </div>
+        <EmptyState
+          icon={Calendar}
+          message="학생 정보를 불러올 수 없습니다."
+        />
       </Card>
     );
   }
@@ -380,27 +381,10 @@ export function AttendanceTab({
                 })}
               </div>
             ) : (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: 'calc(var(--spacing-xl) * 5)',
-                padding: 'var(--spacing-xl)',
-              }}>
-                <Calendar
-                  size={emptyStateIconSize}
-                  strokeWidth={emptyStateIconStrokeWidth}
-                  style={{
-                    color: 'var(--color-gray-300)',
-                    marginBottom: 'var(--spacing-xs)',
-                    display: 'inline-block',
-                  }}
-                />
-                <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                  수정할 {terms.ATTENDANCE_LABEL} 기록이 없습니다.
-                </p>
-              </div>
+              <EmptyState
+                icon={Calendar}
+                message={`수정할 ${terms.ATTENDANCE_LABEL} 기록이 없습니다.`}
+              />
             )}
           </Card>
         </div>
@@ -560,27 +544,10 @@ export function AttendanceTab({
                 </div>
               </div>
             ) : (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: 'calc(var(--spacing-xl) * 5)',
-                padding: 'var(--spacing-xl)',
-              }}>
-                <Calendar
-                  size={emptyStateIconSize}
-                  strokeWidth={emptyStateIconStrokeWidth}
-                  style={{
-                    color: 'var(--color-gray-300)',
-                    marginBottom: 'var(--spacing-xs)',
-                    display: 'inline-block',
-                  }}
-                />
-                <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                  {terms.ATTENDANCE_LABEL} 데이터가 없습니다.
-                </p>
-              </div>
+              <EmptyState
+                icon={Calendar}
+                message={`${terms.ATTENDANCE_LABEL} 데이터가 없습니다.`}
+              />
             )}
 
             {isEditable && attendanceLogs.length > 0 && (
@@ -655,29 +622,12 @@ export function AttendanceTab({
                 })}
               </div>
             ) : (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: 'calc(var(--spacing-xl) * 5)',
-                padding: 'var(--spacing-xl)',
-              }}>
-                <Calendar
-                  size={emptyStateIconSize}
-                  strokeWidth={emptyStateIconStrokeWidth}
-                  style={{
-                    color: 'var(--color-gray-300)',
-                    marginBottom: 'var(--spacing-xs)',
-                    display: 'inline-block',
-                  }}
-                />
-                <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                  {attendanceLogs.length === 0
-                    ? `최근 ${terms.ATTENDANCE_LABEL} 내역이 없습니다.`
-                    : `필터 조건에 맞는 ${terms.ATTENDANCE_LABEL} 내역이 없습니다.`}
-                </p>
-              </div>
+              <EmptyState
+                icon={Calendar}
+                message={attendanceLogs.length === 0
+                  ? `최근 ${terms.ATTENDANCE_LABEL} 내역이 없습니다.`
+                  : `필터 조건에 맞는 ${terms.ATTENDANCE_LABEL} 내역이 없습니다.`}
+              />
             )}
           </Card>
         </div>

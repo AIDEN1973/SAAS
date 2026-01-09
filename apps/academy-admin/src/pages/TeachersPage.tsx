@@ -9,7 +9,8 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet } from '@ui-core/react';
+import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet, EmptyState } from '@ui-core/react';
+import { UserCog } from 'lucide-react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import {
@@ -188,9 +189,10 @@ export function TeachersPage() {
               ))}
               {teachers?.length === 0 && (
                 <Card padding="lg">
-                  <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                    등록된 {terms.PERSON_LABEL_SECONDARY}가 없습니다.
-                  </div>
+                  <EmptyState
+                    icon={UserCog}
+                    message={`등록된 ${terms.PERSON_LABEL_SECONDARY}가 없습니다.`}
+                  />
                 </Card>
               )}
             </div>

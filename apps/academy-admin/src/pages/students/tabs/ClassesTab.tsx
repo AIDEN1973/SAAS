@@ -6,8 +6,8 @@
  * [불변 규칙] CSS 변수만 사용 (하드코딩 금지)
  * [불변 규칙] SSOT UI 디자인 준수
  */
-import { useState, useMemo } from 'react';
-import { useModal, useResponsiveMode, useToast, IconButtonGroup, Card, isMobile, useIconSize, useIconStrokeWidth } from '@ui-core/react';
+import { useState } from 'react';
+import { useModal, useResponsiveMode, useToast, IconButtonGroup, Card, isMobile, useIconSize, useIconStrokeWidth, EmptyState } from '@ui-core/react';
 import { BookOpen, Trash2, Pencil } from 'lucide-react';
 import { SchemaForm } from '@schema-engine';
 import { useIndustryTranslations } from '@hooks/use-industry-translations';
@@ -75,9 +75,9 @@ export function ClassesTab({
   const titleIconStrokeWidth = useIconStrokeWidth();
 
   // 빈 상태 아이콘 크기 계산 (CSS 변수 사용, 기본 크기의 4배)
-  const baseIconSize = useIconSize();
-  const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
-  const emptyStateIconStrokeWidth = useIconStrokeWidth();
+  // const baseIconSize = useIconSize();
+  // const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
+  // const emptyStateIconStrokeWidth = useIconStrokeWidth();
 
   const assignedClassIds = studentClasses
     .filter((sc) => sc.is_active)
@@ -399,27 +399,10 @@ export function ClassesTab({
               })}
           </div>
         ) : (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: 'calc(var(--spacing-xl) * 5)', // [불변 규칙] CSS 변수 사용 (spacing-xl = 2rem, 5배 = 10rem ≈ 160px)
-            padding: 'var(--spacing-xl)',
-          }}>
-            <BookOpen
-              size={emptyStateIconSize}
-              strokeWidth={emptyStateIconStrokeWidth}
-              style={{
-                color: 'var(--color-gray-300)',
-                marginBottom: 'var(--spacing-xs)',
-                display: 'inline-block',
-              }}
-            />
-            <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-              {`배정된 ${terms.GROUP_LABEL}이(가) 없습니다.`}
-            </p>
-          </div>
+          <EmptyState
+            icon={BookOpen}
+            message={`배정된 ${terms.GROUP_LABEL}이(가) 없습니다.`}
+          />
         )}
         </Card>
         </div>

@@ -34,7 +34,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Badge, PageHeader, isMobile, Modal, Drawer } from '@ui-core/react';
+import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Badge, PageHeader, isMobile, Modal, Drawer, EmptyState } from '@ui-core/react';
+import { MapPin, Sparkles, FileText } from 'lucide-react';
 import { SchemaForm } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -814,12 +815,11 @@ export function AIPage() {
                     </div>
                   ) : (
                     <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
-                      <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                        <p>지역 비교 데이터가 없습니다.</p>
-                        <p style={{ marginTop: 'var(--spacing-xs)' }}>
-                          지역 정보를 설정하면 지역 대비 분석을 제공할 수 있습니다.
-                        </p>
-                      </div>
+                      <EmptyState
+                        icon={MapPin}
+                        message="지역 비교 데이터가 없습니다."
+                        description="지역 정보를 설정하면 지역 대비 분석을 제공할 수 있습니다."
+                      />
                     </Card>
                   )}
 
@@ -1047,12 +1047,11 @@ export function AIPage() {
                    !aiInsights.dailyAutomationDigest &&
                    !aiInsights.metaAutomationPattern && (
                     <Card padding="lg">
-                      <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                        <p>AI 인사이트 데이터가 없습니다.</p>
-                        <p style={{ marginTop: 'var(--spacing-xs)' }}>
-                          데이터가 축적되면 AI 분석 결과를 제공합니다.
-                        </p>
-                      </div>
+                      <EmptyState
+                        icon={Sparkles}
+                        message="AI 인사이트 데이터가 없습니다."
+                        description="데이터가 축적되면 AI 분석 결과를 제공합니다."
+                      />
                     </Card>
                   )}
                 </>
@@ -1296,9 +1295,10 @@ function ConsultationSummaryTab() {
               ))}
             </div>
           ) : (
-            <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-              상담일지가 없습니다.
-            </div>
+            <EmptyState
+              icon={FileText}
+              message="상담일지가 없습니다."
+            />
           )}
         </div>
       )}
@@ -1372,9 +1372,10 @@ function PerformanceDetailContent({ performanceAnalysis, onNavigateToClass }: Pe
 
   if (performanceAnalysis.length === 0) {
     return (
-      <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-        성과 분석 데이터가 없습니다.
-      </div>
+      <EmptyState
+        icon={Sparkles}
+        message="성과 분석 데이터가 없습니다."
+      />
     );
   }
 
@@ -1809,9 +1810,10 @@ function AttendanceAnomalyDetailContent({ attendanceAnomalies, onNavigateToStude
 
   if (attendanceAnomalies.length === 0) {
     return (
-      <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-        {terms.ABSENCE_LABEL} 이상 탐지 데이터가 없습니다.
-      </div>
+      <EmptyState
+        icon={Sparkles}
+        message={`${terms.ABSENCE_LABEL} 이상 탐지 데이터가 없습니다.`}
+      />
     );
   }
 

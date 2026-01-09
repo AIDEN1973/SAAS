@@ -7,7 +7,7 @@
  * [불변 규칙] SSOT UI 디자인 준수
  */
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useResponsiveMode, useToast, IconButtonGroup, Card, isMobile, isTablet, useIconSize, useIconStrokeWidth, Drawer, ActionButtonGroup } from '@ui-core/react';
+import { useResponsiveMode, useToast, IconButtonGroup, Card, isMobile, isTablet, useIconSize, useIconStrokeWidth, Drawer, ActionButtonGroup, EmptyState } from '@ui-core/react';
 import { Tag as TagIcon, Pencil, X as XIcon, Save } from 'lucide-react';
 import { SchemaFormWithMethods } from '@schema-engine';
 import { useIndustryTranslations } from '@hooks/use-industry-translations';
@@ -84,9 +84,9 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
   const titleIconStrokeWidth = useIconStrokeWidth();
 
   // 빈 상태 아이콘 크기 계산 (CSS 변수 사용, 기본 크기의 4배)
-  const baseIconSize = useIconSize();
-  const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
-  const emptyStateIconStrokeWidth = useIconStrokeWidth();
+  // const baseIconSize = useIconSize();
+  // const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
+  // const emptyStateIconStrokeWidth = useIconStrokeWidth();
 
   // [P1-4 수정] RGB를 HEX로 변환하는 유틸리티 함수
   // DB가 hex 포맷을 기대하는 경우를 대비하여 rgb/rgba를 hex로 변환
@@ -500,7 +500,10 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
                           })}
                         </div>
                       ) : (
-                        <p style={{ color: 'var(--color-text-secondary)' }}>{`등록된 ${terms.TAG_LABEL}이(가) 없습니다.`}</p>
+                        <EmptyState
+                          icon={TagIcon}
+                          message={`등록된 ${terms.TAG_LABEL}이(가) 없습니다.`}
+                        />
                       )}
                       {/* 요구사항: 태그수정 > 취소/저장 버튼은 학생관리 수정폼처럼 텍스트+아이콘 함께 출력 */}
                       <ActionButtonGroup
@@ -569,7 +572,10 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
                       })}
                     </div>
                   ) : (
-                    <p style={{ color: 'var(--color-text-secondary)' }}>{`등록된 ${terms.TAG_LABEL}이(가) 없습니다.`}</p>
+                    <EmptyState
+                      icon={TagIcon}
+                      message={`등록된 ${terms.TAG_LABEL}이(가) 없습니다.`}
+                    />
                   )}
                   {/* 요구사항: 태그수정 > 취소/저장 버튼은 학생관리 수정폼처럼 텍스트+아이콘 함께 출력 */}
                   <ActionButtonGroup
@@ -681,25 +687,10 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
             </div>
           </div>
         ) : (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: 'calc(var(--spacing-xl) * 5)', // [불변 규칙] CSS 변수 사용 (spacing-xl = 2rem, 5배 = 10rem ≈ 160px)
-            padding: 'var(--spacing-xl)',
-          }}>
-            <TagIcon
-              size={emptyStateIconSize}
-              strokeWidth={emptyStateIconStrokeWidth}
-              style={{
-                color: 'var(--color-gray-300)',
-                marginBottom: 'var(--spacing-xs)',
-                display: 'inline-block',
-              }}
-            />
-            <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>{`등록된 ${terms.TAG_LABEL}이(가) 없습니다.`}</p>
-          </div>
+          <EmptyState
+            icon={TagIcon}
+            message={`등록된 ${terms.TAG_LABEL}이(가) 없습니다.`}
+          />
         )}
 
         {/* 요구사항: 페이지별 카드 헤더 우측 수정 버튼 제거 → 카드 하단 우측 수정 버튼 */}

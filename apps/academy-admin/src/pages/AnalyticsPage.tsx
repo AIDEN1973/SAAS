@@ -30,6 +30,7 @@ import { AttendancePatternCard } from '../components/analytics-cards/AttendanceP
 import type { HourlyAttendanceData, DailyAttendanceData } from '../components/analytics-cards/AttendancePatternCard';
 import { HeatmapCard } from '../components/analytics-cards/HeatmapCard';
 import type { HeatmapData } from '../components/analytics-cards/HeatmapCard';
+import { AIInsightCard } from '../components/analytics-cards/AIInsightCard';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useConfig } from '@hooks/use-config';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
@@ -780,7 +781,7 @@ export function AnalyticsPage() {
       // 기술문서 5146줄: store_count >= 3 조건 미충족 시 명확한 메시지 표시
       if (comparisonGroup === 'insufficient' || sampleCount < minimumSampleSize) {
         if (!locationInfo.location_code) {
-          insights.push('경고: 지역 정보가 설정되지 않아 정확한 지역 비교가 불가능합니다. 설정 화면에서 위치 정보를 입력해주세요.');
+          insights.push('지역 정보를 설정해주세요.');
         } else {
           // 기술문서 5146줄: "해당 지역의 통계는 매장 수 부족으로 제공되지 않습니다" 출력
           insights.push(`경고: 해당 지역의 통계는 매장 수 부족(현재 ${sampleCount}개, 최소 3개 필요)으로 제공되지 않습니다.`);
@@ -1259,38 +1260,10 @@ export function AnalyticsPage() {
           ) : regionalStats ? (
             <>
               {/* 아키텍처 문서 3.6.3: AI 해석 문장을 최상단에 배치 */}
-              {regionalStats && regionalStats.insights && regionalStats.insights.length > 0 && (
-                <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-                  <h2 style={{ marginBottom: 'var(--spacing-md)', fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)' }}>
-                    AI 인사이트
-                  </h2>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-                    {regionalStats.insights.map((insight, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          padding: 'var(--spacing-lg)',
-                          backgroundColor: 'var(--color-background-secondary)',
-                          borderRadius: 'var(--border-radius-md)',
-                          lineHeight: 'var(--line-height-relaxed)',
-                          fontWeight: index === 0 ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)',
-                        }}
-                      >
-                        {insight}
-                      </div>
-                    ))}
-                    {regionalStats.comparisonGroup !== 'insufficient' && regionalStats.sampleCount > 0 && (
-                      <div style={{
-                        fontSize: 'var(--font-size-xs)',
-                        color: 'var(--color-text-secondary)',
-                        paddingTop: 'var(--spacing-xs)',
-                      }}>
-                        비교 기준: {regionalStats.comparisonGroup === 'same_dong' ? '동' : regionalStats.comparisonGroup === 'same_sigungu' ? '구' : regionalStats.comparisonGroup === 'same_sido' ? '시도' : regionalStats.comparisonGroup === 'same_region_zone' ? '권역' : ''} ({regionalStats.sampleCount}개 조직)
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              )}
+              <AIInsightCard
+                insights={regionalStats?.insights || []}
+                isLoading={isLoading}
+              />
 
               {/* FR-07: 시간대·요일별 출석 패턴 분석 */}
               <AttendancePatternCard

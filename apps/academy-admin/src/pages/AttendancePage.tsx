@@ -17,7 +17,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOptimizedQuery } from '@hooks/use-optimized-query';
-import { ErrorBoundary , Container, Card, Button, Input, Badge, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid, PageHeader , useResponsiveMode, isMobile, isTablet, NotificationCardLayout } from '@ui-core/react';
+import { ErrorBoundary , Container, Card, Button, Input, Badge, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid, PageHeader , useResponsiveMode, isMobile, isTablet, NotificationCardLayout, EmptyState } from '@ui-core/react';
 // [SSOT] Barrel export를 통한 통합 import
 import { createSafeNavigate } from '../utils';
 import { CardGridLayout } from '../components/CardGridLayout';
@@ -1037,9 +1037,10 @@ export function AttendancePage() {
                 {/* 정상 상태: 학생 리스트 */}
                 {!isLoading && !error && filteredStudents.length === 0 && (
                   <Card padding="lg">
-                    <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                      오늘 수업 {terms.PERSON_LABEL_PRIMARY}이(가) 없습니다.
-                    </div>
+                    <EmptyState
+                      icon={Users}
+                      message={`오늘 수업 ${terms.PERSON_LABEL_PRIMARY}이(가) 없습니다.`}
+                    />
                   </Card>
                 )}
                 {!isLoading && !error && filteredStudents.length > 0 && (

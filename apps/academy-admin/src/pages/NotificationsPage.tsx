@@ -12,7 +12,7 @@
 import React, { useState, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOptimizedQuery } from '@hooks/use-optimized-query';
-import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer, PageHeader, useIconSize, useIconStrokeWidth, isMobile, isTablet } from '@ui-core/react';
+import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer, PageHeader, useIconSize, useIconStrokeWidth, isMobile, isTablet, EmptyState } from '@ui-core/react';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -28,7 +28,7 @@ import { useStudentTaskCards } from '@hooks/use-student';
 import { useUpdateConfig } from '@hooks/use-config';
 import { fetchNotificationTemplates } from '@hooks/use-notification-templates';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, FileText } from 'lucide-react';
 // logWarn import 제거됨 - 채널 선택 기능 제거로 미사용
 
 export function NotificationsPage() {
@@ -698,9 +698,10 @@ export function NotificationsPage() {
                   ))}
                 </div>
               ) : (
-                <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
-                  등록된 템플릿이 {terms.MESSAGES.NO_DATA}
-                </div>
+                <EmptyState
+                  icon={FileText}
+                  message={`등록된 템플릿이 ${terms.MESSAGES.NO_DATA}`}
+                />
               )}
               {templateSchema && (
                 <>

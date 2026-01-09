@@ -1,0 +1,261 @@
+프로젝트 SQL 스키마 정합성 분석 보고서
+📋 개요
+제공된 SQL 스키마와 프로젝트 코드베이스를 교차 검증하여 데이터 정합성, 일관성, 잠재적 오류를 분석했습니다.
+
+✅ 주요 발견 사항 요약
+번호	분류	심각도	문제	영향 범위
+1	데이터 불일치	🔴 HIGH	academy_students.class_name 컬럼 불필요	데이터 중복, 정규화 위반
+2	스키마 누락	🔴 HIGH	academy_students.student_phone 컬럼 누락	키오스크 출석 기능 불가
+3	외래키 불일치	🟡 MEDIUM	guardians.student_id FK 정의 모호	참조 무결성 위험
+4	외래키 불일치	🟡 MEDIUM	student_consultations FK 누락	참조 무결성 위험
+5	외래키 불일치	🟡 MEDIUM	student_classes.student_id FK 누락	참조 무결성 위험
+6	인덱스 누락	🟢 LOW	academy_students 유니크 인덱스 누락	성능 저하, 중복 방지 미흡
+7	타입 불일치	🟢 LOW	attendance_logs bigint vs uuid	일관성 저하
+8	제약 조건 누락	🟢 LOW	academy_students.student_phone 유니크 제약 누락	중복 방지 미흡
+🔴 1. 데이터 불일치: academy_students.class_name 컬럼 불필요
+문제 설명
+SQL 스키마에 academy_students.class_name TEXT 컬럼이 존재하지만, 이는 데이터 정규화 위반입니다.
+
+
+-- SQL 스키마 (제공된 파일)
+CREATE TABLE public.academy_students (
+  ...
+  class_name text,  -- ❌ 문제: 학생-반 관계는 student_classes에서 관리해야 함
+  ...
+);
+왜 문제인가?
+정규화 위반: 학생과 반의 관계는 이미 student_classes 테이블로 관리됩니다 (M:N 관계).
+
+
+CREATE TABLE public.student_classes (
+  student_id uuid NOT NULL,  -- persons.id 참조
+  class_id uuid NOT NULL,    -- academy_classes.id 참조
+  enrolled_at date NOT NULL,
+  left_at date,
+  is_active boolean
+);
+데이터 중복: class_name을 academy_students에 저장하면 학생이 여러 반에 등록될 경우 데이터가 불일치합니다.
+
+코드 미사용: 프로젝트 코드에서 class_name은 읽기 전용으로만 사용되며, 실제 비즈니스 로직에서는 student_classes 조인으로 반 정보를 조회합니다.
+
+
+// packages/industry/industry-academy/src/service.ts (line 249)
+class_name: undefined, // TODO: class_name 처리
+권장 사항
+
+-- ❌ 제거 권장
+ALTER TABLE public.academy_students DROP COLUMN class_name;
+
+-- ✅ 학생의 반 정보는 student_classes 테이블에서 조회
+SELECT
+  p.name AS student_name,
+  ac.name AS class_name
+FROM persons p
+INNER JOIN student_classes sc ON sc.student_id = p.id AND sc.is_active = true
+INNER JOIN academy_classes ac ON ac.id = sc.class_id;
+🔴 2. 스키마 누락: academy_students.student_phone 컬럼 누락
+문제 설명
+제공된 SQL 스키마에는 academy_students.student_phone 컬럼이 없지만, 실제 프로젝트 코드와 마이그레이션 파일에서는 필수 컬럼으로 사용됩니다.
+
+
+-- 제공된 SQL 스키마 (누락)
+CREATE TABLE public.academy_students (
+  ...
+  -- student_phone 컬럼 없음 ❌
+);
+
+-- 실제 마이그레이션 파일 (150_add_kiosk_check_in_support.sql)
+ALTER TABLE public.academy_students
+ADD COLUMN IF NOT EXISTS student_phone TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_academy_students_tenant_phone
+ON public.academy_students(tenant_id, student_phone)
+WHERE student_phone IS NOT NULL;
+영향 범위
+키오스크 출석 기능 불가: KioskCheckInPage.tsx:88에서 student_phone 필드를 사용합니다.
+
+
+student_phone: phoneNumber.replace(/-/g, ''), // 하이픈 제거
+Supabase Edge Function 오류: kiosk-check-in/index.ts:76에서 student_phone으로 학생을 조회합니다.
+
+
+.eq('student_phone', normalizedPhone)
+권장 사항
+
+-- ✅ 스키마에 추가 필요
+ALTER TABLE public.academy_students
+ADD COLUMN IF NOT EXISTS student_phone TEXT;
+
+-- ✅ 유니크 제약 조건 추가 (테넌트 내 중복 방지)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_academy_students_tenant_phone
+ON public.academy_students(tenant_id, student_phone)
+WHERE student_phone IS NOT NULL;
+
+COMMENT ON COLUMN public.academy_students.student_phone IS
+'학생 본인 휴대폰 번호 (키오스크 출석 체크용). 테넌트 내 유니크. 형식: 01012345678 (하이픈 없음)';
+🟡 3. 외래키 불일치: guardians.student_id FK 정의 모호
+문제 설명
+제공된 SQL 스키마에서 guardians.student_id의 외래키가 명시되지 않았습니다.
+
+
+-- 제공된 SQL 스키마
+CREATE TABLE public.guardians (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  tenant_id uuid NOT NULL,
+  student_id uuid NOT NULL,  -- ❌ FK 없음
+  ...
+);
+그러나 실제 마이그레이션 파일에서는 persons.id를 참조합니다:
+
+
+-- 008_update_guardians_fk_to_person_id.sql
+ALTER TABLE public.guardians
+ADD CONSTRAINT guardians_student_id_fkey
+FOREIGN KEY (student_id) REFERENCES public.persons(id) ON DELETE CASCADE;
+권장 사항
+
+-- ✅ 스키마에 FK 명시
+ALTER TABLE public.guardians
+ADD CONSTRAINT guardians_student_id_fkey
+FOREIGN KEY (student_id) REFERENCES public.persons(id) ON DELETE CASCADE;
+🟡 4. 외래키 불일치: student_consultations FK 누락
+문제 설명
+student_consultations.student_id도 persons.id를 참조해야 하지만, 제공된 스키마에 FK가 없습니다.
+
+
+-- 제공된 SQL 스키마
+CREATE TABLE public.student_consultations (
+  student_id uuid NOT NULL,  -- ❌ FK 없음
+  ...
+);
+권장 사항
+
+-- ✅ FK 추가
+ALTER TABLE public.student_consultations
+ADD CONSTRAINT student_consultations_student_id_fkey
+FOREIGN KEY (student_id) REFERENCES public.persons(id) ON DELETE CASCADE;
+🟡 5. 외래키 불일치: student_classes.student_id FK 누락
+문제 설명
+student_classes.student_id도 persons.id를 참조해야 하지만, 제공된 스키마에 FK가 없습니다.
+
+
+-- 제공된 SQL 스키마
+CREATE TABLE public.student_classes (
+  student_id uuid NOT NULL,  -- ❌ FK 없음
+  class_id uuid NOT NULL,
+  ...
+  CONSTRAINT student_classes_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.academy_classes(id)
+  -- student_id FK 없음 ❌
+);
+권장 사항
+
+-- ✅ FK 추가
+ALTER TABLE public.student_classes
+ADD CONSTRAINT student_classes_student_id_fkey
+FOREIGN KEY (student_id) REFERENCES public.persons(id) ON DELETE CASCADE;
+🟢 6. 인덱스 누락: academy_students 유니크 제약
+문제 설명
+academy_students.person_id가 UNIQUE 제약이 있어야 하지만, 제공된 스키마에 명시되지 않았습니다.
+
+
+-- 제공된 SQL 스키마
+CREATE TABLE public.academy_students (
+  person_id uuid NOT NULL UNIQUE,  -- ✅ UNIQUE 있음 (문제 없음)
+  ...
+);
+이 부분은 실제로 문제 없음으로 확인되었습니다. SQL 스키마에 이미 UNIQUE 제약이 포함되어 있습니다.
+
+🟢 7. 타입 불일치: attendance_logs bigint vs uuid
+문제 설명
+attendance_logs.id가 bigint 타입인데, 다른 테이블들은 대부분 uuid를 사용합니다.
+
+
+CREATE TABLE public.attendance_logs (
+  id bigint NOT NULL DEFAULT nextval('attendance_logs_id_seq'::regclass),  -- bigint
+  ...
+);
+
+CREATE TABLE public.academy_students (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),  -- uuid
+  ...
+);
+권장 사항
+일관성 유지: 특별한 이유가 없다면 uuid로 통일하는 것이 좋습니다.
+파티셔닝 고려: attendance_logs가 파티션 테이블(occurred_at로 파티셔닝)이므로 bigint가 성능상 유리할 수 있습니다. 이 경우 현재 구조 유지가 합리적입니다.
+🟢 8. 제약 조건 누락: academy_students.student_phone 유니크 제약
+문제 설명
+student_phone에 대한 유니크 인덱스가 마이그레이션에는 있지만, 제공된 스키마에는 없습니다.
+
+
+-- 마이그레이션 파일
+CREATE UNIQUE INDEX IF NOT EXISTS idx_academy_students_tenant_phone
+ON public.academy_students(tenant_id, student_phone)
+WHERE student_phone IS NOT NULL;
+권장 사항
+스키마 문서에 명시적으로 기재합니다.
+📊 외래키 관계 검증 결과
+✅ 올바른 외래키 관계
+자식 테이블	컬럼	부모 테이블	부모 컬럼	상태
+academy_students	person_id	persons	id	✅ 정상
+academy_teachers	person_id	persons	id	✅ 정상
+student_classes	class_id	academy_classes	id	✅ 정상
+class_teachers	class_id	academy_classes	id	✅ 정상
+class_teachers	teacher_id	academy_teachers	person_id	✅ 정상
+attendance_logs	student_id	persons	id	✅ 정상
+attendance_logs	class_id	academy_classes	id	✅ 정상
+⚠️ 누락된 외래키
+테이블	컬럼	참조 대상	조치 필요
+guardians	student_id	persons(id)	🔴 FK 추가
+student_consultations	student_id	persons(id)	🔴 FK 추가
+student_classes	student_id	persons(id)	🔴 FK 추가
+🛠️ 권장 수정 SQL (우선순위별)
+🔴 Priority 1: 즉시 수정 필요
+
+-- 1. student_phone 컬럼 추가 (키오스크 기능 필수)
+ALTER TABLE public.academy_students
+ADD COLUMN IF NOT EXISTS student_phone TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_academy_students_tenant_phone
+ON public.academy_students(tenant_id, student_phone)
+WHERE student_phone IS NOT NULL;
+
+-- 2. 외래키 추가 (참조 무결성 보장)
+ALTER TABLE public.guardians
+ADD CONSTRAINT guardians_student_id_fkey
+FOREIGN KEY (student_id) REFERENCES public.persons(id) ON DELETE CASCADE;
+
+ALTER TABLE public.student_consultations
+ADD CONSTRAINT student_consultations_student_id_fkey
+FOREIGN KEY (student_id) REFERENCES public.persons(id) ON DELETE CASCADE;
+
+ALTER TABLE public.student_classes
+ADD CONSTRAINT student_classes_student_id_fkey
+FOREIGN KEY (student_id) REFERENCES public.persons(id) ON DELETE CASCADE;
+🟡 Priority 2: 데이터 정규화
+
+-- 3. class_name 컬럼 제거 (정규화 위반 해결)
+-- ⚠️ 주의: 기존 데이터를 student_classes로 마이그레이션 후 실행
+ALTER TABLE public.academy_students DROP COLUMN IF EXISTS class_name;
+📋 체크리스트
+스키마 정합성
+✅ tenants - 기본 구조 정상
+✅ persons - 멀티 인더스트리 Party 패턴 정상
+⚠️ academy_students - student_phone 누락, class_name 불필요
+✅ academy_classes - 정상
+✅ academy_teachers - 정상
+⚠️ guardians - FK 누락
+⚠️ student_consultations - FK 누락
+⚠️ student_classes - FK 누락
+✅ class_teachers - 정상
+✅ attendance_logs - 정상 (파티셔닝 고려 시 bigint 합리적)
+코드와 스키마 일관성
+✅ TypeScript 타입 정의와 SQL 스키마 일치 (대부분)
+⚠️ student_phone 코드에서 사용하지만 스키마 문서에 누락
+⚠️ class_name 스키마에 있지만 코드에서 미사용
+🎯 결론
+제공된 SQL 스키마는 전반적으로 잘 설계되었으나, 아래 3가지 핵심 이슈를 해결해야 합니다:
+
+academy_students.student_phone 컬럼 추가 - 키오스크 기능 필수
+외래키 명시 - guardians, student_consultations, student_classes의 student_id FK 추가
+academy_students.class_name 제거 - 데이터 정규화 개선
+위 수정 사항을 적용하면 데이터 무결성, 일관성, 유지보수성이 크게 향상됩니다.

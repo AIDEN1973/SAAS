@@ -18,10 +18,10 @@ declare global {
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, useIconSize, useIconStrokeWidth, useResponsiveMode, useToast, Input, Container, Card, Button, Drawer, PageHeader, RightLayerMenuLayout, isMobile, isTablet } from '@ui-core/react';
+import { ErrorBoundary, useIconSize, useIconStrokeWidth, useResponsiveMode, useToast, Input, Container, Card, Button, Drawer, PageHeader, RightLayerMenuLayout, isMobile, isTablet, EmptyState } from '@ui-core/react';
 import { DataTableActionButtons } from '../components/DataTableActionButtons';
-import { ChevronDown, ChevronUp } from 'lucide-react';
-import { SchemaFilter, SchemaTable, SchemaForm, registerWidget } from '@schema-engine';
+import { ChevronDown, ChevronUp, Users } from 'lucide-react';
+import { SchemaTable, SchemaForm, registerWidget } from '@schema-engine';
 import type { FormSchema } from '@schema-engine/types';
 import { useStudentPage } from './hooks/useStudentPage';
 import { apiClient } from '@api-sdk/core';
@@ -533,18 +533,6 @@ export function StudentsPage() {
           }
         />
 
-        {/* 검색 및 필터 패널 */}
-        {/* SchemaFilter에서 검색 필드 디바운싱이 자동으로 적용됨 */}
-        <SchemaFilter
-          schema={effectiveFilterSchema}
-          onFilterChange={handleFilterChange}
-          defaultValues={{
-            search: filter.search || '',
-            status: filter.status || '',
-            grade: filter.grade || '',
-            class_id: filter.class_id || '',
-          }}
-        />
         <input
           ref={fileInputRef}
           type="file"
@@ -717,6 +705,14 @@ export function StudentsPage() {
                   filters={tableFilters}
                   actionContext={actionContextMemo}
                   onRowClick={handleRowClickMemo}
+                  filterSchema={effectiveFilterSchema}
+                  onFilterChange={handleFilterChange}
+                  filterDefaultValues={{
+                    search: filter.search || '',
+                    status: filter.status || '',
+                    grade: filter.grade || '',
+                    class_id: filter.class_id || '',
+                  }}
                 />
               )}
           </>
@@ -725,21 +721,18 @@ export function StudentsPage() {
         {/* 빈 상태 (로딩 완료 후, 에러 없을 때, 학생이 없을 때만 표시) */}
         {!isLoading && !error && students && students.length === 0 && (
             <Card padding="lg" variant="default">
-              <div style={{
-                textAlign: 'center',
-                color: 'var(--color-text-secondary)',
-                padding: 'var(--spacing-xl)'
-              }}>
-                <p style={{ marginBottom: 'var(--spacing-md)' }}>
-                  등록된 {terms.PERSON_LABEL_PRIMARY}이(가) {terms.MESSAGES.NO_DATA}
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCreateForm(true)}
-                >
-                  첫 {terms.PERSON_LABEL_PRIMARY} 등록
-                </Button>
-              </div>
+              <EmptyState
+                icon={Users}
+                message={`등록된 ${terms.PERSON_LABEL_PRIMARY}이(가) ${terms.MESSAGES.NO_DATA}`}
+                actions={
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCreateForm(true)}
+                  >
+                    첫 {terms.PERSON_LABEL_PRIMARY} 등록
+                  </Button>
+                }
+              />
           </Card>
         )}
       </Container>

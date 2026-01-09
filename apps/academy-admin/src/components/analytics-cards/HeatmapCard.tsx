@@ -10,7 +10,8 @@
  */
 
 import React, { useState, useRef, useMemo } from 'react';
-import { Card, Button } from '@ui-core/react';
+import { Card, Button, EmptyState } from '@ui-core/react';
+import { MapPin } from 'lucide-react';
 
 export interface HeatmapData {
   date: string;
@@ -137,9 +138,10 @@ export function HeatmapCard({
     return (
       <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
         <h2 style={{ marginBottom: 'var(--spacing-md)' }}>지역 히트맵</h2>
-        <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-          지역 정보를 설정해주세요.
-        </div>
+        <EmptyState
+          icon={MapPin}
+          message="지역 정보를 설정해주세요."
+        />
       </Card>
     );
   }
@@ -176,9 +178,11 @@ export function HeatmapCard({
             로딩 중...
           </div>
         ) : !data || data.length === 0 ? (
-          <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-            히트맵 데이터가 없습니다. 지역 정보를 설정하거나 충분한 데이터가 쌓일 때까지 기다려주세요.
-          </div>
+          <EmptyState
+            icon={MapPin}
+            message="히트맵 데이터가 없습니다."
+            description="지역 정보를 설정하거나 충분한 데이터가 쌓일 때까지 기다려주세요."
+          />
         ) : (
           <div
             ref={containerRef}

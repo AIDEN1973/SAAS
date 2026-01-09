@@ -9,7 +9,8 @@
  */
 
 import React from 'react';
-import { Card } from '@ui-core/react';
+import { Card, EmptyState } from '@ui-core/react';
+import { BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export interface RegionalComparisonData {
@@ -44,9 +45,10 @@ export function RegionalComparisonChart({ data, title, isLoading }: RegionalComp
     return (
       <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
         <h3 style={{ marginBottom: 'var(--spacing-md)' }}>{title}</h3>
-        <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}>
-          데이터가 없습니다.
-        </div>
+        <EmptyState
+          icon={BarChart3}
+          message="데이터가 없습니다."
+        />
       </Card>
     );
   }

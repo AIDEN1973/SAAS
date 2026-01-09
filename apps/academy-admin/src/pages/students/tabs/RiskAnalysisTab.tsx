@@ -6,8 +6,7 @@
  * [불변 규칙] CSS 변수만 사용 (하드코딩 금지)
  * [불변 규칙] SSOT UI 디자인 준수
  */
-import { useMemo } from 'react';
-import { useToast, useIconSize, useIconStrokeWidth, Card, Badge, IconButtonGroup, Button } from '@ui-core/react';
+import { useToast, useIconSize, useIconStrokeWidth, Card, Badge, IconButtonGroup, Button, EmptyState } from '@ui-core/react';
 import { AlertTriangle, AlertCircle, CheckCircle2, Lightbulb, RefreshCcw } from 'lucide-react';
 import { LayerSectionHeader } from '../components/LayerSectionHeader';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -46,9 +45,9 @@ export function RiskAnalysisTab({
   const buttonIconSize = useIconSize('--size-icon-md');
 
   // 빈 상태 아이콘 크기 계산 (CSS 변수 사용, 기본 크기의 4배)
-  const baseIconSize = useIconSize();
-  const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
-  const emptyStateIconStrokeWidth = useIconStrokeWidth();
+  // const baseIconSize = useIconSize();
+  // const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
+  // const emptyStateIconStrokeWidth = useIconStrokeWidth();
 
   // 출결 로그와 상담 기록은 현재 탭에서 사용하지 않음 (향후 사용 예정)
   // const thirtyDaysAgo = useMemo(() => {
@@ -185,56 +184,36 @@ export function RiskAnalysisTab({
           }
         />
         <Card padding="md" variant="default" style={layerSectionCardStyle}>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: 'calc(var(--spacing-xl) * 5)', // [불변 규칙] CSS 변수 사용
-            padding: 'var(--spacing-xl)',
-            gap: 'var(--spacing-md)',
-          }}>
-            <AlertTriangle
-              size={emptyStateIconSize}
-              strokeWidth={emptyStateIconStrokeWidth}
-              style={{
-                color: 'var(--color-gray-300)',
-                marginBottom: 'var(--spacing-xs)',
-                display: 'inline-block',
-              }}
-            />
-            <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-              분석 데이터가 없습니다.
-              <br />
-              아래 버튼을 클릭하여 {terms.EMERGENCY_RISK_LABEL} 분석을 시작하세요.
-            </p>
-            {isEditable && (
-              <div style={{ marginTop: 'var(--spacing-md)', display: 'flex', justifyContent: 'center' }}>
-              <Button
-                variant="outline"
+          <EmptyState
+            icon={AlertTriangle}
+            message="분석 데이터가 없습니다."
+            description={`아래 버튼을 클릭하여 ${terms.EMERGENCY_RISK_LABEL} 분석을 시작하세요.`}
+            actions={
+              isEditable ? (
+                <Button
+                  variant="outline"
                   size="sm"
-                onClick={async () => {
-                  try {
-                    await refetchRiskAnalysis();
-                    toast(`${terms.EMERGENCY_RISK_LABEL} 분석이 완료되었습니다.`, 'success', '알림');
-                  } catch (error) {
-                    toast(
-                      error instanceof Error ? error.message : `${terms.EMERGENCY_RISK_LABEL} 분석에 실패했습니다.`,
-                      'error'
-                    );
-                  }
-                }}
-                disabled={isLoading}
-              >
+                  onClick={async () => {
+                    try {
+                      await refetchRiskAnalysis();
+                      toast(`${terms.EMERGENCY_RISK_LABEL} 분석이 완료되었습니다.`, 'success', '알림');
+                    } catch (error) {
+                      toast(
+                        error instanceof Error ? error.message : `${terms.EMERGENCY_RISK_LABEL} 분석에 실패했습니다.`,
+                        'error'
+                      );
+                    }
+                  }}
+                  disabled={isLoading}
+                >
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-                    {/* [불변 규칙] 하드코딩 금지: CSS 변수 사용 (--size-icon-md = 14px) */}
                     <RefreshCcw size={buttonIconSize} strokeWidth={titleIconStrokeWidth} />
                     <span>{isLoading ? '분석 중...' : '분석시작'}</span>
                   </span>
-              </Button>
-              </div>
-            )}
-          </div>
+                </Button>
+              ) : undefined
+            }
+          />
         </Card>
       </div>
     );

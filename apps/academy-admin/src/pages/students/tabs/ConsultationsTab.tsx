@@ -6,8 +6,8 @@
  * [불변 규칙] CSS 변수만 사용 (하드코딩 금지)
  * [불변 규칙] SSOT UI 디자인 준수
  */
-import { useMemo, useRef } from 'react';
-import { useModal, useResponsiveMode, useToast, IconButtonGroup, Card, isMobile, useIconSize, useIconStrokeWidth } from '@ui-core/react';
+import { useRef } from 'react';
+import { useModal, useResponsiveMode, useToast, IconButtonGroup, Card, isMobile, useIconSize, useIconStrokeWidth, EmptyState } from '@ui-core/react';
 import { FileText, Trash2, Pencil, RefreshCcw } from 'lucide-react';
 import { SchemaForm } from '@schema-engine';
 import { useIndustryTranslations } from '@hooks/use-industry-translations';
@@ -71,9 +71,9 @@ export function ConsultationsTab({
   const terms = useIndustryTerms();
 
   // 빈 상태 아이콘 크기 계산 (CSS 변수 사용, 기본 크기의 4배)
-  const baseIconSize = useIconSize();
-  const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
-  const emptyStateIconStrokeWidth = useIconStrokeWidth();
+  // const baseIconSize = useIconSize();
+  // const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
+  // const emptyStateIconStrokeWidth = useIconStrokeWidth();
 
   // 타이틀 아이콘 크기 및 선 두께 계산 (CSS 변수 사용)
   const titleIconSize = useIconSize();
@@ -312,25 +312,10 @@ export function ConsultationsTab({
             </div>
           ) : (
             <Card padding="md">
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: 'calc(var(--spacing-xl) * 5)', // [불변 규칙] CSS 변수 사용
-                padding: 'var(--spacing-xl)',
-              }}>
-                <FileText
-                  size={emptyStateIconSize}
-                  strokeWidth={emptyStateIconStrokeWidth}
-                  style={{
-                    color: 'var(--color-gray-300)',
-                    marginBottom: 'var(--spacing-xs)',
-                    display: 'inline-block',
-                  }}
-                />
-                <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>{`등록된 ${terms.CONSULTATION_LABEL}일지가 없습니다.`}</p>
-              </div>
+              <EmptyState
+                icon={FileText}
+                message={`등록된 ${terms.CONSULTATION_LABEL}일지가 없습니다.`}
+              />
             </Card>
           )}
         </div>
