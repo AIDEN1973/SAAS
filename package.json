@@ -56,7 +56,6 @@
     "lint-staged": "^16.2.7",
     "prettier": "^3.1.0",
     "tsx": "^4.7.0",
-    "turbo": "^2.7.3",
     "typescript": "~5.3.3",
     "vitest": "^4.0.16"
   },
@@ -70,6 +69,7 @@
     "*.{js,jsx,cjs,mjs}": "eslint --fix --max-warnings=0"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0"
+    "@supabase/supabase-js": "^2.39.0",
+    "turbo": "^2.7.3"
   }
 }
