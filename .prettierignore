@@ -1,0 +1,26 @@
+# Dependencies
+node_modules
+package-lock.json
+*.lock
+
+# Build outputs
+dist
+build
+.next
+.turbo
+*.tsbuildinfo
+
+# Cache
+.cache
+.vite
+.vercel
+
+# Logs
+*.log
+
+# Environment
+.env*
+!.env.example
+
+# Git
+.git
