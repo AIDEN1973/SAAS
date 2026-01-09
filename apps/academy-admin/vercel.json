@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd ../.. && npm run build --filter=@app/academy-admin",
+  "buildCommand": "cd ../.. && npx turbo run build --filter=@app/academy-admin",
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": "vite",
