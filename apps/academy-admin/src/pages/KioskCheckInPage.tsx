@@ -21,7 +21,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { Container, Card, Button, Input, useModal } from '@ui-core/react';
-import { getApiContext } from '@api-sdk/core';
+import { getApiContext, apiClient } from '@api-sdk/core';
 import { logError, logInfo } from '../utils';
 
 interface KioskCheckInResponse {
@@ -82,41 +82,29 @@ export function KioskCheckInPage() {
     setIsLoading(true);
 
     try {
-      // kiosk-check-in Edge Function 호출
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/kiosk-check-in`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            tenant_id: tenantId,
-            student_phone: phoneNumber.replace(/-/g, ''), // 하이픈 제거
-          }),
-        }
-      );
+      // [P0 수정] api-sdk를 통해 Edge Function 호출 (fetch 직접 호출 금지)
+      const response = await apiClient.invokeFunction<KioskCheckInResponse>('kiosk-check-in', {
+        tenant_id: tenantId,
+        student_phone: phoneNumber.replace(/-/g, ''), // 하이픈 제거
+      });
 
-      const data: unknown = await response.json();
-
-      if (!response.ok) {
-        const errorData = data as KioskCheckInError;
+      if (!response.success) {
+        const errorData = response.error as unknown as KioskCheckInError;
         logError('KioskCheckInPage:CheckInFailed', {
-          error: errorData.error,
-          status: response.status,
-          hint: errorData.hint,
+          error: errorData?.error || response.error?.message,
+          hint: errorData?.hint,
         });
 
         showAlert(
           '출석 실패',
-          errorData.error + (errorData.hint ? `\n\n${errorData.hint}` : '')
+          (errorData?.error || response.error?.message || '알 수 없는 오류') +
+            (errorData?.hint ? `\n\n${errorData.hint}` : '')
         );
         setIsLoading(false);
         return;
       }
 
-      const successData = data as KioskCheckInResponse;
+      const successData = response.data as KioskCheckInResponse;
 
       // 성공 메시지 표시
       setLastCheckIn({
@@ -167,37 +155,37 @@ export function KioskCheckInPage() {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        padding: '2rem',
+        padding: 'var(--spacing-xl)',
       }}>
-        <Card style={{ width: '100%', maxWidth: '500px', padding: '3rem', textAlign: 'center' }}>
-          <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem', fontWeight: 'bold' }}>
+        <Card style={{ width: 'var(--width-full)', maxWidth: 'var(--width-modal-md)', padding: 'var(--spacing-2xl)', textAlign: 'center' }}>
+          <h1 style={{ fontSize: 'var(--font-size-3xl)', marginBottom: 'var(--spacing-lg)', fontWeight: 'var(--font-weight-bold)' }}>
             출석 체크
           </h1>
 
-          <p style={{ fontSize: '1.2rem', color: '#666', marginBottom: '3rem' }}>
+          <p style={{ fontSize: 'var(--font-size-xl)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-2xl)' }}>
             학생 본인의 휴대폰 번호를 입력해주세요
           </p>
 
           {/* 성공 메시지 */}
           {lastCheckIn && (
             <div style={{
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              padding: '2rem',
-              borderRadius: '8px',
-              marginBottom: '2rem',
-              fontSize: '1.5rem',
-              fontWeight: 'bold',
+              backgroundColor: 'var(--color-success)',
+              color: 'var(--color-white)',
+              padding: 'var(--spacing-xl)',
+              borderRadius: 'var(--border-radius-md)',
+              marginBottom: 'var(--spacing-xl)',
+              fontSize: 'var(--font-size-2xl)',
+              fontWeight: 'var(--font-weight-bold)',
             }}>
               <div>{lastCheckIn.studentName} 학생</div>
-              <div style={{ fontSize: '1.2rem', marginTop: '0.5rem' }}>
+              <div style={{ fontSize: 'var(--font-size-xl)', marginTop: 'var(--spacing-sm)' }}>
                 {lastCheckIn.time} 출석 완료!
               </div>
             </div>
           )}
 
           {/* 휴대폰 번호 입력 */}
-          <div style={{ marginBottom: '2rem' }}>
+          <div style={{ marginBottom: 'var(--spacing-xl)' }}>
             <Input
               type="tel"
               value={phoneNumber}
@@ -206,10 +194,10 @@ export function KioskCheckInPage() {
               placeholder="010-1234-5678"
               disabled={isLoading}
               style={{
-                fontSize: '2rem',
-                padding: '1.5rem',
+                fontSize: 'var(--font-size-2xl)',
+                padding: 'var(--spacing-lg)',
                 textAlign: 'center',
-                width: '100%',
+                width: 'var(--width-full)',
               }}
               autoFocus
             />
@@ -220,10 +208,10 @@ export function KioskCheckInPage() {
             onClick={handleCheckIn}
             disabled={isLoading || !phoneNumber}
             style={{
-              width: '100%',
-              fontSize: '1.8rem',
-              padding: '1.5rem',
-              fontWeight: 'bold',
+              width: 'var(--width-full)',
+              fontSize: 'var(--font-size-xl)',
+              padding: 'var(--spacing-lg)',
+              fontWeight: 'var(--font-weight-bold)',
             }}
           >
             {isLoading ? '처리 중...' : '출석하기'}
@@ -231,21 +219,21 @@ export function KioskCheckInPage() {
 
           {/* 안내 메시지 */}
           <div style={{
-            marginTop: '2rem',
-            fontSize: '1rem',
-            color: '#999',
+            marginTop: 'var(--spacing-xl)',
+            fontSize: 'var(--font-size-base)',
+            color: 'var(--color-text-tertiary)',
           }}>
             <p>출석 완료 시 보호자님께 자동으로 알림이 발송됩니다.</p>
           </div>
         </Card>
 
         {/* 관리자 페이지로 돌아가기 (작은 링크) */}
-        <div style={{ marginTop: '2rem' }}>
+        <div style={{ marginTop: 'var(--spacing-xl)' }}>
           <a
             href="/attendance"
             style={{
-              fontSize: '0.9rem',
-              color: '#999',
+              fontSize: 'var(--font-size-sm)',
+              color: 'var(--color-text-tertiary)',
               textDecoration: 'none',
             }}
           >

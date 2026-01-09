@@ -205,7 +205,7 @@ export function AddressSearchInput({
             right: 0,
             zIndex: 100,
             backgroundColor: 'var(--color-white)',
-            border: '1px solid var(--color-border)',
+            border: '1px solid var(--color-gray-300)',
             borderRadius: 'var(--border-radius-md)',
             boxShadow: 'var(--shadow-md)',
             maxHeight: '200px',
@@ -221,8 +221,8 @@ export function AddressSearchInput({
               style={{
                 padding: 'var(--spacing-sm) var(--spacing-md)',
                 cursor: 'pointer',
-                backgroundColor: selectedIndex === index ? 'var(--color-bg-hover)' : 'transparent',
-                borderBottom: index < results.length - 1 ? '1px solid var(--color-border-light)' : 'none',
+                backgroundColor: selectedIndex === index ? 'var(--color-gray-100)' : 'transparent',
+                borderBottom: index < results.length - 1 ? '1px solid var(--color-gray-300-light)' : 'none',
                 transition: 'background-color 0.15s ease',
               }}
             >

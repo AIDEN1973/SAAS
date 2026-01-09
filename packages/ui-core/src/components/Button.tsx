@@ -164,9 +164,9 @@ export const Button: React.FC<ButtonProps> = ({
           e.currentTarget.style.backgroundColor = colorVars.dark || 'var(--color-gray-200)'; // 색상 없으면 연한 회색
           e.currentTarget.style.boxShadow = 'var(--shadow-md)';
         } else if (variant === 'outline') {
-          e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+          e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
         } else if (variant === 'ghost') {
-          e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+          e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
         }
       }}
       onMouseLeave={(e) => {

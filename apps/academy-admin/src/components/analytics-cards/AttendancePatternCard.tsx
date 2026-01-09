@@ -213,13 +213,13 @@ export function AttendancePatternCard({ hourlyData, dailyData, isLoading }: Atte
                     {dailyData.map((day) => (
                       <tr key={day.day} style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
                         <td style={{ padding: 'var(--spacing-sm)' }}>{day.dayLabel}</td>
-                        <td style={{ padding: 'var(--spacing-sm)', textAlign: 'right', color: '#5cb85c' }}>
+                        <td style={{ padding: 'var(--spacing-sm)', textAlign: 'right', color: 'var(--color-success)' }}>
                           {day.present}
                         </td>
-                        <td style={{ padding: 'var(--spacing-sm)', textAlign: 'right', color: '#f0ad4e' }}>
+                        <td style={{ padding: 'var(--spacing-sm)', textAlign: 'right', color: 'var(--color-warning)' }}>
                           {day.late}
                         </td>
-                        <td style={{ padding: 'var(--spacing-sm)', textAlign: 'right', color: '#d9534f' }}>
+                        <td style={{ padding: 'var(--spacing-sm)', textAlign: 'right', color: 'var(--color-error)' }}>
                           {day.absent}
                         </td>
                         <td style={{ padding: 'var(--spacing-sm)', textAlign: 'right', fontWeight: 'var(--font-weight-semibold)' }}>

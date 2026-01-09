@@ -8,7 +8,6 @@
  * - 섹션 7-10: 매출, 예정 매출, ARPU, 월간 매출 성장률, 주간 매출, 미납률
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import { useQuery } from '@tanstack/react-query';
 import { fetchBillingHistory } from '@hooks/use-billing';
 import { fetchPayments } from '@hooks/use-payments';
@@ -19,6 +18,7 @@ import { safe, logError } from '../../utils';
 import { createQueryKey } from '@hooks/use-query-key-utils';
 import type { DateRange } from '../../utils/date-range-utils';
 import type { BillingHistoryItem } from '@hooks/use-billing';
+import type { Dayjs } from 'dayjs';
 
 // [P2-FIX] 로컬 logError 제거 - SSOT logError 사용 (../../utils)
 
@@ -29,7 +29,7 @@ function formatNumberWithCommas(value: number): string {
 
 export interface UseRevenueStatsCardsParams {
   tenantId: string | null;
-  baseKST: any;
+  baseKST: Dayjs;
   monthlyRange: {
     current: DateRange;
     last: DateRange;
@@ -219,10 +219,10 @@ export function useRevenueStatsCards({
 
         const weeklyPaymentsSafe = Array.isArray(weeklyPayments) ? weeklyPayments : [];
         const lastWeekPaymentsSafe = Array.isArray(lastWeekPayments) ? lastWeekPayments : [];
-        const weeklyRevenue = weeklyPaymentsSafe.reduce((sum: number, payment) => {
+        const weeklyRevenue = weeklyPaymentsSafe.reduce((sum, payment) => {
           return sum + (payment.amount || 0);
         }, 0);
-        const lastWeekRevenue = lastWeekPaymentsSafe.reduce((sum: number, payment) => {
+        const lastWeekRevenue = lastWeekPaymentsSafe.reduce((sum, payment) => {
           return sum + (payment.amount || 0);
         }, 0);
         const weeklyRevenueTrend = calculateTrend(weeklyRevenue, lastWeekRevenue, '전주 대비');

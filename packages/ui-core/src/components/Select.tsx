@@ -9,6 +9,7 @@ import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { clsx } from 'clsx';
 import { createPortal } from 'react-dom';
 import { Popover } from './Popover';
+import { registerOpenDropdown, unregisterDropdown } from '../hooks/useDropdownManager';
 
 type SizeToken = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
@@ -283,36 +284,6 @@ export const Select: React.FC<SelectProps> = ({
   // 라벨을 플레이스홀더로 사용
   const placeholder = label || '선택하세요';
 
-  // 플레이스홀더에서 키워드를 볼드 처리하는 함수
-  const renderPlaceholderWithBold = React.useCallback((text: string) => {
-    const keywords = ['이름', '학년', '클래스', '재원상태'];
-    const parts: React.ReactNode[] = [];
-    let lastIndex = 0;
-
-    keywords.forEach((keyword) => {
-      const index = text.indexOf(keyword, lastIndex);
-      if (index !== -1) {
-        // 키워드 이전 텍스트 추가
-        if (index > lastIndex) {
-          parts.push(text.substring(lastIndex, index));
-        }
-        // 키워드를 볼드 처리
-        parts.push(
-          <strong key={`${keyword}-${index}`} style={{ fontWeight: 'var(--font-weight-extrabold)' }}>
-            {keyword}
-          </strong>
-        );
-        lastIndex = index + keyword.length;
-      }
-    });
-
-    // 남은 텍스트 추가
-    if (lastIndex < text.length) {
-      parts.push(text.substring(lastIndex));
-    }
-
-    return parts.length > 0 ? parts : text;
-  }, []);
 
   // 선택된 값의 라벨 찾기
   const selectedLabels = React.useMemo(() => {
@@ -332,6 +303,23 @@ export const Select: React.FC<SelectProps> = ({
       ? `${selectedLabels.length}개 선택됨`
       : placeholder
     : selectedLabels[0] || placeholder;
+
+  // 드롭다운 닫기 콜백 (전역 매니저용)
+  const closeDropdown = useCallback(() => {
+    setIsOpen(false);
+  }, []);
+
+  // 드롭다운 열릴 때 전역 매니저에 등록, 닫힐 때 해제
+  useEffect(() => {
+    if (isOpen) {
+      registerOpenDropdown(closeDropdown);
+    } else {
+      unregisterDropdown(closeDropdown);
+    }
+    return () => {
+      unregisterDropdown(closeDropdown);
+    };
+  }, [isOpen, closeDropdown]);
 
   // 드롭다운 닫을 때 래퍼 테두리 색상 복원
   useEffect(() => {
@@ -457,7 +445,7 @@ export const Select: React.FC<SelectProps> = ({
               fontWeight: 'var(--font-weight-normal)',
             }}
           >
-            {(multiple ? selectedLabels.length > 0 : selectedLabels.length > 0) ? displayText : renderPlaceholderWithBold(displayText)}
+            {displayText}
           </span>
         <div
           style={{
@@ -512,9 +500,6 @@ export const Select: React.FC<SelectProps> = ({
                 ref={listRef}
                 role="listbox"
               style={{
-                maxHeight: 'var(--height-chart)', // styles.css 준수: 차트 높이 토큰 사용
-                overflowY: 'auto',
-                overflowX: 'hidden', // 가로 스크롤 방지
                 padding: 'var(--spacing-xs)',
                 width: '100%', // 부모(Popover) 너비에 맞춤
                 boxSizing: 'border-box',
@@ -536,10 +521,10 @@ export const Select: React.FC<SelectProps> = ({
                         padding: 'var(--spacing-sm) var(--spacing-md)',
                         borderRadius: 'var(--border-radius-sm)',
                         cursor: option.disabled ? 'not-allowed' : 'pointer',
-                        backgroundColor: isFocused
-                          ? 'var(--color-gray-50)'
-                          : isSelected
-                          ? 'var(--color-gray-100)'
+                        backgroundColor: isSelected
+                          ? 'var(--color-primary-selected)'
+                          : isFocused
+                          ? 'var(--color-primary-hover)'
                           : 'transparent',
                         color: option.disabled
                           ? 'var(--color-text-tertiary)'

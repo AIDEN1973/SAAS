@@ -9,6 +9,7 @@ import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { clsx } from 'clsx';
 import { createPortal } from 'react-dom';
 import { Popover } from './Popover';
+import { registerOpenDropdown, unregisterDropdown } from '../hooks/useDropdownManager';
 
 type SizeToken = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
@@ -51,36 +52,6 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   // 라벨을 플레이스홀더로 사용
   const placeholder = label || '날짜를 선택하세요';
 
-  // 플레이스홀더에서 키워드를 볼드 처리하는 함수
-  const renderPlaceholderWithBold = React.useCallback((text: string) => {
-    const keywords = ['이름', '학년', '클래스', '재원상태'];
-    const parts: React.ReactNode[] = [];
-    let lastIndex = 0;
-
-    keywords.forEach((keyword) => {
-      const index = text.indexOf(keyword, lastIndex);
-      if (index !== -1) {
-        // 키워드 이전 텍스트 추가
-        if (index > lastIndex) {
-          parts.push(text.substring(lastIndex, index));
-        }
-        // 키워드를 볼드 처리
-        parts.push(
-          <strong key={`${keyword}-${index}`} style={{ fontWeight: 'var(--font-weight-extrabold)' }}>
-            {keyword}
-          </strong>
-        );
-        lastIndex = index + keyword.length;
-      }
-    });
-
-    // 남은 텍스트 추가
-    if (lastIndex < text.length) {
-      parts.push(text.substring(lastIndex));
-    }
-
-    return parts.length > 0 ? parts : text;
-  }, []);
 
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -355,6 +326,23 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     );
   }, [selectedDate]);
 
+  // 달력 닫기 콜백 (전역 매니저용)
+  const closeDropdown = useCallback(() => {
+    setIsOpen(false);
+  }, []);
+
+  // 달력 열릴 때 전역 매니저에 등록, 닫힐 때 해제
+  useEffect(() => {
+    if (isOpen) {
+      registerOpenDropdown(closeDropdown);
+    } else {
+      unregisterDropdown(closeDropdown);
+    }
+    return () => {
+      unregisterDropdown(closeDropdown);
+    };
+  }, [isOpen, closeDropdown]);
+
   // 달력 닫을 때 래퍼 테두리 색상 복원
   useEffect(() => {
     if (anchorRef.current?.parentElement && !isOpen) {
@@ -394,7 +382,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
               fontWeight: 'var(--font-weight-normal)', // styles.css 준수: 폰트 웨이트 토큰 사용
             }}
           >
-            {displayValue ? displayValue : renderPlaceholderWithBold(placeholder)}
+            {displayValue ? displayValue : placeholder}
           </span>
           <div
             style={{

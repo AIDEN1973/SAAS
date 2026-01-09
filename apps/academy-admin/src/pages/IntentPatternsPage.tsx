@@ -12,8 +12,8 @@
  * 4. 전체 품질 검토 (분기 1회)
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Button, Card, Badge, Input } from '@ui-core/react';
-import { createClient } from '@lib/supabase-client';
+import { Button, Card, Badge, Input, useModal } from '@ui-core/react';
+import { apiClient } from '@api-sdk/core';
 
 interface IntentPattern {
   id: number;
@@ -29,7 +29,7 @@ interface IntentPattern {
 }
 
 export const IntentPatternsPage: React.FC = () => {
-  const supabase = createClient();
+  const { showAlert, showConfirm } = useModal();
   const [patterns, setPatterns] = useState<IntentPattern[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'low_quality' | 'unused'>('all');
@@ -38,47 +38,48 @@ export const IntentPatternsPage: React.FC = () => {
   const loadPatterns = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('chatops_intent_patterns')
-        .select('*')
-        .order('confidence', { ascending: false })
-        .order('usage_count', { ascending: false });
-
-      // 필터 적용
+      // 필터 조건 설정
+      const filters: Record<string, unknown> = {};
       if (filter === 'low_quality') {
-        query = query.gt('usage_count', 10).lt('confidence', 0.5);
+        filters.usage_count = { gt: 10 };
+        filters.confidence = { lt: 0.5 };
       } else if (filter === 'unused') {
-        query = query.eq('usage_count', 0);
+        filters.usage_count = 0;
       }
 
-      const { data, error } = await query;
+      const response = await apiClient.get<IntentPattern>('chatops_intent_patterns', {
+        filters,
+        orderBy: { column: 'confidence', ascending: false },
+      });
 
-      if (error) throw error;
-      setPatterns(data || []);
+      if (!response.success) {
+        throw new Error(response.error?.message || '패턴 조회 실패');
+      }
+      setPatterns(response.data || []);
     } catch (error) {
       console.error('패턴 조회 실패:', error);
-      alert('패턴 조회에 실패했습니다.');
+      showAlert('패턴 조회에 실패했습니다.');
     } finally {
       setLoading(false);
     }
-  }, [filter, supabase]);
+  }, [filter, showAlert]);
 
   // 패턴 삭제
   const deletePattern = async (id: number) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return;
+    const confirmed = await showConfirm('정말 삭제하시겠습니까?', '패턴 삭제');
+    if (!confirmed) return;
 
     try {
-      const { error } = await supabase
-        .from('chatops_intent_patterns')
-        .delete()
-        .eq('id', id);
+      const response = await apiClient.delete('chatops_intent_patterns', String(id));
 
-      if (error) throw error;
-      alert('삭제되었습니다.');
+      if (!response.success) {
+        throw new Error(response.error?.message || '삭제 실패');
+      }
+      showAlert('삭제되었습니다.');
       void loadPatterns();
     } catch (error) {
       console.error('삭제 실패:', error);
-      alert('삭제에 실패했습니다.');
+      showAlert('삭제에 실패했습니다.');
     }
   };
 
@@ -92,25 +93,27 @@ export const IntentPatternsPage: React.FC = () => {
 
   const addPattern = async () => {
     if (!newPattern.pattern || !newPattern.tool_name) {
-      alert('패턴과 Tool 이름은 필수입니다.');
+      showAlert('패턴과 Tool 이름은 필수입니다.');
       return;
     }
 
     try {
-      const { error } = await supabase.rpc('learn_intent_pattern', {
+      const response = await apiClient.callRPC('learn_intent_pattern', {
         user_query: newPattern.pattern,
         tool_name: newPattern.tool_name,
         action: newPattern.action || null,
         initial_confidence: newPattern.confidence,
       });
 
-      if (error) throw error;
-      alert('패턴이 추가되었습니다.');
+      if (!response.success) {
+        throw new Error(response.error?.message || '패턴 추가 실패');
+      }
+      showAlert('패턴이 추가되었습니다.');
       setNewPattern({ pattern: '', tool_name: '', action: '', confidence: 0.8 });
       void loadPatterns();
     } catch (error) {
       console.error('추가 실패:', error);
-      alert('패턴 추가에 실패했습니다.');
+      showAlert('패턴 추가에 실패했습니다.');
     }
   };
 
@@ -248,7 +251,7 @@ export const IntentPatternsPage: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', gap: 'var(--spacing-md)', alignItems: 'center' }}>
               {/* 패턴 정보 */}
               <div>
-                <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
+                <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
                   {pattern.pattern}
                 </div>
                 <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
@@ -295,7 +298,7 @@ export const IntentPatternsPage: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => deletePattern(pattern.id)}
-                  style={{ color: 'var(--color-danger)' }}
+                  style={{ color: 'var(--color-error)' }}
                 >
                   삭제
                 </Button>

@@ -135,8 +135,8 @@ export const SmsComposer: React.FC<SmsComposerProps> = ({
         gap: 'var(--spacing-md)',
         padding: 'var(--spacing-md)',
         backgroundColor: 'var(--color-white)',
-        borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--border-radius-md)',
+        border: '1px solid var(--color-gray-300)',
       }}
     >
       {/* 헤더 */}
@@ -163,7 +163,7 @@ export const SmsComposer: React.FC<SmsComposerProps> = ({
               padding: 'var(--spacing-xs) var(--spacing-sm)',
               backgroundColor: 'var(--color-warning-bg)',
               color: 'var(--color-warning)',
-              borderRadius: 'var(--radius-sm)',
+              borderRadius: 'var(--border-radius-sm)',
               fontSize: 'var(--font-size-sm)',
               fontWeight: 'var(--font-weight-medium)',
             }}
@@ -178,7 +178,7 @@ export const SmsComposer: React.FC<SmsComposerProps> = ({
         style={{
           padding: 'var(--spacing-sm)',
           backgroundColor: 'var(--color-bg-secondary)',
-          borderRadius: 'var(--radius-sm)',
+          borderRadius: 'var(--border-radius-sm)',
         }}
       >
         <div
@@ -239,7 +239,7 @@ export const SmsComposer: React.FC<SmsComposerProps> = ({
               width: '100%',
               padding: 'var(--spacing-sm)',
               border: 'none',
-              borderBottom: '1px solid var(--color-border)',
+              borderBottom: '1px solid var(--color-gray-300)',
               backgroundColor: 'var(--color-white)',
               fontSize: 'var(--font-size-base)',
               outline: 'none',
@@ -284,8 +284,8 @@ export const SmsComposer: React.FC<SmsComposerProps> = ({
           style={{
             width: '100%',
             padding: 'var(--spacing-sm)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--color-gray-300)',
+            borderRadius: 'var(--border-radius-sm)',
             backgroundColor: 'var(--color-white)',
             fontSize: 'var(--font-size-base)',
             lineHeight: 'var(--line-height)',
@@ -351,8 +351,8 @@ export const SmsComposer: React.FC<SmsComposerProps> = ({
               disabled={disabled}
               style={{
                 padding: 'var(--spacing-sm)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-gray-300)',
+                borderRadius: 'var(--border-radius-sm)',
                 fontSize: 'var(--font-size-base)',
                 outline: 'none',
               }}
@@ -364,8 +364,8 @@ export const SmsComposer: React.FC<SmsComposerProps> = ({
               disabled={disabled}
               style={{
                 padding: 'var(--spacing-sm)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-gray-300)',
+                borderRadius: 'var(--border-radius-sm)',
                 fontSize: 'var(--font-size-base)',
                 outline: 'none',
               }}
@@ -403,8 +403,8 @@ export const SmsComposer: React.FC<SmsComposerProps> = ({
               padding: 'var(--spacing-sm) var(--spacing-lg)',
               backgroundColor: 'var(--color-white)',
               color: 'var(--color-text)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--color-gray-300)',
+              borderRadius: 'var(--border-radius-sm)',
               fontSize: 'var(--font-size-base)',
               cursor: isLoading ? 'not-allowed' : 'pointer',
               opacity: isLoading ? 0.5 : 1,
@@ -422,7 +422,7 @@ export const SmsComposer: React.FC<SmsComposerProps> = ({
             backgroundColor: isValid && !disabled ? 'var(--color-primary)' : 'var(--color-bg-secondary)',
             color: isValid && !disabled ? 'var(--color-white)' : 'var(--color-text-tertiary)',
             border: 'none',
-            borderRadius: 'var(--radius-sm)',
+            borderRadius: 'var(--border-radius-sm)',
             fontSize: 'var(--font-size-base)',
             fontWeight: 'var(--font-weight-medium)',
             cursor: !isValid || isLoading || disabled ? 'not-allowed' : 'pointer',

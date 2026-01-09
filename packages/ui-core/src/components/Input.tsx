@@ -68,36 +68,6 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   // 실제 사용할 value (valueProp이 있으면 사용, 없으면 내부 상태 사용)
   const value = isControlled ? (valueProp ?? '') : internalValue;
 
-  // 플레이스홀더에서 키워드를 볼드 처리하는 함수
-  const renderPlaceholderWithBold = React.useCallback((text: string) => {
-    const keywords = ['이름', '학년', '클래스', '재원상태'];
-    const parts: React.ReactNode[] = [];
-    let lastIndex = 0;
-
-    keywords.forEach((keyword) => {
-      const index = text.indexOf(keyword, lastIndex);
-      if (index !== -1) {
-        // 키워드 이전 텍스트 추가
-        if (index > lastIndex) {
-          parts.push(text.substring(lastIndex, index));
-        }
-        // 키워드를 볼드 처리
-        parts.push(
-          <strong key={`${keyword}-${index}`} style={{ fontWeight: 'var(--font-weight-extrabold)' }}>
-            {keyword}
-          </strong>
-        );
-        lastIndex = index + keyword.length;
-      }
-    });
-
-    // 남은 텍스트 추가
-    if (lastIndex < text.length) {
-      parts.push(text.substring(lastIndex));
-    }
-
-    return parts.length > 0 ? parts : text;
-  }, []);
 
   // 값이 비어있는지 확인 (빈 문자열, 공백만 있는 문자열도 빈 값으로 처리)
   const isEmpty = React.useMemo(() => {
@@ -291,7 +261,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
               width: `calc(100% - ${sizeStyles[size].paddingLeft} - ${sizeStyles[size].paddingRight})`,
             }}
           >
-            {renderPlaceholderWithBold(inputPlaceholder)}
+            {inputPlaceholder}
           </div>
         )}
       </div>

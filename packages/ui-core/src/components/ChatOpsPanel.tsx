@@ -29,6 +29,8 @@ import { Card } from './Card';
 import { Input } from './Input';
 import { Badge } from './Badge';
 import { Spinner } from './Spinner';
+import { EmptyState } from './EmptyState';
+import { Search } from 'lucide-react';
 import { renderMarkdown } from '../utils/markdown-renderer';
 
 /**
@@ -992,9 +994,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                             border: 'var(--border-width-thin) solid var(--color-gray-200)',
                           }}
                         >
-                          <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                            조회 결과가 없습니다.
-                          </div>
+                          <EmptyState icon={Search} message="조회 결과가 없습니다." />
                         </Card>
                       );
                     }
@@ -1012,9 +1012,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                             border: 'var(--border-width-thin) solid var(--color-gray-200)',
                           }}
                         >
-                          <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                            조회 결과가 없습니다.
-                          </div>
+                          <EmptyState icon={Search} message="조회 결과가 없습니다." />
                         </Card>
                       );
                     }

@@ -18,10 +18,6 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"],
-  "references": [
-    { "path": "../../packages/env-registry" },
-    { "path": "../../packages/lib/supabase-client" }
-  ]
+  "include": ["src"]
 }
 

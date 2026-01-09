@@ -2,22 +2,12 @@
   "extends": "../../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
-    "composite": true,
     "declaration": true,
     "declarationMap": true,
-    "emitDeclarationOnly": true,
-    "noEmit": false,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "skipLibCheck": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"],
-  "references": [
-    { "path": "../../api-sdk" },
-    { "path": "../../services/student-service" },
-    { "path": "../../services/class-service" },
-    { "path": "../../core/core-tags" },
-    { "path": "../../core/core-party" }
-  ]
+  "exclude": ["node_modules", "dist"]
 }
 

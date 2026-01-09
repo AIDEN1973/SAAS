@@ -112,7 +112,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         }}
         onMouseEnter={(e) => {
           if (!isFirstPage) {
-            e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+            e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
           }
         }}
         onMouseLeave={(e) => {
@@ -166,7 +166,7 @@ export const Pagination: React.FC<PaginationProps> = ({
             }}
             onMouseEnter={(e) => {
               if (!isActive) {
-                e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+                e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
               }
             }}
             onMouseLeave={(e) => {
@@ -203,7 +203,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         }}
         onMouseEnter={(e) => {
           if (!isLastPage) {
-            e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+            e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
           }
         }}
         onMouseLeave={(e) => {

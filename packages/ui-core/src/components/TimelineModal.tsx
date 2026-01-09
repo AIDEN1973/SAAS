@@ -11,13 +11,13 @@
  * - SSOT: docu/액티비티.md (Execution Audit 시스템)
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Modal } from './Modal';
-import { DataTable, DataTableColumn } from './DataTable';
+import { DataTable, DataTableColumn, DataTableFilter, DataTableFilterState } from './DataTable';
 import { Badge } from './Badge';
-import { Select } from './Select';
 import { ExecutionAuditRun, ExecutionAuditStep, ExecutionAuditFilters, ExecutionAuditRunStatus, ExecutionAuditSource } from './ExecutionAuditPanel';
 import { toKST } from '@lib/date-utils';
+import { Clock } from 'lucide-react';
 
 export interface TimelineModalProps {
   isOpen: boolean;
@@ -234,32 +234,90 @@ export const TimelineModal: React.FC<TimelineModalProps> = ({
   executionAuditInitialFilters,
   executionAuditAvailableOperationTypes = [],
 }) => {
-  // 필터 상태
-  const [statusFilter, setStatusFilter] = useState<string>(executionAuditInitialFilters?.status || 'all');
-  const [sourceFilter, setSourceFilter] = useState<string>(executionAuditInitialFilters?.source || 'all');
-  const [operationTypeFilter, setOperationTypeFilter] = useState<string>(executionAuditInitialFilters?.operation_type || 'all');
+  // DataTable 내장 필터 설정
+  const filters = useMemo<DataTableFilter[]>(() => {
+    const baseFilters: DataTableFilter[] = [
+      {
+        type: 'dateRange',
+        columnKey: 'occurred_at',
+        label: '기간',
+      },
+      {
+        type: 'text',
+        columnKey: 'summary',
+        label: '요약',
+        placeholder: '요약 검색...',
+      },
+      {
+        type: 'select',
+        columnKey: 'status',
+        label: '상태',
+        placeholder: '모든 상태',
+        options: [
+          { value: 'success', label: '성공' },
+          { value: 'partial', label: '부분 성공' },
+          { value: 'failed', label: '실패' },
+        ],
+      },
+      {
+        type: 'select',
+        columnKey: 'source',
+        label: '소스',
+        placeholder: '모든 소스',
+        options: [
+          { value: 'ai', label: 'AI' },
+          { value: 'automation', label: '자동화' },
+          { value: 'scheduler', label: '스케줄러' },
+          { value: 'manual', label: '수동' },
+          { value: 'webhook', label: '웹훅' },
+        ],
+      },
+    ];
 
-  // 필터 변경 핸들러
-  const handleFilterChange = (key: keyof ExecutionAuditFilters, value: string) => {
-    const newFilters: ExecutionAuditFilters = {
-      status: statusFilter as ExecutionAuditRunStatus | 'all',
-      source: sourceFilter as ExecutionAuditSource | 'all',
-      operation_type: operationTypeFilter,
-    };
-
-    if (key === 'status') {
-      setStatusFilter(value);
-      newFilters.status = value as ExecutionAuditRunStatus | 'all';
-    } else if (key === 'source') {
-      setSourceFilter(value);
-      newFilters.source = value as ExecutionAuditSource | 'all';
-    } else if (key === 'operation_type') {
-      setOperationTypeFilter(value);
-      newFilters.operation_type = value;
+    // 작업 타입 필터 (옵션이 있는 경우에만 추가)
+    if (executionAuditAvailableOperationTypes.length > 0) {
+      baseFilters.push({
+        type: 'select',
+        columnKey: 'operation_type',
+        label: '작업',
+        placeholder: '모든 작업',
+        options: executionAuditAvailableOperationTypes.map((type) => ({
+          value: type,
+          label: getOperationTypeLabel(type),
+        })),
+      });
     }
 
-    onExecutionAuditFilterChange?.(newFilters);
-  };
+    return baseFilters;
+  }, [executionAuditAvailableOperationTypes]);
+
+  // 초기 필터 상태
+  const initialFilterState = useMemo<DataTableFilterState>(() => {
+    const state: DataTableFilterState = {};
+    if (executionAuditInitialFilters?.status && executionAuditInitialFilters.status !== 'all') {
+      state.status = { selected: executionAuditInitialFilters.status };
+    }
+    if (executionAuditInitialFilters?.source && executionAuditInitialFilters.source !== 'all') {
+      state.source = { selected: executionAuditInitialFilters.source };
+    }
+    if (executionAuditInitialFilters?.operation_type && executionAuditInitialFilters.operation_type !== 'all') {
+      state.operation_type = { selected: executionAuditInitialFilters.operation_type };
+    }
+    return state;
+  }, [executionAuditInitialFilters]);
+
+  // 필터 변경 핸들러 (DataTable → 외부 콜백 변환)
+  const handleFilterChange = useCallback((filterState: DataTableFilterState) => {
+    if (!onExecutionAuditFilterChange) return;
+
+    const newFilters: ExecutionAuditFilters = {
+      status: (filterState.status?.selected || 'all') as ExecutionAuditRunStatus | 'all',
+      source: (filterState.source?.selected || 'all') as ExecutionAuditSource | 'all',
+      operation_type: filterState.operation_type?.selected || 'all',
+    };
+
+    onExecutionAuditFilterChange(newFilters);
+  }, [onExecutionAuditFilterChange]);
 
   // 테이블 컬럼 정의
   const columns = useMemo<DataTableColumn<ExecutionAuditRun>[]>(
@@ -323,63 +381,23 @@ export const TimelineModal: React.FC<TimelineModalProps> = ({
       onClose={onClose}
       title="타임라인"
       size="xl"
+      className="timeline-modal"
+      style={{
+        width: '90vw',
+        maxWidth: 'var(--width-modal-2xl)',
+      }}
     >
-      {/* 필터 영역 */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 'var(--spacing-md)',
-          marginBottom: 'var(--spacing-md)',
-          paddingBottom: 'var(--spacing-md)',
-          borderBottom: 'var(--border-width-thin) solid var(--color-border)',
-        }}
-      >
-        <Select
-          value={statusFilter}
-          onChange={(value) => handleFilterChange('status', typeof value === 'string' ? value : value[0])}
-          options={[
-            { value: 'all', label: '모든 상태' },
-            { value: 'success', label: '성공' },
-            { value: 'partial', label: '부분 성공' },
-            { value: 'failed', label: '실패' },
-          ]}
-          style={{ minWidth: '120px' }}
-        />
-        <Select
-          value={sourceFilter}
-          onChange={(value) => handleFilterChange('source', typeof value === 'string' ? value : value[0])}
-          options={[
-            { value: 'all', label: '모든 소스' },
-            { value: 'ai', label: 'AI' },
-            { value: 'automation', label: '자동화' },
-            { value: 'scheduler', label: '스케줄러' },
-            { value: 'manual', label: '수동' },
-            { value: 'webhook', label: '웹훅' },
-          ]}
-          style={{ minWidth: '120px' }}
-        />
-        {executionAuditAvailableOperationTypes.length > 0 && (
-          <Select
-            value={operationTypeFilter}
-            onChange={(value) => handleFilterChange('operation_type', typeof value === 'string' ? value : value[0])}
-            options={[
-              { value: 'all', label: '모든 작업' },
-              ...executionAuditAvailableOperationTypes.map((type) => ({
-                value: type,
-                label: getOperationTypeLabel(type),
-              })),
-            ]}
-            style={{ minWidth: '150px' }}
-          />
-        )}
-      </div>
-
-      {/* 테이블 영역 */}
+      {/* 테이블 영역 (내장 필터 사용) */}
       <DataTable
         data={executionAuditRuns}
         columns={columns}
         onRowClick={onExecutionAuditRowClick}
         emptyMessage="액티비티가 없습니다."
+        emptyIcon={Clock}
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        initialFilterState={initialFilterState}
+        enableClientSideFiltering={true}
       />
     </Modal>
   );

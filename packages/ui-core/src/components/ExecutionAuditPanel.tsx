@@ -21,6 +21,8 @@ import { Button } from './Button';
 import { Badge } from './Badge';
 import { Spinner } from './Spinner';
 import { Input } from './Input';
+import { EmptyState } from './EmptyState';
+import { Clock } from 'lucide-react';
 import { toKST } from '@lib/date-utils';
 
 /**
@@ -266,7 +268,7 @@ export const ExecutionAuditPanel: React.FC<ExecutionAuditPanelProps> = ({
               handleFilterChange({ searchQuery: newQuery });
             }}
             placeholder="검색"
-            style={{ width: '200px' }}
+            style={{ width: 'var(--width-student-info-min)' }}
             aria-label="검색 입력"
           />
         </div>
@@ -292,21 +294,7 @@ export const ExecutionAuditPanel: React.FC<ExecutionAuditPanelProps> = ({
             <Spinner size="md" />
           </div>
         ) : filteredRuns.length === 0 ? (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                color: 'var(--color-text-secondary)',
-                textAlign: 'center',
-              }}
-            >
-              <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)' }}>
-                실행 기록이 없습니다
-              </div>
-            </div>
+            <EmptyState icon={Clock} message="실행 기록이 없습니다." />
         ) : (
           <>
             {/* 리스트 아이템 */}
@@ -365,7 +353,7 @@ export const ExecutionAuditPanel: React.FC<ExecutionAuditPanelProps> = ({
                   }}
                   onMouseEnter={(e) => {
                     if (isClickable) {
-                      e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                      e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                     }
                   }}
                   onMouseLeave={(e) => {

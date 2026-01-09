@@ -106,13 +106,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         <main
           style={{
             flex: 1,
-            overflowY: 'auto',
+            overflowY: 'scroll', // 스크롤바 항상 표시하여 페이지별 콘텐츠 너비 일관성 보장
             overflowX: 'hidden',
             backgroundColor: 'var(--color-background)',
-            // 모바일(xs, sm): padding 제거 (Container에서 처리), 태블릿 이상(md+): 넓은 여백 (유아이 문서 6-1 준수)
-            padding: isMobile
-              ? 0 // 모바일: padding 제거 (Container에서만 padding 처리)
-              : 'var(--spacing-xl)', // 태블릿 이상: 32px
+            // padding은 각 페이지의 Container 컴포넌트에서 처리 (이중 padding 방지)
+            padding: 0,
             transition: 'var(--transition-all)',
           }}
         >

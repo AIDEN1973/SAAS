@@ -5,6 +5,8 @@ import path from 'path';
 export default defineConfig({
   // 프로젝트 루트의 .env.local 파일을 로드
   envDir: path.resolve(__dirname, '../..'),
+  // Vite 캐시를 루트로 통합
+  cacheDir: path.resolve(__dirname, '../../node_modules/.vite'),
   // Vercel 빌드 시 환경변수를 빌드 타임에 주입
   define: {
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ''),

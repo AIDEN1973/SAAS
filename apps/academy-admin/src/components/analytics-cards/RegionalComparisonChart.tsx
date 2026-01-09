@@ -61,9 +61,9 @@ export function RegionalComparisonChart({ data, title, isLoading }: RegionalComp
           <YAxis />
           <Tooltip />
           <Legend />
-          <Bar dataKey="value" fill="#428bca" name="현재 값" />
-          <Bar dataKey="average" fill="#5cb85c" name="지역 평균" />
-          <Bar dataKey="top10" fill="#f0ad4e" name="상위 10%" />
+          <Bar dataKey="value" fill="var(--color-primary)" name="현재 값" />
+          <Bar dataKey="average" fill="var(--color-success)" name="지역 평균" />
+          <Bar dataKey="top10" fill="var(--color-warning)" name="상위 10%" />
         </BarChart>
       </ResponsiveContainer>
     </Card>

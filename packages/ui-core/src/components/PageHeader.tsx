@@ -57,11 +57,12 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
       className={clsx(className)}
       style={{
         display: 'flex',
-        justifyContent: 'space-between',
+        justifyContent: actions ? 'space-between' : 'flex-start', // actions가 없으면 flex-start
         alignItems: 'center',
         marginBottom: 'var(--spacing-lg)',
         flexWrap: isMobile ? 'wrap' : 'nowrap',
         gap: 'var(--spacing-md)',
+        minHeight: 'var(--touch-target-min)', // 최소 높이 보장
         ...style,
       }}
     >
@@ -72,6 +73,8 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
           margin: 0,
           lineHeight: 'var(--line-height-tight)', // styles.css 준수: 타이틀과 버튼 수평 정렬을 위한 특수 값
           color: 'var(--color-text)',
+          display: 'flex',
+          alignItems: 'center', // 수직 중앙 정렬
         }}
       >
         {title}
@@ -84,6 +87,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
             alignItems: 'center',
             gap: 'var(--spacing-sm)',
             flexWrap: 'wrap',
+            flexShrink: 0, // actions 영역이 줄어들지 않도록
           }}
         >
           {actions}

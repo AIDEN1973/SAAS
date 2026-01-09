@@ -58,8 +58,10 @@ export const Container: React.FC<ContainerProps> = ({
     '3xl': 'var(--spacing-3xl)',
   };
 
-  // 모바일(xs, sm): 적절한 여백 유지, 태블릿 이상(md+): 지정된 padding 사용 (유아이 문서 6-1 준수)
-  const effectivePadding = isMobile ? 'lg' : padding; // md = 16px (모바일 적절한 여백)
+  // 반응형 좌우 여백:
+  // - 모바일(xs, sm): lg = 24px (충분한 여백)
+  // - 태블릿(md) 및 데스크톱(lg, xl): xl = 32px (일관된 넓은 여백)
+  const effectivePadding: SpacingToken = isMobile ? 'lg' : 'xl';
   const effectivePaddingTop = paddingTop === 'none' ? 0 : paddingMap[paddingTop];
 
   return (
@@ -72,6 +74,7 @@ export const Container: React.FC<ContainerProps> = ({
         paddingLeft: paddingMap[effectivePadding],
         paddingRight: paddingMap[effectivePadding],
         paddingTop: effectivePaddingTop,
+        paddingBottom: paddingMap[effectivePadding], // 하단 여백도 동일하게 적용
         transition: 'var(--transition-all)',
         ...style,
       }}

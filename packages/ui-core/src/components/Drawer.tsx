@@ -9,7 +9,6 @@
 import React, { useEffect } from 'react';
 import { clsx } from 'clsx';
 import { Card } from './Card';
-import { Button } from './Button';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 
 export interface DrawerProps {
@@ -158,8 +157,8 @@ export const Drawer: React.FC<DrawerProps> = ({
               padding: isMobile
                 ? 'var(--padding-header-vertical) var(--spacing-lg)' // 모바일: 상하 패딩 CSS 변수 사용, 좌우 CSS 변수 사용
                 : 'var(--padding-header-vertical) var(--spacing-xl)', // 태블릿 이상: 상하 패딩 CSS 변수 사용, 좌우 CSS 변수 사용
-              borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
-              backgroundColor: 'var(--color-gray-50)',
+              borderBottom: 'var(--border-width-thin) solid var(--color-primary-dark)',
+              backgroundColor: 'var(--color-primary)',
               minHeight: 'var(--height-header)', // 글로벌 헤더 높이와 동일하게 설정
             }}
           >
@@ -168,24 +167,42 @@ export const Drawer: React.FC<DrawerProps> = ({
                 fontWeight: 'var(--font-weight-bold)',
                 fontSize: 'var(--font-size-lg)',
                 margin: 0,
-                color: 'var(--color-text)',
+                color: 'var(--color-white)',
                 letterSpacing: 'var(--letter-spacing-title)', // styles.css 준수: 타이틀 글자 간격 토큰 사용
                 flex: 1,
               }}
             >
               {title}
             </h2>
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={onClose}
+              aria-label="닫기"
               style={{
                 minWidth: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
                 minHeight: 'var(--touch-target-min)', // styles.css 준수: 터치 타깃 최소 크기 (접근성)
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                fontSize: 'var(--font-size-3xl)',
+                color: 'var(--color-white)',
+                fontWeight: 'var(--font-weight-medium)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 'var(--line-height-tight)',
+                opacity: 'var(--opacity-subtle)',
+                transition: 'opacity var(--transition-base)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = 'var(--opacity-full)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = 'var(--opacity-subtle)';
               }}
             >
-              ✕
-            </Button>
+              ×
+            </button>
           </div>
         )}
 

@@ -266,7 +266,7 @@ export const Header: React.FC<HeaderProps> = ({
                     boxShadow: 'var(--shadow-lg)',
                     border: 'var(--border-width-thin) solid var(--color-gray-200)',
                     padding: 'var(--spacing-md)',
-                    minWidth: '280px',
+                    minWidth: 'var(--width-card-min)',
                   }}
                 >
                   {/* 닫기 버튼 */}
@@ -287,7 +287,7 @@ export const Header: React.FC<HeaderProps> = ({
                       transition: 'var(--transition-all)',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+                      e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = 'transparent';
@@ -400,7 +400,7 @@ export const Header: React.FC<HeaderProps> = ({
                           minWidth: 'var(--size-avatar-xl)',
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+                          e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = 'transparent';
@@ -445,7 +445,7 @@ export const Header: React.FC<HeaderProps> = ({
                           minWidth: 'var(--size-avatar-xl)',
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+                          e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = 'transparent';

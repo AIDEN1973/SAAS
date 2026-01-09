@@ -5,7 +5,6 @@
  * [성능] 100개 이상의 태그도 부드럽게 스크롤
  */
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import React, { useMemo } from 'react';
 import { Button } from '@ui-core/react';
 import { useVirtualScroll } from '../hooks/useVirtualScroll';
@@ -59,7 +58,7 @@ export const VirtualTagList: React.FC<VirtualTagListProps> = ({
           position: 'relative',
         }}
       >
-        {virtualItems.map((virtualItem: { index: number; key: string; start: number }) => {
+        {virtualItems.map((virtualItem) => {
           const tag = filteredTags[virtualItem.index];
           const isSelected = selectedTagIds.includes(tag.id);
 

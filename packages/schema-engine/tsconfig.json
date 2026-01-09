@@ -5,8 +5,6 @@
     "rootDir": "..",
     "declaration": true,
     "declarationMap": true,
-    "emitDeclarationOnly": true,
-    "noEmit": false,
     "jsx": "react-jsx"
   },
   "include": ["src/**/*", "../../vite-env.d.ts"],

@@ -87,7 +87,7 @@ export const Accordion: React.FC<AccordionProps> = ({
               }}
               onMouseEnter={(e) => {
                 if (!item.disabled) {
-                  e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                 }
               }}
               onMouseLeave={(e) => {

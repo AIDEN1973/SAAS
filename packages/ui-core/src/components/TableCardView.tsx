@@ -8,8 +8,10 @@
 
 import React from 'react';
 import { clsx } from 'clsx';
+import { Database } from 'lucide-react';
 import { Card } from './Card';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
+import { EmptyState } from './EmptyState';
 
 export interface TableCardViewColumn<T = unknown> {
   key: string;
@@ -50,15 +52,8 @@ export function TableCardView<T = unknown>({
 
   if (data.length === 0) {
     return (
-      <div
-        style={{
-          padding: 'var(--spacing-3xl)',
-          textAlign: 'center',
-          color: 'var(--color-text-tertiary)',
-          fontSize: 'var(--font-size-sm)',
-        }}
-      >
-        {emptyMessage}
+      <div style={{ padding: 'var(--spacing-3xl)' }}>
+        <EmptyState icon={Database} message={emptyMessage} />
       </div>
     );
   }

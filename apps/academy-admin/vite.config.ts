@@ -18,10 +18,6 @@ function enforceReactChunk(): RollupPlugin {
         const packageName = normalizedId.split('node_modules/')[1]?.split('/')[0];
         if (packageName === 'react' || packageName === 'react-dom') {
           reactModuleIds.add(normalizedId);
-          // 프로덕션 빌드에서는 로그 최소화
-          if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
-            console.log('[enforce-react-chunk] React module resolved:', normalizedId);
-          }
         }
       }
       return null;
@@ -235,25 +231,9 @@ export default defineConfig(({ mode }) => {
   const loadedUrl = finalEnv.VITE_SUPABASE_URL || finalEnv.NEXT_PUBLIC_SUPABASE_URL;
   const loadedKey = finalEnv.VITE_SUPABASE_ANON_KEY || finalEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // 디버깅: 프로덕션 빌드에서는 로그 최소화
-  if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
-    console.log('🔍 Vite Config - 환경변수 로드:');
-    console.log('  loadEnv 결과 VITE_SUPABASE_URL:', env.VITE_SUPABASE_URL || '(없음)');
-    console.log('  .env.local 파일 VITE_SUPABASE_URL:', envLocal.VITE_SUPABASE_URL || '(없음)');
-    console.log('  최종 사용 VITE_SUPABASE_URL:', finalEnv.VITE_SUPABASE_URL || '(없음)');
-    console.log('  envDir:', envDir);
-    console.log('  mode:', mode);
-    console.log('🔍 Vite Config - 환경변수 로드 결과:');
-    console.log('  로드된 URL:', loadedUrl || '(없음)');
-    console.log('  로드된 Key:', loadedKey ? '***' : '(없음)');
-  }
-
-  // 환경변수가 없으면 경고만 출력 (강제 주입하지 않음)
-  // 프로덕션 빌드에서는 경고만 출력
+  // 환경변수가 없으면 경고 출력
   if (!loadedUrl || !loadedKey) {
-    if (process.env.NODE_ENV === 'development' || process.env.VERBOSE) {
-      console.warn('Supabase 환경변수가 설정되지 않았습니다. .env.local 파일을 확인하세요.');
-    }
+    console.warn('⚠️ Supabase 환경변수가 설정되지 않았습니다. .env.local 파일을 확인하세요.');
   }
 
   // 환경변수를 define에 주입 (있는 경우만)
@@ -275,6 +255,8 @@ export default defineConfig(({ mode }) => {
   envDir,
   // 환경변수를 빌드 타임에 주입
   define,
+  // Vite 캐시를 루트로 통합
+  cacheDir: path.resolve(__dirname, '../../node_modules/.vite'),
   // 프로덕션 빌드에서 정적 자산 경로 문제 해결
   base: '/',
   plugins: [

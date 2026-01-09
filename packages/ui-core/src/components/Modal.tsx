@@ -20,6 +20,7 @@ export interface ModalProps {
   closeOnOverlayClick?: boolean;
   closeOnEscape?: boolean;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 /**
@@ -37,6 +38,7 @@ export const Modal: React.FC<ModalProps> = ({
   closeOnOverlayClick = true,
   closeOnEscape = true,
   className,
+  style,
 }) => {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
@@ -92,6 +94,10 @@ export const Modal: React.FC<ModalProps> = ({
     },
   };
 
+  // zIndex 값을 숫자로 변환
+  const MODAL_Z_INDEX = 9999;
+  const BACKDROP_Z_INDEX = 9998;
+
   return (
     <div
       className={clsx(className)}
@@ -101,7 +107,7 @@ export const Modal: React.FC<ModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        zIndex: 'var(--z-modal)',
+        zIndex: MODAL_Z_INDEX,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -117,7 +123,7 @@ export const Modal: React.FC<ModalProps> = ({
           right: 0,
           bottom: 0,
           backgroundColor: 'var(--overlay-background)',
-          zIndex: 'var(--z-modal-backdrop)',
+          zIndex: BACKDROP_Z_INDEX,
         }}
         onClick={closeOnOverlayClick ? onClose : undefined}
       />
@@ -127,16 +133,18 @@ export const Modal: React.FC<ModalProps> = ({
         variant="elevated"
         style={{
           position: 'relative',
-          zIndex: 'var(--z-modal)',
+          zIndex: MODAL_Z_INDEX,
           maxHeight: isMobile ? 'var(--height-modal-max-mobile)' : 'var(--height-modal-max)', // styles.css 준수: 모달 높이 토큰 사용
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          padding: 0, // 패딩 제거 (내부 요소에서 관리)
+          padding: 'var(--spacing-none)', // styles.css 준수: spacing 토큰 사용
+          borderRadius: 'var(--border-radius-xl)', // 라운드 XL
           ...sizeMap[size],
+          ...style, // 커스텀 스타일 적용
         }}
       >
-        {/* Header */}
+        {/* Header - Card의 overflow: hidden이 라운드를 처리하므로 별도 borderRadius 불필요 */}
         {title && (
           <div
             style={{
@@ -145,15 +153,16 @@ export const Modal: React.FC<ModalProps> = ({
               justifyContent: 'space-between',
               padding: 'var(--spacing-lg)',
               paddingBottom: 'var(--spacing-md)',
-              borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
+              backgroundColor: 'var(--color-primary)',
+              borderBottom: 'var(--border-width-thin) solid var(--color-primary-dark)',
               flexShrink: 0,
             }}
           >
             <h2
               style={{
                 fontWeight: 'var(--font-weight-semibold)',
-                color: 'var(--color-text)',
-                margin: 0,
+                color: 'var(--color-white)',
+                margin: 'var(--spacing-none)', // styles.css 준수: spacing 토큰 사용
               }}
             >
               {title}
@@ -167,20 +176,22 @@ export const Modal: React.FC<ModalProps> = ({
                 backgroundColor: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
-                padding: 0,
-                fontSize: 'var(--font-size-2xl)',
-                color: 'var(--color-text-secondary)',
-                fontWeight: 'var(--font-weight-normal)',
+                padding: 'var(--spacing-none)', // styles.css 준수: spacing 토큰 사용
+                fontSize: 'var(--font-size-3xl)',
+                color: 'var(--color-white)',
+                fontWeight: 'var(--font-weight-medium)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 lineHeight: 'var(--line-height-tight)', // styles.css 준수: 타이틀과 버튼 수평 정렬용 토큰 사용
+                opacity: 'var(--opacity-90)', // styles.css 준수: opacity 토큰 사용
+                transition: 'opacity var(--transition-base)',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.opacity = 'var(--opacity-100)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.opacity = 'var(--opacity-90)';
               }}
             >
               ×
@@ -190,10 +201,13 @@ export const Modal: React.FC<ModalProps> = ({
 
         {/* Content */}
         <div
+          className="ui-core-hiddenScrollbar"
           style={{
             padding: 'var(--spacing-lg)',
+            paddingBottom: 'var(--spacing-lg)',
             overflowY: 'auto',
             flex: 1,
+            marginBottom: 'var(--spacing-xl)',
           }}
         >
           {children}

@@ -9,9 +9,11 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DataTable, type DataTableColumn, Pagination } from '@ui-core/react';
+import { Funnel } from 'phosphor-react';
 import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
-import type { TableSchema } from '../types';
+import type { TableSchema, FilterSchema } from '../types';
 import { executeActionsForEvent, executeAction, type ActionContext } from '../core/actionEngine';
+import { SchemaFilter } from './SchemaFilter';
 
 export interface SchemaTableProps {
   schema: TableSchema;
@@ -37,6 +39,12 @@ export interface SchemaTableProps {
   filters?: Record<string, unknown>;
   // 행 클릭 핸들러 (선택적, schema.actions보다 우선순위 높음)
   onRowClick?: (row: Record<string, unknown>) => void;
+  // 필터 스키마 (선택적) - 테이블 상단에 필터 버튼/패널 표시
+  filterSchema?: FilterSchema;
+  // 필터 변경 핸들러 (filterSchema와 함께 사용)
+  onFilterChange?: (filters: Record<string, unknown>) => void;
+  // 필터 기본값 (filterSchema와 함께 사용)
+  filterDefaultValues?: Record<string, unknown>;
 }
 
 /**
@@ -57,11 +65,23 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   apiCall,
   filters,
   onRowClick,
+  filterSchema,
+  onFilterChange,
+  filterDefaultValues,
 }) => {
   const { dataSource, columns, rowActions, rowActionHandlers, pagination: paginationConfig } = schema.table;
 
   // 페이지네이션 상태 관리
   const [currentPage, setCurrentPage] = React.useState(1);
+
+  // 필터 패널 상태 관리
+  const [showFilterPanel, setShowFilterPanel] = React.useState(false);
+  const filterToggleRef = React.useRef<HTMLButtonElement>(null);
+
+  // 필터 변경 핸들러
+  const handleInternalFilterChange = React.useCallback((newFilters: Record<string, unknown>) => {
+    onFilterChange?.(newFilters);
+  }, [onFilterChange]);
   const itemsPerPage = paginationConfig?.defaultPageSize || paginationConfig?.pageSize || 10;
   const effectivePage = page ?? currentPage;
 
@@ -260,6 +280,51 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
 
   return (
     <div className={className}>
+      {/* 필터 토글 버튼 */}
+      {filterSchema && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            marginBottom: 'var(--spacing-sm)',
+          }}
+        >
+          <button
+            ref={filterToggleRef}
+            type="button"
+            onClick={() => setShowFilterPanel((prev) => !prev)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--spacing-xs)',
+              padding: 'var(--spacing-sm) var(--spacing-md)',
+              border: 'var(--border-width-thin) solid var(--color-gray-200)',
+              borderRadius: 'var(--border-radius-sm)',
+              fontSize: 'var(--font-size-sm)',
+              fontFamily: 'var(--font-family)',
+              cursor: 'pointer',
+              backgroundColor: showFilterPanel ? 'var(--color-primary-50)' : 'var(--color-white)',
+              color: showFilterPanel ? 'var(--color-primary)' : 'var(--color-text)',
+              transition: 'var(--transition-fast)',
+            }}
+          >
+            <Funnel size={16} weight={showFilterPanel ? 'fill' : 'regular'} />
+            필터
+          </button>
+        </div>
+      )}
+
+      {/* 필터 패널 */}
+      {showFilterPanel && filterSchema && (
+        <div>
+          <SchemaFilter
+            schema={filterSchema}
+            onFilterChange={handleInternalFilterChange}
+            defaultValues={filterDefaultValues}
+          />
+        </div>
+      )}
+
       <DataTable
         data={paginatedData}
         columns={dataTableColumns}

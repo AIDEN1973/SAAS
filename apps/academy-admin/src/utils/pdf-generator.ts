@@ -12,6 +12,13 @@ import jsPDF from 'jspdf';
 // eslint-disable-next-line import/no-named-as-default
 import autoTable from 'jspdf-autotable';
 
+// jsPDF with autoTable plugin augmentation
+interface jsPDFWithAutoTable extends jsPDF {
+  lastAutoTable: {
+    finalY: number;
+  };
+}
+
 export interface MonthlyReportData {
   /** 학원 이름 */
   academyName: string;
@@ -92,8 +99,7 @@ export function generateMonthlyReportPDF(data: MonthlyReportData): Blob {
     margin: { left: 20 },
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-  yPosition = (doc as any).lastAutoTable.finalY + 10;
+  yPosition = (doc as jsPDFWithAutoTable).lastAutoTable.finalY + 10;
 
   // 4. 지역 비교 통계 테이블
   if (data.regionalStats.length > 0) {
@@ -118,8 +124,7 @@ export function generateMonthlyReportPDF(data: MonthlyReportData): Blob {
       margin: { left: 20 },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-  yPosition = (doc as any).lastAutoTable.finalY + 10;
+    yPosition = (doc as jsPDFWithAutoTable).lastAutoTable.finalY + 10;
   }
 
   // 5. AI 인사이트
@@ -130,12 +135,10 @@ export function generateMonthlyReportPDF(data: MonthlyReportData): Blob {
 
     doc.setFontSize(10);
     data.aiInsights.forEach((insight, index) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const lines = doc.splitTextToSize(`${index + 1}. ${insight}`, 170);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      doc.text(lines, 20, yPosition);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      yPosition += lines.length * 5 + 3;
+      const lines = doc.splitTextToSize(`${index + 1}. ${insight}`, 170) as string | string[];
+      const linesArray = Array.isArray(lines) ? lines : [lines];
+      doc.text(linesArray, 20, yPosition);
+      yPosition += linesArray.length * 5 + 3;
 
       // 페이지 넘김 처리
       if (yPosition > 270) {

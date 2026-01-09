@@ -622,7 +622,7 @@ function AutomationSettingsCard({ eventType, onCancel }: AutomationSettingsCardP
 // [SSOT] status='planned' 항목은 @core/core-automation의 AUTOMATION_EVENT_PLANNED에서 가져옴
 
 export function AutomationSettingsPage() {
-  const { showAlert } = useModal();
+  const { showAlert, showConfirm } = useModal();
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
@@ -771,14 +771,18 @@ export function AutomationSettingsPage() {
   });
 
   // 카테고리별 일괄 토글
-  const handleToggleCategory = (category: string, enabled: boolean) => {
+  const handleToggleCategory = async (category: string, enabled: boolean) => {
     const categoryEvents = eventsByCategory.find((item) => item.category === category)?.events || [];
     if (categoryEvents.length === 0) return;
 
     const categoryInfo = POLICY_KEY_V2_CATEGORIES[category];
     const action = enabled ? '활성화' : '비활성화';
 
-    if (window.confirm(`"${categoryInfo?.title}" 카테고리의 모든 자동화(${categoryEvents.length}개)를 ${action}하시겠습니까?`)) {
+    const confirmed = await showConfirm(
+      `"${categoryInfo?.title}" 카테고리의 모든 자동화(${categoryEvents.length}개)를 ${action}하시겠습니까?`,
+      '카테고리 일괄 설정'
+    );
+    if (confirmed) {
       bulkToggleMutation.mutate({ eventTypes: categoryEvents, enabled });
     }
   };
@@ -836,10 +840,14 @@ export function AutomationSettingsPage() {
   }, [showPlanned, searchQuery, categoryFilter, statusFilter, approvalFilter, currentConfigData]);
 
   // 전체 일괄 토글
-  const handleToggleAll = (enabled: boolean) => {
+  const handleToggleAll = async (enabled: boolean) => {
     const action = enabled ? '활성화' : '비활성화';
 
-    if (window.confirm(`모든 자동화(${visibleEvents.length}개)를 ${action}하시겠습니까?`)) {
+    const confirmed = await showConfirm(
+      `모든 자동화(${visibleEvents.length}개)를 ${action}하시겠습니까?`,
+      '전체 일괄 설정'
+    );
+    if (confirmed) {
       bulkToggleMutation.mutate({ eventTypes: visibleEvents, enabled });
     }
   };

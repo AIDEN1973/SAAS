@@ -77,6 +77,8 @@ export default defineConfig(({ mode }) => {
       // process.env의 잘못된 값을 제거한 후 loadEnv로 로드한 값 사용
       // NEXT_PUBLIC_* 값도 VITE_*로 주입하여 env-registry에서 접근 가능하도록 함
       define,
+      // Vite 캐시를 루트로 통합
+      cacheDir: path.resolve(__dirname, '../../node_modules/.vite'),
     plugins: [react()],
     optimizeDeps: {
       // esbuild 서비스 안정성을 위한 설정

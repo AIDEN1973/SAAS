@@ -59,6 +59,8 @@
   --color-primary-40: #e8f2ff;
   --color-primary-50: #eff6ff;
   --color-primary-100: #dbeafe;
+  --color-primary-hover: rgba(59, 130, 246, 0.06); /* hover 배경색 (투명도 6%) */
+  --color-primary-selected: rgba(59, 130, 246, 0.10); /* 선택된 상태 배경색 (투명도 10%, hover보다 진함) */
   --color-primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 
   /* Color Tokens for Design System - 모던 톤 */
@@ -155,6 +157,7 @@
   --width-modal-md: 31.25rem;        /* 500px - 모달 중간 크기 */
   --width-modal-lg: 43.75rem;        /* 700px - 모달 큰 크기 */
   --width-modal-xl: 56.25rem;        /* 900px - 모달 매우 큰 크기 */
+  --width-modal-2xl: 87.5rem;        /* 1400px - 모달 타임라인/대시보드용 초대형 크기 */
   --width-modal-max-sm-md: 90vw;     /* 모달 최대 너비 (sm, md 크기) */
   --width-modal-max-lg-xl: 95vw;    /* 모달 최대 너비 (lg, xl 크기) */
   --width-modal-mobile-sm-md: 90%;   /* 모달 모바일 너비 (sm, md 크기) - 하드코딩 금지 규칙 준수 */
@@ -170,6 +173,7 @@
   --height-modal-max: 85vh;          /* 모달 최대 높이 (데스크톱) */
   --height-modal-max-mobile: 90vh;   /* 모달 최대 높이 (모바일) */
   --height-divider-vertical: 40%;     /* 40% - 세로 구분선 높이 (카드 그리드용) */
+  --height-dropdown-max: 25rem;       /* 400px - 드롭다운/검색결과 최대 높이 */
 
   /* Layout Spacing Tokens */
   --spacing-none: 0;                 /* 0 - 여백 없음 (하드코딩 금지 규칙 준수) */
@@ -202,6 +206,7 @@
   --opacity-loading: 0.6;                /* 로딩 상태 투명도 */
   --opacity-inactive: 0.6;               /* 비활성 상태 투명도 (테이블 정렬 아이콘 등) */
   --opacity-secondary: 0.7;              /* 보조 요소 투명도 */
+  --opacity-subtle: 0.9;                 /* 미세한 투명도 (닫기 버튼 등) */
   --opacity-full: 1;                     /* 완전 불투명 */
 
   /* Touch Target Tokens - 접근성 (WCAG 2.1 AAA) */

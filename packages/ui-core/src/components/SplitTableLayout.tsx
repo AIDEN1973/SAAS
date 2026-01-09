@@ -108,7 +108,7 @@ export const SplitTableLayout: React.FC<SplitTableLayoutProps> = ({
                 justifyContent: 'center',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-gray-100)';
+                e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                 e.currentTarget.style.color = 'var(--color-text)';
               }}
               onMouseLeave={(e) => {

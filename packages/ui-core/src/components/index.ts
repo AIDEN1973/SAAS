@@ -38,6 +38,9 @@ export type { BottomActionBarProps } from './BottomActionBar';
 export { ErrorBoundary } from './ErrorBoundary';
 export type { ErrorBoundaryProps, ErrorBoundaryState } from './ErrorBoundary';
 
+export { EmptyState } from './EmptyState';
+export type { EmptyStateProps } from './EmptyState';
+
 export { Badge } from './Badge';
 export type { BadgeProps } from './Badge';
 
@@ -54,7 +57,14 @@ export { TableCardView } from './TableCardView';
 export type { TableCardViewProps, TableCardViewColumn } from './TableCardView';
 
 export { DataTable } from './DataTable';
-export type { DataTableProps, DataTableColumn } from './DataTable';
+export type {
+  DataTableProps,
+  DataTableColumn,
+  DataTableFilterType,
+  DataTableFilter,
+  DataTableFilterValue,
+  DataTableFilterState,
+} from './DataTable';
 
 export { SplitTableLayout } from './SplitTableLayout';
 export type { SplitTableLayoutProps } from './SplitTableLayout';

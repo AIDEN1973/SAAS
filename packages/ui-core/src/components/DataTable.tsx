@@ -6,10 +6,57 @@
  * [불변 규칙] 모바일(xs, sm): 1열 세로 배치, 데스크톱(lg, xl): 가로 테이블
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { clsx } from 'clsx';
-import { CaretUp, CaretDown } from 'phosphor-react';
+import { CaretUp, CaretDown, X, Funnel } from 'phosphor-react';
+import { Database, LucideIcon } from 'lucide-react';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
+import { EmptyState } from './EmptyState';
+import { Select } from './Select';
+import { DatePicker } from './DatePicker';
+import { Input } from './Input';
+import { Grid } from './Layout';
+
+/**
+ * 필터 타입 정의
+ */
+export type DataTableFilterType = 'text' | 'select' | 'dateRange';
+
+/**
+ * 필터 설정 인터페이스
+ */
+export interface DataTableFilter {
+  /** 필터 타입 */
+  type: DataTableFilterType;
+  /** 필터가 적용될 컬럼 키 */
+  columnKey: string;
+  /** 필터 레이블 (선택적) */
+  label?: string;
+  /** 필터 placeholder */
+  placeholder?: string;
+  /** select 타입일 때 옵션 목록 */
+  options?: Array<{ value: string; label: string }>;
+}
+
+/**
+ * 필터 값 인터페이스
+ */
+export interface DataTableFilterValue {
+  /** 텍스트 검색 값 */
+  text?: string;
+  /** 선택된 값 (select) */
+  selected?: string;
+  /** 날짜 범위 (dateRange) */
+  dateRange?: {
+    start?: string;
+    end?: string;
+  };
+}
+
+/**
+ * 필터 상태 타입 (컬럼 키 -> 필터 값)
+ */
+export type DataTableFilterState = Record<string, DataTableFilterValue>;
 
 export interface DataTableColumn<T = unknown> {
   key: string;
@@ -29,6 +76,7 @@ export interface DataTableProps<T = unknown> {
   keyExtractor?: (row: T) => string | number;
   onRowClick?: (row: T) => void;
   emptyMessage?: string;
+  emptyIcon?: LucideIcon;
   className?: string;
   stickyHeader?: boolean;
   pagination?: {
@@ -37,6 +85,18 @@ export interface DataTableProps<T = unknown> {
     onPageChange: (page: number) => void;
   };
   itemsPerPage?: number;
+  /** 내장 필터 설정 */
+  filters?: DataTableFilter[];
+  /** 필터 값 변경 콜백 (서버사이드 필터링용) */
+  onFilterChange?: (filterState: DataTableFilterState) => void;
+  /** 초기 필터 값 */
+  initialFilterState?: DataTableFilterState;
+  /** 클라이언트 사이드 필터링 활성화 (기본: true) */
+  enableClientSideFiltering?: boolean;
+  /** 로딩 상태 */
+  loading?: boolean;
+  /** 에러 메시지 */
+  error?: string | null;
 }
 
 /**
@@ -50,10 +110,17 @@ export function DataTable<T = unknown>({
   keyExtractor,
   onRowClick,
   emptyMessage = '데이터가 없습니다.',
+  emptyIcon,
   className,
   stickyHeader = true,
   pagination,
   itemsPerPage = 10,
+  filters,
+  onFilterChange,
+  initialFilterState = {},
+  enableClientSideFiltering = true,
+  loading = false,
+  error = null,
 }: DataTableProps<T>) {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
@@ -63,6 +130,36 @@ export function DataTable<T = unknown>({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null);
   // 모바일: 행 펼침 상태 관리 (각 행의 키를 키로 사용)
   const [expandedRows, setExpandedRows] = useState<Set<string | number>>(new Set());
+
+  // 필터 상태 관리
+  const [filterState, setFilterState] = useState<DataTableFilterState>(initialFilterState);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const filterToggleRef = useRef<HTMLButtonElement>(null);
+
+  // 필터 값 변경 핸들러
+  const handleFilterValueChange = useCallback((columnKey: string, value: DataTableFilterValue) => {
+    setFilterState((prev) => {
+      const newState = { ...prev, [columnKey]: value };
+      onFilterChange?.(newState);
+      return newState;
+    });
+  }, [onFilterChange]);
+
+  // 필터 초기화 핸들러
+  const handleClearFilters = useCallback(() => {
+    setFilterState({});
+    onFilterChange?.({});
+  }, [onFilterChange]);
+
+  // 활성 필터 개수 계산
+  const activeFilterCount = useMemo(() => {
+    return Object.values(filterState).filter((v) => {
+      if (v.text && v.text.trim()) return true;
+      if (v.selected && v.selected !== 'all') return true;
+      if (v.dateRange && (v.dateRange.start || v.dateRange.end)) return true;
+      return false;
+    }).length;
+  }, [filterState]);
 
   const handleSortClick = (e: React.MouseEvent, columnKey: string) => {
     e.stopPropagation();
@@ -95,18 +192,76 @@ export function DataTable<T = unknown>({
     handleSortClick(e, columnKey);
   };
 
+  // 클라이언트 사이드 필터링 로직
+  const filteredData = useMemo(() => {
+    if (!enableClientSideFiltering || !filters || filters.length === 0) {
+      return data;
+    }
+
+    return data.filter((row) => {
+      const rowData = row as Record<string, unknown>;
+
+      return filters.every((filter) => {
+        const filterValue = filterState[filter.columnKey];
+        if (!filterValue) return true;
+
+        const cellValue = rowData[filter.columnKey];
+
+        switch (filter.type) {
+          case 'text': {
+            const searchText = filterValue.text?.trim().toLowerCase();
+            if (!searchText) return true;
+            const cellStr = String(cellValue ?? '').toLowerCase();
+            return cellStr.includes(searchText);
+          }
+          case 'select': {
+            const selectedValue = filterValue.selected;
+            if (!selectedValue || selectedValue === 'all') return true;
+            return String(cellValue) === selectedValue;
+          }
+          case 'dateRange': {
+            const { start, end } = filterValue.dateRange || {};
+            if (!start && !end) return true;
+
+            const cellDate = cellValue instanceof Date
+              ? cellValue
+              : new Date(String(cellValue));
+
+            if (isNaN(cellDate.getTime())) return true;
+
+            if (start) {
+              const startDate = new Date(start);
+              startDate.setHours(0, 0, 0, 0);
+              if (cellDate < startDate) return false;
+            }
+
+            if (end) {
+              const endDate = new Date(end);
+              endDate.setHours(23, 59, 59, 999);
+              if (cellDate > endDate) return false;
+            }
+
+            return true;
+          }
+          default:
+            return true;
+        }
+      });
+    });
+  }, [data, filters, filterState, enableClientSideFiltering]);
+
   // 정렬된 데이터 계산
   const sortedData = useMemo(() => {
     if (!sortColumn || !sortDirection) {
-      return data;
+      return filteredData;
     }
 
     const column = columns.find((col) => col.key === sortColumn);
     if (!column) {
-      return data;
+      return filteredData;
     }
 
-    return [...data].sort((a, b) => {
+    return [...filteredData].sort((a, b) => {
       const aValue = (a as Record<string, unknown>)[sortColumn];
       const bValue = (b as Record<string, unknown>)[sortColumn];
 
@@ -140,7 +295,7 @@ export function DataTable<T = unknown>({
       }
       return 0;
     });
-  }, [data, sortColumn, sortDirection, columns]);
+  }, [filteredData, sortColumn, sortDirection, columns]);
 
   // 페이지네이션 적용된 데이터 계산
   const paginatedData = useMemo(() => {
@@ -153,37 +308,224 @@ export function DataTable<T = unknown>({
     return sortedData.slice(startIndex, endIndex);
   }, [sortedData, pagination, itemsPerPage]);
 
-  // 모바일: 1열 세로 배치 테이블 구조 (테이블 구조 유지)
-  if (isMobile) {
-    if (paginatedData.length === 0) {
-      return (
-        <div
-          className={clsx(className)}
-          style={{
-            padding: 'var(--spacing-3xl)',
-            textAlign: 'center',
-            color: 'var(--color-text-tertiary)',
-            fontSize: 'var(--font-size-base)',
-            backgroundColor: 'var(--color-white)',
-            border: 'var(--border-width-thin) solid var(--color-text)',
-          }}
-        >
-          {emptyMessage}
-        </div>
-      );
-    }
-
+  // 로딩 상태 렌더링
+  if (loading) {
     return (
       <div
         className={clsx(className)}
         style={{
-          width: '100%',
           display: 'flex',
-          flexDirection: 'column',
-          gap: 0,
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: 'var(--height-chart)',
+          color: 'var(--color-text-secondary)',
+          fontSize: 'var(--font-size-base)',
         }}
       >
-        {paginatedData.map((row, index) => {
+        로딩 중...
+      </div>
+    );
+  }
+
+  // 에러 상태 렌더링
+  if (error) {
+    return (
+      <div
+        className={clsx(className)}
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: 'var(--height-chart)',
+          color: 'var(--color-error)',
+          fontSize: 'var(--font-size-base)',
+        }}
+      >
+        {error}
+      </div>
+    );
+  }
+
+  // 필터 UI 렌더링 함수
+  const renderFilterPanel = useCallback(() => {
+    if (!filters || filters.length === 0) return null;
+
+    return (
+      <div
+        style={{
+          marginBottom: 'var(--spacing-lg)', // SchemaFilter 기준: 필터 영역 하단 여백
+        }}
+      >
+        <Grid columns={4} gap="md">
+          {filters.map((filter) => {
+            const currentValue = filterState[filter.columnKey] || {};
+            const column = columns.find((c) => c.key === filter.columnKey);
+            const label = filter.label || column?.label || filter.columnKey;
+
+            switch (filter.type) {
+              case 'text':
+                return (
+                  <Input
+                    key={filter.columnKey}
+                    type="text"
+                    value={currentValue.text || ''}
+                    onChange={(e) => handleFilterValueChange(filter.columnKey, { ...currentValue, text: e.target.value })}
+                    placeholder={filter.placeholder || `${label} 검색...`}
+                    fullWidth
+                    size="md"
+                    showInlineLabelWhenHasValue={false}
+                  />
+                );
+
+              case 'select':
+                return (
+                  <Select
+                    key={filter.columnKey}
+                    value={currentValue.selected || 'all'}
+                    onChange={(val) => handleFilterValueChange(filter.columnKey, { ...currentValue, selected: typeof val === 'string' ? val : val[0] })}
+                    options={[
+                      { value: 'all', label: filter.placeholder || '전체' },
+                      ...(filter.options || []),
+                    ]}
+                    fullWidth
+                    size="md"
+                    showInlineLabelWhenHasValue={false}
+                  />
+                );
+
+              case 'dateRange':
+                return (
+                  <div key={filter.columnKey} style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <DatePicker
+                        value={currentValue.dateRange?.start || ''}
+                        onChange={(val) =>
+                          handleFilterValueChange(filter.columnKey, {
+                            ...currentValue,
+                            dateRange: { ...currentValue.dateRange, start: val },
+                          })
+                        }
+                        label="시작일"
+                        fullWidth
+                        size="md"
+                        showInlineLabelWhenHasValue={false}
+                      />
+                    </div>
+                    <span style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>~</span>
+                    <div style={{ flex: 1 }}>
+                      <DatePicker
+                        value={currentValue.dateRange?.end || ''}
+                        onChange={(val) =>
+                          handleFilterValueChange(filter.columnKey, {
+                            ...currentValue,
+                            dateRange: { ...currentValue.dateRange, end: val },
+                          })
+                        }
+                        label="종료일"
+                        fullWidth
+                        size="md"
+                        showInlineLabelWhenHasValue={false}
+                      />
+                    </div>
+                  </div>
+                );
+
+              default:
+                return null;
+            }
+          })}
+        </Grid>
+      </div>
+    );
+  }, [filters, filterState, columns, handleFilterValueChange]);
+
+  // 필터 토글 버튼 렌더링
+  const renderFilterToggle = useCallback(() => {
+    if (!filters || filters.length === 0) return null;
+
+    return (
+      <button
+        ref={filterToggleRef}
+        type="button"
+        onClick={() => setShowFilterPanel((prev) => !prev)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--spacing-xs)',
+          padding: 'var(--spacing-sm) var(--spacing-md)',
+          border: 'var(--border-width-thin) solid var(--color-gray-200)',
+          borderRadius: 'var(--border-radius-sm)',
+          fontSize: 'var(--font-size-sm)',
+          fontFamily: 'var(--font-family)',
+          cursor: 'pointer',
+          backgroundColor: showFilterPanel || activeFilterCount > 0 ? 'var(--color-primary-50)' : 'var(--color-white)',
+          color: showFilterPanel || activeFilterCount > 0 ? 'var(--color-primary)' : 'var(--color-text)',
+          transition: 'var(--transition-fast)',
+        }}
+      >
+        <Funnel size={16} weight={showFilterPanel || activeFilterCount > 0 ? 'fill' : 'regular'} />
+        필터
+        {activeFilterCount > 0 && (
+          <span
+            style={{
+              backgroundColor: 'var(--color-primary)',
+              color: 'var(--color-white)',
+              borderRadius: 'var(--border-radius-full)',
+              padding: '0 var(--spacing-xs)',
+              fontSize: 'var(--font-size-xs)',
+              fontWeight: 'var(--font-weight-medium)',
+              minWidth: '18px',
+              textAlign: 'center',
+            }}
+          >
+            {activeFilterCount}
+          </span>
+        )}
+      </button>
+    );
+  }, [filters, showFilterPanel, activeFilterCount]);
+
+  // 모바일: 1열 세로 배치 테이블 구조 (테이블 구조 유지)
+  if (isMobile) {
+    return (
+      <div className={clsx(className)} style={{ width: '100%' }}>
+        {/* 필터 토글 버튼 (모바일) */}
+        {filters && filters.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              marginBottom: 'var(--spacing-sm)',
+            }}
+          >
+            {renderFilterToggle()}
+          </div>
+        )}
+
+        {/* 필터 패널 (모바일) */}
+        {showFilterPanel && renderFilterPanel()}
+
+        {/* 빈 상태 */}
+        {paginatedData.length === 0 ? (
+          <div
+            style={{
+              padding: 'var(--spacing-3xl)',
+              backgroundColor: 'var(--color-white)',
+              border: 'var(--border-width-thin) solid var(--color-text)',
+            }}
+          >
+            <EmptyState icon={emptyIcon || Database} message={emptyMessage} />
+          </div>
+        ) : (
+          <div
+            style={{
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 0,
+            }}
+          >
+            {paginatedData.map((row, index) => {
           const key = keyExtractor ? keyExtractor(row) : index;
           const isExpanded = expandedRows.has(key);
           const visibleColumns = isExpanded ? columns : columns.slice(0, 2);
@@ -312,27 +654,46 @@ export function DataTable<T = unknown>({
               </div>
             </div>
           );
-        })}
+            })}
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div
-      className={clsx(className)}
-      style={{
-        width: '100%',
-        overflowX: 'auto',
-        borderTop: 'var(--border-width-thin) solid var(--color-text)', // 상단 테두리 (폰트 기본색)
-        borderBottom: 'var(--border-width-thin) solid var(--color-text)', // 하단 테두리 (폰트 기본색)
-        borderLeft: 'none', // 좌측 테두리 제거
-        borderRight: 'none', // 우측 테두리 제거
-        backgroundColor: 'var(--color-white)',
-        overflow: 'hidden',
-        borderRadius: 0, // 라운드 제거
-      }}
-    >
-      <table
+    <div className={clsx(className)} style={{ width: '100%' }}>
+      {/* 필터 토글 버튼 */}
+      {filters && filters.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            marginBottom: 'var(--spacing-sm)',
+          }}
+        >
+          {renderFilterToggle()}
+        </div>
+      )}
+
+      {/* 필터 패널 */}
+      {showFilterPanel && renderFilterPanel()}
+
+      {/* 테이블 */}
+      <div
+        style={{
+          width: '100%',
+          overflowX: 'auto',
+          borderTop: 'var(--border-width-thin) solid var(--color-text)', // 상단 테두리 (폰트 기본색)
+          borderBottom: 'var(--border-width-thin) solid var(--color-text)', // 하단 테두리 (폰트 기본색)
+          borderLeft: 'none', // 좌측 테두리 제거
+          borderRight: 'none', // 우측 테두리 제거
+          backgroundColor: 'var(--color-white)',
+          overflow: 'hidden',
+          borderRadius: 0, // 라운드 제거
+        }}
+      >
+        <table
         style={{
           width: '100%',
           borderCollapse: 'collapse', // styles.css 준수: 행간 테두리 표시를 위해 collapse 사용
@@ -498,12 +859,9 @@ export function DataTable<T = unknown>({
                 colSpan={columns.length}
                 style={{
                   padding: 'var(--spacing-3xl)',
-                  textAlign: 'center',
-                  color: 'var(--color-text-tertiary)',
-                  fontSize: 'var(--font-size-base)', // styles.css 준수: 기본 폰트 사이즈 적용
                 }}
               >
-                {emptyMessage}
+                <EmptyState icon={emptyIcon || Database} message={emptyMessage} />
               </td>
             </tr>
           ) : (
@@ -521,7 +879,7 @@ export function DataTable<T = unknown>({
                     }}
                     onMouseEnter={(e) => {
                       if (onRowClick) {
-                        e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+                        e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                       }
                     }}
                     onMouseLeave={(e) => {
@@ -583,6 +941,7 @@ export function DataTable<T = unknown>({
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

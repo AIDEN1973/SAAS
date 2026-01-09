@@ -10,7 +10,9 @@
  */
 
 import React from 'react';
+import { Database } from 'lucide-react';
 import { Card } from './Card';
+import { EmptyState } from './EmptyState';
 
 export interface StatsCardLayoutProps {
   /** 카드 제목 */
@@ -89,45 +91,52 @@ export function StatsCardLayout({
         {title}
       </h3>
 
-      {/* 메인 값 영역 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--spacing-xs)' }}>
-          <div style={{
-            fontSize: 'var(--font-size-2xl)',
-            fontWeight: 'var(--font-weight-bold)',
-            color: isEmpty ? 'var(--color-text-secondary)' : 'var(--color-text)',
-          }}>
-            {value}
-          </div>
-          {unit && (
-            <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-              {unit}
+      {/* 빈 상태 */}
+      {isEmpty ? (
+        <EmptyState icon={Database} />
+      ) : (
+        <>
+          {/* 메인 값 영역 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--spacing-xs)' }}>
+              <div style={{
+                fontSize: 'var(--font-size-2xl)',
+                fontWeight: 'var(--font-weight-bold)',
+                color: isEmpty ? 'var(--color-text-secondary)' : 'var(--color-text)',
+              }}>
+                {value}
+              </div>
+              {unit && (
+                <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                  {unit}
+                </div>
+              )}
+              {trend && (
+                <div style={{
+                  color: typeof trend === 'string' && trend.startsWith('+')
+                    ? 'var(--color-success)'
+                    : 'var(--color-error)'
+                }}>
+                  {trend}
+                </div>
+              )}
             </div>
-          )}
-          {trend && (
-            <div style={{
-              color: typeof trend === 'string' && trend.startsWith('+')
-                ? 'var(--color-success)'
-                : 'var(--color-error)'
-            }}>
-              {trend}
-            </div>
-          )}
-        </div>
 
-        {/* 보조 정보 */}
-        {subtitle && (
-          <div style={{
-            fontSize: 'var(--font-size-base)',
-            color: 'var(--color-text-secondary)'
-          }}>
-            {subtitle}
+            {/* 보조 정보 */}
+            {subtitle && (
+              <div style={{
+                fontSize: 'var(--font-size-base)',
+                color: 'var(--color-text-secondary)'
+              }}>
+                {subtitle}
+              </div>
+            )}
+
+            {/* 추가 컨텐츠 */}
+            {children}
           </div>
-        )}
-
-        {/* 추가 컨텐츠 */}
-        {children}
-      </div>
+        </>
+      )}
     </Card>
   );
 }

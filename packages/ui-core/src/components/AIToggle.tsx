@@ -84,11 +84,11 @@ export const AIToggle: React.FC<AIToggleProps> = ({ className }) => {
           alignItems: 'center',
           justifyContent: 'center',
           padding: 'var(--spacing-sm)',
-          backgroundColor: isHovered && !(!canToggle || isLoading || updateFeature.isPending) ? 'var(--color-primary-40)' : 'transparent',
+          backgroundColor: isHovered && !(!canToggle || isLoading || updateFeature.isPending) ? 'var(--color-primary-hover)' : 'transparent',
           border: 'none',
           borderRadius: 'var(--border-radius-md)',
           cursor: !canToggle || isLoading || updateFeature.isPending ? 'not-allowed' : 'pointer',
-          opacity: !canToggle || isLoading || updateFeature.isPending ? 0.5 : 1,
+          opacity: !canToggle || isLoading || updateFeature.isPending ? 'var(--opacity-disabled)' : 'var(--opacity-full)',
           transition: 'var(--transition-all)',
         }}
       >

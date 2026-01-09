@@ -10,7 +10,6 @@
  * - 섹션 6: 이번 달 평균 출석률, 출석률 개선율
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import { useQuery } from '@tanstack/react-query';
 import { fetchAttendanceStats } from '@hooks/use-student';
 import { fetchAttendanceLogs } from '@hooks/use-attendance';
@@ -20,13 +19,13 @@ import { normalizeStatsCard } from '../../utils/dashboard-card-normalization';
 import { safe, logError } from '../../utils';
 import { createQueryKey } from '@hooks/use-query-key-utils';
 import type { DateRange } from '../../utils/date-range-utils';
-import type { AttendanceLog } from '@services/attendance-service';
+import type { Dayjs } from 'dayjs';
 
 // [P2-FIX] 로컬 logError 제거 - SSOT logError 사용 (../../utils)
 
 export interface UseAttendanceStatsCardsParams {
   tenantId: string | null;
-  baseKST: any;
+  baseKST: Dayjs;
   monthlyRange: {
     current: DateRange;
     last: DateRange;
@@ -163,13 +162,13 @@ export function useAttendanceStatsCards({
           }), []),
         ]);
 
-        const weeklyPresentLogs = weeklyLogs?.filter((log: AttendanceLog) => log.status === 'present') || [];
+        const weeklyPresentLogs = weeklyLogs?.filter((log) => log.status === 'present') || [];
         const presentCount = weeklyPresentLogs.length;
         const weeklyAttendanceRate = weeklyLogs && weeklyLogs.length > 0
           ? Math.round((presentCount / weeklyLogs.length) * 100)
           : 0;
 
-        const lastWeekPresentLogs = lastWeekLogs?.filter((log: AttendanceLog) => log.status === 'present') || [];
+        const lastWeekPresentLogs = lastWeekLogs?.filter((log) => log.status === 'present') || [];
         const lastWeekPresentCount = lastWeekPresentLogs.length;
         const lastWeekAttendanceRate = lastWeekLogs && lastWeekLogs.length > 0
           ? Math.round((lastWeekPresentCount / lastWeekLogs.length) * 100)
@@ -203,13 +202,13 @@ export function useAttendanceStatsCards({
           }), []),
         ]);
 
-        const monthlyPresentLogs = monthlyLogs?.filter((log: AttendanceLog) => log.status === 'present') || [];
+        const monthlyPresentLogs = monthlyLogs?.filter((log) => log.status === 'present') || [];
         const monthlyPresentCount = monthlyPresentLogs.length;
         const monthlyAttendanceRate = monthlyLogs && monthlyLogs.length > 0
           ? Math.round((monthlyPresentCount / monthlyLogs.length) * 100)
           : 0;
 
-        const lastMonthPresentLogs = lastMonthLogs?.filter((log: AttendanceLog) => log.status === 'present') || [];
+        const lastMonthPresentLogs = lastMonthLogs?.filter((log) => log.status === 'present') || [];
         const lastMonthPresentCount = lastMonthPresentLogs.length;
         const lastMonthAttendanceRate = lastMonthLogs && lastMonthLogs.length > 0
           ? Math.round((lastMonthPresentCount / lastMonthLogs.length) * 100)

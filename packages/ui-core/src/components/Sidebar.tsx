@@ -44,6 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
   const [advancedMenuOpen, setAdvancedMenuOpen] = useState(false);
   const [advancedMenuItems, setAdvancedMenuItems] = useState<SidebarItem[] | null>(null);
+  const [selectedAdvancedItem, setSelectedAdvancedItem] = useState<SidebarItem | null>(null);
   const advancedButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleItemClick = (item: SidebarItem) => {
@@ -53,6 +54,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setAdvancedMenuOpen(true);
       return;
     }
+
+    // 일반 메뉴 클릭 시 레이어 메뉴와 선택된 항목 초기화
+    setAdvancedMenuOpen(false);
+    setAdvancedMenuItems(null);
+    setSelectedAdvancedItem(null);
 
     // 일반 메뉴 클릭 처리
     if (item.onClick) {
@@ -113,10 +119,80 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const hasChildren = item.children && item.children.length > 0;
     const isHovered = hoveredItemId === item.id;
 
-    // Advanced 메뉴는 ... 아이콘만 표시
+    // Advanced 메뉴는 선택된 항목과 ... 아이콘 표시
     if (item.isAdvanced) {
       return (
-        <div key={item.id}>
+        <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+          {/* 선택된 Advanced 메뉴 항목 표시 */}
+          {selectedAdvancedItem && (
+            <>
+              {/* 구분선 */}
+              <div
+                style={{
+                  width: '50%',
+                  height: 'var(--border-width-thin)',
+                  backgroundColor: 'var(--color-gray-300)',
+                  margin: 'var(--spacing-md) auto',
+                }}
+              />
+              <button
+                onClick={() => handleItemClick(item)}
+                style={{
+                  width: '100%',
+                  textAlign: 'center',
+                  borderRadius: 'var(--border-radius-xl)',
+                  padding: 'var(--spacing-sm) var(--spacing-xs)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 'var(--spacing-xs)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--color-text)',
+                  fontWeight: 'var(--font-weight-bold)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'var(--transition-all)',
+                  minHeight: 'var(--touch-target-min)',
+                }}
+              >
+                {selectedAdvancedItem.icon && React.isValidElement(selectedAdvancedItem.icon) && (
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 'var(--spacing-sm)',
+                      borderRadius: 'var(--border-radius-lg)',
+                      backgroundColor: 'var(--color-primary)',
+                    }}
+                  >
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */}
+                    {React.cloneElement(selectedAdvancedItem.icon as React.ReactElement<any>, {
+                      ...(selectedAdvancedItem.icon.props || {}),
+                      stroke: 'var(--color-white)',
+                      strokeWidth: 2,
+                      style: {
+                        /* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */
+                        ...(selectedAdvancedItem.icon.props?.style || {}),
+                        width: 'var(--size-icon-sidebar-lg)',
+                        height: 'var(--size-icon-sidebar-lg)',
+                      },
+                    })}
+                  </span>
+                )}
+                <span style={{
+                  lineHeight: 1.2,
+                  whiteSpace: 'nowrap',
+                  fontSize: 'var(--font-size-sm)',
+                }}>
+                  {selectedAdvancedItem.label}
+                </span>
+              </button>
+            </>
+          )}
+          {/* ... 아이콘 버튼 */}
           <button
             ref={advancedButtonRef}
             onClick={() => handleItemClick(item)}
@@ -131,7 +207,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: isHovered ? 'var(--color-primary-40)' : 'transparent',
+              backgroundColor: isHovered ? 'var(--color-primary-hover)' : 'transparent',
               color: 'var(--color-text)',
               border: 'none',
               cursor: 'pointer',
@@ -179,7 +255,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             gap: 'var(--spacing-xs)',
-            backgroundColor: isHovered ? 'var(--color-primary-40)' : 'transparent', // 롤오버 시 인더스트리 타입 색상
+            backgroundColor: isHovered ? 'var(--color-primary-hover)' : 'transparent', // 롤오버 시 인더스트리 타입 색상
             color: 'var(--color-text)', // 항상 기본 텍스트 색상
             fontWeight: isActive ? 'var(--font-weight-bold)' : 'var(--font-weight-medium)',
             border: 'none',
@@ -339,13 +415,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // 레이어 메뉴 아이템 클릭 핸들러
   const handleAdvancedMenuItemClick = (item: SidebarItem) => {
+    // 이미 선택된 항목을 다시 클릭하면 레이어 메뉴 닫기
+    if (selectedAdvancedItem?.id === item.id) {
+      setAdvancedMenuOpen(false);
+      return;
+    }
+
+    // 새로운 항목 선택
+    setSelectedAdvancedItem(item);
+
     if (item.onClick) {
       item.onClick();
     } else if (onItemClick) {
       onItemClick(item);
     }
     setAdvancedMenuOpen(false);
-    setAdvancedMenuItems(null);
   };
 
   // Desktop: Persistent Sidebar
@@ -415,7 +499,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   transition: 'var(--transition-all)',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent';

@@ -457,28 +457,18 @@ export function AIPage() {
     mutationFn: async () => {
       if (!tenantId) throw new Error('Tenant ID is required');
 
-      // [AI 기반 전환] Edge Function 호출로 성과 분석 인사이트 생성
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-performance-insights`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-        }
-      );
+      // [P0 수정] api-sdk를 통해 Edge Function 호출 (fetch 직접 호출 금지)
+      const response = await apiClient.invokeFunction<GenerateInsightsResponse>('generate-performance-insights', {});
 
-      if (!response.ok) {
-        const errorData = (await response.json().catch(() => ({ success: false }))) as GenerateInsightsResponse;
-        throw new Error(errorData.error ?? 'AI 인사이트 생성에 실패했습니다.');
+      if (!response.success) {
+        throw new Error(response.error?.message ?? 'AI 인사이트 생성에 실패했습니다.');
       }
 
-      const result = (await response.json()) as GenerateInsightsResponse;
+      const result = response.data as GenerateInsightsResponse;
       return {
-        success: result.success,
-        generated_count: result.generated_count ?? 0,
-        date: result.date ?? toKST().format('YYYY-MM-DD'),
+        success: result?.success ?? true,
+        generated_count: result?.generated_count ?? 0,
+        date: result?.date ?? toKST().format('YYYY-MM-DD'),
       };
     },
     onSuccess: (data) => {

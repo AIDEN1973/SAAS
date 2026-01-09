@@ -163,32 +163,32 @@ function AppContent() {
     }
 
     try {
-      const { createClient } = await import('@lib/supabase-client');
-      const supabase = createClient();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const { data, error } = await supabase.rpc('global_search', {
-        p_tenant_id: tenantId,
-        p_query: input.query,
-        p_entity_types: input.entity_types || ['student', 'teacher', 'class', 'guardian', 'consultation', 'announcement', 'tag'],
-        p_limit: input.limit || 20,
-      });
+      // [P0 수정] api-sdk를 통해 RPC 호출 (Supabase 직접 호출 금지)
+      const { apiClient } = await import('@api-sdk/core');
 
-      if (error) {
-        console.error('[GlobalSearch] RPC error:', error);
-        return [];
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const results = data || [];
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      return results.map((item: {
+      type GlobalSearchResult = {
         id: string;
         entity_type: string;
         title: string;
         subtitle: string;
         relevance: number;
         created_at: string;
-      }) => ({
+      };
+
+      const response = await apiClient.callRPC<GlobalSearchResult[]>('global_search', {
+        p_tenant_id: tenantId,
+        p_query: input.query,
+        p_entity_types: input.entity_types || ['student', 'teacher', 'class', 'guardian', 'consultation', 'announcement', 'tag'],
+        p_limit: input.limit || 20,
+      });
+
+      if (!response.success) {
+        console.error('[GlobalSearch] RPC error:', response.error);
+        return [];
+      }
+
+      const results = response.data || [];
+      return results.map((item) => ({
         id: item.id,
         entity_type: item.entity_type as SearchResult['entity_type'],
         title: item.title,
@@ -224,30 +224,23 @@ function AppContent() {
       case 'guardian':
         // 보호자 ID로 연결된 학생 찾기
         try {
-          const { createClient } = await import('@lib/supabase-client');
-          const supabase = createClient();
-          const context = getApiContext();
-          const tenantId = context?.tenantId;
-
-          if (!tenantId) {
-            safeNavigate(`/students/list`);
-            return;
-          }
+          // [P0 수정] api-sdk를 통해 조회 (Supabase 직접 호출 금지)
+          const { apiClient } = await import('@api-sdk/core');
 
           // guardians 테이블에서 id로 student_id 찾기
-          const { data: guardian, error } = await supabase
-            .from('guardians')
-            .select('student_id')
-            .eq('tenant_id', tenantId)
-            .eq('id', result.id)
-            .limit(1)
-            .single();
+          const response = await apiClient.get<{ student_id: string }>('guardians', {
+            select: 'student_id',
+            filters: { id: result.id },
+            limit: 1,
+          });
 
-          if (error || !guardian) {
-            console.error('[GlobalSearch] Failed to find student for guardian:', error);
+          if (!response.success || !response.data?.length) {
+            console.error('[GlobalSearch] Failed to find student for guardian:', response.error);
             safeNavigate(`/students/list`);
             return;
           }
+
+          const guardian = response.data[0];
 
           // 학생의 보호자 탭으로 이동 (query parameter 사용)
           safeNavigate(`/students/list?studentId=${guardian.student_id}&panel=guardians`);
@@ -274,11 +267,9 @@ function AppContent() {
 
   // 사용자 프로필 정보
   const userProfile = session?.user ? {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '사용자',
+    name: (session.user.user_metadata?.full_name as string | undefined) || session.user.email?.split('@')[0] || '사용자',
     email: session.user.email || '',
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    avatarUrl: session.user.user_metadata?.avatar_url,
+    avatarUrl: session.user.user_metadata?.avatar_url as string | undefined,
   } : undefined;
 
   // Execution Audit 데이터 로드 (액티비티.md 10.1 참조)

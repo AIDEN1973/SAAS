@@ -10,7 +10,9 @@
  */
 
 import React from 'react';
+import { Database } from 'lucide-react';
 import { Card } from './Card';
+import { EmptyState } from './EmptyState';
 
 export interface ListCardItem {
   label: React.ReactNode;
@@ -98,12 +100,7 @@ export function ListCardLayout({
       {/* 리스트 영역 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
         {isEmpty ? (
-          <div style={{
-            color: 'var(--color-text-secondary)',
-            fontSize: 'var(--font-size-base)',
-          }}>
-            {emptyMessage}
-          </div>
+          <EmptyState icon={Database} message={typeof emptyMessage === 'string' ? emptyMessage : '데이터 없음'} />
         ) : (
           <>
             {items.map((item, index) => (

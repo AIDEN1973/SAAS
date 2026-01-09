@@ -45,10 +45,6 @@
       "@industry/*": ["../../packages/industry/*/src"]
     }
   },
-  "include": ["src"],
-  "references": [
-    { "path": "../../packages/env-registry" },
-    { "path": "../../packages/lib/supabase-client" }
-  ]
+  "include": ["src"]
 }
 

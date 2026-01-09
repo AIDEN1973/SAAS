@@ -199,7 +199,7 @@ export function NotificationCardLayout({
             transition: 'background-color var(--transition-fast)',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+            e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent';
@@ -236,7 +236,7 @@ export function NotificationCardLayout({
               transition: 'background-color var(--transition-fast)',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+              e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
@@ -278,7 +278,7 @@ export function NotificationCardLayout({
                   }}
                   onMouseEnter={(e) => {
                     if (!item.disabled) {
-                      e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                      e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                     }
                   }}
                   onMouseLeave={(e) => {

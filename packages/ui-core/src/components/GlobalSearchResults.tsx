@@ -140,7 +140,7 @@ const SearchResultItem: React.FC<{
         gap: 'var(--spacing-md)',
         width: '100%',
         padding: 'var(--spacing-sm) var(--spacing-md)',
-        backgroundColor: isHighlighted ? 'var(--color-gray-100)' : 'transparent',
+        backgroundColor: isHighlighted ? 'var(--color-primary-hover)' : 'transparent',
         border: 'none',
         cursor: 'pointer',
         textAlign: 'left',
@@ -284,7 +284,7 @@ export const GlobalSearchResults: React.FC<GlobalSearchResultsProps> = ({
   query = '',
   onResultClick,
   className,
-  maxHeight = '400px',
+  maxHeight = 'var(--height-dropdown-max)',
   grouped = true,
   entityTypeLabels,
 }) => {

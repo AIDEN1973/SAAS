@@ -38,6 +38,7 @@ module.exports = {
     {
       files: ["**/*.{ts,tsx}"],
       excludedFiles: [
+        "apps/**/*.{ts,tsx}",
         "**/*.test.{ts,tsx}",
         "**/*.spec.{ts,tsx}",
         "**/*.config.{ts,tsx,js,cjs,mjs}",
