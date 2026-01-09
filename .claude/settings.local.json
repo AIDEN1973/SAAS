@@ -142,7 +142,9 @@
       "Bash(timeout 30 npx turbo run type-check:*)",
       "Bash(timeout 60 npx turbo run:*)",
       "Bash(time npx turbo run build:*)",
-      "Bash(time npx tsc:*)"
+      "Bash(time npx tsc:*)",
+      "Bash(tasklist:*)",
+      "Bash(npx lint-staged:*)"
     ]
   }
 }
