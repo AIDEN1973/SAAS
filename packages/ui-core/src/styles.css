@@ -142,6 +142,9 @@
   --width-layer-menu: 37.5rem;       /* 600px - 레이어 메뉴 기본 너비 */
   --width-layer-menu-tablet: 31.25rem; /* 500px - 태블릿 레이어 메뉴 너비 */
   --width-layer-menu-expanded: 65vw;    /* 레이어 메뉴 확장 너비(전체 화면의 65%) */
+  --width-agent-history-sidebar: 16.25rem; /* 260px - 에이전트 히스토리 사이드바 너비 */
+  --width-agent-timeline-sidebar: 26rem; /* 416px - 에이전트 타임라인 사이드바 너비 */
+  --width-agent-chat-max: 50rem;       /* 800px - 에이전트 채팅 영역 최대 너비 */
   --width-overlay-threshold: 90rem;  /* 1440px - 오버레이 모드 전환 기준 너비 */
   --breakpoint-tablet: 48rem;        /* 768px - 태블릿 브레이크포인트 (유아이 문서 6-0 준수) */
   --transition-debounce: 150ms;     /* 디바운싱 지연 시간 */

@@ -271,3 +271,151 @@ export function useChatOps() {
     },
   });
 }
+
+// ============================================
+// 서버 세션 관리 API 함수들
+// ============================================
+
+/**
+ * 서버에 저장된 세션 정보 인터페이스
+ */
+export interface ChatOpsServerSession {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  summary: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * 서버에 저장된 메시지 인터페이스
+ */
+export interface ChatOpsServerMessage {
+  id: number;
+  session_id: string;
+  tenant_id: string;
+  user_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  intent_key: string | null;
+  automation_level: 'L0' | 'L1' | 'L2' | null;
+  execution_class: 'A' | 'B' | null;
+  created_at: string;
+}
+
+/**
+ * 세션 목록 조회 (서버에서)
+ * 최근 업데이트 순으로 정렬
+ * tenantId가 없으면 빈 배열 반환 (로그인 전 또는 컨텍스트 초기화 전)
+ */
+export async function fetchChatOpsSessions(limit: number = 50): Promise<ChatOpsServerSession[]> {
+  // tenantId가 없으면 빈 배열 반환 (localStorage 폴백 사용)
+  // 로그인 전 상태에서는 정상적인 상황이므로 debug 레벨로 로깅
+  const context = getApiContext();
+  if (!context?.tenantId) {
+    return [];
+  }
+
+  const response = await apiClient.get<ChatOpsServerSession>('chatops_sessions', {
+    select: 'id, tenant_id, user_id, summary, created_at, updated_at',
+    orderBy: { column: 'updated_at', ascending: false },
+    limit,
+  });
+
+  if (response.error) {
+    console.error('[useChatOps] Failed to fetch sessions:', maskPII(response.error));
+    throw new Error(response.error.message);
+  }
+
+  return response.data || [];
+}
+
+/**
+ * 세션의 메시지 목록 조회 (서버에서)
+ * tenantId가 없으면 빈 배열 반환 (로그인 전 또는 컨텍스트 초기화 전)
+ */
+export async function fetchChatOpsMessages(
+  sessionId: string,
+  limit: number = 100
+): Promise<ChatOpsServerMessage[]> {
+  if (!sessionId) {
+    return [];
+  }
+
+  // tenantId가 없으면 빈 배열 반환 (localStorage 폴백 사용)
+  // 로그인 전 상태에서는 정상적인 상황이므로 조용히 스킵
+  const context = getApiContext();
+  if (!context?.tenantId) {
+    return [];
+  }
+
+  const response = await apiClient.get<ChatOpsServerMessage>('chatops_messages', {
+    select: 'id, session_id, tenant_id, user_id, role, content, intent_key, automation_level, execution_class, created_at',
+    filters: { session_id: sessionId },
+    orderBy: { column: 'created_at', ascending: true },
+    limit,
+  });
+
+  if (response.error) {
+    console.error('[useChatOps] Failed to fetch messages:', maskPII(response.error));
+    throw new Error(response.error.message);
+  }
+
+  return response.data || [];
+}
+
+/**
+ * 세션 삭제 (서버에서)
+ * 관련 메시지도 CASCADE 삭제됨
+ * tenantId가 없으면 조용히 실패 (localStorage만 삭제됨)
+ */
+export async function deleteChatOpsServerSession(sessionId: string): Promise<void> {
+  if (!sessionId) {
+    throw new Error('Session ID is required');
+  }
+
+  // tenantId가 없으면 스킵 (localStorage만 삭제됨)
+  // 로그인 전 상태에서는 정상적인 상황이므로 조용히 스킵
+  const context = getApiContext();
+  if (!context?.tenantId) {
+    return;
+  }
+
+  // 세션 삭제 (CASCADE로 관련 메시지도 자동 삭제됨)
+  const response = await apiClient.delete('chatops_sessions', sessionId);
+
+  if (response.error) {
+    console.error('[useChatOps] Failed to delete session:', maskPII(response.error));
+    throw new Error(response.error.message);
+  }
+}
+
+/**
+ * 세션 요약 업데이트 (서버에서)
+ * tenantId가 없으면 조용히 실패
+ */
+export async function updateChatOpsSessionSummary(
+  sessionId: string,
+  summary: string
+): Promise<void> {
+  if (!sessionId) {
+    throw new Error('Session ID is required');
+  }
+
+  // tenantId가 없으면 스킵
+  // 로그인 전 상태에서는 정상적인 상황이므로 조용히 스킵
+  const context = getApiContext();
+  if (!context?.tenantId) {
+    return;
+  }
+
+  const response = await apiClient.patch('chatops_sessions', sessionId, {
+    summary: summary.slice(0, 200), // 최대 200자
+  });
+
+  if (response.error) {
+    console.error('[useChatOps] Failed to update session summary:', maskPII(response.error));
+    throw new Error(response.error.message);
+  }
+}

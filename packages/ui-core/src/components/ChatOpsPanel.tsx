@@ -6,7 +6,7 @@
  * [SSOT 준수] 챗봇.md 문서 기준 엄격히 준수
  * [불변 규칙] 실행 결과는 ChatOps UI에 직접 표시하지 않으며, Activity 시스템에 기록됩니다 (챗봇.md 45줄, 액티비티.md 11.3)
  * [불변 규칙] 모든 스타일은 design-system 토큰을 사용합니다
- * [불변 규칙] 버블 대화 방식으로 메시지를 표시합니다 (챗봇.md 7.1)
+ * [불변 규칙] 사용자 메시지는 버블, AI 응답은 버블 없이 텍스트만 표시 (ChatGPT 스타일)
  * [업종 중립] 모든 업종(Academy/Salon/Nail 등)에서 공통으로 사용 가능합니다 (AI_자동화_기능_정리.md 145-158줄 참조)
  * [업종 중립] 업종별 차이는 prop을 통한 확장 포인트(`onViewTaskCard` 등)로 처리됩니다
  *
@@ -103,13 +103,16 @@ export interface ChatOpsPanelProps {
   className?: string;
   /** 업종별 용어 (선택사항, 기본값: Academy 용어) */
   industryTerms?: ChatOpsIndustryTerms;
+  /** 사용자 정보 (환영 메시지용) */
+  userName?: string;
+  userEmail?: string;
 }
 
 /**
  * ChatOpsPanel 컴포넌트
  *
- * 우측 AI 대화창 UI 패널
- * 버블 대화 방식으로 메시지를 표시합니다.
+ * AI 대화창 UI 패널
+ * 사용자 메시지는 버블, AI 응답은 버블 없이 텍스트만 표시 (ChatGPT 스타일)
  */
 /**
  * 원본 메시지에서 요청한 필드 추출 (범용)
@@ -246,6 +249,8 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
   onReset,
   className,
   industryTerms,
+  userName,
+  userEmail,
 }) => {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -296,11 +301,12 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
     const isStatusMessage = message.metadata?.isStatusMessage; // 진행 상황 메시지
 
     // 버블 스타일 (사용자/어시스턴트/진행상황 구분)
+    // AI 응답은 버블 없이 텍스트만 표시 (ChatGPT 스타일)
     const bubbleStyle: React.CSSProperties = {
       // TODO: Design System에 --width-message-bubble-max: 80% 변수 추가 필요
-      maxWidth: 'var(--width-message-bubble-max, 80%)',
-      padding: 'var(--spacing-md)',
-      borderRadius: 'var(--border-radius-lg)',
+      maxWidth: isUser ? 'var(--width-message-bubble-max, 80%)' : 'var(--width-full)',
+      padding: isUser ? 'var(--spacing-md)' : 'var(--spacing-sm) 0',
+      borderRadius: isUser ? 'var(--border-radius-lg)' : '0',
       marginBottom: 'var(--spacing-sm)',
       wordWrap: 'break-word',
       ...(isUser
@@ -317,14 +323,16 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
             color: 'var(--color-info-700)',
             marginRight: 'auto',
             borderBottomLeftRadius: 'var(--border-radius-sm)',
+            padding: 'var(--spacing-md)',
+            borderRadius: 'var(--border-radius-lg)',
             fontStyle: 'italic',
             fontSize: 'var(--font-size-sm)',
           }
         : {
-            backgroundColor: 'var(--color-gray-100)',
+            // AI 응답: 버블 없이 텍스트만 표시
+            backgroundColor: 'transparent',
             color: 'var(--color-text)',
             marginRight: 'auto',
-            borderBottomLeftRadius: 'var(--border-radius-sm)',
           }),
     };
 
@@ -1326,6 +1334,12 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
     );
   };
 
+  // 새 대화 시작 모드 (메시지 없음)
+  const isEmptyChat = messages.length === 0;
+
+  // 사용자 표시명 (이름 > 이메일 ID > 기본값)
+  const displayName = userName || (userEmail ? userEmail.split('@')[0] : '사용자');
+
   return (
     <div
       className={clsx(className)}
@@ -1333,64 +1347,234 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        backgroundColor: 'var(--color-background)',
+        backgroundColor: 'var(--color-body)',
       }}
     >
-      {/* 헤더 영역 (초기화 버튼) */}
-      {messages.length > 0 && onReset && (
+      {isEmptyChat ? (
+        // 새 대화 시작: 중앙 환영 메시지 + 입력창
         <div
           style={{
+            flex: 1,
             display: 'flex',
-            justifyContent: 'flex-end',
-            padding: 'var(--spacing-md) var(--spacing-lg)',
-            borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)',
-            backgroundColor: 'var(--color-white)',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 'var(--spacing-xl)',
+            gap: 'var(--spacing-xl)',
           }}
         >
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onReset}
-            disabled={isLoading}
-          >
-            초기화
-          </Button>
-        </div>
-      )}
-
-      {/* 메시지 영역 */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: 'var(--spacing-lg)',
-          display: 'flex',
-          flexDirection: 'column',
-          ...(messages.length === 0 ? { justifyContent: 'center' } : {}),
-        }}
-        className="ui-core-hiddenScrollbar"
-      >
-        {messages.length === 0 ? (
+          {/* 환영 메시지 */}
           <div
             style={{
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              color: 'var(--color-text-secondary)',
               textAlign: 'center',
+              maxWidth: 'var(--width-agent-chat-max)', // 1280px - 다른 페이지 콘텐츠 영역과 동일
             }}
           >
-            <div style={{ marginBottom: 'var(--spacing-md)' }}>
-              <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>
-                AI 챗봇에 오신 것을 환영합니다
-              </div>
-              <div style={{ fontSize: 'var(--font-size-sm)', marginTop: 'var(--spacing-xs)' }}>
-                자연어로 조회, 업무 생성, 승인 요청을 할 수 있습니다
-              </div>
+            {/* AI 스파크 아이콘 */}
+            <div
+              style={{
+                marginBottom: 'var(--spacing-lg)',
+                color: 'var(--color-primary)',
+                width: 'var(--size-icon-xxl, 48px)',
+                height: 'var(--size-icon-xxl, 48px)',
+              }}
+            >
+              <svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </div>
+            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
+              {displayName}님, 안녕하세요
+            </div>
+            <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text)', marginBottom: 'var(--spacing-lg)' }}>
+              오늘은 어떤 업무를 도와드릴까요?
             </div>
           </div>
-        ) : (
-          <>
+
+          {/* 입력창 (중앙 배치) */}
+          <div style={{ width: '100%', maxWidth: 'var(--width-agent-chat-max)' }}>
+            <form onSubmit={handleSubmit}>
+              <div
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  backgroundColor: 'var(--color-white)',
+                  border: 'var(--border-width-thin) solid var(--color-gray-300)',
+                  borderRadius: 'var(--border-radius-xl)',
+                  padding: 'var(--spacing-md) var(--spacing-md)',
+                  boxShadow: 'var(--shadow-md)',
+                  transition: 'var(--transition-all)',
+                }}
+                onFocus={(e) => {
+                  const target = e.currentTarget;
+                  target.style.borderColor = 'var(--color-primary-400)';
+                  target.style.boxShadow = 'var(--shadow-focus)';
+                }}
+                onBlur={(e) => {
+                  const target = e.currentTarget;
+                  target.style.borderColor = 'var(--color-gray-300)';
+                  target.style.boxShadow = 'var(--shadow-md)';
+                }}
+              >
+                {/* 입력 필드 */}
+                <input
+                  ref={inputRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="업무 지시하기"
+                  disabled={isLoading}
+                  autoFocus
+                  style={{
+                    flex: 1,
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: 'var(--font-size-base)',
+                    backgroundColor: 'transparent',
+                    color: 'var(--color-text)',
+                    padding: 'var(--spacing-xs) var(--spacing-md)',
+                  }}
+                />
+
+                {/* 오른쪽 전송 버튼 */}
+                <button
+                  type="submit"
+                  disabled={!inputValue.trim() || isLoading}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 'var(--size-avatar-sm)',
+                    height: 'var(--size-avatar-sm)',
+                    borderRadius: 'var(--border-radius-sm)',
+                    border: 'none',
+                    backgroundColor: inputValue.trim() && !isLoading
+                      ? 'var(--color-primary)'
+                      : 'var(--color-gray-300)',
+                    color: 'var(--color-white)',
+                    cursor: inputValue.trim() && !isLoading ? 'pointer' : 'not-allowed',
+                    transition: 'var(--transition-all)',
+                    marginLeft: 'var(--spacing-sm)',
+                    flexShrink: 0,
+                  }}
+                  onMouseDown={(e) => {
+                    if (inputValue.trim() && !isLoading) {
+                      e.currentTarget.style.transform = 'var(--transform-scale-down, scale(0.95))';
+                    }
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = 'var(--transform-scale-normal, scale(1))';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'var(--transform-scale-normal, scale(1))';
+                  }}
+                >
+                  <svg
+                    width="var(--size-icon-sm, 18px)"
+                    height="var(--size-icon-sm, 18px)"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    stroke="none"
+                  >
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                  </svg>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* 제안 버튼들 (선택사항) */}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 'var(--spacing-sm)',
+              justifyContent: 'center',
+              maxWidth: 'var(--width-agent-chat-max)',
+            }}
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                setInputValue('오늘 출석 현황 알려줘');
+                // 즉시 전송
+                await handleSubmit(new Event('submit') as any);
+              }}
+              style={{ borderRadius: 'var(--border-radius-full)' }}
+            >
+              📊 오늘 출석 현황
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                setInputValue('이번 달 미납 학생 조회');
+                await handleSubmit(new Event('submit') as any);
+              }}
+              style={{ borderRadius: 'var(--border-radius-full)' }}
+            >
+              💰 미납 학생 조회
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                setInputValue('오늘 지각 학생 목록 보여줘');
+                await handleSubmit(new Event('submit') as any);
+              }}
+              style={{ borderRadius: 'var(--border-radius-full)' }}
+            >
+              ⏰ 지각 학생 확인
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                setInputValue('A반 학생 명단 조회');
+                await handleSubmit(new Event('submit') as any);
+              }}
+              style={{ borderRadius: 'var(--border-radius-full)' }}
+            >
+              👥 반 명단 조회
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* 메시지 영역 (대화 진행 중) */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              display: 'flex',
+              justifyContent: 'center',
+            }}
+            className="ui-core-hiddenScrollbar"
+          >
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 'var(--width-agent-chat-max)',
+                padding: 'var(--spacing-lg)',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
             {(() => {
               console.log('[ChatOpsPanel] 전체 messages 배열:', messages.map(m => ({ id: m.id, type: m.type, contentPreview: typeof m.content === 'string' ? m.content.substring(0, 30) : '[ReactNode]' })));
               // ✅ hidden 플래그가 있는 메시지는 렌더링하지 않음
@@ -1411,142 +1595,149 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
               </div>
             )}
             <div ref={messagesEndRef} />
-          </>
-        )}
-      </div>
+            </div>
+          </div>
 
-      {/* 입력 영역 - ChatGPT 스타일 */}
-      <div
-        style={{
-          padding: 'var(--spacing-lg)',
-          backgroundColor: 'var(--color-white)',
-        }}
-      >
-        <form onSubmit={handleSubmit}>
+          {/* 입력 영역 (하단 고정, 대화 진행 중) */}
           <div
             style={{
-              position: 'relative',
               display: 'flex',
-              alignItems: 'center',
-              backgroundColor: 'var(--color-white)',
-              border: 'var(--border-width-thin) solid var(--color-gray-300)',
-              borderRadius: 'var(--border-radius-xl)',
-              padding: 'var(--spacing-md) var(--spacing-md)',
-              boxShadow: 'var(--shadow-sm)',
-              transition: 'all 0.2s ease',
-            }}
-            onFocus={(e) => {
-              const target = e.currentTarget;
-              target.style.borderColor = 'var(--color-primary-400)';
-              target.style.boxShadow = 'var(--shadow-focus, 0 0 0 2px rgba(59, 130, 246, 0.1))';
-            }}
-            onBlur={(e) => {
-              const target = e.currentTarget;
-              target.style.borderColor = 'var(--color-gray-300)';
-              target.style.boxShadow = 'var(--shadow-sm)';
+              justifyContent: 'center',
+              padding: 'var(--spacing-lg)',
+              backgroundColor: 'var(--color-body)',
             }}
           >
-            {/* 왼쪽 아이콘 - AI 스파크 아이콘 */}
+            <div style={{ width: '100%', maxWidth: 'var(--width-agent-chat-max)' }}>
+            <form onSubmit={handleSubmit}>
+              <div
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  backgroundColor: 'var(--color-white)',
+                  border: 'var(--border-width-thin) solid var(--color-gray-300)',
+                  borderRadius: 'var(--border-radius-xl)',
+                  padding: 'var(--spacing-md) var(--spacing-md)',
+                  boxShadow: 'var(--shadow-sm)',
+                  transition: 'var(--transition-all)',
+                }}
+                onFocus={(e) => {
+                  const target = e.currentTarget;
+                  target.style.borderColor = 'var(--color-primary-400)';
+                  target.style.boxShadow = 'var(--shadow-focus)';
+                }}
+                onBlur={(e) => {
+                  const target = e.currentTarget;
+                  target.style.borderColor = 'var(--color-gray-300)';
+                  target.style.boxShadow = 'var(--shadow-sm)';
+                }}
+              >
+                {/* 왼쪽 아이콘 - AI 스파크 아이콘 */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginRight: 'var(--spacing-sm)',
+                    color: 'var(--color-gray-400)',
+                    width: 'var(--size-icon-md, 20px)',
+                    height: 'var(--size-icon-md, 20px)',
+                  }}
+                >
+                  <svg
+                    width="100%"
+                    height="100%"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </div>
+
+                {/* 입력 필드 */}
+                <input
+                  ref={inputRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="업무를 요청해 보세요."
+                  disabled={isLoading}
+                  style={{
+                    flex: 1,
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: 'var(--font-size-md)',
+                    backgroundColor: 'transparent',
+                    color: 'var(--color-text)',
+                    padding: 'var(--spacing-xs) 0',
+                  }}
+                />
+
+                {/* 오른쪽 전송 버튼 */}
+                <button
+                  type="submit"
+                  disabled={!inputValue.trim() || isLoading}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 'var(--size-avatar-sm)',
+                    height: 'var(--size-avatar-sm)',
+                    borderRadius: 'var(--border-radius-sm)',
+                    border: 'none',
+                    backgroundColor: inputValue.trim() && !isLoading
+                      ? 'var(--color-primary)'
+                      : 'var(--color-gray-300)',
+                    color: 'var(--color-white)',
+                    cursor: inputValue.trim() && !isLoading ? 'pointer' : 'not-allowed',
+                    transition: 'var(--transition-all)',
+                    marginLeft: 'var(--spacing-sm)',
+                    flexShrink: 0,
+                  }}
+                  onMouseDown={(e) => {
+                    if (inputValue.trim() && !isLoading) {
+                      e.currentTarget.style.transform = 'var(--transform-scale-down, scale(0.95))';
+                    }
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = 'var(--transform-scale-normal, scale(1))';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'var(--transform-scale-normal, scale(1))';
+                  }}
+                >
+                  <svg
+                    width="var(--size-icon-sm, 18px)"
+                    height="var(--size-icon-sm, 18px)"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    stroke="none"
+                  >
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                  </svg>
+                </button>
+              </div>
+            </form>
+
+            {/* 하단 안내 문구 */}
             <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                marginRight: 'var(--spacing-sm)',
-                color: 'var(--color-gray-400)',
+                marginTop: 'var(--spacing-sm)',
+                textAlign: 'center',
+                fontSize: 'var(--font-size-xs)',
+                color: 'var(--color-text-secondary)',
               }}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
+              AI 에이전트는 실수를 할 수 있습니다. 중요한 정보는 재확인하세요.
             </div>
-
-            {/* 입력 필드 */}
-            <input
-              ref={inputRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="업무를 요청해 보세요."
-              disabled={isLoading}
-              style={{
-                flex: 1,
-                border: 'none',
-                outline: 'none',
-                fontSize: 'var(--font-size-md)',
-                backgroundColor: 'transparent',
-                color: 'var(--color-text)',
-                padding: 'var(--spacing-xs) 0',
-              }}
-            />
-
-            {/* 오른쪽 전송 버튼 */}
-            <button
-              type="submit"
-              disabled={!inputValue.trim() || isLoading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 'var(--size-avatar-sm)',
-                height: 'var(--size-avatar-sm)',
-                borderRadius: 'var(--border-radius-sm)',
-                border: 'none',
-                backgroundColor: inputValue.trim() && !isLoading
-                  ? 'var(--color-primary)'
-                  : 'var(--color-gray-300)',
-                color: 'var(--color-white)',
-                cursor: inputValue.trim() && !isLoading ? 'pointer' : 'not-allowed',
-                transition: 'background-color 0.15s ease, transform 0.1s ease',
-                marginLeft: 'var(--spacing-sm)',
-                flexShrink: 0,
-              }}
-              onMouseDown={(e) => {
-                if (inputValue.trim() && !isLoading) {
-                  e.currentTarget.style.transform = 'scale(0.95)';
-                }
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                stroke="none"
-              >
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-              </svg>
-            </button>
+            </div>
           </div>
-        </form>
-
-        {/* 하단 안내 문구 */}
-        <div
-          style={{
-            marginTop: 'var(--spacing-sm)',
-            textAlign: 'center',
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--color-text-secondary)',
-          }}
-        >
-          AI 어시스턴트는 실수를 할 수 있습니다. 중요한 정보는 재확인하세요.
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 };

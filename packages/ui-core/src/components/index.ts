@@ -184,3 +184,12 @@ export type { GlobalSearchResultsProps, SearchResult, SearchEntityType } from '.
 
 export { GlobalSearchDropdown } from './GlobalSearchDropdown';
 export type { GlobalSearchDropdownProps } from './GlobalSearchDropdown';
+
+export { AgentHistorySidebar } from './AgentHistorySidebar';
+export type { AgentHistorySidebarProps } from './AgentHistorySidebar';
+
+export { AgentTimelineSidebar } from './AgentTimelineSidebar';
+export type { AgentTimelineSidebarProps } from './AgentTimelineSidebar';
+
+export { AgentModeContainer } from './AgentModeContainer';
+export type { AgentModeContainerProps } from './AgentModeContainer';

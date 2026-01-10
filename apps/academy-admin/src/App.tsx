@@ -124,6 +124,7 @@ const AlimtalkSettingsPage = lazy(() => import('./pages/AlimtalkSettingsPage').t
 const IntentPatternsPage = lazy(() => import('./pages/IntentPatternsPage').then(m => ({ default: m.IntentPatternsPage })));
 const SchemaEditorPage = lazy(() => import('../../super-admin/src/pages/SchemaEditorPage').then(m => ({ default: m.SchemaEditorPage })));
 const AuthGuard = lazy(() => import('../../super-admin/src/components/AuthGuard').then(m => ({ default: m.AuthGuard })));
+const AgentPage = lazy(() => import('./pages/AgentPage').then(m => ({ default: m.AgentPage })));
 
 // 로딩 컴포넌트
 // [SSOT] 하드코딩 금지: CSS 변수 사용
@@ -580,14 +581,31 @@ function AppContent() {
     aiLayerMenu.clearChatOpsMessages();
   }, [aiLayerMenu]);
 
-  // Location 변경 추적 (필요시 디버깅용으로 활성화)
-  // useEffect(() => {
-  //   console.log('[App.tsx] Location changed:', {
-  //     pathname: location.pathname,
-  //     search: location.search,
-  //     hash: location.hash,
-  //   });
-  // }, [location]);
+  // URL과 에이전트 상태 동기화
+  // /agent 경로 진입 시 에이전트 모드 활성화
+  // 다른 경로 이동 시 에이전트 모드 비활성화
+  const isAgentPath = location.pathname === '/agent';
+  useEffect(() => {
+    if (isAgentPath && !aiLayerMenu.isOpen) {
+      // /agent 경로로 진입했는데 에이전트가 닫혀있으면 열기
+      aiLayerMenu.open();
+    } else if (!isAgentPath && aiLayerMenu.isOpen) {
+      // 다른 경로로 이동했는데 에이전트가 열려있으면 닫기
+      aiLayerMenu.close();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAgentPath]); // aiLayerMenu.isOpen을 dependency에서 제외하여 무한 루프 방지
+
+  // 에이전트 버튼 클릭 핸들러 (라우트 기반)
+  const handleAgentToggle = useCallback(() => {
+    if (isAgentPath) {
+      // 에이전트 페이지에서 버튼 클릭 시 이전 페이지로 이동 (또는 홈)
+      safeNavigate('/home');
+    } else {
+      // 다른 페이지에서 버튼 클릭 시 에이전트 페이지로 이동
+      safeNavigate('/agent');
+    }
+  }, [isAgentPath, safeNavigate]);
 
   // NOTE: 사이드바 아이템은 getSidebarItemsForRole()에서 생성합니다.
 
@@ -974,7 +992,7 @@ function AppContent() {
                     <AIToggle />
                     <AgentButton
                       isOpen={aiLayerMenu.isOpen}
-                      onClick={aiLayerMenu.toggle}
+                      onClick={handleAgentToggle}
                     />
                     <TimelineButton
                       onClick={() => setIsTimelineOpen(true)}
@@ -994,17 +1012,27 @@ function AppContent() {
                   void handleSidebarItemClick(item);
                 },
               }}
-              chatOpsIndustryTerms={{
-                personLabel: terms.PERSON_LABEL_PRIMARY,
-                personLabelPlural: terms.PERSON_LABEL_PLURAL,
-                attendanceLabel: terms.ATTENDANCE_LABEL,
-                lateLabel: terms.LATE_LABEL,
-              }}
-              onChatOpsSendMessage={handleChatOpsSendMessage}
-              onChatOpsReset={handleChatOpsReset}
-              onExecutionAuditRowClick={handleExecutionAuditRowClick}
             >
               <Routes>
+                {/* 에이전트 모드 전용 라우트 - 새로고침해도 유지됨 */}
+                <Route path="/agent" element={
+                  <RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}>
+                    <Suspense fallback={<PageLoader />}>
+                      <AgentPage
+                        chatOpsIndustryTerms={{
+                          personLabel: terms.PERSON_LABEL_PRIMARY,
+                          personLabelPlural: terms.PERSON_LABEL_PLURAL,
+                          attendanceLabel: terms.ATTENDANCE_LABEL,
+                          lateLabel: terms.LATE_LABEL,
+                        }}
+                        onChatOpsSendMessage={handleChatOpsSendMessage}
+                        onChatOpsReset={handleChatOpsReset}
+                        userName={session?.user?.user_metadata?.full_name as string | undefined}
+                        userEmail={session?.user?.email}
+                      />
+                    </Suspense>
+                  </RoleBasedRoute>
+                } />
                 <Route path="/home" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><HomePage /></RoleBasedRoute>} />
                 <Route path="/home/all-cards" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><AllCardsPage /></Suspense></RoleBasedRoute>} />
                 <Route path="/students/home" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><StudentsHomePage /></Suspense></RoleBasedRoute>} />

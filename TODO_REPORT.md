@@ -1,7 +1,7 @@
 # TODO 리포트
 
 **생성 일시**: 2026-01-10
-**총 TODO 수**: 105개
+**총 TODO 수**: 104개
 
 ---
 
@@ -9,13 +9,13 @@
 
 | 항목 | 수량 |
 |------|------|
-| 총 TODO | 105개 |
+| 총 TODO | 104개 |
 | 이슈 번호 포함 | 4개 (4%) |
-| 이슈 번호 없음 | 101개 (96%) |
+| 이슈 번호 없음 | 100개 (96%) |
 | P0 (즉시 처리) | 1개 |
 | P1 (중요) | 3개 |
 | P2 (일반) | 0개 |
-| 미분류 | 101개 |
+| 미분류 | 100개 |
 
 ## 🔴 P0 (즉시 처리)
 
@@ -102,23 +102,11 @@
 - [packages\chatops-intents\src\registry.ts:83](packages\chatops-intents\src\registry.ts#L83)
   - workspace 의존성 해결 후 @core/automation에서 직접 import하도록 변경 예정
 
-- [packages\ui-core\src\components\ChatOpsPanel.tsx:300](packages\ui-core\src\components\ChatOpsPanel.tsx#L300)
+- [packages\ui-core\src\components\ChatOpsPanel.tsx:306](packages\ui-core\src\components\ChatOpsPanel.tsx#L306)
   - Design System에 --width-message-bubble-max: 80% 변수 추가 필요
-
-- [packages\ui-core\src\components\AppLayout.tsx:145](packages\ui-core\src\components\AppLayout.tsx#L145)
-  - 업종별 라우팅 로직 구현 (industryAdapter 사용 권장)
 
 - [packages\ui-core\src\components\AIToggle.tsx:59](packages\ui-core\src\components\AIToggle.tsx#L59)
   - 플랫폼 레벨 체크는 서버 API를 통해 확인해야 함
-
-- [packages\services\class-service\src\service.ts:89](packages\services\class-service\src\service.ts#L89)
-  - 실제 학생 수 계산
-
-- [packages\services\class-service\src\service.ts:90](packages\services\class-service\src\service.ts#L90)
-  - 실제 활성 학생 수 계산
-
-- [packages\services\auth-service\src\service.ts:30](packages\services\auth-service\src\service.ts#L30)
-  - 로그인, 로그아웃, 회원가입 로직 구현 필요
 
 - [packages\schema-engine\src\react\SchemaTable.tsx:190](packages\schema-engine\src\react\SchemaTable.tsx#L190)
   - Tag/Badge 컴포넌트 사용
@@ -146,6 +134,15 @@
 
 - [packages\schema-engine\src\loader\i18n.ts:127](packages\schema-engine\src\loader\i18n.ts#L127)
   - table, detail, filter, widget 스키마도 처리
+
+- [packages\services\auth-service\src\service.ts:30](packages\services\auth-service\src\service.ts#L30)
+  - 로그인, 로그아웃, 회원가입 로직 구현 필요
+
+- [packages\services\class-service\src\service.ts:89](packages\services\class-service\src\service.ts#L89)
+  - 실제 학생 수 계산
+
+- [packages\services\class-service\src\service.ts:90](packages\services\class-service\src\service.ts#L90)
+  - 실제 활성 학생 수 계산
 
 - [packages\industry\industry-academy\src\service.ts:152](packages\industry\industry-academy\src\service.ts#L152)
   - 반 필터링 로직 추가
@@ -344,7 +341,7 @@
 
 ## ⚠️ 이슈 번호가 없는 TODO
 
-총 101개의 TODO에 이슈 번호가 없습니다.
+총 100개의 TODO에 이슈 번호가 없습니다.
 
 - [scripts\scan-todos.ts:46](scripts\scan-todos.ts#L46)
   - 설명
@@ -409,23 +406,11 @@
 - [packages\chatops-intents\src\registry.ts:83](packages\chatops-intents\src\registry.ts#L83)
   - workspace 의존성 해결 후 @core/automation에서 직접 import하도록 변경 예정
 
-- [packages\ui-core\src\components\ChatOpsPanel.tsx:300](packages\ui-core\src\components\ChatOpsPanel.tsx#L300)
+- [packages\ui-core\src\components\ChatOpsPanel.tsx:306](packages\ui-core\src\components\ChatOpsPanel.tsx#L306)
   - Design System에 --width-message-bubble-max: 80% 변수 추가 필요
-
-- [packages\ui-core\src\components\AppLayout.tsx:145](packages\ui-core\src\components\AppLayout.tsx#L145)
-  - 업종별 라우팅 로직 구현 (industryAdapter 사용 권장)
 
 - [packages\ui-core\src\components\AIToggle.tsx:59](packages\ui-core\src\components\AIToggle.tsx#L59)
   - 플랫폼 레벨 체크는 서버 API를 통해 확인해야 함
-
-- [packages\services\class-service\src\service.ts:89](packages\services\class-service\src\service.ts#L89)
-  - 실제 학생 수 계산
-
-- [packages\services\class-service\src\service.ts:90](packages\services\class-service\src\service.ts#L90)
-  - 실제 활성 학생 수 계산
-
-- [packages\services\auth-service\src\service.ts:30](packages\services\auth-service\src\service.ts#L30)
-  - 로그인, 로그아웃, 회원가입 로직 구현 필요
 
 - [packages\schema-engine\src\react\SchemaTable.tsx:190](packages\schema-engine\src\react\SchemaTable.tsx#L190)
   - Tag/Badge 컴포넌트 사용
@@ -453,6 +438,15 @@
 
 - [packages\schema-engine\src\loader\i18n.ts:127](packages\schema-engine\src\loader\i18n.ts#L127)
   - table, detail, filter, widget 스키마도 처리
+
+- [packages\services\auth-service\src\service.ts:30](packages\services\auth-service\src\service.ts#L30)
+  - 로그인, 로그아웃, 회원가입 로직 구현 필요
+
+- [packages\services\class-service\src\service.ts:89](packages\services\class-service\src\service.ts#L89)
+  - 실제 학생 수 계산
+
+- [packages\services\class-service\src\service.ts:90](packages\services\class-service\src\service.ts#L90)
+  - 실제 활성 학생 수 계산
 
 - [packages\industry\industry-academy\src\service.ts:152](packages\industry\industry-academy\src\service.ts#L152)
   - 반 필터링 로직 추가

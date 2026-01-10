@@ -108,6 +108,10 @@ export function isSafeInternalPath(target: string): boolean {
       '/analytics',
       '/ai',
       '/settings',
+      '/agent', // 에이전트 모드 전용 라우트
+      '/auth', // 인증 관련 라우트
+      '/kiosk-check-in', // 키오스크 체크인
+      '/super-admin', // 슈퍼 어드민
     ];
     const matchesBasePattern = baseRoutePatterns.some((pattern) => {
       return normalized === pattern || normalized.startsWith(pattern + '/') || normalized.startsWith(pattern + '?');

@@ -219,6 +219,14 @@ serve(async (req: Request) => {
         content: message,
       });
 
+      // ✅ 세션 summary 업데이트 (null인 경우에만 첫 사용자 메시지로 설정)
+      const summaryText = message.length > 50 ? message.substring(0, 50) + '...' : message;
+      await supabaseSvc
+        .from('chatops_sessions')
+        .update({ summary: summaryText, updated_at: new Date().toISOString() })
+        .eq('id', session_id)
+        .is('summary', null);
+
       // ✅ runAgentWithProgress 사용: Tool 실행 + 진행 상황 SSE
       const originalStream = await runAgentWithProgress(
         message,
@@ -451,6 +459,14 @@ serve(async (req: Request) => {
           content: agentResult.response,
         },
       ]);
+
+      // ✅ 세션 summary 업데이트 (null인 경우에만 첫 사용자 메시지로 설정)
+      const summaryText = message.length > 50 ? message.substring(0, 50) + '...' : message;
+      await supabaseSvc
+        .from('chatops_sessions')
+        .update({ summary: summaryText, updated_at: new Date().toISOString() })
+        .eq('id', session_id)
+        .is('summary', null);
 
       // ✅ ExecutionAudit 기록 생성 - 실제 Tool이 성공한 경우에만
       // confirm_action, register, discharge 등 L2 작업이 성공한 경우에만 액티비티에 표시

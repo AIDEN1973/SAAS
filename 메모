@@ -265,6 +265,9 @@ Automation Config First 원칙:
 ✅ TypeScript 타입 검사
 ✅ 단위 테스트
 ✅ 전체 빌드
+
+
+
 2. npm run ci:local:full
 실행 시간: ~45분
 
