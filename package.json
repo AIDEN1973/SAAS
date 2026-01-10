@@ -34,6 +34,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "setup:env": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-env.ps1",
     "check:shared-catalog": "tsx scripts/check-shared-catalog.ts",
+    "verify:catalog-sync": "tsx scripts/verify-catalog-sync.ts",
+    "scan:todos": "tsx scripts/scan-todos.ts",
     "test:chatops-intents": "tsx scripts/test-chatops-all-intents.ts",
     "gen:intent-examples": "tsx scripts/generate-intent-examples.ts",
     "test:db-contract": "tsx scripts/test-db-contract.ts",

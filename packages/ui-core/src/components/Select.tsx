@@ -45,6 +45,13 @@ export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectE
    * true일 경우 가장 긴 옵션 텍스트 너비를 기준으로 설정
    */
   autoDropdownWidth?: boolean;
+  /**
+   * 드롭다운 정렬 방식
+   * - 'start': 버튼 왼쪽 정렬 (기본값)
+   * - 'center': 버튼 가로 중앙 정렬
+   * - 'end': 버튼 오른쪽 정렬
+   */
+  dropdownAlign?: 'start' | 'center' | 'end';
 }
 
 /**
@@ -68,6 +75,7 @@ export const Select: React.FC<SelectProps> = ({
   disabled,
   dropdownMinWidth,
   autoDropdownWidth = false,
+  dropdownAlign = 'start',
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ...props
 }) => {
@@ -114,8 +122,8 @@ export const Select: React.FC<SelectProps> = ({
       paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (화살표 공간 포함)
     },
     sm: {
-      paddingTop: 'var(--spacing-xs)',
-      paddingBottom: 'var(--spacing-xs)',
+      paddingTop: 'calc(var(--spacing-xs) + var(--spacing-xs) / 2)', // Button 컴포넌트와 동일한 높이 유지
+      paddingBottom: 'calc(var(--spacing-xs) + var(--spacing-xs) / 2)', // Button 컴포넌트와 동일한 높이 유지
       paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
       paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (화살표 공간 포함)
     },
@@ -205,6 +213,7 @@ export const Select: React.FC<SelectProps> = ({
 
   const handleSelect = useCallback((optionValue: string | number, e?: React.MouseEvent) => {
     if (e) {
+      e.preventDefault(); // 기본 동작 방지
       e.stopPropagation(); // 이벤트 전파 방지 (상위 요소의 클릭 이벤트 트리거 방지)
     }
     if (multiple) {
@@ -216,8 +225,12 @@ export const Select: React.FC<SelectProps> = ({
         : [...currentValues, valueStr];
       onChange?.(newValues);
     } else {
+      // 단일 선택: 값 변경 후 드롭다운 닫기
       onChange?.(String(optionValue));
-      setIsOpen(false);
+      // requestAnimationFrame을 사용하여 onChange가 완료된 후 드롭다운 닫기
+      requestAnimationFrame(() => {
+        setIsOpen(false);
+      });
     }
   }, [multiple, value, onChange]);
 
@@ -281,8 +294,8 @@ export const Select: React.FC<SelectProps> = ({
     onBlur?.(e as unknown as React.FocusEvent<HTMLSelectElement>);
   }, [onBlur]);
 
-  // 라벨을 플레이스홀더로 사용
-  const placeholder = label || '선택하세요';
+  // 라벨을 플레이스홀더로 사용 (label이 명시적으로 빈 문자열이면 빈 문자열 사용)
+  const placeholder = label !== undefined ? label : '선택하세요';
 
 
   // 선택된 값의 라벨 찾기
@@ -389,10 +402,11 @@ export const Select: React.FC<SelectProps> = ({
 
         const baseFontSize = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16;
         const spacingMd = getCSSVariableAsPx('--spacing-md', baseFontSize);
+        const spacingLg = getCSSVariableAsPx('--spacing-lg', baseFontSize * 1.5);
         const spacingXs = getCSSVariableAsPx('--spacing-xs', baseFontSize * 0.25);
 
-        // 패딩과 여백을 고려한 최종 너비 계산
-        const optionHorizontalPadding = spacingMd * 2; // 옵션 좌우 패딩
+        // 패딩과 여백을 고려한 최종 너비 계산 (좌측 md + 우측 lg)
+        const optionHorizontalPadding = spacingMd + spacingLg; // 옵션 좌우 패딩
         const dropdownHorizontalPadding = spacingXs * 2; // 드롭다운 메뉴 좌우 패딩
         const totalPadding = optionHorizontalPadding + dropdownHorizontalPadding;
         const contentWidth = maxWidth + totalPadding + spacingMd; // 여유 공간
@@ -443,6 +457,7 @@ export const Select: React.FC<SelectProps> = ({
               whiteSpace: 'nowrap',
               color: (multiple ? selectedLabels.length > 0 : selectedLabels.length > 0) ? 'var(--color-text)' : 'var(--color-text-tertiary)',
               fontWeight: 'var(--font-weight-normal)',
+              marginRight: 'var(--spacing-xs)', // 텍스트와 화살표 아이콘 사이 간격
             }}
           >
             {displayText}
@@ -493,7 +508,7 @@ export const Select: React.FC<SelectProps> = ({
               isOpen={isOpen}
               onClose={() => setIsOpen(false)}
               anchorEl={anchorRef.current}
-              placement="bottom-start"
+              placement={dropdownAlign === 'center' ? 'bottom' : dropdownAlign === 'end' ? 'bottom-end' : 'bottom-start'}
               style={dropdownWidth ? { width: `${dropdownWidth}px`, minWidth: `${dropdownWidth}px` } : undefined}
             >
               <div
@@ -518,7 +533,10 @@ export const Select: React.FC<SelectProps> = ({
                       aria-selected={isSelected}
                       onClick={(e) => !option.disabled && handleSelect(option.value, e)}
                       style={{
-                        padding: 'var(--spacing-sm) var(--spacing-md)',
+                        paddingTop: 'var(--spacing-sm)',
+                        paddingBottom: 'var(--spacing-sm)',
+                        paddingLeft: 'var(--spacing-md)',
+                        paddingRight: 'var(--spacing-lg)', // 우측 여백 증가
                         borderRadius: 'var(--border-radius-sm)',
                         cursor: option.disabled ? 'not-allowed' : 'pointer',
                         backgroundColor: isSelected

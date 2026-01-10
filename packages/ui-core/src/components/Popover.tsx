@@ -15,7 +15,7 @@ export interface PopoverProps {
   onClose: () => void;
   anchorEl: HTMLElement | null;
   children: React.ReactNode;
-  placement?: 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end';
+  placement?: 'bottom' | 'bottom-start' | 'bottom-end' | 'top' | 'top-start' | 'top-end';
   offset?: number;
   className?: string;
   style?: React.CSSProperties;
@@ -57,18 +57,35 @@ export const Popover: React.FC<PopoverProps> = ({
       const anchorRect = anchorEl.getBoundingClientRect();
       const popoverRect = popoverRef.current.getBoundingClientRect();
 
+      // style prop에서 명시적으로 전달된 width가 있으면 우선 사용 (초기 렌더링 시 popoverRect.width가 0일 수 있음)
+      let effectivePopoverWidth = popoverRect.width;
+      if (style?.width) {
+        const styleWidth = typeof style.width === 'number' ? style.width : parseFloat(String(style.width));
+        if (!isNaN(styleWidth) && styleWidth > 0) {
+          effectivePopoverWidth = styleWidth;
+        }
+      }
+
       // fixed positioning은 viewport 기준이므로 scroll 값을 더하지 않음
       let top = 0;
       let left = 0;
 
       switch (placement) {
+        case 'bottom':
+          top = anchorRect.bottom + offset;
+          left = anchorRect.left + (anchorRect.width - effectivePopoverWidth) / 2;
+          break;
         case 'bottom-start':
           top = anchorRect.bottom + offset;
           left = anchorRect.left;
           break;
         case 'bottom-end':
           top = anchorRect.bottom + offset;
-          left = anchorRect.right - popoverRect.width;
+          left = anchorRect.right - effectivePopoverWidth;
+          break;
+        case 'top':
+          top = anchorRect.top - popoverRect.height - offset;
+          left = anchorRect.left + (anchorRect.width - effectivePopoverWidth) / 2;
           break;
         case 'top-start':
           top = anchorRect.top - popoverRect.height - offset;
@@ -76,7 +93,7 @@ export const Popover: React.FC<PopoverProps> = ({
           break;
         case 'top-end':
           top = anchorRect.top - popoverRect.height - offset;
-          left = anchorRect.right - popoverRect.width;
+          left = anchorRect.right - effectivePopoverWidth;
           break;
       }
 
@@ -144,7 +161,7 @@ export const Popover: React.FC<PopoverProps> = ({
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
-  }, [isOpen, anchorEl, placement, offset]);
+  }, [isOpen, anchorEl, placement, offset, style]);
 
   useEffect(() => {
     if (!isOpen) return;

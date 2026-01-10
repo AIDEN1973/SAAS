@@ -144,7 +144,12 @@
       "Bash(time npx turbo run build:*)",
       "Bash(time npx tsc:*)",
       "Bash(tasklist:*)",
-      "Bash(npx lint-staged:*)"
+      "Bash(npx lint-staged:*)",
+      "Bash(iconv:*)",
+      "Bash(git -C /c/cursor/SAMDLE log --oneline -30)",
+      "Bash(git -C /c/cursor/SAMDLE diff --stat HEAD~10..HEAD)",
+      "Bash(git -C /c/cursor/SAMDLE log:*)",
+      "Bash(wc:*)"
     ]
   }
 }

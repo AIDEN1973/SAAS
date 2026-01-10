@@ -165,7 +165,7 @@ export interface MultiConditionRule {
  */
 export interface FormFieldSchema {
   name: string;
-  kind: 'text' | 'email' | 'phone' | 'number' | 'password' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'datetime' | 'custom';
+  kind: 'text' | 'email' | 'phone' | 'number' | 'password' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'datetime' | 'dateRange' | 'custom';
   ui?: {
     // SDUI v1.1: i18n 키 지원 (label/placeholder/description은 하위 호환성)
     labelKey?: string;  // i18n 키 (우선순위)

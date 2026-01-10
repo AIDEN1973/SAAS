@@ -54,6 +54,46 @@ export const CACHE_CONFIG = {
 } as const;
 
 /**
+ * React Query 캐시 시간 상수 (SSOT)
+ *
+ * 정책 시점 일관성 보장을 위한 표준 캐시 시간 상수
+ * @see docu/React_Query_표준_패턴.md
+ */
+export const CACHE_TIMES = {
+  // 정적 데이터 (거의 변하지 않음)
+  STATIC: 1000 * 60 * 60 * 24, // 24시간
+
+  // 준정적 데이터 (하루 단위 변경)
+  SEMI_STATIC: 1000 * 60 * 60, // 1시간
+
+  // 정책 데이터 (자주 변경되지 않음, 하지만 변경 시 즉시 반영 필요)
+  // 중요: 모든 정책 관련 쿼리는 이 값을 사용하여 정책 시점 일관성 보장
+  POLICY: 1000 * 60 * 5, // 5분
+
+  // 일반 데이터 (자주 변경됨)
+  DEFAULT: 1000 * 60, // 1분
+
+  // 실시간 데이터 (계속 변경됨)
+  REALTIME: 1000 * 10, // 10초
+
+  // 즉시 무효화 (항상 최신 데이터 필요)
+  INSTANT: 0, // 0초
+} as const;
+
+/**
+ * 각 캐시 타입에 대한 gcTime (메모리 보관 시간)
+ * 일반적으로 staleTime의 2배로 설정
+ */
+export const GC_TIMES = {
+  STATIC: CACHE_TIMES.STATIC * 2,
+  SEMI_STATIC: CACHE_TIMES.SEMI_STATIC * 2,
+  POLICY: CACHE_TIMES.POLICY * 2,
+  DEFAULT: CACHE_TIMES.DEFAULT * 2,
+  REALTIME: CACHE_TIMES.REALTIME * 2,
+  INSTANT: CACHE_TIMES.INSTANT,
+} as const;
+
+/**
  * Query Key 타입 (타입 안전성)
  */
 export type QueryKeyType =

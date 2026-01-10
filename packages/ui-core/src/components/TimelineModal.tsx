@@ -383,22 +383,24 @@ export const TimelineModal: React.FC<TimelineModalProps> = ({
       size="xl"
       className="timeline-modal"
       style={{
-        width: '90vw',
+        width: '85vw',
         maxWidth: 'var(--width-modal-2xl)',
       }}
     >
-      {/* 테이블 영역 (내장 필터 사용) */}
-      <DataTable
-        data={executionAuditRuns}
-        columns={columns}
-        onRowClick={onExecutionAuditRowClick}
-        emptyMessage="액티비티가 없습니다."
-        emptyIcon={Clock}
-        filters={filters}
-        onFilterChange={handleFilterChange}
-        initialFilterState={initialFilterState}
-        enableClientSideFiltering={true}
-      />
+      {/* 테이블 영역 (내장 필터 사용) - 검색 시 높이 변동 방지를 위해 minHeight 설정 */}
+      <div style={{ minHeight: 'var(--height-modal-content-min)' }}>
+        <DataTable
+          data={executionAuditRuns}
+          columns={columns}
+          onRowClick={onExecutionAuditRowClick}
+          emptyMessage="액티비티가 없습니다."
+          emptyIcon={Clock}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          initialFilterState={initialFilterState}
+          enableClientSideFiltering={true}
+        />
+      </div>
     </Modal>
   );
 };

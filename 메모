@@ -246,3 +246,14 @@ Automation Config First 원칙:
 4. eslint selector/message 코드 블록
    - 추가된 규칙의 selector
    - 전체 규칙 코드 블록
+
+
+
+
+
+
+# 카탈로그 동기화 검증
+npm run verify:catalog-sync
+
+# TODO 스캔 및 리포트 생성
+npm run scan:todos

@@ -60,7 +60,7 @@
 - Intent 실행 전 검증
 - Healthcheck 아키텍처
 
-**대체 문서**: `docu/Agent_사전예방.md`
+**대체 문서**: `docu/Agent_계약검증.md` (사전예방 내용 통합됨)
 
 ---
 
@@ -101,9 +101,8 @@
 
 1. **`docu/Agent_아키텍처_전환.md`** - Agent 전환 가이드
 2. **`docu/Agent_파라미터_추출.md`** - Agent 기반 파라미터 추출
-3. **`docu/Agent_계약검증.md`** - Agent 기반 계약 검증
-4. **`docu/Agent_사전예방.md`** - Agent 기반 사전예방
-5. **`docu/챗봇.md`** - ChatOps 전체 문서 (Agent 기반)
+3. **`docu/Agent_계약검증.md`** - Agent 기반 계약 검증 + 배포 전 검증 + 모니터링
+4. **`docu/챗봇.md`** - ChatOps 전체 문서 (Agent 기반)
 
 ---
 

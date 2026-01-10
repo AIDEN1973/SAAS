@@ -473,7 +473,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                       minHeight: 'var(--size-checkbox)', // 접근성
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--color-gray-100)';
+                      e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = 'transparent';
@@ -532,7 +532,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                           gap: 'var(--spacing-xs)',
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                          e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = 'var(--color-white)';
@@ -619,7 +619,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                                   transition: 'var(--transition-fast)',
                                 }}
                                 onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                                  e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                                 }}
                                 onMouseLeave={(e) => {
                                   e.currentTarget.style.backgroundColor = isActive ? 'var(--color-primary-50)' : 'transparent';
@@ -665,7 +665,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                           gap: 'var(--spacing-xs)',
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                          e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = 'var(--color-white)';
@@ -752,7 +752,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                                   transition: 'var(--transition-fast)',
                                 }}
                                 onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                                  e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                                 }}
                                 onMouseLeave={(e) => {
                                   e.currentTarget.style.backgroundColor = isActive ? 'var(--color-primary-50)' : 'transparent';
@@ -786,7 +786,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                       minHeight: 'var(--size-checkbox)', // 접근성
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--color-gray-100)';
+                      e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = 'transparent';
@@ -882,7 +882,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                         }}
                         onMouseEnter={(e) => {
                           if (!isSelectedDate) {
-                            e.currentTarget.style.backgroundColor = 'var(--color-primary-50)';
+                            e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
                           }
                         }}
                         onMouseLeave={(e) => {

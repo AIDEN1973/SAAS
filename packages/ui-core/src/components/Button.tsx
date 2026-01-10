@@ -29,7 +29,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
  *   "size": "md"
  * }
  */
-export const Button: React.FC<ButtonProps> = ({
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
   variant = 'solid',
   color = 'primary',
   size = 'md',
@@ -38,7 +38,10 @@ export const Button: React.FC<ButtonProps> = ({
   className,
   children,
   ...props
-}) => {
+}, ref) => {
+  // hover 상태 관리 (inline style 직접 조작 대신 state 사용)
+  const [isHovered, setIsHovered] = React.useState(false);
+
   // Color token을 CSS Variable로 매핑
   const colorMap: Record<ColorToken, {
     main: string;
@@ -88,22 +91,22 @@ export const Button: React.FC<ButtonProps> = ({
   const effectiveColor: ColorToken = selected ? 'primary' : color;
   const colorVars = colorMap[effectiveColor];
 
-  // Size를 CSS Variables로 매핑 (세로 패딩 반 포인트 증가)
+  // Size를 CSS Variables로 매핑 (Select 컴포넌트와 높이 일치)
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
-      padding: 'calc(var(--spacing-xs) + var(--spacing-xs) / 2) var(--spacing-xs)',
+      padding: 'var(--spacing-xs) var(--spacing-xs)',
     },
     sm: {
       padding: 'calc(var(--spacing-xs) + var(--spacing-xs) / 2) var(--spacing-sm)',
     },
     md: {
-      padding: 'calc(var(--spacing-xs) + var(--spacing-xs) / 2) var(--spacing-sm)',
+      padding: 'var(--spacing-sm) var(--spacing-sm)', // Select md와 동일한 높이
     },
     lg: {
-      padding: 'calc(var(--spacing-sm) + var(--spacing-xs) / 2) var(--spacing-md)',
+      padding: 'var(--spacing-md) var(--spacing-md)', // Select lg와 동일한 높이
     },
     xl: {
-      padding: 'calc(var(--spacing-md) + var(--spacing-xs) / 2) var(--spacing-lg)',
+      padding: 'var(--spacing-lg) var(--spacing-lg)', // Select xl와 동일한 높이
     },
   };
 
@@ -118,6 +121,9 @@ export const Button: React.FC<ButtonProps> = ({
     transition: 'var(--transition-all)',
     outline: 'none',
     boxSizing: 'border-box', // 테두리 포함 크기 계산
+    fontFamily: 'var(--font-family)', // Select와 동일한 폰트
+    fontSize: 'var(--font-size-base)', // Select와 동일한 폰트 크기
+    lineHeight: 'var(--line-height)', // Select와 동일한 line-height (높이 일치)
     ...sizeStyles[size],
     ...(fullWidth && { width: '100%' }),
   };
@@ -125,21 +131,38 @@ export const Button: React.FC<ButtonProps> = ({
   // 기본 버튼은 텍스트 기본 색상 사용, 선택된 버튼은 인더스트리 테마 색상 사용
   const defaultTextColor = selected ? colorVars.main : 'var(--color-text)';
 
+  // hover 상태에 따른 배경색 계산 함수
+  const getBackgroundColor = (v: 'solid' | 'outline' | 'ghost'): string => {
+    if (v === 'solid') {
+      return isHovered
+        ? (colorVars.dark || 'var(--color-gray-200)')
+        : (colorVars.main || 'var(--color-white)');
+    } else if (v === 'outline') {
+      if (isHovered) return 'var(--color-primary-hover)';
+      return selected ? 'var(--color-primary-selected)' : 'var(--color-white)';
+    } else {
+      // ghost
+      if (isHovered) return 'var(--color-primary-hover)';
+      return selected ? 'var(--color-primary-selected)' : 'transparent';
+    }
+  };
+
   const variantStyles: Record<'solid' | 'outline' | 'ghost', React.CSSProperties> = {
     solid: {
-      backgroundColor: colorVars.main || 'var(--color-white)', // 색상 없으면 화이트
+      backgroundColor: getBackgroundColor('solid'),
       color: 'var(--color-white)',
+      boxShadow: isHovered ? 'var(--shadow-md)' : 'none',
       // baseStyle에서 테두리 적용됨 (선택: primary 색상, 미선택: 투명)
     },
     outline: {
-      backgroundColor: 'var(--color-white)', // 배경색 화이트
+      backgroundColor: getBackgroundColor('outline'),
       color: defaultTextColor || 'var(--color-text)', // 색상 없으면 기본 텍스트 색상
       // baseStyle에서 테두리 적용됨 (선택: primary 색상, 미선택: 투명)
-      // outline variant는 미선택 시 텍스트 색상 테두리로 오버라이드
-      ...(selected ? {} : { border: `var(--border-width-thin) solid ${defaultTextColor || 'var(--color-border)'}` }),
+      // outline variant는 미선택 시 gray-200 테두리로 오버라이드 (SchemaTable 기준)
+      ...(selected ? {} : { border: `var(--border-width-thin) solid var(--color-gray-200)` }),
     },
     ghost: {
-      backgroundColor: 'transparent', // ghost는 투명 배경 유지
+      backgroundColor: getBackgroundColor('ghost'),
       color: defaultTextColor || 'var(--color-text)', // 색상 없으면 기본 텍스트 색상
       // baseStyle에서 테두리 적용됨 (선택: primary 색상, 미선택: 투명)
     },
@@ -157,38 +180,16 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <button
+      ref={ref}
       className={clsx(className)}
       style={style}
-      onMouseEnter={(e) => {
-        if (variant === 'solid') {
-          e.currentTarget.style.backgroundColor = colorVars.dark || 'var(--color-gray-200)'; // 색상 없으면 연한 회색
-          e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-        } else if (variant === 'outline') {
-          e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
-        } else if (variant === 'ghost') {
-          e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (variant === 'solid') {
-          e.currentTarget.style.backgroundColor = colorVars.main || 'var(--color-white)'; // 색상 없으면 화이트
-          e.currentTarget.style.boxShadow = 'none';
-        } else if (variant === 'outline') {
-          e.currentTarget.style.backgroundColor = 'var(--color-white)'; // 배경색 화이트
-        } else if (variant === 'ghost') {
-          e.currentTarget.style.backgroundColor = 'transparent'; // ghost는 투명 배경 유지
-        }
-      }}
-      onFocus={() => {
-        // 포커스 링 제거: 버튼 클릭 시 테두리 굵어지는 효과 제거 (유아이 문서 준수)
-        // 키보드 접근성은 styles.css의 button:focus-visible에서 처리
-      }}
-      onBlur={() => {
-        // 포커스 링 제거: 버튼 클릭 시 테두리 굵어지는 효과 제거 (유아이 문서 준수)
-      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       {...restProps}
     >
       {children}
     </button>
   );
-};
+});
+
+Button.displayName = 'Button';

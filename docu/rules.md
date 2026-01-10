@@ -1,4 +1,9 @@
 📘 Cursor AI 전용 개발 규칙 (DearSaaS Monorepo)
+
+**버전**: 3.0.0
+**최종 업데이트**: 2026-01-10
+**상태**: ✅ 정본 (SSOT)
+
 0. 기본 원칙
 
 멀티테넌트 + Supabase + Monorepo 아키텍처를 전제로 한다.
@@ -140,8 +145,8 @@ import { withTenant } from '@lib/supabase-client/db';
 - Enforcement (PR 체크리스트, ESLint/코드 규칙 후보, 예외 승인 프로세스)
 
 **관련 문서**:
-- 상세 가이드: `docu/컴포넌트 디자인.md` (컴포넌트별 사용 예시)
-- 아키텍처 문서: `docu/디어쌤 아키텍처.md` (4장: Multi-Tenant Theme Engine, 6장: Responsive UX)
+- 상세 가이드: `docu/SSOT_UI_DESIGN.md` (UI Core Component 카탈로그 및 사용 예시)
+- 아키텍처 문서: `docu/디어쌤_아키텍처.md` (4장: Multi-Tenant Theme Engine, 6장: Responsive UX)
 
 **불변 규칙**:
 - "디자인 값"의 정본은 Design Tokens/Theme로만 존재한다. 임의 px/hex 하드코딩을 금지한다.

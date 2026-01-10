@@ -170,18 +170,31 @@ export const SchemaFilter: React.FC<SchemaFilterProps> = ({
 
   const layout = schema.filter.layout;
 
+  // text 필드 제외한 필터 필드 목록
+  const filterFields = schema.filter.fields.filter((field) => field.kind !== 'text');
+  const filterCount = filterFields.length;
+
+  // 필터 개수에 따른 columns 결정 (최대 4개까지, 필터 개수보다 크지 않음)
+  const layoutColumns = typeof layout?.columns === 'number' ? layout.columns : 4;
+  const effectiveColumns = Math.min(filterCount, layoutColumns) as 1 | 2 | 3 | 4;
+
   return (
     <div
       className={className}
       style={{
+        width: '100%',
         marginBottom: 'var(--spacing-lg)', // styles.css 준수: 필터 영역 하단 여백 공통 적용
+        backgroundColor: 'var(--color-primary-40)', // 인더스트리 타입 40
+        borderRadius: 'var(--border-radius-md)',
+        padding: 'var(--spacing-md)',
       }}
     >
       <Grid
-        columns={(layout?.columns || 1) as 1 | 2 | 3 | 4}
+        columns={effectiveColumns}
         gap={layout?.columnGap || 'md'}
+        style={{ width: '100%' }}
       >
-        {schema.filter.fields.map((field) => (
+        {filterFields.map((field) => (
           <SchemaField
             key={field.name}
             field={field}

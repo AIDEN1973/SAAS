@@ -20,61 +20,19 @@
 
 ## ⚠️ 업종 중립성 (Industry Neutrality)
 
-### 핵심 원칙
+**이 시스템은 다양한 업종의 테넌트를 관리하는 SaaS 플랫폼입니다.**
 
-**이 시스템은 SaaS 관리 플랫폼입니다** - 단일 학원용 SaaS가 아닌, **다양한 업종의 테넌트를 관리하는 플랫폼**입니다.
+Tool 계약 검증 시 **업종별 테이블명은 다르지만, 검증 로직은 동일**합니다.
 
-### Industry Adapter를 통한 계약 검증
+**📖 자세한 내용은 정본 문서를 참조하세요**: **[Industry_Neutrality.md](./Industry_Neutrality.md)** ⭐
 
-Tool 계약 검증 시 **업종별 테이블명은 다르지만, 검증 로직은 동일**합니다:
-
-**공통 검증 로직 (업종 무관)**:
-```typescript
-// 1. Tenant Isolation 검증 (모든 업종 동일)
-const tenantId = requireTenantScope(context.tenant_id);
-
-// 2. Industry Adapter로 올바른 테이블명 가져오기
-const tableName = await getTenantTableName(supabase, tenantId, 'student');
-// → academy: "academy_students"
-// → salon: "salon_customers"
-// → nail: "nail_members"
-
-// 3. 공통 쿼리 패턴
-const { data, error } = await supabase
-  .from(tableName)  // 동적 테이블명
-  .select('*')
-  .eq('tenant_id', tenantId)
-  .ilike('name', `%${student_name}%`);
-
-// 4. 공통 검증
-if (!data || data.length === 0) {
-  return { success: false, error: '해당 정보를 찾을 수 없습니다.' };
-}
-```
-
-### 업종별 계약 검증 예시
-
-**학원 (Academy)**:
-- Table: `academy_students`
-- FK: `persons` → `person_id`
-- 필수 컬럼: `name`, `phone`, `birth_date`
-
-**미용실 (Salon)**:
-- Table: `salon_customers`
-- FK: `persons` → `person_id`
-- 필수 컬럼: `name`, `phone`, `preferred_stylist`
-
-**네일샵 (Nail)**:
-- Table: `nail_members`
-- FK: `persons` → `person_id`
-- 필수 컬럼: `name`, `phone`, `membership_tier`
-
-→ **검증 로직은 동일**, Industry Adapter가 테이블명만 변환
-
-**참고 문서**:
-- `docu/Agent_아키텍처_전환.md` - Industry Neutrality 개요
-- `docu/디어쌤 아키텍처.md` - Industry Adapter 상세 구현
-- `docu/체크리스트.md` - Industry Adapter 검증 체크리스트
+**핵심 요약**:
+- **검증 로직**: 업종 무관 (공통)
+- **Industry Adapter**: `getTenantTableName()`으로 올바른 테이블명 반환
+  - 학원 → `academy_students`
+  - 미용실 → `salon_customers`
+  - 네일샵 → `nail_members`
+- **계약 검증**: Tenant Isolation + FK + 필수 컬럼 (업종별 테이블 다르지만 로직 동일)
 
 ---
 
@@ -748,16 +706,151 @@ return {
 
 ---
 
-## 참고 자료
+## 배포 전 검증 (Deploy-time Verification)
 
-- **Agent 아키텍처**: `docu/Agent_아키텍처_전환.md`
-- **파라미터 추출**: `docu/Agent_파라미터_추출.md`
-- **Tool 정의**: `infra/supabase/supabase/functions/_shared/agent-tools-final.ts`
-- **Agent Engine**: `infra/supabase/supabase/functions/_shared/agent-engine-final.ts`
-- **레거시 문서**: `docu/legacy/계약붕괴방지_Intent기반.md`
+### 목적
+
+배포 전 환경 설정 및 스키마 검증으로 런타임 오류 사전 방지
+
+### 검증 항목
+
+**1. 환경 변수 존재 여부**
+```bash
+# scripts/preflight-check.sh
+required_vars=("SUPABASE_URL" "SERVICE_ROLE_KEY" "OPENAI_API_KEY")
+for var in "${required_vars[@]}"; do
+  if [ -z "${!var}" ]; then
+    echo "❌ 환경 변수 누락: $var"
+    exit 1
+  fi
+done
+```
+
+**2. DB 스키마 검증**
+```typescript
+// 필수 테이블 존재 여부 확인
+const requiredTables = ['tenants', 'persons', 'users'];
+
+for (const table of requiredTables) {
+  const { data, error } = await supabase.from(table).select('id').limit(1);
+  if (error) {
+    console.error(`❌ 테이블 없음: ${table}`);
+    process.exit(1);
+  }
+}
+```
+
+**3. Industry Adapter 매핑 검증**
+```typescript
+// 모든 industry_type에 대해 테이블 매핑 존재 여부 확인
+const industryTypes = ['academy', 'salon', 'nail', 'gym'];
+const entityTypes = ['student', 'payment', 'attendance'];
+
+for (const industry of industryTypes) {
+  for (const entity of entityTypes) {
+    const tableName = getTenantTableName(industry, entity);
+    if (!tableName) {
+      console.error(`❌ Industry Adapter 매핑 누락: ${industry}.${entity}`);
+      process.exit(1);
+    }
+  }
+}
+```
+
+### CI/CD 통합
+
+**.github/workflows/ci.yml**:
+```yaml
+test-db-contract:
+  name: Database Contract Tests
+  runs-on: ubuntu-latest
+  timeout-minutes: 5
+  steps:
+    - run: npm run test:db-contract
+      continue-on-error: false
+```
 
 ---
 
-**작성자**: AI Assistant
-**최종 업데이트**: 2025-01-29
+## 런타임 모니터링 (Runtime Monitoring)
+
+### 헬스체크 엔드포인트
+
+**Edge Function: `/health`**
+```typescript
+// infra/supabase/functions/health/index.ts
+export async function handler(req: Request) {
+  const checks = {
+    database: false,
+    openai: false,
+    industryAdapter: false,
+  };
+
+  // DB 연결 테스트
+  try {
+    const { error } = await supabase.from('tenants').select('id').limit(1);
+    checks.database = !error;
+  } catch (e) {
+    checks.database = false;
+  }
+
+  // OpenAI API 테스트
+  try {
+    const response = await openai.models.list();
+    checks.openai = response.data.length > 0;
+  } catch (e) {
+    checks.openai = false;
+  }
+
+  // Industry Adapter 검증
+  try {
+    const tableName = getTenantTableName('academy', 'student');
+    checks.industryAdapter = tableName === 'academy_students';
+  } catch (e) {
+    checks.industryAdapter = false;
+  }
+
+  const allHealthy = Object.values(checks).every(v => v);
+  return new Response(
+    JSON.stringify({ status: allHealthy ? 'healthy' : 'unhealthy', checks }),
+    { status: allHealthy ? 200 : 503 }
+  );
+}
+```
+
+### 알림 설정
+
+**Sentry 통합**:
+```typescript
+// Tool 실행 실패 시 Sentry로 알림
+if (!result.success) {
+  Sentry.captureException(new Error('Tool execution failed'), {
+    tags: {
+      tool: 'manage_student',
+      tenant_id: context.tenant_id,
+    },
+    extra: {
+      args,
+      error: result.error,
+    },
+  });
+}
+```
+
+---
+
+## 참고 자료
+
+- **Agent 아키텍처**: [Agent_아키텍처_전환.md](./Agent_아키텍처_전환.md)
+- **파라미터 추출**: [Agent_파라미터_추출.md](./Agent_파라미터_추출.md)
+- **Industry Neutrality**: [Industry_Neutrality.md](./Industry_Neutrality.md) ⭐
+- **Tool 정의**: `infra/supabase/supabase/functions/_shared/agent-tools-final.ts`
+- **Industry Adapter**: `infra/supabase/supabase/functions/_shared/industry-adapter.ts`
+- **Agent Engine**: `infra/supabase/supabase/functions/_shared/agent-engine-final.ts`
+
+---
+
+**버전**: 3.0.0 (사전예방 통합)
+**작성자**: Claude Sonnet 4.5
+**최종 업데이트**: 2026-01-10
 

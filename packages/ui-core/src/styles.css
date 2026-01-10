@@ -172,6 +172,7 @@
   --padding-header-vertical: var(--spacing-sm); /* 8px - 헤더 상하 패딩 (태블릿/데스크탑 일관성 유지) */
   --height-modal-max: 85vh;          /* 모달 최대 높이 (데스크톱) */
   --height-modal-max-mobile: 90vh;   /* 모달 최대 높이 (모바일) */
+  --height-modal-content-min: 400px; /* 모달 콘텐츠 최소 높이 (검색 시 높이 변동 방지) */
   --height-divider-vertical: 40%;     /* 40% - 세로 구분선 높이 (카드 그리드용) */
   --height-dropdown-max: 25rem;       /* 400px - 드롭다운/검색결과 최대 높이 */
 
@@ -217,6 +218,8 @@
   --size-font-reduction: 0.125rem;       /* 2px - 폰트 크기 축소용 (에러 메시지 등) */
   --width-datepicker-year: 6.5rem;       /* 104px - DatePicker 연도 드롭다운 최소 너비 */
   --width-datepicker-month: 5.25rem;      /* 84px - DatePicker 월 드롭다운 최소 너비 */
+  --width-datepicker-input: 9rem;         /* 144px - DatePicker 입력 필드 최소 너비 */
+  --width-daterange-container: 20rem;     /* 320px - DateRange 컨테이너 최소 너비 */
   --height-datepicker-dropdown: 13.75rem; /* 220px - DatePicker 드롭다운 최대 높이 */
   --size-switch-width: 2.75rem;         /* 44px - 스위치 너비 (접근성) */
   --size-switch-height: 1.5rem;         /* 24px - 스위치 높이 */
@@ -327,6 +330,7 @@
   --width-search-button: 12.5rem; /* 200px - 글로벌 검색 버튼 최소 너비 */
   --width-search-dropdown-min: 25rem; /* 400px - 글로벌 검색 드롭다운 최소 너비 */
   --width-search-dropdown-max: 31.25rem; /* 500px - 글로벌 검색 드롭다운 최대 너비 */
+  --width-items-per-page: 5rem; /* 80px - 아이템퍼페이지 드롭다운 최소 너비 */
   --height-search-results-max: 21.875rem; /* 350px - 글로벌 검색 결과 최대 높이 */
 
   /* Transform Values */

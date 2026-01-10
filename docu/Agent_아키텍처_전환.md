@@ -71,33 +71,18 @@ agent-tools-final.ts (15개 Tool)
 
 ## ⚠️ 업종 중립성 (Industry Neutrality)
 
-### 핵심 원칙
+**이 시스템은 다양한 업종의 테넌트를 관리하는 SaaS 플랫폼입니다.**
 
-**이 시스템은 SaaS 관리 플랫폼입니다** - 단일 학원용 SaaS가 아닌, **다양한 업종의 테넌트를 관리하는 플랫폼**입니다.
+Agent Tool 명칭은 고정되어 있지만, **실제 DB 테이블 매핑은 동적**으로 이루어집니다.
 
-### Industry Adapter 패턴
+**📖 자세한 내용은 정본 문서를 참조하세요**: **[Industry_Neutrality.md](./Industry_Neutrality.md)** ⭐
 
-Agent Tool 명칭은 고정되어 있지만, **실제 DB 테이블 매핑은 동적**으로 이루어집니다:
-
-| Tool 명칭 (고정) | 업종별 실제 테이블 매핑 | 설명 |
-|-----------------|---------------------|------|
-| `manage_student` | `academy_students` (학원)<br>`salon_customers` (미용실)<br>`nail_members` (네일샵) | Tool 이름은 변경 불필요 |
-| `query_attendance` | `academy_attendance_records` (학원)<br>`salon_visit_logs` (미용실)<br>`nail_check_ins` (네일샵) | Industry Adapter가 자동 매핑 |
-| `send_message` | 모든 업종 동일 (공통 메시징) | 업종 무관 |
-
-**구현 코드**:
-```typescript
-// Industry Adapter 사용 예시
-const tableName = await getTenantTableName(supabase, tenant_id, 'student');
-// academy → academy_students
-// salon → salon_customers
-// nail → nail_members
-
-const { data } = await supabase
-  .from(tableName)
-  .select('*')
-  .eq('tenant_id', tenant_id);
-```
+**핵심 요약**:
+- **Tool 명칭 고정**: `manage_student`, `query_attendance` 등 (업종 무관)
+- **Industry Adapter**: `getTenantTableName()`으로 동적 테이블 매핑
+  - `manage_student` → 학원: `academy_students`, 미용실: `salon_customers`, 네일샵: `nail_members`
+  - `query_attendance` → 학원: `academy_attendance_records`, 미용실: `salon_visit_logs`
+- **새 업종 추가**: Tool 코드 변경 없이 Industry Adapter 매핑만 추가
 
 ### 테넌트 확장 가이드
 
@@ -108,9 +93,9 @@ const { data } = await supabase
 4. ✅ **즉시 사용 가능** - Agent는 Industry Adapter를 통해 자동으로 올바른 테이블에 접근
 
 **참고 문서**:
-- `docu/디어쌤 아키텍처.md` - Industry Adapter 상세 구현
-- `docu/AI_자동화_기능_정리.md` - Industry Neutrality 원칙
-- `docu/액티비티.md` - 업종 중립적 실행 감사 시스템
+- [디어쌤_아키텍처.md](./디어쌤_아키텍처.md) - Industry Adapter 상세 구현
+- [Industry_Neutrality.md](./Industry_Neutrality.md) - Industry Neutrality 정본 ⭐
+- [액티비티.md](./액티비티.md) - 업종 중립적 실행 감사 시스템
 
 ---
 

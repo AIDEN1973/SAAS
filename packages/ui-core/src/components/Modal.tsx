@@ -94,9 +94,8 @@ export const Modal: React.FC<ModalProps> = ({
     },
   };
 
-  // zIndex 값을 숫자로 변환
-  const MODAL_Z_INDEX = 9999;
-  const BACKDROP_Z_INDEX = 9998;
+  // [불변 규칙] CSS 변수 사용: 하드코딩 금지
+  // Popover(--z-popover: 1060)보다 낮은 z-index를 사용하여 드롭다운이 모달 위에 표시되도록 함
 
   return (
     <div
@@ -107,7 +106,7 @@ export const Modal: React.FC<ModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        zIndex: MODAL_Z_INDEX,
+        zIndex: 'var(--z-modal)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -123,7 +122,7 @@ export const Modal: React.FC<ModalProps> = ({
           right: 0,
           bottom: 0,
           backgroundColor: 'var(--overlay-background)',
-          zIndex: BACKDROP_Z_INDEX,
+          zIndex: 'var(--z-modal-backdrop)',
         }}
         onClick={closeOnOverlayClick ? onClose : undefined}
       />
@@ -133,7 +132,7 @@ export const Modal: React.FC<ModalProps> = ({
         variant="elevated"
         style={{
           position: 'relative',
-          zIndex: MODAL_Z_INDEX,
+          zIndex: 'var(--z-modal)',
           maxHeight: isMobile ? 'var(--height-modal-max-mobile)' : 'var(--height-modal-max)', // styles.css 준수: 모달 높이 토큰 사용
           display: 'flex',
           flexDirection: 'column',

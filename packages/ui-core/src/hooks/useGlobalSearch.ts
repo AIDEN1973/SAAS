@@ -12,7 +12,7 @@ import type { SearchResult, SearchEntityType } from '../components/GlobalSearchR
 /**
  * 검색 입력 파라미터
  */
-export interface SearchInput {
+export interface GlobalSearchInput {
   query: string;
   entity_types?: SearchEntityType[];
   limit?: number;
@@ -69,7 +69,7 @@ export interface UseGlobalSearchOptions {
   /** 테넌트 ID (필수) */
   tenantId: string;
   /** 검색 API 호출 함수 */
-  onSearch: (input: SearchInput) => Promise<SearchResult[]>;
+  onSearch: (input: GlobalSearchInput) => Promise<SearchResult[]>;
 }
 
 export interface UseGlobalSearchReturn {

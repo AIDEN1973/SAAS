@@ -16,6 +16,8 @@ import { Select } from './Select';
 import { DatePicker } from './DatePicker';
 import { Input } from './Input';
 import { Grid } from './Layout';
+import { Button } from './Button';
+import { SearchInput } from './SearchInput';
 
 /**
  * 필터 타입 정의
@@ -97,6 +99,18 @@ export interface DataTableProps<T = unknown> {
   loading?: boolean;
   /** 에러 메시지 */
   error?: string | null;
+  /** 페이지당 항목 수 변경 핸들러 */
+  onItemsPerPageChange?: (itemsPerPage: number) => void;
+  /** 필터 컨트롤 영역 숨기기 (SchemaTable 등에서 자체 필터 컨트롤을 사용할 때) */
+  hideFilterControls?: boolean;
+  /** 페이지당 항목 수 선택 옵션 (기본값: [20, 40, 60, 80]) */
+  itemsPerPageOptions?: number[];
+  /** 검색어 */
+  searchValue?: string;
+  /** 검색어 변경 핸들러 */
+  onSearchChange?: (value: string) => void;
+  /** 검색 플레이스홀더 (기본값: "검색...") */
+  searchPlaceholder?: string;
 }
 
 /**
@@ -114,13 +128,19 @@ export function DataTable<T = unknown>({
   className,
   stickyHeader = true,
   pagination,
-  itemsPerPage = 10,
+  itemsPerPage = 20,
   filters,
   onFilterChange,
   initialFilterState = {},
   enableClientSideFiltering = true,
   loading = false,
   error = null,
+  onItemsPerPageChange,
+  itemsPerPageOptions = [20, 40, 60, 80],
+  hideFilterControls = false,
+  searchValue = '',
+  onSearchChange,
+  searchPlaceholder = '검색...',
 }: DataTableProps<T>) {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
@@ -135,6 +155,23 @@ export function DataTable<T = unknown>({
   const [filterState, setFilterState] = useState<DataTableFilterState>(initialFilterState);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const filterToggleRef = useRef<HTMLButtonElement>(null);
+
+  // 페이지당 항목 수 내부 상태 관리 (외부 제어는 선택적)
+  const [internalItemsPerPage, setInternalItemsPerPage] = useState(itemsPerPage);
+  // 내부 상태를 우선 사용 (외부에서 명시적으로 제어하지 않는 한)
+  const effectiveItemsPerPage = internalItemsPerPage;
+
+  // 검색어 내부 상태 관리 (외부 제어는 선택적)
+  const [internalSearchValue, setInternalSearchValue] = useState(searchValue);
+  // 외부에서 searchValue가 전달되면 외부 값 사용, 아니면 내부 상태 사용
+  const effectiveSearchValue = onSearchChange ? searchValue : internalSearchValue;
+  const handleSearchChange = useCallback((value: string) => {
+    if (onSearchChange) {
+      onSearchChange(value);
+    } else {
+      setInternalSearchValue(value);
+    }
+  }, [onSearchChange]);
 
   // 필터 값 변경 핸들러
   const handleFilterValueChange = useCallback((columnKey: string, value: DataTableFilterValue) => {
@@ -188,17 +225,34 @@ export function DataTable<T = unknown>({
 
   const handleFilterClick = (e: React.MouseEvent, columnKey: string) => {
     e.stopPropagation();
-    // 필터 아이콘 클릭 시 정렬 기능 동작
-    handleSortClick(e, columnKey);
+    // 필터 아이콘 클릭 시 필터 패널 토글
+    setShowFilterPanel((prev) => !prev);
   };
 
-  // 클라이언트 사이드 필터링 로직
+  // 클라이언트 사이드 필터링 로직 (검색 + 필터)
   const filteredData = useMemo(() => {
-    if (!enableClientSideFiltering || !filters || filters.length === 0) {
-      return data;
+    let result = data;
+
+    // 1. 검색어 필터링 (모든 컬럼에서 검색)
+    const searchText = effectiveSearchValue.trim().toLowerCase();
+    if (searchText) {
+      result = result.filter((row) => {
+        const rowData = row as Record<string, unknown>;
+        // 모든 컬럼에서 검색어 포함 여부 확인
+        return columns.some((column) => {
+          const cellValue = rowData[column.key];
+          const cellStr = String(cellValue ?? '').toLowerCase();
+          return cellStr.includes(searchText);
+        });
+      });
     }
 
-    return data.filter((row) => {
+    // 2. 필터 적용
+    if (!enableClientSideFiltering || !filters || filters.length === 0) {
+      return result;
+    }
+
+    return result.filter((row) => {
       const rowData = row as Record<string, unknown>;
 
       return filters.every((filter) => {
@@ -248,7 +302,7 @@ export function DataTable<T = unknown>({
         }
       });
     });
-  }, [data, filters, filterState, enableClientSideFiltering]);
+  }, [data, filters, filterState, enableClientSideFiltering, effectiveSearchValue, columns]);
 
   // 정렬된 데이터 계산
   const sortedData = useMemo(() => {
@@ -303,10 +357,10 @@ export function DataTable<T = unknown>({
       return sortedData;
     }
 
-    const startIndex = (pagination.currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
+    const startIndex = (pagination.currentPage - 1) * effectiveItemsPerPage;
+    const endIndex = startIndex + effectiveItemsPerPage;
     return sortedData.slice(startIndex, endIndex);
-  }, [sortedData, pagination, itemsPerPage]);
+  }, [sortedData, pagination, effectiveItemsPerPage]);
 
   // 로딩 상태 렌더링
   if (loading) {
@@ -350,155 +404,312 @@ export function DataTable<T = unknown>({
   const renderFilterPanel = useCallback(() => {
     if (!filters || filters.length === 0) return null;
 
+    // text 필터 제외한 필터 목록
+    const nonTextFilters = filters.filter((filter) => filter.type !== 'text');
+
+    if (nonTextFilters.length === 0) return null;
+
+    // dateRange 필터는 2칸 차지하므로 실제 차지하는 컬럼 수 계산
+    const totalColumnSpan = nonTextFilters.reduce((sum, filter) => {
+      return sum + (filter.type === 'dateRange' ? 2 : 1);
+    }, 0);
+
+    // 필터가 차지하는 총 컬럼 수에 따른 columns 결정 (최대 4개)
+    const effectiveColumns = Math.min(totalColumnSpan, 4) as 1 | 2 | 3 | 4;
+
     return (
       <div
         style={{
+          width: '100%',
           marginBottom: 'var(--spacing-lg)', // SchemaFilter 기준: 필터 영역 하단 여백
+          backgroundColor: 'var(--color-primary-40)', // 인더스트리 타입 40
+          borderRadius: 'var(--border-radius-md)',
+          padding: 'var(--spacing-md)',
         }}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
-        <Grid columns={4} gap="md">
-          {filters.map((filter) => {
-            const currentValue = filterState[filter.columnKey] || {};
-            const column = columns.find((c) => c.key === filter.columnKey);
-            const label = filter.label || column?.label || filter.columnKey;
+        <Grid columns={effectiveColumns} gap="md" style={{ width: '100%' }}>
+          {nonTextFilters.map((filter) => {
+              const currentValue = filterState[filter.columnKey] || {};
+              const column = columns.find((c) => c.key === filter.columnKey);
+              const label = filter.label || column?.label || filter.columnKey;
 
-            switch (filter.type) {
-              case 'text':
-                return (
-                  <Input
-                    key={filter.columnKey}
-                    type="text"
-                    value={currentValue.text || ''}
-                    onChange={(e) => handleFilterValueChange(filter.columnKey, { ...currentValue, text: e.target.value })}
-                    placeholder={filter.placeholder || `${label} 검색...`}
-                    fullWidth
-                    size="md"
-                    showInlineLabelWhenHasValue={false}
-                  />
-                );
+              switch (filter.type) {
+                case 'select':
+                  return (
+                    <Select
+                      key={filter.columnKey}
+                      value={currentValue.selected || 'all'}
+                      onChange={(val) => handleFilterValueChange(filter.columnKey, { ...currentValue, selected: typeof val === 'string' ? val : val[0] })}
+                      options={[
+                        { value: 'all', label: filter.placeholder || '전체' },
+                        ...(filter.options || []),
+                      ]}
+                      fullWidth
+                      size="md"
+                      showInlineLabelWhenHasValue={false}
+                    />
+                  );
 
-              case 'select':
-                return (
-                  <Select
-                    key={filter.columnKey}
-                    value={currentValue.selected || 'all'}
-                    onChange={(val) => handleFilterValueChange(filter.columnKey, { ...currentValue, selected: typeof val === 'string' ? val : val[0] })}
-                    options={[
-                      { value: 'all', label: filter.placeholder || '전체' },
-                      ...(filter.options || []),
-                    ]}
-                    fullWidth
-                    size="md"
-                    showInlineLabelWhenHasValue={false}
-                  />
-                );
+                case 'dateRange':
+                  // 로컬 시간 기준 YYYY-MM-DD 형식 변환 함수 (KST 대응)
+                  const formatLocalDate = (date: Date): string => {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                  };
 
-              case 'dateRange':
-                return (
-                  <div key={filter.columnKey} style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center' }}>
-                    <div style={{ flex: 1 }}>
-                      <DatePicker
-                        value={currentValue.dateRange?.start || ''}
-                        onChange={(val) =>
-                          handleFilterValueChange(filter.columnKey, {
-                            ...currentValue,
-                            dateRange: { ...currentValue.dateRange, start: val },
-                          })
-                        }
-                        label="시작일"
-                        fullWidth
-                        size="md"
-                        showInlineLabelWhenHasValue={false}
-                      />
+                  // 프리셋과 현재 날짜 범위 일치 여부 확인 함수
+                  const isPresetSelected = (presetDays: number): boolean => {
+                    if (!currentValue.dateRange?.start || !currentValue.dateRange?.end) return false;
+
+                    const today = new Date();
+                    let expectedStart: string;
+                    let expectedEnd: string;
+
+                    if (presetDays === 0) {
+                      // 오늘
+                      expectedStart = formatLocalDate(today);
+                      expectedEnd = formatLocalDate(today);
+                    } else if (presetDays === 1) {
+                      // 어제
+                      const yesterday = new Date(today);
+                      yesterday.setDate(yesterday.getDate() - 1);
+                      expectedStart = formatLocalDate(yesterday);
+                      expectedEnd = formatLocalDate(yesterday);
+                    } else {
+                      // 일주일, 한달
+                      const startDate = new Date(today);
+                      startDate.setDate(startDate.getDate() - presetDays + 1);
+                      expectedStart = formatLocalDate(startDate);
+                      expectedEnd = formatLocalDate(today);
+                    }
+
+                    return currentValue.dateRange.start === expectedStart && currentValue.dateRange.end === expectedEnd;
+                  };
+
+                  return (
+                    <div key={filter.columnKey} style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center', gridColumn: 'span 2' }}>
+                      {/* 기간 프리셋 버튼 */}
+                      <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexShrink: 0 }}>
+                        {[
+                          { label: '오늘', days: 0 },
+                          { label: '어제', days: 1 },
+                          { label: '일주일', days: 7 },
+                          { label: '한달', days: 30 },
+                        ].map((preset) => (
+                          <Button
+                            key={preset.label}
+                            type="button"
+                            variant="outline"
+                            size="md"
+                            selected={isPresetSelected(preset.days)}
+                            onClick={() => {
+                              // 이미 선택된 프리셋을 다시 클릭하면 선택 해제
+                              if (isPresetSelected(preset.days)) {
+                                handleFilterValueChange(filter.columnKey, {
+                                  ...currentValue,
+                                  dateRange: { start: '', end: '' },
+                                });
+                                return;
+                              }
+
+                              const today = new Date();
+                              let startDate: Date;
+                              let endDate: Date;
+
+                              if (preset.days === 0) {
+                                // 오늘
+                                startDate = today;
+                                endDate = today;
+                              } else if (preset.days === 1) {
+                                // 어제
+                                const yesterday = new Date(today);
+                                yesterday.setDate(yesterday.getDate() - 1);
+                                startDate = yesterday;
+                                endDate = yesterday;
+                              } else {
+                                // 일주일, 한달
+                                const start = new Date(today);
+                                start.setDate(start.getDate() - preset.days + 1);
+                                startDate = start;
+                                endDate = today;
+                              }
+
+                              handleFilterValueChange(filter.columnKey, {
+                                ...currentValue,
+                                dateRange: {
+                                  start: formatLocalDate(startDate),
+                                  end: formatLocalDate(endDate),
+                                },
+                              });
+                            }}
+                          >
+                            {preset.label}
+                          </Button>
+                        ))}
+                      </div>
+                      {/* 날짜 선택 */}
+                      <div style={{ display: 'flex', gap: 'var(--spacing-xs)', alignItems: 'center', flex: 1, minWidth: 'var(--width-daterange-container)' }}>
+                        <div style={{ flex: 1, minWidth: 'var(--width-datepicker-input)' }}>
+                          <DatePicker
+                            value={currentValue.dateRange?.start || ''}
+                            onChange={(val) =>
+                              handleFilterValueChange(filter.columnKey, {
+                                ...currentValue,
+                                dateRange: { ...currentValue.dateRange, start: val },
+                              })
+                            }
+                            label="시작일"
+                            fullWidth
+                            size="md"
+                            showInlineLabelWhenHasValue={false}
+                          />
+                        </div>
+                        <span style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>~</span>
+                        <div style={{ flex: 1, minWidth: 'var(--width-datepicker-input)' }}>
+                          <DatePicker
+                            value={currentValue.dateRange?.end || ''}
+                            onChange={(val) =>
+                              handleFilterValueChange(filter.columnKey, {
+                                ...currentValue,
+                                dateRange: { ...currentValue.dateRange, end: val },
+                              })
+                            }
+                            label="종료일"
+                            fullWidth
+                            size="md"
+                            showInlineLabelWhenHasValue={false}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <span style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>~</span>
-                    <div style={{ flex: 1 }}>
-                      <DatePicker
-                        value={currentValue.dateRange?.end || ''}
-                        onChange={(val) =>
-                          handleFilterValueChange(filter.columnKey, {
-                            ...currentValue,
-                            dateRange: { ...currentValue.dateRange, end: val },
-                          })
-                        }
-                        label="종료일"
-                        fullWidth
-                        size="md"
-                        showInlineLabelWhenHasValue={false}
-                      />
-                    </div>
-                  </div>
-                );
+                  );
 
-              default:
-                return null;
-            }
-          })}
+                default:
+                  return null;
+              }
+            })}
         </Grid>
       </div>
     );
   }, [filters, filterState, columns, handleFilterValueChange]);
 
-  // 필터 토글 버튼 렌더링
-  const renderFilterToggle = useCallback(() => {
-    if (!filters || filters.length === 0) return null;
+  // 페이지당 항목 수 변경 핸들러
+  const handleItemsPerPageChange = useCallback((value: string | string[]) => {
+    const valueStr = Array.isArray(value) ? value[0] : value;
+    const newValue = Number(valueStr);
+    setInternalItemsPerPage(newValue);
+    onItemsPerPageChange?.(newValue);
+  }, [onItemsPerPageChange]);
+
+  // 필터 토글 버튼 및 페이지당 항목 수 선택 렌더링
+  const renderFilterControls = useCallback(() => {
+    // hideFilterControls가 true이면 아무것도 렌더링하지 않음
+    if (hideFilterControls) {
+      return null;
+    }
+
+    const hasFilters = filters && filters.length > 0;
+    // 항상 검색창과 itemsPerPage 선택기 표시 (내부 상태 관리)
+    const showItemsPerPage = true;
+    const showSearch = true; // 검색창 항상 표시
+
+    if (!hasFilters && !showItemsPerPage && !showSearch) {
+      return null;
+    }
 
     return (
-      <button
-        ref={filterToggleRef}
-        type="button"
-        onClick={() => setShowFilterPanel((prev) => !prev)}
+      <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 'var(--spacing-xs)',
-          padding: 'var(--spacing-sm) var(--spacing-md)',
-          border: 'var(--border-width-thin) solid var(--color-gray-200)',
-          borderRadius: 'var(--border-radius-sm)',
-          fontSize: 'var(--font-size-sm)',
-          fontFamily: 'var(--font-family)',
-          cursor: 'pointer',
-          backgroundColor: showFilterPanel || activeFilterCount > 0 ? 'var(--color-primary-50)' : 'var(--color-white)',
-          color: showFilterPanel || activeFilterCount > 0 ? 'var(--color-primary)' : 'var(--color-text)',
-          transition: 'var(--transition-fast)',
+          justifyContent: 'flex-end',
+          gap: 'var(--spacing-sm)',
         }}
       >
-        <Funnel size={16} weight={showFilterPanel || activeFilterCount > 0 ? 'fill' : 'regular'} />
-        필터
-        {activeFilterCount > 0 && (
-          <span
+        {/* 검색 입력창 (항상 표시) */}
+        <SearchInput
+          value={effectiveSearchValue}
+          onChange={handleSearchChange}
+          placeholder={searchPlaceholder}
+          size="sm"
+        />
+
+        {/* 필터 버튼 */}
+        {hasFilters && (
+          <Button
+            ref={filterToggleRef}
+            type="button"
+            onClick={() => setShowFilterPanel((prev) => !prev)}
+            variant="outline"
+            size="sm"
+            selected={showFilterPanel || activeFilterCount > 0}
             style={{
-              backgroundColor: 'var(--color-primary)',
-              color: 'var(--color-white)',
-              borderRadius: 'var(--border-radius-full)',
-              padding: '0 var(--spacing-xs)',
-              fontSize: 'var(--font-size-xs)',
-              fontWeight: 'var(--font-weight-medium)',
-              minWidth: '18px',
-              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--spacing-xs)',
             }}
           >
-            {activeFilterCount}
-          </span>
+            <Funnel size={16} weight={showFilterPanel || activeFilterCount > 0 ? 'fill' : 'regular'} />
+            필터
+            {activeFilterCount > 0 && (
+              <span
+                style={{
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'var(--color-white)',
+                  borderRadius: 'var(--border-radius-full)',
+                  padding: '0 var(--spacing-xs)',
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  minWidth: 'var(--spacing-md)', // 16px - 배지 최소 너비
+                  textAlign: 'center',
+                }}
+              >
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
         )}
-      </button>
+
+        {/* 페이지당 항목 수 선택 (항상 표시) */}
+        {showItemsPerPage && (
+          <Select
+            value={String(effectiveItemsPerPage)}
+            onChange={handleItemsPerPageChange}
+            dropdownAlign="center"
+            options={itemsPerPageOptions.map((option) => ({
+              value: String(option),
+              label: `${option}개`,
+            }))}
+            size="sm"
+            autoDropdownWidth={true}
+            dropdownMinWidth={80}
+            style={{
+              minWidth: 'var(--width-items-per-page)',
+            }}
+          />
+        )}
+      </div>
     );
-  }, [filters, showFilterPanel, activeFilterCount]);
+  }, [hideFilterControls, filters, showFilterPanel, activeFilterCount, effectiveItemsPerPage, handleItemsPerPageChange, itemsPerPageOptions]);
 
   // 모바일: 1열 세로 배치 테이블 구조 (테이블 구조 유지)
   if (isMobile) {
     return (
       <div className={clsx(className)} style={{ width: '100%' }}>
-        {/* 필터 토글 버튼 (모바일) */}
-        {filters && filters.length > 0 && (
+        {/* 필터 및 페이지당 항목 수 선택 (모바일) - hideFilterControls가 true면 렌더링하지 않음 */}
+        {!hideFilterControls && (
           <div
             style={{
               display: 'flex',
               justifyContent: 'flex-end',
-              marginBottom: 'var(--spacing-sm)',
+              marginBottom: 'var(--spacing-md)',
             }}
           >
-            {renderFilterToggle()}
+            {renderFilterControls()}
           </div>
         )}
 
@@ -663,16 +874,16 @@ export function DataTable<T = unknown>({
 
   return (
     <div className={clsx(className)} style={{ width: '100%' }}>
-      {/* 필터 토글 버튼 */}
-      {filters && filters.length > 0 && (
+      {/* 필터 및 페이지당 항목 수 선택 - hideFilterControls가 true면 렌더링하지 않음 */}
+      {!hideFilterControls && (
         <div
           style={{
             display: 'flex',
             justifyContent: 'flex-end',
-            marginBottom: 'var(--spacing-sm)',
+            marginBottom: 'var(--spacing-md)',
           }}
         >
-          {renderFilterToggle()}
+          {renderFilterControls()}
         </div>
       )}
 

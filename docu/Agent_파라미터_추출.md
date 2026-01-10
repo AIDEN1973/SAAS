@@ -21,48 +21,19 @@
 
 ## ⚠️ 업종 중립성 (Industry Neutrality)
 
-### 핵심 원칙
+**이 시스템은 다양한 업종의 테넌트를 관리하는 SaaS 플랫폼입니다.**
 
-**이 시스템은 SaaS 관리 플랫폼입니다** - 단일 학원용 SaaS가 아닌, **다양한 업종의 테넌트를 관리하는 플랫폼**입니다.
+Tool 명칭은 업종에 독립적이지만 (`manage_student`), 실제 데이터 처리는 업종별로 동적 매핑됩니다.
 
-### Industry Adapter를 통한 파라미터 처리
+**📖 자세한 내용은 정본 문서를 참조하세요**: **[Industry_Neutrality.md](./Industry_Neutrality.md)** ⭐
 
-파라미터 추출 시 Tool 명칭은 고정되지만, **실제 데이터 처리는 업종별로 동적 매핑**됩니다:
-
-**예시 1: 학원 (Academy)**
-```typescript
-사용자: "박소영 전화번호"
-→ Tool: manage_student(action: "get_profile", student_name: "박소영")
-→ Industry Adapter: getTenantTableName() → "academy_students"
-→ 쿼리: SELECT * FROM academy_students WHERE tenant_id=... AND name ILIKE '%박소영%'
-```
-
-**예시 2: 미용실 (Salon)**
-```typescript
-사용자: "김지영 고객 정보"
-→ Tool: manage_student(action: "get_profile", student_name: "김지영")
-→ Industry Adapter: getTenantTableName() → "salon_customers"
-→ 쿼리: SELECT * FROM salon_customers WHERE tenant_id=... AND name ILIKE '%김지영%'
-```
-
-**예시 3: 네일샵 (Nail)**
-```typescript
-사용자: "이민아 회원 조회"
-→ Tool: manage_student(action: "get_profile", student_name: "이민아")
-→ Industry Adapter: getTenantTableName() → "nail_members"
-→ 쿼리: SELECT * FROM nail_members WHERE tenant_id=... AND name ILIKE '%이민아%'
-```
-
-### Tool 명칭 vs 사용자 입력
-
-- **Tool 명칭**: `manage_student` (고정, 코드 변경 불필요)
-- **사용자 입력**: "학생", "고객", "회원", "원생" 등 다양 → LLM이 모두 `student_name` 파라미터로 추출
-- **실제 처리**: Industry Adapter가 `industry_type`에 따라 올바른 테이블로 자동 라우팅
-
-**참고 문서**:
-- `docu/Agent_아키텍처_전환.md` - Industry Neutrality 개요
-- `docu/디어쌤 아키텍처.md` - Industry Adapter 상세 구현
-- `docu/AI_자동화_기능_정리.md` - Industry Neutrality 원칙
+**핵심 요약**:
+- **Tool 명칭**: `manage_student` (고정)
+- **사용자 입력**: "학생", "고객", "회원" 등 (다양) → LLM이 `student_name`으로 추출
+- **Industry Adapter**: `industry_type`에 따라 올바른 테이블로 자동 라우팅
+  - 학원 → `academy_students`
+  - 미용실 → `salon_customers`
+  - 네일샵 → `nail_members`
 
 ---
 

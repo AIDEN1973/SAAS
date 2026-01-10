@@ -32,6 +32,7 @@ import {
   Textarea,
   Radio,
   Card,
+  Button,
 } from '@ui-core/react';
 // ⚠️ 참고: Input 컴포넌트는 TextInput의 역할을 수행합니다.
 // 기술문서에서는 TextInput으로 명시되어 있으나, 실제 구현은 Input 컴포넌트를 사용합니다.
@@ -508,6 +509,146 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               dateTime={true}
             />
           )}
+        />
+      </FormFieldLayout>
+    );
+  }
+
+  // dateRange (프리셋 버튼 + 시작일/종료일 DatePicker)
+  if (kind === 'dateRange') {
+    // 로컬 시간 기준 YYYY-MM-DD 형식 변환 함수 (KST 대응)
+    const formatLocalDate = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    // 프리셋 목록
+    const presets = [
+      { label: '오늘', days: 0 },
+      { label: '어제', days: 1 },
+      { label: '일주일', days: 7 },
+      { label: '한달', days: 30 },
+    ];
+
+    return (
+      <FormFieldLayout colSpan={colSpan}>
+        <Controller
+          name={name}
+          control={control}
+          rules={finalRules as any}
+          render={({ field: f }) => {
+            const currentValue = (f.value as { start?: string; end?: string }) || {};
+
+            // 프리셋과 현재 날짜 범위 일치 여부 확인 함수
+            const isPresetSelected = (presetDays: number): boolean => {
+              if (!currentValue.start || !currentValue.end) return false;
+
+              const today = new Date();
+              let expectedStart: string;
+              let expectedEnd: string;
+
+              if (presetDays === 0) {
+                expectedStart = formatLocalDate(today);
+                expectedEnd = formatLocalDate(today);
+              } else if (presetDays === 1) {
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                expectedStart = formatLocalDate(yesterday);
+                expectedEnd = formatLocalDate(yesterday);
+              } else {
+                const startDate = new Date(today);
+                startDate.setDate(startDate.getDate() - presetDays + 1);
+                expectedStart = formatLocalDate(startDate);
+                expectedEnd = formatLocalDate(today);
+              }
+
+              return currentValue.start === expectedStart && currentValue.end === expectedEnd;
+            };
+
+            // 프리셋 버튼 클릭 핸들러
+            const handlePresetClick = (presetDays: number) => {
+              // 이미 선택된 프리셋을 다시 클릭하면 선택 해제
+              if (isPresetSelected(presetDays)) {
+                f.onChange({ start: '', end: '' });
+                return;
+              }
+
+              const today = new Date();
+              let startDate: Date;
+              let endDate: Date;
+
+              if (presetDays === 0) {
+                startDate = today;
+                endDate = today;
+              } else if (presetDays === 1) {
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                startDate = yesterday;
+                endDate = yesterday;
+              } else {
+                const start = new Date(today);
+                start.setDate(start.getDate() - presetDays + 1);
+                startDate = start;
+                endDate = today;
+              }
+
+              f.onChange({
+                start: formatLocalDate(startDate),
+                end: formatLocalDate(endDate),
+              });
+            };
+
+            return (
+              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center' }}>
+                {/* 기간 프리셋 버튼 */}
+                <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexShrink: 0 }}>
+                  {presets.map((preset) => (
+                    <Button
+                      key={preset.label}
+                      type="button"
+                      variant="outline"
+                      size="md"
+                      selected={isPresetSelected(preset.days)}
+                      disabled={isDisabled}
+                      onClick={() => handlePresetClick(preset.days)}
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+                {/* 날짜 선택 */}
+                <div style={{ display: 'flex', gap: 'var(--spacing-xs)', alignItems: 'center', flex: 1, minWidth: 'var(--width-daterange-container)' }}>
+                  <div style={{ flex: 1, minWidth: 'var(--width-datepicker-input)' }}>
+                    <DatePicker
+                      value={currentValue.start || ''}
+                      onChange={(val) => f.onChange({ ...currentValue, start: val })}
+                      label="시작일"
+                      disabled={isDisabled}
+                      error={error}
+                      fullWidth
+                      size="md"
+                      showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
+                    />
+                  </div>
+                  <span style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>~</span>
+                  <div style={{ flex: 1, minWidth: 'var(--width-datepicker-input)' }}>
+                    <DatePicker
+                      value={currentValue.end || ''}
+                      onChange={(val) => f.onChange({ ...currentValue, end: val })}
+                      label="종료일"
+                      disabled={isDisabled}
+                      error={error}
+                      fullWidth
+                      size="md"
+                      showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          }}
         />
       </FormFieldLayout>
     );

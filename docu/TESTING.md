@@ -1,5 +1,9 @@
 # 테스트 가이드
 
+**버전**: 1.0.0
+**최종 업데이트**: 2026-01-10
+**상태**: ✅ 정본 (SSOT)
+
 이 문서는 SAMDLE 프로젝트의 전체 테스트 시스템을 설명합니다.
 
 **테스트 프레임워크:**
@@ -284,9 +288,123 @@ E2E 테스트를 처음 실행하기 전에 브라우저를 설치해야 합니�
 npx playwright install
 ```
 
-### **⚠️ E2E 테스트 환경 구축 필요**
+### **⚠️ E2E 테스트 환경 구축**
 
-E2E 테스트를 실행하기 전에 환경 설정이 필요합니다. 자세한 내용은 [E2E-TESTING-SETUP.md](./E2E-TESTING-SETUP.md)를 참조하세요.
+E2E 테스트를 실행하기 전에 환경 설정이 필요합니다.
+
+#### **사전 요구사항**
+
+**1. Supabase 로컬 인스턴스**
+
+E2E 테스트는 로컬 Supabase 인스턴스가 필요합니다.
+
+```bash
+# Supabase CLI 설치
+npm install -g supabase
+
+# Supabase 로컬 시작
+cd infra/supabase
+supabase start
+```
+
+로컬 Supabase가 시작되면 다음 정보를 확인할 수 있습니다:
+- API URL: `http://localhost:54321`
+- Anon Key: (콘솔에 표시됨)
+
+**2. 환경 변수 설정**
+
+`.env.test` 파일이 이미 생성되어 있습니다. 필요시 수정하세요:
+
+```bash
+# .env.test
+VITE_SUPABASE_URL=http://localhost:54321
+VITE_SUPABASE_ANON_KEY=your-local-anon-key
+PLAYWRIGHT_BASE_URL=http://localhost:3000
+TEST_USER_EMAIL=test@example.com
+TEST_USER_PASSWORD=TestPassword123!
+```
+
+#### **E2E 테스트 실행 단계**
+
+**1단계: Supabase 로컬 시작**
+
+```bash
+cd infra/supabase
+supabase start
+```
+
+**2단계: 테스트 데이터 시드**
+
+```bash
+npm run seed:test
+```
+
+이 명령은 다음 데이터를 생성합니다:
+- ✅ 테스트 사용자 3명 (관리자, 일반 사용자, 기본 사용자)
+- ✅ 테스트 테넌트 1개
+- ✅ 샘플 학생 5명
+- ✅ 샘플 출석 데이터
+- ✅ 샘플 청구서 데이터
+
+**3단계: E2E 테스트 실행**
+
+```bash
+# 모든 브라우저에서 실행
+npm run test:e2e
+
+# Chromium만 실행
+npm run test:e2e:chromium
+
+# UI 모드로 실행 (권장)
+npm run test:e2e:ui
+
+# 디버그 모드로 실행
+npm run test:e2e:debug
+```
+
+**4단계: 테스트 리포트 확인**
+
+```bash
+npm run test:e2e:report
+```
+
+#### **E2E 테스트 작성 가이드**
+
+**기본 템플릿**
+
+```typescript
+import { test, expect } from '@playwright/test';
+import { loginAsAdmin } from './helpers/auth';
+
+test.describe('내 기능 테스트', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page);
+  });
+
+  test('시나리오 설명', async ({ page }) => {
+    // 페이지 이동
+    await page.goto('/my-feature');
+
+    // 요소 찾기
+    const button = page.locator('button:has-text("클릭")');
+
+    // 클릭
+    await button.click();
+
+    // 검증
+    await expect(page).toHaveURL('/expected-url');
+    await expect(page.locator('.success')).toBeVisible();
+  });
+});
+```
+
+**모범 사례**
+
+1. **테스트 독립성**: 각 테스트는 독립적으로 실행 가능해야 함
+2. **명확한 시나리오**: 테스트 이름은 "무엇을 테스트하는지" 명확히 표현
+3. **명시적 대기**: `waitFor`를 사용하여 비동기 동작 처리
+4. **선택자 우선순위**: `data-testid > role > text > css`
+5. **에러 핸들링**: 예상되는 에러도 테스트
 
 **✅ 현재 상태** (2026-01-05 최종 업데이트 - 모든 수정 완료):
 
@@ -350,6 +468,62 @@ npm run seed:test
 
 # 3. E2E 테스트 실행
 npm run test:e2e
+```
+
+#### **E2E 문제 해결**
+
+**문제 1: Supabase 연결 실패**
+
+**증상**: `Error: fetch failed` 또는 `ECONNREFUSED`
+
+**해결**:
+```bash
+# Supabase가 실행 중인지 확인
+supabase status
+
+# 실행 중이 아니면 시작
+supabase start
+```
+
+**문제 2: 테스트 사용자 로그인 실패**
+
+**증상**: `Invalid login credentials`
+
+**해결**:
+```bash
+# 시드 데이터 재생성
+npm run seed:test
+```
+
+**문제 3: 개발 서버 시작 실패**
+
+**증상**: `webServer.command failed`
+
+**해결**:
+```bash
+# 개발 서버 수동 시작
+npm run dev:admin
+
+# 다른 터미널에서 테스트 실행 (서버 재시작 방지)
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm run test:e2e
+```
+
+**문제 4: 포트 충돌**
+
+**증상**: `Port 3000 is already in use`
+
+**해결**:
+```bash
+# .env.test에서 포트 변경
+PLAYWRIGHT_BASE_URL=http://localhost:3001
+
+# 또는 기존 프로세스 종료
+# Windows
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
+
+# Linux/Mac
+lsof -ti:3000 | xargs kill -9
 ```
 
 ### **기본 실행**

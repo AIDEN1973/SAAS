@@ -141,7 +141,7 @@ export interface MultiConditionRule {
  */
 export interface FormFieldSchema {
     name: string;
-    kind: 'text' | 'email' | 'phone' | 'number' | 'password' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'datetime' | 'custom';
+    kind: 'text' | 'email' | 'phone' | 'number' | 'password' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'datetime' | 'dateRange' | 'custom';
     ui?: {
         labelKey?: string;
         label?: string;

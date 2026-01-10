@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { DataTable, type DataTableColumn, Pagination } from '@ui-core/react';
+import { DataTable, type DataTableColumn, Pagination, Select, Button, SearchInput } from '@ui-core/react';
 import { Funnel } from 'phosphor-react';
 import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 import type { TableSchema, FilterSchema } from '../types';
@@ -45,6 +45,12 @@ export interface SchemaTableProps {
   onFilterChange?: (filters: Record<string, unknown>) => void;
   // 필터 기본값 (filterSchema와 함께 사용)
   filterDefaultValues?: Record<string, unknown>;
+  // 검색어
+  searchValue?: string;
+  // 검색어 변경 핸들러
+  onSearchChange?: (value: string) => void;
+  // 검색 플레이스홀더 (기본값: "검색...")
+  searchPlaceholder?: string;
 }
 
 /**
@@ -68,21 +74,45 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   filterSchema,
   onFilterChange,
   filterDefaultValues,
+  searchValue = '',
+  onSearchChange,
+  searchPlaceholder = '검색...',
 }) => {
   const { dataSource, columns, rowActions, rowActionHandlers, pagination: paginationConfig } = schema.table;
 
   // 페이지네이션 상태 관리
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [itemsPerPage, setItemsPerPage] = React.useState(20); // 항상 20으로 시작
 
   // 필터 패널 상태 관리
   const [showFilterPanel, setShowFilterPanel] = React.useState(false);
-  const filterToggleRef = React.useRef<HTMLButtonElement>(null);
+
+  // 검색어 내부 상태 관리 (외부 제어는 선택적)
+  const [internalSearchValue, setInternalSearchValue] = React.useState(searchValue);
+  // 외부에서 searchValue가 전달되면 외부 값 사용, 아니면 내부 상태 사용
+  const effectiveSearchValue = onSearchChange ? searchValue : internalSearchValue;
+  const handleSearchChange = React.useCallback((value: string) => {
+    if (onSearchChange) {
+      onSearchChange(value);
+    } else {
+      setInternalSearchValue(value);
+    }
+  }, [onSearchChange]);
+
+  // 활성 필터 개수 계산 (DataTable과 동일한 로직)
+  const activeFilterCount = React.useMemo(() => {
+    if (!filters) return 0;
+    return Object.values(filters).filter((value) => {
+      if (value === null || value === undefined || value === '') return false;
+      if (Array.isArray(value) && value.length === 0) return false;
+      return true;
+    }).length;
+  }, [filters]);
 
   // 필터 변경 핸들러
   const handleInternalFilterChange = React.useCallback((newFilters: Record<string, unknown>) => {
     onFilterChange?.(newFilters);
   }, [onFilterChange]);
-  const itemsPerPage = paginationConfig?.defaultPageSize || paginationConfig?.pageSize || 10;
   const effectivePage = page ?? currentPage;
 
   // 필터 직렬화하여 안정적으로 비교 (객체 참조가 아닌 값 비교)
@@ -198,8 +228,8 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
                     style={{
                       padding: 'var(--spacing-xs) var(--spacing-sm)',
                       fontSize: 'var(--font-size-sm)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 'var(--radius-sm)',
+                      border: 'var(--border-width-thin) solid var(--color-border)',
+                      borderRadius: 'var(--border-radius-sm)',
                       backgroundColor: 'var(--color-background)',
                       color: 'var(--color-text)',
                       cursor: 'pointer',
@@ -253,22 +283,38 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
     }
     return [];
   }, [data, injectedData]);
+
+  // 검색어 필터링 적용된 데이터
+  const searchFilteredData = React.useMemo(() => {
+    const searchText = effectiveSearchValue.trim().toLowerCase();
+    if (!searchText) return allData;
+
+    return allData.filter((row) => {
+      // 모든 컬럼에서 검색어 포함 여부 확인
+      return columns.some((col) => {
+        const cellValue = row[col.key];
+        const cellStr = String(cellValue ?? '').toLowerCase();
+        return cellStr.includes(searchText);
+      });
+    });
+  }, [allData, effectiveSearchValue, columns]);
+
   const totalPages = React.useMemo(() => {
     if (!paginationConfig) return 1;
-    const basis = typeof totalCount === 'number' ? totalCount : allData.length;
+    const basis = typeof totalCount === 'number' ? totalCount : searchFilteredData.length;
     const pages = Math.ceil(basis / itemsPerPage);
     return pages > 0 ? pages : 1; // 최소 1페이지는 보장
-  }, [allData.length, itemsPerPage, paginationConfig, totalCount]);
+  }, [searchFilteredData.length, itemsPerPage, paginationConfig, totalCount]);
 
   // 페이지네이션 적용된 데이터 계산
   const paginatedData = React.useMemo(() => {
-    if (!paginationConfig) return allData;
+    if (!paginationConfig) return searchFilteredData;
     // 서버 페이지네이션 모드: injectedData가 이미 해당 페이지 데이터임
-    if (typeof totalCount === 'number') return allData;
+    if (typeof totalCount === 'number') return searchFilteredData;
     const startIndex = (effectivePage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return allData.slice(startIndex, endIndex);
-  }, [allData, effectivePage, itemsPerPage, paginationConfig, totalCount]);
+    return searchFilteredData.slice(startIndex, endIndex);
+  }, [searchFilteredData, effectivePage, itemsPerPage, paginationConfig, totalCount]);
 
   if (!injectedData && isLoading) {
     return <div className={className}>로딩 중...</div>;
@@ -280,49 +326,87 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
 
   return (
     <div className={className}>
-      {/* 필터 토글 버튼 */}
-      {filterSchema && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            marginBottom: 'var(--spacing-sm)',
-          }}
-        >
-          <button
-            ref={filterToggleRef}
+      {/* 필터 컨트롤 영역 (검색 + 필터버튼 + itemsPerPage) - DataTable 내부 필터와 동일한 레이아웃 */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 'var(--spacing-sm)',
+          marginBottom: 'var(--spacing-md)',
+        }}
+      >
+        {/* 검색 입력창 (항상 표시) */}
+        <SearchInput
+          value={effectiveSearchValue}
+          onChange={handleSearchChange}
+          placeholder={searchPlaceholder}
+          size="sm"
+        />
+
+        {/* 필터 버튼 */}
+        {filterSchema && (
+          <Button
             type="button"
             onClick={() => setShowFilterPanel((prev) => !prev)}
+            variant="outline"
+            size="sm"
+            selected={showFilterPanel || activeFilterCount > 0}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 'var(--spacing-xs)',
-              padding: 'var(--spacing-sm) var(--spacing-md)',
-              border: 'var(--border-width-thin) solid var(--color-gray-200)',
-              borderRadius: 'var(--border-radius-sm)',
-              fontSize: 'var(--font-size-sm)',
-              fontFamily: 'var(--font-family)',
-              cursor: 'pointer',
-              backgroundColor: showFilterPanel ? 'var(--color-primary-50)' : 'var(--color-white)',
-              color: showFilterPanel ? 'var(--color-primary)' : 'var(--color-text)',
-              transition: 'var(--transition-fast)',
             }}
           >
-            <Funnel size={16} weight={showFilterPanel ? 'fill' : 'regular'} />
+            <Funnel size={16} weight={showFilterPanel || activeFilterCount > 0 ? 'fill' : 'regular'} />
             필터
-          </button>
-        </div>
-      )}
+            {activeFilterCount > 0 && (
+              <span
+                style={{
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'var(--color-white)',
+                  borderRadius: 'var(--border-radius-full)',
+                  padding: '0 var(--spacing-xs)',
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  minWidth: 'var(--spacing-md)', // 16px - 배지 최소 너비
+                  textAlign: 'center',
+                }}
+              >
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+        )}
 
-      {/* 필터 패널 */}
+        {/* 페이지당 항목 수 선택 */}
+        <Select
+          value={String(itemsPerPage)}
+          onChange={(value: string | string[]) => {
+            const valueStr = Array.isArray(value) ? value[0] : value;
+            setItemsPerPage(Number(valueStr));
+          }}
+          dropdownAlign="center"
+          options={[20, 40, 60, 80].map((option) => ({
+            value: String(option),
+            label: `${option}개`,
+          }))}
+          size="sm"
+          autoDropdownWidth={true}
+          dropdownMinWidth={80}
+          style={{
+            minWidth: 'var(--width-items-per-page)',
+          }}
+        />
+      </div>
+
+      {/* 필터 패널 (SchemaFilter 사용) - SchemaFilter 자체에 marginBottom이 있으므로 wrapper에는 불필요 */}
       {showFilterPanel && filterSchema && (
-        <div>
-          <SchemaFilter
-            schema={filterSchema}
-            onFilterChange={handleInternalFilterChange}
-            defaultValues={filterDefaultValues}
-          />
-        </div>
+        <SchemaFilter
+          schema={filterSchema}
+          onFilterChange={handleInternalFilterChange}
+          defaultValues={filterDefaultValues}
+        />
       )}
 
       <DataTable
@@ -332,7 +416,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
         onRowClick={(onRowClick || (rowActions && rowActions.length > 0)) ? handleRowClick : undefined}
         emptyMessage="데이터가 없습니다."
         pagination={undefined}
-        itemsPerPage={itemsPerPage}
+        hideFilterControls={true}
       />
       {/* 페이지네이션: 테이블 영역 밖에 렌더링 */}
       {paginationConfig && (
