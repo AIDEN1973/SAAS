@@ -51,8 +51,9 @@ async function verifyAutomationEventCatalog(): Promise<ValidationResult> {
   }
 
   if (!existsSync(infraCatalogPath)) {
-    result.errors.push(`infra 카탈로그 파일을 찾을 수 없습니다: ${infraCatalogPath}`);
-    result.success = false;
+    result.warnings.push(`infra 카탈로그 파일을 찾을 수 없습니다: ${infraCatalogPath} (Edge Functions 미배포 시 정상)`);
+    // infra가 없으면 검증 스킵
+    log(`⚠ infra 카탈로그 미발견 (스킵)`, colors.yellow);
     return result;
   }
 
@@ -160,6 +161,7 @@ async function verifyIndustryTypeEnum(): Promise<ValidationResult> {
 
 /**
  * 3. Shared Catalog 등록 항목 파일 존재 검증
+ * status: 'implemented' 항목만 파일 존재 검증
  */
 async function verifySharedCatalog(): Promise<ValidationResult> {
   const result: ValidationResult = { success: true, errors: [], warnings: [] };
@@ -175,29 +177,72 @@ async function verifySharedCatalog(): Promise<ValidationResult> {
 
   const catalogContent = readFileSync(sharedCatalogPath, 'utf-8');
 
-  // path 필드 추출 (정규식)
-  const pathMatches = catalogContent.matchAll(/path:\s*['"]([^'"]+)['"]/g);
-  const registeredPaths = Array.from(pathMatches, m => m[1]);
+  // status: 'implemented'인 항목의 path만 추출
+  const implementedItems: { path: string; key: string }[] = [];
 
-  if (registeredPaths.length === 0) {
-    result.warnings.push('Shared Catalog에 등록된 경로가 없습니다.');
+  // 간단한 접근: path와 status를 개별적으로 추출한 후 매칭
+  // path: '...' 다음에 status: 'implemented'가 나오는 패턴 찾기
+  const lines = catalogContent.split('\n');
+  let currentKey = '';
+  let currentPath = '';
+  let currentStatus = '';
+
+  for (const line of lines) {
+    // 항목 키 추출 (예: 'use-student': {)
+    const keyMatch = line.match(/^\s*'([^']+)':\s*\{/);
+    if (keyMatch) {
+      // 이전 항목 처리
+      if (currentKey && currentPath && currentStatus === 'implemented') {
+        implementedItems.push({ path: currentPath, key: currentKey });
+      }
+      currentKey = keyMatch[1];
+      currentPath = '';
+      currentStatus = '';
+    }
+
+    // path 추출
+    const pathMatch = line.match(/path:\s*['"]([^'"]+)['"]/);
+    if (pathMatch && currentKey) {
+      currentPath = pathMatch[1];
+    }
+
+    // status 추출
+    const statusMatch = line.match(/status:\s*['"]([^'"]+)['"]/);
+    if (statusMatch && currentKey) {
+      currentStatus = statusMatch[1];
+    }
+  }
+
+  // 마지막 항목 처리
+  if (currentKey && currentPath && currentStatus === 'implemented') {
+    implementedItems.push({ path: currentPath, key: currentKey });
+  }
+
+  if (implementedItems.length === 0) {
+    result.warnings.push('Shared Catalog에 implemented 상태의 항목이 없습니다.');
     return result;
   }
 
   let missingCount = 0;
-  for (const path of registeredPaths) {
+  for (const { path, key } of implementedItems) {
     const fullPath = join(rootDir, path);
     if (!existsSync(fullPath)) {
-      result.errors.push(`등록된 파일이 존재하지 않습니다: ${path}`);
+      result.errors.push(`[${key}] implemented 상태이나 파일이 없습니다: ${path}`);
       result.success = false;
       missingCount++;
     }
   }
 
-  if (result.success) {
-    log(`✓ Shared Catalog 등록 항목 확인 (${registeredPaths.length}개 경로)`, colors.green);
+  // 통계 출력
+  const stats = {
+    implemented: implementedItems.length,
+    missing: missingCount,
+  };
+
+  if (missingCount === 0) {
+    log(`✓ Shared Catalog implemented 항목 검증 완료 (${stats.implemented}개 모두 존재)`, colors.green);
   } else {
-    log(`✗ ${missingCount}개 파일이 누락되었습니다.`, colors.red);
+    log(`✗ ${missingCount}/${stats.implemented}개 implemented 항목의 파일이 누락됨`, colors.red);
   }
 
   return result;

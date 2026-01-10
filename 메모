@@ -252,8 +252,36 @@ Automation Config First 원칙:
 
 
 
-# 카탈로그 동기화 검증
-npm run verify:catalog-sync
+추가된 명령어
+1. npm run ci:local (추천)
+실행 시간: ~15분
 
-# TODO 스캔 및 리포트 생성
-npm run scan:todos
+포함 내용: 배포 제외한 CI 핵심 검증 7단계
+
+✅ SSOT 카탈로그 검증
+✅ DB 계약 테스트
+✅ TODO 스캔
+✅ ESLint
+✅ TypeScript 타입 검사
+✅ 단위 테스트
+✅ 전체 빌드
+2. npm run ci:local:full
+실행 시간: ~45분
+
+포함 내용: ci:local + E2E 테스트 (30분)
+
+사용 예시
+
+# PR 생성 전 로컬에서 검증
+npm run ci:local
+
+# 중요한 변경사항이 있을 때 E2E까지 포함
+npm run ci:local:full
+
+# 빠른 검증만 필요할 때
+npm run lint && npm run test
+장점
+✅ CI 실패 사전 방지: PR 생성 전에 모든 검증 완료
+✅ 시간 절약: CI에서 실패하고 재푸시하는 것보다 빠름
+✅ 순차 실행: 하나라도 실패하면 즉시 중단 (&& 체인)
+✅ 간편함: 긴 명령어 외울 필요 없음

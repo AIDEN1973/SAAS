@@ -14,6 +14,11 @@ export default defineConfig({
     'import.meta.env.VITE_KAKAO_JS_KEY': JSON.stringify(process.env.VITE_KAKAO_JS_KEY || process.env.NEXT_PUBLIC_KAKAO_JS_KEY || ''),
   },
   plugins: [react()],
+  test: {
+    // Vitest 설정: e2e 폴더와 playwright 파일 제외
+    exclude: ['node_modules', 'dist', 'e2e', '**/*.e2e.{test,spec}.{js,ts}', '**/playwright.config.ts'],
+    environment: 'jsdom',
+  },
   resolve: {
     alias: [
       { find: '@ui-core/react/styles', replacement: path.resolve(__dirname, '../../packages/ui-core/src/styles.css') },

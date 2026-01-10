@@ -80,6 +80,11 @@ export default defineConfig(({ mode }) => {
       // Vite 캐시를 루트로 통합
       cacheDir: path.resolve(__dirname, '../../node_modules/.vite'),
     plugins: [react()],
+    test: {
+      // Vitest 설정: e2e 폴더와 playwright 파일 제외
+      exclude: ['node_modules', 'dist', 'e2e', '**/*.e2e.{test,spec}.{js,ts}', '**/playwright.config.ts'],
+      environment: 'jsdom',
+    },
     optimizeDeps: {
       // esbuild 서비스 안정성을 위한 설정
       esbuildOptions: {

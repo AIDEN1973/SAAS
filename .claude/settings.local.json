@@ -149,7 +149,8 @@
       "Bash(git -C /c/cursor/SAMDLE log --oneline -30)",
       "Bash(git -C /c/cursor/SAMDLE diff --stat HEAD~10..HEAD)",
       "Bash(git -C /c/cursor/SAMDLE log:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(CI=true npm run test:e2e)"
     ]
   }
 }

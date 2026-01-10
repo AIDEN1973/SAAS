@@ -39,6 +39,9 @@
     "test:chatops-intents": "tsx scripts/test-chatops-all-intents.ts",
     "gen:intent-examples": "tsx scripts/generate-intent-examples.ts",
     "test:db-contract": "tsx scripts/test-db-contract.ts",
+    "ci:local": "npm run verify:catalog-sync && npm run test:db-contract && npm run scan:todos && npm run lint && npm run type-check && npm run test:unit && npm run build",
+    "ci:local:quick": "npm run verify:catalog-sync && npm run test:db-contract && npm run scan:todos && npm run lint && npm run type-check && npm run test:unit",
+    "ci:local:full": "npm run ci:local:quick && npm run build && npm run test:e2e",
     "prepare": "node -e \"try { if (!process.env.CI && !process.env.VERCEL && require('fs').existsSync('node_modules/husky')) { require('husky').install(); } } catch(e) {}\" || true"
   },
   "devDependencies": {

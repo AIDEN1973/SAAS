@@ -259,6 +259,11 @@ export default defineConfig(({ mode }) => {
   cacheDir: path.resolve(__dirname, '../../node_modules/.vite'),
   // 프로덕션 빌드에서 정적 자산 경로 문제 해결
   base: '/',
+  test: {
+    // Vitest 설정: e2e 폴더와 playwright 파일 제외
+    exclude: ['node_modules', 'dist', 'e2e', '**/*.e2e.{test,spec}.{js,ts}', '**/playwright.config.ts'],
+    environment: 'jsdom',
+  },
   plugins: [
     react(),
     excludeServerCode(),
