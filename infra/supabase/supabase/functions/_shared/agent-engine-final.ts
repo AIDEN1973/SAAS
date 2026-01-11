@@ -93,7 +93,7 @@ async function callOpenAIChat(
     model: 'gpt-4o-mini',
     messages: messages,
     temperature: 0.3,
-    max_tokens: 800, // 1500→800 감소: 응답 시간 최적화
+    max_tokens: 500, // 800→500 감소: 응답 시간 최적화 (일반 응답 200-400 토큰)
   };
 
   if (tools && tools.length > 0) {
@@ -1764,18 +1764,15 @@ async function executeAssignTags(
     if (tags && Array.isArray(tags)) {
       tagIds = tags;
     } else if (tag_names && Array.isArray(tag_names)) {
-      // tag_names를 tag_id로 변환 (tags 테이블에서 조회)
-      for (const tagName of tag_names) {
-        const { data: tag } = await context.supabase
-          .from('tags')
-          .select('id')
-          .eq('tenant_id', requireTenantScope(context.tenant_id))
-          .eq('name', tagName)
-          .maybeSingle();
+      // ✅ 성능 최적화: N+1 쿼리 제거 - IN 연산자로 일괄 조회
+      const { data: tagRecords } = await context.supabase
+        .from('tags')
+        .select('id')
+        .eq('tenant_id', requireTenantScope(context.tenant_id))
+        .in('name', tag_names);
 
-        if (tag) {
-          tagIds.push(tag.id);
-        }
+      if (tagRecords) {
+        tagIds = tagRecords.map(t => t.id);
       }
     }
 
@@ -2135,34 +2132,7 @@ export async function runAgentWithProgress(
           controller.enqueue(encoder.encode(sseData));
         };
 
-        sendProgress('status', { message: '요청을 분석하는 중입니다...' });
-
-        // ✅ Intent 매핑 조회 (룰 기반 학습)
-        let intentHint = '';
-        let matchedPattern: any = null;
-        try {
-          const { data: matchedPatterns } = await context.supabase.rpc('match_intent_pattern', {
-            user_query: userMessage
-          });
-
-          if (matchedPatterns && matchedPatterns.length > 0) {
-            const topMatch = matchedPatterns[0];
-            matchedPattern = topMatch; // 나중에 통계 업데이트용
-            console.log('[AgentEngine] Intent 매칭 성공:', {
-              pattern: topMatch.pattern,
-              tool: topMatch.tool_name,
-              confidence: topMatch.confidence
-            });
-
-            // 프롬프트에 힌트 추가 (토큰 비용 최소화: ~30 토큰)
-            intentHint = `\n\n[힌트] 이 요청은 "${topMatch.tool_name}"${topMatch.action ? ` (action: ${topMatch.action})` : ''} Tool과 관련될 수 있습니다. (신뢰도: ${topMatch.confidence})`;
-          }
-        } catch (error) {
-          console.warn('[AgentEngine] Intent 매핑 조회 실패 (무시):', error);
-          // 에러 발생 시 무시하고 계속 진행
-        }
-
-        const systemPrompt = AGENT_SYSTEM_PROMPT + intentHint;
+        const systemPrompt = AGENT_SYSTEM_PROMPT;
         const messages: AgentMessage[] = [
           { role: 'system', content: systemPrompt },
           ...conversationHistory.slice(-6),
@@ -2248,39 +2218,6 @@ export async function runAgentWithProgress(
 
         // 최종 응답 전송
         sendProgress('content', { content: finalResponse });
-
-        // ✅ Intent 패턴 사용 통계 자동 업데이트
-        if (matchedPattern) {
-          try {
-            // 매칭된 패턴의 Tool이 실제로 사용되었는지 확인
-            const toolWasUsed = toolResults.some(t => t.tool === matchedPattern.tool_name);
-            const wasSuccessful = toolResults.some(t =>
-              t.tool === matchedPattern.tool_name && t.success
-            );
-
-            // 패턴 ID 조회 (match_intent_pattern은 ID를 반환하지 않으므로 별도 조회 필요)
-            const { data: patternData } = await context.supabase
-              .from('chatops_intent_patterns')
-              .select('id')
-              .eq('pattern', matchedPattern.pattern)
-              .single();
-
-            if (patternData) {
-              await context.supabase.rpc('update_intent_pattern_usage', {
-                pattern_id: patternData.id,
-                is_success: toolWasUsed && wasSuccessful
-              });
-
-              console.log('[AgentEngine] Intent 패턴 통계 업데이트:', {
-                pattern: matchedPattern.pattern,
-                toolUsed: toolWasUsed,
-                success: wasSuccessful
-              });
-            }
-          } catch (error) {
-            console.warn('[AgentEngine] Intent 통계 업데이트 실패 (무시):', error);
-          }
-        }
 
         // 완료 신호
         const costUsd = (totalUsage.prompt_tokens * 0.00000015 + totalUsage.completion_tokens * 0.0000006);

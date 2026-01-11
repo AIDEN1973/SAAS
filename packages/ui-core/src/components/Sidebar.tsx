@@ -457,7 +457,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             style={{
               position: 'fixed',
               inset: 0,
-              zIndex: 'var(--z-max)',
+              zIndex: 'var(--z-popover)',
             }}
             onClick={() => {
               setAdvancedMenuOpen(false);
@@ -470,7 +470,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               position: 'fixed',
               left: 'calc(var(--width-sidebar) - var(--spacing-sm))',
               top: 'calc(var(--height-header) + var(--spacing-lg))',
-              zIndex: 'calc(var(--z-max) + 1)',
+              zIndex: 'var(--z-tooltip)',
               backgroundColor: 'var(--color-white)',
               borderRadius: 'var(--border-radius-lg)',
               boxShadow: 'var(--shadow-lg)',

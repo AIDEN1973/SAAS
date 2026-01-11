@@ -153,7 +153,8 @@
       "Bash(CI=true npm run test:e2e)",
       "Bash(supabase login:*)",
       "Bash(set SUPABASE_ACCESS_TOKEN=sbp_d69a9ff08f662fc84fe20a08196b2148cd933613)",
-      "Bash(supabase link:*)"
+      "Bash(supabase link:*)",
+      "Bash(pnpm run build:packages:*)"
     ]
   }
 }

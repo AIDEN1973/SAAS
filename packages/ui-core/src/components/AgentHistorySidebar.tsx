@@ -117,7 +117,7 @@ export const AgentHistorySidebar: React.FC<AgentHistorySidebarProps> = ({
           flexDirection: 'column',
           alignItems: 'center',
           padding: 'var(--spacing-md) var(--spacing-xs)',
-          backgroundColor: 'var(--color-primary-40)',
+          backgroundColor: 'var(--color-gray-50)',
           borderRight: 'var(--border-width-thin) solid var(--color-gray-200)',
           gap: 'var(--spacing-sm)',
         }}
@@ -157,7 +157,7 @@ export const AgentHistorySidebar: React.FC<AgentHistorySidebarProps> = ({
         minWidth: 'var(--width-agent-history-sidebar)',
         display: 'flex',
         flexDirection: 'column',
-        backgroundColor: 'var(--color-primary-40)',
+        backgroundColor: 'var(--color-gray-50)',
         borderRight: 'var(--border-width-thin) solid var(--color-gray-200)',
         overflow: 'hidden',
       }}

@@ -499,6 +499,35 @@ textarea::placeholder {
   }
 }
 
+/* ChatOps 3-dot 로딩 애니메이션 */
+@keyframes chatops-dot-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.chatops-loading-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background-color: var(--color-gray-400);
+  /* !important로 prefers-reduced-motion 규칙 오버라이드 (로딩 피드백은 필수 UI) */
+  animation: chatops-dot-bounce 0.6s ease-in-out infinite !important;
+  animation-duration: 0.6s !important;
+  animation-iteration-count: infinite !important;
+}
+
+.chatops-loading-dot:nth-child(2) {
+  animation-delay: 0.15s !important;
+}
+
+.chatops-loading-dot:nth-child(3) {
+  animation-delay: 0.3s !important;
+}
+
 /* 공통 스크롤바 숨김 클래스 (업종 중립) */
 /* 우측 레이어 메뉴 등: 스크롤은 가능하지만 스크롤바는 숨김 */
 /* - Firefox: scrollbar-width */

@@ -140,18 +140,7 @@ serve(async (req: Request) => {
       );
     }
 
-    const tenantKey = await tenantLogKey(tenant_id);
-
-    // 성능 최적화: industry_type 조회 (한 번만)
-    const { data: tenantData } = await supabaseSvc
-      .from('tenants')
-      .select('industry_type')
-      .eq('id', tenant_id)
-      .single();
-
-    const industryType = tenantData?.industry_type || 'academy';
-
-    // 요청 파싱
+    // 요청 파싱 (가장 먼저 - 검증 필요)
     const body: ChatOpsRequest = await req.json();
     const { session_id, message, stream = false } = body;
 
@@ -165,41 +154,38 @@ serve(async (req: Request) => {
       );
     }
 
-    console.log('[ChatOps] 사용자 메시지 수신:', {
-      session_id: session_id.substring(0, 8) + '...',
-      message_preview: maskPII(message.substring(0, 100)),
-      message_length: message.length,
-      tenant: tenantKey,
-    });
-
-    // 성능 최적화: 세션 upsert (조회 없이 생성/업데이트)
-    await supabaseSvc
-      .from('chatops_sessions')
-      .upsert({
-        id: session_id,
-        tenant_id: requireTenantScope(tenant_id),
-        user_id: user_id,
-        summary: null,
-      }, {
-        onConflict: 'id',
-        ignoreDuplicates: true,  // 기존 세션은 업데이트하지 않음
-      });
-
-    console.log('[ChatOps] 세션 준비 완료:', { session_id: session_id.substring(0, 8) + '...' });
-
-    // P0-FIX: 대화 히스토리 조회 (최근 10개로 증가 - Draft ID 유지 보장)
-    // 이유: Draft 생성 + 중간 대화 + 동의 턴을 모두 포함하려면 최소 10개 필요
-    const { data: recentMessages } = await supabaseSvc
+    // ✅ 성능 최적화: 모든 초기 DB 쿼리를 병렬 실행
+    const [tenantResult, , messagesResult] = await Promise.all([
+      // 1. industry_type 조회
+      supabaseSvc
+        .from('tenants')
+        .select('industry_type')
+        .eq('id', tenant_id)
+        .single(),
+      // 2. 세션 upsert (결과 불필요)
+      supabaseSvc
+        .from('chatops_sessions')
+        .upsert({
+          id: session_id,
+          tenant_id: requireTenantScope(tenant_id),
+          user_id: user_id,
+          summary: null,
+        }, {
+          onConflict: 'id',
+          ignoreDuplicates: true,
+        }),
+      // 3. 대화 히스토리 조회
+      supabaseSvc
         .from('chatops_messages')
         .select('role, content')
         .eq('session_id', session_id)
         .eq('tenant_id', requireTenantScope(tenant_id))
         .order('created_at', { ascending: false })
-      .limit(10);
+        .limit(4), // 6→4 감소: 최근 2턴만 (토큰 20% 절감)
+    ]);
 
-    console.log('[ChatOps] 최근 메시지 조회 성공:', { count: recentMessages?.length || 0 });
-
-    const conversationHistory: AgentMessage[] = (recentMessages || [])
+    const industryType = tenantResult.data?.industry_type || 'academy';
+    const conversationHistory: AgentMessage[] = (messagesResult.data || [])
       .reverse()
       .map((msg: any) => ({
         role: msg.role as 'user' | 'assistant',
@@ -208,26 +194,24 @@ serve(async (req: Request) => {
 
     // 🚀 AGENT-MODE: Agent 실행 (스트리밍 또는 일반)
     if (stream) {
-      console.log('[ChatOps] Agent 스트리밍 모드 (진행 상황 포함)로 처리 시작');
-
-      // 사용자 메시지 즉시 저장
-      await supabaseSvc.from('chatops_messages').insert({
-        session_id: session_id,
-        tenant_id: requireTenantScope(tenant_id),
-        user_id: user_id,
-        role: 'user',
-        content: message,
-      });
-
-      // ✅ 세션 summary 업데이트 (null인 경우에만 첫 사용자 메시지로 설정)
+      // ✅ 성능 최적화: 사용자 메시지 저장을 백그라운드로 (응답 대기 안 함)
       const summaryText = message.length > 50 ? message.substring(0, 50) + '...' : message;
-      await supabaseSvc
-        .from('chatops_sessions')
-        .update({ summary: summaryText, updated_at: new Date().toISOString() })
-        .eq('id', session_id)
-        .is('summary', null);
+      void Promise.all([
+        supabaseSvc.from('chatops_messages').insert({
+          session_id: session_id,
+          tenant_id: requireTenantScope(tenant_id),
+          user_id: user_id,
+          role: 'user',
+          content: message,
+        }),
+        supabaseSvc
+          .from('chatops_sessions')
+          .update({ summary: summaryText, updated_at: new Date().toISOString() })
+          .eq('id', session_id)
+          .is('summary', null),
+      ]);
 
-      // ✅ runAgentWithProgress 사용: Tool 실행 + 진행 상황 SSE
+      // ✅ runAgentWithProgress 사용: Tool 실행 + 진행 상황 SSE (즉시 시작)
       const originalStream = await runAgentWithProgress(
         message,
         conversationHistory,

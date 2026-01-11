@@ -26,9 +26,7 @@ import { clsx } from 'clsx';
 import { toKST } from '@lib/date-utils';
 import { Button } from './Button';
 import { Card } from './Card';
-import { Input } from './Input';
 import { Badge } from './Badge';
-import { Spinner } from './Spinner';
 import { EmptyState } from './EmptyState';
 import { Search } from 'lucide-react';
 import { renderMarkdown } from '../utils/markdown-renderer';
@@ -114,9 +112,87 @@ export interface ChatOpsPanelProps {
  * AI 대화창 UI 패널
  * 사용자 메시지는 버블, AI 응답은 버블 없이 텍스트만 표시 (ChatGPT 스타일)
  */
+// ============================================
+// 공통 상수 및 유틸리티 함수
+// ============================================
+
 /**
- * 원본 메시지에서 요청한 필드 추출 (범용)
+ * 필드 키워드 매핑 (SSOT - 단일 정의)
+ * 중복 방지: 이 상수를 모든 필드 매칭 로직에서 사용
  */
+const FIELD_KEYWORDS_MAP: Record<string, string[]> = {
+  name: ['이름', '성명'],
+  phone: ['전화번호', '전화', '연락처', '번호', '핸드폰', '폰번호'],
+  email: ['이메일', '메일'],
+  date: ['날짜', '일자'],
+  time: ['시간', '시각'],
+  status: [
+    '상태', '출석', '결석', '지각', '재학', '휴원', '퇴원',
+    '나온', '안온', '불참', '참석',
+    '미납', '연체', '미결제', '납부 안한', '결제 안한', '돈 안낸',
+    '미납자', '연체자', '미결제자',
+  ],
+  amount: ['금액', '요금', '비용', '가격', '돈', '수강료', '학비', '납부액', '결제액', '미납액', '연체액'],
+  month: ['월', '기간'],
+  class_name: ['반', '클래스'],
+  grade: ['학년', '학급'],
+  guardian: ['보호자'],
+  guardian_name: ['보호자'],
+  guardian_contact: ['보호자', '전화번호'],
+  total_count: ['개수', '건수', '명수'],
+};
+
+/**
+ * 상태값 → 한글 변환 (SSOT - 단일 정의)
+ */
+function getStatusLabel(status: string): string {
+  const statusLabels: Record<string, string> = {
+    active: '재학',
+    present: '출석',
+    absent: '결석',
+    late: '지각',
+    paid: '납부',
+    overdue: '미납',
+    unissued: '미발행',
+    excused: '조퇴',
+  };
+  return statusLabels[status] || status;
+}
+
+/**
+ * 상태값 → Badge 색상 (SSOT - 단일 정의)
+ */
+function getStatusColor(status: string): 'success' | 'error' | 'warning' | 'gray' {
+  if (['active', 'present', 'paid'].includes(status)) return 'success';
+  if (['absent', 'overdue'].includes(status)) return 'error';
+  if (['late', 'unissued'].includes(status)) return 'warning';
+  return 'gray';
+}
+
+/**
+ * Card 기본 스타일 (SSOT - 단일 정의)
+ */
+const CARD_BASE_STYLE: React.CSSProperties = {
+  backgroundColor: 'var(--color-white)',
+  border: 'var(--border-width-thin) solid var(--color-gray-200)',
+};
+
+/**
+ * 결과 Card 공통 스타일 (위쪽 마진)
+ */
+const RESULT_CARD_STYLE: React.CSSProperties = {
+  ...CARD_BASE_STYLE,
+  marginTop: 'var(--spacing-sm)',
+};
+
+/**
+ * Plan Preview Card 스타일 (아래쪽 마진)
+ */
+const PLAN_CARD_STYLE: React.CSSProperties = {
+  ...CARD_BASE_STYLE,
+  marginBottom: 'var(--spacing-sm)',
+};
+
 /**
  * 필드 표시 보조 함수 (SSOT 경계 준수)
  *
@@ -132,40 +208,8 @@ function extractRequestedFields(originalMessage: string): { requestedFields: Set
   const messageLower = originalMessage.toLowerCase();
   const requestedFields = new Set<string>();
 
-  // ⚠️ 표시 보조용 키워드 매핑 (판정 로직 아님)
-  // 실제 의도 판단은 서버에서 수행되어야 하며, 이 함수는 UI 표시를 위한 보조 정보만 제공합니다.
-  const fieldKeywords: Record<string, string[]> = {
-    name: ['이름', '성명'],
-    phone: ['전화번호', '전화', '연락처', '번호', '핸드폰', '폰번호'],
-    email: ['이메일', '메일'],
-    date: ['날짜', '일자'],
-    time: ['시간', '시각'],
-    status: [
-      // 기본 상태
-      '상태', '출석', '결석', '지각', '재학', '휴원', '퇴원',
-      // 출석 관련 동의어
-      '나온', '안온', '불참', '참석',
-      // 미납/연체 관련 동의어
-      '미납', '연체', '미결제', '납부 안한', '결제 안한', '돈 안낸',
-      '미납자', '연체자', '미결제자', '납부 안한 사람', '결제 안한 사람',
-    ],
-    amount: [
-      // 기본 금액
-      '금액', '요금', '비용', '가격',
-      // 동의어
-      '돈', '수강료', '학비', '납부액', '결제액',
-      // 미납 관련
-      '미납액', '연체액', '미결제액', '미납 금액', '연체 금액',
-    ],
-    month: ['월', '기간'],
-    class_name: ['반', '클래스'],
-    grade: ['학년', '학급'],
-    guardian: ['보호자'],
-    total_count: ['개수', '건수', '명수'],
-  };
-
-  // 키워드 매칭 (표시 보조용)
-  for (const [field, keywords] of Object.entries(fieldKeywords)) {
+  // 키워드 매칭 (표시 보조용) - FIELD_KEYWORDS_MAP 사용 (SSOT)
+  for (const [field, keywords] of Object.entries(FIELD_KEYWORDS_MAP)) {
     if (keywords.some(keyword => messageLower.includes(keyword))) {
       requestedFields.add(field);
       // 보호자 키워드는 guardian_name과 guardian_contact도 추가
@@ -237,6 +281,29 @@ function formatValue(field: string, value: unknown): string {
   return String(value);
 }
 
+/**
+ * ChatOps 로딩 애니메이션 컴포넌트
+ * 3-dot bounce 애니메이션 (각 dot이 순차적으로 위아래로 튀어오름)
+ * 스타일은 styles.css의 .chatops-loading-dot 클래스에 정의됨
+ */
+const ChatOpsLoadingDots: React.FC = () => {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--spacing-xs)',
+        marginBottom: 'var(--spacing-md)',
+        padding: 'var(--spacing-sm) 0',
+      }}
+    >
+      <div className="chatops-loading-dot" />
+      <div className="chatops-loading-dot" />
+      <div className="chatops-loading-dot" />
+    </div>
+  );
+};
+
 export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
   messages,
   isLoading = false,
@@ -285,13 +352,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
   };
 
   const renderMessage = (message: ChatOpsMessage) => {
-    console.log('[ChatOpsPanel] renderMessage:', {
-      id: message.id,
-      type: message.type,
-      contentPreview: typeof message.content === 'string' ? message.content.substring(0, 50) : '[ReactNode]',
-    });
     const isUser = message.type === 'user_message';
-    const isAssistant = message.type === 'assistant_message';
     const isPlanPreview = message.type === 'plan_preview';
     const isDisambiguation = message.type === 'disambiguation';
     const isTaskCreated = message.type === 'task_created';
@@ -353,11 +414,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
             <Card
               padding="md"
               variant="default"
-              style={{
-                marginBottom: 'var(--spacing-sm)',
-                backgroundColor: 'var(--color-white)',
-                border: 'var(--border-width-thin) solid var(--color-gray-200)',
-              }}
+              style={PLAN_CARD_STYLE}
             >
               <div style={{ marginBottom: 'var(--spacing-xs)' }}>
                 <Badge variant="outline" color="info">
@@ -402,10 +459,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
             <Card
               padding="md"
               variant="default"
-              style={{
-                backgroundColor: 'var(--color-white)',
-                border: 'var(--border-width-thin) solid var(--color-gray-200)',
-              }}
+              style={CARD_BASE_STYLE}
             >
               <div style={{ marginBottom: 'var(--spacing-sm)', color: 'var(--color-text)' }}>
                 여러 후보가 있습니다. 선택해주세요:
@@ -656,11 +710,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                     <Card
                       padding="md"
                       variant="default"
-                      style={{
-                        marginTop: 'var(--spacing-sm)',
-                        backgroundColor: 'var(--color-white)',
-                        border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                      }}
+                      style={RESULT_CARD_STYLE}
                     >
                       <div style={{ marginBottom: 'var(--spacing-xs)' }}>
                         <Badge variant="outline" color="info">
@@ -685,8 +735,8 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                           )}
                             {(showAll || requestedFields.has('status')) && student.status && (
                             <div style={{ marginBottom: 'var(--spacing-xs)' }}>
-                              <Badge variant="outline" color={student.status === 'active' ? 'success' : 'gray'}>
-                                {student.status === 'active' ? '재학' : student.status}
+                              <Badge variant="outline" color={getStatusColor(student.status)}>
+                                {getStatusLabel(student.status)}
                               </Badge>
                             </div>
                           )}
@@ -763,11 +813,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                     <Card
                       padding="md"
                       variant="default"
-                      style={{
-                        marginTop: 'var(--spacing-sm)',
-                        backgroundColor: 'var(--color-white)',
-                        border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                      }}
+                      style={RESULT_CARD_STYLE}
                     >
                       <div style={{ marginBottom: 'var(--spacing-xs)' }}>
                         <Badge variant="outline" color="info">
@@ -780,8 +826,8 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                             {(showAll || showDate) && <span style={{ marginRight: 'var(--spacing-sm)' }}>{record.date}</span>}
                             {(showAll || showTime) && <span style={{ marginRight: 'var(--spacing-sm)', color: 'var(--color-gray-600)' }}>{record.time}</span>}
                             {(showAll || showStatus) && (
-                              <Badge variant="outline" color={record.status === 'present' ? 'success' : record.status === 'absent' ? 'error' : 'warning'}>
-                                {record.status === 'present' ? '출석' : record.status === 'absent' ? '결석' : record.status === 'late' ? '지각' : record.status}
+                              <Badge variant="outline" color={getStatusColor(record.status)}>
+                                {getStatusLabel(record.status)}
                               </Badge>
                             )}
                           </div>
@@ -814,11 +860,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                     <Card
                       padding="md"
                       variant="default"
-                      style={{
-                        marginTop: 'var(--spacing-sm)',
-                        backgroundColor: 'var(--color-white)',
-                        border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                      }}
+                      style={RESULT_CARD_STYLE}
                     >
                       <div style={{ marginBottom: 'var(--spacing-xs)' }}>
                         <Badge variant="outline" color="info">
@@ -861,11 +903,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                     <Card
                       padding="md"
                       variant="default"
-                      style={{
-                        marginTop: 'var(--spacing-sm)',
-                        backgroundColor: 'var(--color-white)',
-                        border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                      }}
+                      style={RESULT_CARD_STYLE}
                     >
                       <div style={{ marginBottom: 'var(--spacing-xs)' }}>
                         <Badge variant="outline" color="info">
@@ -878,8 +916,8 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                             {(showAll || showMonth) && <span style={{ marginRight: 'var(--spacing-sm)' }}>{invoice.month}</span>}
                             {(showAll || showAmount) && <span style={{ marginRight: 'var(--spacing-sm)', fontWeight: 'var(--font-weight-medium)' }}>{invoice.amount.toLocaleString()}원</span>}
                             {(showAll || showStatus) && (
-                              <Badge variant="outline" color={invoice.status === 'paid' ? 'success' : invoice.status === 'overdue' ? 'error' : 'warning'}>
-                                {invoice.status === 'paid' ? '납부' : invoice.status === 'overdue' ? '미납' : invoice.status === 'unissued' ? '미발행' : invoice.status}
+                              <Badge variant="outline" color={getStatusColor(invoice.status)}>
+                                {getStatusLabel(invoice.status)}
                               </Badge>
                             )}
                           </div>
@@ -911,11 +949,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                     <Card
                       padding="md"
                       variant="default"
-                      style={{
-                        marginTop: 'var(--spacing-sm)',
-                        backgroundColor: 'var(--color-white)',
-                        border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                      }}
+                      style={RESULT_CARD_STYLE}
                     >
                       <div style={{ marginBottom: 'var(--spacing-xs)' }}>
                         <Badge variant="outline" color="info">
@@ -927,8 +961,8 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                           <div key={student.id} style={{ marginBottom: 'var(--spacing-xs)', paddingBottom: 'var(--spacing-xs)', borderBottom: idx < students.length - 1 ? 'var(--border-width-thin) solid var(--color-gray-200)' : 'none' }}>
                             {(showAll || showName) && <span style={{ marginRight: 'var(--spacing-sm)' }}>{student.name}</span>}
                             {(showAll || showStatus) && (
-                              <Badge variant="outline" color={student.status === 'active' ? 'success' : 'gray'}>
-                                {student.status === 'active' ? '재학' : student.status}
+                              <Badge variant="outline" color={getStatusColor(student.status)}>
+                                {getStatusLabel(student.status)}
                               </Badge>
                             )}
                           </div>
@@ -956,11 +990,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                     <Card
                       padding="md"
                       variant="default"
-                      style={{
-                        marginTop: 'var(--spacing-sm)',
-                        backgroundColor: 'var(--color-white)',
-                        border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                      }}
+                      style={RESULT_CARD_STYLE}
                     >
                       <div style={{ marginBottom: 'var(--spacing-xs)' }}>
                         <Badge variant="outline" color="info">
@@ -996,11 +1026,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                         <Card
                           padding="md"
                           variant="default"
-                          style={{
-                            marginTop: 'var(--spacing-sm)',
-                            backgroundColor: 'var(--color-white)',
-                            border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                          }}
+                          style={RESULT_CARD_STYLE}
                         >
                           <EmptyState icon={Search} message="조회 결과가 없습니다." />
                         </Card>
@@ -1014,11 +1040,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                         <Card
                           padding="md"
                           variant="default"
-                          style={{
-                            marginTop: 'var(--spacing-sm)',
-                            backgroundColor: 'var(--color-white)',
-                            border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                          }}
+                          style={RESULT_CARD_STYLE}
                         >
                           <EmptyState icon={Search} message="조회 결과가 없습니다." />
                         </Card>
@@ -1027,30 +1049,14 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
 
                     const fields = Object.keys(firstItem);
 
-                    // 필드명 매핑 (필터링에 사용)
-                    const fieldKeywordsMap: Record<string, string[]> = {
-                      name: ['이름', '성명'],
-                      phone: ['전화번호', '전화', '연락처'],
-                      email: ['이메일', '메일'],
-                      date: ['날짜', '일자'],
-                      time: ['시간', '시각'],
-                      status: ['상태'],
-                      amount: ['금액', '요금', '비용'],
-                      month: ['월', '기간'],
-                      class_name: ['반', '클래스'],
-                      grade: ['학년'],
-                      guardian_name: ['보호자'],
-                      guardian_contact: ['보호자', '전화번호'],
-                    };
-
-                    // 필터링된 필드만 추출
+                    // 필터링된 필드만 추출 - FIELD_KEYWORDS_MAP 사용 (SSOT)
                     let visibleFields = showAll
                       ? fields
                       : fields.filter(field => {
                           const fieldLower = field.toLowerCase();
                           return requestedFields.has(field) ||
                                  requestedFields.has(fieldLower) ||
-                                 fieldKeywordsMap[field]?.some(keyword => originalMessage.toLowerCase().includes(keyword));
+                                 FIELD_KEYWORDS_MAP[field]?.some(keyword => originalMessage.toLowerCase().includes(keyword));
                         });
 
                     // 필터링 결과가 비어있으면 전체 표시
@@ -1072,11 +1078,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                       <Card
                         padding="md"
                         variant="default"
-                        style={{
-                          marginTop: 'var(--spacing-sm)',
-                          backgroundColor: 'var(--color-white)',
-                          border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                        }}
+                        style={RESULT_CARD_STYLE}
                       >
                         <div style={{ marginBottom: 'var(--spacing-xs)' }}>
                           <Badge variant="outline" color="info">
@@ -1100,15 +1102,8 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                                 return (
                                   <span key={field} style={{ marginRight: 'var(--spacing-sm)' }}>
                                     {field === 'status' ? (
-                                      <Badge variant="outline" color={
-                                        value === 'active' || value === 'present' || value === 'paid' ? 'success' :
-                                        value === 'absent' || value === 'overdue' ? 'error' : 'warning'
-                                      }>
-                                        {value === 'active' ? '재학' :
-                                         value === 'present' ? '출석' :
-                                         value === 'absent' ? '결석' :
-                                         value === 'paid' ? '납부' :
-                                         value === 'overdue' ? '미납' : value}
+                                      <Badge variant="outline" color={getStatusColor(value)}>
+                                        {getStatusLabel(value)}
                                       </Badge>
                                     ) : field === 'amount' ? (
                                       <span style={{ fontWeight: 'var(--font-weight-medium)' }}>
@@ -1138,29 +1133,14 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                   if (typeof data === 'object' && data !== null) {
                     const fields = Object.keys(data);
 
-                    // 필드명 매핑 (필터링에 사용)
-                    const fieldKeywordsMap: Record<string, string[]> = {
-                      name: ['이름', '성명'],
-                      phone: ['전화번호', '전화', '연락처'],
-                      email: ['이메일', '메일'],
-                      date: ['날짜', '일자'],
-                      time: ['시간', '시각'],
-                      status: ['상태'],
-                      amount: ['금액', '요금', '비용'],
-                      month: ['월', '기간'],
-                      class_name: ['반', '클래스'],
-                      grade: ['학년'],
-                      guardian_name: ['보호자'],
-                      guardian_contact: ['보호자', '전화번호'],
-                    };
-
+                    // 필터링된 필드만 추출 - FIELD_KEYWORDS_MAP 사용 (SSOT)
                     let visibleFields = showAll
                       ? fields
                       : fields.filter(field => {
                           const fieldLower = field.toLowerCase();
                           return requestedFields.has(field) ||
                                  requestedFields.has(fieldLower) ||
-                                 fieldKeywordsMap[field]?.some(keyword => originalMessage.toLowerCase().includes(keyword));
+                                 FIELD_KEYWORDS_MAP[field]?.some(keyword => originalMessage.toLowerCase().includes(keyword));
                         });
 
                     // 필터링 결과가 비어있으면 전체 표시
@@ -1182,11 +1162,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                       <Card
                         padding="md"
                         variant="default"
-                        style={{
-                          marginTop: 'var(--spacing-sm)',
-                          backgroundColor: 'var(--color-white)',
-                          border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                        }}
+                        style={RESULT_CARD_STYLE}
                       >
                         <div style={{ marginBottom: 'var(--spacing-xs)' }}>
                           <Badge variant="outline" color="info">
@@ -1204,15 +1180,8 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                                   {getFieldLabel(field, industryTerms)}:
                                 </span>
                                 {field === 'status' ? (
-                                  <Badge variant="outline" color={
-                                    value === 'active' || value === 'present' || value === 'paid' ? 'success' :
-                                    value === 'absent' || value === 'overdue' ? 'error' : 'warning'
-                                  }>
-                                    {value === 'active' ? '재학' :
-                                     value === 'present' ? '출석' :
-                                     value === 'absent' ? '결석' :
-                                     value === 'paid' ? '납부' :
-                                     value === 'overdue' ? '미납' : value}
+                                  <Badge variant="outline" color={getStatusColor(value)}>
+                                    {getStatusLabel(value)}
                                   </Badge>
                                 ) : (
                                   <span>{formatValue(field, value)}</span>
@@ -1230,11 +1199,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                     <Card
                       padding="md"
                       variant="default"
-                      style={{
-                        marginTop: 'var(--spacing-sm)',
-                        backgroundColor: 'var(--color-white)',
-                        border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                      }}
+                      style={RESULT_CARD_STYLE}
                     >
                       <div style={{ marginBottom: 'var(--spacing-xs)' }}>
                         <Badge variant="outline" color="info">
@@ -1294,11 +1259,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                   <Card
                     padding="md"
                     variant="default"
-                    style={{
-                      marginTop: 'var(--spacing-sm)',
-                      backgroundColor: 'var(--color-white)',
-                      border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                    }}
+                    style={RESULT_CARD_STYLE}
                   >
                     <div style={{ marginBottom: 'var(--spacing-xs)' }}>
                       <Badge variant="outline" color="info">
@@ -1575,25 +1536,11 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                 flexDirection: 'column',
               }}
             >
-            {(() => {
-              console.log('[ChatOpsPanel] 전체 messages 배열:', messages.map(m => ({ id: m.id, type: m.type, contentPreview: typeof m.content === 'string' ? m.content.substring(0, 30) : '[ReactNode]' })));
-              // ✅ hidden 플래그가 있는 메시지는 렌더링하지 않음
-              return messages
-                .filter(m => !m.metadata?.hidden)
-                .map(renderMessage);
-            })()}
-            {isLoading && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--spacing-sm)',
-                  marginBottom: 'var(--spacing-md)',
-                }}
-              >
-                <Spinner size="sm" />
-              </div>
-            )}
+            {/* ✅ hidden 플래그가 있는 메시지는 렌더링하지 않음 */}
+            {messages
+              .filter(m => !m.metadata?.hidden)
+              .map(renderMessage)}
+            {isLoading && <ChatOpsLoadingDots />}
             <div ref={messagesEndRef} />
             </div>
           </div>

@@ -7,10 +7,11 @@
  */
 
 import React, { useMemo } from 'react';
-import { Modal } from '@ui-core/react';
+import { Modal, EmptyState } from '@ui-core/react';
 import type { StatsCard } from '../../types/dashboardCard';
 import type { DailyStoreMetric } from '@hooks/use-daily-store-metrics';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { TrendingUp } from 'lucide-react';
 
 export interface StatsChartModalProps {
   isOpen: boolean;
@@ -172,17 +173,15 @@ export function StatsChartModal({ isOpen, onClose, card, data }: StatsChartModal
         minHeight: 'calc(var(--spacing-3xl) * 10)',
       }}>
         {chartData.length === 0 ? (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            // HARD-CODE-EXCEPTION: height는 calc()로 계산된 값 (레이아웃용 특수 값)
-            height: 'calc(var(--spacing-3xl) * 10)',
-            color: 'var(--color-text-secondary)',
-            fontSize: 'var(--font-size-base)',
-          }}>
-            데이터가 없습니다.
-          </div>
+          <EmptyState
+            icon={TrendingUp}
+            message="데이터가 없습니다"
+            description="최근 30일 동안의 데이터가 없습니다."
+            style={{
+              // HARD-CODE-EXCEPTION: height는 calc()로 계산된 값 (레이아웃용 특수 값)
+              height: 'calc(var(--spacing-3xl) * 10)',
+            }}
+          />
         ) : (
           <>
             {/* HARD-CODE-EXCEPTION: recharts 라이브러리 요구값 (3rd-party 라이브러리 요구값) */}
