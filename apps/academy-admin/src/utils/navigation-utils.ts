@@ -100,10 +100,16 @@ export function isSafeInternalPath(target: string): boolean {
       '/',
       '/home',
       '/students',
+      '/customers', // 업종별 경로 (salon, nail_salon)
+      '/clients', // 업종별 경로 (real_estate)
+      '/members', // 업종별 경로 (gym)
       '/attendance',
+      '/appointments', // 업종별 경로 (salon, nail_salon, real_estate)
       '/billing',
       '/classes',
       '/teachers',
+      '/staff', // 업종별 경로 (salon, nail_salon)
+      '/agents', // 업종별 경로 (real_estate)
       '/notifications',
       '/analytics',
       '/ai',
@@ -112,6 +118,7 @@ export function isSafeInternalPath(target: string): boolean {
       '/auth', // 인증 관련 라우트
       '/kiosk-check-in', // 키오스크 체크인
       '/super-admin', // 슈퍼 어드민
+      '/manual', // 매뉴얼 페이지
     ];
     const matchesBasePattern = baseRoutePatterns.some((pattern) => {
       return normalized === pattern || normalized.startsWith(pattern + '/') || normalized.startsWith(pattern + '?');

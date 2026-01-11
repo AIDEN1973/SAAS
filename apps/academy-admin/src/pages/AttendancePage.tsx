@@ -14,24 +14,21 @@
  * - 출결 히스토리 조회
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useOptimizedQuery } from '@hooks/use-optimized-query';
-import { ErrorBoundary , Container, Card, Button, Input, Badge, Select, useModal, Checkbox, Tabs, BottomActionBar, Grid, PageHeader , useResponsiveMode, isMobile, isTablet, NotificationCardLayout, EmptyState } from '@ui-core/react';
+import { ErrorBoundary , Container, Card, Button, Badge, Select, useModal, Checkbox, BottomActionBar, Grid, PageHeader , useResponsiveMode, isMobile, isTablet, NotificationCardLayout, EmptyState } from '@ui-core/react';
 // [SSOT] Barrel export를 통한 통합 import
 import { createSafeNavigate } from '../utils';
 import { CardGridLayout } from '../components/CardGridLayout';
 import { Users, UserCheck, Clock, UserX } from 'lucide-react';
-import type { TabItem } from '@ui-core/react';
 import { SchemaFilter } from '@schema-engine';
-import { useAttendanceLogs, fetchAttendanceLogs, useCreateAttendanceLog, useDeleteAttendanceLog } from '@hooks/use-attendance';
+import { useAttendanceLogs, useCreateAttendanceLog, useDeleteAttendanceLog } from '@hooks/use-attendance';
 import { useStudents } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
-import { useConfig } from '@hooks/use-config';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES } from '../constants';
-import type { AttendanceFilter, AttendanceType, AttendanceStatus, AttendanceLog } from '@services/attendance-service';
+import type { AttendanceFilter, AttendanceType, AttendanceStatus } from '@services/attendance-service';
 import type { Student } from '@services/student-service';
 import type { ColorToken } from '@design-system/core';
 import type { DayOfWeek } from '@services/class-service';
@@ -40,10 +37,8 @@ import { createAttendanceFormSchema } from '../schemas/attendance.schema';
 import { createAttendanceFilterSchema, createAttendanceHeaderFilterSchema } from '../schemas/attendance.filter.schema';
 // 출결 설정은 환경설정 > 출결 설정으로 이동 (아키텍처 문서 3.3.7)
 // import { attendanceSettingsFormSchema } from '../schemas/attendance-settings.schema';
-import { getApiContext } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
 import { useUserRole } from '@hooks/use-auth';
-import { getPolicyValue } from '../utils/policy-registry';
 
 // 학생 출결 상태 인터페이스
 interface StudentAttendanceState {
@@ -69,8 +64,6 @@ export function AttendancePage() {
   const isMobileMode = isMobile(modeUpper);
   const isTabletMode = isTablet(modeUpper); // 아키텍처 문서 3.3.9: 태블릿 모드 감지 (768px ~ 1024px)
   const { data: userRole } = useUserRole();
-  const context = getApiContext();
-  const tenantId = context.tenantId;
   const terms = useIndustryTerms();
 
   // 역할별 권한 체크 (아키텍처 문서 2.3, 498-507줄)
@@ -78,20 +71,6 @@ export function AttendancePage() {
   // Teacher: 출결 입력 및 수정 모두 가능
   const canModifyAttendance = userRole !== 'assistant';
 
-  // 화면 모드: 'today' (오늘 출결하기) 또는 'qr' (QR 출결 실행)
-  // 아키텍처 문서 3.3.1: 출결 메인 화면은 "오늘 출결하기"와 "QR 출결 실행(학생용)" 두 개만 있어야 함
-  // localStorage 기반 상태 초기화 (SSR Safe, AutomationSettingsPage 패턴 적용)
-  const [viewMode, setViewMode] = useState<'today' | 'qr'>(() => {
-    try {
-      const stored = localStorage.getItem('attendance-page-view-mode');
-      return stored === 'qr' ? 'qr' : 'today';
-    } catch (error) {
-      if (import.meta.env?.DEV) {
-        console.warn('AttendancePage: localStorage 접근 실패, 기본값 사용', { error });
-      }
-      return 'today';
-    }
-  });
 
   // 오늘 출결하기 관련 상태
   // localStorage 기반 상태 초기화 (마지막 선택 반 기억)
@@ -117,33 +96,17 @@ export function AttendancePage() {
     date_to: toKST().format('YYYY-MM-DD'),
   });
 
-  // QR 출결 상태
-  const [showQRScanner, setShowQRScanner] = useState(false);
-  const [qrScanning, setQrScanning] = useState(false);
-  const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
 
   // 통계/히트맵 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8)
   // const [showStatistics, setShowStatistics] = useState(false);
 
   // 출결 설정은 환경설정 > 출결 설정으로 이동 (아키텍처 문서 1716줄)
   // const [showSettings, setShowSettings] = useState(false);
-  const { data: config } = useConfig();
+  // const { data: config } = useConfig(); // 현재 사용되지 않음
 
   // 전역 모달 훅 사용
   const { showAlert, showConfirm } = useModal();
 
-  // localStorage 상태 지속성 핸들러 (AutomationSettingsPage 패턴)
-  const handleViewModeChange = useCallback((mode: 'today' | 'qr') => {
-    setViewMode(mode);
-    try {
-      localStorage.setItem('attendance-page-view-mode', mode);
-    } catch (error) {
-      if (import.meta.env?.DEV) {
-        console.warn('AttendancePage: localStorage 저장 실패', { error });
-      }
-    }
-  }, []);
 
   const handleClassIdChange = useCallback((classId: string | null) => {
     setSelectedClassId(classId);
@@ -162,19 +125,20 @@ export function AttendancePage() {
 
   // [P0-FIX] Policy Registry 기반 출결 설정 (Automation Config First 원칙)
   // Fail Closed: Policy가 없으면 지각/결석 판정 불가 (기본값 null)
-  const attendanceConfig = useMemo(() => {
-    const lateAfter = getPolicyValue<number>('ATTENDANCE_LATE_AFTER', config);
-    const absentAfter = getPolicyValue<number>('ATTENDANCE_ABSENT_AFTER', config);
-    const autoNotification = getPolicyValue<boolean>('ATTENDANCE_AUTO_NOTIFICATION', config) ?? false;
-    const notificationChannel = getPolicyValue<string>('ATTENDANCE_NOTIFICATION_CHANNEL', config) ?? 'sms';
+  // Note: 현재 사용되지 않지만 향후 확장을 위해 유지
+  // const _attendanceConfig = useMemo(() => {
+  //   const lateAfter = getPolicyValue<number>('ATTENDANCE_LATE_AFTER', config);
+  //   const absentAfter = getPolicyValue<number>('ATTENDANCE_ABSENT_AFTER', config);
+  //   const autoNotification = getPolicyValue<boolean>('ATTENDANCE_AUTO_NOTIFICATION', config) ?? false;
+  //   const notificationChannel = getPolicyValue<string>('ATTENDANCE_NOTIFICATION_CHANNEL', config) ?? 'sms';
 
-    return {
-      late_after: lateAfter,
-      absent_after: absentAfter,
-      auto_notification: autoNotification,
-      notification_channel: notificationChannel as 'sms' | 'kakao_at',
-    };
-  }, [config]);
+  //   return {
+  //     late_after: lateAfter,
+  //     absent_after: absentAfter,
+  //     auto_notification: autoNotification,
+  //     notification_channel: notificationChannel as 'sms' | 'kakao_at',
+  //   };
+  // }, [config]);
 
   // 출결 기록 상태
   // const [showCreateForm, setShowCreateForm] = useState(false); // (미사용) 출결 기록 수동 생성 UI 도입 시 사용
@@ -260,65 +224,69 @@ export function AttendancePage() {
     return filtered;
   }, [todayStudents, selectedClassId, selectedClassStudentIds, searchQuery]);
 
-  // AI 출석 예측 조회 (초기 상태에만 적용)
-  // [성능 최적화] useOptimizedQuery 사용
-  const { data: aiPredictions, isLoading: isLoadingPredictions } = useOptimizedQuery(
-    ['ai-attendance-predictions', selectedDate, selectedClassId, filteredStudents.map(s => s.id)],
-    async () => {
-      if (!filteredStudents || filteredStudents.length === 0) return {};
+  // [비활성화] AI 출석 예측 기능 비활성화
+  const aiPredictions = useMemo<Record<string, { check_in: boolean; check_out: boolean; status: AttendanceStatus }>>(() => ({}), []);
+  const isLoadingPredictions = false;
 
-      try {
-        // AI 출석 예측 (아키텍처 문서 3.3.2: AI가 출석을 "예측"하여 기본값 설정)
-        // 현재는 과거 출결 패턴 기반 간단한 예측 구현
-        // 향후 Edge Function으로 AI 예측 API 호출로 확장 예정
-        const predictions: Record<string, { check_in: boolean; check_out: boolean; status: AttendanceStatus }> = {};
+  // // AI 출석 예측 조회 (초기 상태에만 적용)
+  // // [성능 최적화] useOptimizedQuery 사용
+  // const { data: aiPredictions, isLoading: isLoadingPredictions } = useOptimizedQuery(
+  //   ['ai-attendance-predictions', selectedDate, selectedClassId, filteredStudents.map(s => s.id)],
+  //   async () => {
+  //     if (!filteredStudents || filteredStudents.length === 0) return {};
 
-        // 각 학생의 과거 출결 패턴 조회
-        // 기술문서 5-2: KST 기준 날짜 처리
-        const dateFrom = toKST(selectedDate).subtract(30, 'day').format('YYYY-MM-DD');
+  //     try {
+  //       // AI 출석 예측 (아키텍처 문서 3.3.2: AI가 출석을 "예측"하여 기본값 설정)
+  //       // 현재는 과거 출결 패턴 기반 간단한 예측 구현
+  //       // 향후 Edge Function으로 AI 예측 API 호출로 확장 예정
+  //       const predictions: Record<string, { check_in: boolean; check_out: boolean; status: AttendanceStatus }> = {};
 
-        for (const student of filteredStudents) {
-          try {
-            // 학생의 과거 출결 데이터 조회
-            // 정본 규칙: fetchAttendanceLogs 함수 사용 (Hook의 queryFn 로직 재사용)
-            if (!tenantId) continue;
-            const pastLogs = await fetchAttendanceLogs(tenantId, {
-              student_id: student.id,
-              date_from: dateFrom,
-              date_to: selectedDate,
-              attendance_type: 'check_in',
-            });
+  //       // 각 학생의 과거 출결 패턴 조회
+  //       // 기술문서 5-2: KST 기준 날짜 처리
+  //       const dateFrom = toKST(selectedDate).subtract(30, 'day').format('YYYY-MM-DD');
 
-            if (pastLogs.length > 0) {
-              // 출석률 계산
-              const presentCount = (pastLogs as unknown as AttendanceLog[]).filter((log: AttendanceLog) => log.status === 'present').length;
-              const attendanceRate = presentCount / pastLogs.length;
+  //       for (const student of filteredStudents) {
+  //         try {
+  //           // 학생의 과거 출결 데이터 조회
+  //           // 정본 규칙: fetchAttendanceLogs 함수 사용 (Hook의 queryFn 로직 재사용)
+  //           if (!tenantId) continue;
+  //           const pastLogs = await fetchAttendanceLogs(tenantId, {
+  //             student_id: student.id,
+  //             date_from: dateFrom,
+  //             date_to: selectedDate,
+  //             attendance_type: 'check_in',
+  //           });
 
-              // 출석률이 70% 이상이면 출석 예측
-              if (attendanceRate >= 0.7) {
-                predictions[student.id] = {
-                  check_in: true,
-                  check_out: false,
-                  status: attendanceRate >= 0.9 ? 'present' : 'late',
-                };
-              }
-            }
-          } catch (error) {
-            // AI 예측 실패 시 해당 학생은 예측값 없음으로 처리 (아키텍처 문서 3.3.2: fallback_on_prediction_failure)
-          }
-        }
+  //           if (pastLogs.length > 0) {
+  //             // 출석률 계산
+  //             const presentCount = (pastLogs as unknown as AttendanceLog[]).filter((log: AttendanceLog) => log.status === 'present').length;
+  //             const attendanceRate = presentCount / pastLogs.length;
 
-        return predictions;
-      } catch (error) {
-        // AI 예측 실패 시 빈 객체 반환 (모든 학생 미체크 상태) - 아키텍처 문서 3.3.2: fallback_on_prediction_failure
-        return {};
-      }
-    },
-    {
-      enabled: filteredStudents.length > 0 && viewMode === 'today',
-      // useOptimizedQuery의 기본 staleTime(5분)이 자동 적용됨
-    }
-  );
+  //             // 출석률이 70% 이상이면 출석 예측
+  //             if (attendanceRate >= 0.7) {
+  //               predictions[student.id] = {
+  //                 check_in: true,
+  //                 check_out: false,
+  //                 status: attendanceRate >= 0.9 ? 'present' : 'late',
+  //               };
+  //             }
+  //           }
+  //         } catch (error) {
+  //           // AI 예측 실패 시 해당 학생은 예측값 없음으로 처리 (아키텍처 문서 3.3.2: fallback_on_prediction_failure)
+  //         }
+  //       }
+
+  //       return predictions;
+  //     } catch (error) {
+  //       // AI 예측 실패 시 빈 객체 반환 (모든 학생 미체크 상태) - 아키텍처 문서 3.3.2: fallback_on_prediction_failure
+  //       return {};
+  //     }
+  //   },
+  //   {
+  //     enabled: filteredStudents.length > 0 && viewMode === 'today',
+  //     // useOptimizedQuery의 기본 staleTime(5분)이 자동 적용됨
+  //   }
+  // );
 
   // 전체 로딩 상태 (아키텍처 문서 3.3.3: loading 상태)
   // isLoadingPredictions 정의 이후에 계산해야 함
@@ -327,14 +295,15 @@ export function AttendancePage() {
   // 전체 에러 상태 (아키텍처 문서 3.3.3: error 상태)
   const error = errorLogs || errorStudents || errorClasses;
 
+  // AI 예측값 초기화 여부 추적 (무한루프 방지)
+  const initializedRef = useRef(false);
+
   // AI 예측값을 초기 상태에 적용 (한 번만 실행)
   useEffect(() => {
-    if (!aiPredictions || Object.keys(studentAttendanceStates).length > 0) {
-      // 이미 사용자가 수정한 경우 AI 예측값 적용하지 않음
-      return;
-    }
-
+    // 이미 초기화된 경우 스킵
+    if (initializedRef.current) return;
     if (isLoadingPredictions) return;
+    if (filteredStudents.length === 0) return;
 
     // AI 예측값을 초기 상태로 설정
     const newStates: Record<string, StudentAttendanceState> = {};
@@ -364,11 +333,13 @@ export function AttendancePage() {
     });
 
     setStudentAttendanceStates(newStates);
-  }, [aiPredictions, isLoadingPredictions, filteredStudents, studentAttendanceStates]);
+    initializedRef.current = true;
+  }, [aiPredictions, isLoadingPredictions, filteredStudents]);
 
   // 선택된 반/날짜 변경 시 상태 초기화
   useEffect(() => {
     setStudentAttendanceStates({});
+    initializedRef.current = false; // 다시 초기화할 수 있도록 리셋
   }, [selectedClassId, selectedDate]);
 
   // 출결 필터 스키마 생성 (동적 옵션)
@@ -421,123 +392,61 @@ export function AttendancePage() {
 
   // 지각/결석 자동 판정 함수
   // [P0-FIX] Fail Closed 패턴: Policy가 없으면 자동 판정 불가
-  const determineAttendanceStatus = (
-    occurredAt: string | Date,
-    classInfo: { start_time: string; day_of_week: string } | undefined,
-    lateAfter: number | null,
-    absentAfter: number | null
-  ): { status: AttendanceStatus; attendance_type: AttendanceType } => {
-    if (!classInfo) {
-      // 수업 정보가 없으면 수동 입력값 사용
-      return { status: 'present', attendance_type: 'check_in' };
-    }
+  // Note: 현재 사용되지 않지만 향후 확장을 위해 유지
+  // const _determineAttendanceStatus = (
+  //   occurredAt: string | Date,
+  //   classInfo: { start_time: string; day_of_week: string } | undefined,
+  //   lateAfter: number | null,
+  //   absentAfter: number | null
+  // ): { status: AttendanceStatus; attendance_type: AttendanceType } => {
+  //   if (!classInfo) {
+  //     // 수업 정보가 없으면 수동 입력값 사용
+  //     return { status: 'present', attendance_type: 'check_in' };
+  //   }
 
-    // [P0-FIX] Fail Closed: Policy가 없으면 자동 판정 불가 (수동 입력값 사용)
-    if (lateAfter === null || absentAfter === null) {
-      return { status: 'present', attendance_type: 'check_in' };
-    }
+  //   // [P0-FIX] Fail Closed: Policy가 없으면 자동 판정 불가 (수동 입력값 사용)
+  //   if (lateAfter === null || absentAfter === null) {
+  //     return { status: 'present', attendance_type: 'check_in' };
+  //   }
 
-    // 반의 요일 확인
-    const dayMap: Record<string, number> = {
-      'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4,
-      'friday': 5, 'saturday': 6, 'sunday': 0,
-    };
-    const classDayOfWeek = dayMap[classInfo.day_of_week.toLowerCase()];
-    const occurredAtKSTForDay = typeof occurredAt === 'string' ? toKST(occurredAt) : toKST(occurredAt.toISOString());
-    const occurredDayOfWeek = occurredAtKSTForDay.day();
+  //   // 반의 요일 확인
+  //   const dayMap: Record<string, number> = {
+  //     'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4,
+  //     'friday': 5, 'saturday': 6, 'sunday': 0,
+  //   };
+  //   const classDayOfWeek = dayMap[classInfo.day_of_week.toLowerCase()];
+  //   const occurredAtKSTForDay = typeof occurredAt === 'string' ? toKST(occurredAt) : toKST(occurredAt.toISOString());
+  //   const occurredDayOfWeek = occurredAtKSTForDay.day();
 
-    // 요일이 맞지 않으면 수동 입력값 사용
-    if (classDayOfWeek !== occurredDayOfWeek) {
-      return { status: 'present', attendance_type: 'check_in' };
-    }
+  //   // 요일이 맞지 않으면 수동 입력값 사용
+  //   if (classDayOfWeek !== occurredDayOfWeek) {
+  //     return { status: 'present', attendance_type: 'check_in' };
+  //   }
 
-    // 수업 시작 시간 파싱
-    const [startHour, startMinute] = classInfo.start_time.split(':').map(Number);
-    const occurredAtKST = typeof occurredAt === 'string' ? toKST(occurredAt) : toKST(occurredAt.toISOString());
-    const classStartTime = occurredAtKST.hour(startHour).minute(startMinute).second(0).millisecond(0);
+  //   // 수업 시작 시간 파싱
+  //   const [startHour, startMinute] = classInfo.start_time.split(':').map(Number);
+  //   const occurredAtKST = typeof occurredAt === 'string' ? toKST(occurredAt) : toKST(occurredAt.toISOString());
+  //   const classStartTime = occurredAtKST.hour(startHour).minute(startMinute).second(0).millisecond(0);
 
-    // 시간 차이 계산 (분)
-    const diffMinutes = occurredAtKST.diff(classStartTime, 'minute');
+  //   // 시간 차이 계산 (분)
+  //   const diffMinutes = occurredAtKST.diff(classStartTime, 'minute');
 
-    // 자동 판정
-    if (diffMinutes <= 0) {
-      return { status: 'present', attendance_type: 'check_in' };
-    } else if (diffMinutes <= lateAfter) {
-      return { status: 'late', attendance_type: 'late' };
-    } else if (diffMinutes <= absentAfter) {
-      return { status: 'late', attendance_type: 'late' };
-    } else {
-      return { status: 'absent', attendance_type: 'absent' };
-    }
-  };
+  //   // 자동 판정
+  //   if (diffMinutes <= 0) {
+  //     return { status: 'present', attendance_type: 'check_in' };
+  //   } else if (diffMinutes <= lateAfter) {
+  //     return { status: 'late', attendance_type: 'late' };
+  //   } else if (diffMinutes <= absentAfter) {
+  //     return { status: 'late', attendance_type: 'late' };
+  //   } else {
+  //     return { status: 'absent', attendance_type: 'absent' };
+  //   }
+  // };
 
-  // QR 스캐너 video 요소 연결
-  useEffect(() => {
-    if (videoRef && stream) {
-      videoRef.srcObject = stream;
-      videoRef.play().catch(() => {
-        // 비디오 재생 실패 시 무시 (카메라 권한 문제 등)
-      });
-    }
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, [videoRef, stream]);
 
   // 출결 설정은 환경설정 > 출결 설정으로 이동 (아키텍처 문서 3.3.7, 1716줄)
   // handleSaveSettings 함수 제거됨
-
-  // 출결 기록 생성
-  const handleCreateAttendance = async (data: Record<string, unknown>) => {
-    if (!data.student_id) {
-      showAlert(`${terms.PERSON_LABEL_PRIMARY}을(를) 선택해주세요.`, terms.MESSAGES.ALERT, 'warning');
-      return;
-    }
-
-    try {
-      const occurredAtKST = toKST(data.occurred_at as string | number | Date);
-      const classInfo = data.class_id
-        ? classes?.find(c => c.id === data.class_id)
-        : undefined;
-
-      // 자동 판정 (수업 정보가 있고 등원인 경우)
-      let finalStatus = data.status;
-      let finalType = data.attendance_type;
-
-      if (data.attendance_type === 'check_in' && classInfo) {
-        const autoDetermined = determineAttendanceStatus(
-          occurredAtKST.toISOString(),
-          classInfo,
-          attendanceConfig.late_after,
-          attendanceConfig.absent_after
-        );
-        finalStatus = autoDetermined.status;
-        finalType = autoDetermined.attendance_type;
-      }
-
-      await createAttendance.mutateAsync({
-        student_id: String(data.student_id ?? ''),
-        class_id: data.class_id ? String(data.class_id) : undefined,
-        occurred_at: occurredAtKST.toISOString(),
-        attendance_type: finalType as AttendanceType,
-        status: finalStatus as AttendanceStatus,
-        notes: data.notes ? String(data.notes) : undefined,
-      });
-
-      // [문서 요구사항] 알림 발송은 서버에서 자동 처리됨 (core-notification → 학부모 알림)
-      // 클라이언트에서는 알림 발송 로직을 제거하고, 서버에서 설정에 따라 자동 발송
-
-      // setShowCreateForm(false); // (미사용) 출결 기록 수동 생성 UI 도입 시 사용
-    } catch (error) {
-      showAlert(
-        `출결 기록 생성 중 오류가 발생했습니다: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        terms.MESSAGES.ERROR,
-        'error'
-      );
-    }
-  };
+  // handleCreateAttendance 함수 제거됨 (미사용)
 
   // 출결 스키마 생성 (동적 옵션)
   const attendanceSchema = useMemo(
@@ -556,97 +465,6 @@ export function AttendancePage() {
   const effectiveFormSchema = attendanceFormSchemaData || attendanceSchema;
   void effectiveFormSchema; // Reserved for future use
 
-  // QR 스캐너 시작
-  const handleStartQRScanner = async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' } // 후면 카메라 우선
-      });
-      setStream(mediaStream);
-      setShowQRScanner(true);
-      setQrScanning(true);
-    } catch (error) {
-      showAlert('카메라 접근 권한이 필요합니다. 브라우저 설정에서 카메라 권한을 허용해주세요.', terms.MESSAGES.ALERT, 'warning');
-    }
-  };
-
-  // QR 스캐너 종료
-  const handleStopQRScanner = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-    setShowQRScanner(false);
-    setQrScanning(false);
-    if (videoRef) {
-      videoRef.srcObject = null;
-    }
-    // QR 스캔 완료 후 QR 탭에 머물러 있음 (아키텍처 문서 3.3.5: QR 출결 실행은 별도 화면)
-  };
-
-  // QR 코드 스캔 처리
-  // [P1-SECURITY] QR 토큰 만료 검증 추가 (아키텍처 문서 3.3.5)
-  const handleQRScan = async (qrData: string) => {
-    try {
-      // QR 코드 형식:
-      // - 레거시: student_id (평문)
-      // - 신규: JSON {student_id, class_id, issued_at, expires_at}
-      let studentId: string;
-      let classId: string | undefined;
-      let expiresAt: string | undefined;
-
-      try {
-        const parsed = JSON.parse(qrData) as {
-          student_id?: string;
-          class_id?: string;
-          issued_at?: string;
-          expires_at?: string;
-        };
-        studentId = parsed.student_id ?? qrData;
-        classId = parsed.class_id;
-        expiresAt = parsed.expires_at;
-
-        // [P1-SECURITY] QR 토큰 만료 검증
-        if (expiresAt) {
-          const nowKST = toKST();
-          const expiresAtKST = toKST(expiresAt);
-
-          if (nowKST.isAfter(expiresAtKST)) {
-            showAlert(
-              'QR 코드가 만료되었습니다. 새로운 QR 코드를 발급받아주세요.',
-              terms.MESSAGES.ALERT,
-              'warning'
-            );
-            return;
-          }
-        }
-      } catch {
-        // JSON이 아니면 student_id로 간주 (레거시 호환성)
-        studentId = qrData;
-      }
-
-      const student = students?.find((s) => s.id === studentId);
-      if (!student) {
-        showAlert(`등록되지 않은 ${terms.PERSON_LABEL_PRIMARY}입니다.`, terms.MESSAGES.ALERT, 'warning');
-        return;
-      }
-
-      // 출결 기록 생성 (QR 스캔 시 즉시 기록)
-      const nowKST = toKST();
-      await handleCreateAttendance({
-        student_id: studentId,
-        class_id: classId,
-        occurred_at: nowKST.format('YYYY-MM-DDTHH:mm'),
-        attendance_type: 'check_in',
-        status: 'present',
-      });
-
-      handleStopQRScanner();
-      showAlert(`${student.name}님의 ${terms.CHECK_IN_LABEL}이(가) 기록되었습니다.`, terms.MESSAGES.SUCCESS, 'success');
-    } catch (error) {
-      showAlert('QR 코드를 인식할 수 없습니다.', terms.MESSAGES.ERROR, 'error');
-    }
-  };
 
   // 통계/히트맵/패턴 분석 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8)
   // calculateStatistics, analyzeDayPattern, analyzeTimePattern, calculateClassHeatmap, detectAbnormalAttendance 함수 제거됨
@@ -916,14 +734,6 @@ export function AttendancePage() {
     return { total, present, late, absent };
   }, [studentAttendanceStates, filteredStudents]);
 
-  // 탭 아이템 (아키텍처 문서 3.3.1: "오늘 출결하기"와 "QR 출결 실행" 두 개만)
-  // QR 출결은 설정 활성화 시에만 표시 (아키텍처 문서 1700-1701줄)
-  const qrEnabled = config?.attendance?.qr_enabled ?? false;
-  const tabItems: TabItem[] = [
-    { key: 'today', label: '오늘 출결하기', content: null },
-    ...(qrEnabled ? [{ key: 'qr', label: 'QR 출결 실행', content: null }] : []),
-  ];
-
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
@@ -931,17 +741,8 @@ export function AttendancePage() {
           title={`출결 관리`}
         />
 
-        {/* 탭 메뉴 */}
-        <Tabs
-          items={tabItems}
-          activeKey={viewMode}
-          onChange={(key) => handleViewModeChange(key as 'today' | 'qr')}
-          style={{ marginBottom: 'var(--spacing-xl)' }}
-        />
-
-          {/* 오늘 출결하기 화면 */}
-          {viewMode === 'today' && (
-            <>
+        {/* 출결 화면 */}
+        <>
               {/* AttendanceHeader: 수업 선택, 날짜 선택, 검색 (아키텍처 문서 3.3.3) - SchemaFilter 사용 */}
               <div style={{ pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
                 <SchemaFilter
@@ -1553,122 +1354,7 @@ export function AttendancePage() {
                   </div>
                 </Card>
               )}
-            </>
-          )}
-
-          {/* QR 출결 실행 화면 (아키텍처 문서 3.3.1: 설정 활성화 시에만 표시) */}
-          {viewMode === 'qr' && (
-            <>
-              {/* QR 스캐너 */}
-              {!showQRScanner && (
-                <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', alignItems: 'center' }}>
-                    <h2 style={{
-                      fontSize: 'var(--font-size-xl)',
-                      fontWeight: 'var(--font-weight-semibold)',
-                      color: 'var(--color-text)',
-                      marginBottom: 'var(--spacing-xs)',
-                    }}>
-                      QR 출결 실행
-                    </h2>
-                    <p style={{ color: 'var(--color-text-secondary)', textAlign: 'center' }}>
-                      QR 코드를 스캔하여 출결을 기록합니다.
-                    </p>
-                    <Button
-                      variant="solid"
-                      color="primary"
-                      onClick={handleStartQRScanner}
-                      size="lg"
-                      style={{ minWidth: 'var(--width-student-info-min)' }}
-                    >
-                      QR 스캔 시작
-                    </Button>
-                  </div>
-                </Card>
-              )}
-
-              {/* QR 스캐너 모달 */}
-              {showQRScanner && (
-            <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)', position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-                <h2 style={{
-                  fontSize: 'var(--font-size-xl)',
-                  fontWeight: 'var(--font-weight-semibold)',
-                  color: 'var(--color-text)',
-                }}>
-                  QR 출결
-                </h2>
-                <Button variant="ghost" size="sm" onClick={handleStopQRScanner}>
-                  닫기
-                </Button>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', alignItems: 'center' }}>
-                <div style={{
-                  width: '100%',
-                  maxWidth: 'var(--width-drawer-tablet)',
-                  aspectRatio: 'var(--aspect-ratio-square)',
-                  backgroundColor: 'var(--color-gray-900)',
-                  borderRadius: 'var(--border-radius-md)',
-                  overflow: 'hidden',
-                  position: 'relative'
-                }}>
-                  <video
-                    ref={setVideoRef}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    playsInline
-                    autoPlay
-                    muted
-                  />
-                  {qrScanning && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'var(--transform-center)',
-                      width: 'var(--width-student-info-min)',
-                      height: 'var(--width-student-info-min)',
-                      border: `var(--border-width-base) solid var(--color-white)`,
-                      borderRadius: 'var(--border-radius-md)',
-                      pointerEvents: 'none'
-                    }} />
-                  )}
-                </div>
-                <p style={{ color: 'var(--color-text-secondary)', textAlign: 'center' }}>
-                  QR 코드를 카메라에 맞춰주세요
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)', width: '100%', maxWidth: 'var(--width-drawer-tablet)' }}>
-                  <Input
-                    placeholder={`QR 코드를 스캔하거나 ${terms.PERSON_LABEL_PRIMARY} ID를 직접 입력하세요`}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        const value = (e.target as HTMLInputElement).value.trim();
-                        if (value) {
-                          void handleQRScan(value);
-                          (e.target as HTMLInputElement).value = '';
-                        }
-                      }
-                    }}
-                    fullWidth
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      const input = document.querySelector('input[placeholder*="QR 코드"]') as HTMLInputElement;
-                      if (input?.value.trim()) {
-                        void handleQRScan(input.value.trim());
-                        input.value = '';
-                      }
-                    }}
-                    fullWidth
-                  >
-                    확인
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          )}
-            </>
-          )}
+        </>
 
         {/* 통계/히트맵/패턴 분석 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8) */}
       </Container>

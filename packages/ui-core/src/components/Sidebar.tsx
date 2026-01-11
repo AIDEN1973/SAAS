@@ -46,6 +46,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [advancedMenuItems, setAdvancedMenuItems] = useState<SidebarItem[] | null>(null);
   const [selectedAdvancedItem, setSelectedAdvancedItem] = useState<SidebarItem | null>(null);
   const advancedButtonRef = useRef<HTMLButtonElement>(null);
+  const prevPathRef = useRef<string | undefined>(currentPath);
+
+  // 경로가 변경되면 advancedMenu 상태 초기화 (오버레이가 클릭을 차단하는 문제 해결)
+  React.useEffect(() => {
+    if (prevPathRef.current !== currentPath) {
+      setAdvancedMenuOpen(false);
+      setAdvancedMenuItems(null);
+      prevPathRef.current = currentPath;
+    }
+  }, [currentPath]);
 
   const handleItemClick = (item: SidebarItem) => {
     // Advanced 메뉴이고 children이 있으면 레이어 메뉴 열기

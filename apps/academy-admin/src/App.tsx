@@ -10,7 +10,7 @@ import {
   Tooltip,
 } from '@ui-core/react';
 import type { SearchResult, SidebarItem, ExecutionAuditRun } from '@ui-core/react';
-import { ChatsCircle, ClockCounterClockwise } from 'phosphor-react';
+import { ChatsCircle, ClockCounterClockwise, BookOpen } from 'phosphor-react';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleBasedRoute } from './components/RoleBasedRoute';
 import { IndustryBasedRoute } from './components/IndustryBasedRoute';
@@ -95,6 +95,42 @@ const TimelineButton: React.FC<{ onClick: () => void }> = ({ onClick }) => {
   );
 };
 
+// Manual Button Component
+const ManualButton: React.FC<{ isOpen: boolean; onClick: () => void }> = ({ isOpen, onClick }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <Tooltip content="매뉴얼" position="bottom">
+      <button
+        onClick={onClick}
+        aria-label="매뉴얼 열기/닫기"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--spacing-sm)',
+          backgroundColor: isHovered ? 'var(--color-primary-hover)' : 'transparent',
+          border: 'none',
+          borderRadius: 'var(--border-radius-md)',
+          cursor: 'pointer',
+          transition: 'var(--transition-all)',
+        }}
+      >
+        <BookOpen
+          weight={isOpen ? 'bold' : 'regular'}
+          style={{
+            width: 'var(--size-icon-xl)',
+            height: 'var(--size-icon-xl)',
+            color: isOpen ? 'var(--color-primary)' : 'var(--color-text-tertiary)',
+          }}
+        />
+      </button>
+    </Tooltip>
+  );
+};
+
 // 큰 컴포넌트는 lazy loading으로 전환 (초기 로드 번들 크기 감소)
 const AppLayout = lazy(() => import('@ui-core/react').then(m => ({ default: m.AppLayout })));
 const TimelineModal = lazy(() => import('@ui-core/react').then(m => ({ default: m.TimelineModal })));
@@ -125,6 +161,7 @@ const IntentPatternsPage = lazy(() => import('./pages/IntentPatternsPage').then(
 const SchemaEditorPage = lazy(() => import('../../super-admin/src/pages/SchemaEditorPage').then(m => ({ default: m.SchemaEditorPage })));
 const AuthGuard = lazy(() => import('../../super-admin/src/components/AuthGuard').then(m => ({ default: m.AuthGuard })));
 const AgentPage = lazy(() => import('./pages/AgentPage').then(m => ({ default: m.AgentPage })));
+const ManualPage = lazy(() => import('./pages/ManualPage').then(m => ({ default: m.ManualPage })));
 
 // 로딩 컴포넌트
 // [SSOT] 하드코딩 금지: CSS 변수 사용
@@ -154,6 +191,20 @@ function AppContent() {
 
   // 타임라인 모달 상태
   const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+
+  // 매뉴얼 페이지 여부 확인
+  const isManualPath = location.pathname === '/manual';
+
+  // 매뉴얼 버튼 클릭 핸들러 (라우트 기반)
+  const handleManualToggle = useCallback(() => {
+    if (isManualPath) {
+      // 매뉴얼 페이지에서 버튼 클릭 시 이전 페이지로 이동
+      window.history.back();
+    } else {
+      // 다른 페이지에서 버튼 클릭 시 매뉴얼 페이지로 이동
+      safeNavigate('/manual');
+    }
+  }, [isManualPath, safeNavigate]);
 
   // 글로벌 검색 API 호출 함수
   const handleGlobalSearch = useCallback(async (input: { query: string; entity_types?: string[]; limit?: number }) => {
@@ -998,6 +1049,10 @@ function AppContent() {
                     <TimelineButton
                       onClick={() => setIsTimelineOpen(true)}
                     />
+                    <ManualButton
+                      isOpen={isManualPath}
+                      onClick={handleManualToggle}
+                    />
                   </div>
                 ),
                 userProfile,
@@ -1078,6 +1133,8 @@ function AppContent() {
                     </Suspense>
                   }
                 />
+                {/* 매뉴얼 페이지 - 모든 인증된 사용자 접근 가능 */}
+                <Route path="/manual" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><ManualPage /></Suspense></RoleBasedRoute>} />
                 <Route path="/" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><HomePage /></Suspense></RoleBasedRoute>} />
                 <Route path="*" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><HomePage /></Suspense></RoleBasedRoute>} />
               </Routes>
