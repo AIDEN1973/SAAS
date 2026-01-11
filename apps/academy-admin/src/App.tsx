@@ -8,7 +8,6 @@ import {
   getOrCreateChatOpsSessionId,
   useGlobalSearch,
   Tooltip,
-  TimelineModal,
 } from '@ui-core/react';
 import type { SearchResult, SidebarItem, ExecutionAuditRun } from '@ui-core/react';
 import { ChatsCircle, ClockCounterClockwise } from 'phosphor-react';
@@ -98,12 +97,13 @@ const TimelineButton: React.FC<{ onClick: () => void }> = ({ onClick }) => {
 
 // 큰 컴포넌트는 lazy loading으로 전환 (초기 로드 번들 크기 감소)
 const AppLayout = lazy(() => import('@ui-core/react').then(m => ({ default: m.AppLayout })));
+const TimelineModal = lazy(() => import('@ui-core/react').then(m => ({ default: m.TimelineModal })));
 
-// 핵심 페이지는 즉시 로드 (초기 로딩 속도)
-import { HomePage } from './pages/HomePage';
-import { LoginPage } from './pages/LoginPage';
-import { SignupPage } from './pages/SignupPage';
-import { TenantSelectionPage } from './pages/TenantSelectionPage';
+// 핵심 페이지도 lazy loading으로 전환 (초기 로딩 번들 크기 대폭 감소)
+const HomePage = lazy(() => import('./pages/HomePage').then(m => ({ default: m.HomePage })));
+const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const SignupPage = lazy(() => import('./pages/SignupPage').then(m => ({ default: m.SignupPage })));
+const TenantSelectionPage = lazy(() => import('./pages/TenantSelectionPage').then(m => ({ default: m.TenantSelectionPage })));
 
 // 나머지 페이지는 코드 스플리팅 (지연 로딩)
 const StudentsHomePage = lazy(() => import('./pages/StudentsHomePage').then(m => ({ default: m.StudentsHomePage })));
@@ -952,17 +952,18 @@ function AppContent() {
   return (
     <>
       <Routes>
-        {/* 인증이 필요 없는 라우트 */}
-        <Route path="/auth/login" element={<LoginPage />} />
-        <Route path="/auth/signup" element={<SignupPage />} />
-        <Route path="/auth/select-tenant" element={<TenantSelectionPage />} />
+        {/* 인증이 필요 없는 라우트 - lazy loaded */}
+        <Route path="/auth/login" element={<Suspense fallback={<PageLoader />}><LoginPage /></Suspense>} />
+        <Route path="/auth/signup" element={<Suspense fallback={<PageLoader />}><SignupPage /></Suspense>} />
+        <Route path="/auth/select-tenant" element={<Suspense fallback={<PageLoader />}><TenantSelectionPage /></Suspense>} />
 
       {/* 인증이 필요한 라우트 */}
       <Route
         path="/*"
         element={
           <ProtectedRoute>
-            <AppLayout
+            <Suspense fallback={<PageLoader />}>
+              <AppLayout
               header={{
                 title: '디어쌤 학원관리',
                 search: {
@@ -1033,7 +1034,7 @@ function AppContent() {
                     </Suspense>
                   </RoleBasedRoute>
                 } />
-                <Route path="/home" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><HomePage /></RoleBasedRoute>} />
+                <Route path="/home" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><HomePage /></Suspense></RoleBasedRoute>} />
                 <Route path="/home/all-cards" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><AllCardsPage /></Suspense></RoleBasedRoute>} />
                 <Route path="/students/home" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><StudentsHomePage /></Suspense></RoleBasedRoute>} />
                 <Route path="/students/tasks" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><StudentTasksPage /></Suspense></RoleBasedRoute>} />
@@ -1077,37 +1078,42 @@ function AppContent() {
                     </Suspense>
                   }
                 />
-                <Route path="/" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><HomePage /></RoleBasedRoute>} />
-                <Route path="*" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><HomePage /></RoleBasedRoute>} />
+                <Route path="/" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><HomePage /></Suspense></RoleBasedRoute>} />
+                <Route path="*" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'assistant', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><HomePage /></Suspense></RoleBasedRoute>} />
               </Routes>
-            </AppLayout>
+              </AppLayout>
+            </Suspense>
           </ProtectedRoute>
         }
       />
       </Routes>
 
-      {/* 타임라인 모달 */}
-      <TimelineModal
-        isOpen={isTimelineOpen}
-        onClose={() => setIsTimelineOpen(false)}
-        executionAuditRuns={aiLayerMenu.executionAuditRuns}
-        executionAuditLoading={aiLayerMenu.executionAuditLoading}
-        executionAuditHasMore={aiLayerMenu.executionAuditHasMore}
-        executionAuditNextCursor={aiLayerMenu.executionAuditNextCursor}
-        executionAuditStepsByRunId={aiLayerMenu.executionAuditStepsByRunId}
-        executionAuditStepsLoading={aiLayerMenu.executionAuditStepsLoading}
-        onExecutionAuditLoadMore={(cursor) => {
-          aiLayerMenu.setExecutionAuditLoading(true);
-          aiLayerMenu.setExecutionAuditNextCursor(cursor);
-        }}
-        onExecutionAuditLoadSteps={(runId) => {
-          aiLayerMenu.setExecutionAuditStepsLoading(runId, true);
-        }}
-        onExecutionAuditRowClick={handleExecutionAuditRowClick}
-        onExecutionAuditFilterChange={aiLayerMenu.setExecutionAuditFilters}
-        executionAuditInitialFilters={aiLayerMenu.executionAuditFilters}
-        executionAuditAvailableOperationTypes={aiLayerMenu.executionAuditAvailableOperationTypes}
-      />
+      {/* 타임라인 모달 - lazy loaded */}
+      {isTimelineOpen && (
+        <Suspense fallback={null}>
+          <TimelineModal
+            isOpen={isTimelineOpen}
+            onClose={() => setIsTimelineOpen(false)}
+            executionAuditRuns={aiLayerMenu.executionAuditRuns}
+            executionAuditLoading={aiLayerMenu.executionAuditLoading}
+            executionAuditHasMore={aiLayerMenu.executionAuditHasMore}
+            executionAuditNextCursor={aiLayerMenu.executionAuditNextCursor}
+            executionAuditStepsByRunId={aiLayerMenu.executionAuditStepsByRunId}
+            executionAuditStepsLoading={aiLayerMenu.executionAuditStepsLoading}
+            onExecutionAuditLoadMore={(cursor) => {
+              aiLayerMenu.setExecutionAuditLoading(true);
+              aiLayerMenu.setExecutionAuditNextCursor(cursor);
+            }}
+            onExecutionAuditLoadSteps={(runId) => {
+              aiLayerMenu.setExecutionAuditStepsLoading(runId, true);
+            }}
+            onExecutionAuditRowClick={handleExecutionAuditRowClick}
+            onExecutionAuditFilterChange={aiLayerMenu.setExecutionAuditFilters}
+            executionAuditInitialFilters={aiLayerMenu.executionAuditFilters}
+            executionAuditAvailableOperationTypes={aiLayerMenu.executionAuditAvailableOperationTypes}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

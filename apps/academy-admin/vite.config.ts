@@ -27,7 +27,7 @@ function enforceReactChunk(): RollupPlugin {
       for (const [fileName, chunk] of Object.entries(bundle)) {
         if (chunk.type === 'chunk') {
           // 모든 vendor 및 lib 청크에서 React 검사 (react-vendor 제외)
-          const isNonReactVendorChunk = /vendor-[123]-|lib-a-z-|lib-a-m-|lib-n-z-|lib-other-|lib-scoped-|lib-utils-/.test(fileName);
+          const isNonReactVendorChunk = /vendor-[123]-|lib-a-z-|lib-a-f-|lib-g-m-|lib-a-m-|lib-n-z-|lib-other-|lib-scoped-|lib-utils-/.test(fileName);
           const isReactChunk = /react-vendor|react-router-vendor|react-hook-form-vendor|radix-ui-vendor|charts-vendor|redux-vendor/.test(fileName);
 
           if (isNonReactVendorChunk && !isReactChunk) {
@@ -580,9 +580,11 @@ export default defineConfig(({ mode }) => {
                 return 'lib-scoped';
               }
 
-              // 알파벳 범위로 분배 (lib-a-z 제거)
-              if (firstChar >= 97 && firstChar <= 109) { // a-m
-                return 'lib-a-m';
+              // 알파벳 범위를 더 세분화하여 청크 크기 감소 (a-m을 a-f, g-m으로 분할)
+              if (firstChar >= 97 && firstChar <= 102) { // a-f
+                return 'lib-a-f';
+              } else if (firstChar >= 103 && firstChar <= 109) { // g-m
+                return 'lib-g-m';
               } else if (firstChar >= 110 && firstChar <= 122) { // n-z
                 return 'lib-n-z';
               } else { // 숫자 등
