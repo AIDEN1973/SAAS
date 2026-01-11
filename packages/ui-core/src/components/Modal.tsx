@@ -138,7 +138,7 @@ export const Modal: React.FC<ModalProps> = ({
           flexDirection: 'column',
           overflow: 'hidden',
           padding: 'var(--spacing-none)', // styles.css 준수: spacing 토큰 사용
-          borderRadius: 'var(--border-radius-xl)', // 라운드 XL
+          borderRadius: 'var(--border-radius-lg)', // 라운드 LG (16px)
           ...sizeMap[size],
           ...style, // 커스텀 스타일 적용
         }}
