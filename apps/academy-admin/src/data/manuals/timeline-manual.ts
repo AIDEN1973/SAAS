@@ -91,7 +91,7 @@ export const timelineManual: ManualPage = {
           title: '글로벌 헤더 영역',
           items: [
             { title: '타임라인 아이콘', description: '시계(회전 화살표) 모양 아이콘입니다. 클릭하면 타임라인 모달이 열립니다.' },
-            { title: '아이콘 위치', description: '화면 상단 오른쪽, AI 에이전트 아이콘과 매뉴얼 아이콘 사이에 위치합니다.' },
+            { title: '아이콘 위치', description: '화면 상단 오른쪽, 에이전트 모드 아이콘과 매뉴얼 아이콘 사이에 위치합니다.' },
           ],
         },
         {

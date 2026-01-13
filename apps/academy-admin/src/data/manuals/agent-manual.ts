@@ -1,5 +1,5 @@
 /**
- * AI 에이전트 매뉴얼
+ * 에이전트 모드 매뉴얼
  *
  * [불변 규칙] 매뉴얼 컨텐츠는 명확하고 이해하기 쉽게 작성합니다.
  */
@@ -8,7 +8,7 @@ import type { ManualPage } from '../../types/manual';
 
 export const agentManual: ManualPage = {
   id: 'agent',
-  title: 'AI 에이전트',
+  title: '에이전트 모드',
   description: 'AI와 대화하며 학원 운영 업무를 처리하는 에이전트 모드입니다.',
   icon: 'Bot',
   lastUpdated: '2026-01-11',
@@ -131,7 +131,7 @@ export const agentManual: ManualPage = {
         {
           title: '중앙 채팅 영역',
           items: [
-            { title: '헤더 영역', description: '현재 대화의 제목 또는 "AI 에이전트" 텍스트가 표시됩니다.' },
+            { title: '헤더 영역', description: '현재 대화의 제목 또는 "에이전트 모드" 텍스트가 표시됩니다.' },
             { title: '대화 영역', description: '사용자의 질문과 AI의 답변이 대화 형식으로 표시됩니다.' },
             { title: '사용자 메시지', description: '내가 입력한 질문은 오른쪽에 표시됩니다.' },
             { title: 'AI 답변', description: 'AI의 답변은 왼쪽에 표시됩니다.' },

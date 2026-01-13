@@ -328,7 +328,7 @@ export function NotificationsPage() {
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
         <PageHeader
-          title={terms.MESSAGE_LABEL}
+          title="문자발송"
         />
 
         {/* 탭 선택 */}

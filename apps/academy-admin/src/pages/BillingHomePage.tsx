@@ -167,7 +167,7 @@ export function BillingHomePage() {
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
         <PageHeader
-          title={`${terms.BILLING_HOME_LABEL}`}
+          title="수납관리"
           actions={
             <Button
               variant="outline"

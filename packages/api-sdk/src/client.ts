@@ -13,6 +13,43 @@ import type { ApiResponse, ApiClientConfig } from './types';
 import type { PostgrestFilterBuilder } from '@supabase/postgrest-js';
 
 /**
+ * [근본 수정] 날짜/시간 필터 값에 KST 시간대를 자동 추가하는 헬퍼 함수
+ *
+ * attendance_logs.occurred_at 등 TIMESTAMPTZ 컬럼은 UTC로 저장되므로,
+ * 날짜만 있는 필터('YYYY-MM-DD')는 UTC로 해석되어 잘못된 결과를 반환합니다.
+ *
+ * 예: '2026-01-13' → UTC 1/13 00:00 (KST 1/13 09:00부터)
+ *
+ * 이 함수는 날짜 형식을 감지하여 KST 시간대를 자동으로 추가합니다:
+ * - 'YYYY-MM-DD' (날짜만) → 'YYYY-MM-DDT00:00:00+09:00' (gte) 또는 'YYYY-MM-DDT23:59:59.999+09:00' (lte)
+ * - 'YYYY-MM-DDTHH:mm:ss' (시간대 없음) → 'YYYY-MM-DDTHH:mm:ss+09:00'
+ * - 이미 시간대가 있으면 그대로 반환
+ */
+function normalizeTimestampFilter(value: string, operator: 'gte' | 'lte' | 'gt' | 'lt'): string {
+  // 이미 시간대 정보가 있는 경우 ('+', '-', 'Z' 포함)
+  if (value.includes('+') || value.includes('Z') || /T.*-\d{2}:\d{2}$/.test(value)) {
+    return value;
+  }
+
+  // 날짜만 있는 경우 (YYYY-MM-DD)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    if (operator === 'gte' || operator === 'gt') {
+      return `${value}T00:00:00+09:00`; // KST 하루의 시작
+    } else {
+      return `${value}T23:59:59.999+09:00`; // KST 하루의 끝
+    }
+  }
+
+  // 시간은 있지만 시간대가 없는 경우 (YYYY-MM-DDTHH:mm:ss)
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?/.test(value)) {
+    return `${value}+09:00`; // KST 시간대 추가
+  }
+
+  // 그 외는 그대로 반환
+  return value;
+}
+
+/**
  * API Client
  *
  * Zero-Trust 원칙:
@@ -86,18 +123,31 @@ export class ApiClient {
         Object.entries(searchFilters).forEach(([key, value]) => {
           if (value !== undefined && value !== null && value !== '') {
             // 범위 연산자 처리 (gte, lte, gt, lt)
+            // [근본 수정] 날짜/시간 필터에 KST 시간대 자동 추가
             if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
               if ('gte' in value) {
-                baseQuery = baseQuery.gte(key, value.gte);
+                const normalizedValue = typeof value.gte === 'string'
+                  ? normalizeTimestampFilter(value.gte, 'gte')
+                  : value.gte;
+                baseQuery = baseQuery.gte(key, normalizedValue);
               }
               if ('lte' in value) {
-                baseQuery = baseQuery.lte(key, value.lte);
+                const normalizedValue = typeof value.lte === 'string'
+                  ? normalizeTimestampFilter(value.lte, 'lte')
+                  : value.lte;
+                baseQuery = baseQuery.lte(key, normalizedValue);
               }
               if ('gt' in value) {
-                baseQuery = baseQuery.gt(key, value.gt);
+                const normalizedValue = typeof value.gt === 'string'
+                  ? normalizeTimestampFilter(value.gt, 'gt')
+                  : value.gt;
+                baseQuery = baseQuery.gt(key, normalizedValue);
               }
               if ('lt' in value) {
-                baseQuery = baseQuery.lt(key, value.lt);
+                const normalizedValue = typeof value.lt === 'string'
+                  ? normalizeTimestampFilter(value.lt, 'lt')
+                  : value.lt;
+                baseQuery = baseQuery.lt(key, normalizedValue);
               }
               // 범위 연산자가 없으면 객체 전체를 무시 (예: Date 객체)
               if (!('gte' in value || 'lte' in value || 'gt' in value || 'lt' in value)) {
@@ -342,6 +392,128 @@ export class ApiClient {
         error: undefined,
       };
     } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'UNKNOWN_ERROR',
+        },
+        data: undefined,
+      };
+    }
+  }
+
+  /**
+   * UPSERT 요청 (INSERT 또는 UPDATE)
+   *
+   * [불변 규칙] SDK가 자동으로 tenant_id를 삽입합니다
+   * [불변 규칙] onConflict 파라미터로 중복 체크할 컬럼을 지정합니다
+   *
+   * @param table 테이블 이름
+   * @param data 삽입/업데이트할 데이터
+   * @param options.onConflict 중복 체크할 컬럼 (기본값: 'id')
+   * @param options.ignoreDuplicates true면 중복 시 무시, false면 업데이트 (기본값: false)
+   */
+  async upsert<T = unknown>(
+    table: string,
+    data: Record<string, unknown> | Record<string, unknown>[],
+    options?: {
+      onConflict?: string;
+      ignoreDuplicates?: boolean;
+    }
+  ): Promise<ApiResponse<T>> {
+    try {
+      const context = getApiContext();
+
+      console.group(`[ApiClient.upsert] ${table} 테이블 UPSERT`);
+      console.log('Context:', {
+        tenantId: context?.tenantId,
+        industryType: context?.industryType,
+      });
+      console.log('입력 데이터 (tenant_id 주입 전):', data);
+      console.log('Options:', options);
+
+      if (!context?.tenantId) {
+        console.error('tenant_id 없음!');
+        console.groupEnd();
+        return {
+          success: false,
+          error: {
+            message: 'Tenant ID is required',
+            code: 'TENANT_ID_REQUIRED',
+          },
+          data: undefined,
+        };
+      }
+
+      // [불변 규칙] SDK가 자동으로 tenant_id를 삽입합니다
+      const injectTenantId = (item: Record<string, unknown>) => ({
+        ...item,
+        tenant_id: context.tenantId,
+      });
+
+      const payload = Array.isArray(data)
+        ? data.map(injectTenantId)
+        : injectTenantId(data);
+
+      console.log('최종 Payload (tenant_id 주입 후):', payload);
+
+      // 스키마 접두사 처리
+      let upsertQuery;
+      if (table.includes('.')) {
+        const [schema, tableName] = table.split('.');
+        upsertQuery = this.supabase
+          .schema(schema)
+          .from(tableName)
+          .upsert(payload, {
+            onConflict: options?.onConflict,
+            ignoreDuplicates: options?.ignoreDuplicates ?? false,
+          })
+          .select();
+      } else {
+        upsertQuery = this.supabase
+          .from(table)
+          .upsert(payload, {
+            onConflict: options?.onConflict,
+            ignoreDuplicates: options?.ignoreDuplicates ?? false,
+          })
+          .select();
+      }
+
+      // 단일 객체인 경우 .single() 사용
+      const finalQuery = Array.isArray(data) ? upsertQuery : upsertQuery.single();
+      const { data: result, error } = await finalQuery;
+
+      if (error) {
+        console.error('UPSERT 실패:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        console.groupEnd();
+        return {
+          success: false,
+          error: {
+            message: error.message,
+            code: error.code || 'UNKNOWN_ERROR',
+          },
+          data: undefined,
+        };
+      }
+
+      console.log('UPSERT 성공!');
+      console.log('결과 데이터:', result);
+      console.groupEnd();
+
+      return {
+        success: true,
+        data: result as T,
+        error: undefined,
+      };
+    } catch (error) {
+      console.error('예외 발생:', error);
+      console.groupEnd();
       return {
         success: false,
         error: {

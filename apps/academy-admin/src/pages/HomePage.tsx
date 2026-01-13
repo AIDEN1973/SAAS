@@ -109,7 +109,7 @@ export function HomePage() {
     return (
       <ErrorBoundary>
         <Container maxWidth="xl" padding="lg">
-          <PageHeader title="홈 대시보드" />
+          <PageHeader title="대시보드" />
           <div style={{
             padding: 'var(--spacing-xl)',
             textAlign: 'center',

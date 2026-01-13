@@ -10,6 +10,7 @@ export {
   useCreateAttendanceLog,
   useUpdateAttendanceLog,
   useDeleteAttendanceLog,
+  useUpsertAttendanceLog,
 } from './useAttendance';
 
 export type {

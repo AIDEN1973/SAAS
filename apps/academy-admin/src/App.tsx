@@ -668,7 +668,7 @@ function AppContent() {
    * - Teacher: 홈, 학생 관리, 출결 관리, AI 분석만 노출 (수업 관리는 읽기 전용)
    * - Admin/Owner/Sub Admin: 전체 메뉴 노출
    * - 통계와 AI는 핵심 메뉴이므로 Advanced에 들어가면 안 됨
-   * - 수업/강사 관리, 수납/청구, 메시지/공지는 Advanced 메뉴 (일부 역할만)
+   * - 수업/강사관리, 수납/청구, 메시지/공지는 Advanced 메뉴 (일부 역할만)
    *
    * 업종별 페이지 가시성 (Phase 3):
    * - Academy/Gym: attendance=true, appointments=false
@@ -676,7 +676,7 @@ function AppContent() {
    * - Real Estate: billing=false, appointments=true, properties=true
    *
    * Advanced 메뉴 구조 (아키텍처 문서 4.8):
-   * - 반/강사 관리
+   * - 반/강사관리
    * - 출결 설정
    * - 상품/청구 설정
    * - 메시지 템플릿/예약발송
@@ -697,7 +697,7 @@ function AppContent() {
     if (isPageVisible('classes')) {
       advancedMenuChildren.push({
         id: 'classes-advanced',
-        label: terms.GROUP_LABEL + ' 관리',
+        label: terms.GROUP_LABEL + '관리',
         path: terms.ROUTES.CLASSES || '/classes',
         icon: (
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -715,7 +715,7 @@ function AppContent() {
     if (isPageVisible('teachers')) {
       advancedMenuChildren.push({
         id: 'teachers-advanced',
-        label: terms.PERSON_LABEL_SECONDARY + ' 관리',
+        label: terms.PERSON_LABEL_SECONDARY + '관리',
         path: terms.ROUTES.TEACHERS || '/teachers',
         icon: (
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -154,7 +154,14 @@
       "Bash(supabase login:*)",
       "Bash(set SUPABASE_ACCESS_TOKEN=sbp_d69a9ff08f662fc84fe20a08196b2148cd933613)",
       "Bash(supabase link:*)",
-      "Bash(pnpm run build:packages:*)"
+      "Bash(pnpm run build:packages:*)",
+      "Bash(supabase db diff:*)",
+      "Bash(supabase status:*)",
+      "Bash(supabase db execute:*)",
+      "Bash(supabase db remote execute:*)",
+      "Bash(supabase db remote query:*)",
+      "Bash(node:*)",
+      "Read(//c/**)"
     ]
   }
 }

@@ -10,9 +10,9 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet, EmptyState } from '@ui-core/react';
-import { BookOpen } from 'lucide-react';
-import { SchemaForm, SchemaFilter } from '@schema-engine';
+import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet, DataTable, NotificationCardLayout } from '@ui-core/react';
+import { BookOpen, Users, CheckCircle, XCircle } from 'lucide-react';
+import { SchemaForm } from '@schema-engine';
 import { apiClient } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
@@ -23,7 +23,7 @@ import {
   useCreateClass,
   useUpdateClass,
   useDeleteClass,
-  useClassStatistics,
+  // useClassStatistics, // TODO: 통계 기능 구현 시 사용
   useTeachers,
   useCheckScheduleConflicts,
   useClassTeachers,
@@ -31,7 +31,7 @@ import {
 import type { Class, CreateClassInput, UpdateClassInput, ClassFilter, ClassStatus, DayOfWeek , Teacher } from '@services/class-service';
 import { createClassFormSchema } from '../schemas/class.schema';
 import type { FormSchema } from '@schema-engine/types';
-import { classFilterSchema } from '../schemas/class.filter.schema';
+import { CardGridLayout } from '../components/CardGridLayout';
 
 const DAYS_OF_WEEK: { value: DayOfWeek; label: string }[] = [
   { value: 'monday', label: '월요일' },
@@ -42,6 +42,74 @@ const DAYS_OF_WEEK: { value: DayOfWeek; label: string }[] = [
   { value: 'saturday', label: '토요일' },
   { value: 'sunday', label: '일요일' },
 ];
+
+/**
+ * 통계 카드 컴포넌트
+ */
+function StatisticsCards() {
+  const terms = useIndustryTerms();
+  const { data: allClasses, isLoading } = useClasses({});
+
+  // 통계 계산
+  const statistics = useMemo(() => {
+    if (!allClasses) return { total: 0, active: 0, inactive: 0, totalStudents: 0 };
+
+    return {
+      total: allClasses.length,
+      active: allClasses.filter(c => c.status === 'active').length,
+      inactive: allClasses.filter(c => c.status !== 'active').length,
+      totalStudents: allClasses.reduce((sum, c) => sum + (c.current_count || 0), 0),
+    };
+  }, [allClasses]);
+
+  return (
+    <div style={{ marginBottom: 'var(--spacing-xl)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
+      <CardGridLayout
+        cards={[
+          <NotificationCardLayout
+            key="total"
+            icon={<BookOpen />}
+            title={`전체 ${terms.GROUP_LABEL_PLURAL}`}
+            value={statistics.total}
+            unit="개"
+            layoutMode="stats"
+            iconBackgroundColor="var(--color-gray-100)"
+          />,
+          <NotificationCardLayout
+            key="active"
+            icon={<CheckCircle />}
+            title={`활성 ${terms.GROUP_LABEL}`}
+            value={statistics.active}
+            unit="개"
+            layoutMode="stats"
+            iconBackgroundColor="var(--color-success-50)"
+          />,
+          <NotificationCardLayout
+            key="inactive"
+            icon={<XCircle />}
+            title={`비활성 ${terms.GROUP_LABEL}`}
+            value={statistics.inactive}
+            unit="개"
+            layoutMode="stats"
+            iconBackgroundColor="var(--color-gray-100)"
+          />,
+          <NotificationCardLayout
+            key="students"
+            icon={<Users />}
+            title={`전체 ${terms.PERSON_LABEL_PRIMARY} 수`}
+            value={statistics.totalStudents}
+            unit="명"
+            layoutMode="stats"
+            iconBackgroundColor="var(--color-primary-50)"
+          />,
+        ]}
+        desktopColumns={4}
+        tabletColumns={2}
+        mobileColumns={2}
+      />
+    </div>
+  );
+}
 
 export function ClassesPage() {
   const { showConfirm, showAlert } = useModal();
@@ -148,11 +216,9 @@ export function ClassesPage() {
 
   // Schema Registry 연동 (아키텍처 문서 S3 참조)
   const { data: classFormSchemaData } = useSchema('class', createClassFormSchema(teachers || [], terms), 'form');
-  const { data: classFilterSchemaData } = useSchema('class_filter', classFilterSchema, 'filter');
 
   // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
   const effectiveFormSchema = classFormSchemaData || createClassFormSchema(teachers || [], terms);
-  const effectiveFilterSchema = classFilterSchemaData || classFilterSchema;
 
   // 뷰 모드 토글 핸들러 (localStorage 지속성)
   const handleToggleViewMode = useCallback((mode: 'list' | 'calendar') => {
@@ -178,14 +244,14 @@ export function ClassesPage() {
     }
   }, []);
 
-  const handleFilterChange = useCallback((filters: Record<string, unknown>) => {
-    setFilter({
-      search: filters.search ? String(filters.search) : undefined,
-      status: filters.status as ClassStatus | ClassStatus[] | undefined,
-      day_of_week: filters.day_of_week as DayOfWeek | undefined,
-    });
-    // Promise 반환 없음
-  }, []);
+  // const handleFilterChange = useCallback((filters: Record<string, unknown>) => {
+  //   setFilter({
+  //     search: filters.search ? String(filters.search) : undefined,
+  //     status: filters.status as ClassStatus | ClassStatus[] | undefined,
+  //     day_of_week: filters.day_of_week as DayOfWeek | undefined,
+  //   });
+  //   // Promise 반환 없음
+  // }, []); // TODO: 필터 기능 구현 시 사용
 
   const checkConflicts = useCheckScheduleConflicts();
 
@@ -198,23 +264,31 @@ export function ClassesPage() {
       }
 
       // 일정 충돌 감지 (디어쌤_아키텍처.md 3.2.2)
-      const conflictResult = await checkConflicts.mutateAsync({
-        dayOfWeek: input.day_of_week,
-        startTime: input.start_time,
-        endTime: input.end_time,
-        teacherIds: input.teacher_ids,
-        room: input.room,
-      });
+      // Note: RPC 함수가 없어도 수업 생성은 계속 진행
+      try {
+        const conflictResult = await checkConflicts.mutateAsync({
+          dayOfWeek: input.day_of_week,
+          startTime: input.start_time,
+          endTime: input.end_time,
+          teacherIds: input.teacher_ids,
+          room: input.room,
+        });
 
-      // 충돌이 있으면 사용자 확인
-      if (conflictResult.has_conflicts) {
-        const conflictMessages = conflictResult.conflicts.map((c) => c.message).join('\n');
-        const confirmed = await showConfirm(
-          `다음 충돌이 발견되었습니다:\n\n${conflictMessages}\n\n그래도 생성하시겠습니까?`,
-          '일정 충돌 감지'
-        );
-        if (!confirmed) {
-          return;
+        // 충돌이 있으면 사용자 확인
+        if (conflictResult.has_conflicts) {
+          const conflictMessages = conflictResult.conflicts.map((c) => c.message).join('\n');
+          const confirmed = await showConfirm(
+            `다음 충돌이 발견되었습니다:\n\n${conflictMessages}\n\n그래도 생성하시겠습니까?`,
+            '일정 충돌 감지'
+          );
+          if (!confirmed) {
+            return;
+          }
+        }
+      } catch (conflictError) {
+        // 충돌 감지 실패 시 경고만 표시하고 계속 진행
+        if (import.meta.env?.DEV) {
+          console.warn('일정 충돌 감지 실패:', conflictError);
         }
       }
 
@@ -240,26 +314,34 @@ export function ClassesPage() {
       }
 
       // 일정 변경이 있으면 충돌 감지
+      // Note: RPC 함수가 없어도 수업 수정은 계속 진행
       if (input.day_of_week || input.start_time || input.end_time || input.teacher_ids || input.room) {
         const classData = classes?.find((c) => c.id === classId);
         if (classData) {
-          const conflictResult = await checkConflicts.mutateAsync({
-            classId,
-            dayOfWeek: input.day_of_week || classData.day_of_week,
-            startTime: input.start_time || classData.start_time,
-            endTime: input.end_time || classData.end_time,
-            teacherIds: input.teacher_ids,
-            room: input.room || classData.room,
-          });
+          try {
+            const conflictResult = await checkConflicts.mutateAsync({
+              classId,
+              dayOfWeek: input.day_of_week || classData.day_of_week,
+              startTime: input.start_time || classData.start_time,
+              endTime: input.end_time || classData.end_time,
+              teacherIds: input.teacher_ids,
+              room: input.room || classData.room,
+            });
 
-          if (conflictResult.has_conflicts) {
-            const conflictMessages = conflictResult.conflicts.map((c) => c.message).join('\n');
-            const confirmed = await showConfirm(
-              `다음 충돌이 발견되었습니다:\n\n${conflictMessages}\n\n그래도 수정하시겠습니까?`,
-              '일정 충돌 감지'
-            );
-            if (!confirmed) {
-              return;
+            if (conflictResult.has_conflicts) {
+              const conflictMessages = conflictResult.conflicts.map((c) => c.message).join('\n');
+              const confirmed = await showConfirm(
+                `다음 충돌이 발견되었습니다:\n\n${conflictMessages}\n\n그래도 수정하시겠습니까?`,
+                '일정 충돌 감지'
+              );
+              if (!confirmed) {
+                return;
+              }
+            }
+          } catch (conflictError) {
+            // 충돌 감지 실패 시 경고만 표시하고 계속 진행
+            if (import.meta.env?.DEV) {
+              console.warn('일정 충돌 감지 실패:', conflictError);
             }
           }
         }
@@ -281,7 +363,7 @@ export function ClassesPage() {
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
         <PageHeader
-          title={`${terms.GROUP_LABEL} 관리`}
+          title={`${terms.GROUP_LABEL}관리`}
           actions={
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
               <Button
@@ -316,20 +398,10 @@ export function ClassesPage() {
           }
         />
 
-        {/* 검색 및 필터 패널 */}
-        <SchemaFilter
-          schema={effectiveFilterSchema}
-          onFilterChange={(filters) => {
-            void handleFilterChange(filters);
-          }}
-          defaultValues={{
-            search: filter.search || '',
-            status: filter.status || '',
-            day_of_week: filter.day_of_week || '',
-          }}
-        />
+        {/* 통계 카드 */}
+        <StatisticsCards />
 
-          {/* 수업 생성 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
+        {/* 수업 생성 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
           {showCreateForm && (
             <>
               {isMobileMode || isTabletMode ? (
@@ -374,24 +446,176 @@ export function ClassesPage() {
               </div>
             </Card>
           ) : viewMode === 'list' ? (
-            <ClassListView
-              classes={classes || []}
-              onEdit={(classId) => setEditingClassId(classId)}
-              onDelete={async (classId) => {
-                const confirmed = await showConfirm(`정말 이 ${terms.GROUP_LABEL}을(를) 삭제하시겠습니까?`, `${terms.GROUP_LABEL} 삭제`);
-                if (confirmed) {
-                  try {
-                  await deleteClass.mutateAsync(classId);
-                  } catch (error) {
-                    // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
-                    showAlert(
-                      error instanceof Error ? error.message : `${terms.GROUP_LABEL} 삭제에 실패했습니다.`,
-                      '오류',
-                      'error'
-                    );
-                  }
+            <DataTable
+              data={classes || []}
+              filters={[
+                {
+                  type: 'text',
+                  columnKey: 'search',
+                  label: '검색',
+                  placeholder: `${terms.GROUP_LABEL} 이름 검색`,
+                },
+                {
+                  type: 'select',
+                  columnKey: 'status',
+                  label: '상태',
+                  options: [
+                    { value: '', label: '전체 상태' },
+                    { value: 'active', label: '활성' },
+                    { value: 'inactive', label: '비활성' },
+                    { value: 'completed', label: '완료' },
+                  ],
+                },
+                {
+                  type: 'select',
+                  columnKey: 'day_of_week',
+                  label: '요일',
+                  options: [
+                    { value: '', label: '전체 요일' },
+                    ...DAYS_OF_WEEK.map(d => ({ value: d.value, label: d.label })),
+                  ],
+                },
+              ]}
+              initialFilterState={{
+                search: { text: filter.search || '' },
+                status: { selected: typeof filter.status === 'string' ? filter.status : '' },
+                day_of_week: { selected: filter.day_of_week || '' },
+              }}
+              onFilterChange={(filterState) => {
+                if (filterState.search?.text !== undefined) {
+                  setFilter(prev => ({ ...prev, search: filterState.search.text }));
+                }
+                if (filterState.status?.selected !== undefined) {
+                  setFilter(prev => ({ ...prev, status: filterState.status.selected as ClassStatus | undefined }));
+                }
+                if (filterState.day_of_week?.selected !== undefined) {
+                  setFilter(prev => ({ ...prev, day_of_week: filterState.day_of_week.selected as DayOfWeek | undefined }));
                 }
               }}
+              enableClientSideFiltering={false}
+              columns={[
+                {
+                  key: 'name',
+                  label: `${terms.GROUP_LABEL} 이름`,
+                  width: '20%',
+                  render: (_, classItem) => (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                      <div
+                        style={{
+                          width: 'var(--spacing-sm)',
+                          height: '100%',
+                          backgroundColor: classItem.color,
+                          borderRadius: 'var(--border-radius-sm)',
+                          minHeight: 'var(--spacing-lg)',
+                        }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 'var(--font-weight-semibold)' }}>{classItem.name}</div>
+                        {classItem.subject && (
+                          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                            {classItem.subject}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'schedule',
+                  label: '일정',
+                  width: '20%',
+                  render: (_, classItem) => {
+                    const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
+                    return (
+                      <div>
+                        <div>{dayLabel}</div>
+                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                          {classItem.start_time} ~ {classItem.end_time}
+                        </div>
+                      </div>
+                    );
+                  },
+                },
+                {
+                  key: 'capacity',
+                  label: `${terms.CAPACITY_LABEL}`,
+                  width: '15%',
+                  align: 'center',
+                  render: (_, classItem) => (
+                    <div>
+                      <div style={{ fontWeight: 'var(--font-weight-semibold)' }}>
+                        {classItem.current_count} / {classItem.capacity}
+                      </div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                        {((classItem.current_count / classItem.capacity) * 100).toFixed(0)}%
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'room',
+                  label: '강의실',
+                  width: '15%',
+                  align: 'center',
+                  render: (value) => (value ? String(value) : '-'),
+                },
+                {
+                  key: 'status',
+                  label: '상태',
+                  width: '10%',
+                  align: 'center',
+                  render: (_, classItem) => (
+                    <span
+                      style={{
+                        padding: 'var(--spacing-2xs) var(--spacing-xs)',
+                        borderRadius: 'var(--border-radius-sm)',
+                        fontSize: 'var(--font-size-sm)',
+                        fontWeight: 'var(--font-weight-medium)',
+                        backgroundColor: classItem.status === 'active' ? 'var(--color-success-50)' : 'var(--color-gray-100)',
+                        color: classItem.status === 'active' ? 'var(--color-success-700)' : 'var(--color-text-secondary)',
+                      }}
+                    >
+                      {classItem.status === 'active' ? '활성' : classItem.status === 'inactive' ? '비활성' : '완료'}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'actions',
+                  label: '작업',
+                  width: '20%',
+                  align: 'right',
+                  render: (_, classItem) => (
+                    <div style={{ display: 'flex', gap: 'var(--spacing-xs)', justifyContent: 'flex-end' }}>
+                      <Button size="xs" variant="outline" onClick={() => setEditingClassId(classItem.id)}>
+                        수정
+                      </Button>
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        onClick={async () => {
+                          const confirmed = await showConfirm(
+                            `정말 이 ${terms.GROUP_LABEL}을(를) 삭제하시겠습니까?`,
+                            `${terms.GROUP_LABEL} 삭제`
+                          );
+                          if (confirmed) {
+                            try {
+                              await deleteClass.mutateAsync(classItem.id);
+                            } catch (error) {
+                              showAlert(
+                                error instanceof Error ? error.message : `${terms.GROUP_LABEL} 삭제에 실패했습니다.`,
+                                '오류',
+                                'error'
+                              );
+                            }
+                          }
+                        }}
+                      >
+                        삭제
+                      </Button>
+                    </div>
+                  ),
+                },
+              ]}
             />
           ) : (
             <ClassCalendarView classes={classes || []} />
@@ -650,89 +874,6 @@ function EditClassModal({
     <Modal isOpen={true} onClose={onClose} title={`${terms.GROUP_LABEL} 수정`} size="lg">
       {formContent}
     </Modal>
-  );
-}
-
-/**
- * 수업 리스트 뷰
- */
-function ClassListView({
-  classes,
-  onEdit,
-  onDelete,
-}: {
-  classes: Class[];
-  onEdit: (classId: string) => void;
-  onDelete: (classId: string) => Promise<void>;
-}) {
-  const terms = useIndustryTerms();
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(var(--width-card-min), 1fr))`, gap: 'var(--spacing-md)' }}>
-      {classes.map((classItem) => (
-        <ClassCard key={classItem.id} classItem={classItem} onEdit={onEdit} onDelete={onDelete} />
-      ))}
-      {classes.length === 0 && (
-        <Card padding="lg">
-          <EmptyState
-            icon={BookOpen}
-            message={`등록된 ${terms.GROUP_LABEL}이 없습니다.`}
-          />
-        </Card>
-      )}
-    </div>
-  );
-}
-
-/**
- * 수업 카드
- */
-function ClassCard({
-  classItem,
-  onEdit,
-  onDelete,
-}: {
-  classItem: Class;
-  onEdit: (classId: string) => void;
-  onDelete: (classId: string) => Promise<void>;
-}) {
-  const { data: statistics } = useClassStatistics(classItem.id);
-  const terms = useIndustryTerms();
-  const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
-
-  return (
-    <Card
-      padding="md"
-      style={{
-        borderLeft: `var(--border-width-thick) solid ${classItem.color}`,
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--spacing-sm)' }}>
-        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>
-          {classItem.name}
-        </h3>
-        <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
-          <Button size="xs" variant="ghost" onClick={() => onEdit(classItem.id)}>
-            수정
-          </Button>
-          <Button size="xs" variant="ghost" onClick={() => onDelete(classItem.id)}>
-            삭제
-          </Button>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)', color: 'var(--color-text-secondary)' }}>
-        {classItem.subject && <div>{terms.SUBJECT_LABEL}: {classItem.subject}</div>}
-        {classItem.grade && <div>{terms.GRADE_LABEL}: {classItem.grade}</div>}
-        <div>요일: {dayLabel}</div>
-        <div>시간: {classItem.start_time} ~ {classItem.end_time}</div>
-        <div>{terms.CAPACITY_LABEL}: {classItem.current_count} / {classItem.capacity}</div>
-        {statistics && statistics.capacity_rate > 0 && (
-          <div>{terms.CAPACITY_LABEL}률: {statistics.capacity_rate.toFixed(1)}%</div>
-        )}
-        {/* 출결률/지각률은 출결 데이터 구현 후 표시 */}
-      </div>
-    </Card>
   );
 }
 

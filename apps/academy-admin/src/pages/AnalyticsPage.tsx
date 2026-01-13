@@ -1121,7 +1121,7 @@ export function AnalyticsPage() {
     <ErrorBoundary>
       <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"}>
         <PageHeader
-          title="지역 기반 통계"
+          title="통계분석"
           actions={
             <Button
               variant="outline"

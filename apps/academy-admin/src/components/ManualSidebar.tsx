@@ -25,13 +25,14 @@ const SIDEBAR_MENU_ITEMS: SidebarMenuItem[] = [
   { id: 'notifications', label: '문자발송', manualId: 'notifications' },
   { id: 'analytics', label: '통계분석', manualId: 'analytics' },
   { id: 'ai', label: '인공지능', manualId: 'ai' },
-  { id: 'classes', label: '반 관리', manualId: 'classes' },
-  { id: 'teachers', label: '강사 관리', manualId: 'teachers' },
+  { id: 'classes', label: '수업관리', manualId: 'classes' },
+  { id: 'teachers', label: '강사관리', manualId: 'teachers' },
   { id: 'billing', label: '수납관리', manualId: 'billing' },
   { id: 'automation', label: '자동화 설정', manualId: 'automation' },
   { id: 'alimtalk', label: '알림톡 설정', manualId: 'alimtalk' },
+  { id: 'search', label: '검색', manualId: 'search' },
   { id: 'timeline', label: '타임라인', manualId: 'timeline' },
-  { id: 'agent', label: 'AI 에이전트', manualId: 'agent' },
+  { id: 'agent', label: '에이전트 모드', manualId: 'agent' },
 ];
 
 export interface ManualSidebarProps {

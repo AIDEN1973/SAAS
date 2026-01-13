@@ -76,7 +76,7 @@ export const sharedCatalog: SharedCatalog = {
       path: 'packages/hooks/use-class/src/index.ts',
       import: 'import { useClasses, useClass, useCreateClass, useUpdateClass, useDeleteClass, useTeachers, useClassTeachers } from "@hooks/use-class"',
       status: 'implemented',
-      useWhen: '수업/반 조회/생성/수정/삭제, 강사 관리가 필요한 모든 페이지',
+      useWhen: '수업/반 조회/생성/수정/삭제, 강사관리가 필요한 모든 페이지',
       input: 'useClasses(filter?: ClassFilter): 필터 객체',
       output: 'useClasses(): Class[], useClass(): Class | null',
       extensionPoints: ['filter'],

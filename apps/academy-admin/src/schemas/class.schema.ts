@@ -166,30 +166,8 @@ export function createClassFormSchema(teachers?: Teacher[], terms?: IndustryTerm
       color: 'primary',
       size: 'md',
     },
-    // SDUI v1.1: Action Engine 지원
-    actions: [
-      {
-        event: 'onSubmit',
-        type: 'api.call',
-        endpoint: 'classes',
-        method: 'POST',
-        body: 'form',
-      },
-      {
-        event: 'onSubmitSuccess',
-        type: 'toast',
-        messageKey: 'CLASS.CREATE.SUCCESS',
-        message: terms ? `${terms.GROUP_LABEL}이 생성되었습니다.` : '반이 생성되었습니다.',
-        variant: 'success',
-      },
-      {
-        event: 'onSubmitError',
-        type: 'toast',
-        messageKey: 'CLASS.CREATE.ERROR',
-        message: terms ? `${terms.GROUP_LABEL} 생성에 실패했습니다.` : '반 생성에 실패했습니다.',
-        variant: 'error',
-      },
-    ],
+    // Note: onSubmit 액션은 ClassesPage의 handleCreateClass/handleUpdateClass Hook으로 처리됨
+    // RPC 함수를 통한 트랜잭션 처리 필요 (강사 배정 포함)
     },
   };
 }

@@ -488,7 +488,7 @@ export function AIPage() {
     <ErrorBoundary>
       <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"}>
         <PageHeader
-          title="AI 분석"
+          title="인공지능"
         />
 
         {/* 아키텍처 문서 3.7.1: 빠른 분석 링크 (상세 분석은 별도 페이지에서 제공) */}

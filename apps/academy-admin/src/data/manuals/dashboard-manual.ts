@@ -8,7 +8,7 @@ import type { ManualPage } from '../../types/manual';
 
 export const dashboardManual: ManualPage = {
   id: 'dashboard',
-  title: '홈 대시보드',
+  title: '대시보드',
   description: '학원 운영에 필요한 핵심 정보를 한눈에 확인하는 페이지입니다.',
   icon: 'LayoutDashboard',
   lastUpdated: '2026-01-11',
@@ -44,7 +44,7 @@ export const dashboardManual: ManualPage = {
         {
           title: '대시보드 기본 사용법',
           steps: [
-            { step: 1, content: '로그인 후 자동으로 홈 대시보드가 표시됩니다. 왼쪽 메뉴에서 "대시보드"를 클릭해도 이동할 수 있습니다.' },
+            { step: 1, content: '로그인 후 자동으로 대시보드가 표시됩니다. 왼쪽 메뉴에서 "대시보드"를 클릭해도 이동할 수 있습니다.' },
             { step: 2, content: '화면에 표시된 카드들을 위에서 아래로 스크롤하며 확인합니다. 긴급 알림은 항상 최상단에 표시됩니다.' },
             { step: 3, content: '관심 있는 카드를 클릭하면 해당 상세 페이지로 이동합니다.' },
             { step: 4, content: '통계 카드의 차트 아이콘을 클릭하면 상세 그래프를 확인할 수 있습니다.' },
@@ -96,7 +96,7 @@ export const dashboardManual: ManualPage = {
         {
           title: '페이지 상단 영역',
           items: [
-            { title: '페이지 제목', description: '"홈 대시보드"라고 표시되어 현재 위치를 알려줍니다.' },
+            { title: '페이지 제목', description: '"대시보드"라고 표시되어 현재 위치를 알려줍니다.' },
             { title: '안내 문구', description: '대시보드에서 확인할 수 있는 정보들을 간략하게 설명합니다.' },
             { title: '추천 배너', description: '상황에 따라 AI가 추천하는 다음 작업을 배너로 표시합니다. 클릭하면 해당 페이지로 이동합니다.' },
           ],

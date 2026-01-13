@@ -16,6 +16,7 @@ import { teachersManual } from './teachers-manual';
 import { billingManual } from './billing-manual';
 import { automationManual } from './automation-manual';
 import { alimtalkManual } from './alimtalk-manual';
+import { searchManual } from './search-manual';
 import { timelineManual } from './timeline-manual';
 import { agentManual } from './agent-manual';
 
@@ -82,7 +83,7 @@ export const manualCategories: ManualCategory[] = [
   {
     id: 'global',
     title: '글로벌 기능',
-    pages: [timelineManual, agentManual],
+    pages: [searchManual, timelineManual, agentManual],
   },
 ];
 
@@ -99,6 +100,7 @@ export const allManualPages: ManualPage[] = [
   billingManual,
   automationManual,
   alimtalkManual,
+  searchManual,
   timelineManual,
   agentManual,
 ];

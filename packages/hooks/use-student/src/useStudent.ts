@@ -101,7 +101,8 @@ export async function fetchStudents(
       }
 
       // class_id 필터는 student_classes에서 student_id를 먼저 추출해 persons 조회량 절감
-      if (filter?.class_id) {
+      // [버그 수정] 빈 문자열('') 또는 'all'은 필터로 사용하지 않음 (전체 조회 의미)
+      if (filter?.class_id && filter.class_id.trim() !== '' && filter.class_id !== 'all') {
         const studentClassesResponse = await apiClient.get<StudentClass>('student_classes', {
           filters: { class_id: filter.class_id, is_active: true },
           limit: 5000,
@@ -410,7 +411,8 @@ export function useStudentsPaged(params: {
       }
 
       // class_id → student_classes에서 student_id 제한
-      if (filter?.class_id) {
+      // [버그 수정] 빈 문자열('') 또는 'all'은 필터로 사용하지 않음 (전체 조회 의미)
+      if (filter?.class_id && filter.class_id.trim() !== '' && filter.class_id !== 'all') {
         filterPromises.push(
           apiClient.get<StudentClass>('student_classes', {
             filters: { class_id: filter.class_id, is_active: true },

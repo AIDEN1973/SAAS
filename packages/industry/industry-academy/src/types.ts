@@ -261,6 +261,7 @@ export interface AttendanceLog {
   occurred_at: string;  // timestamptz
   attendance_type: AttendanceType;
   status: AttendanceStatus;
+  check_in_method?: 'manual' | 'kiosk_phone' | 'qr_scan' | 'phone_auth';  // 체크인 방법
   notes?: string;
   created_by?: string;
   created_at: string;
@@ -272,6 +273,7 @@ export interface CreateAttendanceLogInput {
   occurred_at: string;  // timestamptz
   attendance_type: AttendanceType;
   status: AttendanceStatus;
+  check_in_method?: 'manual' | 'kiosk_phone' | 'qr_scan' | 'phone_auth';  // 체크인 방법
   notes?: string;
 }
 

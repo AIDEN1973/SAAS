@@ -384,19 +384,42 @@ function Content({ section }: { section: ManualSection }) {
           }}
           className="manual-numbered-list"
         >
-          {section.features?.map((feature, i) => (
-            <li
-              key={i}
-              style={{
-                fontSize: styles.fonts.body,
-                color: styles.colors.text,
-                lineHeight: styles.lineHeight.relaxed,
-                marginBottom: styles.spacing.sm,
-              }}
-            >
-              {feature}
-            </li>
-          ))}
+          {section.features?.map((feature, i) => {
+            // 콜론(:)을 기준으로 제목과 설명 분리
+            const colonIndex = feature.indexOf(':');
+            if (colonIndex > 0) {
+              const title = feature.substring(0, colonIndex).trim();
+              const description = feature.substring(colonIndex + 1).trim();
+              return (
+                <li
+                  key={i}
+                  style={{
+                    fontSize: styles.fonts.body,
+                    color: styles.colors.text,
+                    lineHeight: styles.lineHeight.relaxed,
+                    marginBottom: styles.spacing.sm,
+                  }}
+                >
+                  <strong style={{ fontWeight: styles.weights.semibold }}>{title}</strong>
+                  {description && `: ${description}`}
+                </li>
+              );
+            }
+            // 콜론이 없으면 기존 방식대로
+            return (
+              <li
+                key={i}
+                style={{
+                  fontSize: styles.fonts.body,
+                  color: styles.colors.text,
+                  lineHeight: styles.lineHeight.relaxed,
+                  marginBottom: styles.spacing.sm,
+                }}
+              >
+                {feature}
+              </li>
+            );
+          })}
         </ol>
       );
 
@@ -527,7 +550,7 @@ export function ManualBody({ manual, currentSectionId }: ManualBodyProps) {
           style={{
             border: 'none',
             borderTop: `1px solid ${styles.colors.border}`,
-            margin: `${styles.spacing.lg} 0`,
+            margin: `${styles.spacing.xl} 0`,
           }}
         />
 
@@ -558,7 +581,7 @@ export function ManualBody({ manual, currentSectionId }: ManualBodyProps) {
                 style={{
                   border: 'none',
                   borderTop: `1px solid ${styles.colors.border}`,
-                  margin: `${styles.spacing.lg} 0`,
+                  margin: `${styles.spacing.xl} 0`,
                 }}
               />
             )}
