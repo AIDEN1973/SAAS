@@ -15,12 +15,14 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, Container, Card, PageHeader, Switch, NotificationCardLayout, Badge, Input, Select, Button } from '@ui-core/react';
+import { ErrorBoundary, useModal, Container, Card, PageHeader, Switch, NotificationCardLayout, Badge, Input, Select, Button, useResponsiveMode, isMobile, SubSidebar } from '@ui-core/react';
 import { getApiContext, apiClient } from '@api-sdk/core';
 import { AUTOMATION_EVENT_CATALOG, AUTOMATION_EVENT_PLANNED } from '@core/core-automation';
 // [SSOT] Barrel export를 통한 통합 import
-import { AUTOMATION_EVENT_DESCRIPTIONS, POLICY_KEY_V2_CATEGORIES, AUTOMATION_EVENT_CRITERIA_FIELDS } from '../constants';
+import { AUTOMATION_EVENT_DESCRIPTIONS, POLICY_KEY_V2_CATEGORIES, AUTOMATION_EVENT_CRITERIA_FIELDS, AUTOMATION_SUB_MENU_ITEMS, DEFAULT_AUTOMATION_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import type { AutomationSubMenuId } from '../constants';
 import { Zap, Settings } from 'lucide-react';
 import { useTenantSettingByPath, useUpdateConfig, useConfig } from '@hooks/use-config';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
@@ -626,9 +628,25 @@ export function AutomationSettingsPage() {
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const [searchParams] = useSearchParams();
+  const mode = useResponsiveMode();
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
   const updateConfig = useUpdateConfig();
   const { data: currentConfigData } = useConfig();
   const terms = useIndustryTerms();
+
+  // 서브 메뉴 상태
+  const validIds = AUTOMATION_SUB_MENU_ITEMS.map(item => item.id) as readonly AutomationSubMenuId[];
+  const [selectedSubMenu, setSelectedSubMenu] = useState<AutomationSubMenuId>(() =>
+    getSubMenuFromUrl(searchParams, validIds, DEFAULT_AUTOMATION_SUB_MENU)
+  );
+
+  const handleSubMenuChange = (id: AutomationSubMenuId) => {
+    setSelectedSubMenu(id);
+    const newUrl = setSubMenuToUrl(id, DEFAULT_AUTOMATION_SUB_MENU);
+    window.history.replaceState(null, '', newUrl);
+  };
 
   const [editingEventType, setEditingEventType] = useState<AutomationEventType | null>(null);
   const [showStats, setShowStats] = useState<boolean>(false);
@@ -893,13 +911,26 @@ export function AutomationSettingsPage() {
 
   return (
     <ErrorBoundary>
-      <Container maxWidth="xl" padding="lg">
-        <PageHeader title="자동화 설정" />
-        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-xs)', marginBottom: 'var(--spacing-lg)' }}>
-          42개 자동화 기능의 활성화 여부를 설정합니다. 모든 자동화는 Policy 기반으로 동작하며, 설정이 없으면 실행되지 않습니다 (Fail Closed).
-        </p>
+      <div style={{ display: 'flex', height: 'var(--height-full)' }}>
+        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {!isMobileMode && (
+          <SubSidebar
+            title="자동화 설정"
+            items={AUTOMATION_SUB_MENU_ITEMS}
+            selectedId={selectedSubMenu}
+            onSelect={handleSubMenuChange}
+            testId="automation-sub-sidebar"
+          />
+        )}
 
-        {/* 상단 컨트롤 영역 */}
+        {/* 메인 콘텐츠 */}
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+          <PageHeader title="자동화 설정" />
+          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-xs)', marginBottom: 'var(--spacing-lg)' }}>
+            42개 자동화 기능의 활성화 여부를 설정합니다. 모든 자동화는 Policy 기반으로 동작하며, 설정이 없으면 실행되지 않습니다 (Fail Closed).
+          </p>
+
+          {/* 상단 컨트롤 영역 */}
         <div style={{ marginBottom: 'var(--spacing-lg)' }}>
           {/* 검색 및 필터 */}
           <div style={{ display: 'flex', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)', flexWrap: 'wrap' }}>
@@ -1174,7 +1205,8 @@ export function AutomationSettingsPage() {
             </div>
           );
         })}
-      </Container>
+        </Container>
+      </div>
     </ErrorBoundary>
   );
 }

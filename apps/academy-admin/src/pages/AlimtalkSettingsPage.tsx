@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ErrorBoundary,
   useModal,
@@ -21,6 +22,9 @@ import {
   DataTable,
   type DataTableColumn,
   EmptyState,
+  useResponsiveMode,
+  isMobile,
+  SubSidebar,
 } from '@ui-core/react';
 import {
   useAlimtalkSettings,
@@ -32,6 +36,9 @@ import {
   type EmphasisType,
 } from '@hooks/use-alimtalk';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
+// [SSOT] Barrel export를 통한 통합 import
+import { ALIMTALK_SUB_MENU_ITEMS, DEFAULT_ALIMTALK_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import type { AlimtalkSubMenuId } from '../constants';
 import {
   MessageSquare,
   Settings,
@@ -51,21 +58,8 @@ import {
 // 탭 타입 정의
 // ============================================================================
 
-type TabType = 'status' | 'channels' | 'templates' | 'history' | 'points';
-
-interface Tab {
-  id: TabType;
-  label: string;
-  icon: React.ReactNode;
-}
-
-const TABS: Tab[] = [
-  { id: 'status', label: '연동 상태', icon: <Settings size={16} /> },
-  { id: 'channels', label: '채널 관리', icon: <MessageSquare size={16} /> },
-  { id: 'templates', label: '템플릿 관리', icon: <FileText size={16} /> },
-  { id: 'history', label: '발송 내역', icon: <Clock size={16} /> },
-  { id: 'points', label: '잔여 포인트', icon: <CreditCard size={16} /> },
-];
+// Tab 관련 타입은 SubSidebar 적용으로 제거됨 (ALIMTALK_SUB_MENU_ITEMS 사용)
+void [Settings, MessageSquare, FileText, Clock, CreditCard]; // 아이콘 타입 보존
 
 // ============================================================================
 // 상태 표시 컴포넌트
@@ -846,61 +840,54 @@ const PointsTab = memo(function PointsTab() {
 // ============================================================================
 
 export function AlimtalkSettingsPage() {
-  const [activeTab, setActiveTab] = useState<TabType>('status');
+  const [searchParams] = useSearchParams();
+  const mode = useResponsiveMode();
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+
+  // 서브 메뉴 상태
+  const validIds = ALIMTALK_SUB_MENU_ITEMS.map(item => item.id) as readonly AlimtalkSubMenuId[];
+  const [selectedSubMenu, setSelectedSubMenu] = useState<AlimtalkSubMenuId>(() =>
+    getSubMenuFromUrl(searchParams, validIds, DEFAULT_ALIMTALK_SUB_MENU)
+  );
+
+  const handleSubMenuChange = (id: AlimtalkSubMenuId) => {
+    setSelectedSubMenu(id);
+    const newUrl = setSubMenuToUrl(id, DEFAULT_ALIMTALK_SUB_MENU);
+    window.history.replaceState(null, '', newUrl);
+  };
 
   // 조건부 렌더링: 한 번에 1개 탭만 마운트
   const renderTabContent = () => {
-    if (activeTab === 'status') return <StatusTab />;
-    if (activeTab === 'channels') return <ChannelsTab />;
-    if (activeTab === 'templates') return <TemplatesTab />;
-    if (activeTab === 'history') return <HistoryTab />;
-    if (activeTab === 'points') return <PointsTab />;
+    if (selectedSubMenu === 'status') return <StatusTab />;
+    if (selectedSubMenu === 'channels') return <ChannelsTab />;
+    if (selectedSubMenu === 'templates') return <TemplatesTab />;
+    if (selectedSubMenu === 'history') return <HistoryTab />;
+    if (selectedSubMenu === 'points') return <PointsTab />;
     return null;
   };
 
   return (
     <ErrorBoundary>
-      <Container>
-        <PageHeader title="알림톡 설정" />
+      <div style={{ display: 'flex', height: 'var(--height-full)' }}>
+        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {!isMobileMode && (
+          <SubSidebar
+            title="알림톡 설정"
+            items={ALIMTALK_SUB_MENU_ITEMS}
+            selectedId={selectedSubMenu}
+            onSelect={handleSubMenuChange}
+            testId="alimtalk-sub-sidebar"
+          />
+        )}
 
-        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-          <div
-            style={{
-              display: 'flex',
-              gap: 'var(--spacing-xs)',
-              borderBottom: '1px solid var(--color-border)',
-              paddingBottom: 'var(--spacing-xs)',
-              overflowX: 'auto',
-            }}
-          >
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--spacing-xs)',
-                  padding: 'var(--spacing-sm) var(--spacing-md)',
-                  border: 'none',
-                  background: activeTab === tab.id ? 'var(--color-primary)' : 'transparent',
-                  color: activeTab === tab.id ? 'white' : 'var(--color-text)',
-                  borderRadius: 'var(--radius-sm)',
-                  cursor: 'pointer',
-                  fontWeight: activeTab === tab.id ? 600 : 400,
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* 메인 콘텐츠 */}
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+          <PageHeader title="알림톡 설정" />
 
-        {renderTabContent()}
-      </Container>
+          {renderTabContent()}
+        </Container>
+      </div>
     </ErrorBoundary>
   );
 }

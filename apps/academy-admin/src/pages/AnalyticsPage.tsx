@@ -23,8 +23,12 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ErrorBoundary, useModal , Container, Card, Button, PageHeader , useResponsiveMode, isMobile } from '@ui-core/react';
+import { ErrorBoundary, useModal , Container, Card, Button, PageHeader , useResponsiveMode, isMobile, SubSidebar } from '@ui-core/react';
+// [SSOT] Barrel export를 통한 통합 import
+import { ANALYTICS_SUB_MENU_ITEMS, DEFAULT_ANALYTICS_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import type { AnalyticsSubMenuId } from '../constants';
 import { RegionalMetricCard } from '../components/analytics-cards/RegionalMetricCard';
 import { AttendancePatternCard } from '../components/analytics-cards/AttendancePatternCard';
 import type { HourlyAttendanceData, DailyAttendanceData } from '../components/analytics-cards/AttendancePatternCard';
@@ -75,6 +79,7 @@ export function AnalyticsPage() {
   const { showAlert } = useModal();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const [searchParams] = useSearchParams();
   const { data: config } = useConfig();
   // [불변 규칙] Zero-Trust: industryType은 Context에서 가져와야 함 (하드코딩 금지)
   const industryType = (context?.industryType || (typeof config?.industry_type === 'string' ? config.industry_type : undefined) || DEFAULT_INDUSTRY_TYPE);
@@ -83,6 +88,18 @@ export function AnalyticsPage() {
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
+
+  // 서브 메뉴 상태
+  const validIds = ANALYTICS_SUB_MENU_ITEMS.map(item => item.id) as readonly AnalyticsSubMenuId[];
+  const [selectedSubMenu, setSelectedSubMenu] = useState<AnalyticsSubMenuId>(() =>
+    getSubMenuFromUrl(searchParams, validIds, DEFAULT_ANALYTICS_SUB_MENU)
+  );
+
+  const handleSubMenuChange = (id: AnalyticsSubMenuId) => {
+    setSelectedSubMenu(id);
+    const newUrl = setSubMenuToUrl(id, DEFAULT_ANALYTICS_SUB_MENU);
+    window.history.replaceState(null, '', newUrl);
+  };
 
   const [selectedMetric, setSelectedMetric] = useState<
     'students' | 'revenue' | 'attendance' | 'growth' | 'new_enrollments' | 'arpu' |
@@ -1119,20 +1136,33 @@ export function AnalyticsPage() {
 
   return (
     <ErrorBoundary>
-      <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"}>
-        <PageHeader
-          title="통계분석"
-          actions={
-            <Button
-              variant="outline"
-              size={isMobileMode ? "sm" : "md"}
-              onClick={() => generateMonthlyReport.mutate()}
-              disabled={generateMonthlyReport.isPending}
-            >
-              {generateMonthlyReport.isPending ? '생성 중...' : '월간 리포트 생성'}
-            </Button>
-          }
-        />
+      <div style={{ display: 'flex', height: 'var(--height-full)' }}>
+        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {!isMobileMode && (
+          <SubSidebar
+            title="통계분석"
+            items={ANALYTICS_SUB_MENU_ITEMS}
+            selectedId={selectedSubMenu}
+            onSelect={handleSubMenuChange}
+            testId="analytics-sub-sidebar"
+          />
+        )}
+
+        {/* 메인 콘텐츠 */}
+        <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"} style={{ flex: 1, overflow: 'auto' }}>
+          <PageHeader
+            title="통계분석"
+            actions={
+              <Button
+                variant="outline"
+                size={isMobileMode ? "sm" : "md"}
+                onClick={() => generateMonthlyReport.mutate()}
+                disabled={generateMonthlyReport.isPending}
+              >
+                {generateMonthlyReport.isPending ? '생성 중...' : '월간 리포트 생성'}
+              </Button>
+            }
+          />
 
         {/* 통계문서 3.1: 운영 현황 카드 4개 (주요 관리 대상 수, 매출, 출석률, 성장률 / 지역순위) */}
         {/* 지표 선택 */}
@@ -1413,6 +1443,7 @@ export function AnalyticsPage() {
             </Card>
         )}
       </Container>
+      </div>
     </ErrorBoundary>
   );
 }

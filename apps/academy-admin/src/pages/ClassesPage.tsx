@@ -9,8 +9,11 @@
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet, DataTable, NotificationCardLayout } from '@ui-core/react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet, DataTable, NotificationCardLayout, SubSidebar } from '@ui-core/react';
+// [SSOT] Barrel export를 통한 통합 import
+import { CLASSES_SUB_MENU_ITEMS, DEFAULT_CLASSES_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import type { ClassesSubMenuId } from '../constants';
 import { BookOpen, Users, CheckCircle, XCircle } from 'lucide-react';
 import { SchemaForm } from '@schema-engine';
 import { apiClient } from '@api-sdk/core';
@@ -115,12 +118,25 @@ export function ClassesPage() {
   const { showConfirm, showAlert } = useModal();
   const { id: urlClassId } = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const mode = useResponsiveMode();
   const terms = useIndustryTerms();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
   const isTabletMode = isTablet(modeUpper);
+
+  // 서브 메뉴 상태
+  const validIds = CLASSES_SUB_MENU_ITEMS.map(item => item.id) as readonly ClassesSubMenuId[];
+  const [selectedSubMenu, setSelectedSubMenu] = useState<ClassesSubMenuId>(() =>
+    getSubMenuFromUrl(searchParams, validIds, DEFAULT_CLASSES_SUB_MENU)
+  );
+
+  const handleSubMenuChange = (id: ClassesSubMenuId) => {
+    setSelectedSubMenu(id);
+    const newUrl = setSubMenuToUrl(id, DEFAULT_CLASSES_SUB_MENU);
+    window.history.replaceState(null, '', newUrl);
+  };
 
   // localStorage 기반 상태 초기화 (SSR Safe, AutomationSettingsPage 패턴 적용)
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>(() => {
@@ -361,45 +377,58 @@ export function ClassesPage() {
 
   return (
     <ErrorBoundary>
-      <Container maxWidth="xl" padding="lg">
-        <PageHeader
-          title={`${terms.GROUP_LABEL}관리`}
-          actions={
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-              <Button
-                variant={showAllClasses ? 'outline' : 'solid'}
-                size="sm"
-                onClick={() => handleToggleShowAll(!showAllClasses)}
-              >
-                {showAllClasses ? `오늘 ${terms.GROUP_LABEL}만` : `전체 ${terms.GROUP_LABEL_PLURAL} 보기`}
-              </Button>
-              <Button
-                variant={viewMode === 'list' ? 'solid' : 'outline'}
-                size="sm"
-                onClick={() => handleToggleViewMode('list')}
-              >
-                리스트
-              </Button>
-              <Button
-                variant={viewMode === 'calendar' ? 'solid' : 'outline'}
-                size="sm"
-                onClick={() => handleToggleViewMode('calendar')}
-              >
-                캘린더
-              </Button>
-              <Button
-                variant="solid"
-                size="sm"
-                onClick={() => setShowCreateForm(!showCreateForm)}
-              >
-                {terms.GROUP_LABEL} 생성
-              </Button>
-            </div>
-          }
-        />
+      <div style={{ display: 'flex', height: 'var(--height-full)' }}>
+        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {!isMobileMode && (
+          <SubSidebar
+            title={`${terms.GROUP_LABEL}관리`}
+            items={CLASSES_SUB_MENU_ITEMS}
+            selectedId={selectedSubMenu}
+            onSelect={handleSubMenuChange}
+            testId="classes-sub-sidebar"
+          />
+        )}
 
-        {/* 통계 카드 */}
-        <StatisticsCards />
+        {/* 메인 콘텐츠 */}
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+          <PageHeader
+            title={`${terms.GROUP_LABEL}관리`}
+            actions={
+              <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                <Button
+                  variant={showAllClasses ? 'outline' : 'solid'}
+                  size="sm"
+                  onClick={() => handleToggleShowAll(!showAllClasses)}
+                >
+                  {showAllClasses ? `오늘 ${terms.GROUP_LABEL}만` : `전체 ${terms.GROUP_LABEL_PLURAL} 보기`}
+                </Button>
+                <Button
+                  variant={viewMode === 'list' ? 'solid' : 'outline'}
+                  size="sm"
+                  onClick={() => handleToggleViewMode('list')}
+                >
+                  리스트
+                </Button>
+                <Button
+                  variant={viewMode === 'calendar' ? 'solid' : 'outline'}
+                  size="sm"
+                  onClick={() => handleToggleViewMode('calendar')}
+                >
+                  캘린더
+                </Button>
+                <Button
+                  variant="solid"
+                  size="sm"
+                  onClick={() => setShowCreateForm(!showCreateForm)}
+                >
+                  {terms.GROUP_LABEL} 생성
+                </Button>
+              </div>
+            }
+          />
+
+          {/* 통계 카드 */}
+          <StatisticsCards />
 
         {/* 수업 생성 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
           {showCreateForm && (
@@ -629,8 +658,9 @@ export function ClassesPage() {
               onSave={handleUpdateClass}
               onClose={handleCloseEditModal}
             />
-        )}
-      </Container>
+          )}
+        </Container>
+      </div>
     </ErrorBoundary>
   );
 }

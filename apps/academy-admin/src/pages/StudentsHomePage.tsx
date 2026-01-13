@@ -10,11 +10,12 @@
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  */
 
-import React, { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 // [SSOT] Barrel export를 통한 통합 import
-import { ROUTES } from '../constants';
-import { ErrorBoundary, Container, Button, PageHeader } from '@ui-core/react';
+import { ROUTES, STUDENTS_SUB_MENU_ITEMS, DEFAULT_STUDENTS_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import type { StudentsSubMenuId } from '../constants';
+import { ErrorBoundary, Container, Button, PageHeader, SubSidebar, useResponsiveMode, isMobile } from '@ui-core/react';
 import { createSafeNavigate } from '../utils';
 import { StudentStatsCard } from '../components/dashboard-cards/StudentStatsCard';
 import { AttendanceStatsCard } from '../components/dashboard-cards/AttendanceStatsCard';
@@ -27,11 +28,28 @@ import { CardGridLayout } from '../components/CardGridLayout';
 
 export function StudentsHomePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const mode = useResponsiveMode();
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+
   // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
   const safeNavigate = useMemo(
     () => createSafeNavigate(navigate),
     [navigate]
   );
+
+  // 서브 메뉴 상태
+  const validIds = STUDENTS_SUB_MENU_ITEMS.map(item => item.id) as readonly StudentsSubMenuId[];
+  const [selectedSubMenu, setSelectedSubMenu] = useState<StudentsSubMenuId>(() =>
+    getSubMenuFromUrl(searchParams, validIds, DEFAULT_STUDENTS_SUB_MENU)
+  );
+
+  const handleSubMenuChange = (id: StudentsSubMenuId) => {
+    setSelectedSubMenu(id);
+    const newUrl = setSubMenuToUrl(id, DEFAULT_STUDENTS_SUB_MENU);
+    window.history.replaceState(null, '', newUrl);
+  };
 
   // 통계 Hook 사용 (학생 관리 전용 기능)
   const { data: studentStats, isLoading: isLoadingStats } = useStudentStats();
@@ -102,19 +120,32 @@ export function StudentsHomePage() {
 
   return (
     <ErrorBoundary>
-      <Container maxWidth="xl" padding="lg">
-        {/* 헤더 섹션 */}
-        <PageHeader
-          title="학생 관리"
-          actions={
-            <Button
-              variant="solid"
-              onClick={handleViewAllStudents}
-            >
-              전체 학생 보기
-            </Button>
-          }
-        />
+      <div style={{ display: 'flex', height: 'var(--height-full)' }}>
+        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {!isMobileMode && (
+          <SubSidebar
+            title="학생관리"
+            items={STUDENTS_SUB_MENU_ITEMS}
+            selectedId={selectedSubMenu}
+            onSelect={handleSubMenuChange}
+            testId="students-sub-sidebar"
+          />
+        )}
+
+        {/* 메인 콘텐츠 */}
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+          {/* 헤더 섹션 */}
+          <PageHeader
+            title="학생 관리"
+            actions={
+              <Button
+                variant="solid"
+                onClick={handleViewAllStudents}
+              >
+                전체 학생 보기
+              </Button>
+            }
+          />
 
         {/* 통계 카드 그룹 */}
         <div style={{ marginBottom: 'var(--spacing-2xl)' }}>
@@ -183,8 +214,9 @@ export function StudentsHomePage() {
             isLoading={isLoadingActivity}
             onAction={handleActivityClick}
           />
-        </div>
-      </Container>
+          </div>
+        </Container>
+      </div>
     </ErrorBoundary>
   );
 }

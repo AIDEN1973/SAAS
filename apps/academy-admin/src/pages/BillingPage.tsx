@@ -9,12 +9,12 @@
  * [요구사항] 월정액/횟수제/패키지 상품, 월 자동 청구 생성, 미납 관리, 결제 수단 지원
  */
 
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 // [SSOT] Barrel export를 통한 통합 import
 import { createSafeNavigate } from '../utils';
-import { ErrorBoundary, useModal, Modal, Container, Card, Button, useResponsiveMode, Drawer, PageHeader, isMobile, isTablet } from '@ui-core/react';
+import { ErrorBoundary, useModal, Modal, Container, Card, Button, useResponsiveMode, Drawer, PageHeader, isMobile, isTablet, SubSidebar } from '@ui-core/react';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
@@ -30,13 +30,15 @@ import { billingFormSchema } from '../schemas/billing.schema';
 import { invoiceTableSchema } from '../schemas/invoice.table.schema';
 import { INVOICE_STATUS_LABELS } from '../utils/billingUtils';
 // [SSOT] Barrel export를 통한 통합 import
-import { ROUTES } from '../constants';
+import { BILLING_SUB_MENU_ITEMS, DEFAULT_BILLING_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import type { BillingSubMenuId } from '../constants';
 
 export function BillingPage() {
   const { showAlert } = useModal();
   const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const [searchParams] = useSearchParams();
   const mode = useResponsiveMode();
   const terms = useIndustryTerms();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
@@ -44,20 +46,24 @@ export function BillingPage() {
   const isMobileMode = isMobile(modeUpper);
   const isTabletMode = isTablet(modeUpper);
 
+  // 서브 메뉴 상태
+  const validIds = BILLING_SUB_MENU_ITEMS.map(item => item.id) as readonly BillingSubMenuId[];
+  const [selectedSubMenu, setSelectedSubMenu] = useState<BillingSubMenuId>(() =>
+    getSubMenuFromUrl(searchParams, validIds, DEFAULT_BILLING_SUB_MENU)
+  );
+
+  const handleSubMenuChange = (id: BillingSubMenuId) => {
+    setSelectedSubMenu(id);
+    const newUrl = setSubMenuToUrl(id, DEFAULT_BILLING_SUB_MENU);
+    window.history.replaceState(null, '', newUrl);
+  };
+
   const [filter, setFilter] = useState<{ status?: InvoiceStatus }>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [activeTab, setActiveTab] = useState<'invoices' | 'products' | 'settlement' | 'teacher-revenue-split'>('invoices');
   const [showProductForm, setShowProductForm] = useState(false);
   const [showSettlementForm, setShowSettlementForm] = useState(false);
   const [showTeacherRevenueSplitForm, setShowTeacherRevenueSplitForm] = useState(false);
-  const navigate = useNavigate();
-  // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
-  const safeNavigate = useMemo(
-    () => createSafeNavigate(navigate),
-    [navigate]
-  );
-  // 현재 화면 구현 범위에서 미사용 상태/세터들은 명시적으로 참조하여 lint(0/0)를 유지합니다.
-  void setActiveTab;
+  void createSafeNavigate; // 네비게이션 보안 유틸리티는 현재 사용하지 않음
   void showProductForm;
   void setShowProductForm;
   void showSettlementForm;
@@ -137,7 +143,7 @@ export function BillingPage() {
 
       return Array.from(productMap.values());
     },
-    enabled: !!tenantId && activeTab === 'products',
+    enabled: false, // 상품 관리는 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙)
   });
   void products;
   void productsLoading;
@@ -249,43 +255,26 @@ export function BillingPage() {
 
   return (
     <ErrorBoundary>
-      <Container maxWidth="xl" padding="lg">
-        <PageHeader
-          title={`${terms.BILLING_LABEL} 관리`}
-        />
+      <div style={{ display: 'flex', height: 'var(--height-full)' }}>
+        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {!isMobileMode && (
+          <SubSidebar
+            title={`${terms.BILLING_LABEL} 관리`}
+            items={BILLING_SUB_MENU_ITEMS}
+            selectedId={selectedSubMenu}
+            onSelect={handleSubMenuChange}
+            testId="billing-sub-sidebar"
+          />
+        )}
 
-        {/* 빠른 링크 (한 페이지에 하나의 기능 원칙 준수: 청구서 관리만 메인, 나머지는 별도 페이지) */}
-        <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ color: 'var(--color-text-secondary)', marginRight: 'var(--spacing-sm)' }}>
-                관련 기능:
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => safeNavigate(ROUTES.BILLING_HOME)}
-              >
-                상품 관리
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => safeNavigate(ROUTES.BILLING_HOME)}
-              >
-                결제 관리
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => safeNavigate(ROUTES.BILLING_HOME)}
-              >
-                매출/정산
-              </Button>
-            </div>
-          </Card>
+        {/* 메인 콘텐츠 */}
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+          <PageHeader
+            title={`${terms.BILLING_LABEL} 관리`}
+          />
 
           {/* 인보이스 탭 */}
-          {activeTab === 'invoices' && (
+          {selectedSubMenu === 'invoices' && (
             <>
           {/* 필터 및 액션 */}
           <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
@@ -426,7 +415,8 @@ export function BillingPage() {
           )}
 
           {/* 상품 관리, 결제 관리, 매출/정산은 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙) */}
-      </Container>
+        </Container>
+      </div>
     </ErrorBoundary>
   );
 }

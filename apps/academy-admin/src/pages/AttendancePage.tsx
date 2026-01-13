@@ -15,9 +15,12 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ErrorBoundary, Container, Card, Button, Badge, Select, useModal, BottomActionBar, PageHeader, useResponsiveMode, isMobile, isTablet, NotificationCardLayout, DataTable } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, Button, Badge, Select, useModal, BottomActionBar, PageHeader, useResponsiveMode, isMobile, isTablet, NotificationCardLayout, DataTable, SubSidebar } from '@ui-core/react';
 import { CardGridLayout } from '../components/CardGridLayout';
-import { Users, UserCheck, Clock, UserX, Smartphone } from 'lucide-react';
+import { Users, UserCheck, Clock, UserX, Smartphone, CalendarCheck, History, BarChart3, Settings } from 'lucide-react';
+import { ATTENDANCE_SUB_MENU_ITEMS, DEFAULT_ATTENDANCE_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import type { AttendanceSubMenuId } from '../constants';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAttendanceLogs, useUpsertAttendanceLog } from '@hooks/use-attendance';
 import { useStudents } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
@@ -102,6 +105,39 @@ export function AttendancePage() {
 
   // 전역 모달 훅 사용
   const { showAlert } = useModal();
+
+  // URL 쿼리 파라미터와 연동된 서브 사이드바 상태
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  // URL에서 초기 서브 메뉴 상태 추출
+  const validSubMenuIds = ATTENDANCE_SUB_MENU_ITEMS.map(item => item.id) as readonly AttendanceSubMenuId[];
+  const selectedSubMenu = getSubMenuFromUrl<AttendanceSubMenuId>(
+    searchParams,
+    validSubMenuIds,
+    DEFAULT_ATTENDANCE_SUB_MENU
+  );
+
+  // 서브 메뉴 변경 핸들러 (URL 동기화)
+  const handleSubMenuChange = useCallback((id: AttendanceSubMenuId) => {
+    const newUrl = setSubMenuToUrl(id, DEFAULT_ATTENDANCE_SUB_MENU);
+    navigate(newUrl, { replace: true });
+  }, [navigate]);
+
+  // 서브 메뉴 아이템에 아이콘 추가
+  const subMenuItemsWithIcons = useMemo(() => {
+    const iconMap: Record<AttendanceSubMenuId, React.ReactNode> = {
+      today: <CalendarCheck size={16} />,
+      history: <History size={16} />,
+      statistics: <BarChart3 size={16} />,
+      settings: <Settings size={16} />,
+    };
+
+    return ATTENDANCE_SUB_MENU_ITEMS.map(item => ({
+      ...item,
+      icon: iconMap[item.id],
+    }));
+  }, []);
 
 
   const handleClassIdChange = useCallback((classId: string | null) => {
@@ -729,10 +765,23 @@ export function AttendancePage() {
 
   return (
     <ErrorBoundary>
-      <Container maxWidth="xl" padding="lg">
-        <PageHeader
-          title={`출결관리`}
-        />
+      <div style={{ display: 'flex', height: 'var(--height-full)' }}>
+        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {!isMobileMode && (
+          <SubSidebar
+            title="출결관리"
+            items={subMenuItemsWithIcons}
+            selectedId={selectedSubMenu}
+            onSelect={handleSubMenuChange}
+            testId="attendance-sub-sidebar"
+          />
+        )}
+
+        {/* 메인 콘텐츠 */}
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+          <PageHeader
+            title={subMenuItemsWithIcons.find(item => item.id === selectedSubMenu)?.label || '출결관리'}
+          />
 
         {/* 출결 화면 */}
         <>
@@ -1361,7 +1410,8 @@ export function AttendancePage() {
         </>
 
         {/* 통계/히트맵/패턴 분석 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8) */}
-      </Container>
+        </Container>
+      </div>
     </ErrorBoundary>
   );
 }

@@ -42,3 +42,57 @@ export {
 } from './automation-event-descriptions';
 export type { AutomationEventCriteriaField } from './automation-event-descriptions';
 
+// 서브 사이드바 메뉴 상수
+export {
+  // 출결관리 페이지
+  ATTENDANCE_SUB_MENU_ITEMS,
+  DEFAULT_ATTENDANCE_SUB_MENU,
+  // 매뉴얼 페이지
+  MANUAL_SUB_MENU_ITEMS,
+  DEFAULT_MANUAL_SUB_MENU,
+  // 학생관리 페이지
+  STUDENTS_SUB_MENU_ITEMS,
+  DEFAULT_STUDENTS_SUB_MENU,
+  // 문자발송 페이지
+  NOTIFICATIONS_SUB_MENU_ITEMS,
+  DEFAULT_NOTIFICATIONS_SUB_MENU,
+  // 통계분석 페이지
+  ANALYTICS_SUB_MENU_ITEMS,
+  DEFAULT_ANALYTICS_SUB_MENU,
+  // 인공지능 페이지
+  AI_SUB_MENU_ITEMS,
+  DEFAULT_AI_SUB_MENU,
+  // 수업관리 페이지
+  CLASSES_SUB_MENU_ITEMS,
+  DEFAULT_CLASSES_SUB_MENU,
+  // 강사관리 페이지
+  TEACHERS_SUB_MENU_ITEMS,
+  DEFAULT_TEACHERS_SUB_MENU,
+  // 수납관리 페이지
+  BILLING_SUB_MENU_ITEMS,
+  DEFAULT_BILLING_SUB_MENU,
+  // 자동화 설정 페이지
+  AUTOMATION_SUB_MENU_ITEMS,
+  DEFAULT_AUTOMATION_SUB_MENU,
+  // 알림톡 설정 페이지
+  ALIMTALK_SUB_MENU_ITEMS,
+  DEFAULT_ALIMTALK_SUB_MENU,
+  // 공통
+  SUB_SIDEBAR_WIDTH,
+  SUB_MENU_QUERY_PARAM,
+  getSubMenuFromUrl,
+  setSubMenuToUrl,
+} from './sub-sidebar-menus';
+export type {
+  AttendanceSubMenuId,
+  ManualSubMenuId,
+  StudentsSubMenuId,
+  NotificationsSubMenuId,
+  AnalyticsSubMenuId,
+  AISubMenuId,
+  ClassesSubMenuId,
+  TeachersSubMenuId,
+  BillingSubMenuId,
+  AutomationSubMenuId,
+  AlimtalkSubMenuId,
+} from './sub-sidebar-menus';

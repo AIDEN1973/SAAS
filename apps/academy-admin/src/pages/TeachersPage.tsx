@@ -9,7 +9,8 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet, EmptyState } from '@ui-core/react';
+import { useSearchParams } from 'react-router-dom';
+import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet, EmptyState, SubSidebar } from '@ui-core/react';
 import { UserCog } from 'lucide-react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
@@ -28,15 +29,32 @@ import { teacherFormSchema } from '../schemas/teacher.schema';
 import type { FormSchema } from '@schema-engine/types';
 import { teacherFilterSchema } from '../schemas/teacher.filter.schema';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
+// [SSOT] Barrel export를 통한 통합 import
+import { TEACHERS_SUB_MENU_ITEMS, DEFAULT_TEACHERS_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import type { TeachersSubMenuId } from '../constants';
 
 export function TeachersPage() {
   const { showConfirm, showAlert } = useModal();
   const terms = useIndustryTerms();
+  const [searchParams] = useSearchParams();
   const mode = useResponsiveMode();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
   const isTabletMode = isTablet(modeUpper);
+
+  // 서브 메뉴 상태
+  const validIds = TEACHERS_SUB_MENU_ITEMS.map(item => item.id) as readonly TeachersSubMenuId[];
+  const [selectedSubMenu, setSelectedSubMenu] = useState<TeachersSubMenuId>(() =>
+    getSubMenuFromUrl(searchParams, validIds, DEFAULT_TEACHERS_SUB_MENU)
+  );
+
+  const handleSubMenuChange = (id: TeachersSubMenuId) => {
+    setSelectedSubMenu(id);
+    const newUrl = setSubMenuToUrl(id, DEFAULT_TEACHERS_SUB_MENU);
+    window.history.replaceState(null, '', newUrl);
+  };
+
   const [filter, setFilter] = useState<TeacherFilter>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null);
@@ -94,29 +112,42 @@ export function TeachersPage() {
 
   return (
     <ErrorBoundary>
-      <Container maxWidth="xl" padding="lg">
-        <PageHeader
-          title={`${terms.PERSON_LABEL_SECONDARY} 관리`}
-          actions={
-            <Button
-              variant="solid"
-              size="sm"
-              onClick={() => setShowCreateForm(!showCreateForm)}
-            >
-              {terms.PERSON_LABEL_SECONDARY} 등록
-            </Button>
-          }
-        />
+      <div style={{ display: 'flex', height: 'var(--height-full)' }}>
+        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {!isMobileMode && (
+          <SubSidebar
+            title={`${terms.PERSON_LABEL_SECONDARY} 관리`}
+            items={TEACHERS_SUB_MENU_ITEMS}
+            selectedId={selectedSubMenu}
+            onSelect={handleSubMenuChange}
+            testId="teachers-sub-sidebar"
+          />
+        )}
 
-        {/* 검색 및 필터 패널 */}
-        <SchemaFilter
-          schema={effectiveFilterSchema}
-          onFilterChange={handleFilterChange}
-          defaultValues={{
-            search: filter.search || '',
-            status: filter.status || '',
-          }}
-        />
+        {/* 메인 콘텐츠 */}
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+          <PageHeader
+            title={`${terms.PERSON_LABEL_SECONDARY} 관리`}
+            actions={
+              <Button
+                variant="solid"
+                size="sm"
+                onClick={() => setShowCreateForm(!showCreateForm)}
+              >
+                {terms.PERSON_LABEL_SECONDARY} 등록
+              </Button>
+            }
+          />
+
+          {/* 검색 및 필터 패널 */}
+          <SchemaFilter
+            schema={effectiveFilterSchema}
+            onFilterChange={handleFilterChange}
+            defaultValues={{
+              search: filter.search || '',
+              status: filter.status || '',
+            }}
+          />
 
         {/* 강사 등록 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
           {showCreateForm && (
@@ -207,7 +238,8 @@ export function TeachersPage() {
               terms={terms}
             />
           )}
-      </Container>
+        </Container>
+      </div>
     </ErrorBoundary>
   );
 }

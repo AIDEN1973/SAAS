@@ -34,7 +34,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Badge, PageHeader, isMobile, Modal, Drawer, EmptyState } from '@ui-core/react';
+import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Badge, PageHeader, isMobile, Modal, Drawer, EmptyState, SubSidebar } from '@ui-core/react';
 import { MapPin, Sparkles, FileText } from 'lucide-react';
 import { SchemaForm } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
@@ -48,7 +48,8 @@ import { useUserRole } from '@hooks/use-auth';
 import { useStoreLocation } from '@hooks/use-config';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
-import { ROUTES } from '../constants';
+import { ROUTES, AI_SUB_MENU_ITEMS, DEFAULT_AI_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import type { AISubMenuId } from '../constants';
 import { createSafeNavigate } from '../utils';
 
 export function AIPage() {
@@ -67,6 +68,18 @@ export function AIPage() {
   );
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab'); // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
+
+  // 서브 메뉴 상태
+  const validIds = AI_SUB_MENU_ITEMS.map(item => item.id) as readonly AISubMenuId[];
+  const [selectedSubMenu, setSelectedSubMenu] = useState<AISubMenuId>(() =>
+    getSubMenuFromUrl(searchParams, validIds, DEFAULT_AI_SUB_MENU)
+  );
+
+  const handleSubMenuChange = (id: AISubMenuId) => {
+    setSelectedSubMenu(id);
+    const newUrl = setSubMenuToUrl(id, DEFAULT_AI_SUB_MENU);
+    window.history.replaceState(null, '', newUrl);
+  };
   const { data: userRole } = useUserRole(); // 아키텍처 문서 2.4: Teacher는 요약만 접근 가능
   const isTeacher = userRole === 'teacher'; // Teacher는 요약만 볼 수 있음
   const terms = useIndustryTerms();
@@ -486,10 +499,23 @@ export function AIPage() {
 
   return (
     <ErrorBoundary>
-      <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"}>
-        <PageHeader
-          title="인공지능"
-        />
+      <div style={{ display: 'flex', height: 'var(--height-full)' }}>
+        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {!isMobileMode && (
+          <SubSidebar
+            title="인공지능"
+            items={AI_SUB_MENU_ITEMS}
+            selectedId={selectedSubMenu}
+            onSelect={handleSubMenuChange}
+            testId="ai-sub-sidebar"
+          />
+        )}
+
+        {/* 메인 콘텐츠 */}
+        <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"} style={{ flex: 1, overflow: 'auto' }}>
+          <PageHeader
+            title="인공지능"
+          />
 
         {/* 아키텍처 문서 3.7.1: 빠른 분석 링크 (상세 분석은 별도 페이지에서 제공) */}
         {/* 아키텍처 문서 2.4: Teacher는 요약만 접근 가능, 상세 분석 버튼은 숨김 */}
@@ -1132,6 +1158,7 @@ export function AIPage() {
             </Modal>
           )}
       </Container>
+      </div>
     </ErrorBoundary>
   );
 }

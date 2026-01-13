@@ -59,8 +59,8 @@
   --color-primary-40: #e8f2ff;
   --color-primary-50: #eff6ff;
   --color-primary-100: #dbeafe;
-  --color-primary-hover: rgba(59, 130, 246, 0.06); /* hover 배경색 (투명도 6%) */
-  --color-primary-selected: rgba(59, 130, 246, 0.10); /* 선택된 상태 배경색 (투명도 10%, hover보다 진함) */
+  --color-primary-hover: color-mix(in srgb, var(--color-primary) 8%, transparent); /* hover 배경색 (프라이머리 8%) */
+  --color-primary-selected: color-mix(in srgb, var(--color-primary) 12%, transparent); /* 선택된 상태 배경색 (프라이머리 12%, hover보다 진함) */
   --color-primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 
   /* Color Tokens for Design System - 모던 톤 */
@@ -142,7 +142,7 @@
   --width-layer-menu: 37.5rem;       /* 600px - 레이어 메뉴 기본 너비 */
   --width-layer-menu-tablet: 31.25rem; /* 500px - 태블릿 레이어 메뉴 너비 */
   --width-layer-menu-expanded: 65vw;    /* 레이어 메뉴 확장 너비(전체 화면의 65%) */
-  --width-agent-history-sidebar: 16.25rem; /* 260px - 에이전트 히스토리 사이드바 너비 */
+  --width-agent-history-sidebar: 14rem; /* 224px - 에이전트 히스토리 사이드바 너비 */
   --width-agent-timeline-sidebar: 26rem; /* 416px - 에이전트 타임라인 사이드바 너비 */
   --width-agent-chat-max: 50rem;       /* 800px - 에이전트 채팅 영역 최대 너비 */
   --width-overlay-threshold: 90rem;  /* 1440px - 오버레이 모드 전환 기준 너비 */
@@ -250,7 +250,7 @@
   --size-icon-sidebar-close: 1.25rem;   /* 20px - 사이드바 닫기 버튼 아이콘 크기 (14px * 1.43) */
   --size-icon-xl: 1.5rem;               /* 24px - 헤더 AI 버튼 등 큰 아이콘 크기 */
   --stroke-width-icon: 1.5;              /* 아이콘 선 두께 */
-  --stroke-width-icon-thin: 1;           /* 아이콘 선 두께 (얇은 선, 확장/축소 등) */
+  --stroke-width-icon-thin: 2;           /* 아이콘 선 두께 (얇은 선, 확장/축소 등) */
   --stroke-width-icon-bold: 2;            /* 아이콘 선 두께 (굵은 선, 필터 아이콘 등) */
   --stroke-width-icon-bold-sidebar: 3;  /* 사이드바 아이콘 굵은 선 두께 (롤오버/선택 시) - 기본값과 동일 */
   --stroke-width-icon-medium: 2;          /* 아이콘 선 두께 (중간 굵기, 아이콘 버튼 등) */
@@ -541,5 +541,17 @@ textarea::placeholder {
 .ui-core-hiddenScrollbar::-webkit-scrollbar {
   width: 0;
   height: 0;
+}
+
+/* 서브사이드바 메뉴 아이콘 선 굵기 조절 */
+.sub-sidebar-menu-icon .lucide,
+.sub-sidebar-menu-icon svg {
+  stroke-width: 1.5 !important;
+}
+
+/* 서브사이드바 메뉴 아이콘 - 선택된 상태 */
+.sub-sidebar-menu-icon-selected .lucide,
+.sub-sidebar-menu-icon-selected svg {
+  stroke-width: 2 !important;
 }
 

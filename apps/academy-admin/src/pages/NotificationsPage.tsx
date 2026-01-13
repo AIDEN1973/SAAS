@@ -10,9 +10,10 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOptimizedQuery } from '@hooks/use-optimized-query';
-import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer, PageHeader, useIconSize, useIconStrokeWidth, isMobile, isTablet, EmptyState } from '@ui-core/react';
+import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer, PageHeader, useIconSize, useIconStrokeWidth, isMobile, isTablet, EmptyState, SubSidebar } from '@ui-core/react';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -29,6 +30,9 @@ import { useUpdateConfig } from '@hooks/use-config';
 import { fetchNotificationTemplates } from '@hooks/use-notification-templates';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { Sparkles, FileText } from 'lucide-react';
+// [SSOT] Barrel export를 통한 통합 import
+import { NOTIFICATIONS_SUB_MENU_ITEMS, DEFAULT_NOTIFICATIONS_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import type { NotificationsSubMenuId } from '../constants';
 // logWarn import 제거됨 - 채널 선택 기능 제거로 미사용
 
 export function NotificationsPage() {
@@ -39,6 +43,7 @@ export function NotificationsPage() {
   const { data: session } = useSession();
   const terms = useIndustryTerms();
   const mode = useResponsiveMode();
+  const [searchParams] = useSearchParams();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
@@ -46,12 +51,23 @@ export function NotificationsPage() {
   const iconSize = useIconSize('--size-icon-base', 20);
   const iconStrokeWidth = useIconStrokeWidth('--stroke-width-icon', 1.5);
 
+  // 서브 메뉴 상태
+  const validIds = NOTIFICATIONS_SUB_MENU_ITEMS.map(item => item.id) as readonly NotificationsSubMenuId[];
+  const [selectedSubMenu, setSelectedSubMenu] = useState<NotificationsSubMenuId>(() =>
+    getSubMenuFromUrl(searchParams, validIds, DEFAULT_NOTIFICATIONS_SUB_MENU)
+  );
+
+  const handleSubMenuChange = (id: NotificationsSubMenuId) => {
+    setSelectedSubMenu(id);
+    const newUrl = setSubMenuToUrl(id, DEFAULT_NOTIFICATIONS_SUB_MENU);
+    window.history.replaceState(null, '', newUrl);
+  };
+
   const [filter, _setFilter] = useState<{ status?: NotificationStatus }>({});
   // 채널 선택 제거됨 - filter는 상태 필터링에 사용, setFilter는 향후 필터 UI 구현 시 사용 예정
   void _setFilter;
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
-  const [activeTab, setActiveTab] = useState<'history' | 'send' | 'templates' | 'bulk' | 'auto-settings'>('history');
   const [aiDraftValues, setAiDraftValues] = useState<Record<string, unknown> | null>(null);
 
   // AI 메시지 초안 제안 조회 (StudentTaskCard에서 task_type: 'ai_suggested', suggested_action.type: 'send_message' 필터링)
@@ -92,7 +108,7 @@ export function NotificationsPage() {
       // 정본 규칙: fetchNotificationTemplates 함수 사용 (Hook의 queryFn 로직 재사용)
       return fetchNotificationTemplates(tenantId, {});
     },
-    { enabled: !!tenantId && activeTab === 'templates' } // 템플릿 탭 활성화 시에만 조회
+    { enabled: !!tenantId && selectedSubMenu === 'templates' } // 템플릿 탭 활성화 시에만 조회
   );
 
   // 템플릿 생성
@@ -326,54 +342,26 @@ export function NotificationsPage() {
 
   return (
     <ErrorBoundary>
-      <Container maxWidth="xl" padding="lg">
-        <PageHeader
-          title="문자발송"
-        />
+      <div style={{ display: 'flex', height: 'var(--height-full)' }}>
+        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {!isMobileMode && (
+          <SubSidebar
+            title="문자발송"
+            items={NOTIFICATIONS_SUB_MENU_ITEMS}
+            selectedId={selectedSubMenu}
+            onSelect={handleSubMenuChange}
+            testId="notifications-sub-sidebar"
+          />
+        )}
 
-        {/* 탭 선택 */}
-        <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
-              <Button
-                variant={activeTab === 'history' ? 'solid' : 'outline'}
-                size="sm"
-                onClick={() => setActiveTab('history')}
-              >
-                {terms.MESSAGE_LABEL} 내역
-              </Button>
-              <Button
-                variant={activeTab === 'send' ? 'solid' : 'outline'}
-                size="sm"
-                onClick={() => setActiveTab('send')}
-              >
-                {terms.MESSAGE_LABEL} 발송
-              </Button>
-              <Button
-                variant={activeTab === 'templates' ? 'solid' : 'outline'}
-                size="sm"
-                onClick={() => setActiveTab('templates')}
-              >
-                템플릿 관리
-              </Button>
-              <Button
-                variant={activeTab === 'bulk' ? 'solid' : 'outline'}
-                size="sm"
-                onClick={() => setActiveTab('bulk')}
-              >
-                단체문자/예약
-              </Button>
-              <Button
-                variant={activeTab === 'auto-settings' ? 'solid' : 'outline'}
-                size="sm"
-                onClick={() => setActiveTab('auto-settings')}
-              >
-                자동 알림 설정
-              </Button>
-            </div>
-          </Card>
+        {/* 메인 콘텐츠 */}
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+          <PageHeader
+            title="문자발송"
+          />
 
           {/* 발송 내역 탭 */}
-          {activeTab === 'history' && (
+          {selectedSubMenu === 'history' && (
             <>
           {/* 액션 버튼 */}
           <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
@@ -498,7 +486,7 @@ export function NotificationsPage() {
           )}
 
           {/* 메시지 발송 탭 */}
-          {activeTab === 'send' && (
+          {selectedSubMenu === 'send' && (
             <>
               {/* AI 초안 제안 배너 (아키텍처 문서 3.5.1: AI 자동 초안 제안 모델) */}
               {messageDraftSuggestions.length > 0 && (
@@ -665,7 +653,7 @@ export function NotificationsPage() {
           )}
 
           {/* 템플릿 관리 탭 */}
-          {activeTab === 'templates' && (
+          {selectedSubMenu === 'templates' && (
             <Card padding="lg">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
                 <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>템플릿 관리</h3>
@@ -777,7 +765,7 @@ export function NotificationsPage() {
           )}
 
           {/* 단체문자/예약 탭 */}
-          {activeTab === 'bulk' && (
+          {selectedSubMenu === 'bulk' && (
             <Card padding="lg">
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
                 단체문자/예약 발송
@@ -812,7 +800,7 @@ export function NotificationsPage() {
           )}
 
           {/* 자동 알림 설정 탭 */}
-          {activeTab === 'auto-settings' && (
+          {selectedSubMenu === 'auto-settings' && (
             <Card padding="lg">
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
                 자동 알림 설정
@@ -851,7 +839,8 @@ export function NotificationsPage() {
               )}
             </Card>
         )}
-      </Container>
+        </Container>
+      </div>
     </ErrorBoundary>
   );
 }
