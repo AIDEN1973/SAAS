@@ -30,7 +30,7 @@ import { isWidgetRegistered, setWidgetRegistered } from '../utils/widget-registr
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
 import { createSafeNavigate } from '../utils';
-import { STUDENTS_SUB_MENU_ITEMS, DEFAULT_STUDENTS_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import { STUDENTS_SUB_MENU_ITEMS, DEFAULT_STUDENTS_SUB_MENU, STUDENTS_RELATED_MENUS, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
 import type { StudentsSubMenuId } from '../constants';
 import { StudentInfoTab } from './students/tabs/StudentInfoTab';
 import { GuardiansTab } from './students/tabs/GuardiansTab';
@@ -260,6 +260,7 @@ export function StudentsPage() {
           items={STUDENTS_SUB_MENU_ITEMS}
           selectedId={selectedSubMenu}
           onSelect={handleSubMenuChange}
+          relatedMenus={STUDENTS_RELATED_MENUS}
           testId="students-sub-sidebar"
         />
         <div style={{ flex: 1, overflow: 'auto' }}>
@@ -267,16 +268,20 @@ export function StudentsPage() {
         layerMenu={{
           isOpen: !!selectedStudentId,
           onClose: () => handleStudentSelect(null),
+          // 중요: 내용 변경 감지를 위해 selectedStudentId를 contentKey로 전달
+          contentKey: selectedStudentId || undefined,
           // 중요: 학생 상세 레이어 메뉴는 AI 레이어 메뉴보다 높은 z-index를 가져야 함 (항상 열려있는 AI 레이어 위에 오버레이)
           style: {
             zIndex: 'var(--z-modal)', // AI 레이어 메뉴(--z-sticky)보다 높음
           },
           title: selectedStudentLoading ? terms.MESSAGES.LOADING : selectedStudent ? (
-            <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 'var(--spacing-xs)', minWidth: 0 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 'var(--spacing-sm)', minWidth: 0 }}>
               <span
                 style={{
-                  fontSize: 'var(--font-size-2xl)',
+                  // 페이지 바디 헤더 타이틀(PageHeader)과 동일한 스타일
+                  fontSize: 'var(--font-size-3xl)',
                   fontWeight: 'var(--font-weight-extrabold)',
+                  lineHeight: 'var(--line-height-tight)',
                   color: 'var(--color-text)',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
@@ -286,7 +291,7 @@ export function StudentsPage() {
               >
                 {selectedStudent.name}
               </span>
-              <span style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
                 {terms.PERSON_LABEL_PRIMARY} 상세정보
               </span>
             </span>
@@ -542,15 +547,17 @@ export function StudentsPage() {
         <PageHeader
           title={`${terms.PERSON_LABEL_PRIMARY}관리`}
           actions={
-            <DataTableActionButtons
-              align="right"
-              onCreate={() => setShowCreateForm(true)}
-              onUpload={() => fileInputRef.current?.click()}
-              onDownload={handleDownload}
-              onDownloadTemplate={handleDownloadTemplate}
-              uploadDisabled={bulkCreateStudents.isPending}
-              createTooltip={`${terms.PERSON_LABEL_PRIMARY}등록`}
-            />
+            selectedSubMenu === 'list' ? (
+              <DataTableActionButtons
+                align="right"
+                onCreate={() => setShowCreateForm(true)}
+                onUpload={() => fileInputRef.current?.click()}
+                onDownload={handleDownload}
+                onDownloadTemplate={handleDownloadTemplate}
+                uploadDisabled={bulkCreateStudents.isPending}
+                createTooltip={`${terms.PERSON_LABEL_PRIMARY}등록`}
+              />
+            ) : undefined
           }
         />
 
@@ -566,6 +573,9 @@ export function StudentsPage() {
           }}
         />
 
+        {/* 학생 목록 탭 ('list') */}
+        {selectedSubMenu === 'list' && (
+          <>
         {/* 태그 필터 */}
         {tags && tags.length > 0 && (
             <div style={{ position: 'relative', marginBottom: 'var(--spacing-md)' }}>
@@ -756,6 +766,76 @@ export function StudentsPage() {
               />
           </Card>
         )}
+          </>
+        )}
+
+        {/* 학생 등록 탭 ('add') */}
+        {selectedSubMenu === 'add' && (
+          <Card padding="lg" variant="default">
+            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+              <h2 style={{
+                fontSize: 'var(--font-size-xl)',
+                fontWeight: 'var(--font-weight-bold)',
+                marginBottom: 'var(--spacing-md)'
+              }}>
+                {terms.PERSON_LABEL_PRIMARY} 등록
+              </h2>
+            </div>
+            <CreateStudentForm
+              onClose={() => handleSubMenuChange('list')}
+              onSubmit={async (data) => {
+                await createStudent.mutateAsync(data);
+                handleSubMenuChange('list');
+              }}
+              effectiveFormSchema={effectiveFormSchema}
+            />
+          </Card>
+        )}
+
+        {/* 태그 관리 탭 ('tags') */}
+        {selectedSubMenu === 'tags' && (
+          <Card padding="lg" variant="default">
+            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+              <h2 style={{
+                fontSize: 'var(--font-size-xl)',
+                fontWeight: 'var(--font-weight-bold)',
+                marginBottom: 'var(--spacing-md)'
+              }}>
+                {terms.TAG_LABEL} 관리
+              </h2>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                {terms.PERSON_LABEL_PRIMARY}에게 적용할 수 있는 {terms.TAG_LABEL}을(를) 관리합니다.
+              </p>
+            </div>
+            <EmptyState
+              icon={Users}
+              message={`${terms.TAG_LABEL} 관리 기능은 준비 중입니다.`}
+            />
+          </Card>
+        )}
+
+        {/* 학생 통계 탭 ('statistics') */}
+        {selectedSubMenu === 'statistics' && (
+          <Card padding="lg" variant="default">
+            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+              <h2 style={{
+                fontSize: 'var(--font-size-xl)',
+                fontWeight: 'var(--font-weight-bold)',
+                marginBottom: 'var(--spacing-md)'
+              }}>
+                {terms.PERSON_LABEL_PRIMARY} 통계
+              </h2>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                {terms.PERSON_LABEL_PRIMARY} 등록, 이탈, 현황 등의 통계를 확인할 수 있습니다.
+              </p>
+            </div>
+            <EmptyState
+              icon={Users}
+              message={`${terms.PERSON_LABEL_PRIMARY} 통계 기능은 준비 중입니다.`}
+            />
+          </Card>
+        )}
+
       </Container>
       </RightLayerMenuLayout>
         </div>

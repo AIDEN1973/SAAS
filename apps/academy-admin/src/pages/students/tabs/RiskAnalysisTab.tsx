@@ -79,11 +79,11 @@ export function RiskAnalysisTab({
 
       // [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
       // [ESLint 규칙] ai_insights 직접 조회 금지: fetchAIInsights 사용
-      // [수정] 출결 이상 감지 타입 사용 (attendance_anomaly)
+      // [수정] Edge Function 저장 타입과 일치: 'risk_analysis'
       const insights = await fetchAIInsights(tenantId, {
-          student_id: studentId,
-        insight_type: 'attendance_anomaly',
-          status: 'active',
+        student_id: studentId,
+        insight_type: 'risk_analysis',
+        status: 'active',
       });
 
       if (!insights || insights.length === 0) {

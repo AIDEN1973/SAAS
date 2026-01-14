@@ -223,7 +223,7 @@ export function AddressSearchInput({
                 cursor: 'pointer',
                 backgroundColor: selectedIndex === index ? 'var(--color-gray-100)' : 'transparent',
                 borderBottom: index < results.length - 1 ? '1px solid var(--color-gray-300-light)' : 'none',
-                transition: 'background-color 0.15s ease',
+                transition: 'background-color var(--transition-fast)',
               }}
             >
               <div

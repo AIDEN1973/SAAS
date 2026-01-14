@@ -543,7 +543,13 @@ export function AILayerMenuProvider({ children }: { children: ReactNode }) {
   }, [loadSessionMessages, loadServerSessions]);
 
   const addExecutionAuditRun = useCallback((run: ExecutionAuditRun) => {
-    setExecutionAuditRuns((prev) => [run, ...prev]);
+    setExecutionAuditRuns((prev) => {
+      // 중복 ID 체크: 이미 존재하는 run은 추가하지 않음
+      if (prev.some(existingRun => existingRun.id === run.id)) {
+        return prev;
+      }
+      return [run, ...prev];
+    });
   }, []);
 
   const setExecutionAuditSteps = useCallback((runId: string, steps: ExecutionAuditStep[]) => {

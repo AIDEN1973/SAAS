@@ -13,7 +13,7 @@ export interface AIInsight {
   id: string;
   tenant_id: string;
   student_id?: string;
-  insight_type: 'weekly_briefing' | 'daily_briefing' | 'attendance_anomaly' | 'performance_analysis' | 'regional_comparison' | 'regional_analytics';
+  insight_type: 'weekly_briefing' | 'daily_briefing' | 'attendance_anomaly' | 'performance_analysis' | 'regional_comparison' | 'regional_analytics' | 'risk_analysis';
   title: string;
   summary: string;
   insights?: string | string[];
@@ -28,7 +28,7 @@ export interface AIInsight {
 }
 
 export interface AIInsightFilter {
-  insight_type?: 'weekly_briefing' | 'daily_briefing' | 'attendance_anomaly' | 'performance_analysis' | 'regional_comparison' | 'regional_analytics';
+  insight_type?: 'weekly_briefing' | 'daily_briefing' | 'attendance_anomaly' | 'performance_analysis' | 'regional_comparison' | 'regional_analytics' | 'risk_analysis';
   status?: 'active' | 'archived' | 'dismissed';
   student_id?: string;
   related_entity_id?: string;

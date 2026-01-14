@@ -18,9 +18,10 @@
  * ```
  */
 
-import React, { useCallback, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { Tooltip } from './Tooltip';
+import { getCSSVariableAsNumber } from '../utils/css-variables';
 
 /** 서브 사이드바 메뉴 아이템 */
 export interface SubSidebarMenuItem<T extends string = string> {
@@ -36,6 +37,16 @@ export interface SubSidebarMenuItem<T extends string = string> {
   badge?: string | number;
   /** 접근성 설명 (optional) */
   ariaLabel?: string;
+  /** 외부 링크 경로 (optional) - 제공 시 외부 페이지로 이동 */
+  href?: string;
+}
+
+/** 관련 메뉴 섹션 */
+export interface RelatedMenuSection {
+  /** 섹션 제목 */
+  title: string;
+  /** 관련 메뉴 아이템 목록 */
+  items: SubSidebarMenuItem[];
 }
 
 export interface SubSidebarProps<T extends string = string> {
@@ -59,6 +70,8 @@ export interface SubSidebarProps<T extends string = string> {
   onCollapsedChange?: (collapsed: boolean) => void;
   /** 구분선 표시 여부 - 기본값: true */
   showDividers?: boolean;
+  /** 관련 메뉴 섹션 (optional) */
+  relatedMenus?: RelatedMenuSection;
   /** 추가 스타일 */
   style?: React.CSSProperties;
   /** 테스트 ID */
@@ -76,14 +89,100 @@ export function SubSidebar<T extends string = string>({
   collapsed: controlledCollapsed,
   onCollapsedChange,
   showDividers = false,
+  relatedMenus,
   style,
   testId,
 }: SubSidebarProps<T>) {
   // 내부 축소 상태 (uncontrolled 모드용)
   const [internalCollapsed, setInternalCollapsed] = useState(false);
+  // 관련 메뉴 확장/축소 상태
+  const [relatedMenuExpanded, setRelatedMenuExpanded] = useState(true);
+  // 관련 메뉴 내부 콘텐츠 높이 (애니메이션용)
+  const relatedMenuInnerRef = useRef<HTMLDivElement>(null);
+  // 측정된 콘텐츠 높이 저장
+  const [measuredHeight, setMeasuredHeight] = useState(0);
+  // 사이드바 확대 애니메이션 진행 중인지 추적
+  const [isSidebarExpanding, setIsSidebarExpanding] = useState(false);
+  // 페이드인 준비 상태 (transition 먼저 적용)
+  const [fadeInReady, setFadeInReady] = useState(false);
+  // 콘텐츠 페이드인 실행 상태 (opacity 변경)
+  const [contentVisible, setContentVisible] = useState(true);
 
   // controlled vs uncontrolled 모드 지원
   const isCollapsed = controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
+
+  // 이전 isCollapsed 값 추적
+  const prevIsCollapsed = useRef(isCollapsed);
+
+  // 렌더링 시점에서 collapsed → expanded 감지 (useEffect보다 먼저 실행)
+  // 이렇게 하면 첫 렌더링에서도 콘텐츠가 숨겨짐
+  const isExpandingNow = prevIsCollapsed.current === true && isCollapsed === false;
+
+  // ★ 핵심: 텍스트 콘텐츠 렌더링 여부
+  // 축소 시: isCollapsed=true → 텍스트 즉시 DOM에서 제거 (CSS transition으로 너비 축소)
+  // 확대 시: isCollapsed=false이지만, 애니메이션 완료 전까지 텍스트 렌더링하지 않음
+  // 이렇게 해야 확대 시 너비가 먼저 확장되고, 그 후 텍스트가 페이드인됨
+  //
+  // isExpandingNow: 렌더링 시점에서 collapsed→expanded 감지 (useEffect 전, 첫 렌더링 포함)
+  // isSidebarExpanding: useEffect에서 설정 (첫 렌더링 이후)
+  // 둘 중 하나라도 true면 텍스트 렌더링하지 않음
+  const shouldRenderTextContent = !isCollapsed && !isSidebarExpanding && !isExpandingNow;
+
+  // 사이드바 확장 시 관련 메뉴도 확장 상태로 초기화
+  useEffect(() => {
+    // 실제로 collapsed → expanded 변경이 일어났을 때만 애니메이션 실행
+    if (prevIsCollapsed.current === true && isCollapsed === false) {
+      setIsSidebarExpanding(true);
+      setFadeInReady(false);
+      setContentVisible(false);
+      setRelatedMenuExpanded(true);
+
+      // [SSOT] CSS 변수에서 애니메이션 시간 읽기 (사이드바 확장 애니메이션 시간)
+      const slowDuration = getCSSVariableAsNumber('--duration-slow', 300);
+
+      const timer = setTimeout(() => {
+        setIsSidebarExpanding(false);
+
+        requestAnimationFrame(() => {
+          setFadeInReady(true);
+
+          requestAnimationFrame(() => {
+            setContentVisible(true);
+
+            // 높이 재측정 (텍스트가 렌더링된 후)
+            const innerElement = relatedMenuInnerRef.current;
+            if (innerElement) {
+              setMeasuredHeight(innerElement.scrollHeight);
+            }
+          });
+        });
+      }, slowDuration);
+
+      prevIsCollapsed.current = isCollapsed;
+      return () => clearTimeout(timer);
+    }
+
+    prevIsCollapsed.current = isCollapsed;
+  }, [isCollapsed]);
+
+  // 관련 메뉴 내부 콘텐츠 높이 측정 (ResizeObserver 사용)
+  useEffect(() => {
+    const innerElement = relatedMenuInnerRef.current;
+    if (!innerElement) return;
+
+    // 초기 높이 측정
+    setMeasuredHeight(innerElement.scrollHeight);
+
+    // ResizeObserver로 콘텐츠 변경 감지
+    const resizeObserver = new ResizeObserver(() => {
+      setMeasuredHeight(innerElement.scrollHeight);
+    });
+    resizeObserver.observe(innerElement);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [relatedMenus?.items]);
 
   // 축소/확장 토글 핸들러
   const handleToggleCollapse = useCallback(() => {
@@ -98,9 +197,7 @@ export function SubSidebar<T extends string = string>({
   // 메뉴 아이템 클릭 핸들러 (메모이제이션)
   const handleItemClick = useCallback(
     (item: SubSidebarMenuItem<T>) => {
-      console.log('[SubSidebar] handleItemClick called:', item.id, 'disabled:', item.disabled);
       if (!item.disabled) {
-        console.log('[SubSidebar] calling onSelect with:', item.id);
         onSelect(item.id);
       }
     },
@@ -154,8 +251,8 @@ export function SubSidebar<T extends string = string>({
           minHeight: 'var(--touch-target-min)', // PageHeader와 동일한 높이 (2.75rem = 44px)
         }}
       >
-        {/* 타이틀 (축소 시 숨김) */}
-        {!isCollapsed && (
+        {/* 타이틀 (축소 시 숨김, 확대 애니메이션 완료 후 페이드인) */}
+        {shouldRenderTextContent && (
           <span
             style={{
               fontSize: 'var(--font-size-3xl)',
@@ -168,13 +265,17 @@ export function SubSidebar<T extends string = string>({
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              // 페이드인 애니메이션
+              opacity: contentVisible ? 1 : 0,
+              visibility: contentVisible ? 'visible' : 'hidden',
+              transition: fadeInReady ? 'opacity var(--transition-base)' : 'none',
             }}
           >
             {title}
           </span>
         )}
 
-        {/* 축소/확장 버튼 */}
+        {/* 축소/확장 버튼 - 항상 표시 */}
         <button
           onClick={handleToggleCollapse}
           style={{
@@ -254,17 +355,19 @@ export function SubSidebar<T extends string = string>({
                 onKeyDown={(e) => handleKeyDown(e, item)}
                 disabled={item.disabled}
                 style={{
-                  width: isCollapsed ? 'auto' : 'calc(100% - var(--spacing-sm))', // 좌우 여백만큼 줄임
+                  // 축소 상태이거나 확대 애니메이션 중에는 좁은 형태
+                  width: !shouldRenderTextContent ? 'auto' : 'calc(100% - var(--spacing-sm))', // 좌우 여백만큼 줄임
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: isCollapsed ? 'center' : 'flex-start',
+                  justifyContent: !shouldRenderTextContent ? 'center' : 'flex-start',
                   gap: 'var(--spacing-sm)',
-                  padding: isCollapsed ? 'var(--spacing-sm)' : 'var(--spacing-sm) var(--spacing-md)',
+                  padding: !shouldRenderTextContent ? 'var(--spacing-sm)' : 'var(--spacing-sm) var(--spacing-md)',
                   minHeight: 'var(--touch-target-min)',
                   cursor: item.disabled ? 'not-allowed' : 'pointer',
-                  backgroundColor: isSelected
-                    ? 'var(--color-primary-40)'
-                    : 'transparent',
+                  // 확대 애니메이션 중에는 배경색 제거
+                  backgroundColor: (isExpandingNow || isSidebarExpanding)
+                    ? 'transparent'
+                    : (isSelected ? 'var(--color-primary-40)' : 'transparent'),
                   border: 'none',
                   borderRadius: 'var(--border-radius-sm)',
                   color: item.disabled
@@ -301,7 +404,7 @@ export function SubSidebar<T extends string = string>({
                   }
                 }}
               >
-                {/* 아이콘 */}
+                {/* 아이콘 (항상 표시, 확대 애니메이션 중 숨김, 완료 후 페이드인) */}
                 {item.icon && (
                   <span
                     aria-hidden="true"
@@ -313,19 +416,34 @@ export function SubSidebar<T extends string = string>({
                       flexShrink: 0,
                       width: 'var(--size-icon-base)',
                       height: 'var(--size-icon-base)',
+                      // 확대 애니메이션 시작 시(isExpandingNow 또는 isSidebarExpanding) 즉시 숨김
+                      // 축소 상태(!isCollapsed)에서는 표시
+                      // 확대 완료 후(shouldRenderTextContent && contentVisible) 페이드인
+                      opacity: (isExpandingNow || isSidebarExpanding) ? 0 : (shouldRenderTextContent ? (contentVisible ? 1 : 0) : 1),
+                      visibility: (isExpandingNow || isSidebarExpanding) ? 'hidden' : (shouldRenderTextContent ? (contentVisible ? 'visible' : 'hidden') : 'visible'),
+                      transition: shouldRenderTextContent && fadeInReady ? 'opacity var(--transition-base)' : 'none',
                     }}
                   >
                     {item.icon}
                   </span>
                 )}
 
-                {/* 라벨 (축소 시 숨김) */}
-                {!isCollapsed && (
-                  <span style={{ flex: 1 }}>{item.label}</span>
+                {/* 라벨 (축소 시 숨김, 확대 애니메이션 완료 후 페이드인) */}
+                {shouldRenderTextContent && (
+                  <span
+                    style={{
+                      flex: 1,
+                      opacity: contentVisible ? 1 : 0,
+                      visibility: contentVisible ? 'visible' : 'hidden',
+                      transition: fadeInReady ? 'opacity var(--transition-base)' : 'none',
+                    }}
+                  >
+                    {item.label}
+                  </span>
                 )}
 
-                {/* 배지 (축소 시 숨김) */}
-                {!isCollapsed && item.badge !== undefined && (
+                {/* 배지 (축소 시 숨김, 확대 애니메이션 완료 후 페이드인) */}
+                {shouldRenderTextContent && item.badge !== undefined && (
                   <span
                     aria-label={`${item.badge} 항목`}
                     style={{
@@ -338,6 +456,9 @@ export function SubSidebar<T extends string = string>({
                       lineHeight: 1,
                       minWidth: 'var(--size-checkbox)',
                       textAlign: 'center',
+                      opacity: contentVisible ? 1 : 0,
+                      visibility: contentVisible ? 'visible' : 'hidden',
+                      transition: fadeInReady ? 'opacity var(--transition-base)' : 'none',
                     }}
                   >
                     {item.badge}
@@ -348,8 +469,8 @@ export function SubSidebar<T extends string = string>({
 
           return (
             <div key={item.id} role="none" style={{ display: 'flex', justifyContent: 'center' }}>
-              {/* 축소 상태일 때 툴팁 표시 */}
-              {isCollapsed ? (
+              {/* 축소 상태일 때는 툴팁과 함께, 확대 상태일 때는 메뉴 버튼만 표시 */}
+              {!shouldRenderTextContent ? (
                 <Tooltip content={item.label} position="right" offset={8}>
                   {menuButton}
                 </Tooltip>
@@ -357,8 +478,8 @@ export function SubSidebar<T extends string = string>({
                 menuButton
               )}
 
-              {/* 구분선 (마지막 아이템 제외, showDividers가 true일 때만, 축소 시 숨김) */}
-              {showDividers && !isLastItem && !isCollapsed && (
+              {/* 구분선 (마지막 아이템 제외, showDividers가 true일 때만, 텍스트 콘텐츠와 함께 표시) */}
+              {showDividers && !isLastItem && shouldRenderTextContent && (
                 <div
                   role="separator"
                   aria-hidden="true"
@@ -372,6 +493,182 @@ export function SubSidebar<T extends string = string>({
             </div>
           );
         })}
+
+        {/* 관련 메뉴 섹션 (축소 시 숨김, 확대 애니메이션 완료 후 표시) */}
+        {relatedMenus && shouldRenderTextContent && (
+          <div
+            style={{
+              marginTop: 'var(--spacing-lg)',
+            }}
+          >
+            {/* 구분선 - 메뉴 아이템 너비와 동일하게 */}
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <div
+                role="separator"
+                aria-hidden="true"
+                style={{
+                  width: 'calc(100% - var(--spacing-sm))',
+                  height: 'var(--border-width-thin)',
+                  backgroundColor: 'var(--color-gray-200)',
+                  marginBottom: 'var(--spacing-md)',
+                }}
+              />
+            </div>
+            {/* 관련 메뉴 헤더 - nav padding 보정 */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingLeft: 'calc(var(--spacing-lg) - var(--spacing-sm))',
+                paddingRight: 0,
+                minHeight: 'var(--touch-target-min)',
+                opacity: contentVisible ? 1 : 0,
+                visibility: contentVisible ? 'visible' : 'hidden',
+                transition: fadeInReady ? 'opacity var(--transition-base)' : 'none',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 'var(--font-size-base)',
+                  fontWeight: 'var(--font-weight-bold)',
+                  color: 'var(--color-text)',
+                }}
+              >
+                {relatedMenus.title}
+              </span>
+              <button
+                onClick={() => {
+                  setRelatedMenuExpanded(!relatedMenuExpanded);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 'var(--spacing-xs)',
+                  marginRight: 0,
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderRadius: 'var(--border-radius-sm)',
+                  cursor: 'pointer',
+                  color: 'var(--color-text-tertiary)',
+                  flexShrink: 0,
+                }}
+                aria-expanded={relatedMenuExpanded}
+                aria-label={`${relatedMenus.title} ${relatedMenuExpanded ? '접기' : '펼치기'}`}
+              >
+                {relatedMenuExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+              </button>
+            </div>
+
+            {/* 관련 메뉴 아이템 목록 - 애니메이션 컨테이너 */}
+            {/*
+              [접근성 예외] prefers-reduced-motion 사용자에게도 부드러운 전환 제공
+              - 이 애니메이션은 필수 UI 기능이며, 급격한 변화가 오히려 불편함을 줄 수 있음
+              - 시간은 0.3s로 충분히 짧아 모션 민감 사용자에게도 적합
+            */}
+            <div
+              className="sub-sidebar-related-menu-animation"
+              data-expanded={relatedMenuExpanded}
+              style={{
+                maxHeight: contentVisible
+                  ? (relatedMenuExpanded ? (measuredHeight > 0 ? `${measuredHeight}px` : '1000px') : '0px')
+                  : '0px',
+                overflow: 'hidden',
+                opacity: contentVisible ? (relatedMenuExpanded ? 1 : 0) : 0,
+                visibility: contentVisible ? 'visible' : 'hidden',
+                transition: fadeInReady
+                  ? (relatedMenuExpanded
+                    ? 'opacity var(--transition-base), max-height var(--transition-base), visibility 0s'
+                    : 'opacity var(--transition-fast), max-height var(--transition-fast) 80ms, visibility 0s 160ms')
+                  : 'none',
+              }}
+            >
+              {/* 내부 콘텐츠 (높이 측정용) */}
+              <div ref={relatedMenuInnerRef}>
+              {relatedMenus.items.map((relatedItem) => {
+                const handleRelatedItemClick = () => {
+                  if (relatedItem.href) {
+                    // 외부 링크로 이동
+                    window.location.href = relatedItem.href;
+                  }
+                };
+
+                return (
+                  <div key={relatedItem.id} role="none" style={{ display: 'flex', justifyContent: 'center' }}>
+                    <button
+                      onClick={handleRelatedItemClick}
+                      disabled={relatedItem.disabled}
+                      style={{
+                        width: 'calc(100% - var(--spacing-sm))',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
+                        gap: 'var(--spacing-sm)',
+                        padding: 'var(--spacing-sm) var(--spacing-md)',
+                        minHeight: 'var(--touch-target-min)',
+                        cursor: relatedItem.disabled ? 'not-allowed' : 'pointer',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        borderRadius: 'var(--border-radius-sm)',
+                        color: relatedItem.disabled
+                          ? 'var(--color-text-tertiary)'
+                          : 'var(--color-text)',
+                        fontSize: 'var(--font-size-base)',
+                        fontWeight: 'var(--font-weight-normal)',
+                        textAlign: 'left',
+                        opacity: relatedItem.disabled ? 0.5 : 1,
+                        transition: 'var(--transition-base)',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!relatedItem.disabled) {
+                          e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!relatedItem.disabled) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                      onFocus={(e) => {
+                        if (!relatedItem.disabled) {
+                          e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+                        }
+                      }}
+                      onBlur={(e) => {
+                        if (!relatedItem.disabled) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                      aria-label={relatedItem.ariaLabel || relatedItem.label}
+                    >
+                      {/* 아이콘 */}
+                      {relatedItem.icon && (
+                        <span
+                          className="sub-sidebar-menu-icon"
+                          aria-hidden="true"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            width: 'var(--size-icon-base)',
+                            height: 'var(--size-icon-base)',
+                          }}
+                        >
+                          {relatedItem.icon}
+                        </span>
+                      )}
+                      {/* 라벨 */}
+                      <span style={{ flex: 1 }}>{relatedItem.label}</span>
+                    </button>
+                  </div>
+                );
+              })}
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
     </aside>
   );

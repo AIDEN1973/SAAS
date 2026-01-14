@@ -162,7 +162,11 @@
       "Bash(supabase db remote query:*)",
       "Bash(node:*)",
       "Read(//c/**)",
-      "Bash(if exist \"node_modules\\\\.vite\" rd /s /q \"node_modules\\\\.vite\")"
+      "Bash(if exist \"node_modules\\\\.vite\" rd /s /q \"node_modules\\\\.vite\")",
+      "Bash(for file in \"c:\\\\cursor\\\\SAMDLE\\\\infra\\\\supabase\\\\supabase\\\\migrations\"/*.sql)",
+      "Bash(if grep -q \"CREATE TABLE.*ai_insights\" \"$file\")",
+      "Bash(break)",
+      "Bash(Remove-Item -Path \"tmpclaude-*\" -Recurse -Force)"
     ]
   }
 }

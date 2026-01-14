@@ -4,9 +4,10 @@
  * 우측 레이어 메뉴 (슬라이딩 패널)
  * [불변 규칙] 모든 스타일은 design-system 토큰을 사용합니다.
  * [불변 규칙] 레이어 메뉴 너비만큼 바디 너비가 줄어듭니다 (push 방식).
+ * [불변 규칙] 콘텐츠는 항상 렌더링되며, 슬라이드 애니메이션 중에도 표시됩니다.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { clsx } from 'clsx';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 import { useIconSize, useIconStrokeWidth } from '../hooks/useIconSize';
@@ -28,6 +29,8 @@ export interface RightLayerMenuProps {
   onToggleExpand?: () => void;
   className?: string;
   style?: React.CSSProperties; // 추가 스타일 (오버레이 모드 등에서 사용)
+  /** 내용 변경 감지용 키 (예: studentId). 이 값이 변경되면 페이드 아웃/인 애니메이션 실행 */
+  contentKey?: string | number;
 }
 
 /**
@@ -35,6 +38,11 @@ export interface RightLayerMenuProps {
  *
  * 우측에서 슬라이딩으로 나타나는 레이어 메뉴
  * 레이어 메뉴가 열리면 바디 너비가 자동으로 줄어듭니다.
+ *
+ * [변경] 슬라이드/확장 애니메이션 중에도 콘텐츠가 항상 표시됩니다.
+ * - 깜빡임 및 중복 로딩 문제 해결
+ * - CSS transform으로 슬라이딩 애니메이션만 적용
+ * - 닫힘 애니메이션 중 이전 콘텐츠 유지 (캐싱)
  */
 export const RightLayerMenu: React.FC<RightLayerMenuProps> = ({
   isOpen,
@@ -65,14 +73,35 @@ export const RightLayerMenu: React.FC<RightLayerMenuProps> = ({
     return width || (isMobile ? '100%' : isTablet ? 'var(--width-layer-menu-tablet)' : 'var(--width-layer-menu)');
   }, [width, isMobile, isTablet]);
 
-  if (!isOpen) return null;
+  // ============================================================================
+  // 닫힘 애니메이션 중 콘텐츠 유지를 위한 캐싱
+  // ============================================================================
+
+  // 이전 콘텐츠 캐싱 (닫힘 애니메이션 중 표시용)
+  const cachedChildrenRef = useRef<React.ReactNode>(children);
+  const cachedTitleRef = useRef<React.ReactNode>(title);
+
+  // 열림 상태일 때만 캐시 업데이트
+  useEffect(() => {
+    if (isOpen && children) {
+      cachedChildrenRef.current = children;
+    }
+    if (isOpen && title) {
+      cachedTitleRef.current = title;
+    }
+  }, [isOpen, children, title]);
+
+  // 표시할 콘텐츠: 열림 상태면 현재 children, 닫힘 상태면 캐시된 children
+  const displayChildren = isOpen ? children : cachedChildrenRef.current;
+  const displayTitle = isOpen ? title : cachedTitleRef.current;
 
   return (
     <div
-        className={clsx(className)}
+        className={clsx('student-detail-layer', className)}
         style={{
           position: 'fixed',
-          top: 0,
+          // 글로벌 헤더 하단에서 시작 (모바일은 전체 화면)
+          top: isMobile ? 0 : 'var(--height-header)',
           right: 0,
           bottom: 0,
           left: isMobile ? 0 : 'auto', // 모바일: 전체 화면을 위해 left도 0
@@ -84,40 +113,48 @@ export const RightLayerMenu: React.FC<RightLayerMenuProps> = ({
           zIndex: 'var(--z-sticky)',
           display: 'flex',
           flexDirection: 'column',
+          // SubSidebar와 동일한 paddingTop으로 타이틀 수평 정렬 (Container paddingTop과 동일)
+          paddingTop: 'var(--spacing-xl)',
+          // 슬라이딩 애니메이션: transform으로 우측에서 들어옴
           transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-          transition: 'var(--transition-transform)',
+          transition: 'transform var(--transition-layer-slide), width var(--transition-layer-slide)',
           boxSizing: 'border-box', // 패딩과 보더를 포함한 너비 계산
           overflow: 'hidden', // 내용이 넘치지 않도록
+          // 닫혔을 때 포인터 이벤트 차단 (화면 밖에 있지만 클릭 방지)
+          pointerEvents: isOpen ? 'auto' : 'none',
           ...style, // 추가 스타일 병합
         }}
       >
-      {/* 레이어 메뉴 헤더 */}
+      {/* 레이어 메뉴 헤더 - SubSidebar와 동일한 구조로 타이틀 수평 정렬 */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          // 글로벌 헤더와 동일한 패딩: 모바일(xs, sm): 상하 var(--padding-header-vertical), 좌우 var(--spacing-lg), 태블릿 이상(md+): 상하 var(--padding-header-vertical), 좌우 var(--spacing-xl)
-          padding: isMobile
-            ? 'var(--padding-header-vertical) var(--spacing-lg)' // 모바일: 상하 패딩 CSS 변수 사용, 좌우 CSS 변수 사용
-            : 'var(--padding-header-vertical) var(--spacing-xl)', // 태블릿 이상: 상하 패딩 CSS 변수 사용, 좌우 CSS 변수 사용
-          borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
-          backgroundColor: 'var(--color-gray-50)',
-          minHeight: 'var(--height-header)', // 글로벌 헤더 높이와 동일하게 설정
+          // SubSidebar 헤더와 동일한 레이아웃
+          marginBottom: 0,
+          gap: 'var(--spacing-md)',
+          paddingLeft: isMobile ? 'var(--spacing-lg)' : 'var(--spacing-lg)',
+          paddingRight: isMobile ? 'var(--spacing-lg)' : 'var(--spacing-lg)', // 타이틀 좌측 여백과 동일
+          minHeight: 'var(--touch-target-min)', // PageHeader/SubSidebar와 동일한 높이
         }}
       >
-        <h2
+        {/* 타이틀 - SubSidebar/PageHeader와 동일한 스타일 */}
+        <span
           style={{
-            fontWeight: 'var(--font-weight-bold)',
-            fontSize: 'var(--font-size-lg)',
+            fontSize: 'var(--font-size-3xl)',
+            fontWeight: 'var(--font-weight-extrabold)',
             margin: 0,
+            lineHeight: 'var(--line-height-tight)',
             color: 'var(--color-text)',
-            letterSpacing: 'var(--letter-spacing-title)', // styles.css 준수: 타이틀 글자 간격 토큰 사용
+            display: 'flex',
+            alignItems: 'center',
             flex: 1,
+            minWidth: 0, // flex item이 축소될 수 있도록
           }}
         >
-          {title}
-        </h2>
+          {displayTitle}
+        </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
           {headerActions && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
@@ -134,7 +171,6 @@ export const RightLayerMenu: React.FC<RightLayerMenuProps> = ({
               onMouseEnter={() => setIsExpandHovered(true)}
               onMouseLeave={() => setIsExpandHovered(false)}
               style={{
-                // 요구사항: 아이콘 외부 감싸는 버튼 비지(여백) 제거
                 padding: 0,
                 minWidth: 'auto',
                 minHeight: 'auto',
@@ -147,7 +183,6 @@ export const RightLayerMenu: React.FC<RightLayerMenuProps> = ({
               }}
               aria-label={isExpanded ? '레이어 메뉴 축소' : '레이어 메뉴 확장'}
             >
-              {/* 아이콘 방향/의미: 확장(arrow-left-from-line), 축소(arrow-right-from-line) */}
               {isExpanded ? (
                 <ArrowRightFromLine size={iconSize} strokeWidth={isExpandHovered ? strokeWidthHover : strokeWidthBase} />
               ) : (
@@ -161,7 +196,6 @@ export const RightLayerMenu: React.FC<RightLayerMenuProps> = ({
             size="sm"
             onClick={onClose}
             style={{
-              // 요구사항: X 버튼도 비지(여백) 제거
               padding: 0,
               minWidth: 'auto',
               minHeight: 'auto',
@@ -178,7 +212,7 @@ export const RightLayerMenu: React.FC<RightLayerMenuProps> = ({
         </div>
       </div>
 
-      {/* 레이어 메뉴 내용 */}
+      {/* 레이어 메뉴 내용 - 항상 표시 (닫힘 애니메이션 중 캐시된 콘텐츠 표시) */}
       <div
         style={{
           flex: 1,
@@ -186,9 +220,8 @@ export const RightLayerMenu: React.FC<RightLayerMenuProps> = ({
           padding: 'var(--spacing-lg)',
         }}
       >
-        {children}
+        {displayChildren}
       </div>
     </div>
   );
 };
-

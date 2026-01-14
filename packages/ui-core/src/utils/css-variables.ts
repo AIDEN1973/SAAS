@@ -72,6 +72,29 @@ export function getCSSVariableAsMs(cssVarName: string, fallbackMs: number): numb
 }
 
 /**
+ * CSS 변수 값을 읽어서 숫자로 변환 (단위 없는 값)
+ *
+ * @param cssVarName - CSS 변수 이름 (예: '--duration-slow')
+ * @param fallback - CSS 변수를 읽을 수 없는 경우 사용할 폴백 값
+ * @returns 숫자 값 (number)
+ */
+export function getCSSVariableAsNumber(cssVarName: string, fallback: number): number {
+  if (typeof window === 'undefined') {
+    return fallback;
+  }
+
+  const root = document.documentElement;
+  const cssValue = getComputedStyle(root).getPropertyValue(cssVarName).trim();
+
+  if (!cssValue) {
+    return fallback;
+  }
+
+  const parsed = parseFloat(cssValue);
+  return isNaN(parsed) ? fallback : parsed;
+}
+
+/**
  * CSS 변수 문자열(예: 'var(--width-layer-menu)')을 픽셀 값으로 변환
  *
  * @param cssVarString - CSS 변수 문자열 (예: 'var(--width-layer-menu)' 또는 '100%' 또는 '600px')

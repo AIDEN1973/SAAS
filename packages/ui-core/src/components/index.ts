@@ -195,4 +195,4 @@ export { AgentModeContainer } from './AgentModeContainer';
 export type { AgentModeContainerProps } from './AgentModeContainer';
 
 export { SubSidebar } from './SubSidebar';
-export type { SubSidebarProps, SubSidebarMenuItem } from './SubSidebar';
+export type { SubSidebarProps, SubSidebarMenuItem, RelatedMenuSection } from './SubSidebar';

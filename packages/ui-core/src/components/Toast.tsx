@@ -10,6 +10,7 @@ import { clsx } from 'clsx';
 import { Card } from './Card';
 import { Button } from './Button';
 import { ColorToken } from '@design-system/core';
+import { getCSSVariableAsNumber } from '../utils/css-variables';
 
 export interface ToastProps {
   message: string;
@@ -35,9 +36,11 @@ export const Toast: React.FC<ToastProps> = ({
 
   useEffect(() => {
     if (duration > 0) {
+      // [SSOT] CSS 변수에서 애니메이션 시간 읽기
+      const slowDuration = getCSSVariableAsNumber('--duration-slow', 300);
       const timer = setTimeout(() => {
         setIsVisible(false);
-        setTimeout(() => onClose?.(), 300); // 애니메이션 대기 (transition-slow = 300ms)
+        setTimeout(() => onClose?.(), slowDuration);
       }, duration);
       return () => clearTimeout(timer);
     }
@@ -104,7 +107,9 @@ export const Toast: React.FC<ToastProps> = ({
             size="sm"
             onClick={() => {
               setIsVisible(false);
-              setTimeout(() => onClose(), 300);
+              // [SSOT] CSS 변수에서 애니메이션 시간 읽기
+              const slowDuration = getCSSVariableAsNumber('--duration-slow', 300);
+              setTimeout(() => onClose(), slowDuration);
             }}
             style={{
               minWidth: 'var(--size-avatar-sm)', // styles.css 준수: 아바타 작은 크기 토큰 사용 (32px)

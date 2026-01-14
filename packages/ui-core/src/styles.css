@@ -55,11 +55,11 @@
   --color-primary: #3b82f6;
   --color-primary-light: #60a5fa;
   --color-primary-dark: #2563eb;
-  --color-primary-30: #f5f9ff;
-  --color-primary-40: #e8f2ff;
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-hover: color-mix(in srgb, var(--color-primary) 8%, transparent); /* hover 배경색 (프라이머리 8%) */
+  --color-primary-30: color-mix(in srgb, var(--color-primary) 3%, transparent); /* 프라이머리 3% */
+  --color-primary-40: color-mix(in srgb, var(--color-primary) 4%, transparent); /* 프라이머리 4% */
+  --color-primary-50: color-mix(in srgb, var(--color-primary) 5%, transparent); /* 프라이머리 5% */
+  --color-primary-100: color-mix(in srgb, var(--color-primary) 10%, transparent); /* 프라이머리 10% */
+  --color-primary-hover: var(--color-primary-40); /* hover 배경색 (프라이머리 4%) */
   --color-primary-selected: color-mix(in srgb, var(--color-primary) 12%, transparent); /* 선택된 상태 배경색 (프라이머리 12%, hover보다 진함) */
   --color-primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 
@@ -142,7 +142,7 @@
   --width-layer-menu: 37.5rem;       /* 600px - 레이어 메뉴 기본 너비 */
   --width-layer-menu-tablet: 31.25rem; /* 500px - 태블릿 레이어 메뉴 너비 */
   --width-layer-menu-expanded: 65vw;    /* 레이어 메뉴 확장 너비(전체 화면의 65%) */
-  --width-agent-history-sidebar: 14rem; /* 224px - 에이전트 히스토리 사이드바 너비 */
+  --width-agent-history-sidebar: 14rem; /* 224px - 에이전트 히스토리 사이드바 너비 (서브사이드바 공통 너비) */
   --width-agent-timeline-sidebar: 26rem; /* 416px - 에이전트 타임라인 사이드바 너비 */
   --width-agent-chat-max: 50rem;       /* 800px - 에이전트 채팅 영역 최대 너비 */
   --width-overlay-threshold: 90rem;  /* 1440px - 오버레이 모드 전환 기준 너비 */
@@ -344,8 +344,15 @@
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-layer-slide: 500ms cubic-bezier(0.4, 0, 0.2, 1); /* 레이어 메뉴 슬라이드 */
   --transition-transform: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-all: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Duration - 애니메이션 지속 시간 (JS에서 사용) */
+  --duration-fast: 150;    /* ms */
+  --duration-base: 200;    /* ms */
+  --duration-slow: 300;    /* ms */
+  --duration-layer-slide: 500; /* ms - 레이어 슬라이드 */
 
   /* Focus Ring - 접근성 포커스 링 */
   --focus-ring-width: 0.125rem; /* 2px - 포커스 링 두께 */
@@ -466,6 +473,30 @@ textarea::placeholder {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /*
+   * [접근성 예외] 필수 UI 전환 애니메이션
+   * - 급격한 변화가 오히려 불편함을 줄 수 있는 경우 부드러운 전환 유지
+   * - 전환 시간은 충분히 짧게 설정 (0.3s 이하)
+   * - 관련 메뉴의 상하 확장/축소 애니메이션
+   */
+  .sub-sidebar-related-menu-animation {
+    transition: max-height 0.3s ease-in-out, opacity 0.15s ease-in-out !important;
+  }
+
+  /* opacity는 inline style로 제어하므로 CSS에서 설정하지 않음 */
+
+  /* SubSidebar, AgentHistorySidebar, AgentTimelineSidebar 확대/축소 애니메이션 */
+  aside[role="navigation"],
+  .agent-history-sidebar,
+  .agent-timeline-sidebar {
+    transition: width 0.3s ease-in-out, min-width 0.3s ease-in-out !important;
+  }
+
+  /* RightLayerMenu (StudentDetailLayer) 슬라이드 및 확대/축소 애니메이션 */
+  .student-detail-layer {
+    transition: transform 0.5s ease-in-out, width 0.5s ease-in-out !important;
   }
 }
 

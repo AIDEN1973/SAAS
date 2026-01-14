@@ -252,6 +252,7 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
         title={layerMenu.title}
         width={effectiveMenuWidth}
         headerActions={layerMenu.headerActions}
+        contentKey={layerMenu.contentKey}
         // 요구사항: 태블릿/모바일에서는 확장/축소 버튼 숨김
         expandable={!isMobile && !isTablet}
         isExpanded={isExpanded}

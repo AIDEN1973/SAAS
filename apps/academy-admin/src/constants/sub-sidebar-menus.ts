@@ -12,7 +12,7 @@
  */
 
 import { createElement } from 'react';
-import type { SubSidebarMenuItem } from '@ui-core/react';
+import type { SubSidebarMenuItem, RelatedMenuSection } from '@ui-core/react';
 import {
   LayoutDashboard,
   Users,
@@ -198,32 +198,64 @@ export type StudentsSubMenuId =
   | 'tags'
   | 'statistics';
 
-/** 학생관리 페이지 서브 메뉴 설정 (아이콘은 페이지에서 동적으로 주입) */
+/** 학생관리 페이지 서브 메뉴 설정 */
 export const STUDENTS_SUB_MENU_ITEMS: SubSidebarMenuItem<StudentsSubMenuId>[] = [
   {
     id: 'list',
-    label: '학생 목록',
+    label: '학생목록',
+    icon: createElement(List, { size: ICON_SIZE }),
     ariaLabel: '학생 목록 화면으로 이동',
   },
   {
     id: 'add',
-    label: '학생 등록',
+    label: '학생등록',
+    icon: createElement(Users, { size: ICON_SIZE }),
     ariaLabel: '학생 등록 화면으로 이동',
   },
   {
     id: 'tags',
-    label: '태그 관리',
+    label: '태그관리',
+    icon: createElement(BookOpen, { size: ICON_SIZE }),
     ariaLabel: '태그 관리 화면으로 이동',
   },
   {
     id: 'statistics',
-    label: '학생 통계',
+    label: '학생통계',
+    icon: createElement(BarChart3, { size: ICON_SIZE }),
     ariaLabel: '학생 통계 화면으로 이동',
   },
 ];
 
 /** 기본 학생관리 서브 메뉴 ID */
 export const DEFAULT_STUDENTS_SUB_MENU: StudentsSubMenuId = 'list';
+
+/** 학생관리 관련 메뉴 */
+export const STUDENTS_RELATED_MENUS: RelatedMenuSection = {
+  title: '관련 메뉴',
+  items: [
+    {
+      id: 'classes',
+      label: '수업관리',
+      icon: createElement(GraduationCap, { size: ICON_SIZE }),
+      ariaLabel: '수업 관리 페이지로 이동',
+      href: '/classes',
+    },
+    {
+      id: 'teachers',
+      label: '강사관리',
+      icon: createElement(UserPen, { size: ICON_SIZE }),
+      ariaLabel: '강사 관리 페이지로 이동',
+      href: '/teachers',
+    },
+    {
+      id: 'billing',
+      label: '수납관리',
+      icon: createElement(CreditCard, { size: ICON_SIZE }),
+      ariaLabel: '수납 관리 페이지로 이동',
+      href: '/billing/home',
+    },
+  ],
+};
 
 // ============================================================================
 // 문자발송 페이지 서브 메뉴 설정
@@ -248,6 +280,27 @@ export const NOTIFICATIONS_SUB_MENU_ITEMS: SubSidebarMenuItem<NotificationsSubMe
 
 /** 기본 문자발송 서브 메뉴 ID */
 export const DEFAULT_NOTIFICATIONS_SUB_MENU: NotificationsSubMenuId = 'history';
+
+/** 문자발송 관련 메뉴 */
+export const NOTIFICATIONS_RELATED_MENUS: RelatedMenuSection = {
+  title: '관련 메뉴',
+  items: [
+    {
+      id: 'students',
+      label: '학생관리',
+      icon: createElement(Users, { size: ICON_SIZE }),
+      ariaLabel: '학생 관리 페이지로 이동',
+      href: '/students/list',
+    },
+    {
+      id: 'alimtalk',
+      label: '알림톡 설정',
+      icon: createElement(Bell, { size: ICON_SIZE }),
+      ariaLabel: '알림톡 설정 페이지로 이동',
+      href: '/alimtalk-settings',
+    },
+  ],
+};
 
 // ============================================================================
 // 통계분석 페이지 서브 메뉴 설정
@@ -319,6 +372,34 @@ export const CLASSES_SUB_MENU_ITEMS: SubSidebarMenuItem<ClassesSubMenuId>[] = [
 /** 기본 수업관리 서브 메뉴 ID */
 export const DEFAULT_CLASSES_SUB_MENU: ClassesSubMenuId = 'list';
 
+/** 수업관리 관련 메뉴 */
+export const CLASSES_RELATED_MENUS: RelatedMenuSection = {
+  title: '관련 메뉴',
+  items: [
+    {
+      id: 'students',
+      label: '학생관리',
+      icon: createElement(Users, { size: ICON_SIZE }),
+      ariaLabel: '학생 관리 페이지로 이동',
+      href: '/students/list',
+    },
+    {
+      id: 'teachers',
+      label: '강사관리',
+      icon: createElement(UserPen, { size: ICON_SIZE }),
+      ariaLabel: '강사 관리 페이지로 이동',
+      href: '/teachers',
+    },
+    {
+      id: 'attendance',
+      label: '출결관리',
+      icon: createElement(CircleCheckBig, { size: ICON_SIZE }),
+      ariaLabel: '출결 관리 페이지로 이동',
+      href: '/attendance',
+    },
+  ],
+};
+
 // ============================================================================
 // 강사관리 페이지 서브 메뉴 설정
 // ============================================================================
@@ -341,6 +422,27 @@ export const TEACHERS_SUB_MENU_ITEMS: SubSidebarMenuItem<TeachersSubMenuId>[] = 
 /** 기본 강사관리 서브 메뉴 ID */
 export const DEFAULT_TEACHERS_SUB_MENU: TeachersSubMenuId = 'list';
 
+/** 강사관리 관련 메뉴 */
+export const TEACHERS_RELATED_MENUS: RelatedMenuSection = {
+  title: '관련 메뉴',
+  items: [
+    {
+      id: 'classes',
+      label: '수업관리',
+      icon: createElement(GraduationCap, { size: ICON_SIZE }),
+      ariaLabel: '수업 관리 페이지로 이동',
+      href: '/classes',
+    },
+    {
+      id: 'students',
+      label: '학생관리',
+      icon: createElement(Users, { size: ICON_SIZE }),
+      ariaLabel: '학생 관리 페이지로 이동',
+      href: '/students/list',
+    },
+  ],
+};
+
 // ============================================================================
 // 수납관리 페이지 서브 메뉴 설정
 // ============================================================================
@@ -362,6 +464,27 @@ export const BILLING_SUB_MENU_ITEMS: SubSidebarMenuItem<BillingSubMenuId>[] = [
 
 /** 기본 수납관리 서브 메뉴 ID */
 export const DEFAULT_BILLING_SUB_MENU: BillingSubMenuId = 'invoices';
+
+/** 수납관리 관련 메뉴 */
+export const BILLING_RELATED_MENUS: RelatedMenuSection = {
+  title: '관련 메뉴',
+  items: [
+    {
+      id: 'students',
+      label: '학생관리',
+      icon: createElement(Users, { size: ICON_SIZE }),
+      ariaLabel: '학생 관리 페이지로 이동',
+      href: '/students/list',
+    },
+    {
+      id: 'notifications',
+      label: '문자발송',
+      icon: createElement(Send, { size: ICON_SIZE }),
+      ariaLabel: '문자 발송 페이지로 이동',
+      href: '/notifications',
+    },
+  ],
+};
 
 // ============================================================================
 // 자동화 설정 페이지 서브 메뉴 설정

@@ -348,7 +348,7 @@ export const ExecutionAuditPanel: React.FC<ExecutionAuditPanelProps> = ({
                     position: 'relative',
                     borderBottom: 'var(--border-width-thin) solid var(--color-gray-100)',
                     backgroundColor: 'var(--color-white)',
-                    transition: 'background-color 0.15s ease',
+                    transition: 'background-color var(--transition-fast)',
                     cursor: isClickable ? 'pointer' : 'default',
                   }}
                   onMouseEnter={(e) => {
