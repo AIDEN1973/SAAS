@@ -188,18 +188,34 @@ serve(async (req) => {
         const { data: riskCards, error: riskError } = await withTenant(
           supabase
           .from('task_cards')
-          .select('id')
+          .select('id, student_id')
           .eq('task_type', 'risk')
-            .limit(5),
+            .limit(10),
           tenant.id
         );
 
         if (!riskError && riskCards && riskCards.length > 0) {
+          // 대상자 이름 조회
+          const studentIds = riskCards.map(c => c.student_id).filter(Boolean);
+          const { data: students } = await withTenant(
+            supabase
+            .from('persons')
+            .select('id, name')
+              .in('id', studentIds),
+            tenant.id
+          );
+
+          const studentNames = students?.slice(0, 5).map(s => s.name).join(', ') || '';
+          const moreCount = (students?.length || 0) > 5 ? ` 외 ${(students?.length || 0) - 5}명` : '';
+          const detailSummary = studentNames
+            ? `이탈 위험: ${studentNames}${moreCount} (총 ${riskCards.length}명)`
+            : `${riskCards.length}명의 대상이 이탈 위험 단계입니다.`;
+
           insights.push({
             tenant_id: tenant.id,
             insight_type: 'daily_briefing',
             title: '이탈 위험 대상 알림', // 업종 중립: 학생 → 대상
-            summary: `${riskCards.length}명의 대상이 이탈 위험 단계입니다.`, // 업종 중립: 학생 → 대상
+            summary: detailSummary,
             insights: JSON.stringify([
               '이탈 위험 대상에게 즉시 상담을 진행하세요.', // 업종 중립: 학생 → 대상
               '대상의 진행 동기를 높이기 위한 방안을 모색하세요.', // 업종 중립: 학생 → 대상, 학습 → 진행
@@ -362,7 +378,7 @@ serve(async (req) => {
                 continue;
               }
 
-              // 최근 출석률이 낮은 학생 조회
+              // 최근 출석률이 낮은 대상 조회
               const sevenDaysAgo = toKSTDate(new Date(kstTime.getTime() - 7 * 24 * 60 * 60 * 1000));
               const { data: riskStudents } = await withTenant(
                 supabase
@@ -382,8 +398,8 @@ serve(async (req) => {
                   entity_id: tenant.id,  // entity_id = tenantId (entity_type='tenant')
                   entity_type: 'tenant', // entity_type
                   task_type: 'ai_suggested',
-                  title: '이탈 위험 고객 집중 관리',
-                  description: `${riskStudents.length}명의 이탈 위험 고객이 감지되었습니다. 집중 관리가 필요합니다.`,
+                  title: '이탈 위험 대상 집중 관리',
+                  description: `${riskStudents.length}명의 이탈 위험 대상이 감지되었습니다. 집중 관리가 필요합니다.`,
                   priority: priorityPolicy,
                   dedup_key: dedupKey,
                   expires_at: new Date(kstTime.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString(),
@@ -434,8 +450,8 @@ serve(async (req) => {
                 await supabase.from('ai_insights').insert({
                   tenant_id: tenant.id,
                   insight_type: 'daily_briefing',
-                  title: '주간 위험 학생 KPI',
-                  summary: `최근 1주일간 ${riskCards.length}건의 위험 학생이 감지되었습니다.`,
+                  title: '주간 위험 대상 KPI',
+                  summary: `최근 1주일간 ${riskCards.length}건의 위험 대상이 감지되었습니다.`,
                   created_at: kstTime.toISOString(),
                 });
               }

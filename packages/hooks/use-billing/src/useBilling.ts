@@ -21,6 +21,7 @@ export interface BillingHistoryItem {
   id: string;
   student_id: string;
   student_name?: string;
+  payer_name?: string;
   title?: string;
   amount: number;
   amount_paid: number;
@@ -28,6 +29,7 @@ export interface BillingHistoryItem {
   status: InvoiceStatus;
   period_start: string;
   period_end: string;
+  paid_at?: string | Date;
   created_at: string;
   updated_at: string;
 }

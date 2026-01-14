@@ -20,6 +20,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Tooltip } from './Tooltip';
 
 /** 서브 사이드바 메뉴 아이템 */
 export interface SubSidebarMenuItem<T extends string = string> {
@@ -50,7 +51,7 @@ export interface SubSidebarProps<T extends string = string> {
   onClose?: () => void;
   /** 너비 (CSS 변수 또는 값) - 기본값: var(--width-agent-history-sidebar) */
   width?: string;
-  /** 축소 시 너비 - 기본값: 48px */
+  /** 축소 시 너비 - 기본값: var(--width-sidebar-collapsed) */
   collapsedWidth?: string;
   /** 축소 상태 (controlled) */
   collapsed?: boolean;
@@ -71,7 +72,7 @@ export function SubSidebar<T extends string = string>({
   onSelect,
   onClose,
   width = 'var(--width-agent-history-sidebar)',
-  collapsedWidth = '48px',
+  collapsedWidth = 'var(--width-sidebar-collapsed)',
   collapsed: controlledCollapsed,
   onCollapsedChange,
   showDividers = false,
@@ -97,7 +98,9 @@ export function SubSidebar<T extends string = string>({
   // 메뉴 아이템 클릭 핸들러 (메모이제이션)
   const handleItemClick = useCallback(
     (item: SubSidebarMenuItem<T>) => {
+      console.log('[SubSidebar] handleItemClick called:', item.id, 'disabled:', item.disabled);
       if (!item.disabled) {
+        console.log('[SubSidebar] calling onSelect with:', item.id);
         onSelect(item.id);
       }
     },
@@ -126,13 +129,15 @@ export function SubSidebar<T extends string = string>({
       style={{
         width: currentWidth,
         minWidth: currentWidth,
-        height: 'var(--height-full)',
+        height: 'var(--height-viewport)', // 100vh - 뷰포트 전체 높이 사용하여 우측 구분선이 화면 전체 높이에 표시
         borderRight: 'var(--border-width-thin) solid var(--color-gray-200)',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
         flexShrink: 0,
-        transition: 'width 0.2s ease, min-width 0.2s ease',
+        paddingTop: 'var(--spacing-xl)', // Container의 paddingTop과 동일 (32px)
+        transition: 'var(--transition-base)',
+        position: 'relative',
+        boxSizing: 'border-box', // padding을 height에 포함
         ...style,
       }}
     >
@@ -142,20 +147,24 @@ export function SubSidebar<T extends string = string>({
           display: 'flex',
           alignItems: 'center',
           justifyContent: isCollapsed ? 'center' : 'space-between',
-          padding: 'var(--spacing-sm)',
-          height: '64px',
-          boxSizing: 'border-box',
-          borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)',
+          marginBottom: 'var(--spacing-md)',
+          gap: 'var(--spacing-md)',
+          paddingLeft: isCollapsed ? 0 : 'var(--spacing-lg)', // PageHeader의 기본 여백과 동일
+          paddingRight: isCollapsed ? 0 : 'var(--spacing-sm)',
+          minHeight: 'var(--touch-target-min)', // PageHeader와 동일한 높이 (2.75rem = 44px)
         }}
       >
         {/* 타이틀 (축소 시 숨김) */}
         {!isCollapsed && (
           <span
             style={{
-              paddingLeft: 'var(--spacing-md)',
-              color: 'var(--color-text)',
               fontSize: 'var(--font-size-3xl)',
               fontWeight: 'var(--font-weight-extrabold)',
+              margin: 0,
+              lineHeight: 'var(--line-height-tight)',
+              color: 'var(--color-text)',
+              display: 'flex',
+              alignItems: 'center',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -233,9 +242,9 @@ export function SubSidebar<T extends string = string>({
           const isSelected = selectedId === item.id;
           const isLastItem = index === items.length - 1;
 
-          return (
-            <div key={item.id} role="none">
-              <button
+          // 메뉴 버튼 렌더링
+          const menuButton = (
+            <button
                 role="menuitem"
                 aria-current={isSelected ? 'page' : undefined}
                 aria-disabled={item.disabled}
@@ -245,7 +254,7 @@ export function SubSidebar<T extends string = string>({
                 onKeyDown={(e) => handleKeyDown(e, item)}
                 disabled={item.disabled}
                 style={{
-                  width: '100%',
+                  width: isCollapsed ? 'auto' : 'calc(100% - var(--spacing-sm))', // 좌우 여백만큼 줄임
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: isCollapsed ? 'center' : 'flex-start',
@@ -254,24 +263,26 @@ export function SubSidebar<T extends string = string>({
                   minHeight: 'var(--touch-target-min)',
                   cursor: item.disabled ? 'not-allowed' : 'pointer',
                   backgroundColor: isSelected
-                    ? 'var(--color-primary-selected)'
+                    ? 'var(--color-primary-40)'
                     : 'transparent',
                   border: 'none',
                   borderRadius: 'var(--border-radius-sm)',
                   color: item.disabled
                     ? 'var(--color-text-tertiary)'
-                    : 'var(--color-text)',
+                    : isSelected
+                      ? 'var(--color-primary)' // 선택된 상태: 프라이머리 색상
+                      : 'var(--color-text)',
                   fontSize: 'var(--font-size-base)',
                   fontWeight: isSelected
                     ? 'var(--font-weight-semibold)'
                     : 'var(--font-weight-normal)',
                   textAlign: 'left',
                   opacity: item.disabled ? 0.5 : 1,
-                  transition: 'background-color 0.2s ease, opacity 0.2s ease',
+                  transition: 'var(--transition-base)',
                 }}
                 onMouseEnter={(e) => {
                   if (!item.disabled && !isSelected) {
-                    e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
+                    e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -281,7 +292,7 @@ export function SubSidebar<T extends string = string>({
                 }}
                 onFocus={(e) => {
                   if (!item.disabled && !isSelected) {
-                    e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
+                    e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
                   }
                 }}
                 onBlur={(e) => {
@@ -325,7 +336,7 @@ export function SubSidebar<T extends string = string>({
                       fontWeight: 'var(--font-weight-medium)',
                       borderRadius: 'var(--border-radius-full)',
                       lineHeight: 1,
-                      minWidth: '1.25rem',
+                      minWidth: 'var(--size-checkbox)',
                       textAlign: 'center',
                     }}
                   >
@@ -333,6 +344,18 @@ export function SubSidebar<T extends string = string>({
                   </span>
                 )}
               </button>
+          );
+
+          return (
+            <div key={item.id} role="none" style={{ display: 'flex', justifyContent: 'center' }}>
+              {/* 축소 상태일 때 툴팁 표시 */}
+              {isCollapsed ? (
+                <Tooltip content={item.label} position="right" offset={8}>
+                  {menuButton}
+                </Tooltip>
+              ) : (
+                menuButton
+              )}
 
               {/* 구분선 (마지막 아이템 제외, showDividers가 true일 때만, 축소 시 숨김) */}
               {showDividers && !isLastItem && !isCollapsed && (

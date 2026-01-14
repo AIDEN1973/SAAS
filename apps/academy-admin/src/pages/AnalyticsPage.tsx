@@ -22,10 +22,10 @@
  * - 유아이 문서: 6. Responsive UX (반응형 브레이크포인트 표준)
  */
 
-import React, { useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState, useMemo, useCallback } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ErrorBoundary, useModal , Container, Card, Button, PageHeader , useResponsiveMode, isMobile, SubSidebar } from '@ui-core/react';
+import { ErrorBoundary, useModal, Container, Card, Button, PageHeader, useResponsiveMode, isMobile, SubSidebar } from '@ui-core/react';
 // [SSOT] Barrel export를 통한 통합 import
 import { ANALYTICS_SUB_MENU_ITEMS, DEFAULT_ANALYTICS_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
 import type { AnalyticsSubMenuId } from '../constants';
@@ -80,6 +80,7 @@ export function AnalyticsPage() {
   const context = getApiContext();
   const tenantId = context.tenantId;
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { data: config } = useConfig();
   // [불변 규칙] Zero-Trust: industryType은 Context에서 가져와야 함 (하드코딩 금지)
   const industryType = (context?.industryType || (typeof config?.industry_type === 'string' ? config.industry_type : undefined) || DEFAULT_INDUSTRY_TYPE);
@@ -89,17 +90,14 @@ export function AnalyticsPage() {
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
 
-  // 서브 메뉴 상태
+  // 서브 메뉴 상태 (URL에서 직접 읽음 - StudentsHomePage 패턴)
   const validIds = ANALYTICS_SUB_MENU_ITEMS.map(item => item.id) as readonly AnalyticsSubMenuId[];
-  const [selectedSubMenu, setSelectedSubMenu] = useState<AnalyticsSubMenuId>(() =>
-    getSubMenuFromUrl(searchParams, validIds, DEFAULT_ANALYTICS_SUB_MENU)
-  );
+  const selectedSubMenu = getSubMenuFromUrl(searchParams, validIds, DEFAULT_ANALYTICS_SUB_MENU);
 
-  const handleSubMenuChange = (id: AnalyticsSubMenuId) => {
-    setSelectedSubMenu(id);
+  const handleSubMenuChange = useCallback((id: AnalyticsSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_ANALYTICS_SUB_MENU);
-    window.history.replaceState(null, '', newUrl);
-  };
+    navigate(newUrl, { replace: true });
+  }, [navigate]);
 
   const [selectedMetric, setSelectedMetric] = useState<
     'students' | 'revenue' | 'attendance' | 'growth' | 'new_enrollments' | 'arpu' |
@@ -1149,7 +1147,7 @@ export function AnalyticsPage() {
         )}
 
         {/* 메인 콘텐츠 */}
-        <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"} style={{ flex: 1, overflow: 'auto' }}>
+        <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"} style={{ flex: 1 }}>
           <PageHeader
             title="통계분석"
             actions={
@@ -1164,146 +1162,221 @@ export function AnalyticsPage() {
             }
           />
 
-        {/* 통계문서 3.1: 운영 현황 카드 4개 (주요 관리 대상 수, 매출, 출석률, 성장률 / 지역순위) */}
-        {/* 지표 선택 */}
-        <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
-          <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
-            {(Object.keys(selectedMetricLabels) as Array<keyof typeof selectedMetricLabels>).map((metric) => (
-              <Button
-                  key={metric}
-                  variant={selectedMetric === metric ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => setSelectedMetric(metric)}
-                >
-                  {selectedMetricLabels[metric]}
-                </Button>
-              ))}
-            </div>
-          </Card>
+        {/* 전체 현황 탭 (기본) */}
+        {selectedSubMenu === 'overview' && (
+          <>
+            {/* 통계문서 3.1: 운영 현황 카드 4개 (주요 관리 대상 수, 매출, 출석률, 성장률 / 지역순위) */}
+            {/* 지표 선택 */}
+            <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
+                {(Object.keys(selectedMetricLabels) as Array<keyof typeof selectedMetricLabels>).map((metric) => (
+                  <Button
+                      key={metric}
+                      variant={selectedMetric === metric ? 'solid' : 'outline'}
+                      size="sm"
+                      onClick={() => setSelectedMetric(metric)}
+                    >
+                      {selectedMetricLabels[metric]}
+                    </Button>
+                  ))}
+                </div>
+              </Card>
 
-          {/* 통계문서 3.1: 운영 현황 카드 4개를 동시에 표시 (주요 관리 대상 수 / 지역순위, 매출 / 지역순위, 출석률 / 지역순위, 성장률 / 지역순위) */}
-          {!isLoading && regionalStats && metricValues && (
-            <CardGridLayout
-              cards={[
-                <RegionalMetricCard
-                  key="students"
-                  metric="students"
-                  regionalStats={regionalStats}
-                  selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
-                  metricValue={metricValues.students}
-                />,
-                <RegionalMetricCard
-                  key="revenue"
-                  metric="revenue"
-                  regionalStats={regionalStats}
-                  selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
-                  metricValue={metricValues.revenue}
-                />,
-                <RegionalMetricCard
-                  key="attendance"
-                  metric="attendance"
-                  regionalStats={regionalStats}
-                  selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
-                  metricValue={metricValues.attendance}
-                />,
-                <RegionalMetricCard
-                  key="growth"
-                  metric="growth"
-                  regionalStats={regionalStats}
-                  selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
-                  metricValue={metricValues.growth}
-                />,
-                <RegionalMetricCard
-                  key="new_enrollments"
-                  metric="new_enrollments"
-                  regionalStats={regionalStats}
-                  selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
-                  metricValue={metricValues.new_enrollments}
-                />,
-                <RegionalMetricCard
-                  key="arpu"
-                  metric="arpu"
-                  regionalStats={regionalStats}
-                  selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
-                  metricValue={metricValues.arpu}
-                />,
-                <RegionalMetricCard
-                  key="capacity_rate"
-                  metric="capacity_rate"
-                  regionalStats={regionalStats}
-                  selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
-                  metricValue={metricValues.capacity_rate}
-                />,
-                <RegionalMetricCard
-                  key="overdue_rate"
-                  metric="overdue_rate"
-                  regionalStats={regionalStats}
-                  selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
-                  metricValue={metricValues.overdue_rate}
-                />,
-                <RegionalMetricCard
-                  key="churn_rate"
-                  metric="churn_rate"
-                  regionalStats={regionalStats}
-                  selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
-                  metricValue={metricValues.churn_rate}
-                />,
-                <RegionalMetricCard
-                  key="late_rate"
-                  metric="late_rate"
-                  regionalStats={regionalStats}
-                  selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
-                  metricValue={metricValues.late_rate}
-                />,
-                <RegionalMetricCard
-                  key="absent_rate"
-                  metric="absent_rate"
-                  regionalStats={regionalStats}
-                  selectedMetric={selectedMetric}
-                  onSelect={setSelectedMetric}
-                  metricValue={metricValues.absent_rate}
-                />,
-              ]}
-              desktopColumns={3}
-              tabletColumns={2}
-              mobileColumns={1}
-            />
-          )}
+              {/* 통계문서 3.1: 운영 현황 카드 4개를 동시에 표시 */}
+              {!isLoading && regionalStats && metricValues && (
+                <CardGridLayout
+                  cards={[
+                    <RegionalMetricCard
+                      key="students"
+                      metric="students"
+                      regionalStats={regionalStats}
+                      selectedMetric={selectedMetric}
+                      onSelect={setSelectedMetric}
+                      metricValue={metricValues.students}
+                    />,
+                    <RegionalMetricCard
+                      key="revenue"
+                      metric="revenue"
+                      regionalStats={regionalStats}
+                      selectedMetric={selectedMetric}
+                      onSelect={setSelectedMetric}
+                      metricValue={metricValues.revenue}
+                    />,
+                    <RegionalMetricCard
+                      key="attendance"
+                      metric="attendance"
+                      regionalStats={regionalStats}
+                      selectedMetric={selectedMetric}
+                      onSelect={setSelectedMetric}
+                      metricValue={metricValues.attendance}
+                    />,
+                    <RegionalMetricCard
+                      key="growth"
+                      metric="growth"
+                      regionalStats={regionalStats}
+                      selectedMetric={selectedMetric}
+                      onSelect={setSelectedMetric}
+                      metricValue={metricValues.growth}
+                    />,
+                  ]}
+                  desktopColumns={4}
+                  tabletColumns={2}
+                  mobileColumns={1}
+                />
+              )}
 
-          {/* 지역 순위 카드 */}
-          {isLoading ? (
-            <Card padding="lg" variant="default">
-              <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
-                로딩 중...
-              </div>
-            </Card>
-          ) : regionalStats ? (
-            <>
-              {/* 아키텍처 문서 3.6.3: AI 해석 문장을 최상단에 배치 */}
-              <AIInsightCard
-                insights={regionalStats?.insights || []}
-                isLoading={isLoading}
+              {/* 지역 순위 카드 */}
+              {isLoading ? (
+                <Card padding="lg" variant="default">
+                  <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
+                    로딩 중...
+                  </div>
+                </Card>
+              ) : regionalStats ? (
+                <>
+                  {/* 아키텍처 문서 3.6.3: AI 해석 문장을 최상단에 배치 */}
+                  <AIInsightCard
+                    insights={regionalStats?.insights || []}
+                    isLoading={isLoading}
+                  />
+                </>
+              ) : (
+                <Card padding="lg" variant="default">
+                  <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+                    데이터를 불러올 수 없습니다.
+                  </div>
+                </Card>
+              )}
+          </>
+        )}
+
+        {/* 지역별 분석 탭 */}
+        {selectedSubMenu === 'regional' && (
+          <>
+            {/* 지표 선택 */}
+            <Card padding="md" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
+              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
+                {(Object.keys(selectedMetricLabels) as Array<keyof typeof selectedMetricLabels>).map((metric) => (
+                  <Button
+                      key={metric}
+                      variant={selectedMetric === metric ? 'solid' : 'outline'}
+                      size="sm"
+                      onClick={() => setSelectedMetric(metric)}
+                    >
+                      {selectedMetricLabels[metric]}
+                    </Button>
+                  ))}
+                </div>
+              </Card>
+
+            {/* 통계문서 3.1: 전체 지표 카드 표시 */}
+            {!isLoading && regionalStats && metricValues && (
+              <CardGridLayout
+                cards={[
+                  <RegionalMetricCard
+                    key="students"
+                    metric="students"
+                    regionalStats={regionalStats}
+                    selectedMetric={selectedMetric}
+                    onSelect={setSelectedMetric}
+                    metricValue={metricValues.students}
+                  />,
+                  <RegionalMetricCard
+                    key="revenue"
+                    metric="revenue"
+                    regionalStats={regionalStats}
+                    selectedMetric={selectedMetric}
+                    onSelect={setSelectedMetric}
+                    metricValue={metricValues.revenue}
+                  />,
+                  <RegionalMetricCard
+                    key="attendance"
+                    metric="attendance"
+                    regionalStats={regionalStats}
+                    selectedMetric={selectedMetric}
+                    onSelect={setSelectedMetric}
+                    metricValue={metricValues.attendance}
+                  />,
+                  <RegionalMetricCard
+                    key="growth"
+                    metric="growth"
+                    regionalStats={regionalStats}
+                    selectedMetric={selectedMetric}
+                    onSelect={setSelectedMetric}
+                    metricValue={metricValues.growth}
+                  />,
+                  <RegionalMetricCard
+                    key="new_enrollments"
+                    metric="new_enrollments"
+                    regionalStats={regionalStats}
+                    selectedMetric={selectedMetric}
+                    onSelect={setSelectedMetric}
+                    metricValue={metricValues.new_enrollments}
+                  />,
+                  <RegionalMetricCard
+                    key="arpu"
+                    metric="arpu"
+                    regionalStats={regionalStats}
+                    selectedMetric={selectedMetric}
+                    onSelect={setSelectedMetric}
+                    metricValue={metricValues.arpu}
+                  />,
+                  <RegionalMetricCard
+                    key="capacity_rate"
+                    metric="capacity_rate"
+                    regionalStats={regionalStats}
+                    selectedMetric={selectedMetric}
+                    onSelect={setSelectedMetric}
+                    metricValue={metricValues.capacity_rate}
+                  />,
+                  <RegionalMetricCard
+                    key="overdue_rate"
+                    metric="overdue_rate"
+                    regionalStats={regionalStats}
+                    selectedMetric={selectedMetric}
+                    onSelect={setSelectedMetric}
+                    metricValue={metricValues.overdue_rate}
+                  />,
+                  <RegionalMetricCard
+                    key="churn_rate"
+                    metric="churn_rate"
+                    regionalStats={regionalStats}
+                    selectedMetric={selectedMetric}
+                    onSelect={setSelectedMetric}
+                    metricValue={metricValues.churn_rate}
+                  />,
+                  <RegionalMetricCard
+                    key="late_rate"
+                    metric="late_rate"
+                    regionalStats={regionalStats}
+                    selectedMetric={selectedMetric}
+                    onSelect={setSelectedMetric}
+                    metricValue={metricValues.late_rate}
+                  />,
+                  <RegionalMetricCard
+                    key="absent_rate"
+                    metric="absent_rate"
+                    regionalStats={regionalStats}
+                    selectedMetric={selectedMetric}
+                    onSelect={setSelectedMetric}
+                    metricValue={metricValues.absent_rate}
+                  />,
+                ]}
+                desktopColumns={3}
+                tabletColumns={2}
+                mobileColumns={1}
               />
+            )}
 
-              {/* FR-07: 시간대·요일별 출석 패턴 분석 */}
-              <AttendancePatternCard
-                hourlyData={attendancePatternData?.hourly || []}
-                dailyData={attendancePatternData?.daily || []}
-                isLoading={isAttendancePatternLoading}
-              />
-
-              {/* 통계문서 3.1: 지역 비교 차트 (우리 조직 vs 지역 평균 vs 상위 10% 평균) */}
-              {regionalStats.comparisonGroup !== 'insufficient' && regionalStats.sampleCount >= 3 && (
+            {/* 지역 비교 차트 */}
+            {isLoading ? (
+              <Card padding="lg" variant="default">
+                <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
+                  로딩 중...
+                </div>
+              </Card>
+            ) : regionalStats && regionalStats.comparisonGroup !== 'insufficient' && regionalStats.sampleCount >= 3 ? (
+              <>
                 <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
                   <h2 style={{ marginBottom: 'var(--spacing-md)' }}>지역 비교 차트</h2>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
@@ -1368,10 +1441,8 @@ export function AnalyticsPage() {
                     </div>
                   </div>
                 </Card>
-              )}
 
               {/* 지역 순위 카드 (상세 정보, 펼치기 가능) */}
-              {regionalStats.comparisonGroup !== 'insufficient' && regionalStats.sampleCount >= 3 && (
                 <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
                   <h2 style={{ marginBottom: 'var(--spacing-md)' }}>지역 순위</h2>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
@@ -1420,7 +1491,6 @@ export function AnalyticsPage() {
                     </div>
                   </div>
                 </Card>
-              )}
 
               {/* 히트맵 - [요구사항 3.6.9] 히트맵 기능 (아키텍처 문서 352줄: 전용 Dashboard 구현) */}
               <HeatmapCard
@@ -1434,13 +1504,73 @@ export function AnalyticsPage() {
                 }}
                 tenantId={tenantId || null}
               />
-            </>
-          ) : (
+              </>
+            ) : null}
+          </>
+        )}
+
+        {/* 출석 패턴 탭 */}
+        {selectedSubMenu === 'attendance' && (
+          <>
+            <AttendancePatternCard
+              hourlyData={attendancePatternData?.hourly || []}
+              dailyData={attendancePatternData?.daily || []}
+              isLoading={isAttendancePatternLoading}
+            />
+          </>
+        )}
+
+        {/* AI 인사이트 탭 */}
+        {selectedSubMenu === 'ai-insights' && (
+          <>
+            {isLoading ? (
+              <Card padding="lg" variant="default">
+                <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
+                  로딩 중...
+                </div>
+              </Card>
+            ) : regionalStats ? (
+              <AIInsightCard
+                insights={regionalStats?.insights || []}
+                isLoading={isLoading}
+              />
+            ) : (
+              <Card padding="lg" variant="default">
+                <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+                  AI 인사이트 데이터를 불러올 수 없습니다.
+                </div>
+              </Card>
+            )}
+          </>
+        )}
+
+        {/* 월간 리포트 탭 */}
+        {selectedSubMenu === 'reports' && (
+          <>
             <Card padding="lg" variant="default">
-              <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
-                데이터를 불러올 수 없습니다.
+              <div style={{ marginBottom: 'var(--spacing-md)' }}>
+                <h2 style={{
+                  fontSize: 'var(--font-size-xl)',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  color: 'var(--color-text)',
+                  marginBottom: 'var(--spacing-xs)',
+                }}>
+                  월간 리포트
+                </h2>
+                <p style={{ color: 'var(--color-text-secondary)' }}>
+                  월간 운영 현황과 분석 결과를 PDF로 다운로드할 수 있습니다.
+                </p>
               </div>
+              <Button
+                variant="solid"
+                size="md"
+                onClick={() => generateMonthlyReport.mutate()}
+                disabled={generateMonthlyReport.isPending}
+              >
+                {generateMonthlyReport.isPending ? '생성 중...' : '월간 리포트 생성'}
+              </Button>
             </Card>
+          </>
         )}
       </Container>
       </div>

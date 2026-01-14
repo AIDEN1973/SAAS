@@ -6,17 +6,25 @@
  * [불변 규칙] CSS 변수만 사용 (하드코딩 금지)
  * [불변 규칙] SSOT UI 디자인 준수
  */
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useModal, useResponsiveMode, useToast, IconButtonGroup, Card, isMobile, useIconSize, useIconStrokeWidth, EmptyState } from '@ui-core/react';
 import { FileText, Trash2, Pencil, RefreshCcw } from 'lucide-react';
 import { SchemaForm } from '@schema-engine';
 import { useIndustryTranslations } from '@hooks/use-industry-translations';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { LayerSectionHeader } from '../components/LayerSectionHeader';
+import { AIAnalysisLoadingUI } from '../components/AIAnalysisLoadingUI';
 import { PlusIcon } from '../../../components/DataTableActionButtons';
 import { toKST } from '@lib/date-utils';
 import type { StudentConsultation, ConsultationType } from '@services/student-service';
 import type { FormSchema } from '@schema-engine/types';
+
+// AI 요약 생성 단계 정의
+const AI_SUMMARY_STEPS = [
+  { step: 1, label: '상담 내용 분석 중', duration: 500 },
+  { step: 2, label: 'AI 요약 생성 중', duration: 2000 },
+  { step: 3, label: '결과 저장 중', duration: 300 },
+] as const;
 
 // 상담일지 탭 컴포넌트
 export interface ConsultationsTabProps {
@@ -66,6 +74,10 @@ export function ConsultationsTab({
   const isMobileMode = isMobile(modeUpper);
   const formRef = useRef<HTMLDivElement>(null);
 
+  // AI 요약 생성 중인 상담일지 ID 추적
+  const [generatingAISummaryId, setGeneratingAISummaryId] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState<number>(0);
+
   // Automation & AI Industry-Neutral Rule (SSOT): Industry Adapter를 통한 translations 생성
   const consultationTranslations = useIndustryTranslations(effectiveConsultationFormSchema);
   const terms = useIndustryTerms();
@@ -78,6 +90,35 @@ export function ConsultationsTab({
   // 타이틀 아이콘 크기 및 선 두께 계산 (CSS 변수 사용)
   const titleIconSize = useIconSize();
   const titleIconStrokeWidth = useIconStrokeWidth();
+
+  // AI 요약 생성 진행 단계 시뮬레이션
+  useEffect(() => {
+    if (!generatingAISummaryId) {
+      setCurrentStep(0);
+      return;
+    }
+
+    // 분석 시작 시 첫 단계로 이동
+    setCurrentStep(1);
+
+    // 각 단계별로 타이머 설정
+    const timers: NodeJS.Timeout[] = [];
+    let accumulatedTime = 0;
+
+    AI_SUMMARY_STEPS.forEach((step, index) => {
+      if (index === 0) return; // 첫 단계는 즉시 시작
+
+      accumulatedTime += AI_SUMMARY_STEPS[index - 1].duration;
+      const timer = setTimeout(() => {
+        setCurrentStep(step.step);
+      }, accumulatedTime);
+      timers.push(timer);
+    });
+
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
+  }, [generatingAISummaryId]);
 
   // [P2-7 수정] DOM query 제거: textarea 높이는 schema의 ui 옵션으로 처리 권장
   // 현재는 DOM query로 처리하지만, SDUI 위젯이나 name 변경에 취약함
@@ -190,11 +231,24 @@ export function ConsultationsTab({
           />
           {consultations.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              {consultations.map((consultation) => (
+              {consultations.map((consultation) => {
+                // AI 요약 생성 중인지 확인
+                const isGenerating = generatingAISummaryId === consultation.id;
+
+                return (
                 <Card
                   key={consultation.id}
                   padding="md"
                 >
+                  {/* AI 요약 생성 중일 때 로딩 UI 표시 */}
+                  {isGenerating ? (
+                    <AIAnalysisLoadingUI
+                      steps={AI_SUMMARY_STEPS}
+                      currentStep={currentStep}
+                      message="AI 요약이 완료될 때까지 잠시만 기다려주세요."
+                    />
+                  ) : (
+                  <>
                   {/* 기본보기: 수정폼과 동일한 레이아웃을 읽기 전용으로 렌더링 */}
                   {(() => {
                     const typeLabel =
@@ -295,7 +349,18 @@ export function ConsultationsTab({
                             icon: RefreshCcw,
                             tooltip: consultation.ai_summary ? 'AI 재요약' : 'AI 요약',
                             variant: 'outline',
-                            onClick: () => void onGenerateAISummary(consultation.id),
+                            onClick: () => {
+                              void (async () => {
+                                try {
+                                  setGeneratingAISummaryId(consultation.id);
+                                  await onGenerateAISummary(consultation.id);
+                                } catch (error) {
+                                  toast(error instanceof Error ? error.message : 'AI 요약 생성에 실패했습니다.', 'error');
+                                } finally {
+                                  setGeneratingAISummaryId(null);
+                                }
+                              })();
+                            },
                           },
                           {
                             icon: Pencil,
@@ -307,8 +372,11 @@ export function ConsultationsTab({
                       />
                     </div>
                   )}
+                  </>
+                  )}
                 </Card>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <Card padding="md">

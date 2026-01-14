@@ -9,8 +9,8 @@
  * [요구사항] 자동 알림(등원/하원, 청구 생성, 미납 알림), 수동 메시지, 단체문자, 템플릿 관리, 예약 발송, 발송 내역 조회
  */
 
-import React, { useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState, useMemo, useCallback } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOptimizedQuery } from '@hooks/use-optimized-query';
 import { ErrorBoundary, useModal, Modal, Container, Card, Button, Badge, useResponsiveMode, Drawer, PageHeader, useIconSize, useIconStrokeWidth, isMobile, isTablet, EmptyState, SubSidebar } from '@ui-core/react';
@@ -44,6 +44,7 @@ export function NotificationsPage() {
   const terms = useIndustryTerms();
   const mode = useResponsiveMode();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
@@ -51,17 +52,14 @@ export function NotificationsPage() {
   const iconSize = useIconSize('--size-icon-base', 20);
   const iconStrokeWidth = useIconStrokeWidth('--stroke-width-icon', 1.5);
 
-  // 서브 메뉴 상태
+  // 서브 메뉴 상태 (URL에서 직접 읽음 - StudentsHomePage 패턴)
   const validIds = NOTIFICATIONS_SUB_MENU_ITEMS.map(item => item.id) as readonly NotificationsSubMenuId[];
-  const [selectedSubMenu, setSelectedSubMenu] = useState<NotificationsSubMenuId>(() =>
-    getSubMenuFromUrl(searchParams, validIds, DEFAULT_NOTIFICATIONS_SUB_MENU)
-  );
+  const selectedSubMenu = getSubMenuFromUrl(searchParams, validIds, DEFAULT_NOTIFICATIONS_SUB_MENU);
 
-  const handleSubMenuChange = (id: NotificationsSubMenuId) => {
-    setSelectedSubMenu(id);
+  const handleSubMenuChange = useCallback((id: NotificationsSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_NOTIFICATIONS_SUB_MENU);
-    window.history.replaceState(null, '', newUrl);
-  };
+    navigate(newUrl, { replace: true });
+  }, [navigate]);
 
   const [filter, _setFilter] = useState<{ status?: NotificationStatus }>({});
   // 채널 선택 제거됨 - filter는 상태 필터링에 사용, setFilter는 향후 필터 UI 구현 시 사용 예정
@@ -159,10 +157,10 @@ export function NotificationsPage() {
       const updateInput = {
         notification: {
           auto_notification: {
-            check_in: data.check_in_notification || false,
-            check_out: data.check_out_notification || false,
-            invoice_created: data.invoice_created_notification || false,
-            overdue: data.overdue_notification || false,
+            check_in: Boolean(data.check_in_notification),
+            check_out: Boolean(data.check_out_notification),
+            invoice_created: Boolean(data.invoice_created_notification),
+            overdue: Boolean(data.overdue_notification),
           },
         },
       };
@@ -355,7 +353,7 @@ export function NotificationsPage() {
         )}
 
         {/* 메인 콘텐츠 */}
-        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           <PageHeader
             title="문자발송"
           />

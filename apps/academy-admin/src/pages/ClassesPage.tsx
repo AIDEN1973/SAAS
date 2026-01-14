@@ -14,7 +14,7 @@ import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, M
 // [SSOT] Barrel export를 통한 통합 import
 import { CLASSES_SUB_MENU_ITEMS, DEFAULT_CLASSES_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
 import type { ClassesSubMenuId } from '../constants';
-import { BookOpen, Users, CheckCircle, XCircle } from 'lucide-react';
+import { BookOpen, Users, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { SchemaForm } from '@schema-engine';
 import { apiClient } from '@api-sdk/core';
 import { useSchema } from '@hooks/use-schema';
@@ -31,7 +31,7 @@ import {
   useCheckScheduleConflicts,
   useClassTeachers,
 } from '@hooks/use-class';
-import type { Class, CreateClassInput, UpdateClassInput, ClassFilter, ClassStatus, DayOfWeek , Teacher } from '@services/class-service';
+import type { Class, CreateClassInput, UpdateClassInput, ClassFilter, ClassStatus, DayOfWeek, Teacher } from '@services/class-service';
 import { createClassFormSchema } from '../schemas/class.schema';
 import type { FormSchema } from '@schema-engine/types';
 import { CardGridLayout } from '../components/CardGridLayout';
@@ -128,15 +128,12 @@ export function ClassesPage() {
 
   // 서브 메뉴 상태
   const validIds = CLASSES_SUB_MENU_ITEMS.map(item => item.id) as readonly ClassesSubMenuId[];
-  const [selectedSubMenu, setSelectedSubMenu] = useState<ClassesSubMenuId>(() =>
-    getSubMenuFromUrl(searchParams, validIds, DEFAULT_CLASSES_SUB_MENU)
-  );
+  const selectedSubMenu = getSubMenuFromUrl(searchParams, validIds, DEFAULT_CLASSES_SUB_MENU);
 
-  const handleSubMenuChange = (id: ClassesSubMenuId) => {
-    setSelectedSubMenu(id);
+  const handleSubMenuChange = useCallback((id: ClassesSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_CLASSES_SUB_MENU);
-    window.history.replaceState(null, '', newUrl);
-  };
+    navigate(newUrl, { replace: true });
+  }, [navigate]);
 
   // localStorage 기반 상태 초기화 (SSR Safe, AutomationSettingsPage 패턴 적용)
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>(() => {
@@ -390,7 +387,7 @@ export function ClassesPage() {
         )}
 
         {/* 메인 콘텐츠 */}
-        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           <PageHeader
             title={`${terms.GROUP_LABEL}관리`}
             actions={
@@ -427,10 +424,13 @@ export function ClassesPage() {
             }
           />
 
-          {/* 통계 카드 */}
-          <StatisticsCards />
+          {/* 수업 목록 탭 (기본) */}
+          {selectedSubMenu === 'list' && (
+            <>
+              {/* 통계 카드 */}
+              <StatisticsCards />
 
-        {/* 수업 생성 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
+              {/* 수업 생성 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
           {showCreateForm && (
             <>
               {isMobileMode || isTabletMode ? (
@@ -474,7 +474,7 @@ export function ClassesPage() {
                 오류: {error.message}
               </div>
             </Card>
-          ) : viewMode === 'list' ? (
+          ) : (
             <DataTable
               data={classes || []}
               filters={[
@@ -646,8 +646,33 @@ export function ClassesPage() {
                 },
               ]}
             />
-          ) : (
-            <ClassCalendarView classes={classes || []} />
+          )}
+            </>
+          )}
+
+          {/* 수업 편성표(캘린더) 탭 */}
+          {selectedSubMenu === 'calendar' && (
+            <>
+              {isLoading ? (
+                <Card padding="lg">
+                  <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+                    로딩 중...
+                  </div>
+                </Card>
+              ) : (
+                <ClassCalendarView classes={classes || []} />
+              )}
+            </>
+          )}
+
+          {/* 수업 통계 탭 */}
+          {selectedSubMenu === 'statistics' && (
+            <ClassStatisticsTab />
+          )}
+
+          {/* 일정 충돌 탭 */}
+          {selectedSubMenu === 'schedule-conflicts' && (
+            <ScheduleConflictsTab />
           )}
 
           {/* 수업 수정 모달 */}
@@ -1059,6 +1084,403 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
             </div>
           )}
         </Card>
+    </div>
+  );
+}
+
+/**
+ * 수업 통계 탭 컴포넌트
+ * 수업별 상세 통계를 표시
+ */
+function ClassStatisticsTab() {
+  const terms = useIndustryTerms();
+  const { data: allClasses, isLoading } = useClasses({});
+
+  // 상세 통계 계산
+  const statistics = useMemo(() => {
+    if (!allClasses) return null;
+
+    // 요일별 수업 수
+    const byDayOfWeek = DAYS_OF_WEEK.reduce((acc, day) => {
+      acc[day.value] = allClasses.filter(c => c.day_of_week === day.value).length;
+      return acc;
+    }, {} as Record<DayOfWeek, number>);
+
+    // 상태별 수업 수
+    const byStatus = {
+      active: allClasses.filter(c => c.status === 'active').length,
+      inactive: allClasses.filter(c => c.status === 'inactive').length,
+      archived: allClasses.filter(c => c.status === 'archived').length,
+    };
+
+    // 정원 대비 현재 인원 비율
+    const capacityStats = allClasses.reduce((acc, c) => {
+      const ratio = c.current_count / c.capacity;
+      if (ratio >= 0.9) acc.full++;
+      else if (ratio >= 0.5) acc.medium++;
+      else acc.low++;
+      return acc;
+    }, { full: 0, medium: 0, low: 0 });
+
+    // 전체 통계
+    const totalStudents = allClasses.reduce((sum, c) => sum + (c.current_count || 0), 0);
+    const totalCapacity = allClasses.reduce((sum, c) => sum + c.capacity, 0);
+    const avgCapacityRatio = totalCapacity > 0 ? (totalStudents / totalCapacity * 100) : 0;
+
+    return {
+      total: allClasses.length,
+      byDayOfWeek,
+      byStatus,
+      capacityStats,
+      totalStudents,
+      totalCapacity,
+      avgCapacityRatio,
+    };
+  }, [allClasses]);
+
+  if (isLoading) {
+    return (
+      <Card padding="lg">
+        <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+          로딩 중...
+        </div>
+      </Card>
+    );
+  }
+
+  if (!statistics) return null;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+      {/* 기본 통계 카드 */}
+      <StatisticsCards />
+
+      {/* 요일별 수업 분포 */}
+      <Card padding="lg">
+        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)' }}>
+          요일별 {terms.GROUP_LABEL} 분포
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 'var(--spacing-sm)' }}>
+          {DAYS_OF_WEEK.map(day => (
+            <div
+              key={day.value}
+              style={{
+                textAlign: 'center',
+                padding: 'var(--spacing-md)',
+                backgroundColor: statistics.byDayOfWeek[day.value] > 0 ? 'var(--color-primary-50)' : 'var(--color-gray-50)',
+                borderRadius: 'var(--border-radius-md)',
+              }}
+            >
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                {day.label}
+              </div>
+              <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
+                {statistics.byDayOfWeek[day.value]}
+              </div>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>개</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* 정원 충족률 분포 */}
+      <Card padding="lg">
+        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)' }}>
+          정원 충족률 분포
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--spacing-md)' }}>
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-md)', backgroundColor: 'var(--color-success-50)', borderRadius: 'var(--border-radius-md)' }}>
+            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
+              {statistics.capacityStats.full}
+            </div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>90% 이상</div>
+          </div>
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-md)', backgroundColor: 'var(--color-warning-50)', borderRadius: 'var(--border-radius-md)' }}>
+            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-warning)' }}>
+              {statistics.capacityStats.medium}
+            </div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>50~90%</div>
+          </div>
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-md)', backgroundColor: 'var(--color-gray-50)', borderRadius: 'var(--border-radius-md)' }}>
+            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-secondary)' }}>
+              {statistics.capacityStats.low}
+            </div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>50% 미만</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 'var(--spacing-md)', padding: 'var(--spacing-md)', backgroundColor: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: 'var(--color-text-secondary)' }}>전체 평균 충족률</span>
+            <span style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
+              {statistics.avgCapacityRatio.toFixed(1)}%
+            </span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--spacing-sm)' }}>
+            <span style={{ color: 'var(--color-text-secondary)' }}>총 {terms.PERSON_LABEL_PRIMARY} / 총 정원</span>
+            <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>
+              {statistics.totalStudents}명 / {statistics.totalCapacity}명
+            </span>
+          </div>
+        </div>
+      </Card>
+
+      {/* 상태별 분포 */}
+      <Card padding="lg">
+        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)' }}>
+          상태별 분포
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--spacing-md)' }}>
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-md)', backgroundColor: 'var(--color-success-50)', borderRadius: 'var(--border-radius-md)' }}>
+            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
+              {statistics.byStatus.active}
+            </div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>활성</div>
+          </div>
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-md)', backgroundColor: 'var(--color-gray-50)', borderRadius: 'var(--border-radius-md)' }}>
+            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-secondary)' }}>
+              {statistics.byStatus.inactive}
+            </div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>비활성</div>
+          </div>
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-md)', backgroundColor: 'var(--color-primary-50)', borderRadius: 'var(--border-radius-md)' }}>
+            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
+              {statistics.byStatus.archived}
+            </div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>보관됨</div>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * 일정 충돌 탭 컴포넌트
+ * 강사/강의실 중복 일정을 탐지하고 표시
+ */
+function ScheduleConflictsTab() {
+  const terms = useIndustryTerms();
+  const { data: allClasses, isLoading } = useClasses({});
+  const { data: teachers } = useTeachers();
+  void teachers; // TODO: 강사별 충돌 탐지 기능 구현 시 사용
+
+  // 충돌 탐지
+  const conflicts = useMemo(() => {
+    if (!allClasses || allClasses.length === 0) return [];
+
+    const detectedConflicts: Array<{
+      id: string;
+      type: 'room' | 'teacher' | 'time';
+      message: string;
+      classes: Class[];
+      severity: 'warning' | 'error';
+    }> = [];
+
+    // 각 요일별로 분석
+    DAYS_OF_WEEK.forEach(day => {
+      const dayClasses = allClasses.filter(c => c.day_of_week === day.value && c.status === 'active');
+
+      // 모든 수업 쌍 비교
+      for (let i = 0; i < dayClasses.length; i++) {
+        for (let j = i + 1; j < dayClasses.length; j++) {
+          const class1 = dayClasses[i];
+          const class2 = dayClasses[j];
+
+          // 시간 겹침 확인
+          const timeOverlap = class1.start_time < class2.end_time && class2.start_time < class1.end_time;
+
+          if (timeOverlap) {
+            // 강의실 충돌
+            if (class1.room && class2.room && class1.room === class2.room) {
+              detectedConflicts.push({
+                id: `room-${class1.id}-${class2.id}`,
+                type: 'room',
+                message: `${day.label} ${class1.start_time}~${class1.end_time}: "${class1.name}"과 "${class2.name}"이 같은 강의실(${class1.room})에서 중복됩니다.`,
+                classes: [class1, class2],
+                severity: 'error',
+              });
+            }
+
+            // 시간대 겹침 경고 (같은 시간에 여러 수업)
+            const conflictId = `time-${day.value}-${class1.id}-${class2.id}`;
+            if (!detectedConflicts.some(c => c.id === conflictId)) {
+              detectedConflicts.push({
+                id: conflictId,
+                type: 'time',
+                message: `${day.label} ${class1.start_time}~${class1.end_time}: "${class1.name}"과 "${class2.name}"의 시간이 겹칩니다.`,
+                classes: [class1, class2],
+                severity: 'warning',
+              });
+            }
+          }
+        }
+      }
+    });
+
+    return detectedConflicts;
+  }, [allClasses]);
+
+  if (isLoading) {
+    return (
+      <Card padding="lg">
+        <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+          로딩 중...
+        </div>
+      </Card>
+    );
+  }
+
+  const errorConflicts = conflicts.filter(c => c.severity === 'error');
+  const warningConflicts = conflicts.filter(c => c.severity === 'warning');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+      {/* 요약 카드 */}
+      <CardGridLayout
+        cards={[
+          <NotificationCardLayout
+            key="total"
+            icon={<AlertTriangle />}
+            title="전체 충돌"
+            value={conflicts.length}
+            unit="건"
+            layoutMode="stats"
+            iconBackgroundColor={conflicts.length > 0 ? 'var(--color-warning-50)' : 'var(--color-success-50)'}
+          />,
+          <NotificationCardLayout
+            key="error"
+            icon={<XCircle />}
+            title="심각한 충돌"
+            value={errorConflicts.length}
+            unit="건"
+            layoutMode="stats"
+            iconBackgroundColor={errorConflicts.length > 0 ? 'var(--color-error-50)' : 'var(--color-gray-100)'}
+          />,
+          <NotificationCardLayout
+            key="warning"
+            icon={<AlertTriangle />}
+            title="경고"
+            value={warningConflicts.length}
+            unit="건"
+            layoutMode="stats"
+            iconBackgroundColor={warningConflicts.length > 0 ? 'var(--color-warning-50)' : 'var(--color-gray-100)'}
+          />,
+          <NotificationCardLayout
+            key="classes"
+            icon={<BookOpen />}
+            title={`활성 ${terms.GROUP_LABEL}`}
+            value={allClasses?.filter(c => c.status === 'active').length || 0}
+            unit="개"
+            layoutMode="stats"
+            iconBackgroundColor="var(--color-primary-50)"
+          />,
+        ]}
+        desktopColumns={4}
+        tabletColumns={2}
+        mobileColumns={2}
+      />
+
+      {/* 충돌 목록 */}
+      {conflicts.length === 0 ? (
+        <Card padding="lg">
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
+            <CheckCircle style={{ width: '48px', height: '48px', color: 'var(--color-success)', marginBottom: 'var(--spacing-md)' }} />
+            <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-sm)' }}>
+              충돌 없음
+            </h3>
+            <p style={{ color: 'var(--color-text-secondary)' }}>
+              현재 활성화된 {terms.GROUP_LABEL} 일정에 충돌이 없습니다.
+            </p>
+          </div>
+        </Card>
+      ) : (
+        <>
+          {/* 심각한 충돌 (강의실 중복) */}
+          {errorConflicts.length > 0 && (
+            <Card padding="lg">
+              <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)', color: 'var(--color-error)' }}>
+                심각한 충돌 ({errorConflicts.length}건)
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+                {errorConflicts.map(conflict => (
+                  <div
+                    key={conflict.id}
+                    style={{
+                      padding: 'var(--spacing-md)',
+                      backgroundColor: 'var(--color-error-50)',
+                      borderLeft: 'var(--border-width-thick) solid var(--color-error)',
+                      borderRadius: 'var(--border-radius-md)',
+                    }}
+                  >
+                    <div style={{ fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
+                      {conflict.type === 'room' ? '강의실 충돌' : conflict.type === 'teacher' ? '강사 충돌' : '시간 충돌'}
+                    </div>
+                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                      {conflict.message}
+                    </div>
+                    <div style={{ display: 'flex', gap: 'var(--spacing-xs)', marginTop: 'var(--spacing-sm)' }}>
+                      {conflict.classes.map(c => (
+                        <span
+                          key={c.id}
+                          style={{
+                            padding: 'var(--spacing-2xs) var(--spacing-xs)',
+                            backgroundColor: c.color || 'var(--color-gray-200)',
+                            borderRadius: 'var(--border-radius-sm)',
+                            fontSize: 'var(--font-size-xs)',
+                          }}
+                        >
+                          {c.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* 경고 (시간 겹침) */}
+          {warningConflicts.length > 0 && (
+            <Card padding="lg">
+              <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)', color: 'var(--color-warning)' }}>
+                시간 중복 경고 ({warningConflicts.length}건)
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+                {warningConflicts.map(conflict => (
+                  <div
+                    key={conflict.id}
+                    style={{
+                      padding: 'var(--spacing-md)',
+                      backgroundColor: 'var(--color-warning-50)',
+                      borderLeft: 'var(--border-width-thick) solid var(--color-warning)',
+                      borderRadius: 'var(--border-radius-md)',
+                    }}
+                  >
+                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                      {conflict.message}
+                    </div>
+                    <div style={{ display: 'flex', gap: 'var(--spacing-xs)', marginTop: 'var(--spacing-sm)' }}>
+                      {conflict.classes.map(c => (
+                        <span
+                          key={c.id}
+                          style={{
+                            padding: 'var(--spacing-2xs) var(--spacing-xs)',
+                            backgroundColor: c.color || 'var(--color-gray-200)',
+                            borderRadius: 'var(--border-radius-sm)',
+                            fontSize: 'var(--font-size-xs)',
+                          }}
+                        >
+                          {c.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </>
+      )}
     </div>
   );
 }

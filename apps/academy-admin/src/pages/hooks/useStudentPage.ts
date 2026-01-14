@@ -3,7 +3,7 @@
  *
  * [아키텍처] Application Layer와 UI Composition 분리
  * - 이 Hook은 비즈니스 로직, 상태 관리, 데이터 페칭을 담당
- * - UI Composition은 StudentsPage.tsx에서 담당
+ * - UI Composition은 StudentsHomePage.tsx와 StudentsListPage.tsx에서 담당
  *
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴

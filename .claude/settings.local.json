@@ -161,7 +161,8 @@
       "Bash(supabase db remote execute:*)",
       "Bash(supabase db remote query:*)",
       "Bash(node:*)",
-      "Read(//c/**)"
+      "Read(//c/**)",
+      "Bash(if exist \"node_modules\\\\.vite\" rd /s /q \"node_modules\\\\.vite\")"
     ]
   }
 }

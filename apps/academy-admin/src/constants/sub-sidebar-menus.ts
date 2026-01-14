@@ -28,23 +28,31 @@ import {
   Search,
   Clock,
   Bot,
-  UserPlus,
   List,
-  Tags,
-  TrendingUp,
   Send,
   FileText,
   History,
   Calendar,
   PieChart,
-  Zap,
   Bell,
   Link,
-  Wallet,
   Receipt,
   CircleDollarSign,
   Cog,
-  Play,
+  MapPin,
+  TrendingUp,
+  FileBarChart,
+  AlertTriangle,
+  Lightbulb,
+  Briefcase,
+  CalendarDays,
+  AlertCircle,
+  Award,
+  BookOpen,
+  CreditCard as PaymentIcon,
+  CheckCircle,
+  MessageSquare,
+  Activity,
 } from 'lucide-react';
 
 /** 아이콘 크기 (CSS 변수 참조) */
@@ -148,9 +156,12 @@ export function getSubMenuFromUrl<T extends string>(
   defaultId: T
 ): T {
   const tabParam = searchParams.get(SUB_MENU_QUERY_PARAM);
+  console.log('[getSubMenuFromUrl] tabParam:', tabParam, 'validIds:', validIds, 'defaultId:', defaultId);
   if (tabParam && validIds.includes(tabParam as T)) {
+    console.log('[getSubMenuFromUrl] returning tabParam:', tabParam);
     return tabParam as T;
   }
+  console.log('[getSubMenuFromUrl] returning defaultId:', defaultId);
   return defaultId;
 }
 
@@ -164,13 +175,16 @@ export function setSubMenuToUrl<T extends string>(
   defaultId: T
 ): string {
   const searchParams = new URLSearchParams(window.location.search);
+  console.log('[setSubMenuToUrl] id:', id, 'defaultId:', defaultId, 'current search:', window.location.search);
   if (id === defaultId) {
     searchParams.delete(SUB_MENU_QUERY_PARAM);
   } else {
     searchParams.set(SUB_MENU_QUERY_PARAM, id);
   }
   const queryString = searchParams.toString();
-  return queryString ? `?${queryString}` : window.location.pathname;
+  const result = queryString ? `?${queryString}` : window.location.pathname;
+  console.log('[setSubMenuToUrl] result:', result);
+  return result;
 }
 
 // ============================================================================
@@ -184,12 +198,28 @@ export type StudentsSubMenuId =
   | 'tags'
   | 'statistics';
 
-/** 학생관리 페이지 서브 메뉴 설정 */
+/** 학생관리 페이지 서브 메뉴 설정 (아이콘은 페이지에서 동적으로 주입) */
 export const STUDENTS_SUB_MENU_ITEMS: SubSidebarMenuItem<StudentsSubMenuId>[] = [
-  { id: 'list', label: '학생 목록', icon: createElement(List, { size: ICON_SIZE }), ariaLabel: '학생 목록 화면으로 이동' },
-  { id: 'add', label: '학생 등록', icon: createElement(UserPlus, { size: ICON_SIZE }), ariaLabel: '학생 등록 화면으로 이동' },
-  { id: 'tags', label: '태그 관리', icon: createElement(Tags, { size: ICON_SIZE }), ariaLabel: '태그 관리 화면으로 이동' },
-  { id: 'statistics', label: '학생 통계', icon: createElement(TrendingUp, { size: ICON_SIZE }), ariaLabel: '학생 통계 화면으로 이동' },
+  {
+    id: 'list',
+    label: '학생 목록',
+    ariaLabel: '학생 목록 화면으로 이동',
+  },
+  {
+    id: 'add',
+    label: '학생 등록',
+    ariaLabel: '학생 등록 화면으로 이동',
+  },
+  {
+    id: 'tags',
+    label: '태그 관리',
+    ariaLabel: '태그 관리 화면으로 이동',
+  },
+  {
+    id: 'statistics',
+    label: '학생 통계',
+    ariaLabel: '학생 통계 화면으로 이동',
+  },
 ];
 
 /** 기본 학생관리 서브 메뉴 ID */
@@ -226,16 +256,18 @@ export const DEFAULT_NOTIFICATIONS_SUB_MENU: NotificationsSubMenuId = 'history';
 /** 통계분석 페이지 서브 메뉴 ID */
 export type AnalyticsSubMenuId =
   | 'overview'
+  | 'regional'
   | 'attendance'
-  | 'students'
-  | 'revenue';
+  | 'ai-insights'
+  | 'reports';
 
 /** 통계분석 페이지 서브 메뉴 설정 */
 export const ANALYTICS_SUB_MENU_ITEMS: SubSidebarMenuItem<AnalyticsSubMenuId>[] = [
   { id: 'overview', label: '전체 현황', icon: createElement(PieChart, { size: ICON_SIZE }), ariaLabel: '전체 현황 화면으로 이동' },
-  { id: 'attendance', label: '출결 분석', icon: createElement(CircleCheckBig, { size: ICON_SIZE }), ariaLabel: '출결 분석 화면으로 이동' },
-  { id: 'students', label: '학생 분석', icon: createElement(Users, { size: ICON_SIZE }), ariaLabel: '학생 분석 화면으로 이동' },
-  { id: 'revenue', label: '매출 분석', icon: createElement(TrendingUp, { size: ICON_SIZE }), ariaLabel: '매출 분석 화면으로 이동' },
+  { id: 'regional', label: '지역별 분석', icon: createElement(MapPin, { size: ICON_SIZE }), ariaLabel: '지역별 분석 화면으로 이동' },
+  { id: 'attendance', label: '출석 패턴', icon: createElement(TrendingUp, { size: ICON_SIZE }), ariaLabel: '출석 패턴 화면으로 이동' },
+  { id: 'ai-insights', label: 'AI 인사이트', icon: createElement(Lightbulb, { size: ICON_SIZE }), ariaLabel: 'AI 인사이트 화면으로 이동' },
+  { id: 'reports', label: '월간 리포트', icon: createElement(FileBarChart, { size: ICON_SIZE }), ariaLabel: '월간 리포트 화면으로 이동' },
 ];
 
 /** 기본 통계분석 서브 메뉴 ID */
@@ -248,16 +280,18 @@ export const DEFAULT_ANALYTICS_SUB_MENU: AnalyticsSubMenuId = 'overview';
 /** 인공지능 페이지 서브 메뉴 ID */
 export type AISubMenuId =
   | 'insights'
-  | 'predictions'
-  | 'recommendations'
-  | 'chat';
+  | 'consultation-summary'
+  | 'anomaly-detection'
+  | 'performance'
+  | 'briefing';
 
 /** 인공지능 페이지 서브 메뉴 설정 */
 export const AI_SUB_MENU_ITEMS: SubSidebarMenuItem<AISubMenuId>[] = [
   { id: 'insights', label: 'AI 인사이트', icon: createElement(Brain, { size: ICON_SIZE }), ariaLabel: 'AI 인사이트 화면으로 이동' },
-  { id: 'predictions', label: '예측 분석', icon: createElement(TrendingUp, { size: ICON_SIZE }), ariaLabel: '예측 분석 화면으로 이동' },
-  { id: 'recommendations', label: '추천', icon: createElement(Zap, { size: ICON_SIZE }), ariaLabel: '추천 화면으로 이동' },
-  { id: 'chat', label: 'AI 채팅', icon: createElement(MessageCircle, { size: ICON_SIZE }), ariaLabel: 'AI 채팅 화면으로 이동' },
+  { id: 'consultation-summary', label: '상담 요약', icon: createElement(MessageSquare, { size: ICON_SIZE }), ariaLabel: '상담 요약 화면으로 이동' },
+  { id: 'anomaly-detection', label: '이상 탐지', icon: createElement(AlertTriangle, { size: ICON_SIZE }), ariaLabel: '이상 탐지 화면으로 이동' },
+  { id: 'performance', label: '성과 분석', icon: createElement(Award, { size: ICON_SIZE }), ariaLabel: '성과 분석 화면으로 이동' },
+  { id: 'briefing', label: '브리핑', icon: createElement(Briefcase, { size: ICON_SIZE }), ariaLabel: '브리핑 화면으로 이동' },
 ];
 
 /** 기본 인공지능 서브 메뉴 ID */
@@ -270,16 +304,16 @@ export const DEFAULT_AI_SUB_MENU: AISubMenuId = 'insights';
 /** 수업관리 페이지 서브 메뉴 ID */
 export type ClassesSubMenuId =
   | 'list'
-  | 'schedule'
-  | 'curriculum'
-  | 'settings';
+  | 'calendar'
+  | 'statistics'
+  | 'schedule-conflicts';
 
 /** 수업관리 페이지 서브 메뉴 설정 */
 export const CLASSES_SUB_MENU_ITEMS: SubSidebarMenuItem<ClassesSubMenuId>[] = [
   { id: 'list', label: '수업 목록', icon: createElement(List, { size: ICON_SIZE }), ariaLabel: '수업 목록 화면으로 이동' },
-  { id: 'schedule', label: '시간표', icon: createElement(Calendar, { size: ICON_SIZE }), ariaLabel: '시간표 화면으로 이동' },
-  { id: 'curriculum', label: '커리큘럼', icon: createElement(GraduationCap, { size: ICON_SIZE }), ariaLabel: '커리큘럼 화면으로 이동' },
-  { id: 'settings', label: '수업 설정', icon: createElement(Settings, { size: ICON_SIZE }), ariaLabel: '수업 설정 화면으로 이동' },
+  { id: 'calendar', label: '수업 편성표', icon: createElement(CalendarDays, { size: ICON_SIZE }), ariaLabel: '수업 편성표 화면으로 이동' },
+  { id: 'statistics', label: '수업 통계', icon: createElement(BarChart3, { size: ICON_SIZE }), ariaLabel: '수업 통계 화면으로 이동' },
+  { id: 'schedule-conflicts', label: '일정 충돌', icon: createElement(AlertCircle, { size: ICON_SIZE }), ariaLabel: '일정 충돌 화면으로 이동' },
 ];
 
 /** 기본 수업관리 서브 메뉴 ID */
@@ -292,16 +326,16 @@ export const DEFAULT_CLASSES_SUB_MENU: ClassesSubMenuId = 'list';
 /** 강사관리 페이지 서브 메뉴 ID */
 export type TeachersSubMenuId =
   | 'list'
-  | 'add'
-  | 'schedule'
+  | 'statistics'
+  | 'assignments'
   | 'performance';
 
 /** 강사관리 페이지 서브 메뉴 설정 */
 export const TEACHERS_SUB_MENU_ITEMS: SubSidebarMenuItem<TeachersSubMenuId>[] = [
   { id: 'list', label: '강사 목록', icon: createElement(List, { size: ICON_SIZE }), ariaLabel: '강사 목록 화면으로 이동' },
-  { id: 'add', label: '강사 등록', icon: createElement(UserPlus, { size: ICON_SIZE }), ariaLabel: '강사 등록 화면으로 이동' },
-  { id: 'schedule', label: '강사 일정', icon: createElement(Calendar, { size: ICON_SIZE }), ariaLabel: '강사 일정 화면으로 이동' },
-  { id: 'performance', label: '실적 관리', icon: createElement(TrendingUp, { size: ICON_SIZE }), ariaLabel: '실적 관리 화면으로 이동' },
+  { id: 'statistics', label: '강사 통계', icon: createElement(BarChart3, { size: ICON_SIZE }), ariaLabel: '강사 통계 화면으로 이동' },
+  { id: 'assignments', label: '담당 과목', icon: createElement(BookOpen, { size: ICON_SIZE }), ariaLabel: '담당 과목 화면으로 이동' },
+  { id: 'performance', label: '강사 성과', icon: createElement(Award, { size: ICON_SIZE }), ariaLabel: '강사 성과 화면으로 이동' },
 ];
 
 /** 기본 강사관리 서브 메뉴 ID */
@@ -313,21 +347,21 @@ export const DEFAULT_TEACHERS_SUB_MENU: TeachersSubMenuId = 'list';
 
 /** 수납관리 페이지 서브 메뉴 ID */
 export type BillingSubMenuId =
-  | 'overview'
   | 'invoices'
   | 'payments'
+  | 'products'
   | 'settings';
 
 /** 수납관리 페이지 서브 메뉴 설정 */
 export const BILLING_SUB_MENU_ITEMS: SubSidebarMenuItem<BillingSubMenuId>[] = [
-  { id: 'overview', label: '수납 현황', icon: createElement(Wallet, { size: ICON_SIZE }), ariaLabel: '수납 현황 화면으로 이동' },
   { id: 'invoices', label: '청구서 관리', icon: createElement(Receipt, { size: ICON_SIZE }), ariaLabel: '청구서 관리 화면으로 이동' },
   { id: 'payments', label: '결제 내역', icon: createElement(CircleDollarSign, { size: ICON_SIZE }), ariaLabel: '결제 내역 화면으로 이동' },
-  { id: 'settings', label: '수납 설정', icon: createElement(Settings, { size: ICON_SIZE }), ariaLabel: '수납 설정 화면으로 이동' },
+  { id: 'products', label: '상품 관리', icon: createElement(List, { size: ICON_SIZE }), ariaLabel: '상품 관리 화면으로 이동' },
+  { id: 'settings', label: '수납 설정', icon: createElement(Cog, { size: ICON_SIZE }), ariaLabel: '수납 설정 화면으로 이동' },
 ];
 
 /** 기본 수납관리 서브 메뉴 ID */
-export const DEFAULT_BILLING_SUB_MENU: BillingSubMenuId = 'overview';
+export const DEFAULT_BILLING_SUB_MENU: BillingSubMenuId = 'invoices';
 
 // ============================================================================
 // 자동화 설정 페이지 서브 메뉴 설정
@@ -336,16 +370,18 @@ export const DEFAULT_BILLING_SUB_MENU: BillingSubMenuId = 'overview';
 /** 자동화 설정 페이지 서브 메뉴 ID */
 export type AutomationSubMenuId =
   | 'rules'
-  | 'triggers'
-  | 'actions'
-  | 'logs';
+  | 'payment'
+  | 'attendance'
+  | 'notification'
+  | 'statistics';
 
 /** 자동화 설정 페이지 서브 메뉴 설정 */
 export const AUTOMATION_SUB_MENU_ITEMS: SubSidebarMenuItem<AutomationSubMenuId>[] = [
   { id: 'rules', label: '자동화 규칙', icon: createElement(Cog, { size: ICON_SIZE }), ariaLabel: '자동화 규칙 화면으로 이동' },
-  { id: 'triggers', label: '트리거 설정', icon: createElement(Play, { size: ICON_SIZE }), ariaLabel: '트리거 설정 화면으로 이동' },
-  { id: 'actions', label: '액션 설정', icon: createElement(Zap, { size: ICON_SIZE }), ariaLabel: '액션 설정 화면으로 이동' },
-  { id: 'logs', label: '실행 로그', icon: createElement(History, { size: ICON_SIZE }), ariaLabel: '실행 로그 화면으로 이동' },
+  { id: 'payment', label: '결제 자동화', icon: createElement(PaymentIcon, { size: ICON_SIZE }), ariaLabel: '결제 자동화 화면으로 이동' },
+  { id: 'attendance', label: '출결 자동화', icon: createElement(CheckCircle, { size: ICON_SIZE }), ariaLabel: '출결 자동화 화면으로 이동' },
+  { id: 'notification', label: '알림 자동화', icon: createElement(Bell, { size: ICON_SIZE }), ariaLabel: '알림 자동화 화면으로 이동' },
+  { id: 'statistics', label: '자동화 통계', icon: createElement(Activity, { size: ICON_SIZE }), ariaLabel: '자동화 통계 화면으로 이동' },
 ];
 
 /** 기본 자동화 설정 서브 메뉴 ID */

@@ -17,6 +17,15 @@ export interface TenantConfig {
     notification_channel?: 'sms' | 'kakao_at';  // 기본 알림 채널 (업종 중립, SSOT-3)
     qr_enabled?: boolean;  // QR 인증 활성화 (업종 중립: 출결 → 인증)
   };
+  notification?: {
+    auto_notification?: {
+      check_in?: boolean;
+      check_out?: boolean;
+      absent?: boolean;
+      overdue?: boolean;
+    };
+    default_channel?: 'sms' | 'kakao_at';
+  };
   billing?: {
     cycle?: 'monthly' | 'quarterly' | 'yearly';
   };
@@ -35,6 +44,15 @@ export interface UpdateConfigInput {
     auto_notification?: boolean;
     notification_channel?: 'sms' | 'kakao_at';  // SSOT-3
     qr_enabled?: boolean;
+  };
+  notification?: {
+    auto_notification?: {
+      check_in?: boolean;
+      check_out?: boolean;
+      absent?: boolean;
+      overdue?: boolean;
+    };
+    default_channel?: 'sms' | 'kakao_at';
   };
   billing?: {
     cycle?: 'monthly' | 'quarterly' | 'yearly';

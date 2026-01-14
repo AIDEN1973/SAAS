@@ -16,6 +16,7 @@ export interface TooltipProps {
   delay?: number;
   className?: string;
   useThemeColor?: boolean; // 인더스트리 테마 색상 사용 여부
+  offset?: number; // 툴팁과 트리거 사이 간격 (px) - 지정하지 않으면 CSS 변수 사용
 }
 
 /**
@@ -30,6 +31,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   delay = 200, // 기본 지연 시간 (ms) - 접근성을 위한 최소값
   className,
   useThemeColor = false, // 기본값: false (기존 스타일 유지)
+  offset, // 커스텀 offset (지정하지 않으면 CSS 변수 사용)
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
@@ -59,9 +61,13 @@ export const Tooltip: React.FC<TooltipProps> = ({
     return defaultValue;
   }, []);
 
-  // offset 계산용 - CSS 변수에서 읽기 (하드코딩 제거)
-  // 툴팁과 버튼 사이 간격을 더 넓게 조정 (8px)
-  const offsetPx = useMemo(() => getCssVarPx('--spacing-tooltip-offset', 8), [getCssVarPx]);
+  // offset 계산용 - prop으로 전달된 값 우선 사용, 없으면 CSS 변수에서 읽기
+  const offsetPx = useMemo(() => {
+    if (offset !== undefined) {
+      return offset; // prop으로 전달된 값 사용
+    }
+    return getCssVarPx('--spacing-tooltip-offset', 8); // CSS 변수에서 읽기
+  }, [offset, getCssVarPx]);
 
   // 화살표 크기 - CSS 변수에서 읽기 (하드코딩 제거)
   const arrowInnerSize = useMemo(() => getCssVarPx('--size-tooltip-arrow-inner', 4), [getCssVarPx]);

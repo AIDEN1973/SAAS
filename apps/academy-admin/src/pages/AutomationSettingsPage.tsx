@@ -14,8 +14,8 @@
  * - 설정이 없으면 실행하지 않음 (Fail Closed)
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { ErrorBoundary, useModal, Container, Card, PageHeader, Switch, NotificationCardLayout, Badge, Input, Select, Button, useResponsiveMode, isMobile, SubSidebar } from '@ui-core/react';
 import { getApiContext, apiClient } from '@api-sdk/core';
@@ -629,6 +629,7 @@ export function AutomationSettingsPage() {
   const context = getApiContext();
   const tenantId = context.tenantId;
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const mode = useResponsiveMode();
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
@@ -638,15 +639,12 @@ export function AutomationSettingsPage() {
 
   // 서브 메뉴 상태
   const validIds = AUTOMATION_SUB_MENU_ITEMS.map(item => item.id) as readonly AutomationSubMenuId[];
-  const [selectedSubMenu, setSelectedSubMenu] = useState<AutomationSubMenuId>(() =>
-    getSubMenuFromUrl(searchParams, validIds, DEFAULT_AUTOMATION_SUB_MENU)
-  );
+  const selectedSubMenu = getSubMenuFromUrl(searchParams, validIds, DEFAULT_AUTOMATION_SUB_MENU);
 
-  const handleSubMenuChange = (id: AutomationSubMenuId) => {
-    setSelectedSubMenu(id);
+  const handleSubMenuChange = useCallback((id: AutomationSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_AUTOMATION_SUB_MENU);
-    window.history.replaceState(null, '', newUrl);
-  };
+    navigate(newUrl, { replace: true });
+  }, [navigate]);
 
   const [editingEventType, setEditingEventType] = useState<AutomationEventType | null>(null);
   const [showStats, setShowStats] = useState<boolean>(false);
@@ -924,13 +922,16 @@ export function AutomationSettingsPage() {
         )}
 
         {/* 메인 콘텐츠 */}
-        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           <PageHeader title="자동화 설정" />
           <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-xs)', marginBottom: 'var(--spacing-lg)' }}>
             42개 자동화 기능의 활성화 여부를 설정합니다. 모든 자동화는 Policy 기반으로 동작하며, 설정이 없으면 실행되지 않습니다 (Fail Closed).
           </p>
 
-          {/* 상단 컨트롤 영역 */}
+          {/* 자동화 규칙 탭 (기본) */}
+          {selectedSubMenu === 'rules' && (
+            <>
+              {/* 상단 컨트롤 영역 */}
         <div style={{ marginBottom: 'var(--spacing-lg)' }}>
           {/* 검색 및 필터 */}
           <div style={{ display: 'flex', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)', flexWrap: 'wrap' }}>
@@ -1205,6 +1206,164 @@ export function AutomationSettingsPage() {
             </div>
           );
         })}
+            </>
+          )}
+
+          {/* 결제 자동화 탭 */}
+          {selectedSubMenu === 'payment' && (
+            <>
+              <Card padding="lg">
+                <h2 style={{ marginBottom: 'var(--spacing-md)' }}>결제 자동화</h2>
+                <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
+                  결제 관련 자동화만 표시됩니다.
+                </p>
+                <CardGridLayout
+                  cards={AUTOMATION_EVENT_CATALOG
+                    .filter(eventType => AUTOMATION_EVENT_DESCRIPTIONS[eventType]?.policyKey === 'payment')
+                    .map((eventType) => (
+                      <AutomationCardWithState
+                        key={eventType}
+                        eventType={eventType}
+                        isEditing={editingEventType === eventType}
+                        onEdit={() => setEditingEventType(eventType)}
+                        onCancel={() => setEditingEventType(null)}
+                        stats={executionStats?.[eventType]}
+                        showStats={showStats}
+                        terms={terms}
+                      />
+                    ))}
+                  desktopColumns={3}
+                  tabletColumns={2}
+                  mobileColumns={1}
+                />
+              </Card>
+            </>
+          )}
+
+          {/* 출결 자동화 탭 */}
+          {selectedSubMenu === 'attendance' && (
+            <>
+              <Card padding="lg">
+                <h2 style={{ marginBottom: 'var(--spacing-md)' }}>출결 자동화</h2>
+                <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
+                  출결 관련 자동화만 표시됩니다.
+                </p>
+                <CardGridLayout
+                  cards={AUTOMATION_EVENT_CATALOG
+                    .filter(eventType => AUTOMATION_EVENT_DESCRIPTIONS[eventType]?.policyKey === 'attendance')
+                    .map((eventType) => (
+                      <AutomationCardWithState
+                        key={eventType}
+                        eventType={eventType}
+                        isEditing={editingEventType === eventType}
+                        onEdit={() => setEditingEventType(eventType)}
+                        onCancel={() => setEditingEventType(null)}
+                        stats={executionStats?.[eventType]}
+                        showStats={showStats}
+                        terms={terms}
+                      />
+                    ))}
+                  desktopColumns={3}
+                  tabletColumns={2}
+                  mobileColumns={1}
+                />
+              </Card>
+            </>
+          )}
+
+          {/* 알림 자동화 탭 */}
+          {selectedSubMenu === 'notification' && (
+            <>
+              <Card padding="lg">
+                <h2 style={{ marginBottom: 'var(--spacing-md)' }}>알림 자동화</h2>
+                <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
+                  알림 관련 자동화만 표시됩니다.
+                </p>
+                <CardGridLayout
+                  cards={AUTOMATION_EVENT_CATALOG
+                    .filter(eventType =>
+                      AUTOMATION_EVENT_DESCRIPTIONS[eventType]?.policyKey === 'notification' ||
+                      AUTOMATION_EVENT_DESCRIPTIONS[eventType]?.policyKey === 'report'
+                    )
+                    .map((eventType) => (
+                      <AutomationCardWithState
+                        key={eventType}
+                        eventType={eventType}
+                        isEditing={editingEventType === eventType}
+                        onEdit={() => setEditingEventType(eventType)}
+                        onCancel={() => setEditingEventType(null)}
+                        stats={executionStats?.[eventType]}
+                        showStats={showStats}
+                        terms={terms}
+                      />
+                    ))}
+                  desktopColumns={3}
+                  tabletColumns={2}
+                  mobileColumns={1}
+                />
+              </Card>
+            </>
+          )}
+
+          {/* 자동화 통계 탭 */}
+          {selectedSubMenu === 'statistics' && (
+            <Card padding="lg">
+              <h2 style={{ marginBottom: 'var(--spacing-md)' }}>자동화 통계</h2>
+              {isLoadingStats ? (
+                <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
+                  로딩 중...
+                </div>
+              ) : executionStats && Object.keys(executionStats).length > 0 ? (
+                <div>
+                  <div style={{
+                    marginBottom: 'var(--spacing-lg)',
+                    padding: 'var(--spacing-md)',
+                    backgroundColor: 'var(--color-background-secondary)',
+                    borderRadius: 'var(--radius-md)',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                    gap: 'var(--spacing-md)',
+                  }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text)' }}>
+                        {Object.values(executionStats).reduce((sum, stat) => sum + stat.total, 0)}
+                      </div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>총 실행 횟수</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
+                        {Object.values(executionStats).reduce((sum, stat) => sum + stat.success, 0)}
+                      </div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>성공</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-error)' }}>
+                        {Object.values(executionStats).reduce((sum, stat) => sum + stat.failed, 0)}
+                      </div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>실패</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text)' }}>
+                        {(() => {
+                          const total = Object.values(executionStats).reduce((sum, stat) => sum + stat.total, 0);
+                          const success = Object.values(executionStats).reduce((sum, stat) => sum + stat.success, 0);
+                          return total > 0 ? `${Math.round((success / total) * 100)}%` : '0%';
+                        })()}
+                      </div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>성공률</div>
+                    </div>
+                  </div>
+                  <p style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-sm)' }}>
+                    최근 30일 기준
+                  </p>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+                  자동화 실행 데이터가 없습니다.
+                </div>
+              )}
+            </Card>
+          )}
         </Container>
       </div>
     </ErrorBoundary>

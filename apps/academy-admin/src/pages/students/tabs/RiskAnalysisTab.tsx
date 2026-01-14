@@ -9,14 +9,23 @@
 import { useToast, useIconSize, useIconStrokeWidth, Card, Badge, IconButtonGroup, Button, EmptyState } from '@ui-core/react';
 import { AlertTriangle, AlertCircle, CheckCircle2, Lightbulb, RefreshCcw } from 'lucide-react';
 import { LayerSectionHeader } from '../components/LayerSectionHeader';
+import { AIAnalysisLoadingUI } from '../components/AIAnalysisLoadingUI';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { fetchAIInsights } from '@hooks/use-ai-insights';
 import { toKST } from '@lib/date-utils';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
+import { useState, useEffect } from 'react';
 
 // 레이어 섹션 본문 카드 스타일
 const layerSectionCardStyle: React.CSSProperties = {};
+
+// 분석 단계 정의
+const ANALYSIS_STEPS = [
+  { step: 1, label: '데이터 수집 중', duration: 800 },
+  { step: 2, label: 'AI 분석 중', duration: 3000 },
+  { step: 3, label: '결과 저장 중', duration: 500 },
+] as const;
 
 // 이탈위험 분석 탭 컴포넌트
 export interface RiskAnalysisTabProps {
@@ -44,6 +53,9 @@ export function RiskAnalysisTab({
   // 타입 안전: useIconSize('--size-icon-md')는 유효한 시그니처
   const buttonIconSize = useIconSize('--size-icon-md');
 
+  // 분석 진행 단계 추적 (애니메이션용)
+  const [currentStep, setCurrentStep] = useState<number>(0);
+
   // 빈 상태 아이콘 크기 계산 (CSS 변수 사용, 기본 크기의 4배)
   // const baseIconSize = useIconSize();
   // const emptyStateIconSize = useMemo(() => baseIconSize * 4, [baseIconSize]);
@@ -67,10 +79,10 @@ export function RiskAnalysisTab({
 
       // [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
       // [ESLint 규칙] ai_insights 직접 조회 금지: fetchAIInsights 사용
-      // [수정] 'risk_analysis'는 유효한 insight_type이 아니므로 제거하고 performance_analysis 사용
+      // [수정] 출결 이상 감지 타입 사용 (attendance_anomaly)
       const insights = await fetchAIInsights(tenantId, {
           student_id: studentId,
-        insight_type: 'performance_analysis',
+        insight_type: 'attendance_anomaly',
           status: 'active',
       });
 
@@ -134,7 +146,7 @@ export function RiskAnalysisTab({
       return response.data;
     },
     enabled: false, // [변경] 자동 실행 비활성화, 수동으로만 실행
-    staleTime: Infinity, // 캐시된 데이터 유지
+    staleTime: 5 * 60 * 1000, // [성능 최적화] 5분 캐싱 (기존: Infinity)
     refetchOnWindowFocus: false,
   });
 
@@ -151,6 +163,35 @@ export function RiskAnalysisTab({
   } | null | undefined;
   const isLoading = isAnalyzing || isLoadingSaved;
 
+  // 분석 진행 시뮬레이션: 단계별 타이밍에 맞춰 currentStep 업데이트
+  useEffect(() => {
+    if (!isAnalyzing) {
+      setCurrentStep(0);
+      return;
+    }
+
+    // 분석 시작 시 첫 단계로 이동
+    setCurrentStep(1);
+
+    // 각 단계별로 타이머 설정
+    const timers: NodeJS.Timeout[] = [];
+    let accumulatedTime = 0;
+
+    ANALYSIS_STEPS.forEach((step, index) => {
+      if (index === 0) return; // 첫 단계는 즉시 시작
+
+      accumulatedTime += ANALYSIS_STEPS[index - 1].duration;
+      const timer = setTimeout(() => {
+        setCurrentStep(step.step);
+      }, accumulatedTime);
+      timers.push(timer);
+    });
+
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
+  }, [isAnalyzing]);
+
   if (isLoading) {
     return (
       <div>
@@ -163,9 +204,11 @@ export function RiskAnalysisTab({
           }
         />
         <Card padding="md" variant="default" style={layerSectionCardStyle}>
-          <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
-            분석 중...
-          </div>
+          <AIAnalysisLoadingUI
+            steps={ANALYSIS_STEPS}
+            currentStep={currentStep}
+            message="분석이 완료될 때까지 잠시만 기다려주세요."
+          />
         </Card>
       </div>
     );
@@ -208,7 +251,7 @@ export function RiskAnalysisTab({
                 >
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
                     <RefreshCcw size={buttonIconSize} strokeWidth={titleIconStrokeWidth} />
-                    <span>{isLoading ? '분석 중...' : '분석시작'}</span>
+                    <span>{isLoading ? 'AI 분석 중...' : '분석 시작 (약 3-5초)'}</span>
                   </span>
                 </Button>
               ) : undefined
@@ -353,7 +396,7 @@ export function RiskAnalysisTab({
                 items={[
                   {
                     icon: RefreshCcw,
-                    tooltip: '재분석',
+                    tooltip: '재분석 (약 3-5초 소요)',
                     variant: 'outline',
                     onClick: () => {
                       void (async () => {

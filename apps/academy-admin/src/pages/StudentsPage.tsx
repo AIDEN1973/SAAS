@@ -17,8 +17,8 @@ declare global {
 }
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ErrorBoundary, useIconSize, useIconStrokeWidth, useResponsiveMode, useToast, Input, Container, Card, Button, Drawer, PageHeader, RightLayerMenuLayout, isMobile, isTablet, EmptyState } from '@ui-core/react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ErrorBoundary, useIconSize, useIconStrokeWidth, useResponsiveMode, useToast, Input, Container, Card, Button, Drawer, PageHeader, RightLayerMenuLayout, isMobile, isTablet, EmptyState, SubSidebar } from '@ui-core/react';
 import { DataTableActionButtons } from '../components/DataTableActionButtons';
 import { ChevronDown, ChevronUp, Users } from 'lucide-react';
 import { SchemaTable, SchemaForm, registerWidget } from '@schema-engine';
@@ -30,6 +30,8 @@ import { isWidgetRegistered, setWidgetRegistered } from '../utils/widget-registr
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
 import { createSafeNavigate } from '../utils';
+import { STUDENTS_SUB_MENU_ITEMS, DEFAULT_STUDENTS_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import type { StudentsSubMenuId } from '../constants';
 import { StudentInfoTab } from './students/tabs/StudentInfoTab';
 import { GuardiansTab } from './students/tabs/GuardiansTab';
 import { ConsultationsTab } from './students/tabs/ConsultationsTab';
@@ -120,10 +122,20 @@ if (typeof window !== 'undefined') {
 export function StudentsPage() {
   // [P1-7 확인] navigate는 actionContextMemo에서 사용됨 (195줄)
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const iconSize = useIconSize();
   const iconStrokeWidth = useIconStrokeWidth();
   const { toast } = useToast();
   const terms = useIndustryTerms();
+
+  // 서브 메뉴 상태 (URL에서 직접 읽음)
+  const validIds = STUDENTS_SUB_MENU_ITEMS.map(item => item.id) as readonly StudentsSubMenuId[];
+  const selectedSubMenu = getSubMenuFromUrl(searchParams, validIds, DEFAULT_STUDENTS_SUB_MENU);
+
+  const handleSubMenuChange = useCallback((id: StudentsSubMenuId) => {
+    const newUrl = setSubMenuToUrl(id, DEFAULT_STUDENTS_SUB_MENU);
+    navigate(newUrl, { replace: true });
+  }, [navigate]);
 
   // [아키텍처] Application Layer와 UI Composition 분리
   // - useStudentPage Hook이 모든 비즈니스 로직, 상태 관리, 데이터 페칭을 담당
@@ -242,6 +254,15 @@ export function StudentsPage() {
 
   return (
     <ErrorBoundary>
+      <div style={{ display: 'flex', height: '100vh' }}>
+        <SubSidebar
+          title={`${terms.PERSON_LABEL_PRIMARY}관리`}
+          items={STUDENTS_SUB_MENU_ITEMS}
+          selectedId={selectedSubMenu}
+          onSelect={handleSubMenuChange}
+          testId="students-sub-sidebar"
+        />
+        <div style={{ flex: 1, overflow: 'auto' }}>
       <RightLayerMenuLayout
         layerMenu={{
           isOpen: !!selectedStudentId,
@@ -737,6 +758,8 @@ export function StudentsPage() {
         )}
       </Container>
       </RightLayerMenuLayout>
+        </div>
+      </div>
     </ErrorBoundary>
   );
 }

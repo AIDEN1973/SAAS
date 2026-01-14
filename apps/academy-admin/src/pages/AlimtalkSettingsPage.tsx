@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ErrorBoundary,
   useModal,
@@ -841,21 +841,19 @@ const PointsTab = memo(function PointsTab() {
 
 export function AlimtalkSettingsPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const mode = useResponsiveMode();
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
 
   // 서브 메뉴 상태
   const validIds = ALIMTALK_SUB_MENU_ITEMS.map(item => item.id) as readonly AlimtalkSubMenuId[];
-  const [selectedSubMenu, setSelectedSubMenu] = useState<AlimtalkSubMenuId>(() =>
-    getSubMenuFromUrl(searchParams, validIds, DEFAULT_ALIMTALK_SUB_MENU)
-  );
+  const selectedSubMenu = getSubMenuFromUrl(searchParams, validIds, DEFAULT_ALIMTALK_SUB_MENU);
 
-  const handleSubMenuChange = (id: AlimtalkSubMenuId) => {
-    setSelectedSubMenu(id);
+  const handleSubMenuChange = useCallback((id: AlimtalkSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_ALIMTALK_SUB_MENU);
-    window.history.replaceState(null, '', newUrl);
-  };
+    navigate(newUrl, { replace: true });
+  }, [navigate]);
 
   // 조건부 렌더링: 한 번에 1개 탭만 마운트
   const renderTabContent = () => {
@@ -882,7 +880,7 @@ export function AlimtalkSettingsPage() {
         )}
 
         {/* 메인 콘텐츠 */}
-        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           <PageHeader title="알림톡 설정" />
 
           {renderTabContent()}

@@ -5,7 +5,6 @@
  * 서버가 ChatGPT API를 호출하여 상담일지 내용을 요약
  *
  * [불변 규칙] Zero-Trust: tenant_id는 JWT에서 추출 (요청 본문에서 받지 않음)
- * [불변 규칙] PII 마스킹: 상담일지 요약 시 개인정보 마스킹 필수 (아키텍처 문서 3.1.5, 898-950줄)
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -13,7 +12,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { shouldUseAI, getTenantSettingByPath } from '../_shared/policy-utils.ts';
 import { withTenant } from '../_shared/withTenant.ts';
 import { envServer } from '../_shared/env-registry.ts';
-import { maskPhone, maskEmail } from '../_shared/pii-utils.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -64,66 +62,6 @@ function extractTenantIdFromJWT(authHeader: string | null): string | null {
     console.error('[Consultation AI Summary] JWT parsing error:', error instanceof Error ? error.message : String(error));
     return null;
   }
-}
-
-/**
- * PII 마스킹 함수
- * 아키텍처 문서 3.1.5, 898-950줄: 상담일지 요약 시 개인정보 마스킹 규칙
- *
- * 마스킹 규칙 (업종 중립):
- * - 개인 실명: /[가-힣]{2,4}/g → [개인] (preserve_length: false, 업종 중립: 학생 → 개인)
- * - 전화번호: /(\d{3})-(\d{4})-(\d{4})/g → 010-****-**** (preserve_length: true)
- * - 기관명: /([가-힣]+학원|([가-힣]+(학원|아카데미|교육원)))/g → [기관명] (conditional_masking: true, 업종 중립: 학원명 → 기관명)
- * - 주소: /[가-힣]+시[가-힣]+구[가-힣]+동/g → [주소] (preserve_length: false)
- */
-function maskPIIInContent(content: string): string {
-  let masked = content;
-
-  // 1. 전화번호 마스킹: 010-1234-5678 → 010-****-5678 (공통 유틸리티 사용)
-  // 문서 규칙: pattern: /(\d{3})-(\d{4})-(\d{4})/g, replacement: '010-****-****', preserve_length: true
-  // 주의: maskPhone은 '010-****-5678' 형식이지만, 문서 요구사항은 '010-****-****'이므로 정규식으로 처리
-  masked = masked.replace(/(\d{3})-(\d{4})-(\d{4})/g, (match) => {
-    // 공통 유틸리티의 maskPhone을 사용하되, 문서 요구사항에 맞게 '010-****-****' 형식으로 변환
-    const maskedPhone = maskPhone(match);
-    // maskPhone 결과를 '010-****-****' 형식으로 변환 (중간 4자리도 마스킹)
-    return maskedPhone.replace(/(\d{3})-(\*{4})-(\d{4})/, '$1-****-$3');
-  });
-
-  // 2. 개인명 마스킹: 2-4자 한글 이름 → [개인] (업종 중립: 학생 → 개인)
-  // 문서 규칙: pattern: /[가-힣]{2,4}/g, replacement: '[개인]', preserve_length: false
-  // 주의: 너무 광범위하게 매칭하지 않도록 일반 단어 제외
-  const commonWords = new Set([
-    '오늘', '내일', '어제', '시간', '수업', '과제', '시험', '성적', '학습', '공부',
-    '학생', '선생', '교사', '원장', '부모', '학부', '학원', '학교', '반', '수업',
-    '과목', '국어', '영어', '수학', '과학', '사회', '역사', '체육', '음악', '미술',
-    '월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일',
-    '오전', '오후', '저녁', '밤', '낮', '아침', '점심',
-  ]);
-
-  // 2-4자 한글 이름 패턴 (일반 단어 제외)
-  masked = masked.replace(/[가-힣]{2,4}/g, (match) => {
-    if (commonWords.has(match)) {
-      return match;
-    }
-    return '[개인]'; // 업종 중립: [학생] → [개인]
-  });
-
-  // 3. 기관명 마스킹: "XX학원", "XX아카데미", "XX교육원" → [기관명] (업종 중립: 학원명 → 기관명)
-  // 문서 규칙: pattern: /([가-힣]+학원|([가-힣]+(학원|아카데미|교육원)))/g, replacement: '[기관명]'
-  // 주의: 문서의 정확한 패턴 사용 (conditional_masking: true - 필요한 경우만)
-  masked = masked.replace(/([가-힣]+(?:학원|아카데미|교육원))/g, '[기관명]'); // 업종 중립: [학원명] → [기관명]
-
-  // 4. 주소 마스킹: "XX시 XX구 XX동" → [주소]
-  // 문서 규칙: pattern: /[가-힣]+시[가-힣]+구[가-힣]+동/g, replacement: '[주소]'
-  masked = masked.replace(/[가-힣]+시\s*[가-힣]+구\s*[가-힣]+동/g, '[주소]');
-
-  // 5. 이메일 마스킹: user@example.com → u***@example.com (공통 유틸리티 사용)
-  // 문서에는 명시되지 않았지만, PII 보호를 위해 추가
-  masked = masked.replace(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, (match) => {
-    return maskEmail(match);
-  });
-
-  return masked;
 }
 
 serve(async (req) => {
@@ -302,26 +240,21 @@ serve(async (req) => {
       );
     }
 
-    // 3. PII 마스킹 적용 (아키텍처 문서 3.1.5, 898-950줄)
-    const maskedContent = maskPIIInContent(consultation.content);
-
-    console.log('[Consultation AI Summary] PII masking applied:', {
+    console.log('[Consultation AI Summary] Processing content:', {
       consultation_id: consultation.id,
-      original_length: consultation.content.length,
-      masked_length: maskedContent.length,
+      content_length: consultation.content.length,
       has_content: !!consultation.content,
     });
 
-    // 4. ChatGPT API 호출
-    const prompt = `다음은 상담일지 내용입니다. 이 내용을 간결하고 명확하게 요약해주세요. // 업종 중립: 학원 상담일지 → 상담일지
+    // 3. ChatGPT API 호출 (PII 마스킹 제거 - 사용자 요청)
+    const prompt = `다음은 상담일지 내용입니다. 이 내용을 간결하고 명확하게 요약해주세요.
 
 상담일지 내용:
-${maskedContent}
+${consultation.content}
 
 요약 요구사항:
 - 핵심 내용을 3-5문장으로 요약
 - 학생의 상태, 상담 내용, 필요한 조치사항을 포함
-- 개인정보는 마스킹되어 있으므로 그대로 유지
 - 자연스러운 한국어로 작성
 
 요약:`;
@@ -401,7 +334,7 @@ ${maskedContent}
       summary_length: aiSummary.length,
     });
 
-    // 6. 응답 반환
+    // 5. 응답 반환
     const response: ConsultationAISummaryResponse = {
       ai_summary: aiSummary,
     };

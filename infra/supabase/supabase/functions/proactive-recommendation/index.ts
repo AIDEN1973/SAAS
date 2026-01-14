@@ -7,12 +7,12 @@
  * 분석 항목:
  * - 수납 마감일 전 미납자 알림 추천
  * - 출결 패턴 기반 이탈 위험 조기 경고
- * - 상담 필요 학생 추천
- * - 정원 부족/과잉 반 조정 추천
+ * - 상담 필요 대상 추천
+ * - 정원 부족/과잉 그룹 조정 추천
  * - 시즌별 마케팅 추천
  *
  * [불변 규칙] Zero-Trust: tenant_id는 JWT에서 추출
- * [불변 규칙] PII 마스킹: 개인정보 마스킹 필수
+ * [불변 규칙] Industry Neutrality: 업종 중립적 용어 사용
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -84,15 +84,29 @@ serve(async (req) => {
         .lte('due_date', sevenDaysLater);
 
       if (upcomingBillings && upcomingBillings.length > 0) {
+        // 대상자 정보 조회 (이름 포함)
+        const studentIds = [...new Set(upcomingBillings.map(b => b.student_id))];
+        const { data: students } = await supabase
+          .from('persons')
+          .select('id, name')
+          .eq('tenant_id', tenant.id)
+          .in('id', studentIds);
+
+        const studentNameMap = new Map(students?.map(s => [s.id, s.name]) || []);
         const totalAmount = upcomingBillings.reduce((sum, b) => sum + (b.amount || 0), 0);
+
+        const studentNames = studentIds.slice(0, 5).map(id => studentNameMap.get(id) || '').filter(Boolean).join(', ');
+        const moreCount = studentIds.length > 5 ? ` 외 ${studentIds.length - 5}명` : '';
+        const detailDescription = `7일 내 마감: ${studentNames}${moreCount} (${upcomingBillings.length}건, ${totalAmount.toLocaleString()}원)`;
+
         recommendations.push({
           type: 'billing_reminder',
           priority: upcomingBillings.length >= 5 ? 'high' : 'medium',
           title: '수납 마감 임박 알림 권장',
-          description: `${upcomingBillings.length}건의 수납이 7일 내 마감 예정입니다. 총 ${totalAmount.toLocaleString()}원`,
+          description: detailDescription,
           action_type: 'send_billing_reminder',
           target_count: upcomingBillings.length,
-          suggested_action: '미납 학부모에게 수납 안내 문자 발송을 권장합니다.',
+          suggested_action: '미납 대상자에게 수납 안내 문자 발송을 권장합니다.',
           deadline: sevenDaysLater,
         });
       }
@@ -106,7 +120,7 @@ serve(async (req) => {
         .in('status', ['absent', 'unauthorized_absent']);
 
       if (attendanceRisk && attendanceRisk.length > 0) {
-        // 학생별 결석 횟수 집계
+        // 대상자별 결석 횟수 집계
         const absentByStudent = new Map<string, number>();
         for (const log of attendanceRisk) {
           absentByStudent.set(log.student_id, (absentByStudent.get(log.student_id) || 0) + 1);
@@ -114,23 +128,36 @@ serve(async (req) => {
         const highRiskStudents = Array.from(absentByStudent.entries()).filter(([_, count]) => count >= 3);
 
         if (highRiskStudents.length > 0) {
+          // 대상자 정보 조회 (이름 포함)
+          const { data: students } = await supabase
+            .from('persons')
+            .select('id, name')
+            .eq('tenant_id', tenant.id)
+            .in('id', highRiskStudents.map(([id]) => id));
+
+          const studentNames = students?.map(s => s.name).join(', ') || '';
+          const detailDescription = studentNames
+            ? `최근 30일간 결석 3회 이상: ${studentNames} (총 ${highRiskStudents.length}명)`
+            : `최근 30일간 결석 3회 이상인 대상 ${highRiskStudents.length}명 감지`;
+
           recommendations.push({
             type: 'churn_prevention',
             priority: 'high',
-            title: '이탈 위험 학생 조기 발견',
-            description: `최근 30일간 결석 3회 이상인 학생 ${highRiskStudents.length}명이 감지되었습니다.`,
+            title: '이탈 위험 대상 조기 발견',
+            description: detailDescription,
             action_type: 'contact_guardian',
             target_count: highRiskStudents.length,
-            suggested_action: '학부모 상담을 통해 출결 상황을 파악하고 이탈을 방지하세요.',
+            suggested_action: '보호자 상담을 통해 출결 상황을 파악하고 이탈을 방지하세요.',
           });
         }
       }
 
-      // 3. 상담 필요 학생 추천 (최근 상담 없는 활성 학생)
+      // 3. 상담 필요 대상 추천 (최근 상담 없는 활성 대상)
       const { data: activeStudents } = await supabase
-        .from('students')
-        .select('id')
+        .from('persons')
+        .select('id, name')
         .eq('tenant_id', tenant.id)
+        .eq('person_type', 'student')
         .eq('status', 'active');
 
       if (activeStudents && activeStudents.length > 0) {
@@ -144,19 +171,23 @@ serve(async (req) => {
         const needsConsultation = activeStudents.filter(s => !consultedStudentIds.has(s.id));
 
         if (needsConsultation.length >= 5) {
+          const studentNames = needsConsultation.slice(0, 10).map(s => s.name).join(', ');
+          const moreCount = needsConsultation.length > 10 ? ` 외 ${needsConsultation.length - 10}명` : '';
+          const detailDescription = `최근 30일간 상담 미실시: ${studentNames}${moreCount} (총 ${needsConsultation.length}명)`;
+
           recommendations.push({
             type: 'consultation_needed',
             priority: 'medium',
-            title: '정기 상담 필요 학생',
-            description: `최근 30일간 상담 기록이 없는 학생이 ${needsConsultation.length}명입니다.`,
+            title: '정기 상담 필요 대상',
+            description: detailDescription,
             action_type: 'schedule_consultation',
             target_count: needsConsultation.length,
-            suggested_action: '정기적인 학부모 상담을 통해 학생 현황을 파악하세요.',
+            suggested_action: '정기적인 보호자 상담을 통해 대상 현황을 파악하세요.',
           });
         }
       }
 
-      // 4. 정원 부족/과잉 반 분석
+      // 4. 정원 부족/과잉 그룹 분석
       const { data: classes } = await supabase
         .from('academy_classes')
         .select('id, name, max_students')
@@ -164,7 +195,8 @@ serve(async (req) => {
         .eq('status', 'active');
 
       if (classes && classes.length > 0) {
-        const capacityIssues: { overCapacity: number; underCapacity: number } = { overCapacity: 0, underCapacity: 0 };
+        const overCapacityClasses: string[] = [];
+        const underCapacityClasses: string[] = [];
 
         for (const cls of classes) {
           const { count } = await supabase
@@ -177,36 +209,41 @@ serve(async (req) => {
           const maxStudents = cls.max_students || 20;
           const rate = (studentCount / maxStudents) * 100;
 
-          if (rate > 100) capacityIssues.overCapacity++;
-          else if (rate < 50) capacityIssues.underCapacity++;
+          if (rate > 100) overCapacityClasses.push(`${cls.name}(${studentCount}/${maxStudents})`);
+          else if (rate < 50) underCapacityClasses.push(`${cls.name}(${studentCount}/${maxStudents})`);
         }
 
-        if (capacityIssues.overCapacity > 0 || capacityIssues.underCapacity > 0) {
+        if (overCapacityClasses.length > 0 || underCapacityClasses.length > 0) {
+          const overDetail = overCapacityClasses.length > 0 ? `정원 초과: ${overCapacityClasses.join(', ')}` : '';
+          const underDetail = underCapacityClasses.length > 0 ? `정원 미달: ${underCapacityClasses.join(', ')}` : '';
+          const separator = overDetail && underDetail ? ' / ' : '';
+          const detailDescription = `${overDetail}${separator}${underDetail}`;
+
           recommendations.push({
             type: 'capacity_adjustment',
-            priority: capacityIssues.overCapacity > 0 ? 'high' : 'low',
-            title: '반 정원 조정 필요',
-            description: `정원 초과 반 ${capacityIssues.overCapacity}개, 정원 미달 반 ${capacityIssues.underCapacity}개가 감지되었습니다.`,
+            priority: overCapacityClasses.length > 0 ? 'high' : 'low',
+            title: '그룹 정원 조정 필요',
+            description: detailDescription,
             action_type: 'adjust_class_capacity',
-            target_count: capacityIssues.overCapacity + capacityIssues.underCapacity,
-            suggested_action: '반 통합 또는 분반을 검토하세요.',
+            target_count: overCapacityClasses.length + underCapacityClasses.length,
+            suggested_action: '그룹 통합 또는 분할을 검토하세요.',
           });
         }
       }
 
       // 5. 시즌별 마케팅 추천 (분기 시작 전)
       const currentMonth = toKST().month() + 1; // 1-12
-      const isPreSeason = [2, 5, 8, 11].includes(currentMonth); // 학기 시작 전달
+      const isPreSeason = [2, 5, 8, 11].includes(currentMonth); // 시즌 시작 전달
 
       if (isPreSeason) {
         recommendations.push({
           type: 'marketing_timing',
           priority: 'medium',
           title: '시즌 마케팅 적기',
-          description: '다음 달 학기 시작을 앞두고 신규 등록 마케팅을 권장합니다.',
+          description: '다음 달 시즌 시작을 앞두고 신규 등록 마케팅을 권장합니다.',
           action_type: 'start_marketing_campaign',
           target_count: 0,
-          suggested_action: 'SNS, 지역 커뮤니티 등을 통해 신규 학생 모집 홍보를 시작하세요.',
+          suggested_action: 'SNS, 지역 커뮤니티 등을 통해 신규 구성원 모집 홍보를 시작하세요.',
         });
       }
 
@@ -218,7 +255,15 @@ serve(async (req) => {
         if (openaiApiKey) {
           try {
             const highPriorityCount = recommendations.filter(r => r.priority === 'high').length;
-            const prompt = `다음 선제적 추천 사항들을 한국어로 2-3문장으로 요약해주세요:
+            const prompt = `다음 선제적 추천 사항들을 한국어로 2-3문장으로 요약해주세요.
+
+중요:
+- 구체적인 대상자 이름과 숫자를 반드시 포함
+- 추상적이거나 두리뭉실한 표현 금지 (예: "일부 대상" → 구체적 이름 명시)
+- 우선순위가 높은 항목을 먼저 언급
+- 업종 중립적 용어 사용 (학생→대상/구성원 등)
+
+추천 사항:
 ${recommendations.map(r => `- [${r.priority}] ${r.title}: ${r.description}`).join('\n')}`;
 
             const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -229,9 +274,12 @@ ${recommendations.map(r => `- [${r.priority}] ${r.title}: ${r.description}`).joi
               },
               body: JSON.stringify({
                 model: 'gpt-4o-mini',
-                messages: [{ role: 'user', content: prompt }],
-                max_tokens: 200,
-                temperature: 0.7,
+                messages: [
+                  { role: 'system', content: '운영 데이터 분석 전문가. 구체적 대상명과 수치를 포함한 실행 가능한 조치사항 제시. 추상적 표현 금지. 업종 중립적 용어 사용.' },
+                  { role: 'user', content: prompt }
+                ],
+                max_tokens: 300,
+                temperature: 0.5,
               }),
             });
 

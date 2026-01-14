@@ -7,36 +7,28 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { SubSidebar } from '@ui-core/react';
 import { ManualBody } from '../components/ManualBody';
-import type { ManualPage as ManualPageType } from '../types/manual';
 import { getManualById, allManualPages } from '../data/manuals';
-import { MANUAL_SUB_MENU_ITEMS, DEFAULT_MANUAL_SUB_MENU } from '../constants';
+import { MANUAL_SUB_MENU_ITEMS, DEFAULT_MANUAL_SUB_MENU, getSubMenuFromUrl } from '../constants';
 import type { ManualSubMenuId } from '../constants';
 
 export function ManualPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   // URL에서 매뉴얼 ID와 섹션 ID 가져오기
-  const manualId = searchParams.get('id') as ManualSubMenuId | null;
   const sectionId = searchParams.get('section');
 
-  // 현재 선택된 매뉴얼 ID (URL 기반)
-  const selectedManualId: ManualSubMenuId = useMemo(() => {
-    if (manualId && MANUAL_SUB_MENU_ITEMS.some(item => item.id === manualId)) {
-      return manualId;
-    }
-    return DEFAULT_MANUAL_SUB_MENU;
-  }, [manualId]);
+  // 현재 선택된 매뉴얼 ID (URL 기반, SSOT 헬퍼 함수 사용)
+  const validIds = MANUAL_SUB_MENU_ITEMS.map(item => item.id) as readonly ManualSubMenuId[];
+  const selectedManualId = getSubMenuFromUrl(searchParams, validIds, DEFAULT_MANUAL_SUB_MENU);
 
   // 현재 선택된 매뉴얼 데이터
-  const [currentManual, setCurrentManual] = useState<ManualPageType | null>(() => {
-    if (manualId) {
-      return getManualById(manualId) || allManualPages[0] || null;
-    }
-    return allManualPages[0] || null;
-  });
+  const currentManual = useMemo(() => {
+    return getManualById(selectedManualId) || allManualPages[0] || null;
+  }, [selectedManualId]);
 
   // 현재 선택된 섹션 ID (URL에 section 파라미터가 있을 때만 설정, 없으면 null로 최상단 표시)
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(() => {
@@ -48,29 +40,24 @@ export function ManualPage() {
     window.scrollTo(0, 0);
   }, []);
 
-  // URL 파라미터 변경 시 매뉴얼 업데이트
+  // URL section 파라미터 변경 시 섹션 업데이트
   useEffect(() => {
-    if (manualId) {
-      const manual = getManualById(manualId);
-      if (manual) {
-        setCurrentManual(manual);
-        // URL에 section 파라미터가 있을 때만 해당 섹션으로 설정
-        setCurrentSectionId(sectionId || null);
-      }
-    }
-  }, [manualId, sectionId]);
+    setCurrentSectionId(sectionId || null);
+  }, [sectionId]);
 
   // 매뉴얼 페이지 선택 핸들러 (SubSidebar에서 호출)
   const handleSelectManual = useCallback(
     (id: ManualSubMenuId) => {
-      const manual = getManualById(id);
-      if (manual) {
-        setCurrentManual(manual);
-        setCurrentSectionId(null); // 최상단 표시
-        setSearchParams({ id });
+      // 섹션 파라미터 제거하고 id만 설정
+      const searchParams = new URLSearchParams();
+      if (id !== DEFAULT_MANUAL_SUB_MENU) {
+        searchParams.set('id', id);
       }
+      const queryString = searchParams.toString();
+      const newUrl = queryString ? `?${queryString}` : window.location.pathname;
+      navigate(newUrl, { replace: true });
     },
-    [setSearchParams]
+    [navigate]
   );
 
   // 매뉴얼 섹션 선택 핸들러
@@ -78,10 +65,17 @@ export function ManualPage() {
     (newSectionId: string) => {
       setCurrentSectionId(newSectionId);
       if (currentManual) {
-        setSearchParams({ id: currentManual.id, section: newSectionId });
+        const searchParams = new URLSearchParams();
+        if (currentManual.id !== DEFAULT_MANUAL_SUB_MENU) {
+          searchParams.set('id', currentManual.id);
+        }
+        searchParams.set('section', newSectionId);
+        const queryString = searchParams.toString();
+        const newUrl = queryString ? `?${queryString}` : window.location.pathname;
+        navigate(newUrl, { replace: true });
       }
     },
-    [currentManual, setSearchParams]
+    [currentManual, navigate]
   );
 
   return (

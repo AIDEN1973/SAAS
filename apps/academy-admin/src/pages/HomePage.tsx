@@ -631,7 +631,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
             summary: `오늘 ${safeTodayConsultations.length}건의 ${terms.CONSULTATION_LABEL}이(가) 예정되어 있습니다.`,
             insights: [
               `${terms.CONSULTATION_LABEL}일지를 작성하여 ${terms.PERSON_LABEL_PRIMARY} 관리를 강화하세요.`,
-              `${terms.CONSULTATION_LABEL} 내용을 바탕으로 ${terms.PERSON_LABEL_PRIMARY}의 학습 방향을 조정할 수 있습니다.`,
+              `${terms.CONSULTATION_LABEL} 내용을 바탕으로 ${terms.PERSON_LABEL_PRIMARY}의 진행 방향을 조정할 수 있습니다.`,
             ],
               created_at: baseKST.toISOString(),
               action_url: ROUTES.AI_CONSULTATION, // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
@@ -1003,7 +1003,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
           summary: `${riskCount}명의 ${terms.PERSON_LABEL_PRIMARY}이(가) ${terms.EMERGENCY_RISK_LABEL}입니다.`,
           insights: [
             `${terms.EMERGENCY_RISK_LABEL} ${terms.PERSON_LABEL_PLURAL}에게 즉시 ${terms.CONSULTATION_LABEL}을(를) 진행하세요.`,
-            `${terms.PERSON_LABEL_PRIMARY}의 학습 동기를 높이기 위한 방안을 모색하세요.`,
+            `${terms.PERSON_LABEL_PRIMARY}의 진행 동기를 높이기 위한 방안을 모색하세요.`,
           ],
           created_at: riskCardCreatedAt, // [P0-2 수정] 원천 데이터 기준으로 고정
           action_url: riskActionUrl, // 정본: 서버에서 제공된 action_url 사용

@@ -8,8 +8,8 @@
  * [요구사항] 강사 프로필 보기
  */
 
-import React, { useState, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState, useCallback, useMemo } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet, EmptyState, SubSidebar } from '@ui-core/react';
 import { UserCog } from 'lucide-react';
 import { SchemaForm, SchemaFilter } from '@schema-engine';
@@ -37,6 +37,7 @@ export function TeachersPage() {
   const { showConfirm, showAlert } = useModal();
   const terms = useIndustryTerms();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const mode = useResponsiveMode();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
@@ -45,15 +46,12 @@ export function TeachersPage() {
 
   // 서브 메뉴 상태
   const validIds = TEACHERS_SUB_MENU_ITEMS.map(item => item.id) as readonly TeachersSubMenuId[];
-  const [selectedSubMenu, setSelectedSubMenu] = useState<TeachersSubMenuId>(() =>
-    getSubMenuFromUrl(searchParams, validIds, DEFAULT_TEACHERS_SUB_MENU)
-  );
+  const selectedSubMenu = getSubMenuFromUrl(searchParams, validIds, DEFAULT_TEACHERS_SUB_MENU);
 
-  const handleSubMenuChange = (id: TeachersSubMenuId) => {
-    setSelectedSubMenu(id);
+  const handleSubMenuChange = useCallback((id: TeachersSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_TEACHERS_SUB_MENU);
-    window.history.replaceState(null, '', newUrl);
-  };
+    navigate(newUrl, { replace: true });
+  }, [navigate]);
 
   const [filter, setFilter] = useState<TeacherFilter>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -125,7 +123,7 @@ export function TeachersPage() {
         )}
 
         {/* 메인 콘텐츠 */}
-        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           <PageHeader
             title={`${terms.PERSON_LABEL_SECONDARY} 관리`}
             actions={
@@ -139,17 +137,20 @@ export function TeachersPage() {
             }
           />
 
-          {/* 검색 및 필터 패널 */}
-          <SchemaFilter
-            schema={effectiveFilterSchema}
-            onFilterChange={handleFilterChange}
-            defaultValues={{
-              search: filter.search || '',
-              status: filter.status || '',
-            }}
-          />
+          {/* 강사 목록 탭 (기본) */}
+          {selectedSubMenu === 'list' && (
+            <>
+              {/* 검색 및 필터 패널 */}
+              <SchemaFilter
+                schema={effectiveFilterSchema}
+                onFilterChange={handleFilterChange}
+                defaultValues={{
+                  search: filter.search || '',
+                  status: filter.status || '',
+                }}
+              />
 
-        {/* 강사 등록 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
+              {/* 강사 등록 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
           {showCreateForm && (
             <>
               {isMobileMode || isTabletMode ? (
@@ -227,6 +228,23 @@ export function TeachersPage() {
                 </Card>
               )}
             </div>
+          )}
+            </>
+          )}
+
+          {/* 강사 통계 탭 */}
+          {selectedSubMenu === 'statistics' && (
+            <TeacherStatisticsTab terms={terms} />
+          )}
+
+          {/* 담당 과목 탭 */}
+          {selectedSubMenu === 'assignments' && (
+            <TeacherAssignmentsTab terms={terms} />
+          )}
+
+          {/* 강사 성과 탭 */}
+          {selectedSubMenu === 'performance' && (
+            <TeacherPerformanceTab terms={terms} />
           )}
 
           {/* 강사 수정 모달 */}
@@ -661,5 +679,441 @@ function TeacherCard({
         </div>
       )}
     </Card>
+  );
+}
+
+/**
+ * 강사 통계 탭 컴포넌트
+ * 전체 강사 현황 통계를 표시
+ */
+function TeacherStatisticsTab({ terms }: { terms: ReturnType<typeof useIndustryTerms> }) {
+  const { data: teachers, isLoading: isLoadingTeachers } = useTeachers();
+
+  // 통계 계산
+  const statistics = useMemo(() => {
+    if (!teachers) return null;
+
+    // 상태별 분포
+    const byStatus = {
+      active: teachers.filter(t => t.status === 'active').length,
+      on_leave: teachers.filter(t => t.status === 'on_leave').length,
+      resigned: teachers.filter(t => t.status === 'resigned').length,
+    };
+
+    // 전문 분야별 분포
+    const bySpecialization: Record<string, number> = {};
+    teachers.forEach(t => {
+      if (t.specialization) {
+        bySpecialization[t.specialization] = (bySpecialization[t.specialization] || 0) + 1;
+      }
+    });
+
+    return {
+      total: teachers.length,
+      byStatus,
+      bySpecialization,
+    };
+  }, [teachers]);
+
+  if (isLoadingTeachers) {
+    return (
+      <Card padding="lg">
+        <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+          로딩 중...
+        </div>
+      </Card>
+    );
+  }
+
+  if (!statistics) return null;
+
+  const statusLabels: Record<TeacherStatus, string> = {
+    active: terms.STAFF_ACTIVE,
+    on_leave: terms.STAFF_LEAVE,
+    resigned: terms.STAFF_RESIGNED,
+  };
+
+  const statusColors: Record<TeacherStatus, string> = {
+    active: 'var(--color-success)',
+    on_leave: 'var(--color-warning)',
+    resigned: 'var(--color-error)',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+      {/* 기본 통계 카드 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-md)' }}>
+        <Card padding="md">
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
+              {statistics.total}
+            </div>
+            <div style={{ color: 'var(--color-text-secondary)' }}>전체 {terms.PERSON_LABEL_SECONDARY}</div>
+          </div>
+        </Card>
+        <Card padding="md">
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
+              {statistics.byStatus.active}
+            </div>
+            <div style={{ color: 'var(--color-text-secondary)' }}>{terms.STAFF_ACTIVE}</div>
+          </div>
+        </Card>
+        <Card padding="md">
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-warning)' }}>
+              {statistics.byStatus.on_leave}
+            </div>
+            <div style={{ color: 'var(--color-text-secondary)' }}>{terms.STAFF_LEAVE}</div>
+          </div>
+        </Card>
+        <Card padding="md">
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-error)' }}>
+              {statistics.byStatus.resigned}
+            </div>
+            <div style={{ color: 'var(--color-text-secondary)' }}>{terms.STAFF_RESIGNED}</div>
+          </div>
+        </Card>
+      </div>
+
+      {/* 상태별 분포 차트 */}
+      <Card padding="lg">
+        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)' }}>
+          상태별 분포
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+          {(Object.entries(statistics.byStatus) as [TeacherStatus, number][]).map(([status, count]) => (
+            <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+              <div style={{ width: '100px', color: 'var(--color-text-secondary)' }}>{statusLabels[status]}</div>
+              <div style={{ flex: 1, height: '24px', backgroundColor: 'var(--color-gray-100)', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    width: statistics.total > 0 ? `${(count / statistics.total) * 100}%` : '0%',
+                    height: '100%',
+                    backgroundColor: statusColors[status],
+                    transition: 'width 0.3s ease',
+                  }}
+                />
+              </div>
+              <div style={{ width: '60px', textAlign: 'right', fontWeight: 'var(--font-weight-semibold)' }}>
+                {count}명
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* 전문 분야별 분포 */}
+      {Object.keys(statistics.bySpecialization).length > 0 && (
+        <Card padding="lg">
+          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)' }}>
+            전문 분야별 분포
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 'var(--spacing-sm)' }}>
+            {Object.entries(statistics.bySpecialization).map(([specialization, count]) => (
+              <div
+                key={specialization}
+                style={{
+                  padding: 'var(--spacing-md)',
+                  backgroundColor: 'var(--color-primary-50)',
+                  borderRadius: 'var(--border-radius-md)',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
+                  {count}
+                </div>
+                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>{specialization}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* 강사 목록 (간략) */}
+      <Card padding="lg">
+        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)' }}>
+          {terms.PERSON_LABEL_SECONDARY} 목록
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+          {teachers?.map(teacher => (
+            <div
+              key={teacher.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: 'var(--spacing-sm)',
+                backgroundColor: 'var(--color-background-secondary)',
+                borderRadius: 'var(--border-radius-sm)',
+                borderLeft: `3px solid ${statusColors[teacher.status]}`,
+              }}
+            >
+              <div>
+                <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{teacher.name}</span>
+                {teacher.specialization && (
+                  <span style={{ color: 'var(--color-text-secondary)', marginLeft: 'var(--spacing-sm)' }}>
+                    ({teacher.specialization})
+                  </span>
+                )}
+              </div>
+              <span
+                style={{
+                  fontSize: 'var(--font-size-xs)',
+                  padding: 'var(--spacing-2xs) var(--spacing-xs)',
+                  borderRadius: 'var(--border-radius-full)',
+                  backgroundColor: `${statusColors[teacher.status]}20`,
+                  color: statusColors[teacher.status],
+                }}
+              >
+                {statusLabels[teacher.status]}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * 담당 과목 탭 컴포넌트
+ * 강사별 담당 과목/수업 현황을 표시
+ */
+function TeacherAssignmentsTab({ terms }: { terms: ReturnType<typeof useIndustryTerms> }) {
+  const { data: teachers, isLoading: isLoadingTeachers } = useTeachers();
+
+  // 각 강사의 담당 수업 수는 TeacherAssignmentItem에서 개별 조회
+
+  if (isLoadingTeachers) {
+    return (
+      <Card padding="lg">
+        <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+          로딩 중...
+        </div>
+      </Card>
+    );
+  }
+
+  const dayLabels: Record<string, string> = {
+    monday: '월',
+    tuesday: '화',
+    wednesday: '수',
+    thursday: '목',
+    friday: '금',
+    saturday: '토',
+    sunday: '일',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+      <Card padding="lg">
+        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)' }}>
+          {terms.PERSON_LABEL_SECONDARY}별 담당 {terms.GROUP_LABEL}
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+          {teachers?.filter(t => t.status === 'active').map(teacher => (
+            <TeacherAssignmentItem key={teacher.id} teacher={teacher} terms={terms} dayLabels={dayLabels} />
+          ))}
+          {teachers?.filter(t => t.status === 'active').length === 0 && (
+            <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+              활성 {terms.PERSON_LABEL_SECONDARY}가 없습니다.
+            </div>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * 강사 담당 과목 아이템 컴포넌트
+ */
+function TeacherAssignmentItem({
+  teacher,
+  terms,
+  dayLabels,
+}: {
+  teacher: Teacher;
+  terms: ReturnType<typeof useIndustryTerms>;
+  dayLabels: Record<string, string>;
+}) {
+  const { data: stats } = useTeacherStatistics(teacher.id);
+  const { data: assignedClasses } = useTeacherClasses(teacher.id);
+
+  return (
+    <div
+      style={{
+        padding: 'var(--spacing-md)',
+        backgroundColor: 'var(--color-background-secondary)',
+        borderRadius: 'var(--border-radius-md)',
+        borderLeft: 'var(--border-width-thick) solid var(--color-primary)',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-sm)' }}>
+        <div>
+          <span style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-md)' }}>{teacher.name}</span>
+          {teacher.specialization && (
+            <span style={{ color: 'var(--color-text-secondary)', marginLeft: 'var(--spacing-sm)', fontSize: 'var(--font-size-sm)' }}>
+              {teacher.specialization}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-primary)', fontWeight: 'var(--font-weight-semibold)' }}>
+            {stats?.total_classes || 0}개 {terms.GROUP_LABEL}
+          </span>
+          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-success)', fontWeight: 'var(--font-weight-semibold)' }}>
+            {stats?.total_students || 0}명 {terms.PERSON_LABEL_PRIMARY}
+          </span>
+        </div>
+      </div>
+
+      {assignedClasses && assignedClasses.length > 0 ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xs)' }}>
+          {assignedClasses.map(ct => (
+            <div
+              key={ct.class_id}
+              style={{
+                padding: 'var(--spacing-xs) var(--spacing-sm)',
+                backgroundColor: ct.academy_classes.color || 'var(--color-gray-200)',
+                borderRadius: 'var(--border-radius-sm)',
+                fontSize: 'var(--font-size-xs)',
+              }}
+            >
+              <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{ct.academy_classes.name}</span>
+              <span style={{ color: 'var(--color-text-secondary)', marginLeft: 'var(--spacing-xs)' }}>
+                {dayLabels[ct.academy_classes.day_of_week]} {ct.academy_classes.start_time.substring(0, 5)}
+              </span>
+              {ct.role === 'assistant' && (
+                <span style={{ color: 'var(--color-warning)', marginLeft: 'var(--spacing-xs)' }}>({terms.ASSISTANT_TEACHER})</span>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+          담당 {terms.GROUP_LABEL}이 없습니다.
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 강사 성과 탭 컴포넌트
+ * 강사별 성과 분석을 표시
+ */
+function TeacherPerformanceTab({ terms }: { terms: ReturnType<typeof useIndustryTerms> }) {
+  const { data: teachers, isLoading: isLoadingTeachers } = useTeachers();
+
+  if (isLoadingTeachers) {
+    return (
+      <Card padding="lg">
+        <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+          로딩 중...
+        </div>
+      </Card>
+    );
+  }
+
+  const activeTeachers = teachers?.filter(t => t.status === 'active') || [];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+      {/* 성과 요약 */}
+      <Card padding="lg">
+        <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)' }}>
+          {terms.PERSON_LABEL_SECONDARY} 성과 현황
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+          {activeTeachers.map(teacher => (
+            <TeacherPerformanceItem key={teacher.id} teacher={teacher} terms={terms} />
+          ))}
+          {activeTeachers.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+              활성 {terms.PERSON_LABEL_SECONDARY}가 없습니다.
+            </div>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * 강사 성과 아이템 컴포넌트
+ */
+function TeacherPerformanceItem({
+  teacher,
+  terms,
+}: {
+  teacher: Teacher;
+  terms: ReturnType<typeof useIndustryTerms>;
+}) {
+  const { data: stats } = useTeacherStatistics(teacher.id);
+
+  // 성과 점수 계산 (담당 수업 수 * 2 + 담당 학생 수)
+  const performanceScore = (stats?.total_classes || 0) * 2 + (stats?.total_students || 0);
+
+  return (
+    <div
+      style={{
+        padding: 'var(--spacing-md)',
+        backgroundColor: 'var(--color-background-secondary)',
+        borderRadius: 'var(--border-radius-md)',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-sm)' }}>
+        <div>
+          <span style={{ fontWeight: 'var(--font-weight-bold)' }}>{teacher.name}</span>
+          {teacher.specialization && (
+            <span style={{ color: 'var(--color-text-secondary)', marginLeft: 'var(--spacing-sm)', fontSize: 'var(--font-size-sm)' }}>
+              {teacher.specialization}
+            </span>
+          )}
+        </div>
+        <div
+          style={{
+            padding: 'var(--spacing-xs) var(--spacing-sm)',
+            backgroundColor: performanceScore > 20 ? 'var(--color-success-50)' : performanceScore > 10 ? 'var(--color-warning-50)' : 'var(--color-gray-100)',
+            color: performanceScore > 20 ? 'var(--color-success)' : performanceScore > 10 ? 'var(--color-warning)' : 'var(--color-text-secondary)',
+            borderRadius: 'var(--border-radius-full)',
+            fontWeight: 'var(--font-weight-bold)',
+            fontSize: 'var(--font-size-sm)',
+          }}
+        >
+          점수: {performanceScore}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--spacing-sm)' }}>
+        <div style={{ textAlign: 'center', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-primary-50)', borderRadius: 'var(--border-radius-sm)' }}>
+          <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
+            {stats?.total_classes || 0}
+          </div>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>담당 {terms.GROUP_LABEL}</div>
+        </div>
+        <div style={{ textAlign: 'center', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-success-50)', borderRadius: 'var(--border-radius-sm)' }}>
+          <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
+            {stats?.total_students || 0}
+          </div>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>담당 {terms.PERSON_LABEL_PRIMARY}</div>
+        </div>
+        <div style={{ textAlign: 'center', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-warning-50)', borderRadius: 'var(--border-radius-sm)' }}>
+          <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-warning)' }}>
+            {stats?.main_teacher_classes || 0}
+          </div>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>{terms.HOMEROOM_TEACHER}</div>
+        </div>
+        <div style={{ textAlign: 'center', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-gray-100)', borderRadius: 'var(--border-radius-sm)' }}>
+          <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-secondary)' }}>
+            {stats?.assistant_classes || 0}
+          </div>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>{terms.ASSISTANT_TEACHER}</div>
+        </div>
+      </div>
+    </div>
   );
 }

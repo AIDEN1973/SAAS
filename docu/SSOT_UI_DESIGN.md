@@ -229,7 +229,7 @@ Theme은 다음 순서로 병합됩니다 (낮은 번호가 우선):
 | **Primitive** | 기본 UI 요소 (버튼, 입력, 배지 등) | `Button`, `Input`, `Badge`, `Avatar` |
 | **Composite** | 여러 Primitive 조합 (카드, 모달, 테이블 등) | `Card`, `Modal`, `DataTable`, `FormField` |
 | **Pattern** | 특정 패턴 구현 (페이지 헤더, 액션 바 등) | `PageHeader`, `BottomActionBar`, `ContextRecommendationBanner` |
-| **Layout** | 레이아웃 구조 (컨테이너, 그리드, 사이드바 등) | `Container`, `Grid`, `Sidebar`, `AppLayout` |
+| **Layout** | 레이아웃 구조 (컨테이너, 그리드, 사이드바 등) | `Container`, `Grid`, `Sidebar`, `SubSidebar`, `AppLayout` |
 | **Industry** | 업종별 라우팅 및 용어 (Phase 3) | `IndustryBasedRoute`, `useIndustryTerms`, `useIndustryConfig` |
 
 **불변 규칙**:
@@ -249,6 +249,7 @@ Theme은 다음 순서로 병합됩니다 (낮은 번호가 우선):
 | 페이지 컨테이너 | `Container` | 각 페이지 최상위 |
 | 페이지 헤더 | `PageHeader` | `Container` 내부 첫 번째 요소 |
 | 사이드바 | `Sidebar` | `AppLayout` 내부 |
+| 서브 사이드바 | `SubSidebar` | 메인 사이드바 우측, 페이지 내부 서브 네비게이션 |
 | 글로벌 헤더 | `Header` | `AppLayout` 내부 |
 
 #### 폼 입력
@@ -381,12 +382,94 @@ import { Card, Button } from '@ui-core/react';
 )}
 ```
 
-#### 공통 컴포넌트 제안 (향후 구현)
+#### AI 분석 로딩 상태 (진행률 표시)
+
+**정본 위치**: `apps/academy-admin/src/pages/students/components/AIAnalysisLoadingUI.tsx`
+
+AI 분석 및 생성 작업의 로딩 상태는 전용 컴포넌트를 사용합니다:
+
+```tsx
+// ✅ 권장: AIAnalysisLoadingUI 컴포넌트 사용
+import { AIAnalysisLoadingUI } from '../components/AIAnalysisLoadingUI';
+
+// 1. 분석 단계 정의
+const ANALYSIS_STEPS = [
+  { step: 1, label: '데이터 수집 중', duration: 800 },
+  { step: 2, label: 'AI 분석 중', duration: 3000 },
+  { step: 3, label: '결과 저장 중', duration: 500 },
+] as const;
+
+// 2. 상태 및 단계 추적
+const [currentStep, setCurrentStep] = useState<number>(0);
+
+// 3. 진행 단계 시뮬레이션
+useEffect(() => {
+  if (!isAnalyzing) {
+    setCurrentStep(0);
+    return;
+  }
+
+  setCurrentStep(1);
+  const timers: NodeJS.Timeout[] = [];
+  let accumulatedTime = 0;
+
+  ANALYSIS_STEPS.forEach((step, index) => {
+    if (index === 0) return;
+    accumulatedTime += ANALYSIS_STEPS[index - 1].duration;
+    const timer = setTimeout(() => {
+      setCurrentStep(step.step);
+    }, accumulatedTime);
+    timers.push(timer);
+  });
+
+  return () => {
+    timers.forEach(timer => clearTimeout(timer));
+  };
+}, [isAnalyzing]);
+
+// 4. UI 렌더링
+{isAnalyzing ? (
+  <AIAnalysisLoadingUI
+    steps={ANALYSIS_STEPS}
+    currentStep={currentStep}
+    message="분석이 완료될 때까지 잠시만 기다려주세요."
+  />
+) : (
+  // 일반 콘텐츠
+)}
+```
+
+**레이아웃 구조**:
+- 상단: 애니메이션 점 3개 (`.chatops-loading-dot` 클래스 사용)
+- 중간: 단계별 인디케이터 (숫자 원형) + 현재 단계 문구
+- 하단: 설명 메시지
+
+**Props**:
+- `steps`: `readonly AIAnalysisStep[]` - 분석 단계 배열
+- `currentStep`: `number` - 현재 진행 중인 단계 번호
+- `message`: `string` (선택) - 하단 설명 메시지 (기본값: "분석이 완료될 때까지 잠시만 기다려주세요.")
+
+**사용 위치**:
+- `RiskAnalysisTab.tsx`: 이탈위험 분석 (3단계)
+- `ConsultationsTab.tsx`: 상담 AI 요약 생성 (3단계)
+- `AIPage.tsx`: 성과 분석 인사이트 생성 (3단계), 상담일지 자동 요약 (3단계)
+
+**스타일 규칙**:
+- 모든 값은 CSS 변수 사용 (하드코딩 금지)
+- 단계 인디케이터 크기: `var(--size-avatar-sm)` (32px)
+- 전환 효과: `var(--transition-all)`
+- 간격: `var(--spacing-*)` 토큰만 사용
+- 색상: `var(--color-*)` 토큰만 사용
+
+#### 공통 컴포넌트 현황
+
+**구현 완료**:
+- ✅ `EmptyState`: 빈 상태 표시 (안내 메시지 + 아이콘)
+- ✅ `AIAnalysisLoadingUI`: AI 분석/생성 작업 로딩 상태 (진행률 표시)
 
 **TODO**: `packages/ui-core/src/components/`에 다음 컴포넌트 추가:
-- `LoadingState`: 로딩 상태 표시 (Spinner + 메시지)
+- `LoadingState`: 일반 로딩 상태 표시 (Spinner + 메시지)
 - `ErrorState`: 에러 상태 표시 (에러 메시지 + 재시도 버튼)
-- `EmptyState`: 빈 상태 표시 (안내 메시지 + 액션 버튼)
 
 **현재**: 각 페이지에서 위 패턴을 따르되, 향후 공통 컴포넌트로 교체 예정
 
@@ -444,6 +527,73 @@ import { SidebarLayout } from '@ui-core/react';
   {/* 메인 콘텐츠 */}
 </SidebarLayout>
 ```
+
+#### SubSidebar
+
+**용도**: 페이지 내부 서브 네비게이션 사이드바 (메인 사이드바 우측)
+
+**정본 위치**: `packages/ui-core/src/components/SubSidebar.tsx`
+
+```tsx
+import { SubSidebar } from '@ui-core/react';
+
+<div style={{ display: 'flex', height: 'var(--height-viewport)', width: 'var(--width-full)' }}>
+  {!isMobileMode && (
+    <SubSidebar
+      title="학생관리"
+      items={subMenuItems}
+      selectedId={selectedSubMenu}
+      onSelect={handleSubMenuChange}
+    />
+  )}
+  <div style={{ flex: 1, overflow: 'auto', height: 'var(--height-full)' }}>
+    {/* 메인 콘텐츠 */}
+  </div>
+</div>
+```
+
+**Props**:
+- `title`: 사이드바 제목 (PageHeader 타이틀과 동일한 스타일 적용)
+- `items`: 메뉴 아이템 목록 (`{ id, label, icon?, disabled?, badge? }`)
+- `selectedId`: 현재 선택된 아이템 ID
+- `onSelect`: 아이템 선택 핸들러
+- `width`: 너비 (기본값: `var(--width-agent-history-sidebar)`)
+- `collapsedWidth`: 축소 시 너비 (기본값: `var(--touch-target-min)`)
+- `collapsed`: 축소 상태 (controlled)
+- `onCollapsedChange`: 축소 상태 변경 핸들러
+
+**스타일 규칙**:
+- 헤더 타이틀: `PageHeader`와 동일한 폰트 스타일 (`--font-size-3xl`, `--font-weight-extrabold`, `--line-height-tight`)
+- 상단 여백: `Container`의 `paddingTop`과 동일 (`--spacing-xl`)
+- 선택/호버 배경색: `var(--color-primary-40)`
+- 선택된 메뉴 텍스트: `var(--color-primary)`
+- 모든 값은 CSS 변수 사용 (하드코딩 금지)
+
+**사용 위치**:
+- `AIPage` - 인공지능 페이지
+- `AnalyticsPage` - 분석 페이지
+- `AttendancePage` - 출결 페이지
+- `AutomationSettingsPage` - 자동화 설정 페이지
+- `BillingPage` - 수납 페이지
+- `ClassesPage` - 반 관리 페이지
+- `ManualPage` - 매뉴얼 페이지
+- `NotificationsPage` - 알림 페이지
+- `StudentsHomePage` - 학생 홈 페이지
+- `StudentsPage` - 학생 관리 페이지
+- `TeachersPage` - 강사 관리 페이지
+
+**패턴**: 서브 메뉴가 있는 모든 주요 페이지에서 일관되게 사용
+
+**메뉴 정의 SSOT**: `apps/academy-admin/src/constants/sub-sidebar-menus.ts`
+- 각 페이지별 서브 메뉴 아이템 정의
+- 타입 안전성을 위한 TypeScript 타입 정의
+- 아이콘 크기는 상수로 관리 (`ICON_SIZE`)
+- 예시: `AI_SUB_MENU_ITEMS`, `STUDENTS_SUB_MENU_ITEMS`, `ATTENDANCE_SUB_MENU_ITEMS` 등
+
+**URL 상태 관리**:
+- `getSubMenuFromUrl()`: URL 파라미터에서 선택된 서브 메뉴 ID 추출
+- `setSubMenuToUrl()`: 선택된 서브 메뉴 ID를 URL 파라미터로 설정
+- 페이지 새로고침 시에도 선택된 탭 유지
 
 ### F-2. Page Templates 규칙
 
@@ -741,14 +891,27 @@ function MyPage() {
 
 ---
 
-**문서 버전**: 1.1.0
-**최종 업데이트**: 2026-01-04
+**문서 버전**: 1.3.0
+**최종 업데이트**: 2026-01-14
 **유지보수 책임**: 프론트엔드 팀
 
 ---
 
 ## 변경 이력
 
+- **2026-01-14 (v1.3.0)**: AI 분석 로딩 상태 컴포넌트 및 SubSidebar 사용 위치 업데이트
+  - AIAnalysisLoadingUI 공통 컴포넌트 추가
+  - AI 분석/생성 작업 진행률 표시 패턴 문서화
+  - 3단계 진행률 표시 구현 가이드 추가
+  - 사용 위치 및 스타일 규칙 명시
+  - EmptyState 컴포넌트 구현 완료 상태로 업데이트
+  - SubSidebar 사용 페이지 목록 업데이트 (11개 페이지)
+  - SubSidebar 메뉴 정의 SSOT 및 URL 상태 관리 가이드 추가
+- **2026-01-13 (v1.2.0)**: SubSidebar 컴포넌트 문서화
+  - Layout 컴포넌트 분류에 SubSidebar 추가
+  - 페이지 구조 결정표에 서브 사이드바 추가
+  - SubSidebar 상세 사용 가이드 및 Props 문서화
+  - 스타일 규칙 (PageHeader와 동일한 폰트, CSS 변수 사용) 명시
 - **2026-01-04 (v1.1.0)**: Phase 3: Industry-Based Routing 반영
   - Industry 컴포넌트 분류 추가
   - useIndustryTerms, useIndustryConfig Hook 문서화

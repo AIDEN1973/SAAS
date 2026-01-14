@@ -31,26 +31,31 @@
  * - 유아이 문서: 1.1 Zero-Trust UI Layer
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Badge, PageHeader, isMobile, Modal, Drawer, EmptyState, SubSidebar } from '@ui-core/react';
 import { MapPin, Sparkles, FileText } from 'lucide-react';
-import { SchemaForm } from '@schema-engine';
-import { useSchema } from '@hooks/use-schema';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { toKST } from '@lib/date-utils';
 import { useStudents, useGenerateConsultationAISummary, fetchConsultations } from '@hooks/use-student';
 import { fetchAIInsights, useDismissAIInsight } from '@hooks/use-ai-insights';
 import type { StudentConsultation } from '@services/student-service';
-import { studentSelectFormSchema } from '../schemas/student-select.schema';
 import { useUserRole } from '@hooks/use-auth';
 import { useStoreLocation } from '@hooks/use-config';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
+import { AIAnalysisLoadingUI } from './students/components/AIAnalysisLoadingUI';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES, AI_SUB_MENU_ITEMS, DEFAULT_AI_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
 import type { AISubMenuId } from '../constants';
 import { createSafeNavigate } from '../utils';
+
+// 성과 분석 인사이트 생성 단계 정의 (컴포넌트 외부에 정의하여 불필요한 재생성 방지)
+const PERFORMANCE_INSIGHTS_STEPS = [
+  { step: 1, label: '데이터 수집 중', duration: 1000 },
+  { step: 2, label: 'AI 성과 분석 중', duration: 4000 },
+  { step: 3, label: '인사이트 생성 중', duration: 800 },
+] as const;
 
 export function AIPage() {
   const { showAlert } = useModal();
@@ -71,15 +76,12 @@ export function AIPage() {
 
   // 서브 메뉴 상태
   const validIds = AI_SUB_MENU_ITEMS.map(item => item.id) as readonly AISubMenuId[];
-  const [selectedSubMenu, setSelectedSubMenu] = useState<AISubMenuId>(() =>
-    getSubMenuFromUrl(searchParams, validIds, DEFAULT_AI_SUB_MENU)
-  );
+  const selectedSubMenu = getSubMenuFromUrl(searchParams, validIds, DEFAULT_AI_SUB_MENU);
 
-  const handleSubMenuChange = (id: AISubMenuId) => {
-    setSelectedSubMenu(id);
+  const handleSubMenuChange = useCallback((id: AISubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_AI_SUB_MENU);
-    window.history.replaceState(null, '', newUrl);
-  };
+    navigate(newUrl, { replace: true });
+  }, [navigate]);
   const { data: userRole } = useUserRole(); // 아키텍처 문서 2.4: Teacher는 요약만 접근 가능
   const isTeacher = userRole === 'teacher'; // Teacher는 요약만 볼 수 있음
   const terms = useIndustryTerms();
@@ -458,6 +460,9 @@ export function AIPage() {
   // 출결 이상 탐지 상세 모달 상태
   const [showAttendanceDetail, setShowAttendanceDetail] = useState(false);
 
+  // AI 분석 진행 상태 추적
+  const [currentAnalysisStep, setCurrentAnalysisStep] = useState<number>(0);
+
   // 월간 리포트 생성 - Edge Function 호출
   // Edge Function 응답 타입 정의
   interface GenerateInsightsResponse {
@@ -497,6 +502,35 @@ export function AIPage() {
     },
   });
 
+  // 성과 분석 진행 단계 시뮬레이션
+  useEffect(() => {
+    if (!generateReport.isPending) {
+      setCurrentAnalysisStep(0);
+      return;
+    }
+
+    // 분석 시작 시 첫 단계로 이동
+    setCurrentAnalysisStep(1);
+
+    // 각 단계별로 타이머 설정
+    const timers: NodeJS.Timeout[] = [];
+    let accumulatedTime = 0;
+
+    PERFORMANCE_INSIGHTS_STEPS.forEach((step, index) => {
+      if (index === 0) return; // 첫 단계는 즉시 시작
+
+      accumulatedTime += PERFORMANCE_INSIGHTS_STEPS[index - 1].duration;
+      const timer = setTimeout(() => {
+        setCurrentAnalysisStep(step.step);
+      }, accumulatedTime);
+      timers.push(timer);
+    });
+
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
+  }, [generateReport.isPending]);
+
   return (
     <ErrorBoundary>
       <div style={{ display: 'flex', height: 'var(--height-full)' }}>
@@ -512,7 +546,7 @@ export function AIPage() {
         )}
 
         {/* 메인 콘텐츠 */}
-        <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"} style={{ flex: 1, overflow: 'auto' }}>
+        <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"} style={{ flex: 1 }}>
           <PageHeader
             title="인공지능"
           />
@@ -674,8 +708,8 @@ export function AIPage() {
             </Card>
           ) : (
             <>
-              {/* 아키텍처 문서 3.7.1: 기본 화면에서는 서버가 생성한 "요약 카드" 중심으로 표시 (일부 타입에서만 AI 호출 발생) */}
-              {aiInsights && (
+              {/* AI 인사이트 탭 (기본) */}
+              {selectedSubMenu === 'insights' && aiInsights && (
                 <>
                   {/* Phase 1 MVP: 주간 브리핑 카드 (아키텍처 문서 3581줄: 매주 월요일 07:00 생성) */}
                   {aiInsights.weeklyBriefing && (
@@ -1083,8 +1117,114 @@ export function AIPage() {
                 </>
               )}
 
+              {/* 상담 요약 탭 */}
+              {selectedSubMenu === 'consultation-summary' && (
+                <div id="consultation-card">
+                  <ConsultationSummaryTab />
+                </div>
+              )}
+
+              {/* 이상 탐지 탭 */}
+              {selectedSubMenu === 'anomaly-detection' && (
+                <Card padding="lg">
+                  <h2 style={{ marginBottom: 'var(--spacing-md)' }}>{terms.ABSENCE_LABEL} 이상 탐지</h2>
+                  {aiInsights?.attendanceAnomalies && aiInsights.attendanceAnomalies.length > 0 ? (
+                    <AttendanceAnomalyDetailContent
+                      attendanceAnomalies={aiInsights.attendanceAnomalies}
+                      onNavigateToStudent={(studentId) => {
+                        safeNavigate(ROUTES.STUDENT_DETAIL(studentId));
+                      }}
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={Sparkles}
+                      message={`${terms.ABSENCE_LABEL} 이상 탐지 데이터가 없습니다.`}
+                      description="AI 분석이 완료되면 결과를 확인할 수 있습니다."
+                    />
+                  )}
+                </Card>
+              )}
+
+              {/* 성과 분석 탭 */}
+              {selectedSubMenu === 'performance' && (
+                <Card padding="lg">
+                  <h2 style={{ marginBottom: 'var(--spacing-md)' }}>{terms.GROUP_LABEL}/{terms.SUBJECT_LABEL} 성과 분석</h2>
+                  {generateReport.isPending ? (
+                    <AIAnalysisLoadingUI
+                      steps={PERFORMANCE_INSIGHTS_STEPS}
+                      currentStep={currentAnalysisStep}
+                      message="AI 성과 분석이 완료될 때까지 잠시만 기다려주세요."
+                    />
+                  ) : aiInsights?.performanceAnalysis && aiInsights.performanceAnalysis.length > 0 ? (
+                    <PerformanceDetailContent
+                      performanceAnalysis={aiInsights.performanceAnalysis}
+                      onNavigateToClass={(classId) => {
+                        safeNavigate(ROUTES.CLASS_DETAIL(classId));
+                      }}
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={Sparkles}
+                      message="성과 분석 데이터가 없습니다."
+                      description='"월간 리포트 생성" 버튼을 클릭하여 AI 분석을 실행하세요.'
+                    />
+                  )}
+                </Card>
+              )}
+
+              {/* 브리핑 탭 */}
+              {selectedSubMenu === 'briefing' && (
+                <>
+                  {/* 주간 브리핑 */}
+                  {aiInsights?.weeklyBriefing ? (
+                    <Card padding="lg" style={{ marginBottom: 'var(--spacing-md)' }}>
+                      <h2 style={{ marginBottom: 'var(--spacing-md)' }}>주간 브리핑</h2>
+                      <div style={{
+                        padding: 'var(--spacing-md)',
+                        backgroundColor: 'var(--color-background-secondary)',
+                        borderRadius: 'var(--border-radius-md)',
+                        whiteSpace: 'pre-wrap',
+                      }}>
+                        {aiInsights.weeklyBriefing.summary}
+                      </div>
+                    </Card>
+                  ) : (
+                    <Card padding="lg" style={{ marginBottom: 'var(--spacing-md)' }}>
+                      <EmptyState
+                        icon={Sparkles}
+                        message="주간 브리핑 데이터가 없습니다."
+                        description="매주 월요일 07:00에 자동 생성됩니다."
+                      />
+                    </Card>
+                  )}
+
+                  {/* 일일 브리핑 */}
+                  {aiInsights?.dailyBriefing ? (
+                    <Card padding="lg">
+                      <h2 style={{ marginBottom: 'var(--spacing-md)' }}>일일 브리핑</h2>
+                      <div style={{
+                        padding: 'var(--spacing-md)',
+                        backgroundColor: 'var(--color-background-secondary)',
+                        borderRadius: 'var(--border-radius-md)',
+                        whiteSpace: 'pre-wrap',
+                      }}>
+                        {aiInsights.dailyBriefing.summary}
+                      </div>
+                    </Card>
+                  ) : (
+                    <Card padding="lg">
+                      <EmptyState
+                        icon={Sparkles}
+                        message="일일 브리핑 데이터가 없습니다."
+                        description="매일 07:00에 자동 생성됩니다."
+                      />
+                    </Card>
+                  )}
+                </>
+              )}
+
               {/* 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동 - tab=consultation일 때 상담일지 요약 표시 */}
-              {tabParam === 'consultation' && (
+              {tabParam === 'consultation' && selectedSubMenu === 'insights' && (
                 <div id="consultation-card" style={{ marginTop: 'var(--spacing-md)' }}>
                   <ConsultationSummaryTab />
                 </div>
@@ -1163,6 +1303,13 @@ export function AIPage() {
   );
 }
 
+// AI 요약 생성 단계 정의
+const AI_CONSULTATION_SUMMARY_STEPS = [
+  { step: 1, label: '상담 내용 분석 중', duration: 500 },
+  { step: 2, label: 'AI 요약 생성 중', duration: 2000 },
+  { step: 3, label: '결과 저장 중', duration: 300 },
+] as const;
+
 /**
  * 상담일지 자동 요약 탭 컴포넌트
  * [요구사항 3.7] 상담일지 자동 요약
@@ -1173,15 +1320,11 @@ function ConsultationSummaryTab() {
   const tenantId = context.tenantId;
   const terms = useIndustryTerms();
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [generatingSummaryId, setGeneratingSummaryId] = useState<string | null>(null);
+  const [currentSummaryStep, setCurrentSummaryStep] = useState<number>(0);
 
   // 관리 대상 목록 조회
   const { data: students } = useStudents({});
-
-  // Schema Registry 연동 (아키텍처 문서 S3 참조)
-  const { data: studentSelectSchemaData } = useSchema('student_select', studentSelectFormSchema, 'form');
-
-  // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
-  const studentSelectSchema = studentSelectSchemaData || studentSelectFormSchema;
 
   // 선택된 관리 대상의 상담일지 조회
   const { data: consultations, isLoading: consultationsLoading } = useQuery({
@@ -1201,10 +1344,40 @@ function ConsultationSummaryTab() {
   // 서버가 AI 요약 생성
   const generateAISummary = useGenerateConsultationAISummary();
 
+  // AI 요약 생성 진행 단계 시뮬레이션
+  useEffect(() => {
+    if (!generatingSummaryId) {
+      setCurrentSummaryStep(0);
+      return;
+    }
+
+    // 분석 시작 시 첫 단계로 이동
+    setCurrentSummaryStep(1);
+
+    // 각 단계별로 타이머 설정
+    const timers: NodeJS.Timeout[] = [];
+    let accumulatedTime = 0;
+
+    AI_CONSULTATION_SUMMARY_STEPS.forEach((step, index) => {
+      if (index === 0) return; // 첫 단계는 즉시 시작
+
+      accumulatedTime += AI_CONSULTATION_SUMMARY_STEPS[index - 1].duration;
+      const timer = setTimeout(() => {
+        setCurrentSummaryStep(step.step);
+      }, accumulatedTime);
+      timers.push(timer);
+    });
+
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
+  }, [generatingSummaryId]);
+
   const handleGenerateSummary = async (consultationId: string) => {
     if (!selectedStudentId) return;
 
     try {
+      setGeneratingSummaryId(consultationId);
       await generateAISummary.mutateAsync({
         consultationId,
         studentId: selectedStudentId,
@@ -1212,6 +1385,8 @@ function ConsultationSummaryTab() {
       showAlert('AI 요약이 생성되었습니다.', '성공');
     } catch (error) {
       showAlert(error instanceof Error ? error.message : 'AI 요약 생성에 실패했습니다.', '오류');
+    } finally {
+      setGeneratingSummaryId(null);
     }
   };
 
@@ -1219,52 +1394,30 @@ function ConsultationSummaryTab() {
     <Card padding="lg">
       <h2 style={{ marginBottom: 'var(--spacing-md)' }}>상담일지 자동 요약</h2>
 
-      {/* 관리 대상 선택 - SchemaForm 사용 */}
-      {studentSelectSchema && studentSelectSchema.type === 'form' && students && (
+      {/* 관리 대상 선택 */}
+      {students && (
         <div style={{ marginBottom: 'var(--spacing-md)' }}>
-          <SchemaForm
-            schema={{
-              ...studentSelectSchema,
-              form: {
-                ...studentSelectSchema.form,
-                fields: [
-                  {
-                    ...studentSelectSchema.form.fields[0],
-                    options: [
-                      { value: '', label: `${terms.PERSON_LABEL_PRIMARY}을 선택하세요` },
-                      ...students.map((student) => ({
-                        value: student.id,
-                        label: student.name,
-                      })),
-                    ],
-                  },
-                ],
-              },
+          <label style={{ display: 'block', marginBottom: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>
+            {terms.PERSON_LABEL_PRIMARY} 선택
+          </label>
+          <select
+            value={selectedStudentId || ''}
+            onChange={(e) => setSelectedStudentId(e.target.value || null)}
+            style={{
+              width: '100%',
+              padding: 'var(--spacing-sm)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--border-radius-md)',
+              fontSize: 'var(--font-size-base)',
             }}
-            onSubmit={(data: Record<string, unknown>) => {
-              setSelectedStudentId((data.student_id as string) || null);
-            }}
-            defaultValues={{ student_id: selectedStudentId || '' }}
-              actionContext={{
-              apiCall: async (endpoint: string, method: string, body?: unknown) => {
-                if (method === 'POST') {
-                  const response = await apiClient.post(endpoint, body as Record<string, unknown>);
-                  if (response.error) {
-                    throw new Error(response.error.message);
-                  }
-                  return response.data;
-                }
-                const response = await apiClient.get(endpoint);
-                if (response.error) {
-                  throw new Error(response.error.message);
-                }
-                return response.data;
-              },
-              showToast: (message: string, variant?: string) => {
-                showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-              },
-            }}
-          />
+          >
+            <option value="">{terms.PERSON_LABEL_PRIMARY}을 선택하세요</option>
+            {students.map((student) => (
+              <option key={student.id} value={student.id}>
+                {student.name}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -1277,11 +1430,23 @@ function ConsultationSummaryTab() {
             </div>
           ) : consultations && consultations.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              {consultations.map((consultation: StudentConsultation) => (
+              {consultations.map((consultation: StudentConsultation) => {
+                // AI 요약 생성 중인지 확인
+                const isGenerating = generatingSummaryId === consultation.id;
+
+                return (
                 <Card
                   key={consultation.id}
                   padding="md"
                 >
+                  {/* AI 요약 생성 중일 때 로딩 UI 표시 */}
+                  {isGenerating ? (
+                    <AIAnalysisLoadingUI
+                      steps={AI_CONSULTATION_SUMMARY_STEPS}
+                      currentStep={currentSummaryStep}
+                      message="AI 요약이 완료될 때까지 잠시만 기다려주세요."
+                    />
+                  ) : (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
@@ -1313,13 +1478,15 @@ function ConsultationSummaryTab() {
                           onClick={() => handleGenerateSummary(consultation.id)}
                           disabled={generateAISummary.isPending}
                         >
-                          {generateAISummary.isPending ? '생성 중...' : 'AI 요약 생성'}
+                          AI 요약 생성
                         </Button>
                       )}
                     </div>
                   </div>
+                  )}
                 </Card>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <EmptyState

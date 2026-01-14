@@ -9,18 +9,16 @@
  * [요구사항] 월정액/횟수제/패키지 상품, 월 자동 청구 생성, 미납 관리, 결제 수단 지원
  */
 
-import React, { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState, useMemo, useCallback } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-// [SSOT] Barrel export를 통한 통합 import
-import { createSafeNavigate } from '../utils';
-import { ErrorBoundary, useModal, Modal, Container, Card, Button, useResponsiveMode, Drawer, PageHeader, isMobile, isTablet, SubSidebar } from '@ui-core/react';
+import { ErrorBoundary, useModal, Modal, Container, Card, Button, useResponsiveMode, Drawer, PageHeader, isMobile, isTablet, SubSidebar, Badge, EmptyState, NotificationCardLayout } from '@ui-core/react';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { SchemaForm, SchemaTable } from '@schema-engine';
 import { useSchema } from '@hooks/use-schema';
 import { useBillingHistory , fetchBillingHistory } from '@hooks/use-billing';
 import { fetchInvoiceItems } from '@hooks/use-invoice-items';
-import { useUpdateConfig } from '@hooks/use-config';
+import { useUpdateConfig, useConfig } from '@hooks/use-config';
 import type { UpdateConfigInput } from '@core/config';
 import { getApiContext, apiClient } from '@api-sdk/core';
 import { toKST } from '@lib/date-utils';
@@ -32,6 +30,8 @@ import { INVOICE_STATUS_LABELS } from '../utils/billingUtils';
 // [SSOT] Barrel export를 통한 통합 import
 import { BILLING_SUB_MENU_ITEMS, DEFAULT_BILLING_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
 import type { BillingSubMenuId } from '../constants';
+import { CardGridLayout } from '../components/CardGridLayout';
+import { Receipt, CreditCard, DollarSign, Package, CheckCircle, Clock, AlertCircle, Plus } from 'lucide-react';
 
 export function BillingPage() {
   const { showAlert } = useModal();
@@ -39,6 +39,7 @@ export function BillingPage() {
   const context = getApiContext();
   const tenantId = context.tenantId;
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const mode = useResponsiveMode();
   const terms = useIndustryTerms();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
@@ -46,24 +47,20 @@ export function BillingPage() {
   const isMobileMode = isMobile(modeUpper);
   const isTabletMode = isTablet(modeUpper);
 
-  // 서브 메뉴 상태
+  // 서브 메뉴 상태 (URL에서 직접 읽음 - StudentsHomePage 패턴)
   const validIds = BILLING_SUB_MENU_ITEMS.map(item => item.id) as readonly BillingSubMenuId[];
-  const [selectedSubMenu, setSelectedSubMenu] = useState<BillingSubMenuId>(() =>
-    getSubMenuFromUrl(searchParams, validIds, DEFAULT_BILLING_SUB_MENU)
-  );
+  const selectedSubMenu = getSubMenuFromUrl(searchParams, validIds, DEFAULT_BILLING_SUB_MENU);
 
-  const handleSubMenuChange = (id: BillingSubMenuId) => {
-    setSelectedSubMenu(id);
+  const handleSubMenuChange = useCallback((id: BillingSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_BILLING_SUB_MENU);
-    window.history.replaceState(null, '', newUrl);
-  };
+    navigate(newUrl, { replace: true });
+  }, [navigate]);
 
   const [filter, setFilter] = useState<{ status?: InvoiceStatus }>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showProductForm, setShowProductForm] = useState(false);
   const [showSettlementForm, setShowSettlementForm] = useState(false);
   const [showTeacherRevenueSplitForm, setShowTeacherRevenueSplitForm] = useState(false);
-  void createSafeNavigate; // 네비게이션 보안 유틸리티는 현재 사용하지 않음
   void showProductForm;
   void setShowProductForm;
   void showSettlementForm;
@@ -114,10 +111,7 @@ export function BillingPage() {
     },
   });
 
-  // P2 TODO: 상품 목록 조회
-  // 장기 계획: products 테이블 생성 후 실제 상품 관리 기능 구현
-  // 현재: invoice_items에서 임시로 상품 정보 추출
-  // 우선순위: 중간 (별도 페이지로 분리 권장)
+  // 상품 목록 조회
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ['products', tenantId],
     queryFn: async () => {
@@ -143,11 +137,49 @@ export function BillingPage() {
 
       return Array.from(productMap.values());
     },
-    enabled: false, // 상품 관리는 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙)
+    enabled: !!tenantId && selectedSubMenu === 'products',
   });
-  void products;
-  void productsLoading;
-  // const createProduct = useMutation({ ... });
+
+  // 결제 내역 조회
+  const { data: paymentHistory, isLoading: paymentsLoading } = useQuery({
+    queryKey: ['payment-history', tenantId],
+    queryFn: async () => {
+      if (!tenantId) return [];
+      // 결제 완료된 인보이스 조회
+      const invoices = await fetchBillingHistory(tenantId, {
+        status: 'paid',
+      });
+      return invoices;
+    },
+    enabled: !!tenantId && selectedSubMenu === 'payments',
+  });
+
+  // 수납 설정 조회
+  const { data: config } = useConfig();
+
+  // 결제 통계 계산
+  const paymentStats = useMemo(() => {
+    if (!invoices) return null;
+
+    const total = invoices.length;
+    const paid = invoices.filter((inv: BillingHistoryItem) => inv.status === 'paid').length;
+    const pending = invoices.filter((inv: BillingHistoryItem) => inv.status === 'pending').length;
+    const overdue = invoices.filter((inv: BillingHistoryItem) => inv.status === 'overdue').length;
+    const totalAmount = invoices.reduce((sum: number, inv: BillingHistoryItem) => sum + (inv.amount || 0), 0);
+    const paidAmount = invoices
+      .filter((inv: BillingHistoryItem) => inv.status === 'paid')
+      .reduce((sum: number, inv: BillingHistoryItem) => sum + (inv.amount_paid || 0), 0);
+
+    return {
+      total,
+      paid,
+      pending,
+      overdue,
+      totalAmount,
+      paidAmount,
+      collectionRate: total > 0 ? Math.round((paid / total) * 100) : 0,
+    };
+  }, [invoices]);
 
   // 매출 통계 조회는 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙)
 
@@ -268,7 +300,7 @@ export function BillingPage() {
         )}
 
         {/* 메인 콘텐츠 */}
-        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           <PageHeader
             title={`${terms.BILLING_LABEL} 관리`}
           />
@@ -414,7 +446,377 @@ export function BillingPage() {
             </>
           )}
 
-          {/* 상품 관리, 결제 관리, 매출/정산은 별도 페이지로 분리 (한 페이지에 하나의 기능 원칙) */}
+          {/* 결제 내역 탭 */}
+          {selectedSubMenu === 'payments' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
+              {/* 결제 통계 요약 */}
+              <CardGridLayout
+                cards={[
+                  <NotificationCardLayout
+                    key="total"
+                    icon={<Receipt />}
+                    title={`전체 ${terms.INVOICE_LABEL}`}
+                    value={paymentStats?.total || 0}
+                    unit="건"
+                    layoutMode="stats"
+                    iconBackgroundColor="var(--color-primary-50)"
+                  />,
+                  <NotificationCardLayout
+                    key="paid"
+                    icon={<CheckCircle />}
+                    title="결제 완료"
+                    value={paymentStats?.paid || 0}
+                    unit="건"
+                    layoutMode="stats"
+                    iconBackgroundColor="var(--color-success-50)"
+                  />,
+                  <NotificationCardLayout
+                    key="pending"
+                    icon={<Clock />}
+                    title="대기"
+                    value={paymentStats?.pending || 0}
+                    unit="건"
+                    layoutMode="stats"
+                    iconBackgroundColor="var(--color-warning-50)"
+                  />,
+                  <NotificationCardLayout
+                    key="overdue"
+                    icon={<AlertCircle />}
+                    title="미납"
+                    value={paymentStats?.overdue || 0}
+                    unit="건"
+                    layoutMode="stats"
+                    iconBackgroundColor="var(--color-error-50)"
+                  />,
+                ]}
+                desktopColumns={4}
+                tabletColumns={2}
+                mobileColumns={2}
+              />
+
+              {/* 수납률 카드 */}
+              <Card padding="lg">
+                <h3 style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  marginBottom: 'var(--spacing-md)',
+                }}>
+                  수납 현황
+                </h3>
+                <div style={{ display: 'flex', gap: 'var(--spacing-xl)', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '200px' }}>
+                    <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                      총 청구 금액
+                    </div>
+                    <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
+                      {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(paymentStats?.totalAmount || 0)}
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: '200px' }}>
+                    <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                      수납 금액
+                    </div>
+                    <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
+                      {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(paymentStats?.paidAmount || 0)}
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: '200px' }}>
+                    <div style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+                      수납률
+                    </div>
+                    <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
+                      {paymentStats?.collectionRate || 0}%
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* 최근 결제 내역 */}
+              <Card padding="lg">
+                <h3 style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  marginBottom: 'var(--spacing-md)',
+                }}>
+                  최근 결제 내역
+                </h3>
+                {paymentsLoading ? (
+                  <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+                    {terms.MESSAGES.LOADING}
+                  </div>
+                ) : paymentHistory && paymentHistory.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+                    {paymentHistory.slice(0, 10).map((payment: BillingHistoryItem) => (
+                      <div
+                        key={payment.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: 'var(--spacing-md)',
+                          backgroundColor: 'var(--color-bg-secondary)',
+                          borderRadius: 'var(--border-radius-md)',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--spacing-2xs)' }}>
+                            {payment.payer_name || '미지정'}
+                          </div>
+                          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                            {payment.paid_at ? toKST(payment.paid_at).format('YYYY-MM-DD HH:mm') : '-'}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-success)' }}>
+                            {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(payment.amount_paid || 0)}
+                          </div>
+                          <Badge variant="soft" color="success">결제 완료</Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState icon={CreditCard} message="결제 내역이 없습니다." />
+                )}
+              </Card>
+            </div>
+          )}
+
+          {/* 상품 관리 탭 */}
+          {selectedSubMenu === 'products' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
+              <Card padding="lg">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+                  <h3 style={{
+                    fontSize: 'var(--font-size-lg)',
+                    fontWeight: 'var(--font-weight-semibold)',
+                  }}>
+                    상품 목록
+                  </h3>
+                  <Button
+                    variant="solid"
+                    size="sm"
+                    onClick={() => setShowProductForm(true)}
+                  >
+                    <Plus size={16} style={{ marginRight: 'var(--spacing-xs)' }} />
+                    상품 추가
+                  </Button>
+                </div>
+                {productsLoading ? (
+                  <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+                    {terms.MESSAGES.LOADING}
+                  </div>
+                ) : products && products.length > 0 ? (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: 'var(--spacing-md)',
+                  }}>
+                    {products.map((product: { id: string; name: string; type: string; amount: number }) => (
+                      <Card key={product.id} padding="md">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
+                              <Package size={18} style={{ color: 'var(--color-primary)' }} />
+                              <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{product.name}</span>
+                            </div>
+                            <Badge variant="soft" color={product.type === 'monthly' ? 'blue' : product.type === 'count' ? 'green' : 'gray'}>
+                              {product.type === 'monthly' ? '월정액' : product.type === 'count' ? '횟수제' : '패키지'}
+                            </Badge>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>
+                              {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(product.amount)}
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState icon={Package} message="등록된 상품이 없습니다." />
+                )}
+              </Card>
+
+              {/* 상품 유형 안내 */}
+              <Card padding="lg">
+                <h3 style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  marginBottom: 'var(--spacing-md)',
+                }}>
+                  상품 유형 안내
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-md)' }}>
+                  <div style={{ padding: 'var(--spacing-md)', backgroundColor: 'var(--color-blue-50)', borderRadius: 'var(--border-radius-md)' }}>
+                    <div style={{ fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-blue-700)', marginBottom: 'var(--spacing-xs)' }}>
+                      월정액
+                    </div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-blue-600)' }}>
+                      매월 정기적으로 청구되는 상품입니다.
+                    </div>
+                  </div>
+                  <div style={{ padding: 'var(--spacing-md)', backgroundColor: 'var(--color-green-50)', borderRadius: 'var(--border-radius-md)' }}>
+                    <div style={{ fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-green-700)', marginBottom: 'var(--spacing-xs)' }}>
+                      횟수제
+                    </div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-green-600)' }}>
+                      수업 횟수에 따라 청구되는 상품입니다.
+                    </div>
+                  </div>
+                  <div style={{ padding: 'var(--spacing-md)', backgroundColor: 'var(--color-purple-50)', borderRadius: 'var(--border-radius-md)' }}>
+                    <div style={{ fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-purple-700)', marginBottom: 'var(--spacing-xs)' }}>
+                      패키지
+                    </div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-purple-600)' }}>
+                      여러 수업/서비스를 묶은 상품입니다.
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* 수납 설정 탭 */}
+          {selectedSubMenu === 'settings' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
+              {/* 자동 청구 설정 */}
+              <Card padding="lg">
+                <h3 style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  marginBottom: 'var(--spacing-md)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--spacing-sm)',
+                }}>
+                  <Clock size={20} />
+                  자동 청구 설정
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: 'var(--spacing-md)',
+                    backgroundColor: 'var(--color-bg-secondary)',
+                    borderRadius: 'var(--border-radius-md)',
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 'var(--font-weight-medium)' }}>월 자동 청구</div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                        매월 1일에 자동으로 청구서가 생성됩니다.
+                      </div>
+                    </div>
+                    <Badge variant="soft" color="success">활성</Badge>
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: 'var(--spacing-md)',
+                    backgroundColor: 'var(--color-bg-secondary)',
+                    borderRadius: 'var(--border-radius-md)',
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 'var(--font-weight-medium)' }}>청구 생성 시간</div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                        매일 04:00 KST에 자동 실행됩니다.
+                      </div>
+                    </div>
+                    <div style={{ fontWeight: 'var(--font-weight-semibold)' }}>04:00</div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* 미납 관리 설정 */}
+              <Card padding="lg">
+                <h3 style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  marginBottom: 'var(--spacing-md)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--spacing-sm)',
+                }}>
+                  <AlertCircle size={20} />
+                  미납 관리 설정
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: 'var(--spacing-md)',
+                    backgroundColor: 'var(--color-bg-secondary)',
+                    borderRadius: 'var(--border-radius-md)',
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 'var(--font-weight-medium)' }}>미납 자동 알림</div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                        납부 기한 초과 시 자동으로 알림을 발송합니다.
+                      </div>
+                    </div>
+                    <Badge variant="soft" color={(config?.notification?.auto_notification?.overdue) ? 'success' : 'gray'}>
+                      {(config?.notification?.auto_notification?.overdue) ? '활성' : '비활성'}
+                    </Badge>
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: 'var(--spacing-md)',
+                    backgroundColor: 'var(--color-bg-secondary)',
+                    borderRadius: 'var(--border-radius-md)',
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 'var(--font-weight-medium)' }}>미납 기준</div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                        납부 기한 경과 후 미납으로 처리됩니다.
+                      </div>
+                    </div>
+                    <div style={{ fontWeight: 'var(--font-weight-semibold)' }}>납부 기한 초과</div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* 강사 매출 배분 설정 */}
+              <Card padding="lg">
+                <h3 style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  marginBottom: 'var(--spacing-md)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--spacing-sm)',
+                }}>
+                  <DollarSign size={20} />
+                  {terms.STAFF_REVENUE_DISTRIBUTION} 설정
+                </h3>
+                <div style={{
+                  padding: 'var(--spacing-md)',
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  borderRadius: 'var(--border-radius-md)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 'var(--font-weight-medium)' }}>{terms.STAFF_REVENUE_DISTRIBUTION}</div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                        {terms.PERSON_LABEL_SECONDARY}별 매출 배분을 설정합니다.
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowTeacherRevenueSplitForm(true)}
+                    >
+                      설정
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
         </Container>
       </div>
     </ErrorBoundary>

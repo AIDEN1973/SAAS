@@ -234,7 +234,7 @@
   --size-avatar-lg: 3rem;               /* 48px - 아바타 큰 크기 */
   --size-avatar-xl: 4rem;                /* 64px - 아바타 매우 큰 크기 */
   --size-tooltip-max-width: 12.5rem;    /* 200px - 툴팁 최대 너비 */
-  --spacing-tooltip-offset: 0.25rem;     /* 4px - 툴팁과 트리거 사이 간격 */
+  --spacing-tooltip-offset: 0.5rem;      /* 8px - 툴팁과 트리거 사이 간격 */
   --size-tooltip-arrow: 0.3125rem;       /* 5px - 툴팁 화살표 크기 (테두리) */
   --size-tooltip-arrow-inner: 0.25rem;   /* 4px - 툴팁 화살표 내부 크기 (배경) */
   --size-spinner-xs: 1rem;              /* 16px - 스피너 작은 크기 */

@@ -78,32 +78,38 @@ function extractTenantIdFromJWT(authHeader: string | null): string | null {
 }
 
 async function generateAIInsights(openaiApiKey: string, classData: ClassPerformanceData): Promise<DetailInsight[]> {
-  const prompt = `다음은 학원 반(클래스)의 종합 성과 데이터입니다. 분석하여 3-5개의 핵심 인사이트를 JSON 배열로 제공해주세요.
+  const prompt = `다음은 그룹(클래스)의 종합 성과 데이터입니다. 구체적이고 실행 가능한 인사이트를 3-5개 제공해주세요.
 
-## 반 기본 정보
-- 반 이름: ${classData.class_name}
-${classData.subject ? `- 과목: ${classData.subject}` : ''}
-${classData.grade ? `- 대상 학년: ${classData.grade}` : ''}
+## 그룹 기본 정보
+- 그룹 이름: ${classData.class_name}
+${classData.subject ? `- 주제/과목: ${classData.subject}` : ''}
+${classData.grade ? `- 대상 레벨: ${classData.grade}` : ''}
 
 ## 출석 현황 (최근 7일)
 - 출석률: ${classData.attendance_rate}%, 결석률: ${classData.absent_rate}%, 지각률: ${classData.late_rate}%
-- 출석 추세: ${classData.attendance_trend}, 총 수업 횟수: ${classData.total_sessions}회
+- 출석 추세: ${classData.attendance_trend}, 총 세션 횟수: ${classData.total_sessions}회
 
-## 학생 현황
-- 현재 학생 수: ${classData.student_count}명, 정원: ${classData.max_students}명, 정원 충족률: ${classData.capacity_rate}%
+## 구성원 현황
+- 현재 인원: ${classData.student_count}명, 정원: ${classData.max_students}명, 정원 충족률: ${classData.capacity_rate}%
 - 최근 신규 등록: ${classData.new_enrollments}명, 이탈: ${classData.withdrawals}명, 등록 추세: ${classData.enrollment_trend}
 
 ## 상담 현황 (최근 30일)
-- 총 상담: ${classData.consultation_count}건, 학습: ${classData.learning_consultations}건, 행동: ${classData.behavior_consultations}건
+- 총 상담: ${classData.consultation_count}건, 진행: ${classData.learning_consultations}건, 행동: ${classData.behavior_consultations}건
 
 ## 수납 현황
 - 수납률: ${classData.billing_collection_rate}%, 미납: ${classData.overdue_count}건, 총 매출: ${classData.total_revenue.toLocaleString()}원
 
-## 강사 배정
-- 담당 강사: ${classData.teacher_count}명, 담임 배정: ${classData.has_main_teacher ? '있음' : '없음'}
+## 담당자 배정
+- 담당자: ${classData.teacher_count}명, 메인 담당자 배정: ${classData.has_main_teacher ? '있음' : '없음'}
+
+중요:
+- 두리뭉실한 표현 금지 (예: "개선이 필요합니다" → 구체적 수치와 액션 제시)
+- 구체적인 수치를 반드시 포함 (예: "출석률 ${classData.attendance_rate}%로 목표 90% 대비 ${90 - classData.attendance_rate}%p 부족")
+- 실행 가능한 조치사항 명시 (예: "결석률 ${classData.absent_rate}% 구성원 개별 면담 권장")
+- 업종 중립적 용어 사용 (학생→구성원, 강사→담당자, 반→그룹 등)
 
 응답 형식:
-[{"type": "improvement|strength|pattern|warning|opportunity", "title": "제목(15자이내)", "description": "설명(80자이내)", "severity": "high|medium|low", "category": "attendance|enrollment|consultation|billing|capacity|teacher"}]`;
+[{"type": "improvement|strength|pattern|warning|opportunity", "title": "제목(20자이내)", "description": "구체적 수치 포함 설명(120자이내)", "severity": "high|medium|low", "category": "attendance|enrollment|consultation|billing|capacity|teacher"}]`;
 
   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -111,11 +117,11 @@ ${classData.grade ? `- 대상 학년: ${classData.grade}` : ''}
     body: JSON.stringify({
       model: 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: '학원 운영 데이터 분석 전문가. JSON 배열만 응답.' },
+        { role: 'system', content: '운영 데이터 분석 전문가. 구체적 수치와 실행 가능한 조치사항을 포함하여 JSON 배열만 응답. 추상적이거나 두리뭉실한 표현 금지. 업종 중립적 용어 사용.' },
         { role: 'user', content: prompt },
       ],
-      temperature: 0.4,
-      max_tokens: 800,
+      temperature: 0.3,
+      max_tokens: 1200,
     }),
   });
 

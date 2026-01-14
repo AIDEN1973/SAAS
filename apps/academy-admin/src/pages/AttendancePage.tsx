@@ -15,9 +15,9 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ErrorBoundary, Container, Card, Button, Badge, Select, useModal, BottomActionBar, PageHeader, useResponsiveMode, isMobile, isTablet, NotificationCardLayout, DataTable, SubSidebar } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, Button, Badge, Select, useModal, BottomActionBar, PageHeader, useResponsiveMode, isMobile, isTablet, NotificationCardLayout, DataTable, SubSidebar, EmptyState } from '@ui-core/react';
 import { CardGridLayout } from '../components/CardGridLayout';
-import { Users, UserCheck, Clock, UserX, Smartphone, CalendarCheck, History, BarChart3, Settings } from 'lucide-react';
+import { Users, UserCheck, Clock, UserX, CalendarCheck, History, BarChart3, Settings, CheckCircle, Smartphone, TrendingUp, Bell } from 'lucide-react';
 import { ATTENDANCE_SUB_MENU_ITEMS, DEFAULT_ATTENDANCE_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
 import type { AttendanceSubMenuId } from '../constants';
 import { useSearchParams, useNavigate } from 'react-router-dom';
@@ -31,6 +31,7 @@ import { toKST } from '@lib/date-utils';
 // import { useUserRole } from '@hooks/use-auth'; // TODO: 권한 체크 구현 시 사용
 import { useQuery } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
+import { useConfig, useUpdateConfig } from '@hooks/use-config';
 
 // 학생 출결 상태 인터페이스
 interface StudentAttendanceState {
@@ -86,7 +87,9 @@ export function AttendancePage() {
   const [studentAttendanceStates, setStudentAttendanceStates] = useState<Record<string, StudentAttendanceState>>({});
   const studentAttendanceStatesRef = useRef<Record<string, StudentAttendanceState>>({});
   // 최신 상태를 ref에 동기화 (useEffect 내에서 클로저 문제 방지)
-  studentAttendanceStatesRef.current = studentAttendanceStates;
+  useEffect(() => {
+    studentAttendanceStatesRef.current = studentAttendanceStates;
+  }, [studentAttendanceStates]);
   const [isSaving, setIsSaving] = useState(false);
 
   // 필터 상태 (출결 기록 조회는 Advanced 메뉴로 이동 - 아키텍처 문서에 명시되지 않음)
@@ -105,6 +108,11 @@ export function AttendancePage() {
 
   // 전역 모달 훅 사용
   const { showAlert } = useModal();
+
+  // 출결 설정 조회 및 업데이트
+  const { data: config } = useConfig();
+  const updateConfig = useUpdateConfig();
+  void updateConfig; // TODO: 출결 설정 업데이트 기능 구현 시 사용
 
   // URL 쿼리 파라미터와 연동된 서브 사이드바 상태
   const [searchParams] = useSearchParams();
@@ -178,7 +186,7 @@ export function AttendancePage() {
 
   // 데이터 조회
   const { data: attendanceLogsData, isLoading: isLoadingLogs, error: errorLogs } = useAttendanceLogs(filter);
-  const attendanceLogs = useMemo(() => attendanceLogsData || [], [attendanceLogsData]);
+  const attendanceLogs: AttendanceLog[] = useMemo(() => attendanceLogsData || [], [attendanceLogsData]);
   const { data: students, isLoading: isLoadingStudents, error: errorStudents } = useStudents();
   const { data: classes, isLoading: isLoadingClasses, error: errorClasses } = useClasses();
 
@@ -430,7 +438,7 @@ export function AttendancePage() {
 
     filteredStudents.forEach(student => {
       // 사용자가 수정 중인 상태는 보존 (ref를 통해 최신 상태 참조)
-      const currentState = studentAttendanceStatesRef.current[student.id];
+      const currentState: StudentAttendanceState | undefined = studentAttendanceStatesRef.current[student.id];
       if (currentState?.user_modified) {
         newStates[student.id] = currentState;
         return;
@@ -778,12 +786,13 @@ export function AttendancePage() {
         )}
 
         {/* 메인 콘텐츠 */}
-        <Container maxWidth="xl" padding="lg" style={{ flex: 1, overflow: 'auto' }}>
+        <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           <PageHeader
             title={subMenuItemsWithIcons.find(item => item.id === selectedSubMenu)?.label || '출결관리'}
           />
 
-        {/* 출결 화면 */}
+        {/* 오늘 출결 탭 */}
+        {selectedSubMenu === 'today' && (
         <>
               {/* AttendanceSummary: 총원/출석/지각/결석 (아키텍처 문서 3.3.3: 상단 통계) */}
               <div style={{ marginBottom: 'var(--spacing-xl)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
@@ -1408,6 +1417,513 @@ export function AttendancePage() {
                 </Card>
               )}
         </>
+        )}
+
+        {/* 출결 기록 탭 */}
+        {selectedSubMenu === 'history' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
+            <Card padding="lg">
+              <h3 style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 'var(--font-weight-semibold)',
+                marginBottom: 'var(--spacing-md)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacing-sm)',
+              }}>
+                <History size={20} />
+                출결 기록 조회
+              </h3>
+              {/* 필터 */}
+              <div style={{ display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap', marginBottom: 'var(--spacing-lg)' }}>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    marginBottom: 'var(--spacing-xs)',
+                  }}>
+                    시작일
+                  </label>
+                  <input
+                    type="date"
+                    value={filter.date_from}
+                    onChange={(e) => setFilter(prev => ({ ...prev, date_from: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: 'var(--spacing-sm) var(--spacing-md)',
+                      border: 'var(--border-width-thin) solid var(--color-border)',
+                      borderRadius: 'var(--border-radius-md)',
+                      fontSize: 'var(--font-size-base)',
+                    }}
+                  />
+                </div>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    marginBottom: 'var(--spacing-xs)',
+                  }}>
+                    종료일
+                  </label>
+                  <input
+                    type="date"
+                    value={filter.date_to}
+                    onChange={(e) => setFilter(prev => ({ ...prev, date_to: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: 'var(--spacing-sm) var(--spacing-md)',
+                      border: 'var(--border-width-thin) solid var(--color-border)',
+                      borderRadius: 'var(--border-radius-md)',
+                      fontSize: 'var(--font-size-base)',
+                    }}
+                  />
+                </div>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    marginBottom: 'var(--spacing-xs)',
+                  }}>
+                    수업
+                  </label>
+                  <select
+                    value={filter.class_id || ''}
+                    onChange={(e) => setFilter(prev => ({ ...prev, class_id: e.target.value || undefined }))}
+                    style={{
+                      width: '100%',
+                      padding: 'var(--spacing-sm) var(--spacing-md)',
+                      border: 'var(--border-width-thin) solid var(--color-border)',
+                      borderRadius: 'var(--border-radius-md)',
+                      fontSize: 'var(--font-size-base)',
+                    }}
+                  >
+                    <option value="">전체 수업</option>
+                    {(classes || []).map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              {/* 출결 기록 목록 */}
+              {isLoadingLogs ? (
+                <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+                  {terms.MESSAGES.LOADING}
+                </div>
+              ) : attendanceLogs && attendanceLogs.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+                  {attendanceLogs.slice(0, 50).map((log) => {
+                    const student = students?.find(s => s.id === log.student_id);
+                    return (
+                      <div
+                        key={log.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: 'var(--spacing-md)',
+                          backgroundColor: 'var(--color-bg-secondary)',
+                          borderRadius: 'var(--border-radius-md)',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--spacing-2xs)' }}>
+                            {student?.name || log.student_id}
+                          </div>
+                          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                            {toKST(log.occurred_at).format('YYYY-MM-DD HH:mm')}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                          <Badge
+                            variant="soft"
+                            color={log.attendance_type === 'check_in' ? 'blue' : 'green'}
+                          >
+                            {log.attendance_type === 'check_in' ? terms.CHECK_IN_LABEL : terms.CHECK_OUT_LABEL}
+                          </Badge>
+                          <Badge
+                            variant="soft"
+                            color={
+                              log.status === 'present' ? 'success' :
+                              log.status === 'late' ? 'warning' :
+                              log.status === 'absent' ? 'error' : 'gray'
+                            }
+                          >
+                            {log.status === 'present' ? terms.PRESENT_LABEL :
+                             log.status === 'late' ? terms.LATE_LABEL :
+                             log.status === 'absent' ? terms.ABSENCE_LABEL : terms.EXCUSED_LABEL}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <EmptyState icon={History} message="출결 기록이 없습니다." />
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* 출결 통계 탭 */}
+        {selectedSubMenu === 'statistics' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
+            {/* 요약 통계 */}
+            <CardGridLayout
+              cards={[
+                <NotificationCardLayout
+                  key="total"
+                  icon={<Users />}
+                  title="총 출결 기록"
+                  value={attendanceLogs.length}
+                  unit="건"
+                  layoutMode="stats"
+                  iconBackgroundColor="var(--color-primary-50)"
+                />,
+                <NotificationCardLayout
+                  key="present"
+                  icon={<UserCheck />}
+                  title={terms.PRESENT_LABEL}
+                  value={attendanceLogs.filter(log => log.status === 'present').length}
+                  unit="건"
+                  layoutMode="stats"
+                  iconBackgroundColor="var(--color-success-50)"
+                />,
+                <NotificationCardLayout
+                  key="late"
+                  icon={<Clock />}
+                  title={terms.LATE_LABEL}
+                  value={attendanceLogs.filter(log => log.status === 'late').length}
+                  unit="건"
+                  layoutMode="stats"
+                  iconBackgroundColor="var(--color-warning-50)"
+                />,
+                <NotificationCardLayout
+                  key="absent"
+                  icon={<UserX />}
+                  title={terms.ABSENCE_LABEL}
+                  value={attendanceLogs.filter(log => log.status === 'absent').length}
+                  unit="건"
+                  layoutMode="stats"
+                  iconBackgroundColor="var(--color-error-50)"
+                />,
+              ]}
+              desktopColumns={4}
+              tabletColumns={2}
+              mobileColumns={2}
+            />
+
+            {/* 출석률 카드 */}
+            <Card padding="lg">
+              <h3 style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 'var(--font-weight-semibold)',
+                marginBottom: 'var(--spacing-md)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacing-sm)',
+              }}>
+                <TrendingUp size={20} />
+                출석률 현황
+              </h3>
+              {attendanceLogs.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+                  {/* 출석률 */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--spacing-xs)' }}>
+                      <span>{terms.PRESENT_LABEL}</span>
+                      <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>
+                        {Math.round((attendanceLogs.filter(log => log.status === 'present').length / attendanceLogs.length) * 100)}%
+                      </span>
+                    </div>
+                    <div style={{
+                      height: '8px',
+                      backgroundColor: 'var(--color-gray-100)',
+                      borderRadius: 'var(--border-radius-full)',
+                      overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        width: `${Math.round((attendanceLogs.filter(log => log.status === 'present').length / attendanceLogs.length) * 100)}%`,
+                        height: '100%',
+                        backgroundColor: 'var(--color-success)',
+                        borderRadius: 'var(--border-radius-full)',
+                      }} />
+                    </div>
+                  </div>
+                  {/* 지각률 */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--spacing-xs)' }}>
+                      <span>{terms.LATE_LABEL}</span>
+                      <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>
+                        {Math.round((attendanceLogs.filter(log => log.status === 'late').length / attendanceLogs.length) * 100)}%
+                      </span>
+                    </div>
+                    <div style={{
+                      height: '8px',
+                      backgroundColor: 'var(--color-gray-100)',
+                      borderRadius: 'var(--border-radius-full)',
+                      overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        width: `${Math.round((attendanceLogs.filter(log => log.status === 'late').length / attendanceLogs.length) * 100)}%`,
+                        height: '100%',
+                        backgroundColor: 'var(--color-warning)',
+                        borderRadius: 'var(--border-radius-full)',
+                      }} />
+                    </div>
+                  </div>
+                  {/* 결석률 */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--spacing-xs)' }}>
+                      <span>{terms.ABSENCE_LABEL}</span>
+                      <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>
+                        {Math.round((attendanceLogs.filter(log => log.status === 'absent').length / attendanceLogs.length) * 100)}%
+                      </span>
+                    </div>
+                    <div style={{
+                      height: '8px',
+                      backgroundColor: 'var(--color-gray-100)',
+                      borderRadius: 'var(--border-radius-full)',
+                      overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        width: `${Math.round((attendanceLogs.filter(log => log.status === 'absent').length / attendanceLogs.length) * 100)}%`,
+                        height: '100%',
+                        backgroundColor: 'var(--color-error)',
+                        borderRadius: 'var(--border-radius-full)',
+                      }} />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <EmptyState icon={BarChart3} message="통계 데이터가 없습니다." />
+              )}
+            </Card>
+
+            {/* 키오스크 사용 통계 */}
+            <Card padding="lg">
+              <h3 style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 'var(--font-weight-semibold)',
+                marginBottom: 'var(--spacing-md)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacing-sm)',
+              }}>
+                <Smartphone size={20} />
+                체크인 방법별 통계
+              </h3>
+              {attendanceLogs.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--spacing-md)' }}>
+                  <div style={{
+                    textAlign: 'center',
+                    padding: 'var(--spacing-md)',
+                    backgroundColor: 'var(--color-bg-secondary)',
+                    borderRadius: 'var(--border-radius-md)',
+                  }}>
+                    <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
+                      {attendanceLogs.filter(log => log.check_in_method === 'manual' || !log.check_in_method).length}
+                    </div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>수동 입력</div>
+                  </div>
+                  <div style={{
+                    textAlign: 'center',
+                    padding: 'var(--spacing-md)',
+                    backgroundColor: 'var(--color-success-50)',
+                    borderRadius: 'var(--border-radius-md)',
+                  }}>
+                    <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
+                      {attendanceLogs.filter(log => log.check_in_method === 'kiosk_phone').length}
+                    </div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-success-700)' }}>키오스크</div>
+                  </div>
+                  <div style={{
+                    textAlign: 'center',
+                    padding: 'var(--spacing-md)',
+                    backgroundColor: 'var(--color-info-50)',
+                    borderRadius: 'var(--border-radius-md)',
+                  }}>
+                    <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-info)' }}>
+                      {attendanceLogs.filter(log => log.check_in_method === 'qr_scan').length}
+                    </div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-info-700)' }}>QR 스캔</div>
+                  </div>
+                </div>
+              ) : (
+                <EmptyState icon={Smartphone} message="체크인 데이터가 없습니다." />
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* 출결 설정 탭 */}
+        {selectedSubMenu === 'settings' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
+            {/* 지각/결석 기준 설정 */}
+            <Card padding="lg">
+              <h3 style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 'var(--font-weight-semibold)',
+                marginBottom: 'var(--spacing-md)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacing-sm)',
+              }}>
+                <Clock size={20} />
+                지각/결석 기준 설정
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: 'var(--spacing-md)',
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  borderRadius: 'var(--border-radius-md)',
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 'var(--font-weight-medium)' }}>지각 기준</div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                      수업 시작 후 해당 시간이 지나면 지각으로 처리됩니다.
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                    <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>
+                      {config?.attendance?.late_after || 10}분
+                    </span>
+                  </div>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: 'var(--spacing-md)',
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  borderRadius: 'var(--border-radius-md)',
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 'var(--font-weight-medium)' }}>결석 기준</div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                      수업 시작 후 해당 시간이 지나면 결석으로 처리됩니다.
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                    <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>
+                      {config?.attendance?.absent_after || 30}분
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* 자동 알림 설정 */}
+            <Card padding="lg">
+              <h3 style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 'var(--font-weight-semibold)',
+                marginBottom: 'var(--spacing-md)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacing-sm)',
+              }}>
+                <Bell size={20} />
+                자동 알림 설정
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: 'var(--spacing-md)',
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  borderRadius: 'var(--border-radius-md)',
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 'var(--font-weight-medium)' }}>등원 알림</div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                      {terms.PERSON_LABEL_PRIMARY} 등원 시 보호자에게 자동으로 알림을 발송합니다.
+                    </div>
+                  </div>
+                  <Badge variant="soft" color={(config?.notification?.auto_notification?.check_in) ? 'success' : 'gray'}>
+                    {(config?.notification?.auto_notification?.check_in) ? '활성' : '비활성'}
+                  </Badge>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: 'var(--spacing-md)',
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  borderRadius: 'var(--border-radius-md)',
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 'var(--font-weight-medium)' }}>하원 알림</div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                      {terms.PERSON_LABEL_PRIMARY} 하원 시 보호자에게 자동으로 알림을 발송합니다.
+                    </div>
+                  </div>
+                  <Badge variant="soft" color={(config?.notification?.auto_notification?.check_out) ? 'success' : 'gray'}>
+                    {(config?.notification?.auto_notification?.check_out) ? '활성' : '비활성'}
+                  </Badge>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: 'var(--spacing-md)',
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  borderRadius: 'var(--border-radius-md)',
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 'var(--font-weight-medium)' }}>결석 알림</div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                      결석 처리 시 보호자에게 자동으로 알림을 발송합니다.
+                    </div>
+                  </div>
+                  <Badge variant="soft" color={(config?.notification?.auto_notification?.absent) ? 'success' : 'gray'}>
+                    {(config?.notification?.auto_notification?.absent) ? '활성' : '비활성'}
+                  </Badge>
+                </div>
+              </div>
+            </Card>
+
+            {/* 알림 채널 설정 */}
+            <Card padding="lg">
+              <h3 style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 'var(--font-weight-semibold)',
+                marginBottom: 'var(--spacing-md)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacing-sm)',
+              }}>
+                <CheckCircle size={20} />
+                알림 채널 설정
+              </h3>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: 'var(--spacing-md)',
+                backgroundColor: 'var(--color-bg-secondary)',
+                borderRadius: 'var(--border-radius-md)',
+              }}>
+                <div>
+                  <div style={{ fontWeight: 'var(--font-weight-medium)' }}>기본 알림 채널</div>
+                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                    출결 알림을 발송할 기본 채널을 설정합니다.
+                  </div>
+                </div>
+                <Badge variant="solid" color="primary">
+                  {config?.notification?.default_channel === 'kakao_at' ? '카카오 알림톡' :
+                   config?.notification?.default_channel === 'sms' ? 'SMS' : 'SMS'}
+                </Badge>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {/* 통계/히트맵/패턴 분석 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8) */}
         </Container>
