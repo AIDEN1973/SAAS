@@ -164,11 +164,20 @@ export async function fetchStudents(
       const personsData = response.data || [];
       const studentIds = personsData.map((p: Person) => p.id);
 
-      // 학부모 정보 조회 (주 보호자만)
-      const guardiansResponse = await apiClient.get<Guardian>('guardians', {
-        filters: { student_id: studentIds, is_primary: true },
-      });
-      const guardiansMap = new Map();
+      // [N+1 최적화] 학부모 정보와 학생 반 정보를 병렬로 조회
+      const [guardiansResponse, studentClassesResponse] = await Promise.all([
+        // 학부모 정보 조회 (주 보호자만)
+        apiClient.get<Guardian>('guardians', {
+          filters: { student_id: studentIds, is_primary: true },
+        }),
+        // 학생 반 정보 조회 (활성 반만)
+        apiClient.get<StudentClass>('student_classes', {
+          filters: { student_id: studentIds, is_active: true },
+        }),
+      ]);
+
+      // 학부모 Map 생성
+      const guardiansMap = new Map<string, string>();
       if (!guardiansResponse.error && guardiansResponse.data) {
         guardiansResponse.data.forEach((g: Guardian) => {
           if (!guardiansMap.has(g.student_id)) {
@@ -177,11 +186,8 @@ export async function fetchStudents(
         });
       }
 
-      // 대표반 정보 조회 (활성 반 중 첫 번째)
-      const studentClassesResponse = await apiClient.get<StudentClass>('student_classes', {
-        filters: { student_id: studentIds, is_active: true },
-      });
-      const studentClassMap = new Map();
+      // 대표반 정보 조회 (반 ID 추출 후 반 정보 조회)
+      const studentClassMap = new Map<string, string>();
       if (!studentClassesResponse.error && studentClassesResponse.data) {
         const classIds = [...new Set(studentClassesResponse.data.map((sc: StudentClass) => sc.class_id))];
         if (classIds.length > 0) {
@@ -192,7 +198,7 @@ export async function fetchStudents(
             const classMap = new Map(classesResponse.data.map((c: Class) => [c.id, c.name]));
             studentClassesResponse.data.forEach((sc: StudentClass) => {
               if (!studentClassMap.has(sc.student_id) && classMap.has(sc.class_id)) {
-                studentClassMap.set(sc.student_id, classMap.get(sc.class_id));
+                studentClassMap.set(sc.student_id, classMap.get(sc.class_id)!);
               }
             });
           }
@@ -708,25 +714,35 @@ export function useCreateStudent() {
         throw new Error(academyResponse.error.message);
       }
 
-      // 3. 보호자 정보 생성
-      if (input.guardians && input.guardians.length > 0) {
-        for (const guardian of input.guardians) {
-          await apiClient.post<Guardian>('guardians', {
-            student_id: person.id,
-            ...guardian,
-          });
-        }
-      }
+      // [N+1 최적화] 3. 보호자 정보와 태그 연결을 병렬로 처리
+      const guardianPromises = (input.guardians && input.guardians.length > 0)
+        ? input.guardians.map((guardian) =>
+            apiClient.post<Guardian>('guardians', {
+              student_id: person.id,
+              ...guardian,
+            })
+          )
+        : [];
 
-      // 4. 태그 연결
-      if (input.tag_ids && input.tag_ids.length > 0) {
-        for (const tagId of input.tag_ids) {
-          await apiClient.post('tag_assignments', {
-            entity_id: person.id,
-            entity_type: 'student',
-            tag_id: tagId,
-          });
-        }
+      const tagPromises = (input.tag_ids && input.tag_ids.length > 0)
+        ? input.tag_ids.map((tagId) =>
+            apiClient.post('tag_assignments', {
+              entity_id: person.id,
+              entity_type: 'student',
+              tag_id: tagId,
+            })
+          )
+        : [];
+
+      // 보호자와 태그 생성을 병렬로 실행
+      const results = await Promise.all([...guardianPromises, ...tagPromises]);
+
+      // 에러 확인 (하나라도 실패하면 롤백)
+      const failedResult = results.find((r) => r.error);
+      if (failedResult) {
+        // 롤백: persons 및 academy_students는 cascade로 삭제됨
+        await apiClient.delete('persons', person.id);
+        throw new Error(failedResult.error?.message || 'Failed to create guardian or tag');
       }
 
       // 5. Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
@@ -792,89 +808,107 @@ export function useBulkCreateStudents() {
 
   return useMutation({
     mutationFn: async (students: CreateStudentInput[]) => {
-      // [불변 규칙] api-sdk를 통해서만 데이터 요청
-      // 일괄 등록은 여러 개의 POST 요청으로 처리
+      // [N+1 최적화] 일괄 등록을 병렬 처리 (최대 10개씩 배치)
+      const BATCH_SIZE = 10;
       const results: Student[] = [];
       const errors: Array<{ index: number; error: string }> = [];
 
-      for (let i = 0; i < students.length; i++) {
-        try {
-          // 1. persons 테이블에 생성
-          const personResponse = await apiClient.post<Person>('persons', {
-            name: students[i].name,
-            email: students[i].email,
-            phone: students[i].phone,
-            address: students[i].address,
+      interface AcademyStudent {
+        person_id: string;
+        tenant_id: string;
+        birth_date?: string;
+        gender?: string;
+        school_name?: string;
+        grade?: string;
+        class_name?: string;
+        status?: string;
+        notes?: string;
+        profile_image_url?: string;
+        created_at: string;
+        updated_at: string;
+        created_by?: string;
+        updated_by?: string;
+      }
+
+      // 배치 단위로 처리
+      for (let batchStart = 0; batchStart < students.length; batchStart += BATCH_SIZE) {
+        const batch = students.slice(batchStart, batchStart + BATCH_SIZE);
+
+        // [N+1 최적화] 1. 배치 내 persons 생성을 병렬로 처리
+        const personPromises = batch.map((student) =>
+          apiClient.post<Person>('persons', {
+            name: student.name,
+            email: student.email,
+            phone: student.phone,
+            address: student.address,
             person_type: 'student',
-          });
+          })
+        );
 
-          if (personResponse.error) {
-            throw new Error(personResponse.error.message);
+        const personResponses = await Promise.all(personPromises);
+
+        // [N+1 최적화] 2. 성공한 persons에 대해 academy_students 생성을 병렬로 처리
+        const academyPromises: Promise<any>[] = [];
+        const validPersons: { index: number; person: Person; student: CreateStudentInput }[] = [];
+
+        personResponses.forEach((response, i) => {
+          const globalIndex = batchStart + i;
+          if (response.error) {
+            errors.push({ index: globalIndex, error: response.error.message });
+          } else if (response.data) {
+            validPersons.push({
+              index: globalIndex,
+              person: response.data,
+              student: batch[i],
+            });
+            academyPromises.push(
+              apiClient.post<AcademyStudent>('academy_students', {
+                person_id: response.data.id,
+                birth_date: batch[i].birth_date,
+                gender: batch[i].gender,
+                school_name: batch[i].school_name,
+                grade: batch[i].grade,
+                status: batch[i].status || 'active',
+                notes: batch[i].notes,
+                profile_image_url: batch[i].profile_image_url,
+              })
+            );
           }
+        });
 
-          const person = personResponse.data!;
+        const academyResponses = await Promise.all(academyPromises);
 
-          // 2. academy_students 테이블에 확장 정보 추가
-          interface AcademyStudent {
-            person_id: string;
-            tenant_id: string;
-            birth_date?: string;
-            gender?: string;
-            school_name?: string;
-            grade?: string;
-            class_name?: string;
-            status?: string;
-            notes?: string;
-            profile_image_url?: string;
-            created_at: string;
-            updated_at: string;
-            created_by?: string;
-            updated_by?: string;
-          }
-          const academyResponse = await apiClient.post<AcademyStudent>('academy_students', {
-            person_id: person.id,
-            birth_date: students[i].birth_date,
-            gender: students[i].gender,
-            school_name: students[i].school_name,
-            grade: students[i].grade,
-            status: students[i].status || 'active',
-            notes: students[i].notes,
-            profile_image_url: students[i].profile_image_url,
-          });
+        // 결과 처리
+        academyResponses.forEach((academyResponse, i) => {
+          const { index: globalIndex, person, student } = validPersons[i];
 
           if (academyResponse.error) {
-            // 롤백: persons 삭제
-            await apiClient.delete('persons', person.id);
-            throw new Error(academyResponse.error.message);
+            // 롤백: persons 삭제 (비동기로 처리, 에러 무시)
+            apiClient.delete('persons', person.id).catch(() => {});
+            errors.push({ index: globalIndex, error: academyResponse.error.message });
+          } else {
+            results.push({
+              id: person.id,
+              tenant_id: person.tenant_id,
+              industry_type: industryType,
+              name: person.name,
+              birth_date: academyResponse.data?.birth_date,
+              gender: academyResponse.data?.gender,
+              phone: person.phone,
+              email: person.email,
+              address: person.address,
+              school_name: academyResponse.data?.school_name,
+              grade: academyResponse.data?.grade,
+              status: academyResponse.data?.status || 'active',
+              notes: academyResponse.data?.notes,
+              profile_image_url: academyResponse.data?.profile_image_url,
+              created_at: person.created_at,
+              updated_at: person.updated_at,
+              created_by: academyResponse.data?.created_by,
+              updated_by: academyResponse.data?.updated_by,
+            } as Student);
           }
-
-          // 3. 결과 반환
-          results.push({
-            id: person.id,
-            tenant_id: person.tenant_id,
-            industry_type: industryType,
-            name: person.name,
-            birth_date: academyResponse.data?.birth_date,
-            gender: academyResponse.data?.gender,
-            phone: person.phone,
-            email: person.email,
-            address: person.address,
-            school_name: academyResponse.data?.school_name,
-            grade: academyResponse.data?.grade,
-            status: academyResponse.data?.status || 'active',
-            notes: academyResponse.data?.notes,
-            profile_image_url: academyResponse.data?.profile_image_url,
-            created_at: person.created_at,
-            updated_at: person.updated_at,
-            created_by: academyResponse.data?.created_by,
-            updated_by: academyResponse.data?.updated_by,
-          } as Student);
-        } catch (error) {
-          errors.push({
-            index: i,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
-        }
+        });
       }
 
       if (errors.length > 0) {
@@ -1783,26 +1817,32 @@ export function useUpdateStudentTags() {
       tagIds: string[];
     }) => {
       const startTime = Date.now();
-      // 기존 태그 할당 제거
+
+      // [N+1 최적화] 기존 태그 할당 조회
       const existingTags = await apiClient.get<TagAssignment>('tag_assignments', {
         filters: { entity_id: studentId, entity_type: 'student' },
       });
 
-      if (existingTags.data) {
-        for (const assignment of existingTags.data) {
-          await apiClient.delete('tag_assignments', assignment.id);
-        }
+      // [N+1 최적화] 기존 태그 삭제를 병렬로 처리
+      if (existingTags.data && existingTags.data.length > 0) {
+        await Promise.all(
+          existingTags.data.map((assignment) =>
+            apiClient.delete('tag_assignments', assignment.id)
+          )
+        );
       }
 
-      // 새 태그 할당
+      // [N+1 최적화] 새 태그 할당을 병렬로 처리
       if (tagIds.length > 0) {
-        for (const tagId of tagIds) {
-          await apiClient.post('tag_assignments', {
-            entity_id: studentId,
-            entity_type: 'student',
-            tag_id: tagId,
-          });
-        }
+        await Promise.all(
+          tagIds.map((tagId) =>
+            apiClient.post('tag_assignments', {
+              entity_id: studentId,
+              entity_type: 'student',
+              tag_id: tagId,
+            })
+          )
+        );
       }
 
       // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)

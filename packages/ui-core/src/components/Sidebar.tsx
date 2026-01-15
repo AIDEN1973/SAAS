@@ -11,10 +11,19 @@ import { X, DotsThree } from 'phosphor-react';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 import { Button } from './Button';
 
+export interface IconProps {
+  stroke?: string;
+  strokeWidth?: number;
+  style?: React.CSSProperties;
+  size?: number;
+  weight?: string;
+  color?: string;
+}
+
 export interface SidebarItem {
   id: string;
   label: string;
-  icon?: React.ReactNode;
+  icon?: React.ReactElement<IconProps>;
   path?: string;
   onClick?: () => void;
   children?: SidebarItem[];
@@ -147,6 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               />
               <button
                 onClick={() => handleItemClick(item)}
+                aria-label={`${selectedAdvancedItem.label} 선택됨`}
                 style={{
                   width: '100%',
                   textAlign: 'center',
@@ -178,14 +188,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       backgroundColor: 'var(--color-primary)',
                     }}
                   >
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */}
-                    {React.cloneElement(selectedAdvancedItem.icon as React.ReactElement<any>, {
-                      ...(selectedAdvancedItem.icon.props || {}),
+                    {React.cloneElement(selectedAdvancedItem.icon, {
+                      ...selectedAdvancedItem.icon.props,
                       stroke: 'var(--color-white)',
                       strokeWidth: 2,
                       style: {
-                        /* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */
-                        ...(selectedAdvancedItem.icon.props?.style || {}),
+                        ...selectedAdvancedItem.icon.props?.style,
                         width: 'var(--size-icon-sidebar-lg)',
                         height: 'var(--size-icon-sidebar-lg)',
                       },
@@ -208,6 +216,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => handleItemClick(item)}
             onMouseEnter={() => setHoveredItemId(item.id)}
             onMouseLeave={() => setHoveredItemId(null)}
+            aria-label="더보기 메뉴"
+            aria-expanded={advancedMenuOpen}
+            aria-haspopup="true"
             style={{
               width: '100%',
               textAlign: 'center',
@@ -255,6 +266,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => handleItemClick(item)}
           onMouseEnter={() => setHoveredItemId(item.id)}
           onMouseLeave={() => setHoveredItemId(null)}
+          aria-label={item.label}
+          aria-current={isActive ? 'page' : undefined}
           style={{
             width: '100%',
             textAlign: 'center',
@@ -287,14 +300,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 backgroundColor: isActive ? 'var(--color-primary)' : 'transparent',
               }}
             >
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */}
-              {React.cloneElement(item.icon as React.ReactElement<any>, {
-                ...(item.icon.props || {}),
+              {React.cloneElement(item.icon, {
+                ...item.icon.props,
                 stroke: isActive ? 'var(--color-white)' : 'var(--color-text)',
                 strokeWidth: 2, // 살짝 굵게
                 style: {
-                  /* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */
-                  ...(item.icon.props?.style || {}),
+                  ...item.icon.props?.style,
                   width: 'var(--size-icon-sidebar-lg)',
                   height: 'var(--size-icon-sidebar-lg)',
                 },
@@ -493,6 +504,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 onClick={() => handleAdvancedMenuItemClick(item)}
+                aria-label={item.label}
+                role="menuitem"
                 style={{
                   width: '100%',
                   textAlign: 'left',
@@ -523,12 +536,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       justifyContent: 'center',
                     }}
                   >
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */}
-                    {React.cloneElement(item.icon as React.ReactElement<any>, {
-                      ...(item.icon.props || {}),
+                    {React.cloneElement(item.icon, {
+                      ...item.icon.props,
                       style: {
-                        /* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */
-                        ...(item.icon.props?.style || {}),
+                        ...item.icon.props?.style,
                         width: 'var(--size-icon-base)',
                         height: 'var(--size-icon-base)',
                       },

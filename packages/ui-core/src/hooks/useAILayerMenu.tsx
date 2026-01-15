@@ -79,16 +79,18 @@ async function fetchServerSessions(): Promise<ChatOpsSession[]> {
     const { fetchChatOpsSessions } = await import('@hooks/use-chatops');
     const serverSessions = await fetchChatOpsSessions(50);
 
-    // [DEBUG] 서버에서 받은 원본 세션 데이터 로깅
-    console.log('[useAILayerMenu] 서버 세션 원본 데이터:', {
-      count: serverSessions.length,
-      sessions: serverSessions.map(s => ({
-        id: s.id,
-        summary: s.summary,
-        created_at: s.created_at,
-        updated_at: s.updated_at,
-      })),
-    });
+    // [DEBUG] 서버에서 받은 원본 세션 데이터 로깅 (개발 환경 전용)
+    if (import.meta.env?.DEV) {
+      console.log('[useAILayerMenu] 서버 세션 원본 데이터:', {
+        count: serverSessions.length,
+        sessions: serverSessions.map(s => ({
+          id: s.id,
+          summary: s.summary,
+          created_at: s.created_at,
+          updated_at: s.updated_at,
+        })),
+      });
+    }
 
     // 서버 세션을 ChatOpsSession 형식으로 변환
     // ID 기준으로 중복 제거 (Set 사용)
@@ -106,19 +108,23 @@ async function fetchServerSessions(): Promise<ChatOpsSession[]> {
           messageCount: 0, // 서버에서는 메시지 수를 별도로 조회해야 함
         });
       } else {
-        // [DEBUG] 중복 세션 발견 시 로깅
-        console.warn('[useAILayerMenu] 중복 세션 ID 발견:', s.id);
+        // [DEBUG] 중복 세션 발견 시 로깅 (개발 환경 전용)
+        if (import.meta.env?.DEV) {
+          console.warn('[useAILayerMenu] 중복 세션 ID 발견:', s.id);
+        }
       }
     }
 
-    // [DEBUG] 변환 후 세션 데이터 로깅
-    console.log('[useAILayerMenu] 변환된 세션 데이터:', {
-      count: uniqueSessions.length,
-      sessions: uniqueSessions.map(s => ({
-        id: s.id,
-        title: s.title,
-      })),
-    });
+    // [DEBUG] 변환 후 세션 데이터 로깅 (개발 환경 전용)
+    if (import.meta.env?.DEV) {
+      console.log('[useAILayerMenu] 변환된 세션 데이터:', {
+        count: uniqueSessions.length,
+        sessions: uniqueSessions.map(s => ({
+          id: s.id,
+          title: s.title,
+        })),
+      });
+    }
 
     return uniqueSessions;
   } catch (error) {

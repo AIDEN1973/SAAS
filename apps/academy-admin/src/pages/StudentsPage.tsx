@@ -29,7 +29,7 @@ import { tagFormSchema } from '../schemas/tag.schema';
 import { isWidgetRegistered, setWidgetRegistered } from '../utils/widget-registry';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
-import { createSafeNavigate } from '../utils';
+import { createSafeNavigate, processTagInput } from '../utils';
 import { STUDENTS_SUB_MENU_ITEMS, DEFAULT_STUDENTS_SUB_MENU, STUDENTS_RELATED_MENUS, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
 import type { StudentsSubMenuId } from '../constants';
 import { StudentInfoTab } from './students/tabs/StudentInfoTab';
@@ -42,25 +42,8 @@ import { RiskAnalysisTab } from './students/tabs/RiskAnalysisTab';
 import { MessageSendTab } from './students/tabs/MessageSendTab';
 import type { StudentStatus, CreateStudentInput, Gender, StudentConsultation, Guardian } from '@services/student-service';
 
-// [코드 중복 제거] 태그 입력값 처리 함수를 공통 유틸로 분리
-// 태그 입력값 실시간 처리: 띄어쓰기 제거 (쉼표 다음 띄어쓰기는 허용)
-// [P2-6 주의] 실시간 변형으로 인해 커서 점프 가능성: onChange에서 정규화하면 caret 위치가 튈 수 있음
-// 개선 옵션: onBlur에서 정규화 적용 또는 selectionStart/End를 유지하는 방식으로 보완
-const processTagInput = (inputValue: string): string => {
-  const parts = inputValue.split(',');
-
-  return parts.map((part, index) => {
-    if (index === 0) {
-      // 첫 번째 부분: 모든 띄어쓰기 제거
-      return part.replace(/\s+/g, '');
-    } else {
-      // 쉼표 다음 부분: 앞의 띄어쓰기 하나만 허용, 나머지 제거
-      const trimmed = part.trimStart();
-      const withoutSpaces = trimmed.replace(/\s+/g, '');
-      return part.startsWith(' ') ? ' ' + withoutSpaces : withoutSpaces;
-    }
-  }).join(',');
-};
+// [P2-QUALITY-1 해결] processTagInput 함수는 utils/data-normalization-utils.ts에서 SSOT로 관리
+// import { processTagInput } from '../utils';
 
 // 태그 이름 입력 필드 커스텀 컴포넌트 (실시간 띄어쓰기 제거)
 const TagNameInputWidget: React.FC<{

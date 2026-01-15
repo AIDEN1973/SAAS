@@ -72,6 +72,7 @@ export {
   normalizeNumber,
   normalizeDateString,
   normalizeBoolean,
+  processTagInput,
 } from './data-normalization-utils';
 
 // 날짜 범위 계산 유틸리티

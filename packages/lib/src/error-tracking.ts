@@ -1,9 +1,26 @@
 /**
  * Error Tracking Utility
  *
- * 에러 추적 시스템 기본 구조
- * [향후 확장] Sentry, DataDog 등과 연동 가능
+ * 에러 추적 시스템 - Sentry 연동 지원
+ *
+ * [설정 방법]
+ * 1. .env 파일에 VITE_SENTRY_DSN 설정
+ * 2. main.tsx에서 initErrorTracking() 호출
+ *
+ * @example
+ * // main.tsx
+ * import { initErrorTracking } from '@lib/error-tracking';
+ *
+ * initErrorTracking({
+ *   service: 'sentry',
+ *   dsn: import.meta.env.VITE_SENTRY_DSN,
+ *   environment: import.meta.env.MODE,
+ *   release: import.meta.env.VITE_APP_VERSION,
+ * });
  */
+
+// Sentry 동적 import를 위한 변수
+let Sentry: typeof import('@sentry/react') | null = null;
 
 export interface ErrorContext {
   component?: string;
@@ -18,6 +35,16 @@ export interface ErrorTrackingService {
   captureMessage(message: string, level?: 'info' | 'warning' | 'error', context?: ErrorContext): void;
   setUser(user: { id: string; email?: string; username?: string }): void;
   setContext(key: string, value: Record<string, unknown>): void;
+}
+
+export interface ErrorTrackingConfig {
+  service?: 'console' | 'sentry';
+  dsn?: string;
+  environment?: string;
+  release?: string;
+  sampleRate?: number;
+  tracesSampleRate?: number;
+  debug?: boolean;
 }
 
 class ConsoleErrorTracker implements ErrorTrackingService {
@@ -56,34 +83,129 @@ class ConsoleErrorTracker implements ErrorTrackingService {
   }
 }
 
+/**
+ * Sentry Error Tracker
+ */
+class SentryErrorTracker implements ErrorTrackingService {
+  constructor(private sentryModule: typeof import('@sentry/react')) {}
+
+  captureException(error: Error, context?: ErrorContext): void {
+    this.sentryModule.captureException(error, {
+      extra: context,
+      tags: {
+        component: context?.component,
+        operation: context?.operation,
+      },
+    });
+  }
+
+  captureMessage(
+    message: string,
+    level: 'info' | 'warning' | 'error' = 'info',
+    context?: ErrorContext
+  ): void {
+    const sentryLevel = level === 'error' ? 'error' : level === 'warning' ? 'warning' : 'info';
+    this.sentryModule.captureMessage(message, {
+      level: sentryLevel,
+      extra: context,
+      tags: {
+        component: context?.component,
+        operation: context?.operation,
+      },
+    });
+  }
+
+  setUser(user: { id: string; email?: string; username?: string }): void {
+    this.sentryModule.setUser(user);
+  }
+
+  setContext(key: string, value: Record<string, unknown>): void {
+    this.sentryModule.setContext(key, value);
+  }
+}
+
 // Singleton instance
 let errorTracker: ErrorTrackingService = new ConsoleErrorTracker();
+let isInitialized = false;
 
 /**
  * 에러 추적 서비스 초기화
  *
  * @example
- * // Sentry 연동 예시 (향후 확장)
- * initErrorTracking({
+ * // Sentry 연동 (production)
+ * await initErrorTracking({
  *   service: 'sentry',
- *   dsn: process.env.SENTRY_DSN,
- *   environment: process.env.NODE_ENV,
+ *   dsn: import.meta.env.VITE_SENTRY_DSN,
+ *   environment: import.meta.env.MODE,
+ *   release: '1.0.0',
+ *   sampleRate: 1.0,
+ *   tracesSampleRate: 0.2,
  * });
+ *
+ * // Console fallback (development)
+ * initErrorTracking({ service: 'console' });
  */
-export function initErrorTracking(config?: {
-  service?: 'console' | 'sentry';
-  dsn?: string;
-  environment?: string;
-}): void {
-  if (!config || config.service === 'console') {
-    errorTracker = new ConsoleErrorTracker();
+export async function initErrorTracking(config?: ErrorTrackingConfig): Promise<void> {
+  if (isInitialized) {
+    console.warn('[ErrorTracking] Already initialized. Skipping.');
     return;
   }
 
-  // 향후 Sentry 등 다른 서비스 연동 시 추가
-  // if (config.service === 'sentry') {
-  //   errorTracker = new SentryErrorTracker(config);
-  // }
+  if (!config || config.service === 'console' || !config.dsn) {
+    errorTracker = new ConsoleErrorTracker();
+    isInitialized = true;
+    console.log('[ErrorTracking] Initialized with Console tracker');
+    return;
+  }
+
+  if (config.service === 'sentry' && config.dsn) {
+    try {
+      // Sentry 동적 import
+      Sentry = await import('@sentry/react');
+
+      // Sentry 초기화
+      Sentry.init({
+        dsn: config.dsn,
+        environment: config.environment || 'development',
+        release: config.release,
+        sampleRate: config.sampleRate ?? 1.0,
+        tracesSampleRate: config.tracesSampleRate ?? 0.2,
+        debug: config.debug ?? false,
+        // 에러 필터링
+        beforeSend(event, hint) {
+          const error = hint.originalException as Error;
+          // 네트워크 에러 중 무시할 것들
+          if (error?.message?.includes('Failed to fetch')) {
+            return null;
+          }
+          // 개발 환경에서는 Rate Limit 에러 무시
+          if (
+            config.environment === 'development' &&
+            error?.message?.includes('Rate limit')
+          ) {
+            return null;
+          }
+          return event;
+        },
+        // 민감 정보 마스킹
+        beforeBreadcrumb(breadcrumb) {
+          if (breadcrumb.data?.url?.includes('password')) {
+            return null;
+          }
+          return breadcrumb;
+        },
+      });
+
+      errorTracker = new SentryErrorTracker(Sentry);
+      isInitialized = true;
+      console.log('[ErrorTracking] Initialized with Sentry');
+    } catch (error) {
+      console.error('[ErrorTracking] Failed to initialize Sentry:', error);
+      // Fallback to console
+      errorTracker = new ConsoleErrorTracker();
+      isInitialized = true;
+    }
+  }
 }
 
 /**

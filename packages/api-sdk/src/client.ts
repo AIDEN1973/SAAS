@@ -9,6 +9,7 @@
 import { createClient } from '@lib/supabase-client';
 import { withTenant } from '@lib/supabase-client/db';
 import { getApiContext } from './context';
+import { rateLimiter, RateLimiter, RateLimitExceededError } from './rate-limiter';
 import type { ApiResponse, ApiClientConfig } from './types';
 import type { PostgrestFilterBuilder } from '@supabase/postgrest-js';
 
@@ -56,9 +57,36 @@ function normalizeTimestampFilter(value: string, operator: 'gte' | 'lte' | 'gt' 
  * - UI에서 권한을 추론하지 않습니다.
  * - SDK에서 권한을 생성하지 않습니다.
  * - 권한 결정은 오직 Supabase RLS가 맡습니다.
+ *
+ * Rate Limiting:
+ * - 테넌트당 100 req/s 제한 적용
+ * - 버스트 허용량 150 req
+ * - 초과 시 자동 대기 후 재시도 (최대 3회)
  */
 export class ApiClient {
   private supabase = createClient();
+  private rateLimiter: RateLimiter;
+  /** Rate Limiting 활성화 여부 (기본값: true) */
+  private rateLimitEnabled: boolean;
+
+  constructor(options?: { rateLimitEnabled?: boolean }) {
+    this.rateLimiter = rateLimiter;
+    this.rateLimitEnabled = options?.rateLimitEnabled ?? true;
+  }
+
+  /**
+   * Rate Limiting이 적용된 요청 실행
+   * PostgrestBuilder를 Promise로 변환하여 실행
+   */
+  private async executeQueryWithRateLimit<T>(
+    tenantId: string,
+    query: PromiseLike<T>
+  ): Promise<T> {
+    if (!this.rateLimitEnabled) {
+      return query;
+    }
+    return this.rateLimiter.executeWithRateLimit(tenantId, async () => query);
+  }
 
   /**
    * GET 요청
@@ -186,7 +214,8 @@ export class ApiClient {
       const isCommonTable = table === 'industry_themes' || table === 'schema_registry' || table.startsWith('schema-registry/') || table === 'daily_region_metrics';
       const query = isCommonTable ? baseQuery : withTenant(baseQuery, context.tenantId);
 
-      const { data, error, count } = await query;
+      // Rate Limiting 적용
+      const { data, error, count } = await this.executeQueryWithRateLimit(context.tenantId, query);
 
       if (error) {
         // schema-registry 요청의 404 에러는 조용히 처리 (스키마가 없을 수 있음)
@@ -292,7 +321,8 @@ export class ApiClient {
         insertQuery = this.supabase.from(table).insert(payload).select().single();
       }
 
-      const { data: result, error } = await insertQuery;
+      // Rate Limiting 적용
+      const { data: result, error } = await this.executeQueryWithRateLimit(context.tenantId, insertQuery);
 
       if (error) {
         console.error('INSERT 실패:', {
@@ -370,10 +400,9 @@ export class ApiClient {
         updateQuery = this.supabase.from(table).update(data).eq(primaryKey, id).select();
       }
 
-      const { data: result, error } = await withTenant(
-        updateQuery,
-        context.tenantId
-      ).single();
+      // Rate Limiting 적용
+      const finalQuery = withTenant(updateQuery, context.tenantId).single();
+      const { data: result, error } = await this.executeQueryWithRateLimit(context.tenantId, finalQuery);
 
       if (error) {
         return {
@@ -482,7 +511,9 @@ export class ApiClient {
 
       // 단일 객체인 경우 .single() 사용
       const finalQuery = Array.isArray(data) ? upsertQuery : upsertQuery.single();
-      const { data: result, error } = await finalQuery;
+
+      // Rate Limiting 적용
+      const { data: result, error } = await this.executeQueryWithRateLimit(context.tenantId, finalQuery);
 
       if (error) {
         console.error('UPSERT 실패:', {
@@ -555,10 +586,9 @@ export class ApiClient {
         deleteQuery = this.supabase.from(table).delete().eq('id', id);
       }
 
-      const { error } = await withTenant(
-        deleteQuery,
-        context.tenantId
-      );
+      // Rate Limiting 적용
+      const finalQuery = withTenant(deleteQuery, context.tenantId);
+      const { error } = await this.executeQueryWithRateLimit(context.tenantId, finalQuery);
 
       if (error) {
         return {
@@ -855,12 +885,14 @@ export class ApiClient {
  *
  * 필요시 커스텀 설정으로 새로운 인스턴스를 생성할 수 있습니다.
  * 대부분의 경우 기본 인스턴스(apiClient)를 사용하면 됩니다.
+ *
+ * @param config.rateLimitEnabled Rate Limiting 활성화 여부 (기본값: true)
  */
-export function createApiClient(_config?: ApiClientConfig): ApiClient {
-  return new ApiClient();
+export function createApiClient(config?: ApiClientConfig & { rateLimitEnabled?: boolean }): ApiClient {
+  return new ApiClient({ rateLimitEnabled: config?.rateLimitEnabled });
 }
 
 /**
- * Default API Client Instance
+ * Default API Client Instance (Rate Limiting 활성화됨)
  */
 export const apiClient = new ApiClient();

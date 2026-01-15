@@ -28,6 +28,7 @@ import { createAutoNotificationSettingsFormSchema } from '../schemas/auto-notifi
 import { useStudentTaskCards } from '@hooks/use-student';
 import { useUpdateConfig } from '@hooks/use-config';
 import { fetchNotificationTemplates } from '@hooks/use-notification-templates';
+import { NotificationFormModal } from './notifications/NotificationFormModal';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { Sparkles, FileText } from 'lucide-react';
 // [SSOT] Barrel export를 통한 통합 import
@@ -404,81 +405,22 @@ export function NotificationsPage() {
           )}
 
           {/* 메시지 발송 폼 - 반응형: 모바일/태블릿은 Drawer, 데스크톱은 Modal */}
+          {/* P2-2 개선: 중복 폼 제거 → NotificationFormModal 컴포넌트 사용 */}
           {schema && (
-            <>
-              {isMobileMode || isTabletMode ? (
-                <Drawer
-                  isOpen={showCreateForm}
-                  onClose={() => {
-                    setShowCreateForm(false);
-                    setAiDraftValues(null);
-                  }}
-                  title={`새 ${terms.MESSAGE_LABEL} 발송`}
-                  position={isMobileMode ? 'bottom' : 'right'}
-                  width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
-                >
-                  <SchemaForm
-                    schema={schema}
-                    onSubmit={handleCreateNotification}
-                    defaultValues={aiDraftValues || {}}
-                    actionContext={{
-                      apiCall: async (endpoint: string, method: string, body?: unknown) => {
-                        if (method === 'POST') {
-                          const response = await apiClient.post(endpoint, body as Record<string, unknown>);
-                          if (response.error) {
-                            throw new Error(response.error.message);
-                          }
-                          return response.data;
-                        }
-                        const response = await apiClient.get(endpoint);
-                        if (response.error) {
-                          throw new Error(response.error.message);
-                        }
-                        return response.data;
-                      },
-                      showToast: (message: string, variant?: string) => {
-                        showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-                      },
-                    }}
-                  />
-                </Drawer>
-              ) : (
-                <Modal
-                  isOpen={showCreateForm}
-                  onClose={() => {
-                    setShowCreateForm(false);
-                    setAiDraftValues(null);
-                  }}
-                  title={`새 ${terms.MESSAGE_LABEL} 발송`}
-                  size="md"
-                >
-                  <SchemaForm
-                    schema={schema}
-                    onSubmit={handleCreateNotification}
-                    defaultValues={aiDraftValues || {}}
-                    actionContext={{
-                      apiCall: async (endpoint: string, method: string, body?: unknown) => {
-                        if (method === 'POST') {
-                          const response = await apiClient.post(endpoint, body as Record<string, unknown>);
-                          if (response.error) {
-                            throw new Error(response.error.message);
-                          }
-                          return response.data;
-                        }
-                        const response = await apiClient.get(endpoint);
-                        if (response.error) {
-                          throw new Error(response.error.message);
-                        }
-                        return response.data;
-                      },
-                      showToast: (message: string, variant?: string) => {
-                        showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-                      },
-                    }}
-                  />
-                </Modal>
-              )}
-            </>
+            <NotificationFormModal
+              isOpen={showCreateForm}
+              onClose={() => {
+                setShowCreateForm(false);
+                setAiDraftValues(null);
+              }}
+              onSubmit={handleCreateNotification}
+              schema={schema}
+              defaultValues={aiDraftValues}
+              title={`새 ${terms.MESSAGE_LABEL} 발송`}
+              isMobileMode={isMobileMode}
+              isTabletMode={isTabletMode}
+              showAlert={showAlert}
+            />
           )}
             </>
           )}
@@ -573,78 +515,22 @@ export function NotificationsPage() {
                     새 {terms.MESSAGE_LABEL} 발송
                   </Button>
                 </div>
+              {/* P2-2 개선: 중복 폼 제거 → NotificationFormModal 컴포넌트 사용 */}
               {schema && (
-                <>
-              {isMobileMode || isTabletMode ? (
-                <Drawer
+                <NotificationFormModal
                   isOpen={showCreateForm}
                   onClose={() => {
                     setShowCreateForm(false);
                     setAiDraftValues(null);
                   }}
+                  onSubmit={handleCreateNotification}
+                  schema={schema}
+                  defaultValues={aiDraftValues}
                   title={`새 ${terms.MESSAGE_LABEL} 발송`}
-                  position={isMobileMode ? 'bottom' : 'right'}
-                  width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
-                >
-                  <SchemaForm
-                    schema={schema}
-                    onSubmit={handleCreateNotification}
-                    defaultValues={aiDraftValues || {}}
-                    actionContext={{
-                          apiCall: async (endpoint: string, method: string, body?: unknown) => {
-                            if (method === 'POST') {
-                              const response = await apiClient.post(endpoint, body as Record<string, unknown>);
-                              if (response.error) {
-                                throw new Error(response.error.message);
-                              }
-                              return response.data;
-                            }
-                            const response = await apiClient.get(endpoint);
-                            if (response.error) {
-                              throw new Error(response.error.message);
-                            }
-                            return response.data;
-                          },
-                          showToast: (message: string, variant?: string) => {
-                            showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-                          },
-                        }}
-                      />
-                    </Drawer>
-                  ) : (
-                    <Modal
-                      isOpen={showCreateForm}
-                      onClose={() => setShowCreateForm(false)}
-                      title={`새 ${terms.MESSAGE_LABEL} 발송`}
-                      size="md"
-                    >
-                      <SchemaForm
-                        schema={schema}
-                        onSubmit={handleCreateNotification}
-                        defaultValues={aiDraftValues || {}}
-                        actionContext={{
-                          apiCall: async (endpoint: string, method: string, body?: unknown) => {
-                            if (method === 'POST') {
-                              const response = await apiClient.post(endpoint, body as Record<string, unknown>);
-                              if (response.error) {
-                                throw new Error(response.error.message);
-                              }
-                              return response.data;
-                            }
-                            const response = await apiClient.get(endpoint);
-                            if (response.error) {
-                              throw new Error(response.error.message);
-                            }
-                            return response.data;
-                          },
-                          showToast: (message: string, variant?: string) => {
-                            showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-                          },
-                        }}
-                      />
-                    </Modal>
-                  )}
-                </>
+                  isMobileMode={isMobileMode}
+                  isTabletMode={isTabletMode}
+                  showAlert={showAlert}
+                />
               )}
             </Card>
             </>

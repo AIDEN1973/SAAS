@@ -17,30 +17,13 @@ import { PlusIcon } from '../../../components/DataTableActionButtons';
 import { useStudentTags } from '@hooks/use-student';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
-import { logWarn } from '../../../utils';
+import { logWarn, processTagInput } from '../../../utils';
 import type { FormSchema } from '@schema-engine/types';
 import type { Tag } from '@core/tags';
 import type { UseFormReturn } from 'react-hook-form';
 
-// [코드 중복 제거] 태그 입력값 처리 함수를 공통 유틸로 분리
-// 태그 입력값 실시간 처리: 띄어쓰기 제거 (쉼표 다음 띄어쓰기는 허용)
-// [P2-6 주의] 실시간 변형으로 인해 커서 점프 가능성: onChange에서 정규화하면 caret 위치가 튈 수 있음
-// 개선 옵션: onBlur에서 정규화 적용 또는 selectionStart/End를 유지하는 방식으로 보완
-const processTagInput = (inputValue: string): string => {
-  const parts = inputValue.split(',');
-
-  return parts.map((part, index) => {
-    if (index === 0) {
-      // 첫 번째 부분: 모든 띄어쓰기 제거
-      return part.replace(/\s+/g, '');
-    } else {
-      // 쉼표 다음 부분: 앞의 띄어쓰기 하나만 허용, 나머지 제거
-      const trimmed = part.trimStart();
-      const withoutSpaces = trimmed.replace(/\s+/g, '');
-      return part.startsWith(' ') ? ' ' + withoutSpaces : withoutSpaces;
-    }
-  }).join(',');
-};
+// [P2-QUALITY-1 해결] processTagInput 함수는 utils/data-normalization-utils.ts에서 SSOT로 관리
+// import { processTagInput } from '../../../utils';
 
 // 태그 탭 컴포넌트
 export interface TagsTabProps {
@@ -418,8 +401,6 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
       name: data.name,
     });
   };
-
-  // [코드 중복 제거] processTagInput 함수는 파일 상단에 공통으로 정의됨
 
   // 태그 등록 폼의 form 인스턴스 참조
   const tagFormRef = useRef<UseFormReturn<Record<string, unknown>> | null>(null);

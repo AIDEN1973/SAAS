@@ -9,6 +9,7 @@ import '@ui-core/react/styles';
 // academy-admin 앱 전용 스타일 (스크롤바 숨김 등 pseudo selector 필요 시)
 import './index.css';
 import { checkSupabaseUrl, checkEnvVariables } from './utils/checkSupabaseUrl';
+import { initErrorTracking } from '@lib/error-tracking';
 
 declare global {
   interface Window {
@@ -61,6 +62,18 @@ const queryClient = new QueryClient({
       retry: 1,
     },
   },
+});
+
+// Sentry 에러 트래킹 초기화 (비동기)
+initErrorTracking({
+  service: import.meta.env.PROD ? 'sentry' : 'console',
+  dsn: import.meta.env.VITE_SENTRY_DSN as string | undefined,
+  environment: (import.meta.env.VITE_SENTRY_ENVIRONMENT as string | undefined) || import.meta.env.MODE,
+  release: (import.meta.env.VITE_APP_VERSION as string | undefined) || '1.0.0',
+  sampleRate: 1.0,
+  tracesSampleRate: 0.2,
+}).catch((error) => {
+  console.error('[ErrorTracking] Initialization failed:', error);
 });
 
 createRoot(document.getElementById('root')!).render(

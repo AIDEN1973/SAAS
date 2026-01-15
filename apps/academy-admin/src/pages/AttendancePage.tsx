@@ -266,9 +266,11 @@ export function AttendancePage() {
 
   // [성능 최적화] 출석 로그를 Map으로 인덱싱 (O(n*m) → O(n+m))
   const attendanceLogsMap = useMemo(() => {
-    console.log('[AttendancePage] 📥 attendanceLogs 인덱싱 시작:', {
-      totalLogs: attendanceLogs.length,
-    });
+    if (import.meta.env?.DEV) {
+      console.log('[AttendancePage] 📥 attendanceLogs 인덱싱 시작:', {
+        totalLogs: attendanceLogs.length,
+      });
+    }
 
     const checkInMap = new Map<string, AttendanceLog>();
     const checkOutMap = new Map<string, AttendanceLog>();
@@ -282,19 +284,23 @@ export function AttendancePage() {
 
         // 기존 로그가 없거나, 현재 로그가 더 최신인 경우에만 저장
         if (!existingLog || new Date(log.occurred_at) > new Date(existingLog.occurred_at)) {
-          console.log('[AttendancePage] ✅ check_in 로그 (최신):', {
-            student_id: log.student_id,
-            status: log.status,
-            occurred_at: log.occurred_at,
-          });
+          if (import.meta.env?.DEV) {
+            console.log('[AttendancePage] ✅ check_in 로그 (최신):', {
+              student_id: log.student_id,
+              status: log.status,
+              occurred_at: log.occurred_at,
+            });
+          }
           checkInMap.set(log.student_id, log);
         } else {
-          console.log('[AttendancePage] ⏭️ check_in 로그 (구버전 스킵):', {
-            student_id: log.student_id,
-            status: log.status,
-            occurred_at: log.occurred_at,
-            existing_occurred_at: existingLog.occurred_at,
-          });
+          if (import.meta.env?.DEV) {
+            console.log('[AttendancePage] ⏭️ check_in 로그 (구버전 스킵):', {
+              student_id: log.student_id,
+              status: log.status,
+              occurred_at: log.occurred_at,
+              existing_occurred_at: existingLog.occurred_at,
+            });
+          }
         }
       } else if (log.attendance_type === 'check_out') {
         const existingLog = checkOutMap.get(log.student_id);
@@ -306,10 +312,12 @@ export function AttendancePage() {
       }
     });
 
-    console.log('[AttendancePage] 📊 인덱싱 완료:', {
-      checkInCount: checkInMap.size,
-      checkOutCount: checkOutMap.size,
-    });
+    if (import.meta.env?.DEV) {
+      console.log('[AttendancePage] 📊 인덱싱 완료:', {
+        checkInCount: checkInMap.size,
+        checkOutCount: checkOutMap.size,
+      });
+    }
 
     return { checkInMap, checkOutMap };
   }, [attendanceLogs]);  // selectedDate, selectedClassId는 실제로 사용되지 않음
@@ -427,11 +435,13 @@ export function AttendancePage() {
     if (isLoadingPredictions) return;
     if (filteredStudents.length === 0) return;
 
-    console.log('[AttendancePage] 🔄 상태 동기화 시작');
-    console.log('[AttendancePage] 📊 attendanceLogsMap:', {
-      checkInCount: attendanceLogsMap.checkInMap.size,
-      checkOutCount: attendanceLogsMap.checkOutMap.size,
-    });
+    if (import.meta.env?.DEV) {
+      console.log('[AttendancePage] 🔄 상태 동기화 시작');
+      console.log('[AttendancePage] 📊 attendanceLogsMap:', {
+        checkInCount: attendanceLogsMap.checkInMap.size,
+        checkOutCount: attendanceLogsMap.checkOutMap.size,
+      });
+    }
 
     // 새로운 상태 계산 (DB 데이터 기반)
     const newStates: Record<string, StudentAttendanceState> = {};
@@ -485,13 +495,17 @@ export function AttendancePage() {
       }
     });
 
-    console.log('[AttendancePage] 🎯 동기화 완료');
+    if (import.meta.env?.DEV) {
+      console.log('[AttendancePage] 🎯 동기화 완료');
+    }
     setStudentAttendanceStates(newStates);
   }, [aiPredictions, isLoadingPredictions, filteredStudents, attendanceLogsMap]);
 
   // 선택된 반/날짜 변경 시 상태 초기화 및 필터 업데이트
   useEffect(() => {
-    console.log('[AttendancePage] 🔄 반/날짜 변경 감지:', { selectedClassId, selectedDate });
+    if (import.meta.env?.DEV) {
+      console.log('[AttendancePage] 🔄 반/날짜 변경 감지:', { selectedClassId, selectedDate });
+    }
 
     // 필터 업데이트 (attendance_logs 재조회를 위해 필수)
     const newFilter = {
@@ -499,7 +513,9 @@ export function AttendancePage() {
       date_to: selectedDate,
       class_id: selectedClassId || undefined,
     };
-    console.log('[AttendancePage] 🔍 필터 업데이트:', newFilter);
+    if (import.meta.env?.DEV) {
+      console.log('[AttendancePage] 🔍 필터 업데이트:', newFilter);
+    }
     setFilter(newFilter);
 
     // 상태 초기화 (새로운 필터로 데이터가 로드되면 useEffect가 자동 동기화)
@@ -570,8 +586,10 @@ export function AttendancePage() {
   const handleSaveAttendance = useCallback(async () => {
     if (isSaving) return;
 
-    console.log('[AttendancePage] 💾 저장 시작');
-    console.log('[AttendancePage] 📋 현재 상태:', studentAttendanceStates);
+    if (import.meta.env?.DEV) {
+      console.log('[AttendancePage] 💾 저장 시작');
+      console.log('[AttendancePage] 📋 현재 상태:', studentAttendanceStates);
+    }
 
     setIsSaving(true);
     try {
@@ -624,11 +642,13 @@ export function AttendancePage() {
             check_in_method: 'manual',
           };
 
-          console.log('[AttendancePage] 📝 출결 기록:', {
-            student_id: state.student_id,
-            status: state.status,
-            has_check_in_time: !!state.check_in_time,
-          });
+          if (import.meta.env?.DEV) {
+            console.log('[AttendancePage] 📝 출결 기록:', {
+              student_id: state.student_id,
+              status: state.status,
+              has_check_in_time: !!state.check_in_time,
+            });
+          }
 
           attendanceRecords.push(record);
         }
@@ -652,10 +672,12 @@ export function AttendancePage() {
             status: state.status,
           };
 
-          console.log('[AttendancePage] 📝 하원 기록:', {
-            student_id: state.student_id,
-            time: checkOutTimeStr,
-          });
+          if (import.meta.env?.DEV) {
+            console.log('[AttendancePage] 📝 하원 기록:', {
+              student_id: state.student_id,
+              time: checkOutTimeStr,
+            });
+          }
 
           attendanceRecords.push(record);
         }
@@ -663,20 +685,28 @@ export function AttendancePage() {
 
       // 출결 기록 생성/수정 (아키텍처 문서 3.3.3: 출결 저장)
       // UPSERT 사용: 기존 레코드가 있으면 UPDATE, 없으면 INSERT
-      console.log('[AttendancePage] 📤 총 ', attendanceRecords.length, '개 레코드 UPSERT 중...');
+      if (import.meta.env?.DEV) {
+        console.log('[AttendancePage] 📤 총 ', attendanceRecords.length, '개 레코드 UPSERT 중...');
+      }
       for (const record of attendanceRecords) {
-        console.log('[AttendancePage] 💾 UPSERT 실행:', record);
+        if (import.meta.env?.DEV) {
+          console.log('[AttendancePage] 💾 UPSERT 실행:', record);
+        }
         await upsertAttendance.mutateAsync(record);
       }
 
       // Success 상태 (아키텍처 문서 3.3.3: success 상태 - 2초 후 자동 닫기)
-      console.log('[AttendancePage] ✅ 저장 완료');
+      if (import.meta.env?.DEV) {
+        console.log('[AttendancePage] ✅ 저장 완료');
+      }
       showAlert(terms.MESSAGES.SAVE_SUCCESS, terms.MESSAGES.SUCCESS, 'success');
 
       // [근본 수정] 저장 후 user_modified 플래그만 false로 초기화
       // 상태 자체는 비우지 않음 - React Query refetch 완료 후 useEffect가 자동 동기화
       // 이렇게 하면 refetch 중에도 현재 데이터가 유지되어 테이블이 초기화되지 않음
-      console.log('[AttendancePage] 🧹 user_modified 플래그만 초기화 (상태 유지)');
+      if (import.meta.env?.DEV) {
+        console.log('[AttendancePage] 🧹 user_modified 플래그만 초기화 (상태 유지)');
+      }
       setStudentAttendanceStates(prevStates => {
         const newStates: Record<string, StudentAttendanceState> = {};
         Object.entries(prevStates).forEach(([studentId, state]) => {

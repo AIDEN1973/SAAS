@@ -129,3 +129,44 @@ export function normalizeBoolean(value: unknown): boolean | null {
   return null;
 }
 
+/**
+ * 태그 입력값 실시간 처리 (SSOT)
+ *
+ * 태그 입력값에서 띄어쓰기를 제거하되, 쉼표 다음 띄어쓰기는 허용합니다.
+ * 이 함수는 사용자가 입력하는 동안 실시간으로 호출되어 입력값을 정규화합니다.
+ *
+ * @param inputValue 사용자가 입력한 원본 문자열
+ * @returns 정규화된 문자열
+ *
+ * @example
+ * ```typescript
+ * // 단일 태그: 모든 띄어쓰기 제거
+ * processTagInput('태 그 1') // → '태그1'
+ *
+ * // 여러 태그: 쉼표 다음 띄어쓰기 1개만 허용
+ * processTagInput('태그1, 태 그2') // → '태그1, 태그2'
+ * processTagInput('태그1,  태그2') // → '태그1, 태그2'
+ * ```
+ *
+ * @remarks
+ * - onChange에서 정규화하면 커서 위치가 튈 수 있음 (React controlled input의 제약)
+ * - 개선 옵션: onBlur에서 정규화 또는 selectionStart/End를 유지하는 방식
+ */
+export function processTagInput(inputValue: string): string {
+  const parts = inputValue.split(',');
+
+  return parts
+    .map((part, index) => {
+      if (index === 0) {
+        // 첫 번째 부분: 모든 띄어쓰기 제거
+        return part.replace(/\s+/g, '');
+      } else {
+        // 쉼표 다음 부분: 앞의 띄어쓰기 하나만 허용, 나머지 제거
+        const trimmed = part.trimStart();
+        const withoutSpaces = trimmed.replace(/\s+/g, '');
+        return part.startsWith(' ') ? ' ' + withoutSpaces : withoutSpaces;
+      }
+    })
+    .join(',');
+}
+

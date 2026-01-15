@@ -50,30 +50,12 @@ import type { AttendanceLog } from '@services/attendance-service';
 // [SSOT] Barrel export를 통한 통합 import
 import { safe, logWarn } from '../utils';
 import { downloadMonthlyReportPDF, type MonthlyReportData } from '../utils/pdf-generator';
+import { useAnalyticsConfig } from '../hooks/useAnalyticsConfig';
 
-// 통계문서 2.4: Percentile Rank 계산을 위한 상수 정의 (하드코딩 제거)
-// Policy 기반 값이 없을 경우 사용하는 fallback 비율 (Default Policy)
-// 중요: 이 값들은 Default Policy이며, 테넌트 생성 시 설정값으로 저장됨 (없으면 실행 안 함)
-// 실제 운영 시 tenant_settings에서 조회해야 함
-// HARD-CODE-EXCEPTION: Policy fallback 값 (비즈니스 로직 하드코딩, 테넌트 생성 시 설정값으로 저장됨)
-const PERCENTILE_FALLBACK_RATIOS = {
-  P25_FACTOR: 0.75, // 25분위수 추정: 평균의 75% (Default Policy: 테넌트 생성 시 설정값으로 저장)
-  P75_FACTOR: 1.25, // 75분위수 추정: 평균의 125% (Default Policy: 테넌트 생성 시 설정값으로 저장)
-  TOP10_FACTOR_STUDENTS: 1.2, // 주요 관리 대상 수 상위 10% 추정: 평균의 120% (Default Policy: 테넌트 생성 시 설정값으로 저장)
-  TOP10_FACTOR_REVENUE: 1.2, // 매출 상위 10% 추정: 평균의 120% (Default Policy: 테넌트 생성 시 설정값으로 저장)
-  TOP10_FACTOR_ATTENDANCE: 1.1, // 출석률 상위 10% 추정: 평균의 110% (Default Policy: 테넌트 생성 시 설정값으로 저장)
-  TOP10_FACTOR_GROWTH: 1.15, // 성장률 상위 10% 추정: 평균의 115% (Default Policy: 테넌트 생성 시 설정값으로 저장)
-  HEATMAP_INTENSITY_THRESHOLD: 0.5, // 히트맵 색상 전환 임계값 (50%, Default Policy: 테넌트 생성 시 설정값으로 저장)
-  ATTENDANCE_AVG_FALLBACK: 0.95, // 출석률 평균 fallback: 내 조직의 95% (Default Policy: 테넌트 생성 시 설정값으로 저장)
-  GROWTH_AVG_FALLBACK: 0.9, // 성장률 평균 fallback: 내 조직의 90% (Default Policy: 테넌트 생성 시 설정값으로 저장)
-  // 히트맵 색상 임계값 (UI 스타일링용, CSS 변수 대신 상수로 관리)
-  HEATMAP_COLOR_THRESHOLDS: {
-    HIGH: 0.8, // 높은 강도 (80% 이상)
-    MEDIUM_HIGH: 0.6, // 중상 강도 (60-80%)
-    MEDIUM: 0.4, // 중간 강도 (40-60%)
-    LOW: 0.2, // 낮은 강도 (20-40%)
-  },
-} as const;
+// P1-2 개선 완료: Policy 하드코딩 제거
+// percentileFactors는 useAnalyticsConfig 훅으로 이동
+// Policy 경로: analytics.percentile_factors
+// Fallback 값은 hooks/useAnalyticsConfig.ts의 DEFAULT_PERCENTILE_FACTORS 참조
 
 export function AnalyticsPage() {
   const { showAlert } = useModal();
@@ -87,6 +69,8 @@ export function AnalyticsPage() {
   const terms = useIndustryTerms();
   const mode = useResponsiveMode(); // 유아이 문서 6-0: 반응형 브레이크포인트 표준 준수
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  // P1-2 개선: Policy 기반 Analytics 설정 조회
+  const { percentileFactors } = useAnalyticsConfig();
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
 
@@ -501,19 +485,19 @@ export function AnalyticsPage() {
           if (selectedMetric === 'students') {
             average = Math.round(Number(dongMetrics[0].active_members_avg) || 0);
             // 상위 10%는 p75를 근사값으로 사용 (기술문서: active_members_p75)
-            top10Percent = Math.round(Number(dongMetrics[0].active_members_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_STUDENTS);
+            top10Percent = Math.round(Number(dongMetrics[0].active_members_p75) || average * percentileFactors.TOP10_FACTOR_STUDENTS);
           } else if (selectedMetric === 'revenue') {
             average = Math.round(Number(dongMetrics[0].revenue_avg) || 0);
             // 상위 10%는 p75를 근사값으로 사용 (기술문서: revenue_p75)
-            top10Percent = Math.round(Number(dongMetrics[0].revenue_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_REVENUE);
+            top10Percent = Math.round(Number(dongMetrics[0].revenue_p75) || average * percentileFactors.TOP10_FACTOR_REVENUE);
           } else if (selectedMetric === 'attendance') {
             // 출석률 실제 컬럼 사용 (마이그레이션 090 적용 후)
-            average = Math.round(Number(dongMetrics[0].avg_attendance_rate) || value * PERCENTILE_FALLBACK_RATIOS.ATTENDANCE_AVG_FALLBACK);
-            top10Percent = Math.round(Number(dongMetrics[0].attendance_rate_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_ATTENDANCE);
+            average = Math.round(Number(dongMetrics[0].avg_attendance_rate) || value * percentileFactors.ATTENDANCE_AVG_FALLBACK);
+            top10Percent = Math.round(Number(dongMetrics[0].attendance_rate_p75) || average * percentileFactors.TOP10_FACTOR_ATTENDANCE);
           } else if (selectedMetric === 'growth') {
             // 성장률 실제 컬럼 사용 (마이그레이션 090 적용 후)
-            average = Math.round(Number(dongMetrics[0].student_growth_rate_avg) || value * PERCENTILE_FALLBACK_RATIOS.GROWTH_AVG_FALLBACK);
-            top10Percent = Math.round(Number(dongMetrics[0].student_growth_rate_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_GROWTH);
+            average = Math.round(Number(dongMetrics[0].student_growth_rate_avg) || value * percentileFactors.GROWTH_AVG_FALLBACK);
+            top10Percent = Math.round(Number(dongMetrics[0].student_growth_rate_p75) || average * percentileFactors.TOP10_FACTOR_GROWTH);
           } else if (selectedMetric === 'new_enrollments') {
             // Phase 1: 신규 등록 (마이그레이션 158)
             average = Math.round(Number(dongMetrics[0].new_enrollments_avg) || value * 0.9);
@@ -564,16 +548,16 @@ export function AnalyticsPage() {
             fallbackLevel = 'same_sigungu';
             if (selectedMetric === 'students') {
               average = Math.round(Number(sigunguMetrics[0].active_members_avg) || 0);
-              top10Percent = Math.round(Number(sigunguMetrics[0].active_members_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_STUDENTS);
+              top10Percent = Math.round(Number(sigunguMetrics[0].active_members_p75) || average * percentileFactors.TOP10_FACTOR_STUDENTS);
             } else if (selectedMetric === 'revenue') {
               average = Math.round(Number(sigunguMetrics[0].revenue_avg) || 0);
-              top10Percent = Math.round(Number(sigunguMetrics[0].revenue_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_REVENUE);
+              top10Percent = Math.round(Number(sigunguMetrics[0].revenue_p75) || average * percentileFactors.TOP10_FACTOR_REVENUE);
             } else if (selectedMetric === 'attendance') {
-              average = Math.round(Number(sigunguMetrics[0].avg_attendance_rate) || value * PERCENTILE_FALLBACK_RATIOS.ATTENDANCE_AVG_FALLBACK);
-              top10Percent = Math.round(Number(sigunguMetrics[0].attendance_rate_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_ATTENDANCE);
+              average = Math.round(Number(sigunguMetrics[0].avg_attendance_rate) || value * percentileFactors.ATTENDANCE_AVG_FALLBACK);
+              top10Percent = Math.round(Number(sigunguMetrics[0].attendance_rate_p75) || average * percentileFactors.TOP10_FACTOR_ATTENDANCE);
             } else if (selectedMetric === 'growth') {
-              average = Math.round(Number(sigunguMetrics[0].student_growth_rate_avg) || value * PERCENTILE_FALLBACK_RATIOS.GROWTH_AVG_FALLBACK);
-              top10Percent = Math.round(Number(sigunguMetrics[0].student_growth_rate_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_GROWTH);
+              average = Math.round(Number(sigunguMetrics[0].student_growth_rate_avg) || value * percentileFactors.GROWTH_AVG_FALLBACK);
+              top10Percent = Math.round(Number(sigunguMetrics[0].student_growth_rate_p75) || average * percentileFactors.TOP10_FACTOR_GROWTH);
             } else if (selectedMetric === 'new_enrollments') {
               average = Math.round(Number(sigunguMetrics[0].new_enrollments_avg) || value * 0.9);
               top10Percent = Math.round(Number(sigunguMetrics[0].new_enrollments_p75) || average * 1.5);
@@ -617,16 +601,16 @@ export function AnalyticsPage() {
               fallbackLevel = 'same_sido';
               if (selectedMetric === 'students') {
                 average = Math.round(Number(sidoMetrics[0].active_members_avg) || 0);
-                top10Percent = Math.round(Number(sidoMetrics[0].active_members_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_STUDENTS);
+                top10Percent = Math.round(Number(sidoMetrics[0].active_members_p75) || average * percentileFactors.TOP10_FACTOR_STUDENTS);
               } else if (selectedMetric === 'revenue') {
                 average = Math.round(Number(sidoMetrics[0].revenue_avg) || 0);
-                top10Percent = Math.round(Number(sidoMetrics[0].revenue_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_REVENUE);
+                top10Percent = Math.round(Number(sidoMetrics[0].revenue_p75) || average * percentileFactors.TOP10_FACTOR_REVENUE);
               } else if (selectedMetric === 'attendance') {
-                average = Math.round(Number(sidoMetrics[0].avg_attendance_rate) || value * PERCENTILE_FALLBACK_RATIOS.ATTENDANCE_AVG_FALLBACK);
-                top10Percent = Math.round(Number(sidoMetrics[0].attendance_rate_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_ATTENDANCE);
+                average = Math.round(Number(sidoMetrics[0].avg_attendance_rate) || value * percentileFactors.ATTENDANCE_AVG_FALLBACK);
+                top10Percent = Math.round(Number(sidoMetrics[0].attendance_rate_p75) || average * percentileFactors.TOP10_FACTOR_ATTENDANCE);
               } else if (selectedMetric === 'growth') {
-                average = Math.round(Number(sidoMetrics[0].student_growth_rate_avg) || value * PERCENTILE_FALLBACK_RATIOS.GROWTH_AVG_FALLBACK);
-                top10Percent = Math.round(Number(sidoMetrics[0].student_growth_rate_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_GROWTH);
+                average = Math.round(Number(sidoMetrics[0].student_growth_rate_avg) || value * percentileFactors.GROWTH_AVG_FALLBACK);
+                top10Percent = Math.round(Number(sidoMetrics[0].student_growth_rate_p75) || average * percentileFactors.TOP10_FACTOR_GROWTH);
               } else if (selectedMetric === 'new_enrollments') {
                 average = Math.round(Number(sidoMetrics[0].new_enrollments_avg) || value * 0.9);
                 top10Percent = Math.round(Number(sidoMetrics[0].new_enrollments_p75) || average * 1.5);
@@ -674,16 +658,16 @@ export function AnalyticsPage() {
                   fallbackLevel = 'same_region_zone';
                   if (selectedMetric === 'students') {
                     average = Math.round(Number(regionZoneMetrics[0].active_members_avg) || 0);
-                    top10Percent = Math.round(Number(regionZoneMetrics[0].active_members_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_STUDENTS);
+                    top10Percent = Math.round(Number(regionZoneMetrics[0].active_members_p75) || average * percentileFactors.TOP10_FACTOR_STUDENTS);
                   } else if (selectedMetric === 'revenue') {
                     average = Math.round(Number(regionZoneMetrics[0].revenue_avg) || 0);
-                    top10Percent = Math.round(Number(regionZoneMetrics[0].revenue_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_REVENUE);
+                    top10Percent = Math.round(Number(regionZoneMetrics[0].revenue_p75) || average * percentileFactors.TOP10_FACTOR_REVENUE);
                   } else if (selectedMetric === 'attendance') {
-                    average = Math.round(Number(regionZoneMetrics[0].avg_attendance_rate) || value * PERCENTILE_FALLBACK_RATIOS.ATTENDANCE_AVG_FALLBACK);
-                    top10Percent = Math.round(Number(regionZoneMetrics[0].attendance_rate_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_ATTENDANCE);
+                    average = Math.round(Number(regionZoneMetrics[0].avg_attendance_rate) || value * percentileFactors.ATTENDANCE_AVG_FALLBACK);
+                    top10Percent = Math.round(Number(regionZoneMetrics[0].attendance_rate_p75) || average * percentileFactors.TOP10_FACTOR_ATTENDANCE);
                   } else if (selectedMetric === 'growth') {
-                    average = Math.round(Number(regionZoneMetrics[0].student_growth_rate_avg) || value * PERCENTILE_FALLBACK_RATIOS.GROWTH_AVG_FALLBACK);
-                    top10Percent = Math.round(Number(regionZoneMetrics[0].student_growth_rate_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_GROWTH);
+                    average = Math.round(Number(regionZoneMetrics[0].student_growth_rate_avg) || value * percentileFactors.GROWTH_AVG_FALLBACK);
+                    top10Percent = Math.round(Number(regionZoneMetrics[0].student_growth_rate_p75) || average * percentileFactors.TOP10_FACTOR_GROWTH);
                   } else if (selectedMetric === 'new_enrollments') {
                     average = Math.round(Number(regionZoneMetrics[0].new_enrollments_avg) || value * 0.9);
                     top10Percent = Math.round(Number(regionZoneMetrics[0].new_enrollments_p75) || average * 1.5);
@@ -728,16 +712,16 @@ export function AnalyticsPage() {
                     industryFilterRemoved = true; // 업종 필터 제거됨
                     if (selectedMetric === 'students') {
                       average = Math.round(Number(allIndustryMetrics[0].active_members_avg) || 0);
-                      top10Percent = Math.round(Number(allIndustryMetrics[0].active_members_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_STUDENTS);
+                      top10Percent = Math.round(Number(allIndustryMetrics[0].active_members_p75) || average * percentileFactors.TOP10_FACTOR_STUDENTS);
                     } else if (selectedMetric === 'revenue') {
                       average = Math.round(Number(allIndustryMetrics[0].revenue_avg) || 0);
-                      top10Percent = Math.round(Number(allIndustryMetrics[0].revenue_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_REVENUE);
+                      top10Percent = Math.round(Number(allIndustryMetrics[0].revenue_p75) || average * percentileFactors.TOP10_FACTOR_REVENUE);
                     } else if (selectedMetric === 'attendance') {
-                      average = Math.round(Number(allIndustryMetrics[0].avg_attendance_rate) || value * PERCENTILE_FALLBACK_RATIOS.ATTENDANCE_AVG_FALLBACK);
-                      top10Percent = Math.round(Number(allIndustryMetrics[0].attendance_rate_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_ATTENDANCE);
+                      average = Math.round(Number(allIndustryMetrics[0].avg_attendance_rate) || value * percentileFactors.ATTENDANCE_AVG_FALLBACK);
+                      top10Percent = Math.round(Number(allIndustryMetrics[0].attendance_rate_p75) || average * percentileFactors.TOP10_FACTOR_ATTENDANCE);
                     } else if (selectedMetric === 'growth') {
-                      average = Math.round(Number(allIndustryMetrics[0].student_growth_rate_avg) || value * PERCENTILE_FALLBACK_RATIOS.GROWTH_AVG_FALLBACK);
-                      top10Percent = Math.round(Number(allIndustryMetrics[0].student_growth_rate_p75) || average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_GROWTH);
+                      average = Math.round(Number(allIndustryMetrics[0].student_growth_rate_avg) || value * percentileFactors.GROWTH_AVG_FALLBACK);
+                      top10Percent = Math.round(Number(allIndustryMetrics[0].student_growth_rate_p75) || average * percentileFactors.TOP10_FACTOR_GROWTH);
                     } else if (selectedMetric === 'new_enrollments') {
                       average = Math.round(Number(allIndustryMetrics[0].new_enrollments_avg) || value * 0.9);
                       top10Percent = Math.round(Number(allIndustryMetrics[0].new_enrollments_p75) || average * 1.5);
@@ -817,20 +801,20 @@ export function AnalyticsPage() {
           let median = 0;
 
           if (selectedMetric === 'students') {
-            p25 = Number(currentMetrics.active_members_p25) || average * PERCENTILE_FALLBACK_RATIOS.P25_FACTOR;
-            p75 = Number(currentMetrics.active_members_p75) || average * PERCENTILE_FALLBACK_RATIOS.P75_FACTOR;
+            p25 = Number(currentMetrics.active_members_p25) || average * percentileFactors.P25_FACTOR;
+            p75 = Number(currentMetrics.active_members_p75) || average * percentileFactors.P75_FACTOR;
             median = Number(currentMetrics.active_members_median) || average;
           } else if (selectedMetric === 'revenue') {
-            p25 = Number(currentMetrics.revenue_p25) || average * PERCENTILE_FALLBACK_RATIOS.P25_FACTOR;
-            p75 = Number(currentMetrics.revenue_p75) || average * PERCENTILE_FALLBACK_RATIOS.P75_FACTOR;
+            p25 = Number(currentMetrics.revenue_p25) || average * percentileFactors.P25_FACTOR;
+            p75 = Number(currentMetrics.revenue_p75) || average * percentileFactors.P75_FACTOR;
             median = Number(currentMetrics.revenue_median) || average;
           } else if (selectedMetric === 'attendance') {
-            p25 = Number(currentMetrics.attendance_rate_p25) || average * PERCENTILE_FALLBACK_RATIOS.P25_FACTOR;
-            p75 = Number(currentMetrics.attendance_rate_p75) || average * PERCENTILE_FALLBACK_RATIOS.P75_FACTOR;
+            p25 = Number(currentMetrics.attendance_rate_p25) || average * percentileFactors.P25_FACTOR;
+            p75 = Number(currentMetrics.attendance_rate_p75) || average * percentileFactors.P75_FACTOR;
             median = average; // attendance_rate_median은 아직 없으므로 average 사용
           } else if (selectedMetric === 'growth') {
-            p25 = Number(currentMetrics.student_growth_rate_p25) || average * PERCENTILE_FALLBACK_RATIOS.P25_FACTOR;
-            p75 = Number(currentMetrics.student_growth_rate_p75) || average * PERCENTILE_FALLBACK_RATIOS.P75_FACTOR;
+            p25 = Number(currentMetrics.student_growth_rate_p25) || average * percentileFactors.P25_FACTOR;
+            p75 = Number(currentMetrics.student_growth_rate_p75) || average * percentileFactors.P75_FACTOR;
             median = average; // growth_rate_median은 아직 없으므로 average 사용
           }
 
