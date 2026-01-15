@@ -3,10 +3,8 @@
   "version": "1.0.0",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "dependencies": {
-    "@sentry/react": "^8.0.0"
-  },
   "peerDependencies": {
+    "@sentry/react": ">=8.0.0",
     "react": ">=18.0.0"
   }
 }
