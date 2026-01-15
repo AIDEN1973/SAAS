@@ -117,7 +117,8 @@ export const studentFormSchema: FormSchema = {
       },
     ],
     submit: {
-      label: '등록',
+      labelKey: 'MESSAGES.SAVE', // [SDUI v1.1] i18n 키 사용 (업종중립 준수)
+      label: '저장', // fallback
       variant: 'solid',
       color: 'primary',
       size: 'md',

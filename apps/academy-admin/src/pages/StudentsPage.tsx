@@ -18,13 +18,13 @@ declare global {
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ErrorBoundary, useIconSize, useIconStrokeWidth, useResponsiveMode, useToast, Input, Container, Card, Button, Drawer, PageHeader, RightLayerMenuLayout, isMobile, isTablet, EmptyState, SubSidebar } from '@ui-core/react';
+import { ErrorBoundary, useIconSize, useIconStrokeWidth, useToast, Input, Container, Card, Button, PageHeader, RightLayerMenuLayout, EmptyState, SubSidebar, Tooltip, Modal } from '@ui-core/react';
 import { DataTableActionButtons } from '../components/DataTableActionButtons';
-import { ChevronDown, ChevronUp, Users } from 'lucide-react';
-import { SchemaTable, SchemaForm, registerWidget } from '@schema-engine';
-import type { FormSchema } from '@schema-engine/types';
+import { ChevronDown, ChevronUp, Users, UserCheck, UserX, Clock, ArrowUpDown } from 'lucide-react';
+import { StatsDashboard } from '../components/stats';
+import type { StatsItem, ChartDataItem, PeriodFilter } from '../components/stats';
+import { SchemaTable, registerWidget } from '@schema-engine';
 import { useStudentPage } from './hooks/useStudentPage';
-import { apiClient } from '@api-sdk/core';
 import { tagFormSchema } from '../schemas/tag.schema';
 import { isWidgetRegistered, setWidgetRegistered } from '../utils/widget-registry';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
@@ -40,7 +40,8 @@ import { ClassesTab } from './students/tabs/ClassesTab';
 import { AttendanceTab } from './students/tabs/AttendanceTab';
 import { RiskAnalysisTab } from './students/tabs/RiskAnalysisTab';
 import { MessageSendTab } from './students/tabs/MessageSendTab';
-import type { StudentStatus, CreateStudentInput, Gender, StudentConsultation, Guardian } from '@services/student-service';
+import { CreateStudentForm } from './students/components/CreateStudentForm';
+import type { StudentStatus, StudentConsultation, Guardian } from '@services/student-service';
 
 // [P2-QUALITY-1 해결] processTagInput 함수는 utils/data-normalization-utils.ts에서 SSOT로 관리
 // import { processTagInput } from '../utils';
@@ -116,8 +117,14 @@ export function StudentsPage() {
   const selectedSubMenu = getSubMenuFromUrl(searchParams, validIds, DEFAULT_STUDENTS_SUB_MENU);
 
   const handleSubMenuChange = useCallback((id: StudentsSubMenuId) => {
+    // '학생등록' 메뉴를 클릭하면 모달을 띄움 (페이지 이동하지 않음)
+    if (id === 'add') {
+      setShowCreateForm(true);
+      return;
+    }
     const newUrl = setSubMenuToUrl(id, DEFAULT_STUDENTS_SUB_MENU);
     navigate(newUrl, { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   // [아키텍처] Application Layer와 UI Composition 분리
@@ -174,7 +181,6 @@ export function StudentsPage() {
     tableFilters,
 
     // 반응형
-    isMobile: isMobileMode,
     isTablet: isTabletMode,
 
     // 핸들러
@@ -235,6 +241,313 @@ export function StudentsPage() {
     }
   }, [handleStudentSelect]);
 
+  // 기간 필터 상태 (기본값: 최근 1개월)
+  const [statsPeriod, setStatsPeriod] = useState<PeriodFilter>('1month');
+
+  // 섹션 순서 상태 (기본값: 'stats-first' = StatsDashboard가 위, 'table-first' = SchemaTable이 위)
+  // localStorage에 저장하여 새로고침 후에도 유지
+  const SECTION_ORDER_KEY = 'students-section-order';
+  const [sectionOrder, setSectionOrder] = useState<'stats-first' | 'table-first'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(SECTION_ORDER_KEY);
+      if (saved === 'table-first') return 'table-first';
+    }
+    return 'stats-first';
+  });
+
+  // 애니메이션 상태
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  // 섹션 순서 토글 핸들러
+  const handleToggleSectionOrder = useCallback(() => {
+    // 페이드 아웃 시작
+    setIsAnimating(true);
+
+    // 페이드 아웃 완료 후 상태 변경
+    setTimeout(() => {
+      setSectionOrder((prev) => {
+        const next = prev === 'stats-first' ? 'table-first' : 'stats-first';
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(SECTION_ORDER_KEY, next);
+        }
+        return next;
+      });
+
+      // 페이드 인을 위해 애니메이션 상태 리셋
+      setTimeout(() => {
+        setIsAnimating(false);
+      }, 50);
+    }, 200);
+  }, []);
+
+  // 선택된 통계 카드 상태 (기본값: 전체 학생)
+  const [selectedStatsKey, setSelectedStatsKey] = useState<string>('total');
+
+  // 기간에 맞는 학생 데이터 필터링
+  const filteredStudentsByPeriod = useMemo(() => {
+    if (!students || students.length === 0) return students;
+
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date | null = null;
+
+    switch (statsPeriod) {
+      case 'today': {
+        // 오늘: 오늘 00:00:00부터
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        break;
+      }
+      case 'yesterday': {
+        // 어제: 어제 00:00:00부터 어제 23:59:59까지
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
+        break;
+      }
+      case 'thisWeek': {
+        // 이번주: 이번주 월요일 00:00:00부터
+        const dayOfWeek = now.getDay(); // 0(일) ~ 6(토)
+        const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // 일요일이면 6일 전, 그 외는 (요일-1)일 전
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToMonday, 0, 0, 0);
+        break;
+      }
+      case 'lastWeek': {
+        // 지난주: 지난주 월요일 00:00:00부터 일요일 23:59:59까지
+        const dayOfWeek = now.getDay();
+        const daysToLastMonday = dayOfWeek === 0 ? 13 : dayOfWeek + 6;
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToLastMonday, 0, 0, 0);
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek === 0 ? 7 : dayOfWeek), 23, 59, 59);
+        break;
+      }
+      case 'lastMonth': {
+        // 지난달: 지난달 1일 00:00:00부터 지난달 마지막날 23:59:59까지
+        const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        startDate = new Date(lastMonthDate.getFullYear(), lastMonthDate.getMonth(), 1, 0, 0, 0);
+        endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59); // 이번달 0일 = 지난달 마지막날
+        break;
+      }
+      case '1month': {
+        // 최근 1개월
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        break;
+      }
+      case '3months': {
+        // 최근 3개월
+        startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+        break;
+      }
+      case '6months': {
+        // 최근 6개월
+        startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+        break;
+      }
+      case '1year': {
+        // 최근 1년
+        startDate = new Date(now.getFullYear(), now.getMonth() - 12, now.getDate());
+        break;
+      }
+      default:
+        return students;
+    }
+
+    return students.filter(s => {
+      const student = s as { created_at?: string };
+      if (!student.created_at) return true; // created_at이 없으면 포함
+      const createdDate = new Date(student.created_at);
+      const afterStart = createdDate >= startDate;
+      const beforeEnd = endDate ? createdDate <= endDate : true;
+      return afterStart && beforeEnd;
+    });
+  }, [students, statsPeriod]);
+
+  // 학생 현황 통계 계산 (기간 필터 적용)
+  const studentStatusStats = useMemo(() => {
+    // 데이터가 없을 때도 0으로 채운 통계 반환 (컴포넌트가 사라지지 않도록)
+    if (!filteredStudentsByPeriod || filteredStudentsByPeriod.length === 0) {
+      return {
+        total: 0,
+        active: 0,
+        onLeave: 0,
+        graduated: 0,
+        withdrawn: 0,
+      };
+    }
+
+    const total = filteredStudentsByPeriod.length;
+    const active = filteredStudentsByPeriod.filter(s => (s as { status?: StudentStatus }).status === 'active').length;
+    const onLeave = filteredStudentsByPeriod.filter(s => (s as { status?: StudentStatus }).status === 'on_leave').length;
+    const graduated = filteredStudentsByPeriod.filter(s => (s as { status?: StudentStatus }).status === 'graduated').length;
+    const withdrawn = filteredStudentsByPeriod.filter(s => (s as { status?: StudentStatus }).status === 'withdrawn').length;
+
+    return {
+      total,
+      active,
+      onLeave,
+      graduated,
+      withdrawn,
+    };
+  }, [filteredStudentsByPeriod]);
+
+  // StatsDashboard용 통계 카드 데이터
+  const statsItems: StatsItem[] = useMemo(() => {
+    return [
+      {
+        key: 'total',
+        icon: Users,
+        title: `전체 ${terms.PERSON_LABEL_PRIMARY}`,
+        value: studentStatusStats.total,
+        unit: '명',
+        iconBackgroundColor: 'var(--color-primary-50)',
+      },
+      {
+        key: 'active',
+        icon: UserCheck,
+        title: '활성',
+        value: studentStatusStats.active,
+        unit: '명',
+        iconBackgroundColor: 'var(--color-success-50)',
+      },
+      {
+        key: 'onLeave',
+        icon: Clock,
+        title: '휴학',
+        value: studentStatusStats.onLeave,
+        unit: '명',
+        iconBackgroundColor: 'var(--color-warning-50)',
+      },
+      {
+        key: 'withdrawn',
+        icon: UserX,
+        title: '퇴학',
+        value: studentStatusStats.withdrawn,
+        unit: '명',
+        iconBackgroundColor: 'var(--color-error-50)',
+      },
+    ];
+  }, [studentStatusStats, terms.PERSON_LABEL_PRIMARY]);
+
+  // StatsDashboard용 차트 데이터 (선택된 카드에 따라 필터링)
+  const chartData: ChartDataItem[] = useMemo(() => {
+    if (!students || students.length === 0) {
+      return [];
+    }
+
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+    // 기간에 따른 시작 날짜 계산 (filteredStudentsByPeriod와 동일한 로직)
+    switch (statsPeriod) {
+      case 'today': {
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        break;
+      }
+      case 'yesterday': {
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
+        break;
+      }
+      case 'thisWeek': {
+        const dayOfWeek = now.getDay();
+        const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToMonday, 0, 0, 0);
+        break;
+      }
+      case 'lastWeek': {
+        const dayOfWeek = now.getDay();
+        const daysToLastMonday = dayOfWeek === 0 ? 13 : dayOfWeek + 6;
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToLastMonday, 0, 0, 0);
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek === 0 ? 7 : dayOfWeek), 23, 59, 59);
+        break;
+      }
+      case 'lastMonth': {
+        const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        startDate = new Date(lastMonthDate.getFullYear(), lastMonthDate.getMonth(), 1, 0, 0, 0);
+        endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+        break;
+      }
+      case '1month': {
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        break;
+      }
+      case '3months': {
+        startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+        break;
+      }
+      case '6months': {
+        startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+        break;
+      }
+      case '1year': {
+        startDate = new Date(now.getFullYear(), now.getMonth() - 12, now.getDate());
+        break;
+      }
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    }
+
+    // 선택된 카드에 따라 학생 상태 필터링 함수
+    const statusFilterMap: Record<string, (status: StudentStatus) => boolean> = {
+      total: () => true,
+      active: (status) => status === 'active',
+      onLeave: (status) => status === 'on_leave',
+      withdrawn: (status) => status === 'withdrawn',
+    };
+
+    const statusFilter = statusFilterMap[selectedStatsKey] || statusFilterMap.total;
+
+    // 날짜별로 학생 데이터를 그룹화 (상태 필터 적용)
+    const dateMap = new Map<string, number>();
+
+    students.forEach(s => {
+      const student = s as { created_at?: string; status?: StudentStatus };
+      if (student.created_at && statusFilter(student.status as StudentStatus)) {
+        const date = new Date(student.created_at);
+        const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        dateMap.set(dateKey, (dateMap.get(dateKey) || 0) + 1);
+      }
+    });
+
+    // 기간 내 모든 날짜 생성
+    const allDates: string[] = [];
+    const currentDate = new Date(startDate);
+
+    while (currentDate <= endDate) {
+      const dateKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+      allDates.push(dateKey);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // 누적 합계 계산 (startDate 이전의 학생 수부터 시작, 상태 필터 적용)
+    let cumulative = 0;
+
+    // startDate 이전에 생성된 학생 수 계산 (상태 필터 적용)
+    students.forEach(s => {
+      const student = s as { created_at?: string; status?: StudentStatus };
+      if (student.created_at && statusFilter(student.status as StudentStatus)) {
+        const date = new Date(student.created_at);
+        if (date < startDate) {
+          cumulative++;
+        }
+      }
+    });
+
+    // 모든 날짜에 대해 차트 데이터 생성
+    return allDates.map(date => {
+      const newStudents = dateMap.get(date) || 0;
+      cumulative += newStudents;
+
+      // 날짜에서 연도 제거 (MM-DD 형식)
+      const [, month, day] = date.split('-');
+      const shortDate = `${month}-${day}`;
+
+      return {
+        name: shortDate,
+        value: cumulative,
+        color: 'var(--color-primary)',
+      };
+    });
+  }, [students, statsPeriod, selectedStatsKey]);
+
   return (
     <ErrorBoundary>
       <div style={{ display: 'flex', height: '100vh' }}>
@@ -246,7 +559,7 @@ export function StudentsPage() {
           relatedMenus={STUDENTS_RELATED_MENUS}
           testId="students-sub-sidebar"
         />
-        <div style={{ flex: 1, overflow: 'auto' }}>
+        <div style={{ flex: 1 }}>
       <RightLayerMenuLayout
         layerMenu={{
           isOpen: !!selectedStudentId,
@@ -526,23 +839,47 @@ export function StudentsPage() {
         }}
       >
         <Container maxWidth="xl" padding="lg">
-        {/* 타이틀과 액션 버튼을 한 줄로 배치 */}
-        <PageHeader
-          title={`${terms.PERSON_LABEL_PRIMARY}관리`}
-          actions={
-            selectedSubMenu === 'list' ? (
-              <DataTableActionButtons
-                align="right"
-                onCreate={() => setShowCreateForm(true)}
-                onUpload={() => fileInputRef.current?.click()}
-                onDownload={handleDownload}
-                onDownloadTemplate={handleDownloadTemplate}
-                uploadDisabled={bulkCreateStudents.isPending}
-                createTooltip={`${terms.PERSON_LABEL_PRIMARY}등록`}
-              />
-            ) : undefined
-          }
-        />
+        {/* 타이틀 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xl)' }}>
+          <PageHeader
+            title={`${terms.PERSON_LABEL_PRIMARY}목록`}
+            style={{ marginBottom: 0 }}
+          />
+          {/* 섹션 순서 토글 버튼 */}
+          <Tooltip
+            content={sectionOrder === 'stats-first' ? '학생목록이 위로' : '학생목록이 아래로'}
+            position="top"
+          >
+            <button
+              type="button"
+              onClick={handleToggleSectionOrder}
+              aria-label={sectionOrder === 'stats-first' ? '테이블을 위로 이동' : '통계를 위로 이동'}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 'var(--spacing-xs)',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                color: 'var(--color-text-secondary)',
+                borderRadius: 'var(--border-radius-sm)',
+                transition: 'color var(--transition-fast), background-color var(--transition-fast)',
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--color-text)';
+                e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--color-text-secondary)';
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <ArrowUpDown size={iconSize} strokeWidth={iconStrokeWidth} />
+            </button>
+          </Tooltip>
+        </div>
 
         <input
           ref={fileInputRef}
@@ -558,7 +895,30 @@ export function StudentsPage() {
 
         {/* 학생 목록 탭 ('list') */}
         {selectedSubMenu === 'list' && (
-          <>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              opacity: isAnimating ? 0 : 1,
+              transition: 'opacity 0.2s ease-in-out',
+            }}
+          >
+            {/* 학생 현황 통계 카드 & 그래프 - 순서에 따라 위치 변경 */}
+            {sectionOrder === 'stats-first' && statsItems.length > 0 && (
+              <div style={{ marginBottom: 'calc(var(--spacing-xl) * 2)' }}>
+                <StatsDashboard
+                  statsItems={statsItems}
+                  chartData={chartData}
+                  period={statsPeriod}
+                  onPeriodChange={setStatsPeriod}
+                  selectedStatsKey={selectedStatsKey}
+                  onStatsCardClick={setSelectedStatsKey}
+                />
+              </div>
+            )}
+
+            {/* 테이블 섹션 컨테이너 */}
+            <div>
         {/* 태그 필터 */}
         {tags && tags.length > 0 && (
             <div style={{ position: 'relative', marginBottom: 'var(--spacing-md)' }}>
@@ -652,40 +1012,47 @@ export function StudentsPage() {
             </div>
         )}
 
-        {/* 학생 등록 폼 - 반응형: 모바일/태블릿은 모달/드로어, 데스크톱은 인라인 */}
-        {showCreateForm && (
-            <>
-              {isMobileMode || isTabletMode ? (
-                // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
-                <Drawer
-                  isOpen={showCreateForm}
-                  onClose={() => setShowCreateForm(false)}
-                  title={`${terms.PERSON_LABEL_PRIMARY} 등록`}
-                  position={isMobileMode ? 'bottom' : 'right'}
-                  width={isTabletMode ? 'var(--width-drawer-tablet)' : 'var(--width-full)'}
-                >
-                  <CreateStudentForm
-                    onClose={() => setShowCreateForm(false)}
-                    onSubmit={async (data) => {
-                      await createStudent.mutateAsync(data);
-                      setShowCreateForm(false);
-                    }}
-                    effectiveFormSchema={effectiveFormSchema}
-                  />
-                </Drawer>
-              ) : (
-                // 데스크톱: 인라인 폼 (기존 방식)
-                <CreateStudentForm
-                  onClose={() => setShowCreateForm(false)}
-                  onSubmit={async (data) => {
-                    await createStudent.mutateAsync(data);
-                    setShowCreateForm(false);
-                  }}
-                  effectiveFormSchema={effectiveFormSchema}
-                />
-              )}
-          </>
-        )}
+        {/* [업종중립] PERSON 등록 폼 - 모달로 표시 */}
+        {showCreateForm && (() => {
+          let triggerSubmit: (() => void) | null = null;
+          return (
+            <Modal
+              isOpen={showCreateForm}
+              onClose={() => setShowCreateForm(false)}
+              title={`${terms.PERSON_LABEL_PRIMARY}등록`}
+              size="lg"
+              footer={
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCreateForm(false)}
+                    style={{ flex: 1 }}
+                  >
+                    {terms.MESSAGES.CANCEL}
+                  </Button>
+                  <Button
+                    variant="solid"
+                    color="primary"
+                    onClick={() => triggerSubmit?.()}
+                    style={{ flex: 1 }}
+                  >
+                    {terms.MESSAGES.SAVE}
+                  </Button>
+                </>
+              }
+            >
+              <CreateStudentForm
+                onClose={() => setShowCreateForm(false)}
+                onSubmit={async (data) => {
+                  await createStudent.mutateAsync(data);
+                  setShowCreateForm(false);
+                }}
+                effectiveFormSchema={effectiveFormSchema}
+                onSubmitTrigger={(fn) => { triggerSubmit = fn; }}
+              />
+            </Modal>
+          );
+        })()}
 
         {/* 학생 목록 */}
         {/* 로딩 상태 */}
@@ -727,6 +1094,17 @@ export function StudentsPage() {
                     grade: filter.grade || '',
                     class_id: filter.class_id || '',
                   }}
+                  customActions={
+                    <DataTableActionButtons
+                      align="right"
+                      onCreate={() => setShowCreateForm(true)}
+                      onUpload={() => fileInputRef.current?.click()}
+                      onDownload={handleDownload}
+                      onDownloadTemplate={handleDownloadTemplate}
+                      uploadDisabled={bulkCreateStudents.isPending}
+                      createTooltip={`${terms.PERSON_LABEL_PRIMARY}등록`}
+                    />
+                  }
                 />
               )}
           </>
@@ -749,10 +1127,25 @@ export function StudentsPage() {
               />
           </Card>
         )}
-          </>
+            </div>
+
+            {/* table-first일 때 StatsDashboard를 아래에 표시 */}
+            {sectionOrder === 'table-first' && statsItems.length > 0 && (
+              <div style={{ marginTop: 'calc(var(--spacing-xl) * 2)' }}>
+                <StatsDashboard
+                  statsItems={statsItems}
+                  chartData={chartData}
+                  period={statsPeriod}
+                  onPeriodChange={setStatsPeriod}
+                  selectedStatsKey={selectedStatsKey}
+                  onStatsCardClick={setSelectedStatsKey}
+                />
+              </div>
+            )}
+          </div>
         )}
 
-        {/* 학생 등록 탭 ('add') */}
+        {/* [업종중립] PERSON 등록 탭 ('add') */}
         {selectedSubMenu === 'add' && (
           <Card padding="lg" variant="default">
             <div style={{ marginBottom: 'var(--spacing-lg)' }}>
@@ -761,7 +1154,7 @@ export function StudentsPage() {
                 fontWeight: 'var(--font-weight-bold)',
                 marginBottom: 'var(--spacing-md)'
               }}>
-                {terms.PERSON_LABEL_PRIMARY} 등록
+                {terms.PERSON_LABEL_PRIMARY}등록
               </h2>
             </div>
             <CreateStudentForm
@@ -836,171 +1229,7 @@ export function StudentsPage() {
 // ============================================================================
 // LayerSectionHeader는 별도 파일(./students/components/LayerSectionHeader.tsx)에서 import 사용
 
-// 학생 등록 폼 컴포넌트
-interface CreateStudentFormProps {
-  onClose: () => void;
-  onSubmit: (data: CreateStudentInput) => Promise<void>;
-  effectiveFormSchema: FormSchema;
-}
-
-function CreateStudentForm({ onClose, onSubmit, effectiveFormSchema }: CreateStudentFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
-  const mode = useResponsiveMode();
-  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
-  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
-  const isMobileMode = isMobile(modeUpper);
-  const isTabletMode = isTablet(modeUpper);
-
-  const handleSubmit = async (data: Record<string, unknown>) => {
-    setIsSubmitting(true);
-    try {
-      // 스키마에서 받은 데이터를 CreateStudentInput 형식으로 변환
-      const input: CreateStudentInput = {
-        name: String(data.name ?? ''),
-        birth_date: data.birth_date ? String(data.birth_date) : undefined,
-        gender: data.gender ? (data.gender as Gender) : undefined,
-        phone: data.phone ? String(data.phone) : undefined,
-        email: data.email ? String(data.email) : undefined,
-        address: data.address ? String(data.address) : undefined,
-        school_name: data.school_name ? String(data.school_name) : undefined,
-        grade: data.grade ? String(data.grade) : undefined,
-        status: (data.status || 'active') as StudentStatus,
-        notes: data.notes ? String(data.notes) : undefined,
-      };
-      await onSubmit(input);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Drawer 내부에서는 헤더가 Drawer에 있으므로 중복 제거
-  // 데스크톱에서만 인라인으로 표시되므로 showHeader는 데스크톱에서만 true
-  const showHeader = !isMobileMode && !isTabletMode;
-  // Drawer 내부에서 사용될 때는 padding 중복 방지를 위해 disableCardPadding=true
-  // 모바일/태블릿에서는 Drawer를 사용하므로 disableCardPadding=true
-  const isInDrawer = isMobileMode || isTabletMode;
-
-  const terms = useIndustryTerms();
-
-  return (
-    <div style={showHeader ? { marginBottom: 'var(--spacing-md)' } : {}}>
-      {showHeader && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>{terms.PERSON_LABEL_PRIMARY} 등록</h3>
-          <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
-            {terms.MESSAGES.CANCEL}
-          </Button>
-        </div>
-      )}
-      <SchemaForm
-        schema={{
-          ...effectiveFormSchema,
-          form: {
-            ...effectiveFormSchema.form,
-            // [P0-1 수정] actions를 명시적으로 비활성화하여 SchemaForm이 자동 API 호출을 하지 않도록 함
-            // handleSubmit에서 createStudent.mutateAsync를 통해 직접 처리
-            actions: [],
-          },
-          // 최상위 actions도 비활성화
-          actions: [],
-        }}
-        onSubmit={handleSubmit}
-        defaultValues={{
-          status: 'active',
-        }}
-        disableCardPadding={isInDrawer}
-        actionContext={{
-          // [P1-3] apiCall 제공: actions: []로 비활성화되어 있지만, 위젯이나 동적 스키마에서 호출 가능성 대비
-          // 완전 차단이 목적이면 apiCall 자체를 제거하고, 필요한 위젯만 별도 안전 래퍼로 제공 가능
-          // [P0-2 수정] PATCH/PUT/DELETE 지원 추가, endpoint whitelist 검증
-          apiCall: async (endpoint: string, method: string, body?: unknown) => {
-            // [P0-2 수정] endpoint 정규화: 선행 / 제거 (쿼리스트링은 유지)
-            // whitelist 검증용: 쿼리스트링 제거 후 base 추출
-            const endpointNoSlash = endpoint.replace(/^\//, '');     // 쿼리 포함 유지
-            const endpointPath = endpointNoSlash.split('?')[0];        // whitelist용
-            const endpointBase = endpointPath.split('/')[0];          // whitelist용
-
-            // [P1-1 수정] endpoint whitelist: 학생 페이지에서 실제로 사용하는 리소스 포함
-            // 보안상 의도: 스키마가 호출할 수 있는 엔드포인트를 제한
-            // 실제 studentFormSchema는 actions가 비활성화되어 있어 호출하지 않지만,
-            // 위젯이나 동적 스키마에서 호출 가능성을 대비한 안전장치
-            // 학생 페이지에서 사용하는 리소스: students, guardians, consultations, attendance_logs, classes, tags, tag_assignments, student_classes
-            const allowedEndpoints = ['students', 'guardians', 'consultations', 'attendance_logs', 'classes', 'tags', 'tag_assignments', 'student_classes'];
-            if (!allowedEndpoints.includes(endpointBase)) {
-              throw new Error(`허용되지 않은 endpoint: ${endpoint}`);
-            }
-
-            // [P0-2 수정] POST/PATCH/PUT/DELETE는 쿼리스트링 차단: SDK 시그니처와 충돌 방지 및 Zero-Trust 경계 강화
-            // PostgREST 계열에서 쓰기 요청에 쿼리스트링이 포함되면 보안 위험 및 런타임 오류 가능
-            const hasQuery = endpointNoSlash.includes('?');
-            if (hasQuery && ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method.toUpperCase())) {
-              throw new Error(`쿼리스트링이 포함된 쓰기 요청은 허용하지 않습니다: ${endpoint}`);
-            }
-
-            switch (method.toUpperCase()) {
-              case 'POST':
-                {
-                  // [P0-2 수정] POST는 리소스명만 허용 (쿼리스트링 제거된 endpointPath 사용)
-                  const resourceOnly = endpointPath; // 'students'
-                  const response = await apiClient.post(resourceOnly, body as Record<string, unknown>);
-                  if (response.error) {
-                    throw new Error(response.error.message);
-                  }
-                  return response.data;
-                }
-              case 'PATCH':
-              case 'PUT':
-                {
-                  // [P0-1 수정] 방어적 파싱: 정확히 'resource/id' 형식만 허용
-                  // students/123/extra 같은 잘못된 경로는 거부
-                  const parts = endpointPath.split('/').filter(Boolean);
-                  if (parts.length !== 2) {
-                    throw new Error(`잘못된 endpoint 형식입니다 (resource/id만 허용): ${endpoint}`);
-                  }
-                  const [resource, id] = parts;
-                  // apiClient에는 put 메서드가 없고 patch만 있음 (PostgREST는 PATCH 사용)
-                  // PUT도 patch로 처리하는 것이 올바름
-                  const response = await apiClient.patch(resource, id, body as Record<string, unknown>);
-                  if (response.error) {
-                    throw new Error(response.error.message);
-                  }
-                  return response.data;
-                }
-              case 'DELETE':
-                {
-                  // [P0-1 수정] 방어적 파싱: 정확히 'resource/id' 형식만 허용
-                  // students/123/extra 같은 잘못된 경로는 거부
-                  const parts = endpointPath.split('/').filter(Boolean);
-                  if (parts.length !== 2) {
-                    throw new Error(`잘못된 endpoint 형식입니다 (resource/id만 허용): ${endpoint}`);
-                  }
-                  const [resource, id] = parts;
-                  const response = await apiClient.delete(resource, id);
-                  if (response.error) {
-                    throw new Error(response.error.message);
-                  }
-                  return response.data;
-                }
-              case 'GET':
-              default:
-                {
-                  // [P0-1 수정] GET은 Schema actionContext에서 허용하지 않음 (Zero-Trust 원칙)
-                  // apiClient.get(table, options) 시그니처와 쿼리스트링 포함 raw path가 불일치할 수 있음
-                  // 동적 스키마/위젯에서 GET이 필요한 경우, 별도의 안전한 래퍼를 사용해야 함
-                  throw new Error('GET은 Schema actionContext에서 허용하지 않습니다. 데이터 조회는 useQuery/useMutation을 사용하세요.');
-                }
-            }
-          },
-          showToast: (message: string, variant?: string) => {
-            const toastVariant = variant === 'success' ? 'success' : variant === 'error' ? 'error' : variant === 'warning' ? 'warning' : 'info';
-            toast(message, toastVariant);
-          },
-        }}
-      />
-    </div>
-  );
-}
+// CreateStudentForm은 별도 파일(./students/components/CreateStudentForm.tsx)에서 import
 
 
 // ============================================================================

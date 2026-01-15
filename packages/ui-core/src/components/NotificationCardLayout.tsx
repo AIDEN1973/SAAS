@@ -109,7 +109,10 @@ export function NotificationCardLayout({
   const menuIconStrokeWidth = useIconStrokeWidth('--stroke-width-icon');
   const cardIconSize = useIconSize('--size-icon-base'); // 기본 아이콘 크기
   const cardIconSizeReduced = useIconSize('--size-icon-md'); // padding 증가에 따라 아이콘 크기 감소
-  const cardIconStrokeWidth = useIconStrokeWidth('--stroke-width-icon');
+  const cardIconStrokeWidthNormal = useIconStrokeWidth('--stroke-width-icon');
+  const cardIconStrokeWidthBold = useIconStrokeWidth('--stroke-width-icon-bold');
+  // 선택된 카드는 굵은 선 사용
+  const cardIconStrokeWidth = isSelected ? cardIconStrokeWidthBold : cardIconStrokeWidthNormal;
   const trendIconStrokeWidth = useIconStrokeWidth('--stroke-width-icon');
 
   // Popover offset을 위한 spacing-xs 값 (px 단위)
@@ -159,7 +162,7 @@ export function NotificationCardLayout({
 
   return (
     <Card
-      padding="md"
+      padding={actualLayoutMode === 'stats' ? 'sm' : 'md'}
       style={{
         backgroundColor: backgroundColor || 'var(--color-white)',
         height: '100%',
@@ -168,6 +171,10 @@ export function NotificationCardLayout({
         opacity: isEmpty ? 'var(--opacity-inactive)' : 'var(--opacity-full)',
         position: 'relative',
         cursor: cursorStyle,
+        // stats 모드일 때 상하 패딩 동일하게 (Card 기본 paddingBottom 오버라이드)
+        ...(actualLayoutMode === 'stats' && {
+          paddingBottom: 'var(--spacing-sm)',
+        }),
       }}
       onClick={handleClick}
       disableHoverEffect={true}
@@ -296,7 +303,7 @@ export function NotificationCardLayout({
       {/* 통합 레이아웃: 좌측 아이콘 + 우측 컨텐츠 영역 */}
       <div style={{
         display: 'flex',
-        alignItems: 'flex-start',
+        alignItems: actualLayoutMode === 'stats' ? 'center' : 'flex-start',
         gap: 'var(--spacing-md)',
       }}>
         {/* 좌측: 원형 배경이 있는 아이콘 (header가 있으면 header 사용, 없으면 icon 사용) */}

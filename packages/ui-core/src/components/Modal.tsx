@@ -206,7 +206,7 @@ export const Modal: React.FC<ModalProps> = ({
             paddingBottom: 'var(--spacing-lg)',
             overflowY: 'auto',
             flex: 1,
-            marginBottom: 'var(--spacing-xl)',
+            marginBottom: footer ? 'var(--spacing-none)' : 'var(--spacing-xl)',
           }}
         >
           {children}
@@ -216,17 +216,23 @@ export const Modal: React.FC<ModalProps> = ({
         {footer && (
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              gap: 'var(--spacing-sm)',
               padding: 'var(--spacing-lg)',
               paddingTop: 'var(--spacing-md)',
               borderTop: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
               flexShrink: 0,
             }}
           >
-            {footer}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 'var(--spacing-sm)',
+                width: '100%',
+              }}
+            >
+              {footer}
+            </div>
           </div>
         )}
       </Card>

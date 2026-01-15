@@ -62,15 +62,23 @@ export const Tooltip: React.FC<TooltipProps> = ({
   }, []);
 
   // offset 계산용 - prop으로 전달된 값 우선 사용, 없으면 CSS 변수에서 읽기
+  // HARD-CODE-EXCEPTION: 8px는 툴팁 오프셋 기본값 (CSS 변수 파싱 실패 시 fallback)
   const offsetPx = useMemo(() => {
     if (offset !== undefined) {
       return offset; // prop으로 전달된 값 사용
     }
-    return getCssVarPx('--spacing-tooltip-offset', 8); // CSS 변수에서 읽기
+    const cssOffset = getCssVarPx('--spacing-tooltip-offset', 8);
+    // rem 변환 오류로 너무 작은 값이 나오면 기본값 사용
+    return cssOffset < 1 ? 8 : cssOffset;
   }, [offset, getCssVarPx]);
 
-  // 화살표 크기 - CSS 변수에서 읽기 (하드코딩 제거)
-  const arrowInnerSize = useMemo(() => getCssVarPx('--size-tooltip-arrow-inner', 4), [getCssVarPx]);
+  // 화살표 크기 - CSS 변수에서 읽기
+  // HARD-CODE-EXCEPTION: 4px는 툴팁 화살표 기본 크기 (CSS 변수 파싱 실패 시 fallback)
+  const arrowInnerSize = useMemo(() => {
+    const size = getCssVarPx('--size-tooltip-arrow-inner', 4);
+    // rem 변환 오류로 너무 작은 값이 나오면 기본값 사용
+    return size < 1 ? 4 : size;
+  }, [getCssVarPx]);
 
   // 정밀한 위치 계산 함수
   const calculatePosition = useCallback(() => {
@@ -229,6 +237,29 @@ export const Tooltip: React.FC<TooltipProps> = ({
                   borderBottomWidth: arrowInnerSize,
                   borderBottomStyle: 'solid',
                   borderBottomColor: useThemeColor ? 'var(--color-primary)' : 'var(--color-text)',
+                  zIndex: 1,
+                }}
+              />
+            )}
+            {/* 하단 삼각형 (position이 'top'일 때 표시, 버튼 쪽을 가리킴) */}
+            {position === 'top' && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: -arrowInnerSize,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 0,
+                  height: 0,
+                  borderLeftWidth: arrowInnerSize,
+                  borderLeftStyle: 'solid',
+                  borderLeftColor: 'transparent',
+                  borderRightWidth: arrowInnerSize,
+                  borderRightStyle: 'solid',
+                  borderRightColor: 'transparent',
+                  borderTopWidth: arrowInnerSize,
+                  borderTopStyle: 'solid',
+                  borderTopColor: useThemeColor ? 'var(--color-primary)' : 'var(--color-text)',
                   zIndex: 1,
                 }}
               />

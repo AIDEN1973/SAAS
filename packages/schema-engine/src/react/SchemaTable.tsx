@@ -51,6 +51,8 @@ export interface SchemaTableProps {
   onSearchChange?: (value: string) => void;
   // 검색 플레이스홀더 (기본값: "검색...")
   searchPlaceholder?: string;
+  // 필터 버튼과 itemsPerPage 드롭다운 사이에 표시할 커스텀 액션
+  customActions?: React.ReactNode;
 }
 
 /**
@@ -77,6 +79,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
   searchValue = '',
   onSearchChange,
   searchPlaceholder = '검색...',
+  customActions,
 }) => {
   const { dataSource, columns, rowActions, rowActionHandlers, pagination: paginationConfig } = schema.table;
 
@@ -326,78 +329,84 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
 
   return (
     <div className={className}>
-      {/* 필터 컨트롤 영역 (검색 + 필터버튼 + itemsPerPage) - DataTable 내부 필터와 동일한 레이아웃 */}
+      {/* 필터 컨트롤 영역 (커스텀 액션 + 검색 + 필터버튼 + itemsPerPage) */}
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
           gap: 'var(--spacing-sm)',
           marginBottom: 'var(--spacing-md)',
         }}
       >
-        {/* 검색 입력창 (항상 표시) */}
-        <SearchInput
-          value={effectiveSearchValue}
-          onChange={handleSearchChange}
-          placeholder={searchPlaceholder}
-          size="sm"
-        />
+        {/* 좌측: 커스텀 액션 */}
+        {customActions || <div />}
 
-        {/* 필터 버튼 */}
-        {filterSchema && (
-          <Button
-            type="button"
-            onClick={() => setShowFilterPanel((prev) => !prev)}
-            variant="outline"
+        {/* 우측: 검색 + 필터 + itemsPerPage */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', flexShrink: 0 }}>
+          {/* 검색 입력창 (항상 표시) */}
+          <SearchInput
+            value={effectiveSearchValue}
+            onChange={handleSearchChange}
+            placeholder={searchPlaceholder}
             size="sm"
-            selected={showFilterPanel || activeFilterCount > 0}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--spacing-xs)',
-            }}
-          >
-            <Funnel size={16} weight={showFilterPanel || activeFilterCount > 0 ? 'fill' : 'regular'} />
-            필터
-            {activeFilterCount > 0 && (
-              <span
-                style={{
-                  backgroundColor: 'var(--color-primary)',
-                  color: 'var(--color-white)',
-                  borderRadius: 'var(--border-radius-full)',
-                  padding: '0 var(--spacing-xs)',
-                  fontSize: 'var(--font-size-xs)',
-                  fontWeight: 'var(--font-weight-medium)',
-                  minWidth: 'var(--spacing-md)', // 16px - 배지 최소 너비
-                  textAlign: 'center',
-                }}
-              >
-                {activeFilterCount}
-              </span>
-            )}
-          </Button>
-        )}
+          />
 
-        {/* 페이지당 항목 수 선택 */}
-        <Select
-          value={String(itemsPerPage)}
-          onChange={(value: string | string[]) => {
-            const valueStr = Array.isArray(value) ? value[0] : value;
-            setItemsPerPage(Number(valueStr));
-          }}
-          dropdownAlign="center"
-          options={[20, 40, 60, 80].map((option) => ({
-            value: String(option),
-            label: `${option}개`,
-          }))}
-          size="sm"
-          autoDropdownWidth={true}
-          dropdownMinWidth={80}
-          style={{
-            minWidth: 'var(--width-items-per-page)',
-          }}
-        />
+          {/* 필터 버튼 */}
+          {filterSchema && (
+            <Button
+              type="button"
+              onClick={() => setShowFilterPanel((prev) => !prev)}
+              variant="outline"
+              size="sm"
+              selected={showFilterPanel || activeFilterCount > 0}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacing-xs)',
+              }}
+            >
+              <Funnel size={16} weight={showFilterPanel || activeFilterCount > 0 ? 'fill' : 'regular'} />
+              필터
+              {activeFilterCount > 0 && (
+                <span
+                  style={{
+                    backgroundColor: 'var(--color-primary)',
+                    color: 'var(--color-white)',
+                    borderRadius: 'var(--border-radius-full)',
+                    padding: '0 var(--spacing-xs)',
+                    fontSize: 'var(--font-size-xs)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    minWidth: 'var(--spacing-md)', // 16px - 배지 최소 너비
+                    textAlign: 'center',
+                  }}
+                >
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+          )}
+
+          {/* 페이지당 항목 수 선택 */}
+          <Select
+            value={String(itemsPerPage)}
+            onChange={(value: string | string[]) => {
+              const valueStr = Array.isArray(value) ? value[0] : value;
+              setItemsPerPage(Number(valueStr));
+            }}
+            dropdownAlign="center"
+            options={[20, 40, 60, 80].map((option) => ({
+              value: String(option),
+              label: `${option}개`,
+            }))}
+            size="sm"
+            autoDropdownWidth={true}
+            dropdownMinWidth={80}
+            style={{
+              minWidth: 'var(--width-items-per-page)',
+            }}
+          />
+        </div>
       </div>
 
       {/* 필터 패널 (SchemaFilter 사용) - SchemaFilter 자체에 marginBottom이 있으므로 wrapper에는 불필요 */}

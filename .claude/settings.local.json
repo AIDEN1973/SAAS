@@ -166,7 +166,9 @@
       "Bash(for file in \"c:\\\\cursor\\\\SAMDLE\\\\infra\\\\supabase\\\\supabase\\\\migrations\"/*.sql)",
       "Bash(if grep -q \"CREATE TABLE.*ai_insights\" \"$file\")",
       "Bash(break)",
-      "Bash(Remove-Item -Path \"tmpclaude-*\" -Recurse -Force)"
+      "Bash(Remove-Item -Path \"tmpclaude-*\" -Recurse -Force)",
+      "Bash(timeout:*)",
+      "Bash(ping:*)"
     ]
   }
 }

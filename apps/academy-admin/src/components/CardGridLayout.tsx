@@ -53,7 +53,7 @@ export function CardGridLayout({
           ...(showTopBorder && {
             borderTop: 'var(--border-width-thin) solid var(--color-text)',
           }),
-          borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)',
+          borderBottom: 'var(--border-width-thin) solid var(--color-text)',
           overflow: 'hidden', // 구분선이 컨테이너 밖으로 나가지 않도록
         }}
       >
@@ -75,7 +75,7 @@ export function CardGridLayout({
               gridColumn: colIndex + 1,
               gridRow: rowIndex + 1,
               position: 'relative',
-              borderBottom: !isLastRow ? 'var(--border-width-thin) solid var(--color-gray-200)' : 'none',
+              borderBottom: !isLastRow ? 'var(--border-width-thin) solid var(--color-text)' : 'none',
               paddingRight: shouldShowDivider ? 'var(--spacing-md)' : 0,
               paddingLeft: colIndex > 0 ? 'var(--spacing-md)' : 0,
               paddingTop: 'var(--spacing-lg)', // 행 내부 상단 여백

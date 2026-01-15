@@ -81,3 +81,4 @@ test-*.sql
 fix-*.ps1
 check-*.js
 *_output.txt
+nul

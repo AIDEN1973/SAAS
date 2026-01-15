@@ -1,75 +1,95 @@
 /**
  * CreateStudentForm Component
  *
- * 학생 등록 폼
+ * [업종중립] PERSON 등록 폼 (학생/수강생/회원 등)
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] Schema Form actions 비활성화하여 직접 처리
+ * [불변 규칙] CSS 변수 사용, 하드코딩 금지
  */
 
-import React, { useState, useCallback } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { SchemaForm } from '@schema-engine';
-import { useToast, useResponsiveMode, isMobile, isTablet, Button } from '@ui-core/react';
+import { useToast } from '@ui-core/react';
 import { apiClient } from '@api-sdk/core';
 import type { FormSchema } from '@schema-engine/types';
 import type { CreateStudentInput, Gender, StudentStatus } from '@services/student-service';
 
 export interface CreateStudentFormProps {
-  onClose: () => void;
+  onClose?: () => void;
   onSubmit: (data: CreateStudentInput) => Promise<void>;
   effectiveFormSchema: FormSchema;
+  onSubmitTrigger?: (triggerSubmit: () => void) => void;
 }
 
-export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
-  onClose,
+export const CreateStudentForm = ({
   onSubmit,
   effectiveFormSchema,
-}) => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  onSubmitTrigger,
+}: CreateStudentFormProps) => {
+  // onClose is unused but kept for API compatibility
   const { toast } = useToast();
-  const mode = useResponsiveMode();
-  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
-  const isMobileMode = isMobile(modeUpper);
-  const isTabletMode = isTablet(modeUpper);
+  const formRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = useCallback(async (data: Record<string, unknown>) => {
-    setIsSubmitting(true);
-    try {
-      const input: CreateStudentInput = {
-        name: String(data.name ?? ''),
-        birth_date: data.birth_date ? String(data.birth_date) : undefined,
-        gender: data.gender ? (data.gender as Gender) : undefined,
-        phone: data.phone ? String(data.phone) : undefined,
-        email: data.email ? String(data.email) : undefined,
-        address: data.address ? String(data.address) : undefined,
-        school_name: data.school_name ? String(data.school_name) : undefined,
-        grade: data.grade ? String(data.grade) : undefined,
-        status: (data.status || 'active') as StudentStatus,
-        notes: data.notes ? String(data.notes) : undefined,
-      };
-      await onSubmit(input);
-    } finally {
-      setIsSubmitting(false);
-    }
+    const input: CreateStudentInput = {
+      name: String(data.name ?? ''),
+      birth_date: data.birth_date ? String(data.birth_date) : undefined,
+      gender: data.gender ? (data.gender as Gender) : undefined,
+      phone: data.phone ? String(data.phone) : undefined,
+      email: data.email ? String(data.email) : undefined,
+      address: data.address ? String(data.address) : undefined,
+      school_name: data.school_name ? String(data.school_name) : undefined,
+      grade: data.grade ? String(data.grade) : undefined,
+      status: (data.status || 'active') as StudentStatus,
+      notes: data.notes ? String(data.notes) : undefined,
+    };
+    await onSubmit(input);
   }, [onSubmit]);
 
-  const showHeader = !isMobileMode && !isTabletMode;
-  const isInDrawer = isMobileMode || isTabletMode;
+  // Expose submit trigger to parent
+  useEffect(() => {
+    if (onSubmitTrigger) {
+      onSubmitTrigger(() => {
+        const form = formRef.current?.querySelector('form');
+        if (form) {
+          form.requestSubmit();
+        }
+      });
+    }
+  }, [onSubmitTrigger]);
 
   return (
-    <div style={showHeader ? { marginBottom: 'var(--spacing-md)' } : {}}>
-      {showHeader && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>학생 등록</h3>
-          <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
-            닫기
-          </Button>
-        </div>
-      )}
+    <div
+      ref={formRef}
+      style={{
+        width: 'var(--width-full)',
+      }}
+    >
+      {/* [SSOT] CSS 변수 기반 스타일 - Modal 내부에서 Card 테두리/패딩 제거 */}
+      <style>
+        {`
+          .schema-form-no-border {
+            border: none !important;
+            box-shadow: var(--shadow-none) !important;
+            padding: var(--spacing-none) !important;
+            background-color: transparent !important;
+          }
+          .schema-form-no-border > div {
+            padding: var(--spacing-none) !important;
+          }
+          .schema-form-no-border form {
+            padding: var(--spacing-none) !important;
+          }
+        `}
+      </style>
       <SchemaForm
         schema={{
           ...effectiveFormSchema,
           form: {
             ...effectiveFormSchema.form,
+            // [불변 규칙] Modal footer에 버튼이 있으므로 내부 submit 버튼 제거
+            submit: undefined,
+            // [불변 규칙] actions 비활성화하여 직접 처리
             actions: [],
           },
           actions: [],
@@ -78,8 +98,16 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
         defaultValues={{
           status: 'active',
         }}
-        disableCardPadding={isInDrawer}
-        actionContext={{
+        className="schema-form-no-border"
+        disableCardPadding={true}
+        cardStyle={{
+          border: 'none',
+          boxShadow: 'none',
+          padding: 0,
+          backgroundColor: 'transparent',
+        }}
+        cardVariant="elevated"
+      actionContext={{
           apiCall: async (endpoint: string, method: string, body?: unknown) => {
             const endpointNoSlash = endpoint.replace(/^\//, '');
             const endpointPath = endpointNoSlash.split('?')[0];
