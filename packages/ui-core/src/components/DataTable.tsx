@@ -940,7 +940,7 @@ export function DataTable<T = unknown>({
                     borderBottom: 'var(--border-width-thin) solid var(--color-text)', // 헤더 하단 테두리 (폰트 기본색)
                     whiteSpace: 'nowrap',
                     width: column.width,
-                    backgroundColor: 'transparent', // 배경 제거
+                    backgroundColor: 'rgba(0, 0, 0, 0.03)', // 그레이 30 (3% 투명도)
                     cursor: isSortable ? 'pointer' : 'default',
                     userSelect: 'none',
                     ...(index === 0 && {
