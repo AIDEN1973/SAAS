@@ -852,7 +852,7 @@ export function AlimtalkSettingsPage() {
 
   const handleSubMenuChange = useCallback((id: AlimtalkSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_ALIMTALK_SUB_MENU);
-    navigate(newUrl, { replace: true });
+    navigate(newUrl);
   }, [navigate]);
 
   // 조건부 렌더링: 한 번에 1개 탭만 마운트
@@ -881,7 +881,7 @@ export function AlimtalkSettingsPage() {
 
         {/* 메인 콘텐츠 */}
         <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
-          <PageHeader title="알림톡 설정" />
+          <PageHeader title={ALIMTALK_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu)?.label || "알림톡 설정"} />
 
           {renderTabContent()}
         </Container>

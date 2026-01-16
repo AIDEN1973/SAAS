@@ -12,7 +12,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { useModal , useResponsiveMode, isMobile, isTablet } from '@ui-core/react';
-import { useStudentsPaged, useStudentTags, useStudentTagsByStudent, useCreateStudent, useBulkCreateStudents, useStudent, useGuardians, useConsultations, useStudentClasses, useUpdateStudent, useDeleteStudent, useCreateGuardian, useUpdateGuardian, useDeleteGuardian, useCreateConsultation, useUpdateConsultation, useDeleteConsultation, useGenerateConsultationAISummary, useUpdateStudentTags, useAssignStudentToClass, useUnassignStudentFromClass, useUpdateStudentClassEnrolledAt } from '@hooks/use-student';
+import { useStudentsPaged, useStudentTags, useStudentTagsByStudent, useCreateStudent, useBulkCreateStudents, useStudent, useGuardians, useConsultations, useAllConsultations, useStudentClasses, useUpdateStudent, useDeleteStudent, useCreateGuardian, useUpdateGuardian, useDeleteGuardian, useCreateConsultation, useUpdateConsultation, useDeleteConsultation, useGenerateConsultationAISummary, useUpdateStudentTags, useAssignStudentToClass, useUnassignStudentFromClass, useUpdateStudentClassEnrolledAt } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
 import { useSession, useUserRole } from '@hooks/use-auth';
 import { useSchema } from '@hooks/use-schema';
@@ -49,6 +49,8 @@ export interface UseStudentPageReturn {
   tagListCollapsedHeight: number | null;
   tagListRef: React.RefObject<HTMLDivElement>;
   fileInputRef: React.RefObject<HTMLInputElement>;
+  selectedConsultationId: string | null;
+  setSelectedConsultationId: (id: string | null) => void;
 
   // 데이터
   students: Student[];
@@ -70,6 +72,9 @@ export interface UseStudentPageReturn {
   allClasses: Class[] | undefined;
   userId: string | undefined;
   userRole: 'admin' | 'teacher' | 'assistant' | null | undefined;
+  allConsultations: StudentConsultation[];
+  allConsultationsLoading: boolean;
+  filteredAllConsultations: StudentConsultation[];
 
   // 스키마
   effectiveFormSchema: FormSchema;
@@ -161,6 +166,7 @@ export function useStudentPage(): UseStudentPageReturn {
   const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
   const [editingConsultationId, setEditingConsultationId] = useState<string | null>(null);
   const [consultationTypeFilter, setConsultationTypeFilter] = useState<ConsultationType | 'all'>('all');
+  const [selectedConsultationId, setSelectedConsultationId] = useState<string | null>(null);
 
   // 타입 가드 함수 (P0-E)
   const isLayerMenuTab = useCallback((value: string | null): value is LayerMenuTab => {
@@ -320,13 +326,26 @@ export function useStudentPage(): UseStudentPageReturn {
   const userId = session?.user?.id;
   const { data: userRole } = useUserRole();
 
-  // 상담일지 필터링
+  // 전체 상담 내역 조회 (상담관리 탭용)
+  const { data: allConsultationsData, isLoading: allConsultationsLoading } = useAllConsultations();
+  const allConsultations = useMemo<StudentConsultation[]>(() => {
+    if (!allConsultationsData) return [];
+    return (allConsultationsData as unknown) as StudentConsultation[];
+  }, [allConsultationsData]);
+
+  // 상담일지 필터링 (선택된 학생용)
   const selectedStudentConsultations = useMemo<StudentConsultation[]>(() => {
     if (!allSelectedStudentConsultations) return [];
     const consultations = (allSelectedStudentConsultations as unknown) as StudentConsultation[];
     if (consultationTypeFilter === 'all') return consultations;
     return consultations.filter((c) => c.consultation_type === consultationTypeFilter);
   }, [allSelectedStudentConsultations, consultationTypeFilter]);
+
+  // 전체 상담 내역 필터링 (상담관리 탭용)
+  const filteredAllConsultations = useMemo<StudentConsultation[]>(() => {
+    if (consultationTypeFilter === 'all') return allConsultations;
+    return allConsultations.filter((c) => c.consultation_type === consultationTypeFilter);
+  }, [allConsultations, consultationTypeFilter]);
 
   // Mutation 훅
   const createStudent = useCreateStudent();
@@ -607,6 +626,8 @@ export function useStudentPage(): UseStudentPageReturn {
     tagListCollapsedHeight,
     tagListRef,
     fileInputRef,
+    selectedConsultationId,
+    setSelectedConsultationId,
 
     // 데이터
     students,
@@ -631,6 +652,9 @@ export function useStudentPage(): UseStudentPageReturn {
     allClasses,
     userId,
     userRole: userRole as 'admin' | 'teacher' | 'assistant' | null | undefined,
+    allConsultations,
+    allConsultationsLoading,
+    filteredAllConsultations,
 
     // 스키마
     effectiveFormSchema,

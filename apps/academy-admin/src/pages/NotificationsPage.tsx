@@ -59,7 +59,7 @@ export function NotificationsPage() {
 
   const handleSubMenuChange = useCallback((id: NotificationsSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_NOTIFICATIONS_SUB_MENU);
-    navigate(newUrl, { replace: true });
+    navigate(newUrl);
   }, [navigate]);
 
   const [filter, _setFilter] = useState<{ status?: NotificationStatus }>({});
@@ -356,7 +356,7 @@ export function NotificationsPage() {
         {/* 메인 콘텐츠 */}
         <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           <PageHeader
-            title="문자발송"
+            title={NOTIFICATIONS_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu)?.label || "문자발송"}
           />
 
           {/* 발송 내역 탭 */}
@@ -538,6 +538,7 @@ export function NotificationsPage() {
 
           {/* 템플릿 관리 탭 */}
           {selectedSubMenu === 'templates' && (
+            <>
             <Card padding="lg">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
                 <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>템플릿 관리</h3>
@@ -646,10 +647,12 @@ export function NotificationsPage() {
                 </>
               )}
             </Card>
+            </>
           )}
 
           {/* 단체문자/예약 탭 */}
           {selectedSubMenu === 'bulk' && (
+            <>
             <Card padding="lg">
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
                 단체문자/예약 발송
@@ -681,10 +684,12 @@ export function NotificationsPage() {
                 />
               )}
             </Card>
+            </>
           )}
 
           {/* 자동 알림 설정 탭 */}
           {selectedSubMenu === 'auto-settings' && (
+            <>
             <Card padding="lg">
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>
                 자동 알림 설정
@@ -722,6 +727,7 @@ export function NotificationsPage() {
                 />
               )}
             </Card>
+            </>
         )}
         </Container>
       </div>

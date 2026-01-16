@@ -15,6 +15,14 @@
  * ESLint 규칙 P0-1 준수: window 전역 플래그는 전용 util로만 접근
  */
 
+// [P0-1 해결] window 타입 선언을 전용 유틸리티 파일로 이동
+// 위젯 등록 플래그 타입 안정성 보장 (XSS 공격 방지를 위한 타입 정의)
+declare global {
+  interface Window {
+    __sduiWidgetRegistered?: Record<string, boolean>; // 키 기반 위젯 등록 플래그 관리
+  }
+}
+
 /**
  * 위젯 등록 플래그 객체 가져오기 (내부 함수)
  * @returns 위젯 등록 플래그 객체

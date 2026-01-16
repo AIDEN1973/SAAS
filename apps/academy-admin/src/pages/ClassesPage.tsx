@@ -132,7 +132,7 @@ export function ClassesPage() {
 
   const handleSubMenuChange = useCallback((id: ClassesSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_CLASSES_SUB_MENU);
-    navigate(newUrl, { replace: true });
+    navigate(newUrl);
   }, [navigate]);
 
   // localStorage 기반 상태 초기화 (SSR Safe, AutomationSettingsPage 패턴 적용)
@@ -389,7 +389,7 @@ export function ClassesPage() {
         {/* 메인 콘텐츠 */}
         <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           <PageHeader
-            title={`${terms.GROUP_LABEL}관리`}
+            title={CLASSES_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu)?.label || `${terms.GROUP_LABEL}관리`}
             actions={
               <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
                 <Button
@@ -667,12 +667,16 @@ export function ClassesPage() {
 
           {/* 수업 통계 탭 */}
           {selectedSubMenu === 'statistics' && (
-            <ClassStatisticsTab />
+            <>
+              <ClassStatisticsTab />
+            </>
           )}
 
           {/* 일정 충돌 탭 */}
           {selectedSubMenu === 'schedule-conflicts' && (
-            <ScheduleConflictsTab />
+            <>
+              <ScheduleConflictsTab />
+            </>
           )}
 
           {/* 수업 수정 모달 */}

@@ -80,7 +80,7 @@ export function AnalyticsPage() {
 
   const handleSubMenuChange = useCallback((id: AnalyticsSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_ANALYTICS_SUB_MENU);
-    navigate(newUrl, { replace: true });
+    navigate(newUrl);
   }, [navigate]);
 
   const [selectedMetric, setSelectedMetric] = useState<
@@ -1133,7 +1133,7 @@ export function AnalyticsPage() {
         {/* 메인 콘텐츠 */}
         <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"} style={{ flex: 1 }}>
           <PageHeader
-            title="통계분석"
+            title={ANALYTICS_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu)?.label || "통계분석"}
             actions={
               <Button
                 variant="outline"
@@ -1533,14 +1533,14 @@ export function AnalyticsPage() {
           <>
             <Card padding="lg" variant="default">
               <div style={{ marginBottom: 'var(--spacing-md)' }}>
-                <h2 style={{
-                  fontSize: 'var(--font-size-xl)',
+                <h3 style={{
+                  fontSize: 'var(--font-size-lg)',
                   fontWeight: 'var(--font-weight-semibold)',
                   color: 'var(--color-text)',
                   marginBottom: 'var(--spacing-xs)',
                 }}>
                   월간 리포트
-                </h2>
+                </h3>
                 <p style={{ color: 'var(--color-text-secondary)' }}>
                   월간 운영 현황과 분석 결과를 PDF로 다운로드할 수 있습니다.
                 </p>

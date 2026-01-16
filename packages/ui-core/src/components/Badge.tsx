@@ -11,7 +11,7 @@ import { ColorToken, SizeToken } from '@design-system/core';
 
 export interface BadgeProps {
   children: React.ReactNode;
-  color?: ColorToken | 'blue' | 'gray' | 'green';
+  color?: ColorToken | 'blue' | 'gray' | 'green' | 'yellow';
   size?: SizeToken;
   variant?: 'solid' | 'outline' | 'soft';
   className?: string;
@@ -31,7 +31,7 @@ export const Badge: React.FC<BadgeProps> = ({
   className,
   style,
 }) => {
-  const colorMap: Record<ColorToken | 'blue' | 'gray' | 'green', {
+  const colorMap: Record<ColorToken | 'blue' | 'gray' | 'green' | 'yellow', {
     main: string;
     light: string;
     dark: string;
@@ -90,6 +90,12 @@ export const Badge: React.FC<BadgeProps> = ({
       light: 'var(--color-success-light)',
       dark: 'var(--color-success-dark)',
       bg50: 'var(--color-success-50)',
+    },
+    yellow: {
+      main: 'var(--color-warning)', // styles.css 준수: warning 색상 사용
+      light: 'var(--color-warning-light)',
+      dark: 'var(--color-warning-dark)',
+      bg50: 'var(--color-warning-50)',
     },
   };
 

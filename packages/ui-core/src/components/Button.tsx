@@ -8,9 +8,10 @@
 import React from 'react';
 import { clsx } from 'clsx';
 import { ColorToken, SizeToken } from '@design-system/core';
+import { Save, X, Edit, Trash2, Plus, Check, Download, Upload, RefreshCw, Send, Sparkles } from 'lucide-react';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'solid' | 'outline' | 'ghost';
+  variant?: 'solid' | 'outline' | 'ghost' | 'destructive';
   color?: ColorToken;
   size?: SizeToken;
   fullWidth?: boolean;
@@ -41,6 +42,62 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
 }, ref) => {
   // hover 상태 관리 (inline style 직접 조작 대신 state 사용)
   const [isHovered, setIsHovered] = React.useState(false);
+
+  // 버튼 텍스트에 따라 아이콘 매핑 (성능 최적화: useCallback + useMemo)
+  const getIconByText = React.useCallback((text: React.ReactNode): React.ReactNode | null => {
+    if (typeof text !== 'string') return null;
+
+    const lowerText = text.toLowerCase().trim();
+
+    // 저장 관련
+    if (lowerText.includes('저장') || lowerText.includes('save')) {
+      return <Save size={14} strokeWidth={1.5} />;
+    }
+    // 수정 관련
+    if (lowerText.includes('수정') || lowerText.includes('edit')) {
+      return <Edit size={14} strokeWidth={1.5} />;
+    }
+    // 삭제 관련
+    if (lowerText.includes('삭제') || lowerText.includes('delete') || lowerText.includes('remove')) {
+      return <Trash2 size={14} strokeWidth={1.5} />;
+    }
+    // 추가/등록 관련
+    if (lowerText.includes('추가') || lowerText.includes('등록') || lowerText.includes('add') || lowerText.includes('new')) {
+      return <Plus size={14} strokeWidth={1.5} />;
+    }
+    // 확인 관련
+    if (lowerText.includes('확인') || lowerText.includes('완료') || lowerText.includes('confirm') || lowerText.includes('ok')) {
+      return <Check size={14} strokeWidth={1.5} />;
+    }
+    // 취소/닫기 관련
+    if (lowerText.includes('취소') || lowerText.includes('닫기') || lowerText.includes('cancel') || lowerText.includes('close')) {
+      return <X size={14} strokeWidth={1.5} />;
+    }
+    // 다운로드 관련
+    if (lowerText.includes('다운로드') || lowerText.includes('download') || lowerText.includes('export')) {
+      return <Download size={14} strokeWidth={1.5} />;
+    }
+    // 업로드 관련
+    if (lowerText.includes('업로드') || lowerText.includes('upload') || lowerText.includes('import')) {
+      return <Upload size={14} strokeWidth={1.5} />;
+    }
+    // 새로고침/재시도 관련
+    if (lowerText.includes('새로고침') || lowerText.includes('재시도') || lowerText.includes('refresh') || lowerText.includes('retry')) {
+      return <RefreshCw size={14} strokeWidth={1.5} />;
+    }
+    // 전송/보내기 관련
+    if (lowerText.includes('전송') || lowerText.includes('보내기') || lowerText.includes('send') || lowerText.includes('submit')) {
+      return <Send size={14} strokeWidth={1.5} />;
+    }
+    // AI 요약 관련
+    if (lowerText.includes('요약') || lowerText.includes('ai') || lowerText.includes('summary')) {
+      return <Sparkles size={14} strokeWidth={1.5} />;
+    }
+
+    return null;
+  }, []);
+
+  const icon = React.useMemo(() => getIconByText(children), [getIconByText, children]);
 
   // Color token을 CSS Variable로 매핑
   const colorMap: Record<ColorToken, {
@@ -123,7 +180,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
     boxSizing: 'border-box', // 테두리 포함 크기 계산
     fontFamily: 'var(--font-family)', // Select와 동일한 폰트
     fontSize: 'var(--font-size-base)', // Select와 동일한 폰트 크기
-    lineHeight: 'var(--line-height)', // Select와 동일한 line-height (높이 일치)
+    // 버튼 높이 일관성을 위해 tight lineHeight 적용 (styles.css 준수)
+    lineHeight: 'var(--line-height-tight)',
     ...sizeStyles[size],
     ...(fullWidth && { width: '100%' }),
   };
@@ -147,7 +205,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
     }
   };
 
-  const variantStyles: Record<'solid' | 'outline' | 'ghost', React.CSSProperties> = {
+  const variantStyles: Record<'solid' | 'outline' | 'ghost' | 'destructive', React.CSSProperties> = {
     solid: {
       backgroundColor: getBackgroundColor('solid'),
       color: 'var(--color-white)',
@@ -166,6 +224,12 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
       color: defaultTextColor || 'var(--color-text)', // 색상 없으면 기본 텍스트 색상
       // baseStyle에서 테두리 적용됨 (선택: primary 색상, 미선택: 투명)
     },
+    destructive: {
+      backgroundColor: isHovered ? colorMap.error.dark : colorMap.error.main,
+      color: 'var(--color-white)',
+      border: `var(--border-width-thin) solid transparent`,
+      boxShadow: isHovered ? 'var(--shadow-md)' : 'none',
+    },
   };
 
   const style: React.CSSProperties = {
@@ -182,11 +246,27 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
     <button
       ref={ref}
       className={clsx(className)}
-      style={style}
+      style={{
+        ...style,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       {...restProps}
     >
+      {icon && (
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            marginRight: 'var(--spacing-xs)',
+          }}
+        >
+          {icon}
+        </span>
+      )}
       {children}
     </button>
   );

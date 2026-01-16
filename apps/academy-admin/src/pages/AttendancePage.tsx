@@ -129,7 +129,7 @@ export function AttendancePage() {
   // 서브 메뉴 변경 핸들러 (URL 동기화)
   const handleSubMenuChange = useCallback((id: AttendanceSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_ATTENDANCE_SUB_MENU);
-    navigate(newUrl, { replace: true });
+    navigate(newUrl);
   }, [navigate]);
 
   // 서브 메뉴 아이템에 아이콘 추가

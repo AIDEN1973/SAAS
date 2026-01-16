@@ -643,7 +643,7 @@ export function AutomationSettingsPage() {
 
   const handleSubMenuChange = useCallback((id: AutomationSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_AUTOMATION_SUB_MENU);
-    navigate(newUrl, { replace: true });
+    navigate(newUrl);
   }, [navigate]);
 
   const [editingEventType, setEditingEventType] = useState<AutomationEventType | null>(null);
@@ -923,7 +923,7 @@ export function AutomationSettingsPage() {
 
         {/* 메인 콘텐츠 */}
         <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
-          <PageHeader title="자동화 설정" />
+          <PageHeader title={AUTOMATION_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu)?.label || "자동화 설정"} />
           <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-xs)', marginBottom: 'var(--spacing-lg)' }}>
             42개 자동화 기능의 활성화 여부를 설정합니다. 모든 자동화는 Policy 기반으로 동작하며, 설정이 없으면 실행되지 않습니다 (Fail Closed).
           </p>
@@ -1213,7 +1213,7 @@ export function AutomationSettingsPage() {
           {selectedSubMenu === 'payment' && (
             <>
               <Card padding="lg">
-                <h2 style={{ marginBottom: 'var(--spacing-md)' }}>결제 자동화</h2>
+                <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>결제 자동화</h3>
                 <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
                   결제 관련 자동화만 표시됩니다.
                 </p>
@@ -1244,7 +1244,7 @@ export function AutomationSettingsPage() {
           {selectedSubMenu === 'attendance' && (
             <>
               <Card padding="lg">
-                <h2 style={{ marginBottom: 'var(--spacing-md)' }}>출결 자동화</h2>
+                <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>출결 자동화</h3>
                 <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
                   출결 관련 자동화만 표시됩니다.
                 </p>
@@ -1275,7 +1275,7 @@ export function AutomationSettingsPage() {
           {selectedSubMenu === 'notification' && (
             <>
               <Card padding="lg">
-                <h2 style={{ marginBottom: 'var(--spacing-md)' }}>알림 자동화</h2>
+                <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>알림 자동화</h3>
                 <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
                   알림 관련 자동화만 표시됩니다.
                 </p>
@@ -1307,8 +1307,9 @@ export function AutomationSettingsPage() {
 
           {/* 자동화 통계 탭 */}
           {selectedSubMenu === 'statistics' && (
+            <>
             <Card padding="lg">
-              <h2 style={{ marginBottom: 'var(--spacing-md)' }}>자동화 통계</h2>
+              <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>자동화 통계</h3>
               {isLoadingStats ? (
                 <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
                   로딩 중...
@@ -1363,6 +1364,7 @@ export function AutomationSettingsPage() {
                 </div>
               )}
             </Card>
+            </>
           )}
         </Container>
       </div>

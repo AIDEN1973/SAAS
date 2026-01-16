@@ -79,7 +79,7 @@ export function StudentsHomePage() {
     console.log('[StudentsHomePage] handleSubMenuChange called with:', id);
     const newUrl = setSubMenuToUrl(id, DEFAULT_STUDENTS_SUB_MENU);
     console.log('[StudentsHomePage] navigating to:', newUrl);
-    navigate(newUrl, { replace: true });
+    navigate(newUrl);
   }, [navigate]);
 
   // 서브 메뉴 아이템에 아이콘 추가
@@ -89,6 +89,7 @@ export function StudentsHomePage() {
       add: <UserPlus size={16} />,
       tags: <Tags size={16} />,
       statistics: <TrendingUp size={16} />,
+      consultations: <TrendingUp size={16} />,
     };
 
     return STUDENTS_SUB_MENU_ITEMS.map(item => ({

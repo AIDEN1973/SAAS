@@ -55,7 +55,7 @@ export function ManualPage() {
       }
       const queryString = searchParams.toString();
       const newUrl = queryString ? `?${queryString}` : window.location.pathname;
-      navigate(newUrl, { replace: true });
+      navigate(newUrl);
     },
     [navigate]
   );
@@ -72,7 +72,7 @@ export function ManualPage() {
         searchParams.set('section', newSectionId);
         const queryString = searchParams.toString();
         const newUrl = queryString ? `?${queryString}` : window.location.pathname;
-        navigate(newUrl, { replace: true });
+        navigate(newUrl);
       }
     },
     [currentManual, navigate]

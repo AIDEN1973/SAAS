@@ -53,7 +53,7 @@ export function BillingPage() {
 
   const handleSubMenuChange = useCallback((id: BillingSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_BILLING_SUB_MENU);
-    navigate(newUrl, { replace: true });
+    navigate(newUrl);
   }, [navigate]);
 
   const [filter, setFilter] = useState<{ status?: InvoiceStatus }>({});
@@ -302,7 +302,7 @@ export function BillingPage() {
         {/* 메인 콘텐츠 */}
         <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           <PageHeader
-            title={`${terms.BILLING_LABEL} 관리`}
+            title={BILLING_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu)?.label || `${terms.BILLING_LABEL} 관리`}
           />
 
           {/* 인보이스 탭 */}

@@ -29,6 +29,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   placeholder,
   value,
   onChange,
+  style,
   ...props
 }, ref) => {
   // 라벨을 플레이스홀더로 사용
@@ -38,6 +39,41 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   const hasValue = !isEmpty;
   const [isFocused, setIsFocused] = React.useState(false);
   const isComposingRef = React.useRef(false);
+  const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+
+  // Auto-resize 기능: overflow: hidden인 경우 내용에 맞게 높이 자동 조절
+  React.useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea && style?.overflow === 'hidden') {
+      // 높이를 auto로 설정하여 scrollHeight를 정확하게 측정
+      textarea.style.height = 'auto';
+      // scrollHeight로 새로운 높이 설정
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  }, [value, style?.overflow]);
+
+  // ref 병합: 외부 ref와 내부 ref 모두 설정
+  const setRefs = React.useCallback((element: HTMLTextAreaElement | null) => {
+    textareaRef.current = element;
+    if (typeof ref === 'function') {
+      ref(element);
+    } else if (ref) {
+      ref.current = element;
+    }
+  }, [ref]);
+
+  // 개발 환경 IME 로깅 함수 (DRY 원칙, 성능 최적화)
+  const logIMEEvent = React.useCallback((eventType: string, data?: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+    if ((import.meta as any).env?.DEV) {
+      console.log(`[IME][Textarea] ${eventType}`, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+        name: (props as any)?.name,
+        value,
+        data,
+      });
+    }
+  }, [props.name, value]);
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
       paddingTop: 'var(--spacing-xs)',
@@ -86,6 +122,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
     fontWeight: 'var(--font-weight-normal)',
     lineHeight: 'var(--line-height)',
     boxSizing: 'border-box',
+    ...style, // 사용자 정의 스타일 병합
   };
 
   // 래퍼 스타일: textarea를 감싸고 사방 테두리 적용 (카드 스타일과 동일)
@@ -130,36 +167,20 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
     >
       <div ref={wrapperRef} style={wrapperStyle}>
         <textarea
-          ref={ref}
+          ref={setRefs}
           className={clsx(className)}
           style={textareaStyle}
           placeholder={textareaPlaceholder}
           value={value}
         onCompositionStart={(e) => {
           isComposingRef.current = true;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-          if ((import.meta as any).env?.DEV) {
-            console.log('[IME][Textarea] compositionstart', {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-              name: (props as any)?.name,
-              value,
-              data: (e as unknown as CompositionEvent).data,
-            });
-          }
+          logIMEEvent('compositionstart', (e as unknown as CompositionEvent).data);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
           (props as any).onCompositionStart?.(e);
         }}
         onCompositionEnd={(e) => {
           isComposingRef.current = false;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-          if ((import.meta as any).env?.DEV) {
-            console.log('[IME][Textarea] compositionend', {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-              name: (props as any)?.name,
-              value,
-              data: (e as unknown as CompositionEvent).data,
-            });
-          }
+          logIMEEvent('compositionend', (e as unknown as CompositionEvent).data);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
           (props as any).onCompositionEnd?.(e);
         }}

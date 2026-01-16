@@ -196,7 +196,8 @@ export type StudentsSubMenuId =
   | 'list'
   | 'add'
   | 'tags'
-  | 'statistics';
+  | 'statistics'
+  | 'consultations';
 
 /** 학생관리 페이지 서브 메뉴 설정 */
 export const STUDENTS_SUB_MENU_ITEMS: SubSidebarMenuItem<StudentsSubMenuId>[] = [
@@ -223,6 +224,12 @@ export const STUDENTS_SUB_MENU_ITEMS: SubSidebarMenuItem<StudentsSubMenuId>[] = 
     label: '학생통계',
     icon: createElement(BarChart3, { size: ICON_SIZE }),
     ariaLabel: '학생 통계 화면으로 이동',
+  },
+  {
+    id: 'consultations',
+    label: '상담관리',
+    icon: createElement(MessageSquare, { size: ICON_SIZE }),
+    ariaLabel: '상담 관리 화면으로 이동',
   },
 ];
 

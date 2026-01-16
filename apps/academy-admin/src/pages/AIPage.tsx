@@ -80,7 +80,7 @@ export function AIPage() {
 
   const handleSubMenuChange = useCallback((id: AISubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_AI_SUB_MENU);
-    navigate(newUrl, { replace: true });
+    navigate(newUrl);
   }, [navigate]);
   const { data: userRole } = useUserRole(); // 아키텍처 문서 2.4: Teacher는 요약만 접근 가능
   const isTeacher = userRole === 'teacher'; // Teacher는 요약만 볼 수 있음
@@ -548,7 +548,7 @@ export function AIPage() {
         {/* 메인 콘텐츠 */}
         <Container maxWidth="xl" padding={isMobileMode ? "sm" : "lg"} style={{ flex: 1 }}>
           <PageHeader
-            title="인공지능"
+            title={AI_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu)?.label || "인공지능"}
           />
 
         {/* 아키텍처 문서 3.7.1: 빠른 분석 링크 (상세 분석은 별도 페이지에서 제공) */}
@@ -1126,8 +1126,9 @@ export function AIPage() {
 
               {/* 이상 탐지 탭 */}
               {selectedSubMenu === 'anomaly-detection' && (
+                <>
                 <Card padding="lg">
-                  <h2 style={{ marginBottom: 'var(--spacing-md)' }}>{terms.ABSENCE_LABEL} 이상 탐지</h2>
+                  <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>{terms.ABSENCE_LABEL} 이상 탐지</h3>
                   {aiInsights?.attendanceAnomalies && aiInsights.attendanceAnomalies.length > 0 ? (
                     <AttendanceAnomalyDetailContent
                       attendanceAnomalies={aiInsights.attendanceAnomalies}
@@ -1143,12 +1144,14 @@ export function AIPage() {
                     />
                   )}
                 </Card>
+                </>
               )}
 
               {/* 성과 분석 탭 */}
               {selectedSubMenu === 'performance' && (
+                <>
                 <Card padding="lg">
-                  <h2 style={{ marginBottom: 'var(--spacing-md)' }}>{terms.GROUP_LABEL}/{terms.SUBJECT_LABEL} 성과 분석</h2>
+                  <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>{terms.GROUP_LABEL}/{terms.SUBJECT_LABEL} 성과 분석</h3>
                   {generateReport.isPending ? (
                     <AIAnalysisLoadingUI
                       steps={PERFORMANCE_INSIGHTS_STEPS}
@@ -1170,6 +1173,7 @@ export function AIPage() {
                     />
                   )}
                 </Card>
+                </>
               )}
 
               {/* 브리핑 탭 */}
@@ -1178,7 +1182,7 @@ export function AIPage() {
                   {/* 주간 브리핑 */}
                   {aiInsights?.weeklyBriefing ? (
                     <Card padding="lg" style={{ marginBottom: 'var(--spacing-md)' }}>
-                      <h2 style={{ marginBottom: 'var(--spacing-md)' }}>주간 브리핑</h2>
+                      <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>주간 브리핑</h3>
                       <div style={{
                         padding: 'var(--spacing-md)',
                         backgroundColor: 'var(--color-background-secondary)',

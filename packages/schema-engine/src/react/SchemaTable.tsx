@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { DataTable, type DataTableColumn, Pagination, Select, Button, SearchInput } from '@ui-core/react';
+import { DataTable, type DataTableColumn, Pagination, Select, Button, SearchInput, Badge } from '@ui-core/react';
 import { Funnel } from 'phosphor-react';
 import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 import type { TableSchema, FilterSchema } from '../types';
@@ -186,11 +186,40 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
           case 'date':
             // 기술문서 5-2: KST 변환 필수
             return _value ? toKST(_value as string | number | Date).format('YYYY-MM-DD') : '-';
+          case 'datetime':
+            // 기술문서 5-2: KST 변환 필수 (날짜 + 시간)
+            return _value ? toKST(_value as string | number | Date).format('YYYY-MM-DD HH:mm') : '-';
           case 'number':
             return typeof _value === 'number' ? _value.toLocaleString() : String(_value ?? '-');
           case 'tag':
-          case 'badge':
-            return <span>{String(_value ?? '-')}</span>; // TODO: Tag/Badge 컴포넌트 사용
+          case 'badge': {
+            // badge_config가 정의되어 있으면 사용
+            const badgeConfig = (col as any).badge_config;
+            if (badgeConfig && _value && typeof _value === 'string') {
+              const config = badgeConfig[_value];
+              if (config) {
+                // labelKey 우선, label은 하위 호환성
+                const displayLabel = config.labelKey
+                  ? (translations[config.labelKey] || config.labelKey)
+                  : (config.label || String(_value));
+                return (
+                  <Badge
+                    color={config.color || 'gray'}
+                    size="sm"
+                    variant="solid"
+                  >
+                    {displayLabel}
+                  </Badge>
+                );
+              }
+            }
+            // badge_config가 없거나 값이 매칭되지 않으면 기본 Badge 사용
+            return (
+              <Badge color="gray" size="sm" variant="solid">
+                {String(_value ?? '-')}
+              </Badge>
+            );
+          }
           default:
             return String(_value ?? '-');
         }

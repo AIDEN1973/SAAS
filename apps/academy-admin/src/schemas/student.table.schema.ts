@@ -42,7 +42,6 @@ export const studentTableSchema: TableSchema = {
         sortable: true,
         type: 'badge',
         // 아키텍처 문서 5045줄: badge_config 사용 (snake_case)
-        // @ts-expect-error - badge_config는 스키마 엔진에서 지원하지만 타입 정의에 없을 수 있음
         badge_config: {
           active: { color: 'green', label: '재원' },
           on_leave: { color: 'yellow', label: '휴원' },

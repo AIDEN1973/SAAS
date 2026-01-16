@@ -51,7 +51,7 @@ export { SearchInput } from './SearchInput';
 export type { SearchInputProps } from './SearchInput';
 
 export { Modal } from './Modal';
-export type { ModalProps } from './Modal';
+export type { ModalProps, InlineFormField } from './Modal';
 
 export { Drawer } from './Drawer';
 export type { DrawerProps } from './Drawer';

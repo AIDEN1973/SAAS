@@ -168,7 +168,10 @@
       "Bash(break)",
       "Bash(Remove-Item -Path \"tmpclaude-*\" -Recurse -Force)",
       "Bash(timeout:*)",
-      "Bash(ping:*)"
+      "Bash(ping:*)",
+      "Bash(for file in AttendancePage.tsx NotificationsPage.tsx AnalyticsPage.tsx AIPage.tsx StudentsHomePage.tsx ClassesPage.tsx BillingPage.tsx TeachersPage.tsx ManualPage.tsx AlimtalkSettingsPage.tsx AutomationSettingsPage.tsx)",
+      "Bash(do sed -i 's/navigate\\(newUrl, { replace: true }\\);/navigate\\(newUrl\\);/g' \"$file\")",
+      "Bash(cd:*)"
     ]
   }
 }

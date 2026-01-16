@@ -38,10 +38,10 @@ export interface StatsDashboardProps {
   statsItems: StatsItem[];
   /** 차트 데이터 */
   chartData: ChartDataItem[];
-  /** 기간 필터 값 */
-  period: PeriodFilter;
-  /** 기간 필터 변경 핸들러 */
-  onPeriodChange: (period: PeriodFilter) => void;
+  /** 기간 필터 값 (hideChart가 true면 선택적) */
+  period?: PeriodFilter;
+  /** 기간 필터 변경 핸들러 (hideChart가 true면 선택적) */
+  onPeriodChange?: (period: PeriodFilter) => void;
   /** 차트 레이블 포맷 함수 (선택적) */
   chartLabelFormatter?: (params: { name: string; value: number; percent?: number }) => string;
   /** 범례 포맷 함수 (선택적) */
@@ -52,6 +52,12 @@ export interface StatsDashboardProps {
   selectedStatsKey?: string;
   /** 통계 카드 클릭 핸들러 */
   onStatsCardClick?: (key: string) => void;
+  /** 차트 영역 숨김 여부 (기본값: false) - true이면 통계 카드만 표시 */
+  hideChart?: boolean;
+  /** 차트 툴팁 단위 (기본값: '명') */
+  chartTooltipUnit?: string;
+  /** 차트 툴팁 레이블 (기본값: '총 학생수') */
+  chartTooltipLabel?: string;
 }
 
 /**
@@ -71,6 +77,9 @@ export function StatsDashboard({
   // showPeriodFilter = true,
   selectedStatsKey,
   onStatsCardClick,
+  hideChart = false,
+  chartTooltipUnit = '명',
+  chartTooltipLabel = '총 학생수',
 }: StatsDashboardProps) {
   // [SSOT] 아이콘 크기 (CSS 변수 기반)
   const iconSize = useIconSize();
@@ -167,7 +176,7 @@ export function StatsDashboard({
 
             const buttonElement = (
               <button
-                onClick={() => onPeriodChange(option.value as PeriodFilter)}
+                onClick={() => onPeriodChange?.(option.value as PeriodFilter)}
                 onMouseEnter={() => setHoveredBadge(option.value)}
                 onMouseLeave={() => setHoveredBadge(null)}
                 style={{
@@ -257,18 +266,19 @@ export function StatsDashboard({
           mobileColumns={1}
         />
 
-        {/* CardGridLayout 하단 구분선에 붙는 토글 버튼 */}
-        <div style={{
-          position: 'absolute',
-          left: '50%',
-          bottom: 'calc(-1 * var(--spacing-md))',
-          transform: 'translateX(-50%)',
-          zIndex: 10,
-        }}>
-          <button
-            onClick={handleToggleChart}
-            aria-label={showChart ? '그래프 숨기기' : '그래프 표시'}
-            style={{
+        {/* CardGridLayout 하단 구분선에 붙는 토글 버튼 (hideChart가 false일 때만 표시) */}
+        {!hideChart && (
+          <div style={{
+            position: 'absolute',
+            left: '50%',
+            bottom: 'calc(-1 * var(--spacing-md))',
+            transform: 'translateX(-50%)',
+            zIndex: 10,
+          }}>
+            <button
+              onClick={handleToggleChart}
+              aria-label={showChart ? '그래프 숨기기' : '그래프 표시'}
+              style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -296,17 +306,19 @@ export function StatsDashboard({
             )}
           </button>
         </div>
+        )}
       </div>
 
-      {/* 그래프 */}
-      <div style={{
-        width: '100%',
-        maxHeight: showChart ? `${chartHeight}px` : '0px',
-        overflow: 'hidden',
-        transition: 'max-height var(--transition-slow), opacity var(--transition-slow)',
-        opacity: showChart ? 1 : 0,
-        marginTop: showChart ? 'var(--spacing-2xl)' : 0,
-      }}>
+      {/* 그래프 (hideChart가 false일 때만 렌더링) */}
+      {!hideChart && (
+        <div style={{
+          width: '100%',
+          maxHeight: showChart ? `${chartHeight}px` : '0px',
+          overflow: 'hidden',
+          transition: 'max-height var(--transition-slow), opacity var(--transition-slow)',
+          opacity: showChart ? 1 : 0,
+          marginTop: showChart ? 'var(--spacing-2xl)' : 0,
+        }}>
         <div ref={chartContentRef} style={{ width: '100%' }}>
         <Card padding="lg" variant="default" style={{ height: '100%', display: 'flex', flexDirection: 'column', paddingTop: 'calc(var(--spacing-lg) + var(--spacing-lg))' }}>
           {/* 그래프 */}
@@ -342,7 +354,7 @@ export function StatsDashboard({
                     />
                     <RechartsTooltip
                       contentStyle={chartStyles.tooltipContent}
-                      formatter={(value: number | undefined) => value !== undefined ? [`${value}명`, '총 학생수'] : ['', '']}
+                      formatter={(value: number | undefined) => value !== undefined ? [`${value}${chartTooltipUnit}`, chartTooltipLabel] : ['', '']}
                       labelFormatter={(label) => `날짜: ${label}`}
                     />
                     <Area
@@ -372,7 +384,8 @@ export function StatsDashboard({
           </div>
         </Card>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

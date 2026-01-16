@@ -50,7 +50,7 @@ export function TeachersPage() {
 
   const handleSubMenuChange = useCallback((id: TeachersSubMenuId) => {
     const newUrl = setSubMenuToUrl(id, DEFAULT_TEACHERS_SUB_MENU);
-    navigate(newUrl, { replace: true });
+    navigate(newUrl);
   }, [navigate]);
 
   const [filter, setFilter] = useState<TeacherFilter>({});
@@ -125,7 +125,7 @@ export function TeachersPage() {
         {/* 메인 콘텐츠 */}
         <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           <PageHeader
-            title={`${terms.PERSON_LABEL_SECONDARY} 관리`}
+            title={TEACHERS_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu)?.label || `${terms.PERSON_LABEL_SECONDARY} 관리`}
             actions={
               <Button
                 variant="solid"
@@ -234,17 +234,23 @@ export function TeachersPage() {
 
           {/* 강사 통계 탭 */}
           {selectedSubMenu === 'statistics' && (
-            <TeacherStatisticsTab terms={terms} />
+            <>
+              <TeacherStatisticsTab terms={terms} />
+            </>
           )}
 
           {/* 담당 과목 탭 */}
           {selectedSubMenu === 'assignments' && (
-            <TeacherAssignmentsTab terms={terms} />
+            <>
+              <TeacherAssignmentsTab terms={terms} />
+            </>
           )}
 
           {/* 강사 성과 탭 */}
           {selectedSubMenu === 'performance' && (
-            <TeacherPerformanceTab terms={terms} />
+            <>
+              <TeacherPerformanceTab terms={terms} />
+            </>
           )}
 
           {/* 강사 수정 모달 */}

@@ -1383,6 +1383,23 @@ export function useConsultations(studentId: string | null) {
 }
 
 /**
+ * 전체 상담기록 목록 조회 Hook (학생 필터 없음)
+ * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ */
+export function useAllConsultations() {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+
+  return useQuery({
+    queryKey: ['consultations', tenantId, 'all'],
+    queryFn: () => fetchConsultations(tenantId!, undefined),
+    enabled: !!tenantId,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
+}
+
+/**
  * 상담기록 생성 Hook
  */
 export function useCreateConsultation() {

@@ -19,7 +19,7 @@
  */
 
 import React, { useCallback, useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ExternalLink } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 import { getCSSVariableAsNumber } from '../utils/css-variables';
 
@@ -39,6 +39,8 @@ export interface SubSidebarMenuItem<T extends string = string> {
   ariaLabel?: string;
   /** 외부 링크 경로 (optional) - 제공 시 외부 페이지로 이동 */
   href?: string;
+  /** 모달 또는 새창으로 열림 여부 (optional) - true일 경우 ExternalLink 아이콘 표시 */
+  opensInModalOrNewWindow?: boolean;
 }
 
 /** 관련 메뉴 섹션 */
@@ -457,6 +459,24 @@ export function SubSidebar<T extends string = string>({
                     }}
                   >
                     {item.label}
+                  </span>
+                )}
+
+                {/* ExternalLink 아이콘 (모달/새창 열림 표시, 축소 시 숨김, 확대 애니메이션 완료 후 페이드인) */}
+                {shouldRenderTextContent && item.opensInModalOrNewWindow && (
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      opacity: contentVisible ? 1 : 0,
+                      visibility: contentVisible ? 'visible' : 'hidden',
+                      transition: fadeInReady ? 'opacity var(--transition-base)' : 'none',
+                    }}
+                  >
+                    <ExternalLink size={14} />
                   </span>
                 )}
 

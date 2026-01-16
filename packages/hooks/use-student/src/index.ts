@@ -22,6 +22,7 @@ export {
   useStudentTagsByStudent,
   useUpdateStudentTags,
   useConsultations,
+  useAllConsultations,
   fetchConsultations,
   useCreateConsultation,
   useUpdateConsultation,
