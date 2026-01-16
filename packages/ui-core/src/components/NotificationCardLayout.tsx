@@ -118,6 +118,9 @@ export function NotificationCardLayout({
   // Popover offset을 위한 spacing-xs 값 (px 단위)
   const spacingXsPx = useIconSize('--spacing-xs');
 
+  // hover 상태 관리 (카드 전체 hover 감지)
+  const [isCardHovered, setIsCardHovered] = useState(false);
+
   // Popover offset을 CSS 변수에서 읽어오기 (하드코딩 금지 규칙 준수)
   const popoverOffset = useMemo(() => {
     if (typeof window !== 'undefined') {
@@ -177,6 +180,8 @@ export function NotificationCardLayout({
         }),
       }}
       onClick={handleClick}
+      onMouseEnter={() => setIsCardHovered(true)}
+      onMouseLeave={() => setIsCardHovered(false)}
       disableHoverEffect={true}
     >
       {/* 우측 상단 그래프 아이콘 버튼 */}
@@ -315,13 +320,16 @@ export function NotificationCardLayout({
               borderRadius: '50%',
               backgroundColor: isSelected
                 ? (iconBackgroundColor || 'var(--color-primary)') // 선택된 카드: 인더스트리 타입 색상
-                : 'var(--color-primary-50)', // 비선택 카드: 기본값 (투명도 10%)
+                : 'var(--color-primary-50)', // 비선택 카드: primary-50 (5%)
               pointerEvents: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
               padding: 'calc(var(--spacing-md) + var(--spacing-xxs) + var(--spacing-xxs))', // 원형 배지 내부 여백 (기본 + 3포인트)
+              transform: isCardHovered && !isSelected ? 'var(--transform-scale-icon-hover)' : 'var(--transform-scale-normal)', // 비선택 카드 hover 시 10% 확대 (CSS 변수 사용, SSOT 준수)
+              transformOrigin: 'center', // 중앙을 기준으로 확대/축소
+              transition: 'transform var(--transition-smooth)', // 매우 부드러운 확대 전환 효과 (400ms, ease-out)
             }}
           >
             {header ? (

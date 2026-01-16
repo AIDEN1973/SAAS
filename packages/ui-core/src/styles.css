@@ -58,6 +58,7 @@
   --color-primary-30: color-mix(in srgb, var(--color-primary) 3%, transparent); /* 프라이머리 3% */
   --color-primary-40: color-mix(in srgb, var(--color-primary) 4%, transparent); /* 프라이머리 4% */
   --color-primary-50: color-mix(in srgb, var(--color-primary) 5%, transparent); /* 프라이머리 5% */
+  --color-primary-80: color-mix(in srgb, var(--color-primary) 7%, transparent); /* 프라이머리 7% (hover 시 한 톤 진하게) */
   --color-primary-100: color-mix(in srgb, var(--color-primary) 10%, transparent); /* 프라이머리 10% */
   --color-primary-hover: var(--color-primary-40); /* hover 배경색 (프라이머리 4%) */
   --color-primary-selected: color-mix(in srgb, var(--color-primary) 12%, transparent); /* 선택된 상태 배경색 (프라이머리 12%, hover보다 진함) */
@@ -261,9 +262,10 @@
   --spacing-switch-indent: 3.25rem;     /* 52px - 스위치 에러/헬퍼 텍스트 들여쓰기 */
 
   /* Transform Tokens */
-  --transform-scale-hover: scale(1.1);   /* 호버 시 확대 */
+  --transform-scale-hover: scale(1.15);   /* 호버 시 확대 (15%) */
   --transform-scale-normal: scale(1);     /* 기본 크기 */
   --transform-lift-hover: translateY(-0.125rem); /* 호버 시 상승 */
+  --transform-scale-icon-hover: scale(1.15); /* 아이콘 호버 시 확대 (15%) */
 
   /* Aspect Ratio Tokens */
   --aspect-ratio-square: 1;              /* 정사각형 비율 (1:1) */
@@ -344,6 +346,7 @@
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 500ms cubic-bezier(0.34, 1.56, 0.64, 1); /* 매우 부드러운 전환 (아이콘 확대 등, elastic-out 효과) */
   --transition-layer-slide: 500ms cubic-bezier(0.4, 0, 0.2, 1); /* 레이어 메뉴 슬라이드 */
   --transition-transform: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-all: all 200ms cubic-bezier(0.4, 0, 0.2, 1);

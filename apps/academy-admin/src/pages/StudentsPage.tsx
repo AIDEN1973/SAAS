@@ -29,7 +29,7 @@ import { tagFormSchema } from '../schemas/tag.schema';
 import { isWidgetRegistered, setWidgetRegistered } from '../utils/widget-registry';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
-import { createSafeNavigate, processTagInput } from '../utils';
+import { createSafeNavigate, processTagInput, calculateTrend } from '../utils';
 import { STUDENTS_SUB_MENU_ITEMS, DEFAULT_STUDENTS_SUB_MENU, STUDENTS_RELATED_MENUS, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
 import type { StudentsSubMenuId } from '../constants';
 import { StudentInfoTab } from './students/tabs/StudentInfoTab';
@@ -387,6 +387,41 @@ export function StudentsPage() {
     };
   }, [filteredStudentsByPeriod]);
 
+  // 지난달 통계 계산 (trend 표시용)
+  const lastMonthStats = useMemo(() => {
+    if (!students || students.length === 0) {
+      return {
+        total: 0,
+        active: 0,
+        onLeave: 0,
+        withdrawn: 0,
+      };
+    }
+
+    // 지난달 말일 계산
+    const now = new Date();
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0); // 이번 달 0일 = 지난달 마지막 날
+
+    // 지난달까지 생성된 학생들
+    const lastMonthStudents = students.filter(s => {
+      const student = s as { created_at?: string };
+      if (!student.created_at) return false;
+      return new Date(student.created_at) <= lastMonthEnd;
+    });
+
+    const total = lastMonthStudents.length;
+    const active = lastMonthStudents.filter(s => (s as { status?: StudentStatus }).status === 'active').length;
+    const onLeave = lastMonthStudents.filter(s => (s as { status?: StudentStatus }).status === 'on_leave').length;
+    const withdrawn = lastMonthStudents.filter(s => (s as { status?: StudentStatus }).status === 'withdrawn').length;
+
+    return {
+      total,
+      active,
+      onLeave,
+      withdrawn,
+    };
+  }, [students]);
+
   // StatsDashboard용 통계 카드 데이터
   const statsItems: StatsItem[] = useMemo(() => {
     return [
@@ -397,6 +432,7 @@ export function StudentsPage() {
         value: studentStatusStats.total,
         unit: '명',
         iconBackgroundColor: 'var(--color-primary-50)',
+        trend: calculateTrend(studentStatusStats.total, lastMonthStats.total),
       },
       {
         key: 'active',
@@ -405,6 +441,7 @@ export function StudentsPage() {
         value: studentStatusStats.active,
         unit: '명',
         iconBackgroundColor: 'var(--color-success-50)',
+        trend: calculateTrend(studentStatusStats.active, lastMonthStats.active),
       },
       {
         key: 'onLeave',
@@ -413,6 +450,7 @@ export function StudentsPage() {
         value: studentStatusStats.onLeave,
         unit: '명',
         iconBackgroundColor: 'var(--color-warning-50)',
+        trend: calculateTrend(studentStatusStats.onLeave, lastMonthStats.onLeave),
       },
       {
         key: 'withdrawn',
@@ -421,9 +459,10 @@ export function StudentsPage() {
         value: studentStatusStats.withdrawn,
         unit: '명',
         iconBackgroundColor: 'var(--color-error-50)',
+        trend: calculateTrend(studentStatusStats.withdrawn, lastMonthStats.withdrawn),
       },
     ];
-  }, [studentStatusStats, terms.PERSON_LABEL_PRIMARY]);
+  }, [studentStatusStats, lastMonthStats, terms.PERSON_LABEL_PRIMARY]);
 
   // StatsDashboard용 차트 데이터 (선택된 카드에 따라 필터링)
   const chartData: ChartDataItem[] = useMemo(() => {

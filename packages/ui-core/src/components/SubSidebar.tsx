@@ -287,8 +287,17 @@ export function SubSidebar<T extends string = string>({
             border: 'none',
             borderRadius: 'var(--border-radius-sm)',
             cursor: 'pointer',
-            color: 'var(--color-text-tertiary)',
+            color: 'var(--color-text-secondary)',
             flexShrink: 0,
+            transition: 'color var(--transition-fast), background-color var(--transition-fast)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-text)';
+            e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-secondary)';
+            e.currentTarget.style.backgroundColor = 'transparent';
           }}
           aria-label={isCollapsed ? `${title} 확장` : `${title} 축소`}
         >
@@ -308,7 +317,16 @@ export function SubSidebar<T extends string = string>({
               border: 'none',
               borderRadius: 'var(--border-radius-sm)',
               cursor: 'pointer',
-              color: 'var(--color-text-tertiary)',
+              color: 'var(--color-text-secondary)',
+              transition: 'color var(--transition-fast), background-color var(--transition-fast)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--color-text)';
+              e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--color-text-secondary)';
+              e.currentTarget.style.backgroundColor = 'transparent';
             }}
             aria-label={`${title} 닫기`}
           >
@@ -551,8 +569,17 @@ export function SubSidebar<T extends string = string>({
                   border: 'none',
                   borderRadius: 'var(--border-radius-sm)',
                   cursor: 'pointer',
-                  color: 'var(--color-text-tertiary)',
+                  color: 'var(--color-text-secondary)',
                   flexShrink: 0,
+                  transition: 'color var(--transition-fast), background-color var(--transition-fast)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--color-text)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--color-text-secondary)';
+                  e.currentTarget.style.backgroundColor = 'transparent';
                 }}
                 aria-expanded={relatedMenuExpanded}
                 aria-label={`${relatedMenus.title} ${relatedMenuExpanded ? '접기' : '펼치기'}`}

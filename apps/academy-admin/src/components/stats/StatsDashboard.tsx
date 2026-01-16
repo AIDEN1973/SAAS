@@ -8,7 +8,7 @@
  */
 
 import { useMemo, useState, useEffect, useRef, createElement } from 'react';
-import { Card, NotificationCardLayout, Tooltip, EmptyState, useIconSize } from '@ui-core/react';
+import { Card, NotificationCardLayout, EmptyState, useIconSize } from '@ui-core/react';
 import { CardGridLayout } from '../CardGridLayout';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import type { LucideIcon } from 'lucide-react';
@@ -21,6 +21,8 @@ export interface StatsItem {
   value: number;
   unit: string;
   iconBackgroundColor: string;
+  /** 지난달 대비 증감 (이번달 선택 시 표시, 예: "+10%", "-5%") */
+  trend?: string;
 }
 
 export interface ChartDataItem {
@@ -29,7 +31,7 @@ export interface ChartDataItem {
   color: string;
 }
 
-export type PeriodFilter = 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'lastMonth' | '1month' | '3months' | '6months' | '1year';
+export type PeriodFilter = 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | '1month' | '3months' | '6months' | '1year';
 
 export interface StatsDashboardProps {
   /** 통계 카드 데이터 (2x2 배열) */
@@ -94,10 +96,12 @@ export function StatsDashboard({
 
   // 기간 필터 옵션 (배지 버튼용)
   const periodBadgeOptions = [
-    { value: '1month', label: '1m', tooltip: '지난 1개월' },
-    { value: '3months', label: '3m', tooltip: '지난 3개월' },
-    { value: '6months', label: '6m', tooltip: '지난 6개월' },
-    { value: '1year', label: '12m', tooltip: '지난 12개월' },
+    { value: 'thisMonth', label: '이번달', tooltip: undefined },
+    { value: 'lastMonth', label: '지난달', tooltip: undefined },
+    { value: '1month', label: '1m', tooltip: '최근 1개월' },
+    { value: '3months', label: '3m', tooltip: '최근 3개월' },
+    { value: '6months', label: '6m', tooltip: '최근 6개월' },
+    { value: '1year', label: '12m', tooltip: '최근 12개월' },
   ];
 
   // hover 상태 관리 (Button 컴포넌트와 동일한 패턴)
@@ -161,30 +165,69 @@ export function StatsDashboard({
               return isHovered ? 'var(--color-primary-hover)' : 'var(--color-white)';
             };
 
-            return (
-              <Tooltip key={option.value} content={option.tooltip} position="top" useThemeColor={isSelected}>
-                <button
-                  onClick={() => onPeriodChange(option.value as PeriodFilter)}
-                  onMouseEnter={() => setHoveredBadge(option.value)}
-                  onMouseLeave={() => setHoveredBadge(null)}
-                  style={{
-                    padding: 'var(--spacing-xs) var(--spacing-sm)',
-                    fontSize: 'var(--font-size-sm)',
-                    fontWeight: 'var(--font-weight-medium)',
-                    backgroundColor: getBackgroundColor(),
-                    color: isSelected ? 'var(--color-white)' : 'var(--color-text-secondary)',
-                    border: isSelected ? 'none' : 'var(--border-width-thin) solid var(--color-gray-200)',
-                    borderRadius: 'var(--border-radius-xs)',
-                    cursor: 'pointer',
-                    transition: 'var(--transition-all)',
-                    minWidth: 'auto',
-                    minHeight: 'auto',
-                  }}
-                >
-                  {option.label}
-                </button>
-              </Tooltip>
+            const buttonElement = (
+              <button
+                onClick={() => onPeriodChange(option.value as PeriodFilter)}
+                onMouseEnter={() => setHoveredBadge(option.value)}
+                onMouseLeave={() => setHoveredBadge(null)}
+                style={{
+                  padding: 'var(--spacing-xs) var(--spacing-sm)',
+                  fontSize: 'var(--font-size-sm)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  backgroundColor: getBackgroundColor(),
+                  color: isSelected ? 'var(--color-white)' : 'var(--color-text-secondary)',
+                  border: isSelected ? 'none' : 'var(--border-width-thin) solid var(--color-gray-200)',
+                  borderRadius: 'var(--border-radius-xs)',
+                  cursor: 'pointer',
+                  transition: 'var(--transition-all)',
+                  minWidth: 'auto',
+                  minHeight: 'auto',
+                }}
+              >
+                {option.label}
+              </button>
             );
+
+            // 툴팁이 있고 선택된 경우에만 고정 툴팁 표시
+            if (option.tooltip && isSelected) {
+              return (
+                <div key={option.value} style={{ position: 'relative', display: 'inline-block' }}>
+                  {/* 고정 툴팁 */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 'calc(100% + var(--spacing-tooltip-offset))',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    padding: 'var(--spacing-xs) var(--spacing-sm)',
+                    backgroundColor: 'var(--color-primary)',
+                    color: 'var(--color-white)',
+                    fontSize: 'var(--font-size-xs)',
+                    borderRadius: 'var(--border-radius-xs)',
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                    zIndex: 1000,
+                  }}>
+                    {option.tooltip}
+                    {/* 화살표 */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 0,
+                      height: 0,
+                      borderLeft: 'var(--spacing-xs) solid transparent',
+                      borderRight: 'var(--spacing-xs) solid transparent',
+                      borderTop: 'var(--spacing-xs) solid var(--color-primary)',
+                    }} />
+                  </div>
+                  {buttonElement}
+                </div>
+              );
+            }
+
+            // 툴팁이 없거나 선택되지 않은 경우 버튼만 반환
+            return <div key={option.value} style={{ display: 'inline-block' }}>{buttonElement}</div>;
           })}
         </div>
       </div>
@@ -201,6 +244,7 @@ export function StatsDashboard({
                 title={item.title}
                 value={item.value}
                 unit={item.unit}
+                trend={period === 'thisMonth' ? item.trend : undefined} // 이번달 선택 시에만 지난달 대비 증감 표시
                 layoutMode="stats"
                 iconBackgroundColor={isCardSelected ? 'var(--color-primary)' : item.iconBackgroundColor}
                 isSelected={isCardSelected}
@@ -261,7 +305,7 @@ export function StatsDashboard({
         overflow: 'hidden',
         transition: 'max-height var(--transition-slow), opacity var(--transition-slow)',
         opacity: showChart ? 1 : 0,
-        marginTop: showChart ? 'var(--spacing-lg)' : 0,
+        marginTop: showChart ? 'var(--spacing-2xl)' : 0,
       }}>
         <div ref={chartContentRef} style={{ width: '100%' }}>
         <Card padding="lg" variant="default" style={{ height: '100%', display: 'flex', flexDirection: 'column', paddingTop: 'calc(var(--spacing-lg) + var(--spacing-lg))' }}>
