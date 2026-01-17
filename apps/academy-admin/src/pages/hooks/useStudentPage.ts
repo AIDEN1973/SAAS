@@ -12,7 +12,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { useModal , useResponsiveMode, isMobile, isTablet } from '@ui-core/react';
-import { useStudentsPaged, useStudentTags, useStudentTagsByStudent, useCreateStudent, useBulkCreateStudents, useStudent, useGuardians, useConsultations, useAllConsultations, useStudentClasses, useUpdateStudent, useDeleteStudent, useCreateGuardian, useUpdateGuardian, useDeleteGuardian, useCreateConsultation, useUpdateConsultation, useDeleteConsultation, useGenerateConsultationAISummary, useUpdateStudentTags, useAssignStudentToClass, useUnassignStudentFromClass, useUpdateStudentClassEnrolledAt } from '@hooks/use-student';
+import { useStudentsPaged, useStudentTags, useStudentTagsByStudent, useAllStudentTagAssignments, useCreateStudent, useBulkCreateStudents, useStudent, useGuardians, useConsultations, useAllConsultations, useStudentClasses, useUpdateStudent, useDeleteStudent, useCreateGuardian, useUpdateGuardian, useDeleteGuardian, useCreateConsultation, useUpdateConsultation, useDeleteConsultation, useGenerateConsultationAISummary, useUpdateStudentTags, useAssignStudentToClass, useUnassignStudentFromClass, useUpdateStudentClassEnrolledAt } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
 import { useSession, useUserRole } from '@hooks/use-auth';
 import { useSchema } from '@hooks/use-schema';
@@ -58,6 +58,7 @@ export interface UseStudentPageReturn {
   isLoading: boolean;
   error: Error | null;
   tags: Array<{ id: string; name: string; color: string }> | undefined;
+  tagAssignments: Array<{ student_id: string; tag_id: string }> | undefined;
   classes: Class[] | undefined;
   selectedStudent: Student | null | undefined;
   selectedStudentLoading: boolean;
@@ -288,6 +289,7 @@ export function useStudentPage(): UseStudentPageReturn {
 
   // 태그 및 반 데이터
   const { data: tags } = useStudentTags();
+  const { data: tagAssignments } = useAllStudentTagAssignments();
   const { data: classes } = useClasses({ status: 'active' });
 
   // 파일 입력 ref
@@ -635,6 +637,7 @@ export function useStudentPage(): UseStudentPageReturn {
     isLoading,
     error: error instanceof Error ? error : null,
     tags,
+    tagAssignments,
     classes,
     selectedStudent,
     selectedStudentLoading,

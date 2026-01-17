@@ -8,9 +8,9 @@
  */
 
 import React from 'react';
-import { Card, Button } from '@ui-core/react';
+import { Card } from '@ui-core/react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { DataTableActionButtons, StatsTableLayout } from '../../../components';
+import { DataTableActionButtons, StatsTableLayout, TagButton } from '../../../components';
 import type { StatsItem, ChartDataItem, PeriodFilter } from '../../../components/stats';
 import type { TableSchema, FilterSchema } from '@schema-engine';
 
@@ -216,19 +216,12 @@ export function StudentListSubPage({
                     {terms.TAG_LABEL}
                   </div>
                   {tags.map((tag) => (
-                    <Button
+                    <TagButton
                       key={tag.id}
-                      variant={filter.tag_ids?.includes(tag.id) ? 'solid' : 'outline'}
-                      size="sm"
+                      tag={tag}
+                      isSelected={filter.tag_ids?.includes(tag.id) ?? false}
                       onClick={() => onTagFilter(tag.id)}
-                      style={{
-                        fontSize: 'calc(var(--font-size-sm) - var(--spacing-xxs))',
-                        backgroundColor: filter.tag_ids?.includes(tag.id) ? tag.color : 'var(--color-white)',
-                        color: filter.tag_ids?.includes(tag.id) ? 'var(--color-white)' : undefined,
-                      }}
-                    >
-                      {tag.name}
-                    </Button>
+                    />
                   ))}
                 </div>
 

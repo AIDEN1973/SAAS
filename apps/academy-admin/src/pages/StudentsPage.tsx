@@ -150,6 +150,7 @@ export function StudentsPage() {
     isLoading,
     error,
     tags,
+    tagAssignments,
     selectedStudent,
     selectedStudentLoading,
     selectedStudentGuardians,
@@ -1111,7 +1112,10 @@ export function StudentsPage() {
             statsPeriod={statsPeriod}
             onStatsPeriodChange={setStatsPeriod}
             currentSubMenuLabel={currentSubMenuLabel}
-            terms={terms}
+            terms={{
+              TAG_LABEL: terms.TAG_LABEL,
+              PERSON_LABEL_PRIMARY: terms.PERSON_LABEL_PRIMARY,
+            }}
           />
         )}
 
@@ -1122,6 +1126,11 @@ export function StudentsPage() {
             onStatsPeriodChange={setStatsPeriod}
             currentSubMenuLabel={currentSubMenuLabel}
             terms={terms}
+            students={students}
+            consultations={allConsultations}
+            tags={tags ?? undefined}
+            tagAssignments={tagAssignments}
+            isLoading={isLoading || allConsultationsLoading}
           />
         )}
 

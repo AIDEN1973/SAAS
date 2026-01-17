@@ -1337,6 +1337,39 @@ export function useStudentTagsByStudent(studentId: string | null) {
 }
 
 /**
+ * 전체 학생 태그 할당 정보 조회 Hook (통계용)
+ * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ */
+export function useAllStudentTagAssignments() {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+
+  return useQuery<Array<{ student_id: string; tag_id: string }>>({
+    queryKey: ['tag_assignments', tenantId, 'student', 'all'],
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    queryFn: async (): Promise<Array<{ student_id: string; tag_id: string }>> => {
+      if (!tenantId) return [];
+
+      const assignmentsResponse = await apiClient.get<TagAssignment>('tag_assignments', {
+        filters: { entity_type: 'student' },
+        limit: 5000,
+      });
+
+      if (assignmentsResponse.error) {
+        throw new Error(assignmentsResponse.error.message);
+      }
+
+      return (assignmentsResponse.data || []).map((a: TagAssignment) => ({
+        student_id: a.entity_id,
+        tag_id: a.tag_id,
+      }));
+    },
+    enabled: !!tenantId,
+  });
+}
+
+/**
  * 상담기록 목록 조회 함수 (Hook의 queryFn 로직을 재사용)
  * [불변 규칙] useQuery 내부에서도 이 함수를 사용하여 일관성 유지
  */

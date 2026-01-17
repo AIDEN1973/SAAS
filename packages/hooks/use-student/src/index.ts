@@ -20,6 +20,7 @@ export {
   useDeleteGuardian,
   useStudentTags,
   useStudentTagsByStudent,
+  useAllStudentTagAssignments,
   useUpdateStudentTags,
   useConsultations,
   useAllConsultations,

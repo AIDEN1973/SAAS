@@ -6,3 +6,9 @@
 
 export { StatsDashboard } from './StatsDashboard';
 export type { StatsItem, ChartDataItem, PeriodFilter, StatsDashboardProps } from './StatsDashboard';
+
+export { DistributionChart } from './DistributionChart';
+export type { DistributionDataItem, DistributionChartProps } from './DistributionChart';
+
+export { HorizontalBarChart } from './HorizontalBarChart';
+export type { HorizontalBarDataItem, HorizontalBarChartProps } from './HorizontalBarChart';

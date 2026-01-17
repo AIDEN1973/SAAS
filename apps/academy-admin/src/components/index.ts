@@ -9,3 +9,5 @@ export type { StatsTableLayoutProps } from './StatsTableLayout';
 
 export { CardGridLayout } from './CardGridLayout';
 export { DataTableActionButtons } from './DataTableActionButtons';
+export { TagButton } from './TagButton';
+export type { TagButtonProps } from './TagButton';
