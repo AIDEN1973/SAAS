@@ -17,7 +17,7 @@ import { PlusIcon } from '../../../components/DataTableActionButtons';
 import { useStudentTags } from '@hooks/use-student';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
-import { logWarn, processTagInput } from '../../../utils';
+import { logWarn, processTagInput, p } from '../../../utils';
 import type { FormSchema } from '@schema-engine/types';
 import type { Tag } from '@core/tags';
 import type { UseFormReturn } from 'react-hook-form';
@@ -483,7 +483,7 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
                       ) : (
                         <EmptyState
                           icon={TagIcon}
-                          message={`등록된 ${terms.TAG_LABEL}이(가) 없습니다.`}
+                          message={`등록된 ${terms.TAG_LABEL}${p.이가(terms.TAG_LABEL)} 없습니다.`}
                         />
                       )}
                       {/* 요구사항: 태그수정 > 취소/저장 버튼은 학생관리 수정폼처럼 텍스트+아이콘 함께 출력 */}
@@ -555,7 +555,7 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
                   ) : (
                     <EmptyState
                       icon={TagIcon}
-                      message={`등록된 ${terms.TAG_LABEL}이(가) 없습니다.`}
+                      message={`등록된 ${terms.TAG_LABEL}${p.이가(terms.TAG_LABEL)} 없습니다.`}
                     />
                   )}
                   {/* 요구사항: 태그수정 > 취소/저장 버튼은 학생관리 수정폼처럼 텍스트+아이콘 함께 출력 */}
@@ -670,7 +670,7 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
         ) : (
           <EmptyState
             icon={TagIcon}
-            message={`등록된 ${terms.TAG_LABEL}이(가) 없습니다.`}
+            message={`등록된 ${terms.TAG_LABEL}${p.이가(terms.TAG_LABEL)} 없습니다.`}
           />
         )}
 

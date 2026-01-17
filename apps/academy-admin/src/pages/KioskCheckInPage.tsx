@@ -22,6 +22,7 @@
 import React, { useState, useCallback } from 'react';
 import { Container, Card, Button, Input, useModal } from '@ui-core/react';
 import { getApiContext, apiClient } from '@api-sdk/core';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { logError, logInfo } from '../utils';
 
 interface KioskCheckInResponse {
@@ -48,6 +49,7 @@ export function KioskCheckInPage() {
   const { showAlert } = useModal();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const terms = useIndustryTerms();
 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -163,7 +165,7 @@ export function KioskCheckInPage() {
           </h1>
 
           <p style={{ fontSize: 'var(--font-size-xl)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-2xl)' }}>
-            학생 본인의 휴대폰 번호를 입력해주세요
+            {terms.PERSON_LABEL_PRIMARY} 본인의 휴대폰 번호를 입력해주세요
           </p>
 
           {/* 성공 메시지 */}
@@ -177,7 +179,7 @@ export function KioskCheckInPage() {
               fontSize: 'var(--font-size-2xl)',
               fontWeight: 'var(--font-weight-bold)',
             }}>
-              <div>{lastCheckIn.studentName} 학생</div>
+              <div>{lastCheckIn.studentName} {terms.PERSON_LABEL_PRIMARY}</div>
               <div style={{ fontSize: 'var(--font-size-xl)', marginTop: 'var(--spacing-sm)' }}>
                 {lastCheckIn.time} 출석 완료!
               </div>

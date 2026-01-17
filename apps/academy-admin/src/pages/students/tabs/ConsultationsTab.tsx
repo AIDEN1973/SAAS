@@ -144,7 +144,7 @@ export function ConsultationsTab({
       }
       onHideForm();
     } catch (error) {
-      toast(error instanceof Error ? error.message : '상담일지 저장에 실패했습니다.', 'error');
+      toast(error instanceof Error ? error.message : `${terms.CONSULTATION_LABEL_PLURAL} 저장에 실패했습니다.`, 'error');
     }
   };
 
@@ -251,11 +251,8 @@ export function ConsultationsTab({
                   <>
                   {/* 기본보기: 수정폼과 동일한 레이아웃을 읽기 전용으로 렌더링 */}
                   {(() => {
-                    const typeLabel =
-                      consultation.consultation_type === 'counseling' ? '상담일지'
-                      : consultation.consultation_type === 'learning' ? '학습일지'
-                      : consultation.consultation_type === 'behavior' ? '행동일지'
-                      : '기타';
+                    // 상담 타입 라벨은 terms에서 가져옴 (업종별 동적 라벨)
+                    const typeLabel = terms.CONSULTATION_TYPE_LABELS[consultation.consultation_type as keyof typeof terms.CONSULTATION_TYPE_LABELS] || '기타';
 
                     const readOnlyFields = [
                       { label: '상담일', value: consultation.consultation_date || '-' },
@@ -340,7 +337,7 @@ export function ConsultationsTab({
                                 try {
                                   await onDelete(consultation.id);
                                 } catch (error) {
-                                  toast(error instanceof Error ? error.message : '상담일지 삭제에 실패했습니다.', 'error');
+                                  toast(error instanceof Error ? error.message : `${terms.CONSULTATION_LABEL_PLURAL} 삭제에 실패했습니다.`, 'error');
                                 }
                               })();
                             },

@@ -1,7 +1,8 @@
 # Industry Neutrality (업종 중립성) 원칙
 
 **작성일**: 2026-01-10
-**버전**: 1.0.0
+**버전**: 1.1.0
+**최종 업데이트**: 2026-01-17
 **상태**: ✅ 정본 (SSOT)
 
 ---
@@ -273,6 +274,110 @@ const tools = [
 
 ---
 
+## 프론트엔드 업종 중립 구현
+
+### useIndustryTerms Hook
+
+**위치**: `packages/hooks/use-industry-terms/src/useIndustryTerms.ts`
+
+```typescript
+import { useIndustryTerms } from '@hooks/use-industry-terms';
+
+function StudentsPage() {
+  const terms = useIndustryTerms();
+
+  return (
+    <PageHeader title={`${terms.PERSON_LABEL_PRIMARY} 관리`}>
+      <Button>신규 {terms.PERSON_LABEL_PRIMARY} 등록</Button>
+    </PageHeader>
+  );
+}
+```
+
+**주요 terms 필드:**
+- `PERSON_LABEL_PRIMARY`: "학생" | "회원" | "고객"
+- `GROUP_LABEL`: "반" | "그룹" | "서비스"
+- `ATTENDANCE_LABEL`: "출결" | "출석" | "방문"
+- `TAG_LABEL`: "태그"
+- `CONSULTATION_LABEL`: "상담"
+
+### 한국어 조사 처리 (Korean Particle Utils)
+
+**위치**: `apps/academy-admin/src/utils/korean-particle-utils.ts`
+
+업종 중립 용어는 동적으로 변경되므로, 한국어 조사도 동적으로 적용해야 합니다.
+
+```typescript
+import { p, templates } from '../utils';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
+
+const terms = useIndustryTerms();
+
+// 방법 1: p 단축 함수 사용
+`${terms.PERSON_LABEL_PRIMARY}${p.이가(terms.PERSON_LABEL_PRIMARY)} 등록되었습니다.`
+// Academy: "학생이 등록되었습니다."
+// Gym: "회원이 등록되었습니다."
+// Salon: "고객이 등록되었습니다."
+
+`${terms.CONSULTATION_LABEL}${p.을를(terms.CONSULTATION_LABEL)} 삭제하시겠습니까?`
+// "상담을 삭제하시겠습니까?"
+
+// 방법 2: templates 사용 (자주 쓰는 문장 패턴)
+templates.registered(terms.PERSON_LABEL_PRIMARY);  // "학생이 등록되었습니다."
+templates.confirmDelete(terms.TAG_LABEL);          // "태그를 삭제하시겠습니까?"
+templates.notFound(terms.GROUP_LABEL);             // "반을 찾을 수 없습니다."
+```
+
+**p 조사 함수 목록:**
+| 함수 | 설명 | 예시 |
+|------|------|------|
+| `p.이가(word)` | 주격 조사 | 학생이/강사가 |
+| `p.을를(word)` | 목적격 조사 | 학생을/강사를 |
+| `p.은는(word)` | 보조사 | 학생은/강사는 |
+| `p.과와(word)` | 접속 조사 | 학생과/강사와 |
+| `p.으로로(word)` | 방향/도구 조사 | 학원으로/집으로 |
+
+**templates 문장 패턴:**
+| 함수 | 결과 |
+|------|------|
+| `templates.registered(entity)` | "{entity}이/가 등록되었습니다." |
+| `templates.deleted(entity)` | "{entity}이/가 삭제되었습니다." |
+| `templates.updated(entity)` | "{entity}이/가 수정되었습니다." |
+| `templates.confirmDelete(entity)` | "{entity}을/를 삭제하시겠습니까?" |
+| `templates.notFound(entity)` | "{entity}을/를 찾을 수 없습니다." |
+| `templates.empty(entity)` | "{entity}이/가 없습니다." |
+
+### SubSidebar 동적 라벨
+
+**위치**: `apps/academy-admin/src/constants/sub-sidebar-menus.ts`
+
+SubSidebar 메뉴 라벨도 업종에 따라 동적으로 변경됩니다.
+
+```typescript
+import { menuLabels } from '../utils';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
+
+const terms = useIndustryTerms();
+
+// 동적 메뉴 라벨 생성
+const subMenuItems = [
+  { id: 'list', label: menuLabels.list(terms.PERSON_LABEL_PRIMARY) },           // "학생목록"
+  { id: 'tags', label: menuLabels.management(terms.TAG_LABEL) },                // "태그관리"
+  { id: 'statistics', label: menuLabels.statistics(terms.PERSON_LABEL_PRIMARY) }, // "학생통계"
+  { id: 'consultations', label: menuLabels.management(terms.CONSULTATION_LABEL) }, // "상담관리"
+];
+```
+
+**menuLabels 함수 목록:**
+| 함수 | 결과 |
+|------|------|
+| `menuLabels.list(entity)` | "{entity}목록" |
+| `menuLabels.add(entity)` | "{entity}등록" |
+| `menuLabels.statistics(entity)` | "{entity}통계" |
+| `menuLabels.management(entity)` | "{entity}관리" |
+
+---
+
 ## 관련 문서
 
 ### 핵심 문서
@@ -297,11 +402,19 @@ const tools = [
 2. **사용자는 자연스러운 업종별 용어 사용** (학생/고객/회원)
 3. **LLM이 용어를 표준 파라미터로 추출** (`student_name`)
 4. **Industry Adapter가 올바른 테이블로 자동 라우팅** (`academy_students`, `salon_customers`)
+5. **프론트엔드는 useIndustryTerms + 한국어 조사 유틸리티로 동적 UI 생성**
 
 이를 통해 **새로운 업종 추가 시 코드 변경 없이 설정만으로 확장 가능**합니다.
 
 ---
 
-**문서 버전**: 1.0.0
-**최종 업데이트**: 2026-01-10
+## 변경 이력
+
+- **2026-01-17 (v1.1.0)**: 프론트엔드 업종 중립 구현 섹션 추가 (useIndustryTerms, 한국어 조사, SubSidebar 동적 라벨)
+- **2026-01-10 (v1.0.0)**: 초기 문서 작성
+
+---
+
+**문서 버전**: 1.1.0
+**최종 업데이트**: 2026-01-17
 **작성자**: Claude Sonnet 4.5

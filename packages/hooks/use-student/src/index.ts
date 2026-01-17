@@ -73,3 +73,13 @@ export {
 export type {
   RecentActivity,
 } from './useRecentActivity';
+
+// 캐시 키 SSOT 및 무효화 유틸리티
+export {
+  STUDENT_CACHE_KEYS,
+  invalidateStudentConsultations,
+  invalidateStudentData,
+  invalidateGuardians,
+  invalidateStudentTags,
+  invalidateStudentClasses,
+} from './cache-keys';

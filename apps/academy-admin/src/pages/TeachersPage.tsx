@@ -30,8 +30,9 @@ import type { FormSchema } from '@schema-engine/types';
 import { teacherFilterSchema } from '../schemas/teacher.filter.schema';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
-import { TEACHERS_SUB_MENU_ITEMS, DEFAULT_TEACHERS_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import { TEACHERS_SUB_MENU_ITEMS, DEFAULT_TEACHERS_SUB_MENU, TEACHERS_MENU_LABEL_MAPPING, getSubMenuFromUrl, setSubMenuToUrl, applyDynamicLabels } from '../constants';
 import type { TeachersSubMenuId } from '../constants';
+import { templates } from '../utils';
 
 export function TeachersPage() {
   const { showConfirm, showAlert } = useModal();
@@ -52,6 +53,11 @@ export function TeachersPage() {
     const newUrl = setSubMenuToUrl(id, DEFAULT_TEACHERS_SUB_MENU);
     navigate(newUrl);
   }, [navigate]);
+
+  // [업종중립] 동적 라벨이 적용된 서브 메뉴 아이템
+  const subMenuItemsWithDynamicLabels = useMemo(() => {
+    return applyDynamicLabels(TEACHERS_SUB_MENU_ITEMS, TEACHERS_MENU_LABEL_MAPPING, terms);
+  }, [terms]);
 
   const [filter, setFilter] = useState<TeacherFilter>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -114,8 +120,8 @@ export function TeachersPage() {
         {/* 서브 사이드바 (모바일에서는 숨김) */}
         {!isMobileMode && (
           <SubSidebar
-            title={`${terms.PERSON_LABEL_SECONDARY} 관리`}
-            items={TEACHERS_SUB_MENU_ITEMS}
+            title={templates.management(terms.PERSON_LABEL_SECONDARY)}
+            items={subMenuItemsWithDynamicLabels}
             selectedId={selectedSubMenu}
             onSelect={handleSubMenuChange}
             testId="teachers-sub-sidebar"

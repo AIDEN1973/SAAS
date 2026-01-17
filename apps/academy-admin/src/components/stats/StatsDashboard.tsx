@@ -58,6 +58,8 @@ export interface StatsDashboardProps {
   chartTooltipUnit?: string;
   /** 차트 툴팁 레이블 (기본값: '총 학생수') */
   chartTooltipLabel?: string;
+  /** 데스크탑 컬럼 수 (기본값: statsItems 개수) */
+  desktopColumns?: number;
 }
 
 /**
@@ -80,6 +82,7 @@ export function StatsDashboard({
   hideChart = false,
   chartTooltipUnit = '명',
   chartTooltipLabel = '총 학생수',
+  desktopColumns,
 }: StatsDashboardProps) {
   // [SSOT] 아이콘 크기 (CSS 변수 기반)
   const iconSize = useIconSize();
@@ -261,7 +264,7 @@ export function StatsDashboard({
               />
             );
           })}
-          desktopColumns={4}
+          desktopColumns={desktopColumns ?? statsItems.length}
           tabletColumns={2}
           mobileColumns={1}
         />

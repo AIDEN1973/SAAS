@@ -18,10 +18,12 @@ import { ErrorBoundary, Container, Card, Button, PageHeader } from '@ui-core/rea
 import { StudentTaskCard } from '../components/StudentTaskCard';
 import { useStudentTaskCards, useStudentTaskCardAction } from '@hooks/use-student';
 import { CardGridLayout } from '../components/CardGridLayout';
-import { createSafeNavigate } from '../utils';
+import { createSafeNavigate, templates } from '../utils';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 
 export function StudentTasksPage() {
   const navigate = useNavigate();
+  const terms = useIndustryTerms();
   const { data: cardsData, isLoading, error } = useStudentTaskCards();
   const cards = cardsData || [];
   const getCardActionUrl = useStudentTaskCardAction();
@@ -36,10 +38,10 @@ export function StudentTasksPage() {
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
         <PageHeader
-          title="전체 학생 업무"
+          title={`전체 ${terms.PERSON_LABEL_PRIMARY} 업무`}
           actions={
             <Button variant="outline" onClick={() => safeNavigate(ROUTES.STUDENTS_LIST)}>
-              학생 관리 홈으로
+              {templates.management(terms.PERSON_LABEL_PRIMARY)} 홈으로
             </Button>
           }
         />
@@ -88,7 +90,7 @@ export function StudentTasksPage() {
           <Card padding="lg">
             <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--spacing-xl)' }}>
               <p style={{ marginBottom: 'var(--spacing-md)' }}>
-                현재 발생한 학생 업무가 없습니다.
+                현재 발생한 {terms.PERSON_LABEL_PRIMARY} 업무가 없습니다.
               </p>
             </div>
           </Card>

@@ -254,7 +254,7 @@ export function AttendanceTab({
       <Card padding="md" variant="default">
         <EmptyState
           icon={Calendar}
-          message="학생 정보를 불러올 수 없습니다."
+          message={`${terms.PERSON_LABEL_PRIMARY} 정보를 불러올 수 없습니다.`}
         />
       </Card>
     );

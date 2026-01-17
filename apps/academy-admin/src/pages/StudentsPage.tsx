@@ -6,14 +6,18 @@
  * [불변 규칙] api-sdk를 통해서만 API 요청
  * [불변 규칙] SDUI 스키마 기반 화면 자동 생성
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
+ *
+ * [리팩토링] SubSidebar 탭별 SubPage 컴포넌트로 분리 (2024-01)
+ * - StudentListSubPage: 학생 목록 탭
+ * - StudentConsultSubPage: 상담관리 탭
+ * - StudentTagsSubPage: 태그 관리 탭
+ * - StudentStatsSubPage: 학생 통계 탭
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ErrorBoundary, useIconSize, useIconStrokeWidth, useToast, Input, Select, Textarea, DatePicker, Container, Card, Button, RightLayerMenuLayout, EmptyState, SubSidebar, Modal } from '@ui-core/react';
-import type { InlineFormField } from '@ui-core/react';
-import { DataTableActionButtons, StatsTableLayout } from '../components';
-import { ChevronDown, ChevronUp, Users, UserCheck, UserX, Clock } from 'lucide-react';
+import { ErrorBoundary, useIconSize, useIconStrokeWidth, useToast, Input, Container, Button, RightLayerMenuLayout, SubSidebar, Modal } from '@ui-core/react';
+import { Users, UserCheck, UserX, Clock } from 'lucide-react';
 import type { StatsItem, ChartDataItem, PeriodFilter } from '../components/stats';
 import { registerWidget } from '@schema-engine';
 import { useStudentPage } from './hooks/useStudentPage';
@@ -24,8 +28,8 @@ import { isWidgetRegistered, setWidgetRegistered } from '../utils/widget-registr
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { toKST } from '@lib/date-utils';
 // [SSOT] Barrel export를 통한 통합 import
-import { createSafeNavigate, processTagInput, calculateTrend } from '../utils';
-import { STUDENTS_SUB_MENU_ITEMS, DEFAULT_STUDENTS_SUB_MENU, STUDENTS_RELATED_MENUS, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import { createSafeNavigate, processTagInput, calculateTrend, p, templates } from '../utils';
+import { STUDENTS_SUB_MENU_ITEMS, DEFAULT_STUDENTS_SUB_MENU, STUDENTS_RELATED_MENUS, STUDENTS_MENU_LABEL_MAPPING, getSubMenuFromUrl, setSubMenuToUrl, applyDynamicLabels } from '../constants';
 import type { StudentsSubMenuId } from '../constants';
 import { StudentInfoTab } from './students/tabs/StudentInfoTab';
 import { GuardiansTab } from './students/tabs/GuardiansTab';
@@ -36,7 +40,9 @@ import { AttendanceTab } from './students/tabs/AttendanceTab';
 import { RiskAnalysisTab } from './students/tabs/RiskAnalysisTab';
 import { MessageSendTab } from './students/tabs/MessageSendTab';
 import { CreateStudentForm } from './students/components/CreateStudentForm';
-import type { StudentStatus, StudentConsultation, Guardian, ConsultationType } from '@services/student-service';
+// SubPage 컴포넌트 import
+import { StudentListSubPage, StudentTagsSubPage, StudentStatsSubPage, StudentConsultSubPage } from './students/subpages';
+import type { StudentStatus, StudentConsultation, Guardian } from '@services/student-service';
 
 // [P2-QUALITY-1 해결] processTagInput 함수는 utils/data-normalization-utils.ts에서 SSOT로 관리
 // import { processTagInput } from '../utils';
@@ -110,6 +116,12 @@ export function StudentsPage() {
   // 서브 메뉴 상태 (URL에서 직접 읽음)
   const validIds = STUDENTS_SUB_MENU_ITEMS.map(item => item.id) as readonly StudentsSubMenuId[];
   const selectedSubMenu = getSubMenuFromUrl(searchParams, validIds, DEFAULT_STUDENTS_SUB_MENU);
+
+  // 현재 선택된 서브메뉴의 label 가져오기 (페이지 타이틀용)
+  const currentSubMenuLabel = useMemo(() => {
+    const menuItem = STUDENTS_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu);
+    return menuItem?.label || '';
+  }, [selectedSubMenu]);
 
   // [아키텍처] Application Layer와 UI Composition 분리
   // - useStudentPage Hook이 모든 비즈니스 로직, 상태 관리, 데이터 페칭을 담당
@@ -210,33 +222,6 @@ export function StudentsPage() {
     // 모달
     showConfirm,
   } = useStudentPage();
-
-  // 상담 상세 모달 편집 상태 (컴포넌트 최상위에 선언 - React Hooks 규칙 준수)
-  const [isEditingInModal, setIsEditingInModal] = useState(false);
-  const [editFormData, setEditFormData] = useState<{
-    consultation_type: ConsultationType;
-    consultation_date: string;
-    content: string;
-  }>({
-    consultation_type: 'counseling',
-    consultation_date: '',
-    content: '',
-  });
-
-  // 선택된 상담이 변경될 때 편집 폼 데이터 동기화
-  useEffect(() => {
-    if (selectedConsultationId && allConsultations) {
-      const consultation = allConsultations.find(c => c.id === selectedConsultationId);
-      if (consultation) {
-        setEditFormData({
-          consultation_type: consultation.consultation_type,
-          consultation_date: consultation.consultation_date,
-          content: consultation.content || '',
-        });
-        setIsEditingInModal(false);
-      }
-    }
-  }, [selectedConsultationId, allConsultations]);
 
   // 서브메뉴 변경 핸들러 (useStudentPage 훅 다음에 선언하여 setShowCreateForm 사용 가능)
   const handleSubMenuChange = useCallback((id: StudentsSubMenuId) => {
@@ -446,6 +431,7 @@ export function StudentsPage() {
         total: 0,
         active: 0,
         onLeave: 0,
+        graduated: 0,
         withdrawn: 0,
       };
     }
@@ -464,12 +450,14 @@ export function StudentsPage() {
     const total = lastMonthStudents.length;
     const active = lastMonthStudents.filter(s => (s as { status?: StudentStatus }).status === 'active').length;
     const onLeave = lastMonthStudents.filter(s => (s as { status?: StudentStatus }).status === 'on_leave').length;
+    const graduated = lastMonthStudents.filter(s => (s as { status?: StudentStatus }).status === 'graduated').length;
     const withdrawn = lastMonthStudents.filter(s => (s as { status?: StudentStatus }).status === 'withdrawn').length;
 
     return {
       total,
       active,
       onLeave,
+      graduated,
       withdrawn,
     };
   }, [students]);
@@ -525,7 +513,7 @@ export function StudentsPage() {
       {
         key: 'onLeave',
         icon: Clock,
-        title: '휴학',
+        title: terms.STAFF_LEAVE === '휴직' ? '휴원' : '휴회',  // 학원: 휴원, 피트니스: 휴회
         value: studentStatusStats.onLeave,
         unit: '명',
         iconBackgroundColor: 'var(--color-warning-50)',
@@ -534,14 +522,14 @@ export function StudentsPage() {
       {
         key: 'withdrawn',
         icon: UserX,
-        title: '퇴학',
+        title: terms.STAFF_RESIGNED === '퇴직' ? '퇴원' : '탈퇴',  // 학원: 퇴원, 피트니스: 탈퇴
         value: studentStatusStats.withdrawn,
         unit: '명',
         iconBackgroundColor: 'var(--color-error-50)',
         trend: calculateTrend(studentStatusStats.withdrawn, lastMonthStats.withdrawn),
       },
     ];
-  }, [studentStatusStats, lastMonthStats, terms.PERSON_LABEL_PRIMARY]);
+  }, [studentStatusStats, lastMonthStats, terms.PERSON_LABEL_PRIMARY, terms.STAFF_LEAVE, terms.STAFF_RESIGNED]);
 
   // 상담관리 탭용 통계 카드 데이터
   const consultationStatsItems: StatsItem[] = useMemo(() => {
@@ -557,7 +545,7 @@ export function StudentsPage() {
       {
         key: 'counseling',
         icon: Users,
-        title: '상담일지',
+        title: terms.CONSULTATION_TYPE_LABELS.counseling,
         value: consultationStats.counseling,
         unit: '건',
         iconBackgroundColor: 'var(--color-info-50)',
@@ -565,7 +553,7 @@ export function StudentsPage() {
       {
         key: 'learning',
         icon: Users,
-        title: '학습일지',
+        title: terms.CONSULTATION_TYPE_LABELS.learning,
         value: consultationStats.learning,
         unit: '건',
         iconBackgroundColor: 'var(--color-success-50)',
@@ -573,13 +561,21 @@ export function StudentsPage() {
       {
         key: 'behavior',
         icon: Users,
-        title: '행동일지',
+        title: terms.CONSULTATION_TYPE_LABELS.behavior,
         value: consultationStats.behavior,
         unit: '건',
         iconBackgroundColor: 'var(--color-warning-50)',
       },
+      {
+        key: 'other',
+        icon: Users,
+        title: terms.CONSULTATION_TYPE_LABELS.other,
+        value: consultationStats.other,
+        unit: '건',
+        iconBackgroundColor: 'var(--color-error-50)',
+      },
     ];
-  }, [consultationStats, terms.CONSULTATION_LABEL_PLURAL]);
+  }, [consultationStats, terms.CONSULTATION_LABEL_PLURAL, terms.CONSULTATION_TYPE_LABELS]);
 
   // 상담관리 탭용 차트 데이터 (선택된 카드에 따라 필터링)
   const consultationChartData: ChartDataItem[] = useMemo(() => {
@@ -593,6 +589,7 @@ export function StudentsPage() {
       counseling: (type) => type === 'counseling',
       learning: (type) => type === 'learning',
       behavior: (type) => type === 'behavior',
+      other: (type) => type === 'other',
     };
 
     const typeFilter = typeFilterMap[selectedConsultationStatsKey] || typeFilterMap.total;
@@ -684,6 +681,7 @@ export function StudentsPage() {
       total: () => true,
       active: (status) => status === 'active',
       onLeave: (status) => status === 'on_leave',
+      graduated: (status) => status === 'graduated',
       withdrawn: (status) => status === 'withdrawn',
     };
 
@@ -742,23 +740,26 @@ export function StudentsPage() {
     });
   }, [students, statsPeriod, selectedStatsKey]);
 
-  // 서브메뉴 아이템에 opensInModalOrNewWindow 속성 추가
-  const subMenuItemsWithModalIndicator = useMemo(() => {
-    return STUDENTS_SUB_MENU_ITEMS.map(item => {
-      // '학생등록' 메뉴는 모달로 열리므로 표시
+  // 서브메뉴 아이템에 동적 라벨 및 opensInModalOrNewWindow 속성 적용
+  const subMenuItemsWithDynamicLabels = useMemo(() => {
+    // 1. 동적 라벨 적용 (업종 중립)
+    const itemsWithLabels = applyDynamicLabels(STUDENTS_SUB_MENU_ITEMS, STUDENTS_MENU_LABEL_MAPPING, terms);
+
+    // 2. '등록' 메뉴에 모달 표시 추가
+    return itemsWithLabels.map(item => {
       if (item.id === 'add') {
         return { ...item, opensInModalOrNewWindow: true };
       }
       return item;
     });
-  }, []);
+  }, [terms]);
 
   return (
     <ErrorBoundary>
       <div style={{ display: 'flex', height: '100vh' }}>
         <SubSidebar
-          title={`${terms.PERSON_LABEL_PRIMARY}관리`}
-          items={subMenuItemsWithModalIndicator}
+          title={templates.management(terms.PERSON_LABEL_PRIMARY)}
+          items={subMenuItemsWithDynamicLabels}
           selectedId={selectedSubMenu}
           onSelect={handleSubMenuChange}
           relatedMenus={STUDENTS_RELATED_MENUS}
@@ -878,12 +879,12 @@ export function StudentsPage() {
                     onEdit={() => setIsEditing(true)}
                     onDelete={async () => {
                       const confirmed = await showConfirm(
-                        `정말 삭제하시겠습니까?\n(문서 기준: ${terms.PERSON_LABEL_PRIMARY}은(는) 삭제 시 상태가 퇴원(withdrawn)으로 변경됩니다.)`,
+                        `정말 삭제하시겠습니까?\n(문서 기준: ${terms.PERSON_LABEL_PRIMARY}${p.은는(terms.PERSON_LABEL_PRIMARY)} 삭제 시 상태가 퇴원(withdrawn)으로 변경됩니다.)`,
                         `${terms.PERSON_LABEL_PRIMARY} ${terms.MESSAGES.DELETE_CONFIRM}`
                       );
                       if (!confirmed) return;
                       await deleteStudent.mutateAsync(selectedStudent.id);
-                      toast(`${terms.PERSON_LABEL_PRIMARY}이(가) 삭제(퇴원 처리)되었습니다.`, 'success');
+                      toast(`${terms.PERSON_LABEL_PRIMARY}${p.이가(terms.PERSON_LABEL_PRIMARY)} 삭제(퇴원 처리)되었습니다.`, 'success');
                       handleStudentSelect(null);
                     }}
                   />
@@ -1057,223 +1058,90 @@ export function StudentsPage() {
           }}
         />
 
-        {/* 학생 목록 탭 ('list') */}
+        {/* 학생 목록 탭 ('list') - StudentListSubPage로 분리됨 */}
         {selectedSubMenu === 'list' && (
-          <>
-            {/* 로딩 상태 */}
-            {isLoading && (
-              <Card padding="lg" variant="default">
-                <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                  {terms.PERSON_LABEL_PRIMARY} 목록 {terms.MESSAGES.LOADING}
-                </div>
-              </Card>
-            )}
-
-            {/* 에러 상태 (로딩 완료 후에만 표시) */}
-            {!isLoading && error && (
-              <Card padding="md" variant="outlined">
-                <div style={{ color: 'var(--color-error)' }}>
-                  {terms.MESSAGES.ERROR}: {error instanceof Error ? error.message : `${terms.PERSON_LABEL_PRIMARY} 목록 불러오기 ${terms.MESSAGES.SAVE_ERROR}`}
-                </div>
-              </Card>
-            )}
-
-            {/* 학생 목록 (로딩 완료 후, 에러 없을 때만 표시) */}
-            {!isLoading && !error && effectiveTableSchema && (
-              <StatsTableLayout
-                entityName={`${terms.PERSON_LABEL_PRIMARY}목록`}
-                statsItems={statsItems}
-                chartData={chartData}
-                period={statsPeriod}
-                onPeriodChange={setStatsPeriod}
-                selectedStatsKey={selectedStatsKey}
-                onStatsCardClick={setSelectedStatsKey}
-                chartTooltipUnit="명"
-                chartTooltipLabel={`총 ${terms.PERSON_LABEL_PRIMARY}수`}
-                tableSchema={effectiveTableSchema}
-                tableData={(students as unknown as Record<string, unknown>[]) || []}
-                totalCount={totalCount}
-                page={tablePage}
-                onPageChange={setTablePage}
-                filters={tableFilters}
-                actionContext={actionContextMemo}
-                onRowClick={handleRowClickMemo}
-                filterSchema={effectiveFilterSchema}
-                onFilterChange={handleFilterChange}
-                filterDefaultValues={{
-                  search: filter.search || '',
-                  status: filter.status || '',
-                  grade: filter.grade || '',
-                  class_id: filter.class_id || '',
-                }}
-                customActions={
-                  <DataTableActionButtons
-                    align="right"
-                    onCreate={() => setShowCreateForm(true)}
-                    onUpload={() => fileInputRef.current?.click()}
-                    onDownload={handleDownload}
-                    onDownloadTemplate={handleDownloadTemplate}
-                    uploadDisabled={bulkCreateStudents.isPending}
-                    createTooltip={`${terms.PERSON_LABEL_PRIMARY}등록`}
-                  />
-                }
-                iconSize={iconSize}
-                iconStrokeWidth={iconStrokeWidth}
-                sectionOrderKey="students-section-order-list"
-                showTitle={true}
-                beforeTable={
-                  tags && tags.length > 0 ? (
-                    <div style={{ position: 'relative', marginBottom: 'var(--spacing-md)' }}>
-                      <div
-                        ref={tagListRef}
-                        style={{
-                          display: 'flex',
-                          gap: 'var(--spacing-xs)',
-                          flexWrap: 'wrap',
-                          // 토글 버튼 영역 확보 (우측 화살표가 버튼을 가리지 않도록)
-                          // [불변 규칙] 하드코딩 금지: CSS 변수만 사용 (스키마엔진 문서 1 참조)
-                          paddingRight: showTagListToggle
-                            ? 'calc(var(--spacing-sm) + var(--size-icon-base) + var(--spacing-xs))'
-                            : undefined,
-                          // 접기 상태: 1줄까지만 보여주기
-                          // HARD-CODE-EXCEPTION: tagListCollapsedHeight는 동적으로 계산된 값이지만 px 단위 사용 (레이아웃용 특수 값)
-                          maxHeight: !isTagListExpanded && tagListCollapsedHeight ? `${tagListCollapsedHeight}px` : undefined,
-                          overflow: !isTagListExpanded && showTagListToggle ? 'hidden' : undefined,
-                          transition: 'max-height var(--transition-fast)',
-                        }}
-                      >
-                        {/* 요청사항: 태그가 있는 경우에만, 첫 번째 태그 왼쪽에 배지 버튼 출력 */}
-                        {/* [최적화] 외부에서 이미 tags && tags.length > 0로 체크했으므로 중복 체크 제거 */}
-                        <div
-                          style={{
-                            padding: 'var(--spacing-xs) var(--spacing-sm)',
-                            fontSize: 'var(--font-size-xs)',
-                            fontWeight: 'var(--font-weight-bold)',
-                            fontFamily: 'var(--font-family)',
-                            lineHeight: 'var(--line-height)',
-                            borderRadius: 'var(--border-radius-xs)',
-                            border: 'var(--border-width-thin) solid var(--color-text)',
-                            color: 'var(--color-white)',
-                            backgroundColor: 'var(--color-text)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {terms.TAG_LABEL}
-                        </div>
-                        {tags.map((tag: { id: string; name: string; color: string }) => (
-                          <Button
-                            key={tag.id}
-                            variant={filter.tag_ids?.includes(tag.id) ? 'solid' : 'outline'}
-                            size="sm"
-                            onClick={() => handleTagFilter(tag.id)}
-                            style={{
-                              // 요청사항:
-                              // - 태그 리스트 버튼 사이즈(체감)를 줄임 (CSS 변수 사용)
-                              // - 기본(미선택) 버튼 배경을 화이트로 고정
-                              // [불변 규칙] 하드코딩 금지: CSS 변수만 사용 (스키마엔진 문서 1 참조)
-                              fontSize: 'calc(var(--font-size-sm) - var(--spacing-xxs))',
-                              backgroundColor: filter.tag_ids?.includes(tag.id) ? tag.color : 'var(--color-white)',
-                              color: filter.tag_ids?.includes(tag.id) ? 'var(--color-white)' : undefined,
-                            }}
-                          >
-                            {tag.name}
-                          </Button>
-                        ))}
-                      </div>
-
-                      {/* 요청사항: 화살표만 추가 (한 줄 초과 시에만 노출) */}
-                      {showTagListToggle && (
-                        <button
-                          type="button"
-                          aria-label={isTagListExpanded ? `${terms.TAG_LABEL} 목록 접기` : `${terms.TAG_LABEL} 목록 펼치기`}
-                          onClick={() => setIsTagListExpanded((v: boolean) => !v)}
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            right: 0,
-                            // HARD-CODE-EXCEPTION: tagListCollapsedHeight는 동적으로 계산된 값이지만 px 단위 사용 (레이아웃용 특수 값)
-                            height: tagListCollapsedHeight ? `${tagListCollapsedHeight}px` : 'var(--size-pagination-button)',
-                            width: 'calc(var(--spacing-sm) + var(--size-icon-base) + var(--spacing-xs))',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: 'none',
-                            background: 'transparent',
-                            cursor: 'pointer',
-                            color: 'var(--color-text-secondary)',
-                          }}
-                        >
-                          {isTagListExpanded
-                            ? <ChevronUp size={iconSize} strokeWidth={iconStrokeWidth} />
-                            : <ChevronDown size={iconSize} strokeWidth={iconStrokeWidth} />}
-                        </button>
-                      )}
-                    </div>
-                  ) : undefined
-                }
-              />
-            )}
-          </>
+          <StudentListSubPage
+            isLoading={isLoading}
+            error={error}
+            statsItems={statsItems}
+            chartData={chartData}
+            statsPeriod={statsPeriod}
+            onStatsPeriodChange={setStatsPeriod}
+            selectedStatsKey={selectedStatsKey}
+            onStatsCardClick={setSelectedStatsKey}
+            effectiveTableSchema={effectiveTableSchema}
+            students={(students as unknown as Record<string, unknown>[]) || []}
+            totalCount={totalCount}
+            tablePage={tablePage}
+            onTablePageChange={setTablePage}
+            tableFilters={tableFilters}
+            actionContext={actionContextMemo}
+            onRowClick={handleRowClickMemo}
+            effectiveFilterSchema={effectiveFilterSchema}
+            onFilterChange={handleFilterChange}
+            filterDefaultValues={{
+              search: filter.search || '',
+              status: filter.status || '',
+              grade: filter.grade || '',
+              class_id: filter.class_id || '',
+            }}
+            tags={tags}
+            filter={filter}
+            onTagFilter={handleTagFilter}
+            isTagListExpanded={isTagListExpanded}
+            showTagListToggle={showTagListToggle}
+            tagListCollapsedHeight={tagListCollapsedHeight}
+            tagListRef={tagListRef}
+            onTagListExpandToggle={setIsTagListExpanded}
+            onCreateClick={() => setShowCreateForm(true)}
+            onUploadClick={() => fileInputRef.current?.click()}
+            onDownload={handleDownload}
+            onDownloadTemplate={handleDownloadTemplate}
+            uploadDisabled={bulkCreateStudents.isPending}
+            iconSize={iconSize}
+            iconStrokeWidth={iconStrokeWidth}
+            currentSubMenuLabel={currentSubMenuLabel}
+            terms={terms}
+          />
         )}
 
-        {/* 태그 관리 탭 ('tags') */}
+        {/* 태그 관리 탭 ('tags') - StudentTagsSubPage로 분리됨 */}
         {selectedSubMenu === 'tags' && (
-          <Card padding="lg" variant="default">
-            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-              <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                {terms.PERSON_LABEL_PRIMARY}에게 적용할 수 있는 {terms.TAG_LABEL}을(를) 관리합니다.
-              </p>
-            </div>
-            <EmptyState
-              icon={Users}
-              message={`${terms.TAG_LABEL} 관리 기능은 준비 중입니다.`}
-            />
-          </Card>
+          <StudentTagsSubPage
+            statsPeriod={statsPeriod}
+            onStatsPeriodChange={setStatsPeriod}
+            currentSubMenuLabel={currentSubMenuLabel}
+            terms={terms}
+          />
         )}
 
-        {/* 학생 통계 탭 ('statistics') */}
+        {/* 학생 통계 탭 ('statistics') - StudentStatsSubPage로 분리됨 */}
         {selectedSubMenu === 'statistics' && (
-          <Card padding="lg" variant="default">
-            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-              <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                {terms.PERSON_LABEL_PRIMARY} 등록, 이탈, 현황 등의 통계를 확인할 수 있습니다.
-              </p>
-            </div>
-            <EmptyState
-              icon={Users}
-              message={`${terms.PERSON_LABEL_PRIMARY} 통계 기능은 준비 중입니다.`}
-            />
-          </Card>
+          <StudentStatsSubPage
+            statsPeriod={statsPeriod}
+            onStatsPeriodChange={setStatsPeriod}
+            currentSubMenuLabel={currentSubMenuLabel}
+            terms={terms}
+          />
         )}
 
-        {/* 상담관리 탭 ('consultations') */}
+        {/* 상담관리 탭 ('consultations') - StudentConsultSubPage로 분리됨 */}
         {selectedSubMenu === 'consultations' && (
-          <StatsTableLayout
-            entityName="상담목록"
-            statsItems={consultationStatsItems}
-            chartData={consultationChartData}
-            period={statsPeriod}
-            onPeriodChange={setStatsPeriod}
-            selectedStatsKey={selectedConsultationStatsKey}
-            onStatsCardClick={setSelectedConsultationStatsKey}
-            chartTooltipUnit="건"
-            chartTooltipLabel="총 상담수"
-            tableSchema={consultationTableSchema}
+          <StudentConsultSubPage
+            consultationStatsItems={consultationStatsItems}
+            consultationChartData={consultationChartData}
+            statsPeriod={statsPeriod}
+            onStatsPeriodChange={setStatsPeriod}
+            selectedConsultationStatsKey={selectedConsultationStatsKey}
+            onConsultationStatsCardClick={setSelectedConsultationStatsKey}
+            consultationTableSchema={consultationTableSchema}
             tableData={allConsultationsLoading ? [] : filteredConsultationsWithTableFilters.map((consultation) => {
-              // 학생 이름 매칭 (students 배열에서 찾기)
               const student = students.find(s => s.id === consultation.student_id);
-              // 원본 내용 (전체 텍스트, 툴팁용)
               const originalContent = consultation.content || '';
-              // 내용 미리보기 (최대 60자, 줄바꿈 제거)
               const contentPreview = originalContent
                 ? (() => {
                     const cleaned = originalContent.replace(/\n/g, ' ').trim();
-                    return cleaned.length > 60
-                      ? cleaned.substring(0, 60) + '...'
-                      : cleaned;
+                    return cleaned.length > 60 ? cleaned.substring(0, 60) + '...' : cleaned;
                   })()
                 : '';
               return {
@@ -1284,309 +1152,111 @@ export function StudentsPage() {
               };
             }) as unknown as Record<string, unknown>[]}
             totalCount={filteredConsultationsWithTableFilters.length}
-            page={1}
-            onPageChange={() => {}}
-            filters={{}}
+            isLoading={allConsultationsLoading}
             actionContext={actionContextMemo}
-            onRowClick={(row) => {
-              const consultationId = (row as { id?: string }).id;
-              if (consultationId) {
-                setSelectedConsultationId(consultationId);
+            onRowClick={(consultationId) => setSelectedConsultationId(consultationId)}
+            consultationFilterSchema={consultationFilterSchema}
+            consultationFilters={consultationFilters}
+            onConsultationFilterChange={handleConsultationFilterChange}
+            selectedConsultationId={selectedConsultationId}
+            allConsultations={allConsultations}
+            students={students.map(s => ({ id: s.id, name: s.name }))}
+            onCloseModal={() => setSelectedConsultationId(null)}
+            onDeleteConsultation={async (consultationId, studentId) => {
+              await deleteConsultation.mutateAsync({ consultationId, studentId });
+              toast(`${terms.CONSULTATION_LABEL_PLURAL}${p.이가(terms.CONSULTATION_LABEL_PLURAL)} 성공적으로 삭제되었습니다.`, 'success', `${terms.CONSULTATION_LABEL_PLURAL} 삭제 완료`);
+              setSelectedConsultationId(null);
+            }}
+            onUpdateConsultation={async (consultationId, studentId, data) => {
+              await updateConsultation.mutateAsync({ consultationId, studentId, consultation: data });
+              toast(`${terms.CONSULTATION_LABEL_PLURAL}${p.이가(terms.CONSULTATION_LABEL_PLURAL)} 성공적으로 수정되었습니다.`, 'success', `${terms.CONSULTATION_LABEL_PLURAL} 수정 완료`);
+            }}
+            onGenerateAISummary={async (consultationId, studentId) => {
+              await generateAISummary.mutateAsync({ consultationId, studentId });
+              toast('AI 요약이 성공적으로 생성되었습니다.', 'success', 'AI 요약 생성 완료');
+            }}
+            updateConsultationPending={updateConsultation.isPending}
+            deleteConsultationPending={deleteConsultation.isPending}
+            generateAISummaryPending={generateAISummary.isPending}
+            onDownload={() => {
+              try {
+                const personNameLabel = `${terms.PERSON_LABEL_PRIMARY}명`;
+                const csvData = filteredConsultationsWithTableFilters.map((consultation) => {
+                  const student = students.find(s => s.id === consultation.student_id);
+                  return {
+                    [personNameLabel]: student?.name || '알 수 없음',
+                    '상담일': consultation.consultation_date,
+                    '상담 구분': terms.CONSULTATION_TYPE_LABELS[consultation.consultation_type as keyof typeof terms.CONSULTATION_TYPE_LABELS] || consultation.consultation_type,
+                    '내용': consultation.content || '',
+                    '등록일시': consultation.created_at,
+                  };
+                });
+                const headers = [personNameLabel, '상담일', '상담 구분', '내용', '등록일시'];
+                const csvContent = [
+                  headers.join(','),
+                  ...csvData.map((row) =>
+                    headers.map((header) => {
+                      const value = String(row[header as keyof typeof row] || '');
+                      return `"${value.replace(/"/g, '""')}"`;
+                    }).join(',')
+                  )
+                ].join('\n');
+                const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `상담목록_${toKST(new Date()).format('YYYY-MM-DD')}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                toast('상담 목록을 다운로드했습니다.', 'success', '다운로드 완료');
+              } catch (error) {
+                toast(error instanceof Error ? error.message : '다운로드 중 오류가 발생했습니다.', 'error', '다운로드 실패');
               }
             }}
-            filterSchema={consultationFilterSchema}
-            onFilterChange={handleConsultationFilterChange}
-            filterDefaultValues={{
-              search: consultationFilters.search,
-              consultation_type: consultationFilters.consultation_type,
-              date_from: consultationFilters.date_from,
-              date_to: consultationFilters.date_to,
+            onDownloadTemplate={() => {
+              try {
+                const personNameLabel = `${terms.PERSON_LABEL_PRIMARY}명(필수)`;
+                const headers = [personNameLabel, '상담일(필수,YYYY-MM-DD)', '상담구분(필수,counseling/learning/behavior/other)', '내용'];
+                const csvContent = [
+                  headers.join(','),
+                  '"홍길동","2024-01-15","counseling","학습 진도 및 성적 관련 상담"',
+                ].join('\n');
+                const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `${terms.CONSULTATION_LABEL}등록_템플릿.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                toast(`${terms.CONSULTATION_LABEL} 등록 템플릿을 다운로드했습니다.`, 'success', '다운로드 완료');
+              } catch (error) {
+                toast(error instanceof Error ? error.message : '다운로드 중 오류가 발생했습니다.', 'error', '다운로드 실패');
+              }
             }}
-            customActions={
-              <DataTableActionButtons
-                align="right"
-                onCreate={() => {
-                  toast('상담 등록 기능은 학생 상세에서 이용 가능합니다.', 'info', '안내');
-                }}
-                onUpload={() => {
-                  toast('상담 일괄 등록 기능은 준비 중입니다.', 'info', '안내');
-                }}
-                onDownload={() => {
-                  try {
-                    const csvData = filteredConsultationsWithTableFilters.map((consultation) => {
-                      const student = students.find(s => s.id === consultation.student_id);
-                      const consultationTypeLabels: Record<string, string> = {
-                        counseling: '상담일지',
-                        learning: '학습일지',
-                        behavior: '행동일지',
-                        other: '기타',
-                      };
-                      return {
-                        '학생명': student?.name || '알 수 없음',
-                        '상담일': consultation.consultation_date,
-                        '상담 구분': consultationTypeLabels[consultation.consultation_type] || consultation.consultation_type,
-                        '내용': consultation.content || '',
-                        '등록일시': consultation.created_at,
-                      };
-                    });
-
-                    const headers = ['학생명', '상담일', '상담 구분', '내용', '등록일시'];
-                    const csvContent = [
-                      headers.join(','),
-                      ...csvData.map((row) =>
-                        headers.map((header) => {
-                          const value = String(row[header as keyof typeof row] || '');
-                          return `"${value.replace(/"/g, '""')}"`;
-                        }).join(',')
-                      )
-                    ].join('\n');
-
-                    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-                    const link = document.createElement('a');
-                    const url = URL.createObjectURL(blob);
-                    link.setAttribute('href', url);
-                    link.setAttribute('download', `상담목록_${new Date().toISOString().split('T')[0]}.csv`);
-                    link.style.visibility = 'hidden';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-
-                    toast('상담 목록을 다운로드했습니다.', 'success', '다운로드 완료');
-                  } catch (error) {
-                    toast(error instanceof Error ? error.message : '다운로드 중 오류가 발생했습니다.', 'error', '다운로드 실패');
-                  }
-                }}
-                onDownloadTemplate={() => {
-                  try {
-                    const headers = ['학생명(필수)', '상담일(필수,YYYY-MM-DD)', '상담구분(필수,counseling/learning/behavior/other)', '내용'];
-                    const csvContent = [
-                      headers.join(','),
-                      '"홍길동","2024-01-15","counseling","학습 진도 및 성적 관련 상담"',
-                    ].join('\n');
-
-                    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-                    const link = document.createElement('a');
-                    const url = URL.createObjectURL(blob);
-                    link.setAttribute('href', url);
-                    link.setAttribute('download', '상담등록_템플릿.csv');
-                    link.style.visibility = 'hidden';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-
-                    toast('상담 등록 템플릿을 다운로드했습니다.', 'success', '다운로드 완료');
-                  } catch (error) {
-                    toast(error instanceof Error ? error.message : '다운로드 중 오류가 발생했습니다.', 'error', '다운로드 실패');
-                  }
-                }}
-                uploadDisabled={false}
-                createTooltip="상담 등록"
-              />
-            }
+            onCreateClick={() => {
+              toast(`${terms.CONSULTATION_LABEL} 등록 기능은 ${terms.PERSON_LABEL_PRIMARY} 상세에서 이용 가능합니다.`, 'info', '안내');
+            }}
+            onUploadClick={() => {
+              toast(`${terms.CONSULTATION_LABEL} 일괄 등록 기능은 준비 중입니다.`, 'info', '안내');
+            }}
             iconSize={iconSize}
             iconStrokeWidth={iconStrokeWidth}
-            sectionOrderKey="students-section-order-consultations"
-            showTitle={true}
+            currentSubMenuLabel={currentSubMenuLabel}
+            terms={{
+              PERSON_LABEL_PRIMARY: terms.PERSON_LABEL_PRIMARY,
+              CONSULTATION_LABEL: terms.CONSULTATION_LABEL,
+              CONSULTATION_LABEL_PLURAL: terms.CONSULTATION_LABEL_PLURAL,
+              CONSULTATION_TYPE_LABELS: terms.CONSULTATION_TYPE_LABELS,
+            }}
+            showConfirm={showConfirm}
           />
         )}
 
       </Container>
-
-      {/* 상담 상세 모달 */}
-      {selectedConsultationId && (() => {
-        const selectedConsultation = allConsultations.find(c => c.id === selectedConsultationId);
-        if (!selectedConsultation) return null;
-
-        const student = students.find(s => s.id === selectedConsultation.student_id);
-        const consultationTypeLabels = {
-          counseling: '상담일지',
-          learning: '학습일지',
-          behavior: '행동일지',
-          other: '기타',
-        };
-
-        const handleDelete = async () => {
-          const confirmed = await showConfirm(
-            `${terms.CONSULTATION_LABEL_PLURAL}을(를) 삭제하시겠습니까?`,
-            `${terms.CONSULTATION_LABEL_PLURAL} 삭제`
-          );
-          if (confirmed && selectedConsultation.student_id) {
-            try {
-              await deleteConsultation.mutateAsync({
-                consultationId: selectedConsultationId,
-                studentId: selectedConsultation.student_id,
-              });
-              toast(`${terms.CONSULTATION_LABEL_PLURAL}이(가) 성공적으로 삭제되었습니다.`, 'success', `${terms.CONSULTATION_LABEL_PLURAL} 삭제 완료`);
-              setSelectedConsultationId(null);
-            } catch (error) {
-              toast(error instanceof Error ? error.message : '삭제 중 오류가 발생했습니다.', 'error', `${terms.CONSULTATION_LABEL_PLURAL} 삭제 실패`);
-            }
-          }
-        };
-
-        const handleEdit = () => {
-          setIsEditingInModal(true);
-        };
-
-        const handleSaveEdit = async () => {
-          if (!selectedConsultation.student_id) return;
-
-          try {
-            await updateConsultation.mutateAsync({
-              consultationId: selectedConsultationId,
-              studentId: selectedConsultation.student_id,
-              consultation: editFormData,
-            });
-            toast(`${terms.CONSULTATION_LABEL_PLURAL}이(가) 성공적으로 수정되었습니다.`, 'success', `${terms.CONSULTATION_LABEL_PLURAL} 수정 완료`);
-            setIsEditingInModal(false);
-          } catch (error) {
-            toast(error instanceof Error ? error.message : '수정 중 오류가 발생했습니다.', 'error', `${terms.CONSULTATION_LABEL_PLURAL} 수정 실패`);
-          }
-        };
-
-        const handleCancelEdit = () => {
-          setIsEditingInModal(false);
-          setEditFormData({
-            consultation_type: selectedConsultation.consultation_type,
-            consultation_date: selectedConsultation.consultation_date,
-            content: selectedConsultation.content || '',
-          });
-        };
-
-        const handleGenerateAISummary = async () => {
-          if (!selectedConsultation.student_id) return;
-
-          try {
-            await generateAISummary.mutateAsync({
-              consultationId: selectedConsultationId,
-              studentId: selectedConsultation.student_id,
-            });
-            toast('AI 요약이 성공적으로 생성되었습니다.', 'success', 'AI 요약 생성 완료');
-          } catch (error) {
-            toast(error instanceof Error ? error.message : 'AI 요약 생성 중 오류가 발생했습니다.', 'error', 'AI 요약 생성 실패');
-          }
-        };
-
-        const inlineFields: InlineFormField[] = [
-          {
-            label: terms.PERSON_LABEL_PRIMARY,
-            value: student?.name || '알 수 없음',
-          },
-          {
-            label: '상담 구분',
-            value: isEditingInModal ? (
-              <Select
-                value={editFormData.consultation_type}
-                onChange={(value) => setEditFormData({ ...editFormData, consultation_type: String(value) as ConsultationType })}
-                fullWidth
-              >
-                <option value="counseling">상담일지</option>
-                <option value="learning">학습일지</option>
-                <option value="behavior">행동일지</option>
-                <option value="other">기타</option>
-              </Select>
-            ) : (
-              consultationTypeLabels[selectedConsultation.consultation_type as keyof typeof consultationTypeLabels] || selectedConsultation.consultation_type
-            ),
-          },
-          {
-            label: '상담일',
-            value: isEditingInModal ? (
-              <DatePicker
-                value={editFormData.consultation_date}
-                onChange={(value) => setEditFormData({ ...editFormData, consultation_date: value })}
-                fullWidth
-              />
-            ) : (
-              selectedConsultation.consultation_date
-            ),
-          },
-          {
-            label: '상담 내용',
-            value: isEditingInModal ? (
-              <Textarea
-                value={editFormData.content}
-                onChange={(e) => setEditFormData({ ...editFormData, content: e.target.value })}
-                placeholder="상담 내용을 입력하세요"
-                fullWidth
-                style={{ resize: 'none', minHeight: '100px', height: 'auto', overflow: 'hidden' }}
-              />
-            ) : (
-              selectedConsultation.content || '내용 없음'
-            ),
-            colSpan: 2,
-            whiteSpace: 'pre-wrap',
-          },
-        ];
-
-        // AI 요약 필드는 읽기 모드에서만 추가
-        if (!isEditingInModal && selectedConsultation.ai_summary) {
-          inlineFields.push({
-            label: 'AI 요약',
-            value: selectedConsultation.ai_summary,
-            colSpan: 2,
-            whiteSpace: 'pre-wrap',
-          });
-        }
-
-        return (
-          <Modal
-            isOpen={true}
-            onClose={() => setSelectedConsultationId(null)}
-            title={isEditingInModal ? `${terms.CONSULTATION_LABEL_PLURAL} 수정` : `${terms.CONSULTATION_LABEL_PLURAL} 상세`}
-            size="xl"
-            bodyLayout="form-inline"
-            inlineFields={inlineFields}
-            footer={
-              isEditingInModal ? (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={handleCancelEdit}
-                    style={{ flex: 1 }}
-                  >
-                    취소
-                  </Button>
-                  <Button
-                    variant="solid"
-                    onClick={handleSaveEdit}
-                    disabled={updateConsultation.isPending}
-                    style={{ flex: 1 }}
-                  >
-                    저장
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    variant="destructive"
-                    onClick={handleDelete}
-                    disabled={deleteConsultation.isPending}
-                    style={{ flex: 1 }}
-                  >
-                    삭제
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleEdit}
-                    style={{ flex: 1 }}
-                  >
-                    수정
-                  </Button>
-                  <Button
-                    variant="solid"
-                    onClick={handleGenerateAISummary}
-                    disabled={generateAISummary.isPending}
-                    style={{ flex: 1 }}
-                  >
-                    {selectedConsultation.ai_summary ? 'AI 재요약' : 'AI 요약'}
-                  </Button>
-                </>
-              )
-            }
-          />
-        );
-      })()}
 
       {/* [업종중립] PERSON 등록 폼 - 모달로 표시 (모든 탭에서 접근 가능하도록 Container 밖에 배치) */}
       {showCreateForm && (() => {

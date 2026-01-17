@@ -18,8 +18,9 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { ErrorBoundary, Container, Card, Button, Badge, Select, useModal, BottomActionBar, PageHeader, useResponsiveMode, isMobile, isTablet, NotificationCardLayout, DataTable, SubSidebar, EmptyState } from '@ui-core/react';
 import { CardGridLayout } from '../components/CardGridLayout';
 import { Users, UserCheck, Clock, UserX, CalendarCheck, History, BarChart3, Settings, CheckCircle, Smartphone, TrendingUp, Bell } from 'lucide-react';
-import { ATTENDANCE_SUB_MENU_ITEMS, DEFAULT_ATTENDANCE_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import { ATTENDANCE_SUB_MENU_ITEMS, DEFAULT_ATTENDANCE_SUB_MENU, ATTENDANCE_MENU_LABEL_MAPPING, getSubMenuFromUrl, setSubMenuToUrl, applyDynamicLabels } from '../constants';
 import type { AttendanceSubMenuId } from '../constants';
+import { templates, p } from '../utils';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAttendanceLogs, useUpsertAttendanceLog } from '@hooks/use-attendance';
 import { useStudents } from '@hooks/use-student';
@@ -132,7 +133,7 @@ export function AttendancePage() {
     navigate(newUrl);
   }, [navigate]);
 
-  // 서브 메뉴 아이템에 아이콘 추가
+  // [업종중립] 동적 라벨 + 아이콘이 적용된 서브 메뉴 아이템
   const subMenuItemsWithIcons = useMemo(() => {
     const iconMap: Record<AttendanceSubMenuId, React.ReactNode> = {
       today: <CalendarCheck size={16} />,
@@ -141,11 +142,15 @@ export function AttendancePage() {
       settings: <Settings size={16} />,
     };
 
-    return ATTENDANCE_SUB_MENU_ITEMS.map(item => ({
+    // 먼저 동적 라벨 적용
+    const itemsWithDynamicLabels = applyDynamicLabels(ATTENDANCE_SUB_MENU_ITEMS, ATTENDANCE_MENU_LABEL_MAPPING, terms);
+
+    // 그 다음 아이콘 추가
+    return itemsWithDynamicLabels.map(item => ({
       ...item,
       icon: iconMap[item.id],
     }));
-  }, []);
+  }, [terms]);
 
 
   const handleClassIdChange = useCallback((classId: string | null) => {
@@ -807,7 +812,7 @@ export function AttendancePage() {
         {/* 서브 사이드바 (모바일에서는 숨김) */}
         {!isMobileMode && (
           <SubSidebar
-            title="출결관리"
+            title={templates.management(terms.ATTENDANCE_LABEL)}
             items={subMenuItemsWithIcons}
             selectedId={selectedSubMenu}
             onSelect={handleSubMenuChange}
@@ -818,7 +823,7 @@ export function AttendancePage() {
         {/* 메인 콘텐츠 */}
         <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           <PageHeader
-            title={subMenuItemsWithIcons.find(item => item.id === selectedSubMenu)?.label || '출결관리'}
+            title={subMenuItemsWithIcons.find(item => item.id === selectedSubMenu)?.label || templates.management(terms.ATTENDANCE_LABEL)}
           />
 
         {/* 오늘 출결 탭 */}
@@ -961,7 +966,7 @@ export function AttendancePage() {
                   <DataTable
                     data={filteredStudents}
                     keyExtractor={(student) => student.id}
-                    emptyMessage={`오늘 수업 ${terms.PERSON_LABEL_PRIMARY}이(가) 없습니다.`}
+                    emptyMessage={`오늘 수업 ${terms.PERSON_LABEL_PRIMARY}${p.이가(terms.PERSON_LABEL_PRIMARY)} 없습니다.`}
                     emptyIcon={Users}
                     loading={isLoading}
                     filters={[

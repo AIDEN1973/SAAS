@@ -54,7 +54,7 @@ import { createQueryKey } from '@hooks/use-query-key-utils';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES, EMPTY_CARD_MESSAGES, EMPTY_CARD_ID_PREFIX, DEFAULT_CLASS_START_TIME } from '../constants';
-import { renderCard, createEmptyTaskCard, getPolicyValue, getPolicyValueWithPath, normalizeAIBriefingCard, normalizeDashboardCards, normalizeEmergencyCard, normalizeClassCard, normalizeStatsCard, normalizeBillingSummaryCard, safe, POLICY_REGISTRY, createSafeNavigate, logError } from '../utils';
+import { renderCard, createEmptyTaskCard, getPolicyValue, getPolicyValueWithPath, normalizeAIBriefingCard, normalizeDashboardCards, normalizeEmergencyCard, normalizeClassCard, normalizeStatsCard, normalizeBillingSummaryCard, safe, POLICY_REGISTRY, createSafeNavigate, logError, p } from '../utils';
 
 /**
  * 캐시 및 갱신 시간 상수
@@ -437,7 +437,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
             id: 'emergency-risk-students',
             type: 'emergency',
             title: `${terms.EMERGENCY_RISK_LABEL} ${terms.PERSON_LABEL_PLURAL}`,
-            message: `${studentAlerts.risk_count}명의 ${terms.PERSON_LABEL_PRIMARY}이(가) ${terms.EMERGENCY_RISK_LABEL}입니다.`,
+            message: `${studentAlerts.risk_count}명의 ${terms.PERSON_LABEL_PRIMARY}${p.이가(terms.PERSON_LABEL_PRIMARY)} ${terms.EMERGENCY_RISK_LABEL}입니다.`,
             priority: 4,
             action_url: terms.ROUTES.PRIMARY_RISK,
           }));
@@ -448,7 +448,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
             id: 'emergency-absent-students',
             type: 'emergency',
             title: `${terms.ABSENCE_LABEL} ${terms.PERSON_LABEL_PLURAL} 알림`,
-            message: `${studentAlerts.absent_count}명의 ${terms.PERSON_LABEL_PRIMARY}이(가) ${terms.EMERGENCY_ABSENT_LABEL}입니다.`,
+            message: `${studentAlerts.absent_count}명의 ${terms.PERSON_LABEL_PRIMARY}${p.이가(terms.PERSON_LABEL_PRIMARY)} ${terms.EMERGENCY_ABSENT_LABEL}입니다.`,
             priority: 5,
             action_url: terms.ROUTES.PRIMARY_ABSENT,
           }));
@@ -459,7 +459,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
             id: 'emergency-consultation-pending',
             type: 'emergency',
             title: `${terms.CONSULTATION_LABEL} 대기 ${terms.PERSON_LABEL_PLURAL}`,
-            message: `${studentAlerts.consultation_pending_count}명의 ${terms.PERSON_LABEL_PRIMARY}이(가) ${terms.EMERGENCY_CONSULTATION_PENDING_LABEL}입니다.`,
+            message: `${studentAlerts.consultation_pending_count}명의 ${terms.PERSON_LABEL_PRIMARY}${p.이가(terms.PERSON_LABEL_PRIMARY)} ${terms.EMERGENCY_CONSULTATION_PENDING_LABEL}입니다.`,
             priority: 6,
             action_url: terms.ROUTES.PRIMARY_CONSULTATION,
           }));
@@ -533,7 +533,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
         id: 'ai-risk-emergency',
         type: 'emergency',
         title: 'AI 위험 감지',
-        message: `높은 위험 점수를 가진 ${terms.PERSON_LABEL_PRIMARY}이(가) 감지되었습니다.`,
+        message: `높은 위험 점수를 가진 ${terms.PERSON_LABEL_PRIMARY}${p.이가(terms.PERSON_LABEL_PRIMARY)} 감지되었습니다.`,
         priority: 3,
         action_url: highRiskCard.action_url, // 정본: 서버에서 제공된 action_url 사용
       });
@@ -628,7 +628,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
             id: 'briefing-consultations',
             type: 'ai_briefing',
             title: `오늘의 ${terms.CONSULTATION_LABEL} 일정`,
-            summary: `오늘 ${safeTodayConsultations.length}건의 ${terms.CONSULTATION_LABEL}이(가) 예정되어 있습니다.`,
+            summary: `오늘 ${safeTodayConsultations.length}건의 ${terms.CONSULTATION_LABEL}${p.이가(terms.CONSULTATION_LABEL)} 예정되어 있습니다.`,
             insights: [
               `${terms.CONSULTATION_LABEL}일지를 작성하여 ${terms.PERSON_LABEL_PRIMARY} 관리를 강화하세요.`,
               `${terms.CONSULTATION_LABEL} 내용을 바탕으로 ${terms.PERSON_LABEL_PRIMARY}의 진행 방향을 조정할 수 있습니다.`,
@@ -672,10 +672,10 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
                 id: 'briefing-billing',
                 type: 'ai_briefing',
                 title: `이번 달 ${terms.BILLING_LABEL} 현황`,
-                summary: `이번 달 ${terms.INVOICE_LABEL}이(가) 자동 발송되었습니다. 예상 ${terms.COLLECTION_RATE_LABEL}은(는) ${expectedCollectionRate}%입니다.`,
+                summary: `이번 달 ${terms.INVOICE_LABEL}${p.이가(terms.INVOICE_LABEL)} 자동 발송되었습니다. 예상 ${terms.COLLECTION_RATE_LABEL}${p.은는(terms.COLLECTION_RATE_LABEL)} ${expectedCollectionRate}%입니다.`,
                 insights: [
                   expectedCollectionRate >= collectionRateThreshold
-                    ? `${terms.COLLECTION_RATE_LABEL}이(가) 양호합니다. 현재 운영 방식을 유지하세요.`
+                    ? `${terms.COLLECTION_RATE_LABEL}${p.이가(terms.COLLECTION_RATE_LABEL)} 양호합니다. 현재 운영 방식을 유지하세요.`
                     : `${terms.COLLECTION_RATE_LABEL} 개선이 필요합니다. 미납 ${terms.PERSON_LABEL_PRIMARY}에게 연락을 취하세요.`,
                 ],
                 created_at: baseKST.toISOString(),
@@ -717,7 +717,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
                 summary: `최근 7일간 ${terms.ABSENCE_LABEL} ${absentCount}건, ${terms.LATE_LABEL} ${lateCount}건이 발생했습니다.`,
                 insights: [
                   `${terms.ATTENDANCE_LABEL} 패턴을 분석하여 원인을 파악하세요.`,
-                  `${terms.LATE_LABEL}이(가) 많은 ${terms.PERSON_LABEL_PLURAL}에게 사전 안내를 제공하세요.`,
+                  `${terms.LATE_LABEL}${p.이가(terms.LATE_LABEL)} 많은 ${terms.PERSON_LABEL_PLURAL}에게 사전 안내를 제공하세요.`,
                 ],
                 created_at: baseKST.toISOString(),
                 action_url: ROUTES.AI_ATTENDANCE, // 아키텍처 문서 3818줄: 각 카드 클릭 시 상세 분석 화면으로 자동 이동
@@ -1000,9 +1000,9 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
           id: 'briefing-risk',
           type: 'ai_briefing',
           title: `${terms.EMERGENCY_RISK_LABEL} ${terms.PERSON_LABEL_PLURAL} 알림`,
-          summary: `${riskCount}명의 ${terms.PERSON_LABEL_PRIMARY}이(가) ${terms.EMERGENCY_RISK_LABEL}입니다.`,
+          summary: `${riskCount}명의 ${terms.PERSON_LABEL_PRIMARY}${p.이가(terms.PERSON_LABEL_PRIMARY)} ${terms.EMERGENCY_RISK_LABEL}입니다.`,
           insights: [
-            `${terms.EMERGENCY_RISK_LABEL} ${terms.PERSON_LABEL_PLURAL}에게 즉시 ${terms.CONSULTATION_LABEL}을(를) 진행하세요.`,
+            `${terms.EMERGENCY_RISK_LABEL} ${terms.PERSON_LABEL_PLURAL}에게 즉시 ${terms.CONSULTATION_LABEL}${p.을를(terms.CONSULTATION_LABEL)} 진행하세요.`,
             `${terms.PERSON_LABEL_PRIMARY}의 진행 동기를 높이기 위한 방안을 모색하세요.`,
           ],
           created_at: riskCardCreatedAt, // [P0-2 수정] 원천 데이터 기준으로 고정

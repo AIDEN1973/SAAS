@@ -12,7 +12,8 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet, DataTable, NotificationCardLayout, SubSidebar } from '@ui-core/react';
 // [SSOT] Barrel export를 통한 통합 import
-import { CLASSES_SUB_MENU_ITEMS, DEFAULT_CLASSES_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import { CLASSES_SUB_MENU_ITEMS, DEFAULT_CLASSES_SUB_MENU, CLASSES_MENU_LABEL_MAPPING, getSubMenuFromUrl, setSubMenuToUrl, applyDynamicLabels } from '../constants';
+import { templates, p } from '../utils';
 import type { ClassesSubMenuId } from '../constants';
 import { BookOpen, Users, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { SchemaForm } from '@schema-engine';
@@ -134,6 +135,11 @@ export function ClassesPage() {
     const newUrl = setSubMenuToUrl(id, DEFAULT_CLASSES_SUB_MENU);
     navigate(newUrl);
   }, [navigate]);
+
+  // [업종중립] 동적 라벨이 적용된 서브 메뉴 아이템
+  const subMenuItemsWithDynamicLabels = useMemo(() => {
+    return applyDynamicLabels(CLASSES_SUB_MENU_ITEMS, CLASSES_MENU_LABEL_MAPPING, terms);
+  }, [terms]);
 
   // localStorage 기반 상태 초기화 (SSR Safe, AutomationSettingsPage 패턴 적용)
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>(() => {
@@ -378,8 +384,8 @@ export function ClassesPage() {
         {/* 서브 사이드바 (모바일에서는 숨김) */}
         {!isMobileMode && (
           <SubSidebar
-            title={`${terms.GROUP_LABEL}관리`}
-            items={CLASSES_SUB_MENU_ITEMS}
+            title={templates.management(terms.GROUP_LABEL)}
+            items={subMenuItemsWithDynamicLabels}
             selectedId={selectedSubMenu}
             onSelect={handleSubMenuChange}
             testId="classes-sub-sidebar"
@@ -389,7 +395,7 @@ export function ClassesPage() {
         {/* 메인 콘텐츠 */}
         <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           <PageHeader
-            title={CLASSES_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu)?.label || `${terms.GROUP_LABEL}관리`}
+            title={subMenuItemsWithDynamicLabels.find(item => item.id === selectedSubMenu)?.label || templates.management(terms.GROUP_LABEL)}
             actions={
               <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
                 <Button
@@ -623,7 +629,7 @@ export function ClassesPage() {
                         variant="outline"
                         onClick={async () => {
                           const confirmed = await showConfirm(
-                            `정말 이 ${terms.GROUP_LABEL}을(를) 삭제하시겠습니까?`,
+                            `정말 이 ${terms.GROUP_LABEL}${p.을를(terms.GROUP_LABEL)} 삭제하시겠습니까?`,
                             `${terms.GROUP_LABEL} 삭제`
                           );
                           if (confirmed) {
@@ -862,13 +868,13 @@ function EditClassModal({
           position={isMobileMode ? 'bottom' : 'right'}
           width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
         >
-          <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>{terms.GROUP_LABEL}을(를) 찾을 수 없습니다.</div>
+          <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>{`${terms.GROUP_LABEL}${p.을를(terms.GROUP_LABEL)} 찾을 수 없습니다.`}</div>
         </Drawer>
       );
     }
     return (
       <Modal isOpen={true} onClose={onClose} title={`${terms.GROUP_LABEL} 수정`} size="lg">
-        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>{terms.GROUP_LABEL}을(를) 찾을 수 없습니다.</div>
+        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>{`${terms.GROUP_LABEL}${p.을를(terms.GROUP_LABEL)} 찾을 수 없습니다.`}</div>
       </Modal>
     );
   }

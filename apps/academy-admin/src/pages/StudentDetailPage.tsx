@@ -12,12 +12,14 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ErrorBoundary, Container, Card, PageHeader } from '@ui-core/react';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES } from '../constants';
-import { createSafeNavigate } from '../utils';
+import { createSafeNavigate, templates } from '../utils';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 
 export function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const terms = useIndustryTerms();
   // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
   const safeNavigate = useMemo(
     () => createSafeNavigate(navigate),
@@ -45,10 +47,10 @@ export function StudentDetailPage() {
   return (
     <ErrorBoundary>
       <Container maxWidth="xl" padding="lg">
-        <PageHeader title="학생 상세" />
+        <PageHeader title={templates.detail(terms.PERSON_LABEL_PRIMARY)} />
         <Card padding="lg">
           <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
-            학생 상세 화면으로 이동 중...
+            {terms.PERSON_LABEL_PRIMARY} 상세 화면으로 이동 중...
           </div>
         </Card>
       </Container>

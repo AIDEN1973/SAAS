@@ -21,6 +21,7 @@ import { useClasses } from '@hooks/use-class';
 import { useAttendanceLogs } from '@hooks/use-attendance';
 import { fetchBillingHistory } from '@hooks/use-billing';
 import { fetchPayments } from '@hooks/use-payments';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 import type { DayOfWeek } from '@services/class-service';
 import { toKST } from '@lib/date-utils';
 import type { BillingHistoryItem } from '@hooks/use-billing';
@@ -34,6 +35,7 @@ export function AllCardsPage() {
   const navigate = useNavigate();
   const context = getApiContext();
   const tenantId = context.tenantId;
+  const terms = useIndustryTerms();
 
   // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
   const safeNavigate = useMemo(
@@ -93,7 +95,7 @@ export function AllCardsPage() {
               type: 'ai_briefing',
               title: '오늘의 상담 일정',
               summary: `오늘 ${todayConsultations.length}건의 상담이 예정되어 있습니다.`,
-              insights: ['상담일지를 작성하여 학생 관리를 강화하세요.'],
+              insights: [`${terms.CONSULTATION_LABEL_PLURAL}를 작성하여 ${terms.PERSON_LABEL_PRIMARY} 관리를 강화하세요.`],
               created_at: toKST().toISOString(),
               action_url: ROUTES.AI_CONSULTATION,
             }));
@@ -188,7 +190,7 @@ export function AllCardsPage() {
         cards.push(normalizeStatsCard({
           id: 'stats-students',
           type: 'stats',
-          title: '전체 학생 수',
+          title: `전체 ${terms.PERSON_LABEL_PRIMARY} 수`,
           value: students.length.toString(),
           action_url: ROUTES.STUDENTS_LIST,
         }));

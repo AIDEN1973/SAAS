@@ -18,7 +18,10 @@ import type { StatsItem, ChartDataItem, PeriodFilter } from './stats';
 import { SchemaTable, type TableSchema, type FilterSchema, type ActionContext } from '@schema-engine';
 
 export interface StatsTableLayoutProps {
-  /** 엔티티 이름 (예: '학생목록', '상담목록', '태그') */
+  /** 페이지 타이틀 (서브사이드바 메뉴명, 예: '상담관리', '학생관리') */
+  title?: string;
+
+  /** 엔티티 이름 (테이블 섹션 이름, 예: '학생목록', '상담목록', '태그') */
   entityName: string;
 
   /** 통계 카드 데이터 */
@@ -45,20 +48,20 @@ export interface StatsTableLayoutProps {
   /** 차트 툴팁 레이블 (기본값: '총 학생수') */
   chartTooltipLabel?: string;
 
-  /** 테이블 스키마 */
-  tableSchema: TableSchema;
+  /** 테이블 스키마 (tableContent가 없을 때 필수) */
+  tableSchema?: TableSchema;
 
-  /** 테이블 데이터 */
-  tableData: Record<string, unknown>[];
+  /** 테이블 데이터 (tableContent가 없을 때 필수) */
+  tableData?: Record<string, unknown>[];
 
-  /** 테이블 총 개수 */
-  totalCount: number;
+  /** 테이블 총 개수 (tableContent가 없을 때 필수) */
+  totalCount?: number;
 
-  /** 테이블 페이지 */
-  page: number;
+  /** 테이블 페이지 (tableContent가 없을 때 필수) */
+  page?: number;
 
-  /** 테이블 페이지 변경 핸들러 */
-  onPageChange: (page: number) => void;
+  /** 테이블 페이지 변경 핸들러 (tableContent가 없을 때 필수) */
+  onPageChange?: (page: number) => void;
 
   /** 테이블 필터 */
   filters?: Record<string, unknown>;
@@ -95,6 +98,12 @@ export interface StatsTableLayoutProps {
 
   /** 타이틀 표시 여부 (기본값: true) - false면 타이틀과 토글 버튼 숨김 */
   showTitle?: boolean;
+
+  /** 통계 대시보드 숨김 여부 (기본값: false) - true면 통계 카드와 차트 영역 숨김, 테이블만 표시 */
+  hideStats?: boolean;
+
+  /** 테이블 대신 표시할 커스텀 컨텐츠 (예: 준비 중 메시지) */
+  tableContent?: React.ReactNode;
 }
 
 /**
@@ -104,6 +113,7 @@ export interface StatsTableLayoutProps {
  * 섹션 순서 변경 기능 포함
  */
 export function StatsTableLayout({
+  title,
   entityName,
   statsItems,
   chartData,
@@ -130,6 +140,8 @@ export function StatsTableLayout({
   sectionOrderKey,
   beforeTable,
   showTitle = true,
+  hideStats = false,
+  tableContent,
 }: StatsTableLayoutProps) {
   // 섹션 순서 상태 (localStorage에 저장)
   const [sectionOrder, setSectionOrder] = useState<'stats-first' | 'table-first'>(() => {
@@ -189,46 +201,49 @@ export function StatsTableLayout({
           marginBottom: 'var(--spacing-xl)',
         }}>
           <PageHeader
-            title={entityName}
+            title={title || entityName}
             style={{ marginBottom: 0 }}
           />
-          <Tooltip
-            content={
-              sectionOrder === 'stats-first'
-                ? `${entityName}${getParticle(entityName)} 위로`
-                : `${entityName}${getParticle(entityName)} 아래로`
-            }
-            position="top"
-          >
-            <button
-              type="button"
-              onClick={handleToggleSectionOrder}
-              aria-label={sectionOrder === 'stats-first' ? '테이블을 위로 이동' : '통계를 위로 이동'}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 'var(--spacing-xs)',
-                border: 'none',
-                background: 'transparent',
-                cursor: 'pointer',
-                color: 'var(--color-text-secondary)',
-                borderRadius: 'var(--border-radius-sm)',
-                transition: 'color var(--transition-fast), background-color var(--transition-fast)',
-                flexShrink: 0,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = 'var(--color-text)';
-                e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = 'var(--color-text-secondary)';
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
+          {/* hideStats가 false이고 statsItems가 있을 때만 토글 버튼 표시 */}
+          {!hideStats && statsItems.length > 0 && (
+            <Tooltip
+              content={
+                sectionOrder === 'stats-first'
+                  ? `${entityName}${getParticle(entityName)} 위로`
+                  : `${entityName}${getParticle(entityName)} 아래로`
+              }
+              position="top"
             >
-              <ArrowUpDown size={iconSize} strokeWidth={iconStrokeWidth} />
-            </button>
-          </Tooltip>
+              <button
+                type="button"
+                onClick={handleToggleSectionOrder}
+                aria-label={sectionOrder === 'stats-first' ? '테이블을 위로 이동' : '통계를 위로 이동'}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 'var(--spacing-xs)',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: 'var(--color-text-secondary)',
+                  borderRadius: 'var(--border-radius-sm)',
+                  transition: 'color var(--transition-fast), background-color var(--transition-fast)',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--color-text)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-primary-40)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--color-text-secondary)';
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <ArrowUpDown size={iconSize} strokeWidth={iconStrokeWidth} />
+              </button>
+            </Tooltip>
+          )}
         </div>
       )}
 
@@ -239,8 +254,8 @@ export function StatsTableLayout({
         opacity: isAnimating ? 0 : 1,
         transition: 'opacity 0.2s ease-in-out',
       }}>
-        {/* 통계 대시보드 - 순서에 따라 위치 변경 */}
-        {sectionOrder === 'stats-first' && statsItems.length > 0 && (
+        {/* 통계 대시보드 - 순서에 따라 위치 변경 (hideStats가 false일 때만 표시) */}
+        {!hideStats && sectionOrder === 'stats-first' && statsItems.length > 0 && (
           <div style={{ marginBottom: 'calc(var(--spacing-xl) * 2)' }}>
             <StatsDashboard
               statsItems={statsItems}
@@ -255,29 +270,34 @@ export function StatsTableLayout({
           </div>
         )}
 
-        {/* 테이블 섹션 */}
+        {/* 테이블 섹션 또는 커스텀 컨텐츠 */}
         <div>
           {/* 테이블 앞에 표시할 컨텐츠 (예: 태그 필터) */}
           {beforeTable}
 
-          <SchemaTable
-            schema={tableSchema}
-            data={tableData}
-            totalCount={totalCount}
-            page={page}
-            onPageChange={onPageChange}
-            filters={filters}
-            actionContext={actionContext}
-            onRowClick={onRowClick}
-            filterSchema={filterSchema}
-            onFilterChange={onFilterChange}
-            filterDefaultValues={filterDefaultValues}
-            customActions={customActions}
-          />
+          {/* tableContent가 있으면 커스텀 컨텐츠, 없으면 SchemaTable 표시 */}
+          {tableContent ? (
+            tableContent
+          ) : tableSchema ? (
+            <SchemaTable
+              schema={tableSchema}
+              data={tableData ?? []}
+              totalCount={totalCount ?? 0}
+              page={page ?? 1}
+              onPageChange={onPageChange ?? (() => {})}
+              filters={filters}
+              actionContext={actionContext}
+              onRowClick={onRowClick}
+              filterSchema={filterSchema}
+              onFilterChange={onFilterChange}
+              filterDefaultValues={filterDefaultValues}
+              customActions={customActions}
+            />
+          ) : null}
         </div>
 
-        {/* table-first일 때 통계 대시보드를 아래에 표시 */}
-        {sectionOrder === 'table-first' && statsItems.length > 0 && (
+        {/* table-first일 때 통계 대시보드를 아래에 표시 (hideStats가 false일 때만) */}
+        {!hideStats && sectionOrder === 'table-first' && statsItems.length > 0 && (
           <div style={{ marginTop: 'calc(var(--spacing-xl) * 2)' }}>
             <StatsDashboard
               statsItems={statsItems}

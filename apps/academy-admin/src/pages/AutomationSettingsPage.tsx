@@ -383,6 +383,8 @@ function AutomationSettingsCard({ eventType, onCancel }: AutomationSettingsCardP
       // [최적화] 상위 쿼리 무효화 시 하위 쿼리도 자동으로 무효화됨 (queryKey prefix matching)
       // ['config', tenantId] 무효화 → ['config', tenantId, 'path', *] 모두 자동 무효화
       void queryClient.invalidateQueries({ queryKey: ['config', tenantId] });
+      // [캐시 동기화] 자동화 통계도 무효화 (설정 변경이 통계에 영향)
+      void queryClient.invalidateQueries({ queryKey: ['automation-stats', tenantId] });
       showAlert('자동화 설정이 저장되었습니다.', '성공');
       onCancel();
     },
@@ -778,6 +780,8 @@ export function AutomationSettingsPage() {
     },
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['config', tenantId] });
+      // [캐시 동기화] 자동화 통계도 무효화 (설정 변경이 통계에 영향)
+      void queryClient.invalidateQueries({ queryKey: ['automation-stats', tenantId] });
       const action = variables.enabled ? '활성화' : '비활성화';
       showAlert(`${variables.eventTypes.length}개 자동화가 ${action}되었습니다.`, '성공');
     },

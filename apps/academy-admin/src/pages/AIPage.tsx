@@ -33,7 +33,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Badge, PageHeader, isMobile, Modal, Drawer, EmptyState, SubSidebar } from '@ui-core/react';
 import { MapPin, Sparkles, FileText } from 'lucide-react';
 import { apiClient, getApiContext } from '@api-sdk/core';
@@ -48,7 +48,7 @@ import { AIAnalysisLoadingUI } from './students/components/AIAnalysisLoadingUI';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES, AI_SUB_MENU_ITEMS, DEFAULT_AI_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
 import type { AISubMenuId } from '../constants';
-import { createSafeNavigate } from '../utils';
+import { createSafeNavigate, p } from '../utils';
 
 // 성과 분석 인사이트 생성 단계 정의 (컴포넌트 외부에 정의하여 불필요한 재생성 방지)
 const PERFORMANCE_INSIGHTS_STEPS = [
@@ -59,6 +59,7 @@ const PERFORMANCE_INSIGHTS_STEPS = [
 
 export function AIPage() {
   const { showAlert } = useModal();
+  const queryClient = useQueryClient();
   const context = getApiContext();
   const tenantId = context.tenantId;
   const mode = useResponsiveMode();
@@ -491,6 +492,8 @@ export function AIPage() {
       };
     },
     onSuccess: (data) => {
+      // [캐시 동기화] AI 인사이트 생성 후 관련 캐시 무효화
+      void queryClient.invalidateQueries({ queryKey: ['ai-insights', tenantId] });
       if (data.generated_count > 0) {
         showAlert(`${data.generated_count}개의 AI 성과 분석 인사이트가 생성되었습니다.`, '성공');
       } else {
@@ -603,7 +606,7 @@ export function AIPage() {
                     safeNavigate(ROUTES.AI_CONSULTATION);
                   }}
                 >
-                  상담일지 요약
+                  {terms.CONSULTATION_LABEL_PLURAL} 요약
                 </Button>
                 <Button
                   variant="outline"
@@ -1396,7 +1399,7 @@ function ConsultationSummaryTab() {
 
   return (
     <Card padding="lg">
-      <h2 style={{ marginBottom: 'var(--spacing-md)' }}>상담일지 자동 요약</h2>
+      <h2 style={{ marginBottom: 'var(--spacing-md)' }}>{terms.CONSULTATION_LABEL_PLURAL} 자동 요약</h2>
 
       {/* 관리 대상 선택 */}
       {students && (
@@ -1495,7 +1498,7 @@ function ConsultationSummaryTab() {
           ) : (
             <EmptyState
               icon={FileText}
-              message="상담일지가 없습니다."
+              message={`${terms.CONSULTATION_LABEL_PLURAL}${p.이가(terms.CONSULTATION_LABEL_PLURAL)} 없습니다.`}
             />
           )}
         </div>
@@ -1503,7 +1506,7 @@ function ConsultationSummaryTab() {
 
       {!selectedStudentId && (
         <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-          {terms.PERSON_LABEL_PRIMARY}을 선택하면 상담일지 목록이 표시됩니다.
+          {terms.PERSON_LABEL_PRIMARY}{p.을를(terms.PERSON_LABEL_PRIMARY)} 선택하면 {terms.CONSULTATION_LABEL_PLURAL} 목록이 표시됩니다.
         </div>
       )}
     </Card>

@@ -14,6 +14,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, Card, Badge, Input, useModal } from '@ui-core/react';
 import { apiClient } from '@api-sdk/core';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 
 interface IntentPattern {
   id: number;
@@ -33,6 +34,7 @@ export const IntentPatternsPage: React.FC = () => {
   const [patterns, setPatterns] = useState<IntentPattern[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'low_quality' | 'unused'>('all');
+  const terms = useIndustryTerms();
 
   // 패턴 목록 조회
   const loadPatterns = useCallback(async () => {
@@ -159,7 +161,7 @@ export const IntentPatternsPage: React.FC = () => {
             <Input
               value={newPattern.pattern}
               onChange={(e) => setNewPattern({ ...newPattern, pattern: e.target.value })}
-              placeholder="예: 학생 명단 보기"
+              placeholder={`예: ${terms.PERSON_LABEL_PRIMARY} 명단 보기`}
             />
           </div>
           <div>

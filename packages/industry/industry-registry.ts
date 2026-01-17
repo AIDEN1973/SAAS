@@ -104,6 +104,13 @@ export interface IndustryTerms {
   CONSULTATION_LABEL: string;
   /** 상담 복수 라벨 */
   CONSULTATION_LABEL_PLURAL: string;
+  /** 상담 타입 라벨 (상담일지, 학습일지, 행동일지, 기타) */
+  CONSULTATION_TYPE_LABELS: {
+    counseling: string;
+    learning: string;
+    behavior: string;
+    other: string;
+  };
 
   // 통계 카드 제목
   /** "총 {대상} 수" */
@@ -286,6 +293,12 @@ const ACADEMY_TERMS: IndustryTerms = {
   // 상담
   CONSULTATION_LABEL: '상담',
   CONSULTATION_LABEL_PLURAL: '상담 내역',
+  CONSULTATION_TYPE_LABELS: {
+    counseling: '상담일지',
+    learning: '학습일지',
+    behavior: '행동일지',
+    other: '기타',
+  },
 
   // 통계 카드
   STATS_TOTAL_COUNT_TITLE: '총 학생 수',
@@ -429,6 +442,12 @@ const GYM_TERMS: IndustryTerms = {
   // 상담
   CONSULTATION_LABEL: '상담',
   CONSULTATION_LABEL_PLURAL: '상담 내역',
+  CONSULTATION_TYPE_LABELS: {
+    counseling: '상담 내역',
+    learning: '운동 기록',
+    behavior: '특이사항',
+    other: '기타',
+  },
 
   // 통계 카드
   STATS_TOTAL_COUNT_TITLE: '총 회원 수',
@@ -572,6 +591,12 @@ const SALON_TERMS: IndustryTerms = {
   // 상담
   CONSULTATION_LABEL: '상담',
   CONSULTATION_LABEL_PLURAL: '상담 내역',
+  CONSULTATION_TYPE_LABELS: {
+    counseling: '상담 내역',
+    learning: '스타일 기록',
+    behavior: '특이사항',
+    other: '기타',
+  },
 
   // 통계 카드
   STATS_TOTAL_COUNT_TITLE: '총 고객 수',
@@ -716,6 +741,12 @@ const NAIL_SALON_TERMS: IndustryTerms = {
   // 상담
   CONSULTATION_LABEL: '상담',
   CONSULTATION_LABEL_PLURAL: '상담 내역',
+  CONSULTATION_TYPE_LABELS: {
+    counseling: '상담 내역',
+    learning: '네일 기록',
+    behavior: '특이사항',
+    other: '기타',
+  },
 
   // 통계 카드
   STATS_TOTAL_COUNT_TITLE: '총 고객 수',
@@ -860,6 +891,12 @@ const REAL_ESTATE_TERMS: IndustryTerms = {
   // 상담
   CONSULTATION_LABEL: '상담',
   CONSULTATION_LABEL_PLURAL: '상담 내역',
+  CONSULTATION_TYPE_LABELS: {
+    counseling: '상담 기록',
+    learning: '매물 안내',
+    behavior: '특이사항',
+    other: '기타',
+  },
 
   // 통계 카드
   STATS_TOTAL_COUNT_TITLE: '총 고객 수',

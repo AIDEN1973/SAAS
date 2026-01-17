@@ -102,7 +102,11 @@ export function BillingPage() {
       return response.data!;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['invoices', tenantId] });
+      // [캐시 동기화] useBillingHistory의 queryKey와 일치시킴
+      void queryClient.invalidateQueries({ queryKey: ['billing-history', tenantId] });
+      // 상품/결제 내역도 무효화
+      void queryClient.invalidateQueries({ queryKey: ['products', tenantId] });
+      void queryClient.invalidateQueries({ queryKey: ['payment-history', tenantId] });
       setShowCreateForm(false);
       showAlert(`${terms.INVOICE_LABEL}가 생성되었습니다.`, terms.MESSAGES.SUCCESS);
     },
@@ -211,7 +215,10 @@ export function BillingPage() {
       };
     },
     onSuccess: (data: { total_amount?: number }) => {
+      // [캐시 동기화] 정산 후 모든 관련 캐시 무효화
       void queryClient.invalidateQueries({ queryKey: ['revenue-stats', tenantId] });
+      void queryClient.invalidateQueries({ queryKey: ['billing-history', tenantId] });
+      void queryClient.invalidateQueries({ queryKey: ['payment-history', tenantId] });
       setShowSettlementForm(false);
       showAlert(`정산이 완료되었습니다. (정산 금액: ${new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(data.total_amount || 0)})`, terms.MESSAGES.SUCCESS);
     },

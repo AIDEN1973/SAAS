@@ -16,6 +16,7 @@ import { LayerSectionHeader } from '../components/LayerSectionHeader';
 import { PlusIcon } from '../../../components/DataTableActionButtons';
 import type { Guardian } from '@services/student-service';
 import type { FormSchema } from '@schema-engine/types';
+import { p } from '../../../utils';
 
 // 학부모 탭 컴포넌트
 export interface GuardiansTabProps {
@@ -86,7 +87,7 @@ export function GuardiansTab({
       }
       onHideForm();
     } catch (error) {
-      toast(error instanceof Error ? error.message : '학부모 정보 저장에 실패했습니다.', 'error');
+      toast(error instanceof Error ? error.message : `${terms.GUARDIAN_LABEL} 정보 저장에 실패했습니다.`, 'error');
     }
   };
 
@@ -307,7 +308,7 @@ export function GuardiansTab({
             <Card padding="md">
               <EmptyState
                 icon={Users}
-                message={`등록된 ${terms.GUARDIAN_LABEL}이(가) 없습니다.`}
+                message={`등록된 ${terms.GUARDIAN_LABEL}${p.이가(terms.GUARDIAN_LABEL)} 없습니다.`}
               />
             </Card>
           )}

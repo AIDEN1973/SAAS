@@ -58,6 +58,221 @@ import {
 /** 아이콘 크기 (CSS 변수 참조) */
 const ICON_SIZE = 16;
 
+// ============================================================================
+// 동적 메뉴 라벨 생성 헬퍼 (업종 중립)
+// ============================================================================
+
+/**
+ * 업종 중립 메뉴 라벨 생성을 위한 ID 타입
+ *
+ * [불변 규칙] 메뉴 ID는 업종과 무관하게 일관된 키를 사용
+ * [불변 규칙] 실제 라벨은 IndustryTerms를 통해 동적으로 생성
+ */
+export type DynamicMenuLabelId =
+  // 주요 대상(학생/회원) 관련
+  | 'primary_list'       // {PERSON}목록
+  | 'primary_add'        // {PERSON}등록
+  | 'primary_statistics' // {PERSON}통계
+  | 'primary_management' // {PERSON}관리
+  // 보조 대상(강사/트레이너) 관련
+  | 'secondary_list'     // {SECONDARY}목록
+  | 'secondary_add'      // {SECONDARY}등록
+  | 'secondary_statistics' // {SECONDARY}통계
+  | 'secondary_assignments' // {SECONDARY} 담당 과목
+  | 'secondary_performance' // {SECONDARY} 성과
+  | 'secondary_management'  // {SECONDARY}관리
+  // 그룹(수업/클래스) 관련
+  | 'group_list'         // {GROUP}목록
+  | 'group_add'          // {GROUP}등록
+  | 'group_calendar'     // {GROUP}편성표
+  | 'group_statistics'   // {GROUP}통계
+  | 'group_conflicts'    // 일정 충돌
+  | 'group_management'   // {GROUP}관리
+  // 상담/태그 관련
+  | 'consultation_list'  // 상담관리
+  | 'tag_management'     // 태그관리
+  // 출결 관련
+  | 'attendance_today'   // 오늘 출결
+  | 'attendance_history' // 출결 기록
+  | 'attendance_stats'   // 출결 통계
+  | 'attendance_settings' // 출결 설정
+  | 'attendance_management'; // 출결관리
+
+/**
+ * 동적 메뉴 라벨 생성 함수
+ *
+ * IndustryTerms를 사용하여 업종에 맞는 메뉴 라벨을 생성합니다.
+ *
+ * @param labelId 라벨 ID
+ * @param terms IndustryTerms 객체
+ * @returns 업종에 맞는 라벨 문자열
+ *
+ * @example
+ * ```tsx
+ * const terms = useIndustryTerms();
+ * const label = getDynamicMenuLabel('primary_list', terms);
+ * // Academy: "학생목록"
+ * // Gym: "회원목록"
+ * // Salon: "고객목록"
+ * ```
+ */
+export function getDynamicMenuLabel(
+  labelId: DynamicMenuLabelId,
+  terms: {
+    PERSON_LABEL_PRIMARY: string;
+    PERSON_LABEL_SECONDARY: string;
+    GROUP_LABEL: string;
+    CONSULTATION_LABEL: string;
+    ATTENDANCE_LABEL: string;
+    TAG_LABEL: string;
+  }
+): string {
+  const labelMap: Record<DynamicMenuLabelId, string> = {
+    // 주요 대상 관련
+    primary_list: `${terms.PERSON_LABEL_PRIMARY}목록`,
+    primary_add: `${terms.PERSON_LABEL_PRIMARY}등록`,
+    primary_statistics: `${terms.PERSON_LABEL_PRIMARY}통계`,
+    primary_management: `${terms.PERSON_LABEL_PRIMARY}관리`,
+    // 보조 대상 관련
+    secondary_list: `${terms.PERSON_LABEL_SECONDARY} 목록`,
+    secondary_add: `${terms.PERSON_LABEL_SECONDARY} 등록`,
+    secondary_statistics: `${terms.PERSON_LABEL_SECONDARY} 통계`,
+    secondary_assignments: `담당 과목`,
+    secondary_performance: `${terms.PERSON_LABEL_SECONDARY} 성과`,
+    secondary_management: `${terms.PERSON_LABEL_SECONDARY}관리`,
+    // 그룹 관련
+    group_list: `${terms.GROUP_LABEL} 목록`,
+    group_add: `${terms.GROUP_LABEL} 등록`,
+    group_calendar: `${terms.GROUP_LABEL} 편성표`,
+    group_statistics: `${terms.GROUP_LABEL} 통계`,
+    group_conflicts: `일정 충돌`,
+    group_management: `${terms.GROUP_LABEL}관리`,
+    // 상담/태그 관련
+    consultation_list: `${terms.CONSULTATION_LABEL}관리`,
+    tag_management: `${terms.TAG_LABEL}관리`,
+    // 출결 관련
+    attendance_today: `오늘 ${terms.ATTENDANCE_LABEL}`,
+    attendance_history: `${terms.ATTENDANCE_LABEL} 기록`,
+    attendance_stats: `${terms.ATTENDANCE_LABEL} 통계`,
+    attendance_settings: `${terms.ATTENDANCE_LABEL} 설정`,
+    attendance_management: `${terms.ATTENDANCE_LABEL}관리`,
+  };
+
+  return labelMap[labelId] || labelId;
+}
+
+/**
+ * 동적 ariaLabel 생성 함수
+ *
+ * @param labelId 라벨 ID
+ * @param terms IndustryTerms 객체
+ * @returns 접근성 라벨 문자열
+ */
+export function getDynamicAriaLabel(
+  labelId: DynamicMenuLabelId,
+  terms: {
+    PERSON_LABEL_PRIMARY: string;
+    PERSON_LABEL_SECONDARY: string;
+    GROUP_LABEL: string;
+    CONSULTATION_LABEL: string;
+    ATTENDANCE_LABEL: string;
+    TAG_LABEL: string;
+  }
+): string {
+  const ariaLabelMap: Record<DynamicMenuLabelId, string> = {
+    // 주요 대상 관련
+    primary_list: `${terms.PERSON_LABEL_PRIMARY} 목록 화면으로 이동`,
+    primary_add: `${terms.PERSON_LABEL_PRIMARY} 등록 화면으로 이동`,
+    primary_statistics: `${terms.PERSON_LABEL_PRIMARY} 통계 화면으로 이동`,
+    primary_management: `${terms.PERSON_LABEL_PRIMARY} 관리 화면으로 이동`,
+    // 보조 대상 관련
+    secondary_list: `${terms.PERSON_LABEL_SECONDARY} 목록 화면으로 이동`,
+    secondary_add: `${terms.PERSON_LABEL_SECONDARY} 등록 화면으로 이동`,
+    secondary_statistics: `${terms.PERSON_LABEL_SECONDARY} 통계 화면으로 이동`,
+    secondary_assignments: `담당 과목 화면으로 이동`,
+    secondary_performance: `${terms.PERSON_LABEL_SECONDARY} 성과 화면으로 이동`,
+    secondary_management: `${terms.PERSON_LABEL_SECONDARY} 관리 화면으로 이동`,
+    // 그룹 관련
+    group_list: `${terms.GROUP_LABEL} 목록 화면으로 이동`,
+    group_add: `${terms.GROUP_LABEL} 등록 화면으로 이동`,
+    group_calendar: `${terms.GROUP_LABEL} 편성표 화면으로 이동`,
+    group_statistics: `${terms.GROUP_LABEL} 통계 화면으로 이동`,
+    group_conflicts: `일정 충돌 화면으로 이동`,
+    group_management: `${terms.GROUP_LABEL} 관리 화면으로 이동`,
+    // 상담/태그 관련
+    consultation_list: `${terms.CONSULTATION_LABEL} 관리 화면으로 이동`,
+    tag_management: `${terms.TAG_LABEL} 관리 화면으로 이동`,
+    // 출결 관련
+    attendance_today: `오늘 ${terms.ATTENDANCE_LABEL} 관리 화면으로 이동`,
+    attendance_history: `${terms.ATTENDANCE_LABEL} 기록 조회 화면으로 이동`,
+    attendance_stats: `${terms.ATTENDANCE_LABEL} 통계 화면으로 이동`,
+    attendance_settings: `${terms.ATTENDANCE_LABEL} 설정 화면으로 이동`,
+    attendance_management: `${terms.ATTENDANCE_LABEL} 관리 화면으로 이동`,
+  };
+
+  return ariaLabelMap[labelId] || `${labelId} 화면으로 이동`;
+}
+
+/**
+ * 동적 메뉴 아이템 생성 헬퍼
+ *
+ * 기존 정적 메뉴 아이템에 동적 라벨을 적용합니다.
+ *
+ * @param items 정적 메뉴 아이템 배열
+ * @param labelMapping ID별 DynamicMenuLabelId 매핑
+ * @param terms IndustryTerms 객체
+ * @returns 동적 라벨이 적용된 메뉴 아이템 배열
+ *
+ * @example
+ * ```tsx
+ * const terms = useIndustryTerms();
+ * const dynamicItems = applyDynamicLabels(
+ *   STUDENTS_SUB_MENU_ITEMS,
+ *   {
+ *     list: 'primary_list',
+ *     add: 'primary_add',
+ *     statistics: 'primary_statistics',
+ *   },
+ *   terms
+ * );
+ * ```
+ */
+export function applyDynamicLabels<T extends string>(
+  items: SubSidebarMenuItem<T>[],
+  labelMapping: Partial<Record<T, DynamicMenuLabelId>>,
+  terms: {
+    PERSON_LABEL_PRIMARY: string;
+    PERSON_LABEL_SECONDARY: string;
+    GROUP_LABEL: string;
+    CONSULTATION_LABEL: string;
+    ATTENDANCE_LABEL: string;
+    TAG_LABEL: string;
+  }
+): SubSidebarMenuItem<T>[] {
+  return items.map((item) => {
+    const dynamicLabelId = labelMapping[item.id];
+    if (dynamicLabelId) {
+      return {
+        ...item,
+        label: getDynamicMenuLabel(dynamicLabelId, terms),
+        ariaLabel: getDynamicAriaLabel(dynamicLabelId, terms),
+      };
+    }
+    return item;
+  });
+}
+
+/**
+ * 학생관리 메뉴의 동적 라벨 매핑
+ */
+export const STUDENTS_MENU_LABEL_MAPPING: Partial<Record<StudentsSubMenuId, DynamicMenuLabelId>> = {
+  list: 'primary_list',
+  add: 'primary_add',
+  statistics: 'primary_statistics',
+  consultations: 'consultation_list',
+  tags: 'tag_management',
+};
+
 /** 출결관리 페이지 서브 메뉴 ID */
 export type AttendanceSubMenuId =
   | 'today'
@@ -88,6 +303,14 @@ export const ATTENDANCE_SUB_MENU_ITEMS: SubSidebarMenuItem<AttendanceSubMenuId>[
     ariaLabel: '출결 설정 화면으로 이동',
   },
 ];
+
+/** 출결관리 메뉴의 동적 라벨 매핑 */
+export const ATTENDANCE_MENU_LABEL_MAPPING: Partial<Record<AttendanceSubMenuId, DynamicMenuLabelId>> = {
+  today: 'attendance_today',
+  history: 'attendance_history',
+  statistics: 'attendance_stats',
+  settings: 'attendance_settings',
+};
 
 /** 서브 사이드바 기본 너비 (CSS 변수) */
 export const SUB_SIDEBAR_WIDTH = 'var(--width-agent-history-sidebar)';
@@ -156,12 +379,9 @@ export function getSubMenuFromUrl<T extends string>(
   defaultId: T
 ): T {
   const tabParam = searchParams.get(SUB_MENU_QUERY_PARAM);
-  console.log('[getSubMenuFromUrl] tabParam:', tabParam, 'validIds:', validIds, 'defaultId:', defaultId);
   if (tabParam && validIds.includes(tabParam as T)) {
-    console.log('[getSubMenuFromUrl] returning tabParam:', tabParam);
     return tabParam as T;
   }
-  console.log('[getSubMenuFromUrl] returning defaultId:', defaultId);
   return defaultId;
 }
 
@@ -175,16 +395,13 @@ export function setSubMenuToUrl<T extends string>(
   defaultId: T
 ): string {
   const searchParams = new URLSearchParams(window.location.search);
-  console.log('[setSubMenuToUrl] id:', id, 'defaultId:', defaultId, 'current search:', window.location.search);
   if (id === defaultId) {
     searchParams.delete(SUB_MENU_QUERY_PARAM);
   } else {
     searchParams.set(SUB_MENU_QUERY_PARAM, id);
   }
   const queryString = searchParams.toString();
-  const result = queryString ? `?${queryString}` : window.location.pathname;
-  console.log('[setSubMenuToUrl] result:', result);
-  return result;
+  return queryString ? `?${queryString}` : window.location.pathname;
 }
 
 // ============================================================================
@@ -379,6 +596,14 @@ export const CLASSES_SUB_MENU_ITEMS: SubSidebarMenuItem<ClassesSubMenuId>[] = [
 /** 기본 수업관리 서브 메뉴 ID */
 export const DEFAULT_CLASSES_SUB_MENU: ClassesSubMenuId = 'list';
 
+/** 수업관리 메뉴의 동적 라벨 매핑 */
+export const CLASSES_MENU_LABEL_MAPPING: Partial<Record<ClassesSubMenuId, DynamicMenuLabelId>> = {
+  list: 'group_list',
+  calendar: 'group_calendar',
+  statistics: 'group_statistics',
+  'schedule-conflicts': 'group_conflicts',
+};
+
 /** 수업관리 관련 메뉴 */
 export const CLASSES_RELATED_MENUS: RelatedMenuSection = {
   title: '관련 메뉴',
@@ -428,6 +653,14 @@ export const TEACHERS_SUB_MENU_ITEMS: SubSidebarMenuItem<TeachersSubMenuId>[] = 
 
 /** 기본 강사관리 서브 메뉴 ID */
 export const DEFAULT_TEACHERS_SUB_MENU: TeachersSubMenuId = 'list';
+
+/** 강사관리 메뉴의 동적 라벨 매핑 */
+export const TEACHERS_MENU_LABEL_MAPPING: Partial<Record<TeachersSubMenuId, DynamicMenuLabelId>> = {
+  list: 'secondary_list',
+  statistics: 'secondary_statistics',
+  assignments: 'secondary_assignments',
+  performance: 'secondary_performance',
+};
 
 /** 강사관리 관련 메뉴 */
 export const TEACHERS_RELATED_MENUS: RelatedMenuSection = {

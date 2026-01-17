@@ -15,7 +15,7 @@ import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { LayerSectionHeader } from '../components/LayerSectionHeader';
 import { PlusIcon } from '../../../components/DataTableActionButtons';
 import { toKST } from '@lib/date-utils';
-import { logError } from '../../../utils';
+import { logError, p } from '../../../utils';
 import type { Class } from '@services/class-service';
 import type { FormSchema } from '@schema-engine/types';
 
@@ -401,7 +401,7 @@ export function ClassesTab({
         ) : (
           <EmptyState
             icon={BookOpen}
-            message={`배정된 ${terms.GROUP_LABEL}이(가) 없습니다.`}
+            message={`배정된 ${terms.GROUP_LABEL}${p.이가(terms.GROUP_LABEL)} 없습니다.`}
           />
         )}
         </Card>

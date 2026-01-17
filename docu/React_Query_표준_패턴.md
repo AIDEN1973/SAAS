@@ -1,7 +1,7 @@
 # React Query 표준 패턴
 
-**버전**: 1.0.0
-**최종 업데이트**: 2026-01-10
+**버전**: 1.1.0
+**최종 업데이트**: 2026-01-17
 **관련 문서**: `docu/체크리스트.md` (P2-QUALITY-2)
 
 ---
@@ -505,6 +505,83 @@ export const GC_TIMES = {
 
 ---
 
+### 6. 학생 관련 캐시 키 SSOT
+
+**정본 위치**: `packages/hooks/use-student/src/cache-keys.ts`
+
+학생(PERSON) 관련 데이터는 여러 화면에서 공유되므로 (SubSidebar, RightLayerMenu 등), 캐시 키 일관성이 중요합니다.
+
+#### STUDENT_CACHE_KEYS 상수
+
+```typescript
+import { STUDENT_CACHE_KEYS } from '@hooks/use-student';
+
+// 학생 목록
+STUDENT_CACHE_KEYS.students(tenantId);           // ['students', tenantId]
+STUDENT_CACHE_KEYS.studentsPaged(tenantId);      // ['students-paged', tenantId]
+STUDENT_CACHE_KEYS.student(tenantId, studentId); // ['student', tenantId, studentId]
+
+// 보호자
+STUDENT_CACHE_KEYS.guardians(tenantId, studentId); // ['guardians', tenantId, studentId]
+
+// 상담 - 캐시 동기화 핵심
+STUDENT_CACHE_KEYS.consultations(tenantId, studentId); // ['consultations', tenantId, studentId]
+STUDENT_CACHE_KEYS.consultationsAll(tenantId);         // ['consultations', tenantId, 'all']
+
+// 태그
+STUDENT_CACHE_KEYS.tags(tenantId, entityType);           // ['tags', tenantId, entityType]
+STUDENT_CACHE_KEYS.tagsByStudent(tenantId, studentId);   // ['tags', tenantId, 'student', studentId]
+
+// 수업 배정
+STUDENT_CACHE_KEYS.studentClasses(tenantId, studentId);  // ['student-classes', tenantId, studentId]
+```
+
+#### 캐시 무효화 유틸리티 함수
+
+```typescript
+import {
+  invalidateStudentConsultations,
+  invalidateStudentData,
+  invalidateGuardians,
+  invalidateStudentTags,
+  invalidateStudentClasses
+} from '@hooks/use-student';
+
+// 상담 관련 캐시 일괄 무효화 (특정 학생 + 전체 상담)
+invalidateStudentConsultations(queryClient, tenantId, studentId);
+
+// 학생 데이터 캐시 무효화 (목록 + 페이지네이션 + 상세)
+invalidateStudentData(queryClient, tenantId, studentId);
+
+// 보호자 캐시 무효화
+invalidateGuardians(queryClient, tenantId, studentId);
+
+// 태그 캐시 무효화 (학생별 태그 + 학생 목록)
+invalidateStudentTags(queryClient, tenantId, studentId);
+
+// 수업 배정 캐시 무효화
+invalidateStudentClasses(queryClient, tenantId, studentId);
+```
+
+#### 상담 캐시 동기화 문제 해결
+
+RightLayerMenu에서 상담 수정 시 SubSidebar 상담관리 탭에도 반영되어야 합니다:
+
+```typescript
+// ❌ 문제: 특정 학생의 상담만 무효화하면 전체 상담 탭이 갱신되지 않음
+queryClient.invalidateQueries({
+  queryKey: ['consultations', tenantId, studentId]
+});
+
+// ✅ 해결: invalidateStudentConsultations 사용
+import { invalidateStudentConsultations } from '@hooks/use-student';
+
+// 특정 학생 상담 + 전체 상담 캐시 모두 무효화
+invalidateStudentConsultations(queryClient, tenantId, studentId);
+```
+
+---
+
 ## 🔍 체크리스트
 
 ### 새 쿼리 추가 시
@@ -543,10 +620,11 @@ export const GC_TIMES = {
 
 ## 📝 변경 이력
 
+- **2026-01-17 (v1.1.0)**: 학생 관련 캐시 키 SSOT (STUDENT_CACHE_KEYS) 섹션 추가
 - **2026-01-10 (v1.0.0)**: 초기 문서 작성
 
 ---
 
-**문서 버전**: 1.0.0
-**최종 업데이트**: 2026-01-10
+**문서 버전**: 1.1.0
+**최종 업데이트**: 2026-01-17
 **유지보수 책임**: 프론트엔드 팀

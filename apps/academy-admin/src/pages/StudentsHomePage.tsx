@@ -13,10 +13,10 @@
 import React, { useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 // [SSOT] Barrel export를 통한 통합 import
-import { ROUTES, STUDENTS_SUB_MENU_ITEMS, DEFAULT_STUDENTS_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
+import { ROUTES, STUDENTS_SUB_MENU_ITEMS, DEFAULT_STUDENTS_SUB_MENU, STUDENTS_MENU_LABEL_MAPPING, getSubMenuFromUrl, setSubMenuToUrl, applyDynamicLabels } from '../constants';
 import type { StudentsSubMenuId } from '../constants';
-import { ErrorBoundary, Container, Button, PageHeader, SubSidebar, useResponsiveMode, isMobile, Card, useModal, isTablet, EmptyState, NotificationCardLayout } from '@ui-core/react';
-import { createSafeNavigate } from '../utils';
+import { ErrorBoundary, Container, Button, PageHeader, SubSidebar, useResponsiveMode, isMobile, Card, useModal, EmptyState, NotificationCardLayout } from '@ui-core/react';
+import { createSafeNavigate, templates, p } from '../utils';
 import { StudentStatsCard } from '../components/dashboard-cards/StudentStatsCard';
 import { AttendanceStatsCard } from '../components/dashboard-cards/AttendanceStatsCard';
 import { StudentAlertsCard } from '../components/dashboard-cards/StudentAlertsCard';
@@ -40,7 +40,6 @@ export function StudentsHomePage() {
   const mode = useResponsiveMode();
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
-  const isTabletMode = isTablet(modeUpper);
   const { showAlert } = useModal();
   const terms = useIndustryTerms();
   const context = getApiContext();
@@ -65,24 +64,12 @@ export function StudentsHomePage() {
   const validIds = STUDENTS_SUB_MENU_ITEMS.map(item => item.id) as readonly StudentsSubMenuId[];
   const selectedSubMenu = getSubMenuFromUrl(searchParams, validIds, DEFAULT_STUDENTS_SUB_MENU);
 
-  // 디버깅 로그
-  console.log('%c========== [StudentsHomePage] COMPONENT RENDER ==========', 'background: #ff0000; color: #ffffff; font-size: 16px; font-weight: bold');
-  console.log('[StudentsHomePage] RENDER - searchParams:', searchParams.toString());
-  console.log('[StudentsHomePage] RENDER - selectedSubMenu:', selectedSubMenu);
-  console.log('[StudentsHomePage] RENDER - validIds:', validIds);
-  console.log('[StudentsHomePage] RENDER - mode:', mode, 'modeUpper:', modeUpper);
-  console.log('[StudentsHomePage] RENDER - isMobileMode:', isMobileMode, 'isTabletMode:', isTabletMode);
-  console.log('[StudentsHomePage] RENDER - SubSidebar will be shown:', !isMobileMode);
-  console.log('%c' + '='.repeat(60), 'background: #ff0000; color: #ffffff; font-size: 16px; font-weight: bold');
-
   const handleSubMenuChange = useCallback((id: StudentsSubMenuId) => {
-    console.log('[StudentsHomePage] handleSubMenuChange called with:', id);
     const newUrl = setSubMenuToUrl(id, DEFAULT_STUDENTS_SUB_MENU);
-    console.log('[StudentsHomePage] navigating to:', newUrl);
     navigate(newUrl);
   }, [navigate]);
 
-  // 서브 메뉴 아이템에 아이콘 추가
+  // [업종중립] 동적 라벨 + 아이콘이 적용된 서브 메뉴 아이템
   const subMenuItemsWithIcons = useMemo(() => {
     const iconMap: Record<StudentsSubMenuId, React.ReactNode> = {
       list: <List size={16} />,
@@ -92,11 +79,15 @@ export function StudentsHomePage() {
       consultations: <TrendingUp size={16} />,
     };
 
-    return STUDENTS_SUB_MENU_ITEMS.map(item => ({
+    // 먼저 동적 라벨 적용
+    const itemsWithDynamicLabels = applyDynamicLabels(STUDENTS_SUB_MENU_ITEMS, STUDENTS_MENU_LABEL_MAPPING, terms);
+
+    // 그 다음 아이콘 추가
+    return itemsWithDynamicLabels.map(item => ({
       ...item,
       icon: iconMap[item.id],
     }));
-  }, []);
+  }, [terms]);
 
   // 통계 Hook 사용 (학생 관리 전용 기능)
   const { data: studentStats, isLoading: isLoadingStats } = useStudentStats();
@@ -122,7 +113,7 @@ export function StudentsHomePage() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['students', tenantId] });
-      showAlert(`${terms.PERSON_LABEL_PRIMARY}이(가) 등록되었습니다.`, terms.MESSAGES.SUCCESS);
+      showAlert(`${terms.PERSON_LABEL_PRIMARY}${p.이가(terms.PERSON_LABEL_PRIMARY)} 등록되었습니다.`, terms.MESSAGES.SUCCESS);
     },
     onError: (error: Error) => {
       showAlert(error.message, terms.MESSAGES.ERROR);
@@ -261,7 +252,7 @@ export function StudentsHomePage() {
         {/* 서브 사이드바 (모바일에서는 숨김) */}
         {!isMobileMode && (
           <SubSidebar
-            title="학생관리"
+            title={templates.management(terms.PERSON_LABEL_PRIMARY)}
             items={subMenuItemsWithIcons}
             selectedId={selectedSubMenu}
             onSelect={handleSubMenuChange}
@@ -273,21 +264,20 @@ export function StudentsHomePage() {
         <Container key={selectedSubMenu} maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           {/* 헤더 섹션 */}
           <PageHeader
-            title={subMenuItemsWithIcons.find(item => item.id === selectedSubMenu)?.label || '학생 관리'}
+            title={subMenuItemsWithIcons.find(item => item.id === selectedSubMenu)?.label || templates.management(terms.PERSON_LABEL_PRIMARY)}
             actions={
               selectedSubMenu === 'list' ? (
                 <Button
                   variant="solid"
                   onClick={handleViewAllStudents}
                 >
-                  전체 학생 보기
+                  전체 {terms.PERSON_LABEL_PRIMARY} 보기
                 </Button>
               ) : selectedSubMenu === 'add' ? (
                 <Button
                   variant="solid"
                   onClick={() => {
                     // Navigate to add student page or open create form
-                    console.log('Add student button clicked');
                   }}
                 >
                   {terms.PERSON_LABEL_PRIMARY} 등록

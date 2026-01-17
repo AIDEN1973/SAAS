@@ -123,6 +123,15 @@ export type {
   ComparisonGroup,
 } from './analytics/regional-comparison-utils';
 
+// 한국어 조사 처리 유틸리티 (SSOT)
+export {
+  getParticle,
+  withParticle,
+  p,
+  templates,
+  menuLabels,
+} from './korean-particle-utils';
+
 // 기타 유틸리티 (필요시 추가)
 export { renderCard } from './dashboardCardRenderer';
 export { handleCardClick } from './handleCardClick';

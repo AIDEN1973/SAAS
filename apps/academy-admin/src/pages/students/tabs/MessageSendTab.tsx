@@ -20,7 +20,7 @@ import { createExecutionAuditRecord } from '@hooks/use-student/src/execution-aud
 import { useSchema } from '@hooks/use-schema';
 import { useCompleteStudentTaskCard, useStudentTaskCards, useGuardians } from '@hooks/use-student';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
-import { logError } from '../../../utils';
+import { logError, p } from '../../../utils';
 import type { Student, Guardian } from '@services/student-service';
 import type { NotificationChannel } from '@core/notification';
 import { notificationFormSchema } from '../../../schemas/notification.schema';
@@ -34,7 +34,6 @@ const MESSAGE_CONSTANTS = {
   STUDENT_DEFAULT: '', // Will be replaced by terms.PERSON_LABEL_PRIMARY
   PHONE_NOT_AVAILABLE: '전화번호 없음',
   LOADING_GUARDIANS: '보호자 정보를 불러오는 중...',
-  TARGET_STUDENT_LABEL: '학생',
   NO_GUARDIANS_MESSAGE: '', // Will be replaced by terms.GUARDIAN_LABEL
   NO_STUDENT_PHONE_MESSAGE: '', // Will be replaced by terms.PERSON_LABEL_PRIMARY
   NO_RECIPIENTS_SELECTED: '발송 대상을 선택해주세요.',
@@ -221,7 +220,7 @@ export function MessageSendTab({
     if (selectedStudent && student?.phone) {
       const phone = typeof student.phone === 'string' ? student.phone : String(student.phone);
       if (phone.trim().length > 0) {
-        recipients.push({ label: MESSAGE_CONSTANTS.TARGET_STUDENT_LABEL, phone: phone.trim() });
+        recipients.push({ label: terms.PERSON_LABEL_PRIMARY, phone: phone.trim() });
       }
     }
 
@@ -241,7 +240,7 @@ export function MessageSendTab({
     }
 
     return recipients;
-  }, [selectedStudent, selectedGuardians, student, guardians]);
+  }, [selectedStudent, selectedGuardians, student, guardians, terms.PERSON_LABEL_PRIMARY]);
 
   // 메시지 발송 (기존 notificationFormSchema 재사용)
   // [불변 규칙] api-sdk를 통해서만 API 요청
@@ -342,7 +341,7 @@ export function MessageSendTab({
           {
             operation_type: 'messaging.send-sms',
             status: status,
-            summary: `${student?.name || '학생'}에게 메시지 발송 요청 완료 (${successCount}건)`,
+            summary: `${student?.name || terms.PERSON_LABEL_PRIMARY}에게 메시지 발송 요청 완료 (${successCount}건)`,
             details: {
               student_id: studentId,
               recipient_count: successCount,
@@ -674,7 +673,7 @@ export function MessageSendTab({
               {guardians && guardians.length === 0 && (
                 <div style={{ padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-warning-50)', borderRadius: 'var(--border-radius-sm)' }}>
                   <p style={{ color: 'var(--color-warning)', fontSize: 'var(--font-size-base)', textAlign: 'center', margin: 0 }}>
-                    {terms.GUARDIAN_LABEL} 정보가 없습니다. {terms.GUARDIAN_LABEL}을(를) 먼저 등록해주세요.
+                    {`${terms.GUARDIAN_LABEL} 정보가 없습니다. ${terms.GUARDIAN_LABEL}${p.을를(terms.GUARDIAN_LABEL)} 먼저 등록해주세요.`}
                   </p>
                 </div>
               )}

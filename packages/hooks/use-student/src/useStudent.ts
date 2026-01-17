@@ -1457,7 +1457,10 @@ export function useCreateConsultation() {
       return response.data!;
     },
     onSuccess: (_, variables) => {
+      // 특정 학생의 상담 캐시 무효화
       queryClient.invalidateQueries({ queryKey: ['consultations', tenantId, variables.studentId] });
+      // [캐시 동기화] 전체 상담 캐시도 무효화 (SubSidebar 상담관리 탭 갱신)
+      queryClient.invalidateQueries({ queryKey: ['consultations', tenantId, 'all'] });
     },
   });
 }
@@ -1515,7 +1518,10 @@ export function useUpdateConsultation() {
       return response.data!;
     },
     onSuccess: (_, variables) => {
+      // 특정 학생의 상담 캐시 무효화
       queryClient.invalidateQueries({ queryKey: ['consultations', tenantId, variables.studentId] });
+      // [캐시 동기화] 전체 상담 캐시도 무효화 (SubSidebar 상담관리 탭 갱신)
+      queryClient.invalidateQueries({ queryKey: ['consultations', tenantId, 'all'] });
     },
   });
 }
@@ -1567,7 +1573,10 @@ export function useDeleteConsultation() {
       }
     },
     onSuccess: (_, variables) => {
+      // 특정 학생의 상담 캐시 무효화
       queryClient.invalidateQueries({ queryKey: ['consultations', tenantId, variables.studentId] });
+      // [캐시 동기화] 전체 상담 캐시도 무효화 (SubSidebar 상담관리 탭 갱신)
+      queryClient.invalidateQueries({ queryKey: ['consultations', tenantId, 'all'] });
     },
   });
 }
@@ -1617,8 +1626,10 @@ export function useGenerateConsultationAISummary() {
       return response.data.ai_summary;
     },
     onSuccess: (_, variables) => {
-      // 상담기록 목록 쿼리 무효화하여 AI 요약 반영
+      // 특정 학생의 상담 캐시 무효화 (AI 요약 반영)
       queryClient.invalidateQueries({ queryKey: ['consultations', tenantId, variables.studentId] });
+      // [캐시 동기화] 전체 상담 캐시도 무효화 (SubSidebar 상담관리 탭 갱신)
+      queryClient.invalidateQueries({ queryKey: ['consultations', tenantId, 'all'] });
     },
   });
 }

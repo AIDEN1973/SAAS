@@ -1,12 +1,14 @@
 /**
  * Student Tabs Configuration
  *
- * 학생 상세 레이어 메뉴의 탭 설정 중앙화
+ * PERSON 상세 레이어 메뉴의 탭 설정 중앙화
  * [확장성] 새 탭 추가 시 이 파일만 수정하면 됨
+ * [업종중립] 라벨은 IndustryTerms를 통해 동적으로 생성
  */
 
 import { User, Users, MessageSquare, Tag, BookOpen, Calendar, AlertTriangle, Send } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import type { IndustryTerms } from '@industry/registry';
 
 export type StudentTabId = 'info' | 'guardians' | 'consultations' | 'tags' | 'classes' | 'attendance' | 'risk' | 'message';
 
@@ -27,7 +29,70 @@ export interface StudentTab {
 }
 
 /**
- * 학생 상세 레이어 메뉴 탭 설정
+ * 탭 설정의 정적 부분 (아이콘, 옵션 등)
+ */
+const TAB_CONFIG: Record<StudentTabId, Omit<StudentTab, 'id' | 'label'>> = {
+  info: {
+    icon: User,
+  },
+  guardians: {
+    icon: Users,
+    showCount: true,
+  },
+  consultations: {
+    icon: MessageSquare,
+    showCount: true,
+  },
+  tags: {
+    icon: Tag,
+  },
+  classes: {
+    icon: BookOpen,
+    showCount: true,
+  },
+  attendance: {
+    icon: Calendar,
+  },
+  risk: {
+    icon: AlertTriangle,
+  },
+  message: {
+    icon: Send,
+  },
+};
+
+/**
+ * 탭 순서
+ */
+const TAB_ORDER: StudentTabId[] = ['info', 'guardians', 'consultations', 'tags', 'classes', 'attendance', 'risk', 'message'];
+
+/**
+ * PERSON 상세 레이어 메뉴 탭 설정 생성 함수
+ * @param terms - 업종별 용어 객체
+ * @returns 탭 설정 배열
+ */
+export function getStudentTabs(terms: IndustryTerms): readonly StudentTab[] {
+  const labelMap: Record<StudentTabId, string> = {
+    info: '기본정보',
+    guardians: `${terms.GUARDIAN_LABEL} 정보`,
+    consultations: terms.CONSULTATION_LABEL_PLURAL,
+    tags: `${terms.TAG_LABEL} 관리`,
+    classes: `${terms.GROUP_LABEL} 배정`,
+    attendance: `${terms.ATTENDANCE_LABEL} 기록`,
+    risk: '이탈위험',
+    message: '메시지 발송',
+  };
+
+  return TAB_ORDER.map((id) => ({
+    id,
+    label: labelMap[id],
+    ...TAB_CONFIG[id],
+  }));
+}
+
+/**
+ * @deprecated STUDENT_TABS는 업종 중립화를 위해 getStudentTabs(terms)로 대체됨
+ * 기존 코드 호환성을 위해 유지하지만, 새 코드에서는 getStudentTabs 사용 권장
  */
 export const STUDENT_TABS: readonly StudentTab[] = [
   {
@@ -73,4 +138,4 @@ export const STUDENT_TABS: readonly StudentTab[] = [
     label: '메시지 발송',
     icon: Send,
   },
-] as const;
+];

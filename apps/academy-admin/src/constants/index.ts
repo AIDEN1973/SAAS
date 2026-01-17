@@ -47,6 +47,7 @@ export {
   // 출결관리 페이지
   ATTENDANCE_SUB_MENU_ITEMS,
   DEFAULT_ATTENDANCE_SUB_MENU,
+  ATTENDANCE_MENU_LABEL_MAPPING,
   // 매뉴얼 페이지
   MANUAL_SUB_MENU_ITEMS,
   DEFAULT_MANUAL_SUB_MENU,
@@ -54,6 +55,7 @@ export {
   STUDENTS_SUB_MENU_ITEMS,
   DEFAULT_STUDENTS_SUB_MENU,
   STUDENTS_RELATED_MENUS,
+  STUDENTS_MENU_LABEL_MAPPING,
   // 문자발송 페이지
   NOTIFICATIONS_SUB_MENU_ITEMS,
   DEFAULT_NOTIFICATIONS_SUB_MENU,
@@ -68,10 +70,12 @@ export {
   CLASSES_SUB_MENU_ITEMS,
   DEFAULT_CLASSES_SUB_MENU,
   CLASSES_RELATED_MENUS,
+  CLASSES_MENU_LABEL_MAPPING,
   // 강사관리 페이지
   TEACHERS_SUB_MENU_ITEMS,
   DEFAULT_TEACHERS_SUB_MENU,
   TEACHERS_RELATED_MENUS,
+  TEACHERS_MENU_LABEL_MAPPING,
   // 수납관리 페이지
   BILLING_SUB_MENU_ITEMS,
   DEFAULT_BILLING_SUB_MENU,
@@ -87,6 +91,10 @@ export {
   SUB_MENU_QUERY_PARAM,
   getSubMenuFromUrl,
   setSubMenuToUrl,
+  // 동적 라벨 생성 헬퍼 (업종 중립)
+  getDynamicMenuLabel,
+  getDynamicAriaLabel,
+  applyDynamicLabels,
 } from './sub-sidebar-menus';
 export type {
   AttendanceSubMenuId,
@@ -100,4 +108,5 @@ export type {
   BillingSubMenuId,
   AutomationSubMenuId,
   AlimtalkSubMenuId,
+  DynamicMenuLabelId,
 } from './sub-sidebar-menus';
