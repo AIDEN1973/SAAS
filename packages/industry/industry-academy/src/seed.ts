@@ -18,25 +18,25 @@ export class AcademySeedService {
    * 학원 업종 초기 데이터 생성
    *
    * [불변 규칙] 테넌트 생성 후 호출되어야 합니다.
-   * [불변 규칙] 기본 반 1개를 생성하여 즉시 운영 가능하도록 합니다.
+   * [불변 규칙] 기본 수업 1개를 생성하여 즉시 운영 가능하도록 합니다.
    *
    * @param tenantId 테넌트 ID
    * @param ownerUserId 소유자 사용자 ID (created_by로 사용)
    */
   async seedTenantData(tenantId: string, ownerUserId: string): Promise<void> {
-    // 1. 기본 반 생성
+    // 1. 기본 수업 생성
     await this.createDefaultClass(tenantId, ownerUserId);
   }
 
   /**
-   * 기본 반 생성
+   * 기본 수업 생성
    *
-   * [불변 규칙] 신규 테넌트가 즉시 운영 가능하도록 기본 반 1개를 생성합니다.
+   * [불변 규칙] 신규 테넌트가 즉시 운영 가능하도록 기본 수업 1개를 생성합니다.
    * 사용자는 나중에 수정/삭제할 수 있습니다.
    */
   private async createDefaultClass(tenantId: string, ownerUserId: string): Promise<void> {
     const defaultClass: CreateClassInput = {
-      name: '기본 반',
+      name: '기본 수업',
       subject: undefined,
       grade: undefined,
       day_of_week: 'monday',
@@ -45,7 +45,7 @@ export class AcademySeedService {
       capacity: 20,
       color: '#3b82f6', // 기본 파란색
       room: undefined,
-      notes: '신규 테넌트 생성 시 자동으로 생성된 기본 반입니다. 수정하거나 삭제할 수 있습니다.',
+      notes: '신규 테넌트 생성 시 자동으로 생성된 기본 수업입니다. 수정하거나 삭제할 수 있습니다.',
       status: 'active', // 명시적으로 active 상태 설정
     };
 
@@ -61,8 +61,8 @@ export class AcademySeedService {
     );
 
     if (error) {
-      // 기본 반 생성 실패해도 전체 시드를 중단하지 않음 (선택 기능)
-      console.warn(`[AcademySeedService] 기본 반 생성 실패: ${error.message}`);
+      // 기본 수업 생성 실패해도 전체 시드를 중단하지 않음 (선택 기능)
+      console.warn(`[AcademySeedService] 기본 수업 생성 실패: ${error.message}`);
     }
   }
 }

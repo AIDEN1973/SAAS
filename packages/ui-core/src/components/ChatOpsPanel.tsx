@@ -134,7 +134,7 @@ const FIELD_KEYWORDS_MAP: Record<string, string[]> = {
   ],
   amount: ['금액', '요금', '비용', '가격', '돈', '수강료', '학비', '납부액', '결제액', '미납액', '연체액'],
   month: ['월', '기간'],
-  class_name: ['반', '클래스'],
+  class_name: ['수업', '클래스'],
   grade: ['학년', '학급'],
   guardian: ['보호자'],
   guardian_name: ['보호자'],
@@ -247,7 +247,7 @@ function getFieldLabel(field: string, industryTerms?: ChatOpsIndustryTerms): str
     status: '상태',
     amount: '금액',
     month: '월',
-    class_name: '반',
+    class_name: '수업',
     grade: '학년',
     guardian_name: '보호자 이름',
     guardian_contact: '보호자 연락처',
@@ -682,8 +682,8 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                     requestedFields.add('name');
                   }
 
-                  // 반 관련 키워드
-                  if (messageLower.includes('반') || messageLower.includes('클래스')) {
+                  // 수업 관련 키워드
+                  if (messageLower.includes('수업') || messageLower.includes('클래스')) {
                     requestedFields.add('class_name');
                   }
 
@@ -851,7 +851,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                   // 명시적 필드 요청만 감지 (기본값 제거) - 업종중립
                   const personLabel = (industryTerms?.personLabel || '학생').toLowerCase();
                   const showName = messageLower.includes('이름') || messageLower.includes(personLabel);
-                  const showClass = messageLower.includes('반') || messageLower.includes('클래스');
+                  const showClass = messageLower.includes('수업') || messageLower.includes('클래스');
                   const showTime = messageLower.includes('시간') || messageLower.includes('시각');
                   // 전체 표시: 명시적 요청이 있거나, 아무 필드도 요청하지 않은 경우
                   const showAll = messageLower.includes('전체') || messageLower.includes('모두') || messageLower.includes('상세') || (!showName && !showClass && !showTime);

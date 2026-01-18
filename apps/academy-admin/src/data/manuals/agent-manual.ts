@@ -181,7 +181,7 @@ export const agentManual: ManualPage = {
             { title: '오늘 출결 현황', description: '"오늘 결석한 학생", "오늘 지각한 학생 명단", "오늘 출석률"' },
             { title: '기간별 출결 조회', description: '"이번 주 결석 현황", "이번 달 지각 많은 학생", "지난 달 출석률 비교"' },
             { title: '학생별 출결 패턴', description: '"김철수 학생 출결 현황", "박영희 학생 이번 달 결석 횟수", "최민수 학생 지각 패턴"' },
-            { title: '반별 출결 현황', description: '"수학A반 오늘 출석 현황", "영어B반 이번 주 결석자", "과학반 출석률"' },
+            { title: '수업별 출결 현황', description: '"수학A 수업 오늘 출석 현황", "영어B 수업 이번 주 결석자", "과학 수업 출석률"' },
             { title: '출결 이상 감지', description: '"연속 결석 학생", "출석률이 낮은 학생", "갑자기 결석이 늘어난 학생"' },
             { title: '출결 통계', description: '"요일별 출석률", "시간대별 지각 현황", "월별 출석률 추이"' },
           ],
@@ -190,7 +190,7 @@ export const agentManual: ManualPage = {
           title: '수납관리',
           items: [
             { title: '미납 현황 조회', description: '"이번 달 미납 학생", "미납 금액 총액", "미납 기간이 긴 학생 순서"' },
-            { title: '수납률 확인', description: '"이번 달 수납률", "지난 달 대비 수납률", "반별 수납률 비교"' },
+            { title: '수납률 확인', description: '"이번 달 수납률", "지난 달 대비 수납률", "수업별 수납률 비교"' },
             { title: '청구서 현황', description: '"이번 달 청구서 발송 현황", "결제 대기 중인 청구서", "결제 실패한 청구서"' },
             { title: '학생별 수납 정보', description: '"김철수 학생 미납 내역", "박영희 학생 결제 히스토리", "최민수 학생 청구서 상태"' },
             { title: '매출 정보', description: '"이번 달 매출", "지난 달 매출", "월별 매출 추이"' },
@@ -207,12 +207,12 @@ export const agentManual: ManualPage = {
           ],
         },
         {
-          title: '반/수업 관리',
+          title: '수업 관리',
           items: [
-            { title: '반 정보 조회', description: '"현재 운영 중인 반 목록", "수학A반 학생 명단", "영어B반 수업 시간"' },
-            { title: '반별 현황', description: '"반별 학생 수", "정원 대비 현황", "수업 시간표"' },
-            { title: '강사 정보', description: '"김선생님 담당 반", "영어과목 강사 목록", "이번 주 수업 스케줄"' },
-            { title: '수업 통계', description: '"과목별 학생 분포", "시간대별 수업 현황", "인기 있는 반"' },
+            { title: '수업 정보 조회', description: '"현재 운영 중인 수업 목록", "수학A 수업 학생 명단", "영어B 수업 시간"' },
+            { title: '수업별 현황', description: '"수업별 학생 수", "정원 대비 현황", "수업 시간표"' },
+            { title: '강사 정보', description: '"김선생님 담당 수업", "영어과목 강사 목록", "이번 주 수업 스케줄"' },
+            { title: '수업 통계', description: '"과목별 학생 분포", "시간대별 수업 현황", "인기 있는 수업"' },
           ],
         },
         {

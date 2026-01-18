@@ -2,7 +2,7 @@
 /**
  * ClassesTab Component
  *
- * 반 배정 탭
+ * 수업 배정 탭
  * [불변 규칙] CSS 변수만 사용 (하드코딩 금지)
  * [불변 규칙] SSOT UI 디자인 준수
  */
@@ -30,7 +30,7 @@ const DAYS_OF_WEEK: { value: string; label: string }[] = [
   { value: 'sunday', label: '일요일' },
 ];
 
-// 반 배정 탭 컴포넌트
+// 수업 배정 탭 컴포넌트
 export interface ClassesTabProps {
   studentClasses: Array<{
     id: string;
@@ -83,12 +83,12 @@ export function ClassesTab({
     .filter((sc) => sc.is_active)
     .map((sc) => sc.class_id);
 
-  // 배정 가능한 반 목록 (아직 배정되지 않은 활성 반)
+  // 배정 가능한 수업 목록 (아직 배정되지 않은 활성 수업)
   const availableClasses = allClasses.filter(
     (c) => c.status === 'active' && !assignedClassIds.includes(c.id)
   );
 
-  // 수정 모드 상태 관리 (반별) - [P2-3 수정] 선언 순서 정리: handleAssign보다 먼저 선언
+  // 수정 모드 상태 관리 (수업별) - [P2-3 수정] 선언 순서 정리: handleAssign보다 먼저 선언
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
   const [editingStudentClassId, setEditingStudentClassId] = useState<string | null>(null);
   const [editingEnrolledAt, setEditingEnrolledAt] = useState<string>('');
@@ -102,18 +102,18 @@ export function ClassesTab({
       setEditingClassId(null);
       setEditingEnrolledAt('');
     } catch (error) {
-      toast('반 배정에 실패했습니다.', 'error');
+      toast('수업 배정에 실패했습니다.', 'error');
     }
   };
 
   const handleUnassign = async (classId: string) => {
-    const confirmed = await showConfirm('정말 이 반에서 제외하시겠습니까?', '반 제외');
+    const confirmed = await showConfirm('정말 이 수업에서 제외하시겠습니까?', '수업 제외');
     if (!confirmed) return;
 
     try {
       await onUnassign(classId, toKST().format('YYYY-MM-DD'));
     } catch (error) {
-      toast('반 제외에 실패했습니다.', 'error');
+      toast('수업 제외에 실패했습니다.', 'error');
     }
   };
 
@@ -131,29 +131,29 @@ export function ClassesTab({
     const newEnrolledAt = String(data.enrolled_at || toKST().format('YYYY-MM-DD'));
 
     try {
-      // 문서 요구사항: 반 배정 수정 시 같은 반이면 enrolled_at만 업데이트, 다른 반이면 반 이동
+      // 문서 요구사항: 수업 배정 수정 시 같은 수업이면 enrolled_at만 업데이트, 다른 수업이면 수업 이동
       if (editingClassId === newClassId) {
-        // 같은 반: enrolled_at만 업데이트 (문서 요구사항 준수)
+        // 같은 수업: enrolled_at만 업데이트 (문서 요구사항 준수)
         // [P1-3 수정] onUpdate는 필수: App Layer 분리 원칙 준수 (UI는 호출만, 비즈니스 로직은 Hook/Service에서)
         if (!onUpdate) {
-          throw new Error('반 배정 수정 기능이 초기화되지 않았습니다.');
+          throw new Error('수업 배정 수정 기능이 초기화되지 않았습니다.');
         }
         await onUpdate(editingStudentClassId, newEnrolledAt);
         toast('배정일이 수정되었습니다.', 'success', '완료');
       } else {
-        // 다른 반: 반 이동 (문서 요구사항: 반 이동 시 이전 반의 left_at 설정)
-        // 기존 반 제외 (left_at 설정)
+        // 다른 수업: 수업 이동 (문서 요구사항: 수업 이동 시 이전 수업의 left_at 설정)
+        // 기존 수업 제외 (left_at 설정)
         await onUnassign(editingClassId, toKST().format('YYYY-MM-DD'));
-        // 새 반 배정
+        // 새 수업 배정
         await onAssign(newClassId, newEnrolledAt);
-        toast('반이 이동되었습니다.', 'success', '완료');
+        toast('수업이 이동되었습니다.', 'success', '완료');
       }
       setShowAssignForm(false);
       setEditingClassId(null);
       setEditingStudentClassId(null);
       setEditingEnrolledAt('');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '반 배정 수정에 실패했습니다.';
+      const errorMessage = error instanceof Error ? error.message : '수업 배정 수정에 실패했습니다.';
       toast(errorMessage, 'error');
     }
   };
@@ -185,16 +185,16 @@ export function ClassesTab({
                       return {
                         name: 'class_id',
                         kind: 'select' as const,
-                        ui: { label: '반 선택', colSpan: 1 },
+                        ui: { label: '수업 선택', colSpan: 1 },
                         validation: { required: true },
-                        options: [{ label: '스키마 오류: 반을 선택할 수 없습니다', value: '' }],
+                        options: [{ label: '스키마 오류: 수업을 선택할 수 없습니다', value: '' }],
                       };
                     }
                     return {
                       ...classIdField,
                       options: [
-                        { label: '반을 선택하세요', value: '' },
-                        // [P0-3 수정] 수정 모드일 때는 현재 배정된 반도 포함 (필터와 독립적으로 원본에서 찾기)
+                        { label: '수업을 선택하세요', value: '' },
+                        // [P0-3 수정] 수정 모드일 때는 현재 배정된 수업도 포함 (필터와 독립적으로 원본에서 찾기)
                         // filteredStudentClasses가 아닌 studentClasses 원본에서 찾아 필터 영향 받지 않도록
                         ...(editingClassId
                           ? studentClasses
@@ -208,7 +208,7 @@ export function ClassesTab({
                                 };
                               })
                           : []),
-                        // 배정 가능한 반만 포함 (이미 배정된 반 제외)
+                        // 배정 가능한 수업만 포함 (이미 배정된 수업 제외)
                         ...availableClasses.map((classItem) => {
                           const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
                           return {
@@ -293,7 +293,7 @@ export function ClassesTab({
             padding="md"
                       >
         {studentClasses.filter((sc) => sc.class).length > 0 ? (
-          // 각 반별로 그룹화하여 표시
+          // 각 수업별로 그룹화하여 표시
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
             {studentClasses
               .filter((sc) => sc.class)
@@ -301,7 +301,7 @@ export function ClassesTab({
                 const classItem = studentClass.class!;
                 const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
 
-                // 각 반 정보를 필드 형태로 변환
+                // 각 수업 정보를 필드 형태로 변환
                 const fields = [
                   { label: `${terms.GROUP_LABEL}명`, value: classItem.name },
                   { label: '과목', value: classItem.subject || '-' },

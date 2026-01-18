@@ -30,6 +30,7 @@ export {
   useDeleteConsultation,
   useGenerateConsultationAISummary,
   useStudentClasses,
+  useAllStudentClasses,
   useAssignStudentToClass,
   useUnassignStudentFromClass,
   useUpdateStudentClassEnrolledAt,

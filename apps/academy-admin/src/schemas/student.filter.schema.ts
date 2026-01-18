@@ -2,7 +2,7 @@
  * Student Filter Schema
  *
  * [불변 규칙] 스키마 엔진 기반 FilterSchema 정의
- * [동적 옵션] 반 목록은 동적으로 채워집니다.
+ * [동적 옵션] 수업 목록은 동적으로 채워집니다.
  */
 
 import type { FilterSchema } from '@schema-engine';
@@ -74,7 +74,7 @@ export function createStudentFilterSchema(classes?: Class[]): FilterSchema {
           colSpan: 1,
         },
         options: [
-          { label: '전체 반', value: '' },
+          { label: '전체 수업', value: '' },
           ...(classes?.map((c) => ({ label: c.name, value: c.id })) || []),
         ],
         defaultValue: '',

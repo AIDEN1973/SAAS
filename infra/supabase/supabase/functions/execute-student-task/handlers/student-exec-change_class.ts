@@ -97,15 +97,15 @@ export const student_exec_change_classHandler: IntentHandler = {
         return {
           status: 'failed',
           error_code: 'EXECUTION_FAILED',
-          message: '현재 반 정보 조회에 실패했습니다.',
+          message: '현재 수업 정보 조회에 실패했습니다.',
         };
       }
 
-      // 2. 기존 반 제거 (left_at 설정)
+      // 2. 기존 수업 제거 (left_at 설정)
       if (currentClasses && currentClasses.length > 0) {
         for (const currentClass of currentClasses) {
           if (currentClass.class_id !== toClassId) {
-            // 다른 반이면 left_at 설정
+            // 다른 수업이면 left_at 설정
             const { error: unassignError } = await withTenant(
               context.supabase
                 .from('student_classes')

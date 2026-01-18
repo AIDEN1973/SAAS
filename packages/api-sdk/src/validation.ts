@@ -299,10 +299,10 @@ export const timeSchema = z
   .regex(/^\d{2}:\d{2}$/, '시간은 HH:MM 형식이어야 합니다');
 
 /**
- * 반 생성 입력 스키마
+ * 수업 생성 입력 스키마
  */
 export const createClassInputSchema = z.object({
-  name: z.string().min(1, '반 이름을 입력해주세요').max(100),
+  name: z.string().min(1, '수업 이름을 입력해주세요').max(100),
   subject: z.string().max(100).optional().nullable(),
   grade: gradeSchema,
   day_of_week: dayOfWeekSchema,

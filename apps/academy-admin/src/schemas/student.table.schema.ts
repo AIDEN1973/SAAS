@@ -32,7 +32,7 @@ export const studentTableSchema: TableSchema = {
       },
       {
         key: 'primary_class_name',
-        label: '반',
+        label: '수업',
         sortable: false,
         type: 'text',
       },

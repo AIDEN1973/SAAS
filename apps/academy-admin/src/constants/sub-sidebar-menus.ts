@@ -88,6 +88,7 @@ export type DynamicMenuLabelId =
   | 'group_statistics'   // {GROUP}통계
   | 'group_conflicts'    // 일정 충돌
   | 'group_management'   // {GROUP}관리
+  | 'group_assignment'   // {GROUP}배정
   // 상담/태그 관련
   | 'consultation_list'  // 상담관리
   | 'tag_management'     // 태그관리
@@ -147,6 +148,7 @@ export function getDynamicMenuLabel(
     group_statistics: `${terms.GROUP_LABEL} 통계`,
     group_conflicts: `일정 충돌`,
     group_management: `${terms.GROUP_LABEL}관리`,
+    group_assignment: `${terms.GROUP_LABEL}배정`,
     // 상담/태그 관련
     consultation_list: `${terms.CONSULTATION_LABEL}관리`,
     tag_management: `${terms.TAG_LABEL}관리`,
@@ -199,6 +201,7 @@ export function getDynamicAriaLabel(
     group_statistics: `${terms.GROUP_LABEL} 통계 화면으로 이동`,
     group_conflicts: `일정 충돌 화면으로 이동`,
     group_management: `${terms.GROUP_LABEL} 관리 화면으로 이동`,
+    group_assignment: `${terms.GROUP_LABEL} 배정 화면으로 이동`,
     // 상담/태그 관련
     consultation_list: `${terms.CONSULTATION_LABEL} 관리 화면으로 이동`,
     tag_management: `${terms.TAG_LABEL} 관리 화면으로 이동`,
@@ -271,6 +274,7 @@ export const STUDENTS_MENU_LABEL_MAPPING: Partial<Record<StudentsSubMenuId, Dyna
   statistics: 'primary_statistics',
   consultations: 'consultation_list',
   tags: 'tag_management',
+  'class-assignment': 'group_assignment',
 };
 
 /** 출결관리 페이지 서브 메뉴 ID */
@@ -414,7 +418,8 @@ export type StudentsSubMenuId =
   | 'add'
   | 'tags'
   | 'statistics'
-  | 'consultations';
+  | 'consultations'
+  | 'class-assignment';
 
 /** 학생관리 페이지 서브 메뉴 설정 */
 export const STUDENTS_SUB_MENU_ITEMS: SubSidebarMenuItem<StudentsSubMenuId>[] = [
@@ -447,6 +452,12 @@ export const STUDENTS_SUB_MENU_ITEMS: SubSidebarMenuItem<StudentsSubMenuId>[] = 
     label: '상담관리',
     icon: createElement(MessageSquare, { size: ICON_SIZE }),
     ariaLabel: '상담 관리 화면으로 이동',
+  },
+  {
+    id: 'class-assignment',
+    label: '수업배정',
+    icon: createElement(GraduationCap, { size: ICON_SIZE }),
+    ariaLabel: '수업 배정 화면으로 이동',
   },
 ];
 

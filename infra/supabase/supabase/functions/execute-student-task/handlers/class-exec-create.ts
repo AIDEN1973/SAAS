@@ -71,11 +71,11 @@ export const class_exec_createHandler: IntentHandler = {
         return {
           status: 'failed',
           error_code: 'INVALID_PARAMS',
-          message: '반 이름이 필요합니다.',
+          message: '수업 이름이 필요합니다.',
         };
       }
 
-      // Industry Adapter: 업종별 클래스 테이블에 반 생성
+      // Industry Adapter: 업종별 클래스 테이블에 수업 생성
       // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
       const classTableName = await getTenantTableName(context.supabase, context.tenant_id, 'class');
       const { data: newClass, error: createError } = await context.supabase

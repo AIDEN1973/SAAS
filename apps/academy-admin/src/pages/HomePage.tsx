@@ -802,7 +802,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
     if (safeTodayClassesData.length === 0) return [];
 
     return safeTodayClassesData.map((cls) => {
-      // 오늘 날짜의 출석 데이터에서 해당 반의 출석 수 계산
+      // 오늘 날짜의 출석 데이터에서 해당 수업의 출석 수 계산
       // [P0-1 수정] safeTodayAttendanceLogs 사용 (배열 보장)
       const attendanceCount = safeTodayAttendanceLogs.filter((log) =>
         log.class_id === cls.id && log.status === 'present'

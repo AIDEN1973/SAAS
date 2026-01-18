@@ -80,7 +80,7 @@ export function getAcademyLabelFromI18n(i18nKey: string): string {
     'TAG.FORM.NAME.LABEL': '태그 이름',
 
     // Class Assignment Form i18n 키 → Academy Label 변환
-    'CLASS_ASSIGNMENT.FORM.CLASS_ID.LABEL': '반 선택',
+    'CLASS_ASSIGNMENT.FORM.CLASS_ID.LABEL': '수업 선택',
     'CLASS_ASSIGNMENT.FORM.ENROLLED_AT.LABEL': '배정일',
   };
 

@@ -119,7 +119,7 @@ function checkFallbackPattern(intent: IntentInfo): boolean {
     'attendance': ['출결', '출석', '지각', '결석', '조퇴'],
     'billing': ['수납', '청구', '결제', '납부', '연체', '환불'],
     'message': ['문자', '메시지', '알림', '공지'],
-    'class': ['반', '수업', '클래스'],
+    'class': ['수업', '클래스'],
     'schedule': ['일정', '스케줄', '시간표'],
     'report': ['리포트', '보고서', '요약', '현황'],
   };

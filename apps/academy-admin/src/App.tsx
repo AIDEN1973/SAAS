@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import React, { Suspense, lazy, useMemo, useEffect, useCallback, useState } from 'react';
 import {
   useModal,
@@ -676,7 +676,7 @@ function AppContent() {
    * - Real Estate: billing=false, appointments=true, properties=true
    *
    * Advanced 메뉴 구조 (아키텍처 문서 4.8):
-   * - 반/강사관리
+   * - 수업/강사관리
    * - 출결 설정
    * - 상품/청구 설정
    * - 메시지 템플릿/예약발송
@@ -934,7 +934,7 @@ function AppContent() {
     }
 
     // Teacher: 핵심 메뉴만 (Advanced 메뉴 없음, 수업 관리는 읽기 전용)
-    // 아키텍처 문서 2.3: "오늘의 반 + 학생 리스트 + 출결 체크만 노출"
+    // 아키텍처 문서 2.3: "오늘의 수업 + 학생 리스트 + 출결 체크만 노출"
     // 아키텍처 문서 2.4: "/analytics/** 접근 금지 (요약만 제공)"
     // 통계와 AI는 핵심 메뉴이므로 Advanced에 들어가면 안 됨 (4.8)
     if (role === 'teacher') {
@@ -1026,13 +1026,13 @@ function AppContent() {
                   onResultClick: (result: SearchResult) => {
                     void handleSearchResultClick(result);
                   },
-                  placeholder: '학생, 반, 보호자 검색 (Ctrl+K)',
-                  inputPlaceholder: '학생, 반, 보호자 등을 검색하세요...',
-                  emptyStateMessage: '학생, 반, 보호자, 상담 등을 검색할 수 있습니다.',
+                  placeholder: '학생, 수업, 보호자 검색 (Ctrl+K)',
+                  inputPlaceholder: '학생, 수업, 보호자 등을 검색하세요...',
+                  emptyStateMessage: '학생, 수업, 보호자, 상담 등을 검색할 수 있습니다.',
                   entityTypeLabels: {
                     student: '학생',
                     teacher: '강사',
-                    class: '반',
+                    class: '수업',
                     guardian: '보호자',
                     consultation: '상담',
                     announcement: '공지사항',
@@ -1176,16 +1176,7 @@ function AppContent() {
 }
 
 function App() {
-  return (
-    <BrowserRouter
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true,
-      }}
-    >
-      <AppContent />
-    </BrowserRouter>
-  );
+  return <AppContent />;
 }
 
 export default App;

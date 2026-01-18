@@ -3,7 +3,7 @@
  *
  * [불변 규칙] 스키마 엔진 기반 FormSchema 정의
  * [불변 규칙] Factory Function 패턴으로 업종중립성 지원
- * [동적 옵션] 학생 및 반 목록은 동적으로 채워집니다.
+ * [동적 옵션] 학생 및 수업 목록은 동적으로 채워집니다.
  */
 
 import type { FormSchema } from '@schema-engine';
@@ -47,7 +47,7 @@ export function createAttendanceFormSchema(
           name: 'class_id',
           kind: 'select',
           ui: {
-            label: terms ? `${terms.GROUP_LABEL} (선택)` : '반 (선택)',
+            label: terms ? `${terms.GROUP_LABEL} (선택)` : '수업 (선택)',
             colSpan: 1,
           },
           options: [

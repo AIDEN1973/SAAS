@@ -65,7 +65,7 @@ export function createAttendanceFilterSchema(
           name: 'class_id',
           kind: 'select',
           ui: {
-            label: terms ? terms.GROUP_LABEL : '반',
+            label: terms ? terms.GROUP_LABEL : '수업',
             colSpan: 1,
           },
           options: classOptions,
@@ -108,7 +108,7 @@ export function createAttendanceFilterSchema(
 }
 
 /**
- * 출결 화면 헤더용 필터 스키마 (반 선택, 날짜 선택, 검색)
+ * 출결 화면 헤더용 필터 스키마 (수업 선택, 날짜 선택, 검색)
  */
 export function createAttendanceHeaderFilterSchema(
   todayClasses?: Array<{ id: string; name: string }>,
@@ -116,10 +116,10 @@ export function createAttendanceHeaderFilterSchema(
 ): FilterSchema {
   const classOptions = todayClasses
     ? [
-        { label: terms ? `전체 ${terms.GROUP_LABEL}` : '전체 반', value: '' },
+        { label: terms ? `전체 ${terms.GROUP_LABEL}` : '전체 수업', value: '' },
         ...todayClasses.map((c) => ({ label: c.name, value: c.id }))
       ]
-    : [{ label: terms ? `전체 ${terms.GROUP_LABEL}` : '전체 반', value: '' }];
+    : [{ label: terms ? `전체 ${terms.GROUP_LABEL}` : '전체 수업', value: '' }];
 
   return {
     version: '1.0.0',
@@ -137,7 +137,7 @@ export function createAttendanceHeaderFilterSchema(
           name: 'class_id',
           kind: 'select',
           ui: {
-            label: terms ? terms.GROUP_LABEL : '반',
+            label: terms ? terms.GROUP_LABEL : '수업',
             colSpan: 1,
           },
           options: classOptions,

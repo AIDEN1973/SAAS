@@ -501,7 +501,7 @@ function EditTeacherModal({
 /**
  * 강사 카드 (프로필 보기)
  * [요구사항] 강사 프로필 보기
- * [P1-1] 담당 반 목록 표시
+ * [P1-1] 담당 수업 목록 표시
  * [P1-3] 강사 통계 표시
  */
 function TeacherCard({
@@ -517,7 +517,7 @@ function TeacherCard({
 }) {
   // P1-3: 강사 통계 조회
   const { data: stats } = useTeacherStatistics(teacher.id);
-  // P1-1: 담당 반 목록 조회
+  // P1-1: 담당 수업 목록 조회
   const { data: assignedClasses } = useTeacherClasses(teacher.id);
 
   const statusLabels: Record<TeacherStatus, string> = {
@@ -644,7 +644,7 @@ function TeacherCard({
         </div>
       )}
 
-      {/* P1-1: 담당 반 목록 */}
+      {/* P1-1: 담당 수업 목록 */}
       {assignedClasses && assignedClasses.length > 0 && (
         <div style={{ marginTop: 'var(--spacing-sm)', paddingTop: 'var(--spacing-sm)', borderTop: '1px solid var(--color-border)' }}>
           <div style={{ fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)' }}>

@@ -708,10 +708,10 @@ export class AcademyService {
     }
   }
 
-  // ==================== 반(Class) 관리 ====================
+  // ==================== 수업(Class) 관리 ====================
 
   /**
-   * 반 목록 조회 (필터링 가능)
+   * 수업 목록 조회 (필터링 가능)
    * [불변 규칙] withTenant() 사용하여 tenant_id 필터 강제
    */
   async getClasses(
@@ -790,9 +790,9 @@ export class AcademyService {
   }
 
   /**
-   * 반 생성
+   * 수업 생성
    * [불변 규칙] INSERT 시 tenant_id 직접 포함
-   * [불변 규칙] 반 색상 자동 생성 (지정하지 않으면 색상 생성)
+   * [불변 규칙] 수업 색상 자동 생성 (지정하지 않으면 색상 생성)
    */
   async createClass(
     tenantId: string,
@@ -801,7 +801,7 @@ export class AcademyService {
     // 색상 자동 생성 (지정하지 않은 경우)
     const color = input.color || this.generateClassColor();
 
-    // 반 생성
+    // 수업 생성
     const { data, error } = await this.supabase
       .from('academy_classes')
       .insert({
@@ -899,10 +899,10 @@ export class AcademyService {
   }
 
   /**
-   * 반 색상 자동 생성
-   * [불변 규칙] 반 색상 자동 생성
+   * 수업 색상 자동 생성
+   * [불변 규칙] 수업 색상 자동 생성
    * [P1 수정] Math.random() 사용 금지: 첫 번째 색상을 기본값으로 사용
-   * 향후에는 기존 반 색상과 중복되지 않도록 개선 예정
+   * 향후에는 기존 수업 색상과 중복되지 않도록 개선 예정
    */
   private generateClassColor(): string {
     // 기본 색상 목록(16진수 색상 코드)
@@ -920,13 +920,13 @@ export class AcademyService {
     ];
 
     // 첫 번째 색상을 기본값으로 사용 (Math.random() 사용 금지)
-    // 향후에는 기존 반 색상과 중복되지 않도록 개선 예정
+    // 향후에는 기존 수업 색상과 중복되지 않도록 개선 예정
     return colors[0];
   }
 
   /**
-   * 반별 출석률과 정원률, 지각률 조회
-   * [문서 요구사항] 반별 출석률과 정원률, 지각률 조회
+   * 수업별 출석률과 정원률, 지각률 조회
+   * [문서 요구사항] 수업별 출석률과 정원률, 지각률 조회
    * TODO: 출석 데이터가 구현되면 향후 정확히 계산
    */
   async getClassStatistics(
@@ -1315,7 +1315,7 @@ export class AcademyService {
   }
 
   /**
-   * 반별 강사 목록 조회
+   * 수업별 강사 목록 조회
    */
   async getClassTeachers(
     tenantId: string,
@@ -1339,7 +1339,7 @@ export class AcademyService {
     return (data || []) as ClassTeacher[];
   }
 
-  // ==================== 학생 반 배정 관리 ====================
+  // ==================== 학생 수업 배정 관리 ====================
 
   /**
    * 학생 반 배정
@@ -1472,7 +1472,7 @@ export class AcademyService {
   }
 
   /**
-   * 학생별 반 목록 조회
+   * 학생별 수업 목록 조회
    * [불변 규칙] student_classes + academy_classes 조인하여 조회
    */
   async getStudentClasses(
@@ -1744,7 +1744,7 @@ export class AcademyService {
   }
 
   /**
-   * 반별 출결 로그 조회
+   * 수업별 출결 로그 조회
    */
   async getAttendanceLogsByClass(
     tenantId: string,

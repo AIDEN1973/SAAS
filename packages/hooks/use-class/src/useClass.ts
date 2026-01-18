@@ -1,7 +1,7 @@
 /**
  * useClass Hook
  *
- * React Query 기반 반/강사 관리 Hook
+ * React Query 기반 수업/강사 관리 Hook
  * [불변 규칙] tenant 변경 시 invalidateQueries() 자동 발생
  * [불변 규칙] api-sdk를 통해서만 데이터 요청
  */
@@ -28,7 +28,7 @@ import type {
 import type { Person } from '@core/party';
 
 /**
- * 반 목록 조회 함수 (Hook의 queryFn 로직을 재사용)
+ * 수업 목록 조회 함수 (Hook의 queryFn 로직을 재사용)
  * [불변 규칙] useQuery 내부에서도 이 함수를 사용하여 일관성 유지
  */
 export async function fetchClasses(
@@ -49,7 +49,7 @@ export async function fetchClasses(
 }
 
 /**
- * 반 목록 조회 Hook
+ * 수업 목록 조회 Hook
  * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
  */
 export function useClasses(filter?: ClassFilter) {
@@ -64,7 +64,7 @@ export function useClasses(filter?: ClassFilter) {
 }
 
 /**
- * 반 상세 조회 Hook
+ * 수업 상세 조회 Hook
  */
 export function useClass(classId: string | null) {
   const context = getApiContext();
@@ -91,8 +91,8 @@ export function useClass(classId: string | null) {
 }
 
 /**
- * 반 생성 Hook
- * [P0-2 수정] DB RPC 함수로 트랜잭션 처리하여 반 생성 + 강사 배정 atomic 보장
+ * 수업 생성 Hook
+ * [P0-2 수정] DB RPC 함수로 트랜잭션 처리하여 수업 생성 + 강사 배정 atomic 보장
  */
 export function useCreateClass() {
   const queryClient = useQueryClient();
@@ -138,7 +138,7 @@ export function useCreateClass() {
             {
               operation_type: 'class.register',
               status: 'success',
-              summary: `${input.name || '반'} 등록 완료 (강사 ${input.teacher_ids.length}명 배정)`,
+              summary: `${input.name || '수업'} 등록 완료 (강사 ${input.teacher_ids.length}명 배정)`,
               details: {
                 class_id: response.data.id,
                 teacher_count: input.teacher_ids.length,
@@ -186,7 +186,7 @@ export function useCreateClass() {
           {
             operation_type: 'class.register',
             status: 'success',
-            summary: `${input.name || '반'} 등록 완료`,
+            summary: `${input.name || '수업'} 등록 완료`,
             details: {
               class_id: response.data.id,
             },
@@ -209,7 +209,7 @@ export function useCreateClass() {
 }
 
 /**
- * 반 수정 Hook
+ * 수업 수정 Hook
  * [수정] teacher_ids 지원 추가 - 기존 강사 배정 제거 후 신규 배정
  */
 export function useUpdateClass() {
@@ -281,7 +281,7 @@ export function useUpdateClass() {
           {
             operation_type: 'class.update',
             status: 'success',
-            summary: `${response.data.name || '반'} 정보 수정 완료 (${changedFields.join(', ')})`,
+            summary: `${response.data.name || '수업'} 정보 수정 완료 (${changedFields.join(', ')})`,
             details: {
               class_id: classId,
               changed_fields: changedFields,
@@ -309,7 +309,7 @@ export function useUpdateClass() {
 }
 
 /**
- * 반 삭제 Hook
+ * 수업 삭제 Hook
  */
 export function useDeleteClass() {
   const queryClient = useQueryClient();
@@ -340,7 +340,7 @@ export function useDeleteClass() {
           {
             operation_type: 'class.delete',
             status: 'success',
-            summary: `${response.data.name || '반'} 삭제 완료 (archived)`,
+            summary: `${response.data.name || '수업'} 삭제 완료 (archived)`,
             details: {
               class_id: classId,
               new_status: 'archived',
@@ -364,7 +364,7 @@ export function useDeleteClass() {
 }
 
 /**
- * 반별 통계 조회 Hook
+ * 수업별 통계 조회 Hook
  */
 export function useClassStatistics(classId: string | null) {
   const context = getApiContext();
@@ -839,10 +839,10 @@ export function useDeleteTeacher() {
   });
 }
 
-// ==================== 반/강사 연결 관리 =====================
+// ==================== 수업/강사 연결 관리 =====================
 
 /**
- * 반별 강사 목록 조회 Hook
+ * 수업별 강사 목록 조회 Hook
  */
 export function useClassTeachers(classId: string | null) {
   const context = getApiContext();

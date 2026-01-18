@@ -25,7 +25,7 @@ import { QuickActionCard } from '../components/dashboard-cards/QuickActionCard';
 import { RecentActivityCard } from '../components/dashboard-cards/RecentActivityCard';
 import { useStudentStats, useAttendanceStats, useStudentAlerts, useConsultationStats, useRecentActivity, useStudents } from '@hooks/use-student';
 import { CardGridLayout } from '../components/CardGridLayout';
-import { List, UserPlus, Tags, TrendingUp, Users, UserCheck, UserX, Clock, BarChart3, PieChart } from 'lucide-react';
+import { List, UserPlus, Tags, TrendingUp, Users, UserCheck, UserX, Clock, BarChart3, PieChart, GraduationCap } from 'lucide-react';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { SchemaForm } from '@schema-engine';
 import { studentFormSchema } from '../schemas/student.schema';
@@ -77,6 +77,7 @@ export function StudentsHomePage() {
       tags: <Tags size={16} />,
       statistics: <TrendingUp size={16} />,
       consultations: <TrendingUp size={16} />,
+      'class-assignment': <GraduationCap size={16} />,
     };
 
     // 먼저 동적 라벨 적용

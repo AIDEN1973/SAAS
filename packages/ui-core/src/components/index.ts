@@ -150,6 +150,9 @@ export type { StatsCardLayoutProps } from './StatsCardLayout';
 export { ListCardLayout } from './ListCardLayout';
 export type { ListCardLayoutProps, ListCardItem } from './ListCardLayout';
 
+export { EntityCard } from './EntityCard';
+export type { EntityCardProps } from './EntityCard';
+
 export { ChatOpsPanel } from './ChatOpsPanel';
 export type { ChatOpsPanelProps, ChatOpsMessage, ChatOpsMessageType, ChatOpsIndustryTerms } from './ChatOpsPanel';
 

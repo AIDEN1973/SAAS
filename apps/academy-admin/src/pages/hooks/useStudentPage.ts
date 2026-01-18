@@ -12,7 +12,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { useModal , useResponsiveMode, isMobile, isTablet } from '@ui-core/react';
-import { useStudentsPaged, useStudentTags, useStudentTagsByStudent, useAllStudentTagAssignments, useCreateStudent, useBulkCreateStudents, useStudent, useGuardians, useConsultations, useAllConsultations, useStudentClasses, useUpdateStudent, useDeleteStudent, useCreateGuardian, useUpdateGuardian, useDeleteGuardian, useCreateConsultation, useUpdateConsultation, useDeleteConsultation, useGenerateConsultationAISummary, useUpdateStudentTags, useAssignStudentToClass, useUnassignStudentFromClass, useUpdateStudentClassEnrolledAt } from '@hooks/use-student';
+import { useStudentsPaged, useStudentTags, useStudentTagsByStudent, useAllStudentTagAssignments, useCreateStudent, useBulkCreateStudents, useStudent, useGuardians, useConsultations, useAllConsultations, useStudentClasses, useAllStudentClasses, useUpdateStudent, useDeleteStudent, useCreateGuardian, useUpdateGuardian, useDeleteGuardian, useCreateConsultation, useUpdateConsultation, useDeleteConsultation, useGenerateConsultationAISummary, useUpdateStudentTags, useAssignStudentToClass, useUnassignStudentFromClass, useUpdateStudentClassEnrolledAt } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
 import { useSession, useUserRole } from '@hooks/use-auth';
 import { useSchema } from '@hooks/use-schema';
@@ -76,6 +76,8 @@ export interface UseStudentPageReturn {
   allConsultations: StudentConsultation[];
   allConsultationsLoading: boolean;
   filteredAllConsultations: StudentConsultation[];
+  allStudentClasses: Array<{ student_id: string; class_ids: string[] }>;
+  allStudentClassesLoading: boolean;
 
   // 스키마
   effectiveFormSchema: FormSchema;
@@ -287,7 +289,7 @@ export function useStudentPage(): UseStudentPageReturn {
     } as Record<string, unknown>;
   }, [filter.grade, filter.search, filter.status]);
 
-  // 태그 및 반 데이터
+  // 태그 및 수업 데이터
   const { data: tags } = useStudentTags();
   const { data: tagAssignments } = useAllStudentTagAssignments();
   const { data: classes } = useClasses({ status: 'active' });
@@ -348,6 +350,12 @@ export function useStudentPage(): UseStudentPageReturn {
     if (consultationTypeFilter === 'all') return allConsultations;
     return allConsultations.filter((c) => c.consultation_type === consultationTypeFilter);
   }, [allConsultations, consultationTypeFilter]);
+
+  // 전체 학생 수업 배정 정보 조회 (수업배정 탭용)
+  const { data: allStudentClassesData, isLoading: allStudentClassesLoading } = useAllStudentClasses();
+  const allStudentClasses = useMemo(() => {
+    return allStudentClassesData || [];
+  }, [allStudentClassesData]);
 
   // Mutation 훅
   const createStudent = useCreateStudent();
@@ -658,6 +666,8 @@ export function useStudentPage(): UseStudentPageReturn {
     allConsultations,
     allConsultationsLoading,
     filteredAllConsultations,
+    allStudentClasses,
+    allStudentClassesLoading,
 
     // 스키마
     effectiveFormSchema,

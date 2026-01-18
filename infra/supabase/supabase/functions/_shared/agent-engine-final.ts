@@ -397,7 +397,7 @@ async function executeManageStudent(
         resume: ['student_name'],                           // 필수: 이름
         update: ['student_name'],                           // 필수: 이름
         update_contact: ['student_name', 'phone'],          // 필수: 이름, 전화번호
-        change_class: ['student_name', 'class_name'],       // 필수: 이름, 반 이름
+        change_class: ['student_name', 'class_name'],       // 필수: 이름, 수업 이름
         merge: ['student_name'],                            // 필수: 이름
         assign_tags: ['student_name'],                      // 필수: 이름 (tags는 선택적, tag_names로 대체 가능)
       };
@@ -455,7 +455,7 @@ async function executeManageStudent(
           phone: '전화번호',
           birth_date: '생년월일 (예: 1973.10.16)',
           date: '날짜 (예: 2025.12.29)',
-          class_name: '반 이름',
+          class_name: '수업 이름',
           reason: '사유',
         };
 
@@ -881,7 +881,7 @@ async function executeQueryClass(
         return { success: false, result: null, error: '업종별 테이블 조회 실패' };
       }
 
-      // 반 목록 조회
+      // 수업 목록 조회
       const { data, error } = await context.supabase
         .from(tableName)
         .select('id, name, instructor_name, schedule, student_count, status')
@@ -895,7 +895,7 @@ async function executeQueryClass(
       const result = {
         classes: data || [],
         count: data?.length || 0,
-        message: `반 목록: ${data?.length || 0}개`,
+        message: `수업 목록: ${data?.length || 0}개`,
       };
 
       // 캐시 저장 (5분)
@@ -1987,11 +1987,11 @@ async function executeChangeClass(
       return {
         success: false,
         result: null,
-        error: to_class ? `반을 찾을 수 없습니다: ${to_class}` : '변경할 반 정보가 필요합니다.',
+        error: to_class ? `수업을 찾을 수 없습니다: ${to_class}` : '변경할 수업 정보가 필요합니다.',
       };
     }
 
-    // 새 반 배정
+    // 새 수업 배정
     const { error: assignError } = await context.supabase
       .from('student_classes')
       .insert({
@@ -2009,17 +2009,17 @@ async function executeChangeClass(
         return {
           success: false,
           result: null,
-          error: '이미 해당 반에 배정되어 있습니다.',
+          error: '이미 해당 수업에 배정되어 있습니다.',
         };
       }
-      console.error('[executeChangeClass] 반 배정 오류:', maskPII(assignError.message));
+      console.error('[executeChangeClass] 수업 배정 오류:', maskPII(assignError.message));
       return { success: false, result: null, error: assignError.message };
     }
 
     return {
       success: true,
       result: {
-        message: `반 변경이 완료되었습니다.${from_class ? ` (${from_class} → ${to_class || '새 반'})` : ''}`,
+        message: `수업 변경이 완료되었습니다.${from_class ? ` (${from_class} → ${to_class || '새 수업'})` : ''}`,
         person_id: maskPII(personId),
         class_id: maskPII(targetClassId),
       },
@@ -2029,7 +2029,7 @@ async function executeChangeClass(
     return {
       success: false,
       result: null,
-      error: error.message || '반 변경 중 오류가 발생했습니다',
+      error: error.message || '수업 변경 중 오류가 발생했습니다',
     };
   }
 }

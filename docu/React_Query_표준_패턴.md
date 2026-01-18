@@ -328,7 +328,7 @@ export function useCreateStudent(tenantId: string) {
         queryKey: createQueryKey('dashboard', 'stats', tenantId),
       });
 
-      // 3. 반별 학생 수 (클래스가 지정된 경우)
+      // 3. 수업별 학생 수 (클래스가 지정된 경우)
       if (data.classId) {
         queryClient.invalidateQueries({
           queryKey: createQueryKey('classes', 'detail', data.classId),

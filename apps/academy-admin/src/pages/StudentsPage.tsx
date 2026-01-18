@@ -41,7 +41,7 @@ import { RiskAnalysisTab } from './students/tabs/RiskAnalysisTab';
 import { MessageSendTab } from './students/tabs/MessageSendTab';
 import { CreateStudentForm } from './students/components/CreateStudentForm';
 // SubPage 컴포넌트 import
-import { StudentListSubPage, StudentTagsSubPage, StudentStatsSubPage, StudentConsultSubPage } from './students/subpages';
+import { StudentListSubPage, StudentTagsSubPage, StudentStatsSubPage, StudentConsultSubPage, StudentClassAssignmentSubPage } from './students/subpages';
 import type { StudentStatus, StudentConsultation, Guardian } from '@services/student-service';
 
 // [P2-QUALITY-1 해결] processTagInput 함수는 utils/data-normalization-utils.ts에서 SSOT로 관리
@@ -167,6 +167,8 @@ export function StudentsPage() {
     allConsultations,
     allConsultationsLoading,
     filteredAllConsultations,
+    allStudentClasses,
+    allStudentClassesLoading,
     selectedConsultationId,
     setSelectedConsultationId,
 
@@ -1262,6 +1264,54 @@ export function StudentsPage() {
               CONSULTATION_TYPE_LABELS: terms.CONSULTATION_TYPE_LABELS,
             }}
             showConfirm={showConfirm}
+          />
+        )}
+
+        {/* 수업배정 탭 ('class-assignment') - StudentClassAssignmentSubPage로 분리됨 */}
+        {selectedSubMenu === 'class-assignment' && (
+          <StudentClassAssignmentSubPage
+            isLoading={isLoading || allStudentClassesLoading}
+            error={error}
+            statsItems={statsItems}
+            chartData={chartData}
+            statsPeriod={statsPeriod}
+            onStatsPeriodChange={setStatsPeriod}
+            selectedStatsKey={selectedStatsKey}
+            onStatsCardClick={setSelectedStatsKey}
+            effectiveTableSchema={effectiveTableSchema}
+            students={(students as unknown as Record<string, unknown>[]) || []}
+            totalCount={totalCount}
+            tablePage={tablePage}
+            onTablePageChange={setTablePage}
+            tableFilters={tableFilters}
+            actionContext={actionContextMemo}
+            effectiveFilterSchema={effectiveFilterSchema}
+            onFilterChange={handleFilterChange}
+            filterDefaultValues={{
+              search: filter.search || '',
+              status: filter.status || '',
+              grade: filter.grade || '',
+              class_id: filter.class_id || '',
+            }}
+            allClasses={allClasses || []}
+            studentClassAssignments={allStudentClasses}
+            onAssignClass={async (studentId, classId) => {
+              await assignStudentToClass.mutateAsync({ studentId, classId });
+              toast(`${terms.GROUP_LABEL} 배정이 완료되었습니다.`, 'success', '배정 완료');
+            }}
+            onUnassignClass={async (studentId, classId) => {
+              await unassignStudentFromClass.mutateAsync({ studentId, classId });
+              toast(`${terms.GROUP_LABEL} 배정이 해제되었습니다.`, 'success', '해제 완료');
+            }}
+            assignPending={assignStudentToClass.isPending || unassignStudentFromClass.isPending}
+            iconSize={iconSize}
+            iconStrokeWidth={iconStrokeWidth}
+            currentSubMenuLabel={currentSubMenuLabel}
+            terms={{
+              PERSON_LABEL_PRIMARY: terms.PERSON_LABEL_PRIMARY,
+              GROUP_LABEL: terms.GROUP_LABEL,
+              MESSAGES: terms.MESSAGES,
+            }}
           />
         )}
 

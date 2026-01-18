@@ -16,6 +16,7 @@ export interface BadgeProps {
   variant?: 'solid' | 'outline' | 'soft';
   className?: string;
   style?: React.CSSProperties;
+  onClick?: () => void;
 }
 
 /**
@@ -30,7 +31,10 @@ export const Badge: React.FC<BadgeProps> = ({
   variant = 'solid',
   className,
   style,
+  onClick,
 }) => {
+  const [isHovered, setIsHovered] = React.useState(false);
+  // 화사한 배지 색상 (한 톤 어둡게 조정)
   const colorMap: Record<ColorToken | 'blue' | 'gray' | 'green' | 'yellow', {
     main: string;
     light: string;
@@ -38,64 +42,64 @@ export const Badge: React.FC<BadgeProps> = ({
     bg50: string;
   }> = {
     primary: {
-      main: 'var(--color-primary)',
-      light: 'var(--color-primary-light)',
-      dark: 'var(--color-primary-dark)',
-      bg50: 'var(--color-primary-50)',
+      main: '#4A7AE0', // 파랑 (한 톤 다크)
+      light: '#5B8DEF',
+      dark: '#4A7AE0',
+      bg50: '#E3EDFF',
     },
     secondary: {
-      main: 'var(--color-secondary)',
-      light: 'var(--color-secondary-light)',
-      dark: 'var(--color-secondary-dark)',
-      bg50: 'var(--color-secondary-50)',
+      main: '#9371F0', // 보라 (한 톤 다크)
+      light: '#A78BFA',
+      dark: '#9371F0',
+      bg50: '#EDE9FE',
     },
     success: {
-      main: 'var(--color-success)',
-      light: 'var(--color-success-light)',
-      dark: 'var(--color-success-dark)',
-      bg50: 'var(--color-success-50)',
+      main: '#34C66A', // 초록 (한 톤 다크)
+      light: '#4ADE80',
+      dark: '#34C66A',
+      bg50: '#E6F9ED',
     },
     warning: {
-      main: 'var(--color-warning)',
-      light: 'var(--color-warning-light)',
-      dark: 'var(--color-warning-dark)',
-      bg50: 'var(--color-warning-50)',
+      main: '#F0A500', // 노랑/금색 (한 톤 다크)
+      light: '#FBBF24',
+      dark: '#F0A500',
+      bg50: '#FEF5DC',
     },
     error: {
-      main: 'var(--color-error)',
-      light: 'var(--color-error-light)',
-      dark: 'var(--color-error-dark)',
-      bg50: 'var(--color-error-50)',
+      main: '#EF5050', // 빨강/코랄 (한 톤 다크)
+      light: '#F87171',
+      dark: '#EF5050',
+      bg50: '#FDE8E8',
     },
     info: {
-      main: 'var(--color-info)',
-      light: 'var(--color-info-light)',
-      dark: 'var(--color-info-dark)',
-      bg50: 'var(--color-info-50)',
+      main: '#0EBDD4', // 시안/청록 (한 톤 다크)
+      light: '#22D3EE',
+      dark: '#0EBDD4',
+      bg50: '#E0F7FA',
     },
     blue: {
-      main: 'var(--color-info)', // styles.css 준수: info 색상 사용
-      light: 'var(--color-info-light)',
-      dark: 'var(--color-info-dark)',
-      bg50: 'var(--color-info-50)',
+      main: '#4A7AE0', // 파랑 (한 톤 다크)
+      light: '#5B8DEF',
+      dark: '#4A7AE0',
+      bg50: '#E3EDFF',
     },
     gray: {
-      main: 'var(--color-gray-500)', // styles.css 준수: gray 색상 사용
-      light: 'var(--color-gray-400)',
-      dark: 'var(--color-gray-600)',
-      bg50: 'var(--color-gray-50)',
+      main: '#7B8494', // 회색 (한 톤 다크)
+      light: '#9CA3AF',
+      dark: '#7B8494',
+      bg50: '#F3F4F6',
     },
     green: {
-      main: 'var(--color-success)', // styles.css 준수: success 색상 사용
-      light: 'var(--color-success-light)',
-      dark: 'var(--color-success-dark)',
-      bg50: 'var(--color-success-50)',
+      main: '#34C66A', // 초록 (한 톤 다크)
+      light: '#4ADE80',
+      dark: '#34C66A',
+      bg50: '#E6F9ED',
     },
     yellow: {
-      main: 'var(--color-warning)', // styles.css 준수: warning 색상 사용
-      light: 'var(--color-warning-light)',
-      dark: 'var(--color-warning-dark)',
-      bg50: 'var(--color-warning-50)',
+      main: '#F0A500', // 노랑/금색 (한 톤 다크)
+      light: '#FBBF24',
+      dark: '#F0A500',
+      bg50: '#FEF5DC',
     },
   };
 
@@ -156,10 +160,26 @@ export const Badge: React.FC<BadgeProps> = ({
     whiteSpace: 'nowrap',
     ...sizeStyles[size],
     ...variantStyles[variant],
+    ...(onClick && {
+      cursor: 'pointer',
+      transition: 'var(--transition-all)',
+      opacity: isHovered ? 0.8 : 1,
+    }),
     ...style,
   };
 
-  return (
+  return onClick ? (
+    <button
+      type="button"
+      className={clsx(className)}
+      style={badgeStyle}
+      onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {children}
+    </button>
+  ) : (
     <span className={clsx(className)} style={badgeStyle}>
       {children}
     </span>

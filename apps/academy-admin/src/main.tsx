@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter } from 'react-router-dom';
 import { ModalProvider, AILayerMenuProvider } from '@ui-core/react';
 // Atlaskit v21에서는 ThemeProvider가 필요 없습니다. 기본 테마가 자동 적용됩니다.
 import App from './App';
@@ -79,11 +80,18 @@ initErrorTracking({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ModalProvider>
-        <AILayerMenuProvider>
-          <App />
-        </AILayerMenuProvider>
-      </ModalProvider>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
+        <ModalProvider>
+          <AILayerMenuProvider>
+            <App />
+          </AILayerMenuProvider>
+        </ModalProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>
 );

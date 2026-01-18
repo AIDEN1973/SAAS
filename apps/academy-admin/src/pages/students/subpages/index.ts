@@ -15,3 +15,6 @@ export type { StudentTagsSubPageProps } from './StudentTagsSubPage';
 
 export { StudentStatsSubPage } from './StudentStatsSubPage';
 export type { StudentStatsSubPageProps } from './StudentStatsSubPage';
+
+export { StudentClassAssignmentSubPage } from './StudentClassAssignmentSubPage';
+export type { StudentClassAssignmentSubPageProps } from './StudentClassAssignmentSubPage';

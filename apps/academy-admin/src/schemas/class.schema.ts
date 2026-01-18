@@ -27,7 +27,7 @@ export function createClassFormSchema(teachers?: Teacher[], terms?: IndustryTerm
         name: 'name',
         kind: 'text',
         ui: {
-          label: terms ? `${terms.GROUP_LABEL} 이름` : '반 이름',
+          label: terms ? `${terms.GROUP_LABEL} 이름` : '수업 이름',
           colSpan: 2,
         },
         validation: {
@@ -67,7 +67,7 @@ export function createClassFormSchema(teachers?: Teacher[], terms?: IndustryTerm
           { label: '일요일', value: 'sunday' },
         ],
         defaultValue: 'monday',
-        // 아키텍처 문서 M5: 반 이름만 입력해도 생성 가능, 시간·요일·정원은 고급 옵션
+        // 아키텍처 문서 M5: 수업 이름만 입력해도 생성 가능, 시간·요일·정원은 고급 옵션
       },
       {
         name: 'start_time',
@@ -79,7 +79,7 @@ export function createClassFormSchema(teachers?: Teacher[], terms?: IndustryTerm
         },
         defaultValue: '14:00',
         validation: {
-          // 아키텍처 문서 M5: 반 이름만 입력해도 생성 가능
+          // 아키텍처 문서 M5: 수업 이름만 입력해도 생성 가능
           pattern: {
             value: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$',
             message: '시간 형식이 올바르지 않습니다 (예: 14:00)',
@@ -96,7 +96,7 @@ export function createClassFormSchema(teachers?: Teacher[], terms?: IndustryTerm
         },
         defaultValue: '15:30',
         validation: {
-          // 아키텍처 문서 M5: 반 이름만 입력해도 생성 가능
+          // 아키텍처 문서 M5: 수업 이름만 입력해도 생성 가능
           pattern: {
             value: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$',
             message: '시간 형식이 올바르지 않습니다 (예: 15:30)',
@@ -112,7 +112,7 @@ export function createClassFormSchema(teachers?: Teacher[], terms?: IndustryTerm
         },
         defaultValue: 20,
         validation: {
-          // 아키텍처 문서 M5: 반 이름만 입력해도 생성 가능
+          // 아키텍처 문서 M5: 수업 이름만 입력해도 생성 가능
           min: 1,
         },
       },
@@ -128,7 +128,7 @@ export function createClassFormSchema(teachers?: Teacher[], terms?: IndustryTerm
         name: 'color',
         kind: 'text',
         ui: {
-          label: terms ? `${terms.GROUP_LABEL} 색상` : '반 색상',
+          label: terms ? `${terms.GROUP_LABEL} 색상` : '수업 색상',
           colSpan: 1,
           placeholder: '#3b82f6',
           description: '자동 할당됩니다. 원하는 색상으로 변경 가능합니다.',

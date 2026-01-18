@@ -47,7 +47,7 @@ export class AttendanceService {
   }
 
   /**
-   * 반별 출결 로그 조회
+   * 수업별 출결 로그 조회
    */
   async getAttendanceLogsByClass(
     tenantId: string,

@@ -1,6 +1,6 @@
 /**
  * Teacher Statistics and Assigned Classes Hooks
- * P1-1, P1-3: 강사별 담당 반 목록 및 통계
+ * P1-1, P1-3: 강사별 담당 수업 목록 및 통계
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -18,7 +18,7 @@ export interface TeacherStatistics {
 
 /**
  * 강사 통계 조회 Hook
- * P1-3: 담당 반 수, 담당 학생 수, 담임/부담임 구분
+ * P1-3: 담당 수업 수, 담당 학생 수, 담임/부담임 구분
  */
 export function useTeacherStatistics(teacherId: string | null) {
   const context = getApiContext();
@@ -44,7 +44,7 @@ export function useTeacherStatistics(teacherId: string | null) {
   });
 }
 
-// ==================== P1-1: 강사별 담당 반 목록 =====================
+// ==================== P1-1: 강사별 담당 수업 목록 =====================
 
 export interface TeacherClassAssignment {
   class_id: string;
@@ -56,8 +56,8 @@ export interface TeacherClassAssignment {
 }
 
 /**
- * 강사별 담당 반 목록 조회 Hook
- * P1-1: 강사 카드에 담당 반 정보 표시
+ * 강사별 담당 수업 목록 조회 Hook
+ * P1-1: 강사 카드에 담당 수업 정보 표시
  */
 export function useTeacherClasses(teacherId: string | null) {
   const context = getApiContext();

@@ -66,7 +66,7 @@ export function AttendancePage() {
 
 
   // 오늘 출결하기 관련 상태
-  // localStorage 기반 상태 초기화 (마지막 선택 반 기억)
+  // localStorage 기반 상태 초기화 (마지막 선택 수업 기억)
   const [selectedClassId, setSelectedClassId] = useState<string | null>(() => {
     try {
       const stored = localStorage.getItem('attendance-page-selected-class');
@@ -327,10 +327,10 @@ export function AttendancePage() {
     return { checkInMap, checkOutMap };
   }, [attendanceLogs]);  // selectedDate, selectedClassId는 실제로 사용되지 않음
 
-  // 선택된 반의 학생 목록
+  // 선택된 수업의 학생 목록
   const filteredStudents = useMemo(() => {
-    // 반이 선택된 경우: 해당 반의 학생만
-    // 반이 선택되지 않은 경우: 선택된 날짜에 수업이 있는 모든 학생
+    // 수업이 선택된 경우: 해당 수업의 학생만
+    // 수업이 선택되지 않은 경우: 선택된 날짜에 수업이 있는 모든 학생
     // [버그 수정] 빈 문자열('')도 "선택 안 됨"으로 처리
     const baseStudents = (selectedClassId && selectedClassId.trim() !== '')
       ? (selectedClassStudents || [])
@@ -506,10 +506,10 @@ export function AttendancePage() {
     setStudentAttendanceStates(newStates);
   }, [aiPredictions, isLoadingPredictions, filteredStudents, attendanceLogsMap]);
 
-  // 선택된 반/날짜 변경 시 상태 초기화 및 필터 업데이트
+  // 선택된 수업/날짜 변경 시 상태 초기화 및 필터 업데이트
   useEffect(() => {
     if (import.meta.env?.DEV) {
-      console.log('[AttendancePage] 🔄 반/날짜 변경 감지:', { selectedClassId, selectedDate });
+      console.log('[AttendancePage] 🔄 수업/날짜 변경 감지:', { selectedClassId, selectedDate });
     }
 
     // 필터 업데이트 (attendance_logs 재조회를 위해 필수)
@@ -632,7 +632,7 @@ export function AttendancePage() {
                 .second(0)
                 .format('YYYY-MM-DDTHH:mm:ssZ');
             } else {
-              // 반 정보가 없으면 현재 시간 사용
+              // 수업 정보가 없으면 현재 시간 사용
               occurredAt = toKST().format('YYYY-MM-DDTHH:mm:ssZ');
             }
           }

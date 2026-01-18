@@ -23,7 +23,7 @@ export const classFilterSchema: FilterSchema = {
         kind: 'text',
         ui: {
           label: '검색',
-          placeholder: '반 이름 검색..',
+          placeholder: '수업 이름 검색..',
           colSpan: 1,
         },
       },

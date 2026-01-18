@@ -296,7 +296,7 @@ function StudentsPage() {
 
 **주요 terms 필드:**
 - `PERSON_LABEL_PRIMARY`: "학생" | "회원" | "고객"
-- `GROUP_LABEL`: "반" | "그룹" | "서비스"
+- `GROUP_LABEL`: "수업" | "그룹" | "서비스"
 - `ATTENDANCE_LABEL`: "출결" | "출석" | "방문"
 - `TAG_LABEL`: "태그"
 - `CONSULTATION_LABEL`: "상담"

@@ -148,7 +148,7 @@ export const class_exec_bulk_reassign_teacherHandler: IntentHandler = {
           error_count: errors.length,
         },
         affected_count: successCount,
-        message: `${successCount}개 반의 강사 재배정이 완료되었습니다.${errors.length > 0 ? ` (${errors.length}개 실패)` : ''}`,
+        message: `${successCount}개 수업의 강사 재배정이 완료되었습니다.${errors.length > 0 ? ` (${errors.length}개 실패)` : ''}`,
       };
     } catch (error) {
       const maskedError = maskPII(error);

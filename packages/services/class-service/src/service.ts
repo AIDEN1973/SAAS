@@ -25,10 +25,10 @@ import type {
  * Service Layer는 Industry Layer의 academyService를 매핑하여 제공합니다.
  */
 export class ClassService {
-  // ==================== 반(Class) 관리 ====================
+  // ==================== 수업(Class) 관리 ====================
 
   /**
-   * 반 목록 조회 (필터링/페이징)
+   * 수업 목록 조회 (필터링/페이징)
    */
   async getClasses(
     tenantId: string,
@@ -38,14 +38,14 @@ export class ClassService {
   }
 
   /**
-   * 반 상세 조회
+   * 수업 상세 조회
    */
   async getClass(tenantId: string, classId: string): Promise<Class | null> {
     return academyService.getClass(tenantId, classId);
   }
 
   /**
-   * 반 생성
+   * 수업 생성
    */
   async createClass(
     tenantId: string,
@@ -55,7 +55,7 @@ export class ClassService {
   }
 
   /**
-   * 반 수정
+   * 수업 수정
    */
   async updateClass(
     tenantId: string,
@@ -66,14 +66,14 @@ export class ClassService {
   }
 
   /**
-   * 반 삭제
+   * 수업 삭제
    */
   async deleteClass(tenantId: string, classId: string): Promise<void> {
     return academyService.deleteClass(tenantId, classId);
   }
 
   /**
-   * 반별 통계 조회
+   * 수업별 통계 조회
    */
   async getClassStatistics(
     tenantId: string,
@@ -139,10 +139,10 @@ export class ClassService {
     return academyService.deleteTeacher(tenantId, teacherId);
   }
 
-  // ==================== 반-강사 연결 ====================
+  // ==================== 수업-강사 연결 ====================
 
   /**
-   * 반에 강사 할당
+   * 수업에 강사 할당
    */
   async assignTeacher(
     tenantId: string,
@@ -152,7 +152,7 @@ export class ClassService {
   }
 
   /**
-   * 반에서 강사 제거
+   * 수업에서 강사 제거
    */
   async unassignTeacher(
     tenantId: string,
@@ -163,7 +163,7 @@ export class ClassService {
   }
 
   /**
-   * 반별 강사 목록 조회
+   * 수업별 강사 목록 조회
    */
   async getClassTeachers(
     tenantId: string,

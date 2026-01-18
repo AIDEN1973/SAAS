@@ -91,12 +91,7 @@ export const Card: React.FC<CardProps> = ({
   const cardStyle: React.CSSProperties = {
     // 요구사항: 카드 라운드 한 단계 축소 (sm -> xs)
     borderRadius: 'var(--border-radius-xs)',
-    paddingTop: basePadding,
-    paddingRight: basePadding,
-    paddingLeft: basePadding,
-    // 요구사항: 기본보기/수정폼 모두에서 카드 내부 하단 여백을 한 단계 더 확보
-    // (하드코딩 금지: spacing 토큰 사용)
-    paddingBottom: `calc(${basePadding} + var(--spacing-sm))`,
+    padding: basePadding,
     ...variantStyles[effectiveVariant],
     ...(onClick && !disableHoverEffect && {
       cursor: 'pointer',

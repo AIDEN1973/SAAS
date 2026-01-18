@@ -119,7 +119,7 @@ export const STUDENT_TABS: readonly StudentTab[] = [
   },
   {
     id: 'classes',
-    label: '반배정',
+    label: '수업배정',
     icon: BookOpen,
     showCount: true,
   },

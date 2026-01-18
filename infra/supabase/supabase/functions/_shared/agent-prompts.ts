@@ -30,7 +30,7 @@ export const AGENT_SYSTEM_PROMPT = `학원 관리 AI 어시스턴트. Tool을 �
 - 학생 등록(register): 이름, 전화번호, 생년월일
 - 학생 수정(update): 학생 식별 정보(이름 또는 ID)
 - 퇴원(discharge)/휴원(pause): 학생 식별, 사유, 날짜
-- 반 변경(change_class): 학생 식별, 반 이름
+- 수업 변경(change_class): 학생 식별, 수업 이름
 
 **Tool 사용**:
 - 조회: query_* Tool (필수 정보만 수집 후 즉시 호출)

@@ -53,7 +53,7 @@ export function AttendanceTab({
   const createAttendanceLog = useCreateAttendanceLog();
   const updateAttendanceLog = useUpdateAttendanceLog();
 
-  // 학생의 배정된 반 목록 조회
+  // 학생의 배정된 수업 목록 조회
   // [P1-7] studentId가 null일 수 있지만, hook 내부에서 enabled: !!studentId로 처리됨
   const { data: studentClassesData } = useStudentClasses(studentId);
   const studentClasses = useMemo(() => studentClassesData ?? [], [studentClassesData]);

@@ -67,7 +67,7 @@ export const DEFAULT_SEARCH_ENTITY_TYPES: SearchEntityType[] = [
 export const SEARCH_ENTITY_TYPE_LABELS: Record<SearchEntityType, string> = {
   student: '학생',
   teacher: '강사',
-  class: '반',
+  class: '수업',
   guardian: '보호자',
   consultation: '상담',
   announcement: '공지사항',

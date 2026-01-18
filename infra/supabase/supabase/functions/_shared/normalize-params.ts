@@ -7,7 +7,7 @@
  *
  * AI가 추출한 파라미터를 Handler가 기대하는 형식으로 변환합니다.
  * - name → student_id (학생 이름으로 조회)
- * - class_name → class_id (반 이름으로 조회)
+ * - class_name → class_id (수업 이름으로 조회)
  * - 기타 일반적인 변환 규칙 적용
  *
  * 이 함수는 모든 Intent에 일관되게 적용되며, 케이스별 로직을 피합니다.
@@ -311,13 +311,13 @@ export async function normalizeParams(
         } else {
           console.log('[ChatOps:Normalize] class_name → class_id 변환 실패:', {
             class_name: maskPII(className),
-            error: classError ? maskPII(classError) : '반을 찾을 수 없음',
+            error: classError ? maskPII(classError) : '수업을 찾을 수 없음',
           });
           // 🔧 FIX: P0-6 - attachResolveFailed() 사용 (직접 대입 금지)
           attachResolveFailed(p, {
             field: 'class_id',
             original_value: className,
-            reason: classError ? '반을 찾을 수 없습니다' : '반을 찾을 수 없음',
+            reason: classError ? '수업을 찾을 수 없습니다' : '수업을 찾을 수 없음',
           });
         }
       }

@@ -1935,11 +1935,52 @@ export function useUpdateStudentTags() {
   });
 }
 
-// ==================== 학생 반 배정 관리 ====================
+// ==================== 학생 수업 배정 관리 ====================
 
 /**
- * 학생의 반 목록 조회 Hook
- * [요구사항] 수강 중인 반 지속 지원
+ * 모든 학생의 수업 배정 정보 조회 Hook
+ * [요구사항] 수업배정 탭에서 전체 학생별 수업 배정 현황 표시
+ */
+export function useAllStudentClasses() {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+
+  return useQuery({
+    queryKey: ['all-student-classes', tenantId],
+    queryFn: async () => {
+      if (!tenantId) return [];
+
+      // 모든 활성 학생-수업 배정 조회
+      const response = await apiClient.get<StudentClass>('student_classes', {
+        filters: { is_active: true },
+        limit: 10000,
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      // 학생별로 그룹화
+      const studentClassMap = new Map<string, string[]>();
+      (response.data || []).forEach((sc: StudentClass) => {
+        const existing = studentClassMap.get(sc.student_id) || [];
+        existing.push(sc.class_id);
+        studentClassMap.set(sc.student_id, existing);
+      });
+
+      // 배열로 변환
+      return Array.from(studentClassMap.entries()).map(([student_id, class_ids]) => ({
+        student_id,
+        class_ids,
+      }));
+    },
+    enabled: !!tenantId,
+  });
+}
+
+/**
+ * 학생의 수업 목록 조회 Hook
+ * [요구사항] 수강 중인 수업 지속 지원
  * [수정] PostgREST 조인 문법 오류 수정: 두 번의 쿼리로 분리
  */
 export function useStudentClasses(studentId: string | null) {
@@ -2114,6 +2155,7 @@ export function useAssignStudentToClass() {
           const key = query.queryKey;
           return (
             (key[0] === 'student-classes' && key[1] === tenantId && key[2] === variables.studentId) ||
+            (key[0] === 'all-student-classes' && key[1] === tenantId) ||
             (key[0] === 'classes' && key[1] === tenantId) ||
             (key[0] === 'students' && key[1] === tenantId)
           );
@@ -2217,6 +2259,7 @@ export function useUnassignStudentFromClass() {
           const key = query.queryKey;
           return (
             (key[0] === 'student-classes' && key[1] === tenantId && key[2] === variables.studentId) ||
+            (key[0] === 'all-student-classes' && key[1] === tenantId) ||
             (key[0] === 'classes' && key[1] === tenantId) ||
             (key[0] === 'students' && key[1] === tenantId)
           );
@@ -2252,7 +2295,7 @@ export function useUpdateStudentClassEnrolledAt() {
       }
 
       // student_classes의 enrolled_at만 업데이트
-      // [주의] current_count 업데이트는 필요 없음 (같은 반이므로 학생 수 변화 없음)
+      // [주의] current_count 업데이트는 필요 없음 (같은 수업이므로 학생 수 변화 없음)
       const response = await apiClient.patch<StudentClass>('student_classes', studentClassId, {
         // 기술문서 5-2: KST 기준 날짜 처리
         enrolled_at: enrolledAt,

@@ -95,7 +95,7 @@ export const agentTools: AgentTool[] = [
           },
           class_name: {
             type: 'string',
-            description: '반 이름 (by_class 타입일 때)',
+            description: '수업 이름 (by_class 타입일 때)',
           },
           date: {
             type: 'string',
@@ -143,7 +143,7 @@ export const agentTools: AgentTool[] = [
     type: 'function',
     function: {
       name: 'query_class',
-      description: '반/수업 정보를 조회합니다.',
+      description: '수업 정보를 조회합니다.',
       parameters: {
         type: 'object',
         properties: {
@@ -154,7 +154,7 @@ export const agentTools: AgentTool[] = [
           },
           class_name: {
             type: 'string',
-            description: '반 이름 (roster 타입일 때)',
+            description: '수업 이름 (roster 타입일 때)',
           },
         },
         required: ['type'],
@@ -181,7 +181,7 @@ export const agentTools: AgentTool[] = [
           },
           class_name: {
             type: 'string',
-            description: '반 이름 (by_class 타입일 때)',
+            description: '수업 이름 (by_class 타입일 때)',
           },
           date: {
             type: 'string',
@@ -267,7 +267,7 @@ export const agentTools: AgentTool[] = [
           },
           class_name: {
             type: 'string',
-            description: '반 이름 (class_history 타입일 때)',
+            description: '수업 이름 (class_history 타입일 때)',
           },
         },
         required: ['type'],
@@ -317,7 +317,7 @@ export const agentTools: AgentTool[] = [
           },
           target: {
             type: 'string',
-            description: '대상 (학생 이름, 반 이름, 또는 "전체")',
+            description: '대상 (학생 이름, 수업 이름, 또는 "전체")',
           },
           message: {
             type: 'string',
@@ -344,7 +344,7 @@ export const agentTools: AgentTool[] = [
           },
           target: {
             type: 'string',
-            description: '대상 (학생 이름, 반 이름, 또는 "전체")',
+            description: '대상 (학생 이름, 수업 이름, 또는 "전체")',
           },
           content: {
             type: 'string',

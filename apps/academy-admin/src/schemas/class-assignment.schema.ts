@@ -24,7 +24,7 @@ export const classAssignmentFormSchema: FormSchema = {
         kind: 'select',
         ui: {
           labelKey: 'CLASS_ASSIGNMENT.FORM.CLASS_ID.LABEL',
-          label: '반 선택',
+          label: '수업 선택',
           colSpan: 1,
         },
         validation: {

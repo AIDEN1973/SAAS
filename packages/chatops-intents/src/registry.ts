@@ -541,7 +541,7 @@ export const intentRegistry: Record<string, IntentRegistryItem> = {
 
   'attendance.query.by_class': {
     intent_key: 'attendance.query.by_class',
-    description: '반별 출결 조회',
+    description: '수업별 출결 조회',
     automation_level: 'L0',
     paramsSchema: z.object({
       class_id: z.string().uuid(),
@@ -566,14 +566,14 @@ export const intentRegistry: Record<string, IntentRegistryItem> = {
       subtype: 'attendance_by_class',
     },
     examples: [
-      '반별 출결 조회',
-      '1반 출결 확인',
-      '수학반 출석 현황',
-      '영어반 출결 조회',
-      '반별 출석률 확인',
-      '특정 반 출결 조회',
-      '반 출결 내역',
-      '반 출석 현황 보여줘',
+      '수업별 출결 조회',
+      '수학A 수업 출결 확인',
+      '수학 수업 출석 현황',
+      '영어 수업 출결 조회',
+      '수업별 출석률 확인',
+      '특정 수업 출결 조회',
+      '수업 출결 내역',
+      '수업 출석 현황 보여줘',
     ],
   },
 
@@ -3372,7 +3372,7 @@ export const intentRegistry: Record<string, IntentRegistryItem> = {
   // 반/수업/시간표(Class/Schedule) 도메인 - L0 조회 Intent
   'class.query.list': {
     intent_key: 'class.query.list',
-    description: '반 목록 조회',
+    description: '수업 목록 조회',
     automation_level: 'L0',
     paramsSchema: z.object({
       active_only: z.boolean().optional(),
@@ -3526,7 +3526,7 @@ export const intentRegistry: Record<string, IntentRegistryItem> = {
 
   'schedule.query.by_class': {
     intent_key: 'schedule.query.by_class',
-    description: '반별 시간표 조회',
+    description: '수업별 시간표 조회',
     automation_level: 'L0',
     paramsSchema: z.object({
       class_id: z.string().uuid(),
@@ -3553,13 +3553,13 @@ export const intentRegistry: Record<string, IntentRegistryItem> = {
     },
     examples: [
       '오늘 수업 시간표 조회',
-      '이번 주 반별 일정 보여줘',
-      '반별 시간표 확인해줘',
+      '이번 주 수업별 일정 보여줘',
+      '수업별 시간표 확인해줘',
       '이번 주 수업 내용 알려줘',
       '오늘 수업 시간표는?',
-      '각 반 시간표는 어떻게 되나요?',
-      '내 반 시간표 확인하고 싶어',
-      '이번 주 반별 일정 리스트',
+      '각 수업 시간표는 어떻게 되나요?',
+      '내 수업 시간표 확인하고 싶어',
+      '이번 주 수업별 일정 리스트',
     ],
   },
 
