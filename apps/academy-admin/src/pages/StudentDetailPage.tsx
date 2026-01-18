@@ -34,7 +34,6 @@ export function StudentDetailPage() {
       path.includes('/attendance') ? 'attendance'
       : path.includes('/risk') ? 'risk'
       : path.includes('/welcome') ? 'welcome'
-      : path.includes('/guardians') ? 'guardians'
       : path.includes('/consultations') ? 'consultations'
       : path.includes('/tags') ? 'tags'
       : path.includes('/classes') ? 'classes'

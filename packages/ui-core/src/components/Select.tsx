@@ -17,6 +17,7 @@ export interface SelectOption {
   value: string | number;
   label: string;
   disabled?: boolean;
+  divider?: boolean; // 이 옵션 뒤에 구분선 표시
 }
 
 export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size' | 'children' | 'onChange'> {
@@ -514,11 +515,16 @@ export const Select: React.FC<SelectProps> = ({
               <div
                 ref={listRef}
                 role="listbox"
+                className="select-dropdown-list"
               style={{
                 padding: 'var(--spacing-xs)',
                 width: '100%', // 부모(Popover) 너비에 맞춤
                 boxSizing: 'border-box',
-              }}
+                maxHeight: '300px', // 최대 높이 설정
+                overflowY: 'auto', // 세로 스크롤
+                scrollbarWidth: 'none', // Firefox: 스크롤바 숨김
+                msOverflowStyle: 'none', // IE/Edge: 스크롤바 숨김
+              } as React.CSSProperties & { scrollbarWidth?: string; msOverflowStyle?: string }}
               >
                 {options.map((option, index) => {
                   const isSelected = multiple
@@ -527,74 +533,84 @@ export const Select: React.FC<SelectProps> = ({
                   const isFocused = index === focusedIndex;
 
                   return (
-                    <div
-                      key={option.value}
-                      role="option"
-                      aria-selected={isSelected}
-                      onClick={(e) => !option.disabled && handleSelect(option.value, e)}
-                      style={{
-                        paddingTop: 'var(--spacing-sm)',
-                        paddingBottom: 'var(--spacing-sm)',
-                        paddingLeft: 'var(--spacing-md)',
-                        paddingRight: 'var(--spacing-lg)', // 우측 여백 증가
-                        borderRadius: 'var(--border-radius-sm)',
-                        cursor: option.disabled ? 'not-allowed' : 'pointer',
-                        backgroundColor: isSelected
-                          ? 'var(--color-primary-selected)'
-                          : isFocused
-                          ? 'var(--color-primary-hover)'
-                          : 'transparent',
-                        color: option.disabled
-                          ? 'var(--color-text-tertiary)'
-                          : 'var(--color-text)', // 기본 텍스트 색상 사용
-                        fontWeight: isSelected ? 'var(--font-weight-medium)' : 'var(--font-weight-normal)',
-                        fontSize: 'var(--font-size-base)', // styles.css 준수: 기본 폰트 사이즈
-                        transition: 'var(--transition-fast)', // styles.css 준수: transition 토큰 사용
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 'var(--spacing-sm)',
-                        whiteSpace: 'nowrap', // 텍스트 줄바꿈 방지
-                      }}
-                      onMouseEnter={() => setFocusedIndex(index)}
-                      onMouseLeave={() => setFocusedIndex(-1)}
-                    >
-                      {multiple && (
+                    <React.Fragment key={option.value}>
+                      <div
+                        role="option"
+                        aria-selected={isSelected}
+                        onClick={(e) => !option.disabled && handleSelect(option.value, e)}
+                        style={{
+                          paddingTop: 'var(--spacing-sm)',
+                          paddingBottom: 'var(--spacing-sm)',
+                          paddingLeft: 'var(--spacing-md)',
+                          paddingRight: 'var(--spacing-lg)', // 우측 여백 증가
+                          borderRadius: 'var(--border-radius-sm)',
+                          cursor: option.disabled ? 'not-allowed' : 'pointer',
+                          backgroundColor: isSelected
+                            ? 'var(--color-primary-selected)'
+                            : isFocused
+                            ? 'var(--color-primary-hover)'
+                            : 'transparent',
+                          color: option.disabled
+                            ? 'var(--color-text-tertiary)'
+                            : 'var(--color-text)', // 기본 텍스트 색상 사용
+                          fontWeight: isSelected ? 'var(--font-weight-medium)' : 'var(--font-weight-normal)',
+                          fontSize: 'var(--font-size-base)', // styles.css 준수: 기본 폰트 사이즈
+                          transition: 'var(--transition-fast)', // styles.css 준수: transition 토큰 사용
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 'var(--spacing-sm)',
+                          whiteSpace: 'nowrap', // 텍스트 줄바꿈 방지
+                        }}
+                        onMouseEnter={() => setFocusedIndex(index)}
+                        onMouseLeave={() => setFocusedIndex(-1)}
+                      >
+                        {multiple && (
+                          <div
+                            style={{
+                              width: 'var(--spacing-md)', // styles.css 준수: 16px
+                              height: 'var(--spacing-md)', // styles.css 준수: 16px
+                              border: `var(--border-width-base) solid ${isSelected ? 'var(--color-primary)' : 'var(--color-gray-300)'}`,
+                              borderRadius: 'var(--border-radius-sm)',
+                              backgroundColor: isSelected ? 'var(--color-primary)' : 'transparent',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {isSelected && (
+                              <svg
+                                viewBox="0 0 10 10"
+                                fill="none"
+                                style={{
+                                  width: 'var(--size-icon-sm)',
+                                  height: 'var(--size-icon-sm)',
+                                  color: 'var(--color-white)'
+                                }}
+                              >
+                                <path
+                                  d="M8 2.5L3.5 7L2 5.5"
+                                  stroke="currentColor"
+                                  strokeWidth="var(--stroke-width-icon)"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            )}
+                          </div>
+                        )}
+                        <span>{option.label}</span>
+                      </div>
+                      {option.divider && (
                         <div
                           style={{
-                            width: 'var(--spacing-md)', // styles.css 준수: 16px
-                            height: 'var(--spacing-md)', // styles.css 준수: 16px
-                            border: `var(--border-width-base) solid ${isSelected ? 'var(--color-primary)' : 'var(--color-gray-300)'}`,
-                            borderRadius: 'var(--border-radius-sm)',
-                            backgroundColor: isSelected ? 'var(--color-primary)' : 'transparent',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
+                            height: '1px',
+                            backgroundColor: 'var(--color-gray-200)',
+                            margin: 'var(--spacing-xs) 0',
                           }}
-                        >
-                          {isSelected && (
-                            <svg
-                              viewBox="0 0 10 10"
-                              fill="none"
-                              style={{
-                                width: 'var(--size-icon-sm)',
-                                height: 'var(--size-icon-sm)',
-                                color: 'var(--color-white)'
-                              }}
-                            >
-                              <path
-                                d="M8 2.5L3.5 7L2 5.5"
-                                stroke="currentColor"
-                                strokeWidth="var(--stroke-width-icon)"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
-                          )}
-                        </div>
+                        />
                       )}
-                      <span>{option.label}</span>
-                    </div>
+                    </React.Fragment>
                   );
                 })}
                 {options.length === 0 && (

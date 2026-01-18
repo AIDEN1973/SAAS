@@ -9,7 +9,7 @@
  */
 
 import React, { useState } from 'react';
-import { Card, Button, EmptyState } from '@ui-core/react';
+import { Card, Button, EmptyState, useChartColors } from '@ui-core/react';
 import { Clock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 
@@ -45,6 +45,7 @@ type ViewMode = 'hourly' | 'daily';
 
 export function AttendancePatternCard({ hourlyData, dailyData, isLoading }: AttendancePatternCardProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('hourly');
+  const chartColors = useChartColors();
 
   if (isLoading) {
     return (
@@ -159,16 +160,16 @@ export function AttendancePatternCard({ hourlyData, dailyData, isLoading }: Atte
               message="데이터가 없습니다."
             />
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={300} debounce={50}>
               <BarChart data={hourlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="hour" label={{ value: '시간', position: 'insideBottom', offset: -5 }} />
                 <YAxis label={{ value: '인원', angle: -90, position: 'insideLeft' }} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="present" stackId="a" fill="#5cb85c" name="출석" />
-                <Bar dataKey="late" stackId="a" fill="#f0ad4e" name="지각" />
-                <Bar dataKey="absent" stackId="a" fill="#d9534f" name="결석" />
+                <Bar dataKey="present" stackId="a" fill={chartColors.success} name="출석" isAnimationActive={true} animationDuration={1000} animationEasing="ease-out" animationBegin={0} />
+                <Bar dataKey="late" stackId="a" fill={chartColors.warning} name="지각" isAnimationActive={true} animationDuration={1000} animationEasing="ease-out" animationBegin={50} />
+                <Bar dataKey="absent" stackId="a" fill={chartColors.error} name="결석" isAnimationActive={true} animationDuration={1000} animationEasing="ease-out" animationBegin={100} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -185,16 +186,18 @@ export function AttendancePatternCard({ hourlyData, dailyData, isLoading }: Atte
             />
           ) : (
             <>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={dailyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="dayLabel" />
-                  <YAxis domain={[0, 100]} label={{ value: '출석률 (%)', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="rate" stroke="#428bca" strokeWidth={2} name="출석률" />
-                </LineChart>
-              </ResponsiveContainer>
+              <div className="chart-animate-up">
+                <ResponsiveContainer width="100%" height={300} debounce={50}>
+                  <LineChart data={dailyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="dayLabel" />
+                    <YAxis domain={[0, 100]} label={{ value: '출석률 (%)', angle: -90, position: 'insideLeft' }} />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="rate" stroke={chartColors.primary} strokeWidth={2} name="출석률" isAnimationActive={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
 
               {/* 상세 테이블 */}
               <div style={{ marginTop: 'var(--spacing-lg)', overflowX: 'auto' }}>

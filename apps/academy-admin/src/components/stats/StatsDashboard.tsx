@@ -8,7 +8,7 @@
  */
 
 import { useMemo, useState, useEffect, useRef, createElement } from 'react';
-import { Card, NotificationCardLayout, EmptyState, useIconSize } from '@ui-core/react';
+import { Card, NotificationCardLayout, EmptyState, useIconSize, useChartColors } from '@ui-core/react';
 import { CardGridLayout } from '../CardGridLayout';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import type { LucideIcon } from 'lucide-react';
@@ -87,6 +87,9 @@ export function StatsDashboard({
   // [SSOT] 아이콘 크기 (CSS 변수 기반)
   const iconSize = useIconSize();
 
+  // [SSOT] 차트 색상 (SVG 속성용)
+  const chartColors = useChartColors();
+
   // 0이 아닌 데이터만 필터링
   const filteredChartData = useMemo(() => {
     return chartData.filter(item => item.value > 0);
@@ -101,10 +104,10 @@ export function StatsDashboard({
       borderRadius: 'var(--border-radius-sm)',
       padding: 'var(--spacing-sm)',
     },
-    dot: { fill: 'var(--color-primary)', r: 4 },
+    dot: { fill: chartColors.primary, r: 4 },
     activeDot: { r: 6 },
     margin: { left: 10, right: 40, top: 10, bottom: 10 },
-  }), []);
+  }), [chartColors.primary]);
 
   // 기간 필터 옵션 (배지 버튼용)
   const periodBadgeOptions = [
@@ -327,7 +330,10 @@ export function StatsDashboard({
           {/* 그래프 */}
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {filteredChartData.length > 0 ? (
-              <div style={{ width: '100%', height: 300 }}>
+              <div
+                style={{ width: '100%', height: 300 }}
+                className="chart-animate-up"
+              >
                 <style>
                   {`
                     .recharts-wrapper,
@@ -338,8 +344,8 @@ export function StatsDashboard({
                     }
                   `}
                 </style>
-                <ResponsiveContainer width="100%" height={300} debounce={100}>
-                  <AreaChart data={filteredChartData.map((item: ChartDataItem) => ({ ...item }))} margin={chartStyles.margin}>
+                <ResponsiveContainer width="100%" height={300} debounce={50}>
+                  <AreaChart data={filteredChartData} margin={chartStyles.margin}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-gray-200)" />
                     <XAxis
                       dataKey="name"
@@ -356,22 +362,47 @@ export function StatsDashboard({
                       width={30}
                     />
                     <RechartsTooltip
-                      contentStyle={chartStyles.tooltipContent}
-                      formatter={(value: number | undefined) => value !== undefined ? [`${value}${chartTooltipUnit}`, chartTooltipLabel] : ['', '']}
-                      labelFormatter={(label) => `날짜: ${label}`}
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload || payload.length === 0) return null;
+
+                        return (
+                          <div style={{
+                            backgroundColor: 'var(--color-white)',
+                            border: 'var(--border-width-thin) solid var(--color-gray-200)',
+                            borderRadius: 'var(--border-radius-sm)',
+                            padding: 'var(--spacing-sm)',
+                          }}>
+                            <div style={{
+                              marginBottom: 'var(--spacing-xs)',
+                              fontSize: 'var(--font-size-sm)',
+                            }}>
+                              날짜 : {label}
+                            </div>
+                            {payload.map((entry: { value?: number | string }, index: number) => (
+                              <div
+                                key={`item-${index}`}
+                                style={{
+                                  fontSize: 'var(--font-size-xs)',
+                                  lineHeight: 1.2,
+                                  color: 'var(--color-text)',
+                                }}
+                              >
+                                {chartTooltipLabel} : {entry.value}{chartTooltipUnit}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }}
                     />
                     <Area
                       type="monotone"
                       dataKey="value"
-                      stroke="var(--color-primary)"
+                      stroke={chartColors.primary}
                       strokeWidth={2}
-                      fill="var(--color-primary-40)"
+                      fill={chartColors.primary50}
                       dot={chartStyles.dot}
                       activeDot={chartStyles.activeDot}
-                      isAnimationActive={true}
-                      animationDuration={800}
-                      animationEasing="ease-in-out"
-                      animationBegin={0}
+                      isAnimationActive={false}
                     />
                   </AreaChart>
                 </ResponsiveContainer>

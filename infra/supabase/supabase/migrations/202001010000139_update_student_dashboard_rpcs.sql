@@ -82,6 +82,7 @@ BEGIN
       ON p.id = ac.person_id
     WHERE p.tenant_id = p_tenant_id
       AND p.person_type = 'student'
+      AND ac.deleted_at IS NULL
       AND (
         v_user_role <> 'teacher'
         OR EXISTS (
@@ -191,6 +192,7 @@ BEGIN
     WHERE p.tenant_id = p_tenant_id
       AND p.person_type = 'student'
       AND ac.status = 'active'
+      AND ac.deleted_at IS NULL
       AND (
         v_user_role <> 'teacher'
         OR EXISTS (
@@ -310,6 +312,7 @@ BEGIN
     WHERE p.tenant_id = p_tenant_id
       AND p.person_type = 'student'
       AND ac.status = 'active'
+      AND ac.deleted_at IS NULL
       AND (
         v_user_role <> 'teacher'
         OR EXISTS (

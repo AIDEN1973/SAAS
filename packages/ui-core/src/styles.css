@@ -29,7 +29,7 @@
   --color-gray-100: #f1f5f9;
   --color-gray-200: #e3e3e3;
   --color-gray-300: #cbd5e1;
-  --color-gray-400: #94a3b8;
+  --color-gray-400: #7B8494;  /* Badge gray main 톤과 일치 */
   --color-gray-500: #64748b;
   --color-gray-600: #475569;
   --color-gray-700: #334155;
@@ -52,9 +52,9 @@
   --color-yellow-800: #854d0e;
 
   /* Primary Colors (for Button, etc.) - 모던 그라데이션 블루 */
-  --color-primary: #3b82f6;
-  --color-primary-light: #60a5fa;
-  --color-primary-dark: #2563eb;
+  --color-primary: #4A7AE0;
+  --color-primary-light: #5B8DEF;
+  --color-primary-dark: #4A7AE0;
   --color-primary-30: color-mix(in srgb, var(--color-primary) 3%, transparent); /* 프라이머리 3% */
   --color-primary-40: color-mix(in srgb, var(--color-primary) 4%, transparent); /* 프라이머리 4% */
   --color-primary-50: color-mix(in srgb, var(--color-primary) 5%, transparent); /* 프라이머리 5% */
@@ -64,31 +64,31 @@
   --color-primary-selected: color-mix(in srgb, var(--color-primary) 12%, transparent); /* 선택된 상태 배경색 (프라이머리 12%, hover보다 진함) */
   --color-primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 
-  /* Color Tokens for Design System - 모던 톤 */
-  --color-success: #10b981;
-  --color-success-light: #34d399;
-  --color-success-dark: #059669;
-  --color-success-50: #ecfdf5;
+  /* Color Tokens for Design System - 모던 톤 (Badge 톤과 일치) */
+  --color-success: #34C66A;
+  --color-success-light: #4ADE80;
+  --color-success-dark: #34C66A;
+  --color-success-50: #E6F9ED;
 
-  --color-warning: #f59e0b;
-  --color-warning-light: #fbbf24;
-  --color-warning-dark: #d97706;
-  --color-warning-50: #fffbeb;
+  --color-warning: #F0A500;
+  --color-warning-light: #FBBF24;
+  --color-warning-dark: #F0A500;
+  --color-warning-50: #FEF5DC;
 
-  --color-error: #ef4444;
-  --color-error-light: #f87171;
-  --color-error-dark: #dc2626;
-  --color-error-50: #fef2f2;
+  --color-error: #EF5050;
+  --color-error-light: #F87171;
+  --color-error-dark: #EF5050;
+  --color-error-50: #FDE8E8;
 
-  --color-info: #06b6d4;
-  --color-info-light: #22d3ee;
-  --color-info-dark: #0891b2;
-  --color-info-50: #ecfeff;
+  --color-info: #0EBDD4;
+  --color-info-light: #22D3EE;
+  --color-info-dark: #0EBDD4;
+  --color-info-50: #E0F7FA;
 
-  --color-secondary: #8b5cf6;
-  --color-secondary-light: #a78bfa;
-  --color-secondary-dark: #7c3aed;
-  --color-secondary-50: #f5f3ff;
+  --color-secondary: #9371F0;
+  --color-secondary-light: #A78BFA;
+  --color-secondary-dark: #9371F0;
+  --color-secondary-50: #EDE9FE;
 
   /* Shadow - 부드러운 모던 그림자 (더 미묘하고 세련된) */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
@@ -501,6 +501,14 @@ textarea::placeholder {
   .student-detail-layer {
     transition: transform 0.5s ease-in-out, width 0.5s ease-in-out !important;
   }
+
+  /* 차트 애니메이션 예외 - 데이터 시각화에 필요한 애니메이션 (Line, Area만) */
+  .chart-animate-up .recharts-area,
+  .chart-animate-up-stagger .recharts-area,
+  .chart-animate-up .recharts-line,
+  .chart-animate-up-stagger .recharts-line {
+    animation-duration: 800ms !important;
+  }
 }
 
 /* Animations */
@@ -589,3 +597,30 @@ textarea::placeholder {
   stroke-width: 2 !important;
 }
 
+
+/* Select 드롭다운 리스트 스크롤바 숨김 */
+.select-dropdown-list::-webkit-scrollbar {
+  display: none;
+}
+
+/* 차트 애니메이션 - 좌에서 우로 확장 (Line, Area 데이터만, 축 제외) */
+@keyframes chartRevealRight {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Area 영역과 곡선에만 애니메이션 적용 */
+.chart-animate-up .recharts-area,
+.chart-animate-up-stagger .recharts-area {
+  animation: chartRevealRight 800ms ease-out forwards;
+}
+
+/* Line 곡선에만 애니메이션 적용 */
+.chart-animate-up .recharts-line,
+.chart-animate-up-stagger .recharts-line {
+  animation: chartRevealRight 800ms ease-out forwards;
+}

@@ -19,6 +19,7 @@ import { getTenantSettingByPath } from '../../_shared/policy-utils.ts';
 import { withTenant } from '../../_shared/withTenant.ts';
 import { assertDomainActionKey } from '../../_shared/domain-action-catalog.ts';
 import { getTenantTableName } from '../../_shared/industry-adapter.ts';
+import { normalizePhoneNumber } from '../../_shared/phone-utils.ts';
 
 export const studentRegisterHandler: IntentHandler = {
   intent_key: 'student.exec.register',
@@ -90,6 +91,11 @@ export const studentRegisterHandler: IntentHandler = {
         };
       }
 
+      // [불변 규칙] 전화번호는 반드시 정규화하여 저장
+      const normalizedPhone = normalizePhoneNumber(formValues.phone as string);
+      const normalizedFatherPhone = normalizePhoneNumber(formValues.father_phone as string);
+      const normalizedMotherPhone = normalizePhoneNumber(formValues.mother_phone as string);
+
       // 1. persons 테이블에 생성
       // ⚠️ 중요: INSERT 쿼리는 withTenant를 사용하지 않고, row object에 tenant_id를 직접 포함
       // ⚠️ 디버깅: INSERT 전 tenant_id 값 확인
@@ -105,7 +111,7 @@ export const studentRegisterHandler: IntentHandler = {
           tenant_id: context.tenant_id,
           name: name,
           email: (formValues.email as string) || null,
-          phone: (formValues.phone as string) || null,
+          phone: normalizedPhone,
           address: (formValues.address as string) || null,
           person_type: 'student',
         })
@@ -149,6 +155,8 @@ export const studentRegisterHandler: IntentHandler = {
           gender: (formValues.gender as string) || null,
           school_name: (formValues.school_name as string) || null,
           grade: (formValues.grade as string) || null,
+          father_phone: normalizedFatherPhone,
+          mother_phone: normalizedMotherPhone,
           status: (formValues.status as string) || 'active',
           notes: (formValues.notes as string) || null,
           profile_image_url: (formValues.profile_image_url as string) || null,
@@ -183,12 +191,19 @@ export const studentRegisterHandler: IntentHandler = {
             const guardianData = guardian as Record<string, unknown>;
             // NOT NULL 필드 기본값 설정
             const guardianName = (guardianData.name as string) || `${name} 보호자`;
-            const guardianPhone = (guardianData.phone as string) || '';
+            const guardianPhoneRaw = (guardianData.phone as string) || '';
             const guardianRelationship = (guardianData.relationship as string) || 'parent';
 
             // phone이 없으면 보호자 생성 스킵 (필수 필드)
-            if (!guardianPhone) {
+            if (!guardianPhoneRaw) {
               guardianErrors.push('보호자 전화번호 누락');
+              continue;
+            }
+
+            // [불변 규칙] 보호자 전화번호도 정규화
+            const guardianPhone = normalizePhoneNumber(guardianPhoneRaw);
+            if (!guardianPhone) {
+              guardianErrors.push('보호자 전화번호 형식 오류');
               continue;
             }
 

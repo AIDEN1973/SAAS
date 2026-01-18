@@ -147,9 +147,16 @@ export class ApiClient {
           delete searchFilters.name;
         }
 
-        // 나머지 필터 적용 (undefined, null, 빈 문자열은 제외)
+        // 나머지 필터 적용 (undefined, 빈 문자열은 제외)
+        // null은 IS NULL 쿼리로 처리해야 하므로 별도 처리
         Object.entries(searchFilters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
+          // null 값은 IS NULL로 처리 (소프트 삭제 필터링 등)
+          if (value === null) {
+            baseQuery = baseQuery.is(key, null);
+            return;
+          }
+
+          if (value !== undefined && value !== '') {
             // 범위 연산자 처리 (gte, lte, gt, lt)
             // [근본 수정] 날짜/시간 필터에 KST 시간대 자동 추가
             if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {

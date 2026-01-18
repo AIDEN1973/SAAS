@@ -18,7 +18,10 @@ export interface Student {
   birth_date?: string;
   gender?: Gender;
   phone?: string;
+  attendance_number?: string;  // 출결번호 (4자리 이상 숫자)
   email?: string;
+  father_phone?: string;  // 아버지 전화번호
+  mother_phone?: string;  // 어머니 전화번호
   address?: string;
   school_name?: string;
   grade?: string;
@@ -74,7 +77,10 @@ export interface CreateStudentInput {
   birth_date?: string;
   gender?: Gender;
   phone?: string;
+  attendance_number?: string;  // 출결번호 (4자리 이상 숫자, 미입력 시 전화번호 뒷 4자리 자동 생성)
   email?: string;
+  father_phone?: string;  // 아버지 전화번호
+  mother_phone?: string;  // 어머니 전화번호
   address?: string;
   school_name?: string;
   grade?: string;
@@ -90,7 +96,10 @@ export interface UpdateStudentInput {
   birth_date?: string;
   gender?: Gender;
   phone?: string;
+  attendance_number?: string;  // 출결번호 (4자리 이상 숫자)
   email?: string;
+  father_phone?: string;  // 아버지 전화번호
+  mother_phone?: string;  // 어머니 전화번호
   address?: string;
   school_name?: string;
   grade?: string;

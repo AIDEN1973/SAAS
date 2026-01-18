@@ -7,6 +7,9 @@
  * @see docu/디어쌤 아키텍처.md - 데이터 정규화 규칙
  */
 
+// [불변 규칙] 전화번호 정규화는 shared lib에서 import (SSOT)
+export { normalizePhoneNumber } from '@lib/normalization';
+
 /**
  * 빈 문자열을 null로 변환 (SSOT)
  *
@@ -169,4 +172,5 @@ export function processTagInput(inputValue: string): string {
     })
     .join(',');
 }
+
 

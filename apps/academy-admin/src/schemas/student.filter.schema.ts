@@ -25,7 +25,7 @@ export function createStudentFilterSchema(classes?: Class[]): FilterSchema {
         name: 'search',
         kind: 'text',
         ui: {
-          placeholder: '이름으로 검색하세요.',
+          placeholder: '이름 또는 출결번호로 검색',
           colSpan: 1,
         },
       },

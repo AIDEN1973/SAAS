@@ -7,7 +7,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { Modal, EmptyState } from '@ui-core/react';
+import { Modal, EmptyState, useChartColors } from '@ui-core/react';
 import type { StatsCard } from '../../types/dashboardCard';
 import type { DailyStoreMetric } from '@hooks/use-daily-store-metrics';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -21,6 +21,7 @@ export interface StatsChartModalProps {
 }
 
 export function StatsChartModal({ isOpen, onClose, card, data }: StatsChartModalProps) {
+  const chartColors = useChartColors();
 
   // 카드 ID에 따라 그래프 데이터 변환
   const chartData = useMemo(() => {
@@ -183,10 +184,10 @@ export function StatsChartModal({ isOpen, onClose, card, data }: StatsChartModal
             }}
           />
         ) : (
-          <>
+          <div className="chart-animate-up">
             {/* HARD-CODE-EXCEPTION: recharts 라이브러리 요구값 (3rd-party 라이브러리 요구값) */}
             {/* height={400}, margin, strokeDasharray 등은 recharts API 요구사항 */}
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={400} debounce={50}>
               <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 {/* HARD-CODE-EXCEPTION: recharts CartesianGrid strokeDasharray는 숫자만 허용 (3rd-party 라이브러리 요구값) */}
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-gray-200)" />
@@ -219,16 +220,15 @@ export function StatsChartModal({ isOpen, onClose, card, data }: StatsChartModal
                 <Line
                   type="monotone"
                   dataKey="value"
-                  stroke="var(--color-primary)"
-                  // HARD-CODE-EXCEPTION: recharts Line strokeWidth는 숫자만 허용 (3rd-party 라이브러리 요구값)
+                  stroke={chartColors.primary}
                   strokeWidth={2}
-                  // HARD-CODE-EXCEPTION: recharts dot/activeDot r은 숫자만 허용 (3rd-party 라이브러리 요구값)
-                  dot={{ fill: 'var(--color-primary)', r: 4 }}
+                  dot={{ fill: chartColors.primary, r: 4 }}
                   activeDot={{ r: 6 }}
+                  isAnimationActive={false}
                 />
               </LineChart>
             </ResponsiveContainer>
-          </>
+          </div>
         )}
       </div>
     </Modal>

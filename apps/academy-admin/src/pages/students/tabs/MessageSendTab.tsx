@@ -18,10 +18,10 @@ import { apiClient, getApiContext } from '@api-sdk/core';
 import { useSession } from '@hooks/use-auth';
 import { createExecutionAuditRecord } from '@hooks/use-student/src/execution-audit-utils';
 import { useSchema } from '@hooks/use-schema';
-import { useCompleteStudentTaskCard, useStudentTaskCards, useGuardians } from '@hooks/use-student';
+import { useCompleteStudentTaskCard, useStudentTaskCards } from '@hooks/use-student';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
-import { logError, p } from '../../../utils';
-import type { Student, Guardian } from '@services/student-service';
+import { logError } from '../../../utils';
+import type { Student } from '@services/student-service';
 import type { NotificationChannel } from '@core/notification';
 import { notificationFormSchema } from '../../../schemas/notification.schema';
 
@@ -86,9 +86,10 @@ export function MessageSendTab({
 
   const formRef = useRef<UseFormReturn<Record<string, unknown>> | null>(null);
   const [selectedChannel] = useState<NotificationChannel>('sms');
-  // 수신자 선택 상태 (학생, 보호자 각각 선택 가능)
+  // 수신자 선택 상태 (학생, 아버지, 어머니 각각 선택 가능)
   const [selectedStudent, setSelectedStudent] = useState(false); // 기본값: 선택 안 함
-  const [selectedGuardians, setSelectedGuardians] = useState<Set<string>>(new Set()); // 선택된 보호자 ID 집합
+  const [selectedFather, setSelectedFather] = useState(false); // 아버지 전화번호 선택
+  const [selectedMother, setSelectedMother] = useState(false); // 어머니 전화번호 선택
   // 기본 선택 초기화 여부 (한 번만 실행)
   const [hasInitializedSelection, setHasInitializedSelection] = useState(false);
 
@@ -104,99 +105,38 @@ export function MessageSendTab({
     }
   }, [selectedChannel]);
 
-  // 보호자 목록 조회
-  // 정본 규칙: useGuardians Hook 사용
-  const { data: guardians, isLoading: guardiansLoading } = useGuardians(studentId);
+  // 아버지/어머니 전화번호 체크
+  const hasFatherPhone = useMemo(() => {
+    if (!student?.father_phone) return false;
+    const phone = typeof student.father_phone === 'string' ? student.father_phone : String(student.father_phone);
+    return phone.trim().length > 0;
+  }, [student]);
 
-  // 보호자 관계별 그룹화 및 관계명 매핑
-  const getRelationshipLabel = (relationship: string): string => {
-    switch (relationship) {
-      case 'parent':
-        return '부';
-      case 'guardian':
-        return '모';
-      case 'other':
-        return '기타';
-      default:
-        return '기타';
-    }
-  };
+  const hasMotherPhone = useMemo(() => {
+    if (!student?.mother_phone) return false;
+    const phone = typeof student.mother_phone === 'string' ? student.mother_phone : String(student.mother_phone);
+    return phone.trim().length > 0;
+  }, [student]);
 
-  // 보호자를 관계별로 그룹화 (부, 모, 기타)
-  const guardiansByRelationship = useMemo(() => {
-    if (!guardians) return { parent: [], guardian: [], other: [] };
-
-    const parent: Guardian[] = [];
-    const guardian: Guardian[] = [];
-    const other: Guardian[] = [];
-
-    guardians.forEach((g) => {
-      if (g.relationship === 'parent') {
-        parent.push(g);
-      } else if (g.relationship === 'guardian') {
-        guardian.push(g);
-      } else {
-        other.push(g);
-      }
-    });
-
-    return { parent, guardian, other };
-  }, [guardians]);
-
-  // 전화번호가 있는 보호자만 필터링 (향후 사용 예정)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const guardiansWithPhone = useMemo(() => {
-    if (!guardians) return [];
-    return guardians.filter((g) => {
-      const phone = typeof g.phone === 'string' ? g.phone : String(g.phone || '');
-      return phone.trim().length > 0;
-    });
-  }, [guardians]);
-
-  // 기본 선택 초기화: 모 -> 부 -> 기타 -> 학생 순서로 자동 체크
+  // 기본 선택 초기화: 모 -> 부 -> 학생 순서로 자동 체크
   useEffect(() => {
-    if (hasInitializedSelection || guardiansLoading) return;
+    if (hasInitializedSelection) return;
 
-    const newSelectedGuardians = new Set<string>();
     let found = false;
 
-    // 1순위: 모 (guardian)
-    if (guardiansByRelationship.guardian.length > 0) {
-      const guardianWithPhone = guardiansByRelationship.guardian.find((g) => {
-        const phone = typeof g.phone === 'string' ? g.phone : String(g.phone || '');
-        return phone.trim().length > 0;
-      });
-      if (guardianWithPhone) {
-        newSelectedGuardians.add(guardianWithPhone.id);
-        found = true;
-      }
+    // 1순위: 모 (mother)
+    if (hasMotherPhone) {
+      setSelectedMother(true);
+      found = true;
     }
 
-    // 2순위: 부 (parent)
-    if (!found && guardiansByRelationship.parent.length > 0) {
-      const parentWithPhone = guardiansByRelationship.parent.find((g) => {
-        const phone = typeof g.phone === 'string' ? g.phone : String(g.phone || '');
-        return phone.trim().length > 0;
-      });
-      if (parentWithPhone) {
-        newSelectedGuardians.add(parentWithPhone.id);
-        found = true;
-      }
+    // 2순위: 부 (father)
+    if (!found && hasFatherPhone) {
+      setSelectedFather(true);
+      found = true;
     }
 
-    // 3순위: 기타 (other)
-    if (!found && guardiansByRelationship.other.length > 0) {
-      const otherWithPhone = guardiansByRelationship.other.find((g) => {
-        const phone = typeof g.phone === 'string' ? g.phone : String(g.phone || '');
-        return phone.trim().length > 0;
-      });
-      if (otherWithPhone) {
-        newSelectedGuardians.add(otherWithPhone.id);
-        found = true;
-      }
-    }
-
-    // 4순위: 학생
+    // 3순위: 학생
     if (!found && student?.phone) {
       const phone = typeof student.phone === 'string' ? student.phone : String(student.phone || '');
       if (phone.trim().length > 0) {
@@ -206,10 +146,9 @@ export function MessageSendTab({
     }
 
     if (found) {
-      setSelectedGuardians(newSelectedGuardians);
       setHasInitializedSelection(true);
     }
-  }, [guardiansByRelationship, guardiansLoading, hasInitializedSelection, student]);
+  }, [hasFatherPhone, hasMotherPhone, hasInitializedSelection, student]);
 
   // 선택된 발송 대상 목록 (채널 셀렉터 아래 표시용, 향후 사용 예정)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -224,23 +163,24 @@ export function MessageSendTab({
       }
     }
 
-    // 선택된 보호자
-    if (guardians && selectedGuardians.size > 0) {
-      guardians.forEach((guardian) => {
-        if (selectedGuardians.has(guardian.id)) {
-          const phone = typeof guardian.phone === 'string' ? guardian.phone : String(guardian.phone || '');
-          if (phone.trim().length > 0) {
-            recipients.push({
-              label: getRelationshipLabel(guardian.relationship),
-              phone: phone.trim()
-            });
-          }
-        }
-      });
+    // 아버지 선택 시
+    if (selectedFather && student?.father_phone) {
+      const phone = typeof student.father_phone === 'string' ? student.father_phone : String(student.father_phone);
+      if (phone.trim().length > 0) {
+        recipients.push({ label: '부', phone: phone.trim() });
+      }
+    }
+
+    // 어머니 선택 시
+    if (selectedMother && student?.mother_phone) {
+      const phone = typeof student.mother_phone === 'string' ? student.mother_phone : String(student.mother_phone);
+      if (phone.trim().length > 0) {
+        recipients.push({ label: '모', phone: phone.trim() });
+      }
     }
 
     return recipients;
-  }, [selectedStudent, selectedGuardians, student, guardians, terms.PERSON_LABEL_PRIMARY]);
+  }, [selectedStudent, selectedFather, selectedMother, student, terms.PERSON_LABEL_PRIMARY]);
 
   // 메시지 발송 (기존 notificationFormSchema 재사용)
   // [불변 규칙] api-sdk를 통해서만 API 요청
@@ -277,16 +217,22 @@ export function MessageSendTab({
         }
       }
 
-      // 선택된 보호자 전화번호 수집
-      if (selectedGuardians.size > 0 && guardians && guardians.length > 0) {
-        const guardianPhones = guardians
-          .filter((g) => selectedGuardians.has(g.id))
-          .map((g) => {
-            const phone = typeof g.phone === 'string' ? g.phone : String(g.phone || '');
-            return phone.trim();
-          })
-          .filter((phone) => phone.length > 0);
-        recipientPhones.push(...guardianPhones);
+      // 아버지 전화번호 수집
+      if (selectedFather && student.father_phone) {
+        const phone = typeof student.father_phone === 'string' ? student.father_phone : String(student.father_phone);
+        const trimmedPhone = phone.trim();
+        if (trimmedPhone.length > 0) {
+          recipientPhones.push(trimmedPhone);
+        }
+      }
+
+      // 어머니 전화번호 수집
+      if (selectedMother && student.mother_phone) {
+        const phone = typeof student.mother_phone === 'string' ? student.mother_phone : String(student.mother_phone);
+        const trimmedPhone = phone.trim();
+        if (trimmedPhone.length > 0) {
+          recipientPhones.push(trimmedPhone);
+        }
       }
 
       if (recipientPhones.length === 0) {
@@ -421,12 +367,8 @@ export function MessageSendTab({
         {/* 발송 대상 선택 */}
         <div style={{ paddingTop: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
 
-          {/* 학생, 부, 모, 기타를 같은 행에 한줄로 출력 - 모두 항상 표시 */}
-          {guardiansLoading ? (
-            <div style={{ padding: 'var(--spacing-sm)', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-base)' }}>
-              {MESSAGE_CONSTANTS.LOADING_GUARDIANS}
-            </div>
-          ) : (
+          {/* 학생, 부, 모를 같은 행에 한줄로 출력 - 모두 항상 표시 */}
+          {(
             <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 'var(--spacing-sm)' }}>
               {/* 학생 - 항상 표시 */}
               <label
@@ -456,235 +398,67 @@ export function MessageSendTab({
             </span>
               </label>
 
-              {/* 부 (parent) - 항상 표시 (보호자가 없어도) */}
-              {guardiansByRelationship.parent.length > 0 ? (
-                guardiansByRelationship.parent.map((guardian) => {
-                  const isSelected = selectedGuardians.has(guardian.id);
-                  const phone = typeof guardian.phone === 'string' ? guardian.phone : String(guardian.phone || '');
-                  const hasPhone = phone.trim().length > 0;
-                  return (
-                    <label
-                      key={guardian.id}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 'var(--spacing-xs)',
-                        cursor: hasPhone ? 'pointer' : 'not-allowed',
-                        padding: 'var(--spacing-sm) var(--spacing-md)',
-                        borderRadius: 'var(--border-radius-full)',
-                        backgroundColor: isSelected ? 'var(--color-primary-50)' : 'var(--color-gray-50)',
-                        border: isSelected ? 'var(--border-width-thin) solid var(--color-primary)' : 'var(--border-width-thin) solid var(--color-gray-200)',
-                        opacity: hasPhone ? 1 : 0.5,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={(e) => {
-                          if (!hasPhone) return;
-                          const newSet = new Set(selectedGuardians);
-                          if (e.target.checked) {
-                            newSet.add(guardian.id);
-                          } else {
-                            newSet.delete(guardian.id);
-                          }
-                          setSelectedGuardians(newSet);
-                        }}
-                        disabled={!hasPhone}
-                        style={{ width: 'var(--spacing-md)', height: 'var(--spacing-md)', cursor: hasPhone ? 'pointer' : 'not-allowed', flexShrink: 0 }}
-                      />
-                      <span style={{ fontSize: 'var(--font-size-base)', color: isSelected ? 'var(--color-primary)' : (hasPhone ? 'var(--color-text)' : 'var(--color-text-secondary)') }}>
-                        {getRelationshipLabel(guardian.relationship)}
-                      </span>
-                    </label>
-                  );
-                })
-              ) : (
-                <label
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 'var(--spacing-xs)',
-                    cursor: 'not-allowed',
-                    padding: 'var(--spacing-sm) var(--spacing-md)',
-                    borderRadius: 'var(--border-radius-full)',
-                    backgroundColor: 'var(--color-gray-50)',
-                    border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                    opacity: 'var(--opacity-disabled)',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={false}
-                    disabled={true}
-                    style={{ width: 'var(--spacing-md)', height: 'var(--spacing-md)', cursor: 'not-allowed', flexShrink: 0 }}
-                  />
-                  <span style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
-                    부
-                  </span>
-                </label>
-              )}
+              {/* 부 (father) - 항상 표시 */}
+              <label
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 'var(--spacing-xs)',
+                  cursor: hasFatherPhone ? 'pointer' : 'not-allowed',
+                  padding: 'var(--spacing-sm) var(--spacing-md)',
+                  borderRadius: 'var(--border-radius-full)',
+                  backgroundColor: selectedFather ? 'var(--color-primary-50)' : 'var(--color-gray-50)',
+                  border: selectedFather ? 'var(--border-width-thin) solid var(--color-primary)' : 'var(--border-width-thin) solid var(--color-gray-200)',
+                  opacity: hasFatherPhone ? 1 : 0.5,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedFather}
+                  onChange={(e) => setSelectedFather(e.target.checked)}
+                  disabled={!hasFatherPhone}
+                  style={{ width: 'var(--spacing-md)', height: 'var(--spacing-md)', cursor: hasFatherPhone ? 'pointer' : 'not-allowed', flexShrink: 0 }}
+                />
+                <span style={{ fontSize: 'var(--font-size-base)', color: selectedFather ? 'var(--color-primary)' : (hasFatherPhone ? 'var(--color-text)' : 'var(--color-text-secondary)') }}>
+                  부
+                </span>
+              </label>
 
-              {/* 모 (guardian) - 항상 표시 (보호자가 없어도) */}
-              {guardiansByRelationship.guardian.length > 0 ? (
-                guardiansByRelationship.guardian.map((guardian) => {
-                  const isSelected = selectedGuardians.has(guardian.id);
-                  const phone = typeof guardian.phone === 'string' ? guardian.phone : String(guardian.phone || '');
-                  const hasPhone = phone.trim().length > 0;
-                  return (
-                    <label
-                      key={guardian.id}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 'var(--spacing-xs)',
-                        cursor: hasPhone ? 'pointer' : 'not-allowed',
-                        padding: 'var(--spacing-sm) var(--spacing-md)',
-                        borderRadius: 'var(--border-radius-full)',
-                        backgroundColor: isSelected ? 'var(--color-primary-50)' : 'var(--color-gray-50)',
-                        border: isSelected ? 'var(--border-width-thin) solid var(--color-primary)' : 'var(--border-width-thin) solid var(--color-gray-200)',
-                        opacity: hasPhone ? 1 : 0.5,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={(e) => {
-                          if (!hasPhone) return;
-                          const newSet = new Set(selectedGuardians);
-                          if (e.target.checked) {
-                            newSet.add(guardian.id);
-                          } else {
-                            newSet.delete(guardian.id);
-                          }
-                          setSelectedGuardians(newSet);
-                        }}
-                        disabled={!hasPhone}
-                        style={{ width: 'var(--spacing-md)', height: 'var(--spacing-md)', cursor: hasPhone ? 'pointer' : 'not-allowed', flexShrink: 0 }}
-                      />
-                      <span style={{ fontSize: 'var(--font-size-base)', color: isSelected ? 'var(--color-primary)' : (hasPhone ? 'var(--color-text)' : 'var(--color-text-secondary)') }}>
-                        {getRelationshipLabel(guardian.relationship)}
-            </span>
-                    </label>
-                  );
-                })
-              ) : (
-                <label
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 'var(--spacing-xs)',
-                    cursor: 'not-allowed',
-                    padding: 'var(--spacing-sm) var(--spacing-md)',
-                    borderRadius: 'var(--border-radius-full)',
-                    backgroundColor: 'var(--color-gray-50)',
-                    border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                    opacity: 'var(--opacity-disabled)',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={false}
-                    disabled={true}
-                    style={{ width: 'var(--spacing-md)', height: 'var(--spacing-md)', cursor: 'not-allowed', flexShrink: 0 }}
-                  />
-                  <span style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
-                    모
-                  </span>
-                </label>
-              )}
-
-              {/* 기타 (other) - 항상 표시 (보호자가 없어도) */}
-              {guardiansByRelationship.other.length > 0 ? (
-                guardiansByRelationship.other.map((guardian) => {
-                  const isSelected = selectedGuardians.has(guardian.id);
-                  const phone = typeof guardian.phone === 'string' ? guardian.phone : String(guardian.phone || '');
-                  const hasPhone = phone.trim().length > 0;
-                  return (
-                    <label
-                      key={guardian.id}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 'var(--spacing-xs)',
-                        cursor: hasPhone ? 'pointer' : 'not-allowed',
-                        padding: 'var(--spacing-sm) var(--spacing-md)',
-                        borderRadius: 'var(--border-radius-full)',
-                        backgroundColor: isSelected ? 'var(--color-primary-50)' : 'var(--color-gray-50)',
-                        border: isSelected ? 'var(--border-width-thin) solid var(--color-primary)' : 'var(--border-width-thin) solid var(--color-gray-200)',
-                        opacity: hasPhone ? 1 : 0.5,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={(e) => {
-                          if (!hasPhone) return;
-                          const newSet = new Set(selectedGuardians);
-                          if (e.target.checked) {
-                            newSet.add(guardian.id);
-                          } else {
-                            newSet.delete(guardian.id);
-                          }
-                          setSelectedGuardians(newSet);
-                        }}
-                        disabled={!hasPhone}
-                        style={{ width: 'var(--spacing-md)', height: 'var(--spacing-md)', cursor: hasPhone ? 'pointer' : 'not-allowed', flexShrink: 0 }}
-                      />
-                      <span style={{ fontSize: 'var(--font-size-base)', color: isSelected ? 'var(--color-primary)' : (hasPhone ? 'var(--color-text)' : 'var(--color-text-secondary)') }}>
-                        {getRelationshipLabel(guardian.relationship)}
-                      </span>
-                    </label>
-                  );
-                })
-              ) : (
-                <label
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 'var(--spacing-xs)',
-                    cursor: 'not-allowed',
-                    padding: 'var(--spacing-sm) var(--spacing-md)',
-                    borderRadius: 'var(--border-radius-full)',
-                    backgroundColor: 'var(--color-gray-50)',
-                    border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                    opacity: 'var(--opacity-disabled)',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={false}
-                    disabled={true}
-                    style={{ width: 'var(--spacing-md)', height: 'var(--spacing-md)', cursor: 'not-allowed', flexShrink: 0 }}
-                  />
-                  <span style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
-                    기타
-                  </span>
-                </label>
-              )}
-
-              {/* 보호자가 없는 경우 */}
-              {guardians && guardians.length === 0 && (
-                <div style={{ padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-warning-50)', borderRadius: 'var(--border-radius-sm)' }}>
-                  <p style={{ color: 'var(--color-warning)', fontSize: 'var(--font-size-base)', textAlign: 'center', margin: 0 }}>
-                    {`${terms.GUARDIAN_LABEL} 정보가 없습니다. ${terms.GUARDIAN_LABEL}${p.을를(terms.GUARDIAN_LABEL)} 먼저 등록해주세요.`}
-                  </p>
-                </div>
-              )}
+              {/* 모 (mother) - 항상 표시 */}
+              <label
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 'var(--spacing-xs)',
+                  cursor: hasMotherPhone ? 'pointer' : 'not-allowed',
+                  padding: 'var(--spacing-sm) var(--spacing-md)',
+                  borderRadius: 'var(--border-radius-full)',
+                  backgroundColor: selectedMother ? 'var(--color-primary-50)' : 'var(--color-gray-50)',
+                  border: selectedMother ? 'var(--border-width-thin) solid var(--color-primary)' : 'var(--border-width-thin) solid var(--color-gray-200)',
+                  opacity: hasMotherPhone ? 1 : 0.5,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedMother}
+                  onChange={(e) => setSelectedMother(e.target.checked)}
+                  disabled={!hasMotherPhone}
+                  style={{ width: 'var(--spacing-md)', height: 'var(--spacing-md)', cursor: hasMotherPhone ? 'pointer' : 'not-allowed', flexShrink: 0 }}
+                />
+                <span style={{ fontSize: 'var(--font-size-base)', color: selectedMother ? 'var(--color-primary)' : (hasMotherPhone ? 'var(--color-text)' : 'var(--color-text-secondary)') }}>
+                  모
+                </span>
+              </label>
             </div>
           )}
         </div>
       </Card>
 
         {/* [불변 규칙] 기존 notificationFormSchema와 SchemaForm 재사용 */}
-        {/* 학생 또는 보호자가 선택되었을 때만 폼 표시 */}
-        {isEditable && schema && (selectedStudent || selectedGuardians.size > 0) && (
+        {/* 학생 또는 부모가 선택되었을 때만 폼 표시 */}
+        {isEditable && schema && (selectedStudent || selectedFather || selectedMother) && (
           <>
             {/* [불변 규칙] 기존 notificationFormSchema와 SchemaFormWithMethods 재사용 */}
             {/* 하나의 카드 레이아웃으로 통합: channel, content, 발송 버튼 */}

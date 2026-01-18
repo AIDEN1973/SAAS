@@ -9,7 +9,7 @@
 
 import React, { useMemo } from 'react';
 import { Card, EmptyState } from '@ui-core/react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, type PieProps } from 'recharts';
 import { PieChart as PieChartIcon } from 'lucide-react';
 
 export interface DistributionDataItem {
@@ -133,7 +133,7 @@ export function DistributionChart({
 }: DistributionChartProps) {
   // 총 합계 계산
   const total = useMemo(() => {
-    return data.reduce((sum, item) => sum + item.value, 0);
+    return data.reduce((acc, item) => acc + item.value, 0);
   }, [data]);
 
   // 차트 스타일
@@ -162,73 +162,72 @@ export function DistributionChart({
 
       {/* 차트 영역 */}
       {data.length > 0 ? (
-        <div style={{ width: '100%', height }}>
-          <style>
-            {`
-              .recharts-wrapper,
-              .recharts-wrapper *,
-              .recharts-surface,
-              .recharts-surface * {
-                outline: none !important;
-              }
-            `}
-          </style>
-          <ResponsiveContainer width="100%" height={height}>
-            <PieChart>
-              <Pie
-                data={data.map((item) => ({ ...item }))}
-                cx="50%"
-                cy="45%"
-                innerRadius={60}
-                outerRadius={90}
-                paddingAngle={2}
-                dataKey="value"
-                isAnimationActive={true}
-                animationDuration={800}
-                animationEasing="ease-in-out"
-              >
-                {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <RechartsTooltip
-                content={<CustomTooltip unit={unit} total={total} />}
-                contentStyle={chartStyles.tooltipContent}
-              />
-              <Legend
-                content={<CustomLegend unit={unit} total={total} />}
-                verticalAlign="bottom"
-                align="center"
-              />
-              {/* 중앙 총계 텍스트 */}
-              <text
-                x="50%"
-                y="42%"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                style={{
-                  fontSize: 'var(--font-size-2xl)',
-                  fontWeight: 'var(--font-weight-bold)',
-                  fill: 'var(--color-text)',
-                }}
-              >
-                {total}
-              </text>
-              <text
-                x="50%"
-                y="52%"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                style={{
-                  fontSize: 'var(--font-size-sm)',
-                  fill: 'var(--color-text-secondary)',
-                }}
-              >
-                {unit}
-              </text>
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        <>
+          {/* 도넛 차트 영역 - 고정 높이 */}
+          <div style={{ width: '100%', height: 200 }}>
+            <style>
+              {`
+                .recharts-wrapper,
+                .recharts-wrapper *,
+                .recharts-surface,
+                .recharts-surface * {
+                  outline: none !important;
+                }
+              `}
+            </style>
+            <ResponsiveContainer width="100%" height={200} debounce={50}>
+              <PieChart>
+                <Pie
+                  data={data as unknown as PieProps['data']}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={2}
+                  dataKey="value"
+                  isAnimationActive={true}
+                  animationDuration={1000}
+                  animationEasing="ease-out"
+                  animationBegin={0}
+                >
+                  {data.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <RechartsTooltip
+                  content={<CustomTooltip unit={unit} total={total} />}
+                  contentStyle={chartStyles.tooltipContent}
+                />
+                {/* 중앙 총계 텍스트 - SVG text는 CSS 변수를 해석하지 못하므로 픽셀값 직접 사용 */}
+                {/* tspan을 사용하여 숫자와 단위를 하나의 text 요소로 표시 */}
+                <text
+                  x="50%"
+                  y="50%"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  style={{ userSelect: 'none' }}
+                >
+                  <tspan
+                    fontSize={20}
+                    fontWeight={700}
+                    fill="#2c3e50"
+                  >
+                    {total}
+                  </tspan>
+                  <tspan
+                    fontSize={13}
+                    fill="#64748b"
+                    dx={4}
+                  >
+                    {unit}
+                  </tspan>
+                </text>
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          {/* 범례 영역 - 별도 영역으로 분리 */}
+          <CustomLegend payload={data.map((item) => ({ value: item.name, color: item.color, payload: { value: item.value } }))} unit={unit} total={total} />
+        </>
       ) : (
         <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <EmptyState icon={PieChartIcon} message={emptyMessage} />

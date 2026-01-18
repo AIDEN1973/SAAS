@@ -19,6 +19,7 @@ import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
+import { normalizePhoneNumber } from '@lib/normalization'; // [불변 규칙] 전화번호 정규화
 import { useSession } from '@hooks/use-auth';
 import { createExecutionAuditRecord } from './execution-audit-utils';
 import type {
@@ -76,11 +77,15 @@ export async function fetchStudents(
       }
 
       // status/grade 필터는 academy_students에서 person_id를 먼저 추출해 정확한 결과 보장
+      // [소프트 삭제] deleted_at IS NULL인 학생만 조회 (삭제된 학생 제외)
+      // [퇴원 vs 삭제 구분] withdrawn은 정상 조회됨 (상태 필터로 제어)
       if (filter?.status || filter?.grade) {
         interface AcademyStudentIdRow {
           person_id: string;
         }
-        const academyFilters: Record<string, unknown> = {};
+        const academyFilters: Record<string, unknown> = {
+          deleted_at: null,  // 삭제되지 않은 학생만
+        };
         if (filter?.grade) academyFilters.grade = filter.grade;
         if (filter?.status) academyFilters.status = filter.status;
 
@@ -124,6 +129,29 @@ export async function fetchStudents(
       interface PersonWithAcademyStudents extends Person {
         academy_students?: Array<Record<string, unknown>>;
       }
+
+      // [소프트 삭제] deleted_at IS NULL인 학생만 조회
+      // restrictedStudentIds가 있든 없든 항상 삭제되지 않은 학생만 포함
+      interface AcademyStudentIdRow {
+        person_id: string;
+      }
+      const nonDeletedResponse = await apiClient.get<AcademyStudentIdRow>('academy_students', {
+        select: 'person_id',
+        filters: { deleted_at: null },
+        limit: 5000,
+      });
+
+      if (!nonDeletedResponse.error && nonDeletedResponse.data) {
+        const nonDeletedIds = nonDeletedResponse.data.map((r) => r.person_id);
+        // restrictedStudentIds가 있으면 교집합, 없으면 nonDeletedIds 사용
+        restrictedStudentIds = restrictedStudentIds
+          ? intersect(restrictedStudentIds, nonDeletedIds)
+          : nonDeletedIds;
+      }
+
+      // 삭제된 학생만 남은 경우 빈 배열 반환
+      if (restrictedStudentIds && restrictedStudentIds.length === 0) return [];
+
       const response = await apiClient.get<PersonWithAcademyStudents>('persons', {
         select: `
           *,
@@ -133,9 +161,13 @@ export async function fetchStudents(
             school_name,
             grade,
             class_name,
+            attendance_number,
+            father_phone,
+            mother_phone,
             status,
             notes,
             profile_image_url,
+            deleted_at,
             created_at,
             updated_at,
             created_by,
@@ -206,8 +238,12 @@ export async function fetchStudents(
       }
 
       // 데이터 변환 persons + academy_students -> Student
-      const students: Student[] = personsData.map((person: Person & { academy_students?: Array<Record<string, unknown>> }) => {
-        const academyData = person.academy_students?.[0] || {};
+      const students: Student[] = personsData.map((person: Person & { academy_students?: Array<Record<string, unknown>> | Record<string, unknown> }) => {
+        // [P0-FIX] PostgREST는 1:1 관계에서 단일 객체를, 1:N 관계에서 배열을 반환
+        const rawAcademyData = person.academy_students;
+        const academyData: Record<string, unknown> = Array.isArray(rawAcademyData)
+          ? (rawAcademyData[0] || {})
+          : (rawAcademyData || {});
         return {
           id: person.id,
           tenant_id: person.tenant_id,
@@ -216,7 +252,10 @@ export async function fetchStudents(
           birth_date: academyData.birth_date,
           gender: academyData.gender,
           phone: person.phone,
+          attendance_number: academyData.attendance_number,
           email: person.email,
+          father_phone: academyData.father_phone,
+          mother_phone: academyData.mother_phone,
           address: person.address,
           school_name: academyData.school_name,
           grade: academyData.grade,
@@ -397,7 +436,8 @@ export function useStudentsPaged(params: {
       // status/grade → academy_students에서 person_id 제한
       if (filter?.status || filter?.grade) {
         interface AcademyStudentIdRow { person_id: string; }
-        const academyFilters: Record<string, unknown> = {};
+        // [소프트 삭제] 삭제되지 않은 학생만 조회
+        const academyFilters: Record<string, unknown> = { deleted_at: null };
         if (filter?.grade) academyFilters.grade = filter.grade;
         if (filter?.status) academyFilters.status = filter.status;
 
@@ -446,6 +486,28 @@ export function useStudentsPaged(params: {
       restrictedStudentIds = intersect(restrictedStudentIds, classIds);
       if (restrictedStudentIds && restrictedStudentIds.length === 0) return { students: [], totalCount: 0 };
 
+      // [소프트 삭제] deleted_at IS NULL인 학생만 조회
+      // restrictedStudentIds가 있든 없든 항상 삭제되지 않은 학생만 포함
+      interface AcademyStudentIdRow {
+        person_id: string;
+      }
+      const nonDeletedResponse = await apiClient.get<AcademyStudentIdRow>('academy_students', {
+        select: 'person_id',
+        filters: { deleted_at: null },
+        limit: 5000,
+      });
+
+      if (!nonDeletedResponse.error && nonDeletedResponse.data) {
+        const nonDeletedIds = nonDeletedResponse.data.map((r) => r.person_id);
+        // restrictedStudentIds가 있으면 교집합, 없으면 nonDeletedIds 사용
+        restrictedStudentIds = restrictedStudentIds
+          ? intersect(restrictedStudentIds, nonDeletedIds)
+          : nonDeletedIds;
+      }
+
+      // 삭제된 학생만 남은 경우 빈 배열 반환
+      if (restrictedStudentIds && restrictedStudentIds.length === 0) return { students: [], totalCount: 0 };
+
       interface PersonWithAcademyStudents extends Person {
         academy_students?: Array<Record<string, unknown>>;
       }
@@ -462,6 +524,9 @@ export function useStudentsPaged(params: {
             school_name,
             grade,
             class_name,
+            attendance_number,
+            father_phone,
+            mother_phone,
             status,
             notes,
             profile_image_url,
@@ -523,8 +588,13 @@ export function useStudentsPaged(params: {
         }
       }
 
-      const students: Student[] = personsData.map((person: Person & { academy_students?: Array<Record<string, unknown>> }) => {
-        const academyData = person.academy_students?.[0] || {};
+      const students: Student[] = personsData.map((person: Person & { academy_students?: Array<Record<string, unknown>> | Record<string, unknown> }) => {
+        // [P0-FIX] PostgREST는 1:1 관계에서 단일 객체를, 1:N 관계에서 배열을 반환
+        // academy_students가 배열인지 객체인지 확인하여 처리
+        const rawAcademyData = person.academy_students;
+        const academyData: Record<string, unknown> = Array.isArray(rawAcademyData)
+          ? (rawAcademyData[0] || {})
+          : (rawAcademyData || {});
         return {
           id: person.id,
           tenant_id: person.tenant_id,
@@ -533,7 +603,10 @@ export function useStudentsPaged(params: {
           birth_date: academyData.birth_date,
           gender: academyData.gender,
           phone: person.phone,
+          attendance_number: academyData.attendance_number,
           email: person.email,
+          father_phone: academyData.father_phone,
+          mother_phone: academyData.mother_phone,
           address: person.address,
           school_name: academyData.school_name,
           grade: academyData.grade,
@@ -581,6 +654,21 @@ export function useStudent(studentId: string | null) {
       interface PersonWithAcademyStudents extends Person {
         academy_students?: Array<Record<string, unknown>>;
       }
+      // [소프트 삭제] 먼저 삭제되지 않은 학생인지 확인
+      interface AcademyStudentIdRow {
+        person_id: string;
+      }
+      const deletedCheckResponse = await apiClient.get<AcademyStudentIdRow>('academy_students', {
+        select: 'person_id',
+        filters: { person_id: studentId, deleted_at: null },
+        limit: 1,
+      });
+
+      // 삭제된 학생이면 null 반환
+      if (deletedCheckResponse.error || !deletedCheckResponse.data || deletedCheckResponse.data.length === 0) {
+        return null;
+      }
+
       const response = await apiClient.get<PersonWithAcademyStudents>('persons', {
         select: `
           *,
@@ -590,6 +678,9 @@ export function useStudent(studentId: string | null) {
             school_name,
             grade,
             class_name,
+            attendance_number,
+            father_phone,
+            mother_phone,
             status,
             notes,
             profile_image_url,
@@ -632,7 +723,10 @@ export function useStudent(studentId: string | null) {
         birth_date: academyData.birth_date ?? undefined,
         gender: academyData.gender ?? undefined,
         phone: person.phone ?? undefined,
+        attendance_number: academyData.attendance_number ?? undefined,
         email: person.email ?? undefined,
+        father_phone: academyData.father_phone ?? undefined,
+        mother_phone: academyData.mother_phone ?? undefined,
         address: person.address ?? undefined,
         school_name: academyData.school_name ?? undefined,
         grade: academyData.grade ?? undefined,
@@ -662,14 +756,95 @@ export function useCreateStudent() {
   const { data: session } = useSession();
 
   return useMutation({
-    mutationFn: async (input: CreateStudentInput) => {
+    mutationFn: async (input: CreateStudentInput): Promise<Student & { restored?: boolean }> => {
       const startTime = Date.now();
+
+      // [불변 규칙] 전화번호는 반드시 정규화 (복원 체크 전에 먼저 수행)
+      const normalizedPhone = normalizePhoneNumber(input.phone);
+      const normalizedFatherPhone = normalizePhoneNumber(input.father_phone);
+      const normalizedMotherPhone = normalizePhoneNumber(input.mother_phone);
+
+      // [소프트 삭제 복원] 동일한 이름+전화번호를 가진 삭제된 학생이 있는지 확인
+      if (input.name && normalizedPhone && tenantId) {
+        interface DeletedStudentRow {
+          person_id: string;
+          name: string;
+          phone: string;
+          deleted_at: string;
+        }
+        const deletedResponse = await apiClient.callRPC<DeletedStudentRow[]>('find_deleted_student', {
+          p_tenant_id: tenantId,
+          p_name: input.name,
+          p_phone: normalizedPhone,
+        });
+
+        if (!deletedResponse.error && deletedResponse.data && deletedResponse.data.length > 0) {
+          // 삭제된 학생 발견 - 복원 처리
+          const deletedStudent = deletedResponse.data[0];
+
+          // 복원 (deleted_at = NULL, status = active)
+          await apiClient.callRPC('restore_deleted_student', {
+            p_person_id: deletedStudent.person_id,
+            p_status: input.status || 'active',
+          });
+
+          // 추가 정보 업데이트 (입력된 새 정보로)
+          await apiClient.patch('persons', deletedStudent.person_id, {
+            address: input.address,
+          });
+
+          await apiClient.patch('academy_students', deletedStudent.person_id, {
+            birth_date: input.birth_date,
+            gender: input.gender,
+            school_name: input.school_name,
+            grade: input.grade,
+            attendance_number: input.attendance_number,
+            father_phone: normalizedFatherPhone,
+            mother_phone: normalizedMotherPhone,
+            notes: input.notes,
+            profile_image_url: input.profile_image_url,
+          });
+
+          // Execution Audit 기록
+          if (session?.user?.id) {
+            const durationMs = Date.now() - startTime;
+            await createExecutionAuditRecord(
+              {
+                operation_type: 'student.restore',
+                status: 'success',
+                summary: `${input.name} 학생 복원 완료 (기존 삭제 데이터 재활성화)`,
+                details: {
+                  student_id: deletedStudent.person_id,
+                  original_deleted_at: deletedStudent.deleted_at,
+                },
+                reference: {
+                  entity_type: 'student',
+                  entity_id: deletedStudent.person_id,
+                },
+                duration_ms: durationMs,
+              },
+              session.user.id
+            );
+          }
+
+          // 복원된 학생 정보 반환
+          return {
+            id: deletedStudent.person_id,
+            tenant_id: tenantId,
+            industry_type: industryType,
+            name: input.name,
+            phone: normalizedPhone,
+            status: input.status || 'active',
+            restored: true,  // 복원 여부 플래그
+          } as Student & { restored: boolean };
+        }
+      }
 
       // 1. persons 테이블에 생성 (공통 필드)
       const personResponse = await apiClient.post<Person>('persons', {
         name: input.name,
         email: input.email,
-        phone: input.phone,
+        phone: normalizedPhone,
         address: input.address,
         person_type: 'student',
       });
@@ -680,7 +855,22 @@ export function useCreateStudent() {
 
       const person = personResponse.data!;
 
-      // 2. academy_students 테이블에 확장 정보 추가
+      // 2. 출결번호 자동 생성 로직 (중복 방지)
+      // [개선] DB의 generate_attendance_number 함수 사용하여 Race Condition 방지
+      let attendanceNumber = input.attendance_number;
+      if (!attendanceNumber && input.phone && tenantId) {
+        // 데이터베이스 함수를 통한 원자적 생성
+        const generateResponse = await apiClient.callRPC('generate_attendance_number', {
+          p_tenant_id: tenantId,
+          p_phone: input.phone,
+        });
+
+        if (!generateResponse.error && generateResponse.data) {
+          attendanceNumber = generateResponse.data as string;
+        }
+      }
+
+      // 3. academy_students 테이블에 확장 정보 추가
       interface AcademyStudent {
         person_id: string;
         tenant_id: string;
@@ -689,6 +879,9 @@ export function useCreateStudent() {
         school_name?: string;
         grade?: string;
         class_name?: string;
+        attendance_number?: string;
+        father_phone?: string;
+        mother_phone?: string;
         status?: string;
         notes?: string;
         profile_image_url?: string;
@@ -703,6 +896,9 @@ export function useCreateStudent() {
         gender: input.gender,
         school_name: input.school_name,
         grade: input.grade,
+        attendance_number: attendanceNumber,
+        father_phone: normalizedFatherPhone,
+        mother_phone: normalizedMotherPhone,
         status: input.status || 'active',
         notes: input.notes,
         profile_image_url: input.profile_image_url,
@@ -714,7 +910,7 @@ export function useCreateStudent() {
         throw new Error(academyResponse.error.message);
       }
 
-      // [N+1 최적화] 3. 보호자 정보와 태그 연결을 병렬로 처리
+      // [N+1 최적화] 4. 보호자 정보와 태그 연결을 병렬로 처리
       const guardianPromises = (input.guardians && input.guardians.length > 0)
         ? input.guardians.map((guardian) =>
             apiClient.post<Guardian>('guardians', {
@@ -745,7 +941,7 @@ export function useCreateStudent() {
         throw new Error(failedResult.error?.message || 'Failed to create guardian or tag');
       }
 
-      // 5. Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      // 6. Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
       if (session?.user?.id) {
         const durationMs = Date.now() - startTime;
         await createExecutionAuditRecord(
@@ -766,7 +962,7 @@ export function useCreateStudent() {
         );
       }
 
-      // 6. 결과 반환 (persons + academy_students 조합)
+      // 7. 결과 반환 (persons + academy_students 조합)
       return {
         id: person.id,
         tenant_id: person.tenant_id,
@@ -775,7 +971,10 @@ export function useCreateStudent() {
         birth_date: academyResponse.data?.birth_date,
         gender: academyResponse.data?.gender,
         phone: person.phone,
+        attendance_number: academyResponse.data?.attendance_number,
         email: person.email,
+        father_phone: academyResponse.data?.father_phone,
+        mother_phone: academyResponse.data?.mother_phone,
         address: person.address,
         school_name: academyResponse.data?.school_name,
         grade: academyResponse.data?.grade,
@@ -945,11 +1144,17 @@ export function useUpdateStudent() {
       input: UpdateStudentInput;
     }) => {
       const startTime = Date.now();
+
+      // [불변 규칙] 전화번호는 반드시 정규화하여 저장
+      const normalizedPhone = input.phone !== undefined ? (normalizePhoneNumber(input.phone) || undefined) : undefined;
+      const normalizedFatherPhone = input.father_phone !== undefined ? (normalizePhoneNumber(input.father_phone) || undefined) : undefined;
+      const normalizedMotherPhone = input.mother_phone !== undefined ? (normalizePhoneNumber(input.mother_phone) || undefined) : undefined;
+
       // 1. persons 테이블 업데이트 (공통 필드)
       const personUpdate: Partial<{ name?: string; email?: string; phone?: string; address?: string }> = {};
       if (input.name !== undefined) personUpdate.name = input.name;
       if (input.email !== undefined) personUpdate.email = input.email;
-      if (input.phone !== undefined) personUpdate.phone = input.phone;
+      if (normalizedPhone !== undefined) personUpdate.phone = normalizedPhone;
       if (input.address !== undefined) personUpdate.address = input.address;
 
       if (Object.keys(personUpdate).length > 0) {
@@ -965,6 +1170,9 @@ export function useUpdateStudent() {
       if (input.gender !== undefined) academyUpdate.gender = input.gender;
       if (input.school_name !== undefined) academyUpdate.school_name = input.school_name;
       if (input.grade !== undefined) academyUpdate.grade = input.grade;
+      if (input.attendance_number !== undefined) academyUpdate.attendance_number = input.attendance_number;
+      if (normalizedFatherPhone !== undefined) academyUpdate.father_phone = normalizedFatherPhone;
+      if (normalizedMotherPhone !== undefined) academyUpdate.mother_phone = normalizedMotherPhone;
       if (input.status !== undefined) academyUpdate.status = input.status;
       if (input.notes !== undefined) academyUpdate.notes = input.notes;
       if (input.profile_image_url !== undefined) academyUpdate.profile_image_url = input.profile_image_url;
@@ -979,6 +1187,9 @@ export function useUpdateStudent() {
           school_name?: string;
           grade?: string;
           class_name?: string;
+          attendance_number?: string;
+          father_phone?: string;
+          mother_phone?: string;
           status?: string;
           notes?: string;
           profile_image_url?: string;
@@ -987,8 +1198,9 @@ export function useUpdateStudent() {
           created_by?: string;
           updated_by?: string;
         }
+        // [소프트 삭제] 삭제되지 않은 학생만 조회
         const academyResponse = await apiClient.get<AcademyStudent>('academy_students', {
-          filters: { person_id: studentId },
+          filters: { person_id: studentId, deleted_at: null },
           limit: 1,
         });
 
@@ -1015,6 +1227,9 @@ export function useUpdateStudent() {
             school_name,
             grade,
             class_name,
+            attendance_number,
+            father_phone,
+            mother_phone,
             status,
             notes,
             profile_image_url,
@@ -1037,7 +1252,11 @@ export function useUpdateStudent() {
         throw new Error('Student not found');
       }
 
-      const academyData = person.academy_students?.[0] || {};
+      // [P0-FIX] PostgREST는 1:1 관계에서 단일 객체를, 1:N 관계에서 배열을 반환
+      const rawAcademyData = person.academy_students;
+      const academyData: Record<string, unknown> = Array.isArray(rawAcademyData)
+        ? (rawAcademyData[0] || {})
+        : (rawAcademyData || {});
       const updatedStudent = {
         id: person.id,
         tenant_id: person.tenant_id,
@@ -1046,7 +1265,10 @@ export function useUpdateStudent() {
         birth_date: academyData.birth_date,
         gender: academyData.gender,
         phone: person.phone,
+        attendance_number: academyData.attendance_number,
         email: person.email,
+        father_phone: academyData.father_phone,
+        mother_phone: academyData.mother_phone,
         address: person.address,
         school_name: academyData.school_name,
         grade: academyData.grade,
@@ -1104,12 +1326,18 @@ export function useUpdateStudent() {
       queryClient.invalidateQueries({
         queryKey: ['student', tenantId, data.id],
       });
+      // [P0-FIX] 통계 카드도 무효화 (status 변경 시 통계 즉시 반영)
+      queryClient.invalidateQueries({ queryKey: ['student-stats', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['student-stats-cards', tenantId] });
     },
   });
 }
 
 /**
- * 학생 삭제 Hook (Soft delete: status를 'withdrawn'으로 변경)
+ * 학생 삭제 Hook (Soft delete: deleted_at 타임스탬프 설정)
+ * [퇴원 vs 삭제 구분]
+ * - 퇴원: status = 'withdrawn', 목록에서 조회 가능 (필터로)
+ * - 삭제: deleted_at IS NOT NULL, 목록에서 완전히 숨김
  * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
  */
 export function useDeleteStudent() {
@@ -1129,34 +1357,15 @@ export function useDeleteStudent() {
       });
 
       const studentName = studentResponse.data?.[0]?.name || '알 수 없음';
-      // Soft delete: status를 'withdrawn'으로 변경
+
+      // Soft delete: deleted_at 타임스탬프 설정
       // [불변 규칙] students는 View이므로 academy_students를 직접 업데이트해야 함
-      interface AcademyStudent {
-        person_id: string;
-        tenant_id: string;
-        status?: string;
-      }
-
-      const academyResponse = await apiClient.get<AcademyStudent>('academy_students', {
-        filters: { person_id: studentId },
-        limit: 1,
+      const deleteResponse = await apiClient.callRPC('soft_delete_student', {
+        p_person_id: studentId,
       });
 
-      if (academyResponse.error) {
-        throw new Error(academyResponse.error.message);
-      }
-
-      const academyStudent = academyResponse.data?.[0];
-      if (!academyStudent) {
-        throw new Error('Academy student not found');
-      }
-
-      const updateResponse = await apiClient.patch('academy_students', academyStudent.person_id, {
-        status: 'withdrawn',
-      });
-
-      if (updateResponse.error) {
-        throw new Error(updateResponse.error.message);
+      if (deleteResponse.error) {
+        throw new Error(deleteResponse.error.message);
       }
 
       // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
@@ -1166,7 +1375,7 @@ export function useDeleteStudent() {
           {
             operation_type: 'student.delete',
             status: 'success',
-            summary: `${studentName} 학생 퇴원 처리 완료`,
+            summary: `${studentName} 학생 삭제 완료`,
             details: {
               student_id: studentId,
             },
@@ -1185,6 +1394,7 @@ export function useDeleteStudent() {
     onSuccess: () => {
       // 학생 목록 쿼리 무효화
       queryClient.invalidateQueries({ queryKey: ['students', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['students-paged', tenantId] });
       // 선택 학생 상세도 무효화 (레이어 메뉴에서 바로 반영)
       queryClient.invalidateQueries({ queryKey: ['student', tenantId] });
     },

@@ -169,7 +169,7 @@ const multiConditionRuleSchema = z.object({
  */
 const formFieldSchema = z.object({
   name: z.string().min(1),
-  kind: z.enum(['text', 'email', 'phone', 'number', 'password', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'date', 'datetime', 'custom']),  // SDUI v1.1: custom 추가
+  kind: z.enum(['text', 'email', 'phone', 'number', 'password', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'date', 'datetime', 'dateRange', 'address', 'custom']),  // SDUI v1.1: dateRange, address, custom 추가
   ui: z.object({
     // SDUI v1.1: i18n 지원
     labelKey: z.string().optional(),
@@ -223,13 +223,13 @@ const formFieldSchema = z.object({
 }, {
   message: 'select/multiselect/radio 필드는 options 배열이 필수입니다.',
 }).refine((data) => {
-  // text/textarea/date 등은 options가 존재하면 안됨 (custom 제외)
+  // text/textarea/date/address 등은 options가 존재하면 안됨 (custom 제외)
   if (!['select', 'multiselect', 'radio', 'custom'].includes(data.kind)) {
     return !data.options || data.options.length === 0;
   }
   return true;
 }, {
-  message: 'text/textarea/date/datetime/number/password/email/phone/checkbox 필드는 options를 가질 수 없습니다.',
+  message: 'text/textarea/date/datetime/dateRange/address/number/password/email/phone/checkbox 필드는 options를 가질 수 없습니다.',
 }).refine((data) => {
   // SDUI v1.1: custom kind는 customComponentType 필수
   if (data.kind === 'custom' && !data.customComponentType) {

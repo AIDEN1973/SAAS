@@ -206,7 +206,7 @@ export function HorizontalBarChart({
               }
             `}
           </style>
-          <ResponsiveContainer width="100%" height={height - 40}>
+          <ResponsiveContainer width="100%" height={height - 40} debounce={50}>
             <BarChart
               data={chartData}
               layout="vertical"
@@ -240,8 +240,9 @@ export function HorizontalBarChart({
                 radius={[0, 4, 4, 0]}
                 onClick={(data) => handleBarClick(data as HorizontalBarDataItem)}
                 isAnimationActive={true}
-                animationDuration={800}
-                animationEasing="ease-in-out"
+                animationDuration={1000}
+                animationEasing="ease-out"
+                animationBegin={0}
               >
                 {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />

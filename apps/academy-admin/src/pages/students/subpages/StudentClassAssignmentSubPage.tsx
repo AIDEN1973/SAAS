@@ -130,6 +130,8 @@ export function StudentClassAssignmentSubPage({
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [gradeFilter, setGradeFilter] = useState<string>('all');
+  const [studentModalPage, setStudentModalPage] = useState(1);
+  const STUDENTS_PER_PAGE = 10;
 
   // 시간대 필터 상태: 'all' | 'morning' | 'afternoon' | 'evening'
   const [timeFilter, setTimeFilter] = useState<'all' | 'morning' | 'afternoon' | 'evening'>('all');
@@ -195,6 +197,15 @@ export function StudentClassAssignmentSubPage({
       return s.name.toLowerCase().includes(query) || (s.grade || '').toLowerCase().includes(query);
     });
   }, [students, studentSearchQuery, gradeFilter]);
+
+  // 페이지네이션된 학생 목록
+  const paginatedStudents = useMemo(() => {
+    const startIndex = (studentModalPage - 1) * STUDENTS_PER_PAGE;
+    return filteredStudents.slice(startIndex, startIndex + STUDENTS_PER_PAGE);
+  }, [filteredStudents, studentModalPage]);
+
+  // 전체 페이지 수
+  const totalStudentPages = Math.ceil(filteredStudents.length / STUDENTS_PER_PAGE);
 
 
   // 수업배정 열이 추가된 테이블 스키마
@@ -296,6 +307,8 @@ export function StudentClassAssignmentSubPage({
     setSelectedClassId(classId);
     setSelectedStudentIds(assignedStudentIds);
     setStudentSearchQuery('');
+    setGradeFilter('all');
+    setStudentModalPage(1);
   };
 
   // 학생배정 모달 닫기
@@ -304,6 +317,19 @@ export function StudentClassAssignmentSubPage({
     setSelectedStudentIds([]);
     setStudentSearchQuery('');
     setGradeFilter('all');
+    setStudentModalPage(1);
+  };
+
+  // 검색어 변경 핸들러 (페이지 리셋)
+  const handleStudentSearchChange = (value: string) => {
+    setStudentSearchQuery(value);
+    setStudentModalPage(1);
+  };
+
+  // 학년 필터 변경 핸들러 (페이지 리셋)
+  const handleGradeFilterChange = (value: string) => {
+    setGradeFilter(value);
+    setStudentModalPage(1);
   };
 
   // 학생 토글 (배정/해제)
@@ -965,7 +991,7 @@ export function StudentClassAssignmentSubPage({
                   type="text"
                   placeholder={`${terms.PERSON_LABEL_PRIMARY} 이름 검색`}
                   value={studentSearchQuery}
-                  onChange={(e) => setStudentSearchQuery(e.target.value)}
+                  onChange={(e) => handleStudentSearchChange(e.target.value)}
                   fullWidth
                 />
               </div>
@@ -974,15 +1000,20 @@ export function StudentClassAssignmentSubPage({
                   label=""
                   size="md"
                   value={gradeFilter}
-                  onChange={(value) => setGradeFilter(value as string)}
+                  onChange={(value) => handleGradeFilterChange(value as string)}
                   options={gradeOptions}
                   fullWidth
                 />
               </div>
             </div>
 
+            {/* 검색 결과 카운트 */}
+            <div style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
+              총 {filteredStudents.length}명 {selectedStudentIds.length > 0 && `(${selectedStudentIds.length}명 선택됨)`}
+            </div>
+
             {/* 학생 목록 - 테이블 리스트형 */}
-            {filteredStudents.length > 0 ? (
+            {paginatedStudents.length > 0 ? (
               <div
                 style={{
                   display: 'flex',
@@ -990,14 +1021,12 @@ export function StudentClassAssignmentSubPage({
                   border: 'var(--border-width-thin) solid var(--color-gray-200)',
                   borderRadius: 'var(--border-radius-xs)',
                   overflow: 'hidden',
-                  maxHeight: '400px',
-                  overflowY: 'auto',
                 }}
               >
-                {filteredStudents.map((student, index) => {
+                {paginatedStudents.map((student, index) => {
                   const studentData = student as { id: string; name: string; grade?: string; phone?: string; birth_date?: string };
                   const isSelected = selectedStudentIds.includes(studentData.id);
-                  const isLastItem = index === filteredStudents.length - 1;
+                  const isLastItem = index === paginatedStudents.length - 1;
 
                   return (
                     <button
@@ -1074,7 +1103,7 @@ export function StudentClassAssignmentSubPage({
                         {studentData.grade && (
                           <span
                             style={{
-                              fontSize: 'var(--font-size-sm)',
+                              fontSize: 'var(--font-size-base)',
                               color: 'var(--color-text-secondary)',
                             }}
                           >
@@ -1086,7 +1115,7 @@ export function StudentClassAssignmentSubPage({
                         {studentData.phone && (
                           <span
                             style={{
-                              fontSize: 'var(--font-size-sm)',
+                              fontSize: 'var(--font-size-base)',
                               color: 'var(--color-text-secondary)',
                             }}
                           >
@@ -1098,7 +1127,7 @@ export function StudentClassAssignmentSubPage({
                         {studentData.birth_date && (
                           <span
                             style={{
-                              fontSize: 'var(--font-size-sm)',
+                              fontSize: 'var(--font-size-base)',
                               color: 'var(--color-text-secondary)',
                             }}
                           >
@@ -1113,8 +1142,33 @@ export function StudentClassAssignmentSubPage({
             ) : (
               <EmptyState
                 icon={GraduationCap}
-                message={studentSearchQuery ? '검색 결과가 없습니다.' : `배정 가능한 ${terms.PERSON_LABEL_PRIMARY}${terms.PERSON_LABEL_PRIMARY.endsWith('생') ? '이' : '가'} 없습니다.`}
+                message={studentSearchQuery || gradeFilter !== 'all' ? '검색 결과가 없습니다.' : `배정 가능한 ${terms.PERSON_LABEL_PRIMARY}${terms.PERSON_LABEL_PRIMARY.endsWith('생') ? '이' : '가'} 없습니다.`}
               />
+            )}
+
+            {/* 페이지네이션 */}
+            {totalStudentPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 'var(--spacing-sm)', marginTop: 'var(--spacing-md)' }}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setStudentModalPage((prev) => Math.max(1, prev - 1))}
+                  disabled={studentModalPage === 1}
+                >
+                  이전
+                </Button>
+                <span style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-secondary)' }}>
+                  {studentModalPage} / {totalStudentPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setStudentModalPage((prev) => Math.min(totalStudentPages, prev + 1))}
+                  disabled={studentModalPage === totalStudentPages}
+                >
+                  다음
+                </Button>
+              </div>
             )}
           </div>
         )}

@@ -76,8 +76,12 @@ export function useChildren() {
       // 데이터 변환 persons + academy_students -> Student
       const personsData = studentsResponse.data || [];
       const children: Student[] = personsData.map((person) => {
-        const personWithStudents = person as unknown as Person & { academy_students?: Array<Record<string, unknown>> };
-        const academyData = personWithStudents.academy_students?.[0] || {};
+        const personWithStudents = person as unknown as Person & { academy_students?: unknown };
+        // [P0-FIX] PostgREST는 1:1 관계에서 단일 객체를, 1:N 관계에서 배열을 반환
+        const rawAcademyData = personWithStudents.academy_students;
+        const academyData: Record<string, unknown> = Array.isArray(rawAcademyData)
+          ? (rawAcademyData[0] || {})
+          : ((rawAcademyData as Record<string, unknown>) || {});
         return {
           id: personWithStudents.id,
           tenant_id: personWithStudents.tenant_id,

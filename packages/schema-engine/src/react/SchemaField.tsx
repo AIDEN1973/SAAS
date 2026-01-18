@@ -33,6 +33,8 @@ import {
   Radio,
   Card,
   Button,
+  AddressInput,
+  DateInput,
 } from '@ui-core/react';
 // ⚠️ 참고: Input 컴포넌트는 TextInput의 역할을 수행합니다.
 // 기술문서에서는 TextInput으로 명시되어 있으나, 실제 구현은 Input 컴포넌트를 사용합니다.
@@ -237,6 +239,28 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
 
   // 🍀 4) 각 필드 렌더링에 isDisabled 적용
 
+  // address → AddressInput 사용 (카카오 우편번호 서비스 통합)
+  if (kind === 'address') {
+    return (
+      <FormFieldLayout colSpan={colSpan}>
+        <Controller
+          name={name}
+          control={control}
+          rules={finalRules as any}
+          render={({ field: f }) => (
+            <AddressInput
+              value={(f.value ?? '') as string}
+              onChange={(value) => f.onChange(value)}
+              onBlur={f.onBlur}
+              placeholder={placeholder}
+              disabled={isDisabled}
+            />
+          )}
+        />
+      </FormFieldLayout>
+    );
+  }
+
   // text/email/phone/password → Controller 사용 (reset 후 값 반영을 위해)
   if (['text', 'email', 'phone', 'password'].includes(kind)) {
     const inputType =
@@ -362,6 +386,20 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
 
   // select / multiselect → Controller
   if (kind === 'select' || kind === 'multiselect') {
+    // options prop 방식으로 변환 (divider 속성 지원)
+    const selectOptions = effectiveOptions?.map((opt) => {
+      // labelKey가 있으면 translations에서 조회, 번역이 없으면 label을 fallback으로 사용
+      const translatedLabel = opt.labelKey
+        ? (translations[opt.labelKey] || opt.label || opt.labelKey)
+        : (opt.label || opt.value);  // label이 없으면 value를 사용
+      return {
+        value: opt.value,
+        label: translatedLabel as string,  // 항상 string으로 보장
+        disabled: (opt as any).disabled,  // divider/disabled는 schema types에 정의됨
+        divider: (opt as any).divider,    // divider 속성 전달
+      };
+    });
+
     return (
       <FormFieldLayout colSpan={colSpan}>
         <Controller
@@ -379,19 +417,8 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               onChange={f.onChange}
               onBlur={f.onBlur}
               multiple={kind === 'multiselect'}
-            >
-              {effectiveOptions?.map((opt) => {
-                // labelKey가 있으면 translations에서 조회, 번역이 없으면 label을 fallback으로 사용
-                const translatedLabel = opt.labelKey
-                  ? (translations[opt.labelKey] || opt.label || opt.labelKey)
-                  : opt.label;
-                return (
-                  <option key={opt.value} value={opt.value}>
-                    {translatedLabel}
-                  </option>
-                );
-              })}
-            </Select>
+              options={selectOptions}
+            />
           )}
         />
       </FormFieldLayout>
@@ -465,7 +492,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
     );
   }
 
-  // date
+  // date → DateInput 사용 (직접 입력 + 캘린더 하이브리드)
   if (kind === 'date') {
     return (
       <FormFieldLayout colSpan={colSpan}>
@@ -474,14 +501,15 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
           control={control}
           rules={finalRules as any}
           render={({ field: f }) => (
-            <DatePicker
+            <DateInput
               label={label}
-              value={f.value as string | Date | undefined}
+              value={(f.value ?? '') as string}
               onChange={f.onChange}
+              onBlur={f.onBlur}
+              placeholder={placeholder}
               disabled={isDisabled}
               error={error}
               fullWidth
-              showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
             />
           )}
         />

@@ -8,11 +8,11 @@
  */
 
 import React, { useMemo, createElement } from 'react';
-import { Card, PageHeader, NotificationCardLayout, useResponsiveMode, isDesktop, EmptyState } from '@ui-core/react';
+import { Card, PageHeader, NotificationCardLayout, useResponsiveMode, isDesktop, EmptyState, useChartColors } from '@ui-core/react';
 import { Users, UserCheck, Clock, UserX, TrendingUp, TrendingDown, UserPlus, Percent, BarChart3, GraduationCap } from 'lucide-react';
 import { DistributionChart, HorizontalBarChart } from '../../../components/stats';
 import { CardGridLayout } from '../../../components';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, DefaultLegendContent } from 'recharts';
 import type { StatsItem, PeriodFilter } from '../../../components/stats';
 import type { Student, StudentConsultation } from '@services/student-service';
 import { useStudentStats } from '../hooks/useStudentStats';
@@ -64,6 +64,9 @@ export function StudentStatsSubPage({
   const mode = useResponsiveMode();
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isDesktopMode = isDesktop(modeUpper);
+
+  // 차트 색상 (SVG용)
+  const chartColors = useChartColors();
 
   // 통계 계산
   const {
@@ -277,7 +280,7 @@ export function StudentStatsSubPage({
         {/* 멀티라인 Area Chart */}
         <div style={{ marginTop: 'var(--spacing-2xl)' }}>
           <Card padding="lg" variant="default">
-            <div style={{ width: '100%', height: 380 }}>
+            <div style={{ width: '100%', height: 380 }} className="chart-animate-up-stagger">
               <style>
                 {`
                   .recharts-wrapper,
@@ -289,7 +292,7 @@ export function StudentStatsSubPage({
                 `}
               </style>
               {chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={380}>
+                <ResponsiveContainer width="100%" height={380} debounce={50}>
                   <AreaChart data={chartData} margin={{ left: 10, right: 40, top: 30, bottom: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-gray-200)" />
                     <XAxis
@@ -304,13 +307,18 @@ export function StudentStatsSubPage({
                       width={30}
                     />
                     <RechartsTooltip
-                      contentStyle={{
-                        backgroundColor: 'var(--color-white)',
-                        border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                        borderRadius: 'var(--border-radius-sm)',
-                        padding: 'var(--spacing-sm)',
-                      }}
-                      formatter={(value, name) => {
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload || payload.length === 0) return null;
+
+                        // 정렬 순서: total, active, onLeave, withdrawn, graduated
+                        const order = ['total', 'active', 'onLeave', 'withdrawn', 'graduated'];
+                        type PayloadEntry = { dataKey?: string; color?: string; value?: number | string };
+                        const sortedPayload = [...(payload as PayloadEntry[])].sort((a, b) => {
+                          const indexA = order.indexOf(String(a.dataKey));
+                          const indexB = order.indexOf(String(b.dataKey));
+                          return indexA - indexB;
+                        });
+
                         const labels: Record<string, string> = {
                           total: `전체 ${terms.PERSON_LABEL_PRIMARY}`,
                           active: '재원',
@@ -318,13 +326,40 @@ export function StudentStatsSubPage({
                           graduated: '졸업',
                           withdrawn: terms.STAFF_RESIGNED === '퇴직' ? '퇴원' : '탈퇴',
                         };
-                        return [`${String(value ?? 0)}명`, labels[String(name)] || String(name)];
+
+                        return (
+                          <div
+                            style={{
+                              backgroundColor: 'var(--color-white)',
+                              border: 'var(--border-width-thin) solid var(--color-gray-200)',
+                              borderRadius: 'var(--border-radius-sm)',
+                              padding: 'var(--spacing-sm)',
+                            }}
+                          >
+                            <div style={{ marginBottom: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)' }}>
+                              날짜 : {label}
+                            </div>
+                            {sortedPayload.map((entry: PayloadEntry, index: number) => (
+                              <div
+                                key={index}
+                                style={{
+                                  margin: 0,
+                                  padding: 0,
+                                  lineHeight: 1.2,
+                                  fontSize: 'var(--font-size-xs)',
+                                  color: entry.color,
+                                }}
+                              >
+                                {labels[String(entry.dataKey)] || String(entry.dataKey)} : {entry.value}명
+                              </div>
+                            ))}
+                          </div>
+                        );
                       }}
-                      labelFormatter={(label) => `날짜: ${label}`}
                     />
                     <Legend
                       wrapperStyle={{ paddingTop: 32 }}
-                      formatter={(value: string) => {
+                      content={() => {
                         const labels: Record<string, string> = {
                           total: `전체 ${terms.PERSON_LABEL_PRIMARY}`,
                           active: '재원',
@@ -332,68 +367,65 @@ export function StudentStatsSubPage({
                           graduated: '졸업',
                           withdrawn: terms.STAFF_RESIGNED === '퇴직' ? '퇴원' : '탈퇴',
                         };
-                        return labels[value] || value;
+                        const customPayload = [
+                          { value: labels.total, type: 'line' as const, color: chartColors.primary },
+                          { value: labels.active, type: 'line' as const, color: chartColors.success },
+                          { value: labels.onLeave, type: 'line' as const, color: chartColors.warning },
+                          { value: labels.graduated, type: 'line' as const, color: chartColors.info },
+                          { value: labels.withdrawn, type: 'line' as const, color: chartColors.error },
+                        ];
+                        return <DefaultLegendContent payload={customPayload} />;
                       }}
                     />
                     <Area
                       type="monotone"
                       dataKey="total"
-                      stroke="var(--color-primary)"
+                      stroke={chartColors.primary}
                       strokeWidth={2}
-                      fill="var(--color-primary-50)"
-                      fillOpacity={0.3}
-                      dot={{ fill: 'var(--color-primary)', r: 3 }}
+                      fill={chartColors.primary50}
+                      dot={{ fill: chartColors.primary, r: 3 }}
                       activeDot={{ r: 5 }}
-                      isAnimationActive={true}
-                      animationDuration={800}
+                      isAnimationActive={false}
                     />
                     <Area
                       type="monotone"
                       dataKey="active"
-                      stroke="var(--color-success)"
+                      stroke={chartColors.success}
                       strokeWidth={2}
-                      fill="var(--color-success-50)"
-                      fillOpacity={0.3}
-                      dot={{ fill: 'var(--color-success)', r: 3 }}
+                      fill={chartColors.success50}
+                      dot={{ fill: chartColors.success, r: 3 }}
                       activeDot={{ r: 5 }}
-                      isAnimationActive={true}
-                      animationDuration={800}
+                      isAnimationActive={false}
                     />
                     <Area
                       type="monotone"
                       dataKey="onLeave"
-                      stroke="var(--color-warning)"
+                      stroke={chartColors.warning}
                       strokeWidth={2}
-                      fill="var(--color-warning-50)"
-                      fillOpacity={0.3}
-                      dot={{ fill: 'var(--color-warning)', r: 3 }}
+                      fill={chartColors.warning50}
+                      dot={{ fill: chartColors.warning, r: 3 }}
                       activeDot={{ r: 5 }}
-                      isAnimationActive={true}
-                      animationDuration={800}
+                      isAnimationActive={false}
                     />
                     <Area
                       type="monotone"
                       dataKey="graduated"
-                      stroke="var(--color-info)"
+                      stroke={chartColors.info}
                       strokeWidth={2}
-                      fill="var(--color-info-50)"
-                      fillOpacity={0.3}
-                      dot={{ fill: 'var(--color-info)', r: 3 }}
+                      fill={chartColors.info50}
+                      dot={{ fill: chartColors.info, r: 3 }}
                       activeDot={{ r: 5 }}
-                      isAnimationActive={true}
-                      animationDuration={800}
+                      isAnimationActive={false}
                     />
                     <Area
                       type="monotone"
                       dataKey="withdrawn"
-                      stroke="var(--color-error)"
+                      stroke={chartColors.error}
                       strokeWidth={2}
-                      fill="var(--color-error-50)"
-                      fillOpacity={0.3}
-                      dot={{ fill: 'var(--color-error)', r: 3 }}
+                      fill={chartColors.error50}
+                      dot={{ fill: chartColors.error, r: 3 }}
                       activeDot={{ r: 5 }}
-                      isAnimationActive={true}
-                      animationDuration={800}
+                      isAnimationActive={false}
                     />
                   </AreaChart>
                 </ResponsiveContainer>

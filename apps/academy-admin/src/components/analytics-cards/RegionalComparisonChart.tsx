@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import { Card, EmptyState } from '@ui-core/react';
+import { Card, EmptyState, useChartColors } from '@ui-core/react';
 import { BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -30,6 +30,8 @@ export interface RegionalComparisonChartProps {
 }
 
 export function RegionalComparisonChart({ data, title, isLoading }: RegionalComparisonChartProps) {
+  const chartColors = useChartColors();
+
   if (isLoading) {
     return (
       <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
@@ -56,16 +58,16 @@ export function RegionalComparisonChart({ data, title, isLoading }: RegionalComp
   return (
     <Card padding="lg" variant="default" style={{ marginBottom: 'var(--spacing-md)' }}>
       <h3 style={{ marginBottom: 'var(--spacing-md)' }}>{title}</h3>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={300} debounce={50}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="name" />
           <YAxis />
           <Tooltip />
           <Legend />
-          <Bar dataKey="value" fill="var(--color-primary)" name="현재 값" />
-          <Bar dataKey="average" fill="var(--color-success)" name="지역 평균" />
-          <Bar dataKey="top10" fill="var(--color-warning)" name="상위 10%" />
+          <Bar dataKey="value" fill={chartColors.primary} name="현재 값" isAnimationActive={true} animationDuration={1000} animationEasing="ease-out" animationBegin={0} />
+          <Bar dataKey="average" fill={chartColors.success} name="지역 평균" isAnimationActive={true} animationDuration={1000} animationEasing="ease-out" animationBegin={50} />
+          <Bar dataKey="top10" fill={chartColors.warning} name="상위 10%" isAnimationActive={true} animationDuration={1000} animationEasing="ease-out" animationBegin={100} />
         </BarChart>
       </ResponsiveContainer>
     </Card>

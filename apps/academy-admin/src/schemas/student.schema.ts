@@ -56,32 +56,23 @@ export const studentFormSchema: FormSchema = {
         name: 'phone',
         kind: 'phone',
         ui: {
-          label: '전화번호',
+          label: '학생 전화번호',
           colSpan: 1,
         },
       },
       {
-        name: 'email',
-        kind: 'email',
-        ui: {
-          label: '이메일',
-          colSpan: 1,
-        },
-      },
-      {
-        name: 'school_name',
+        name: 'attendance_number',
         kind: 'text',
         ui: {
-          label: '학교',
+          label: '출결번호',
           colSpan: 1,
+          placeholder: '출결번호 미입력 시 학생 전화번호 뒤 4자리 자동 적용',
         },
-      },
-      {
-        name: 'grade',
-        kind: 'text',
-        ui: {
-          label: '학년',
-          colSpan: 1,
+        validation: {
+          pattern: {
+            value: '^[0-9]{4,}$',
+            message: '4자리 이상의 숫자만 입력 가능합니다',
+          },
         },
       },
       {
@@ -100,11 +91,67 @@ export const studentFormSchema: FormSchema = {
         defaultValue: 'active',
       },
       {
-        name: 'address',
+        name: 'father_phone',
+        kind: 'phone',
+        ui: {
+          label: '아버지 전화번호',
+          colSpan: 1,
+        },
+      },
+      {
+        name: 'mother_phone',
+        kind: 'phone',
+        ui: {
+          label: '어머니 전화번호',
+          colSpan: 1,
+        },
+      },
+      {
+        name: 'school_name',
         kind: 'text',
+        ui: {
+          label: '학교',
+          colSpan: 1,
+        },
+      },
+      {
+        name: 'grade',
+        kind: 'select',
+        ui: {
+          label: '학년',
+          colSpan: 1,
+        },
+        validation: {
+          required: true,
+        },
+        options: [
+          { label: '선택', value: '' },
+          { label: '4세', value: '4세' },
+          { label: '5세', value: '5세' },
+          { label: '6세', value: '6세' },
+          { label: '7세', value: '7세', divider: true }, // 구분선
+          { label: '초등 1학년', value: '초등 1학년' },
+          { label: '초등 2학년', value: '초등 2학년' },
+          { label: '초등 3학년', value: '초등 3학년' },
+          { label: '초등 4학년', value: '초등 4학년' },
+          { label: '초등 5학년', value: '초등 5학년' },
+          { label: '초등 6학년', value: '초등 6학년', divider: true }, // 구분선
+          { label: '중등 1학년', value: '중등 1학년' },
+          { label: '중등 2학년', value: '중등 2학년' },
+          { label: '중등 3학년', value: '중등 3학년', divider: true }, // 구분선
+          { label: '고등 1학년', value: '고등 1학년' },
+          { label: '고등 2학년', value: '고등 2학년' },
+          { label: '고등 3학년', value: '고등 3학년', divider: true }, // 구분선
+          { label: '기타', value: '기타' },
+        ],
+      },
+      {
+        name: 'address',
+        kind: 'address',
         ui: {
           label: '주소',
           colSpan: 2,
+          placeholder: '주소를 입력하거나 검색 버튼을 클릭하세요',
         },
       },
       {

@@ -30,7 +30,6 @@ export function getInitialTabFromPath(pathname: string, queryTab: string | null)
   if (pathname.includes('/attendance')) return 'attendance';
   if (pathname.includes('/risk')) return 'risk';
   if (pathname.includes('/welcome') || pathname.includes('/message')) return 'message';
-  if (pathname.includes('/guardians')) return 'guardians';
   if (pathname.includes('/consultations')) return 'consultations';
   if (pathname.includes('/tags')) return 'tags';
   if (pathname.includes('/classes')) return 'classes';

@@ -239,7 +239,8 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
           width: '100%',
           marginRight: layerMenu.isOpen && !effectiveUseOverlayMode ? effectiveMenuWidth : 0, // 오버레이 모드일 때는 margin 제거
           transition: 'var(--transition-all)',
-          overflow: 'hidden',
+          overflowY: 'auto', // 세로 스크롤 활성화
+          overflowX: 'hidden', // 가로 스크롤 숨김
         }}
       >
         {children}

@@ -235,7 +235,8 @@ export function SubSidebar<T extends string = string>({
         flexShrink: 0,
         paddingTop: 'var(--spacing-xl)', // Container의 paddingTop과 동일 (32px)
         transition: 'var(--transition-base)',
-        position: 'relative',
+        position: 'sticky',
+        top: 0,
         boxSizing: 'border-box', // padding을 height에 포함
         ...style,
       }}

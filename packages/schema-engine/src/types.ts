@@ -165,7 +165,7 @@ export interface MultiConditionRule {
  */
 export interface FormFieldSchema {
   name: string;
-  kind: 'text' | 'email' | 'phone' | 'number' | 'password' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'datetime' | 'dateRange' | 'custom';
+  kind: 'text' | 'email' | 'phone' | 'number' | 'password' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'datetime' | 'dateRange' | 'address' | 'custom';
   ui?: {
     // SDUI v1.1: i18n 키 지원 (label/placeholder/description은 하위 호환성)
     labelKey?: string;  // i18n 키 (우선순위)
@@ -183,6 +183,8 @@ export interface FormFieldSchema {
     value: string;
     labelKey?: string;  // i18n 키 (우선순위)
     label?: string;     // 직접 문자열 (하위 호환성)
+    disabled?: boolean; // 옵션 비활성화
+    divider?: boolean;  // 이 옵션 뒤에 구분선 표시
   }>;
   defaultValue?: unknown;
   condition?: ConditionRule;  // 단일 조건부 렌더링 규칙 (하위 호환성)

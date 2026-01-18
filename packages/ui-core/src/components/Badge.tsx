@@ -8,6 +8,7 @@
 import React from 'react';
 import { clsx } from 'clsx';
 import { ColorToken, SizeToken } from '@design-system/core';
+import { createBadgeColorMap } from '../hooks/useCssVariable';
 
 export interface BadgeProps {
   children: React.ReactNode;
@@ -18,6 +19,9 @@ export interface BadgeProps {
   style?: React.CSSProperties;
   onClick?: () => void;
 }
+
+// [성능 최적화] 컴포넌트 외부에서 한 번만 생성 (모든 Badge 인스턴스가 공유)
+const BADGE_COLOR_MAP = createBadgeColorMap();
 
 /**
  * Badge 컴포넌트
@@ -34,76 +38,9 @@ export const Badge: React.FC<BadgeProps> = ({
   onClick,
 }) => {
   const [isHovered, setIsHovered] = React.useState(false);
-  // 화사한 배지 색상 (한 톤 어둡게 조정)
-  const colorMap: Record<ColorToken | 'blue' | 'gray' | 'green' | 'yellow', {
-    main: string;
-    light: string;
-    dark: string;
-    bg50: string;
-  }> = {
-    primary: {
-      main: '#4A7AE0', // 파랑 (한 톤 다크)
-      light: '#5B8DEF',
-      dark: '#4A7AE0',
-      bg50: '#E3EDFF',
-    },
-    secondary: {
-      main: '#9371F0', // 보라 (한 톤 다크)
-      light: '#A78BFA',
-      dark: '#9371F0',
-      bg50: '#EDE9FE',
-    },
-    success: {
-      main: '#34C66A', // 초록 (한 톤 다크)
-      light: '#4ADE80',
-      dark: '#34C66A',
-      bg50: '#E6F9ED',
-    },
-    warning: {
-      main: '#F0A500', // 노랑/금색 (한 톤 다크)
-      light: '#FBBF24',
-      dark: '#F0A500',
-      bg50: '#FEF5DC',
-    },
-    error: {
-      main: '#EF5050', // 빨강/코랄 (한 톤 다크)
-      light: '#F87171',
-      dark: '#EF5050',
-      bg50: '#FDE8E8',
-    },
-    info: {
-      main: '#0EBDD4', // 시안/청록 (한 톤 다크)
-      light: '#22D3EE',
-      dark: '#0EBDD4',
-      bg50: '#E0F7FA',
-    },
-    blue: {
-      main: '#4A7AE0', // 파랑 (한 톤 다크)
-      light: '#5B8DEF',
-      dark: '#4A7AE0',
-      bg50: '#E3EDFF',
-    },
-    gray: {
-      main: '#7B8494', // 회색 (한 톤 다크)
-      light: '#9CA3AF',
-      dark: '#7B8494',
-      bg50: '#F3F4F6',
-    },
-    green: {
-      main: '#34C66A', // 초록 (한 톤 다크)
-      light: '#4ADE80',
-      dark: '#34C66A',
-      bg50: '#E6F9ED',
-    },
-    yellow: {
-      main: '#F0A500', // 노랑/금색 (한 톤 다크)
-      light: '#FBBF24',
-      dark: '#F0A500',
-      bg50: '#FEF5DC',
-    },
-  };
 
-  const colorVars = colorMap[color || 'primary'];
+  // [SSOT] 색상 맵은 컴포넌트 외부에서 생성된 BADGE_COLOR_MAP 사용
+  const colorVars = BADGE_COLOR_MAP[color || 'primary'];
 
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
@@ -135,7 +72,7 @@ export const Badge: React.FC<BadgeProps> = ({
 
   const variantStyles: Record<'solid' | 'outline' | 'soft', React.CSSProperties> = {
     solid: {
-      backgroundColor: colorVars.dark || 'var(--color-white)', // 배경색 진하게 (dark 사용), 없으면 화이트
+      backgroundColor: colorVars.main || 'var(--color-white)', // 배경색 메인 색상 사용
       color: 'var(--color-white)', // 폰트 색상 화이트
       border: 'none',
     },

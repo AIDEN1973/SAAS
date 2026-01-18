@@ -32,7 +32,6 @@ import { createSafeNavigate, processTagInput, calculateTrend, p, templates } fro
 import { STUDENTS_SUB_MENU_ITEMS, DEFAULT_STUDENTS_SUB_MENU, STUDENTS_RELATED_MENUS, STUDENTS_MENU_LABEL_MAPPING, getSubMenuFromUrl, setSubMenuToUrl, applyDynamicLabels } from '../constants';
 import type { StudentsSubMenuId } from '../constants';
 import { StudentInfoTab } from './students/tabs/StudentInfoTab';
-import { GuardiansTab } from './students/tabs/GuardiansTab';
 import { ConsultationsTab } from './students/tabs/ConsultationsTab';
 import { TagsTab } from './students/tabs/TagsTab';
 import { ClassesTab } from './students/tabs/ClassesTab';
@@ -42,7 +41,7 @@ import { MessageSendTab } from './students/tabs/MessageSendTab';
 import { CreateStudentForm } from './students/components/CreateStudentForm';
 // SubPage 컴포넌트 import
 import { StudentListSubPage, StudentTagsSubPage, StudentStatsSubPage, StudentConsultSubPage, StudentClassAssignmentSubPage } from './students/subpages';
-import type { StudentStatus, StudentConsultation, Guardian } from '@services/student-service';
+import type { StudentStatus, StudentConsultation } from '@services/student-service';
 
 // [P2-QUALITY-1 해결] processTagInput 함수는 utils/data-normalization-utils.ts에서 SSOT로 관리
 // import { processTagInput } from '../utils';
@@ -133,9 +132,7 @@ export function StudentsPage() {
     layerMenuTab,
     isEditing,
     showCreateForm,
-    showGuardianForm,
     showConsultationForm,
-    editingGuardianId,
     editingConsultationId,
     consultationTypeFilter,
     isTagListExpanded,
@@ -153,8 +150,6 @@ export function StudentsPage() {
     tagAssignments,
     selectedStudent,
     selectedStudentLoading,
-    selectedStudentGuardians,
-    selectedStudentGuardiansLoading,
     selectedStudentConsultations,
     selectedStudentConsultationsLoading,
     selectedStudentTags,
@@ -176,7 +171,6 @@ export function StudentsPage() {
     effectiveFormSchema,
     effectiveFilterSchema,
     effectiveTableSchema,
-    effectiveGuardianFormSchema,
     effectiveConsultationFormSchema,
     effectiveClassAssignmentFormSchema,
 
@@ -197,9 +191,7 @@ export function StudentsPage() {
     handleFileUpload,
     setShowCreateForm,
     setIsEditing,
-    setShowGuardianForm,
     setShowConsultationForm,
-    setEditingGuardianId,
     setEditingConsultationId,
     setConsultationTypeFilter,
     setIsTagListExpanded,
@@ -210,9 +202,6 @@ export function StudentsPage() {
     bulkCreateStudents,
     updateStudent,
     deleteStudent,
-    createGuardian,
-    updateGuardian,
-    deleteGuardian,
     createConsultation,
     updateConsultation,
     deleteConsultation,
@@ -808,63 +797,56 @@ export function StudentsPage() {
             </div>
           ) : selectedStudent ? (
             <div style={{ display: 'flex', flexDirection: 'column', height: 'var(--height-full)' }}>
-              {/* 탭 버튼 (StudentDetailPage와 동일한 스타일) */}
+              {/* 탭 버튼: 기본정보 → 수업배정 → 상담내역 → 태그 → 출결 → 이탈위험 → 문자발송 */}
               <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-lg)', flexWrap: 'wrap', borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', paddingBottom: 'var(--spacing-lg)' }}>
                 <Button
                   variant={layerMenuTab === 'info' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('info')}
                 >
-                  {terms.PERSON_LABEL_PRIMARY} 기본정보
-                </Button>
-                <Button
-                  variant={layerMenuTab === 'guardians' ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => handleTabChange('guardians')}
-                >
-                  {terms.GUARDIAN_LABEL} 정보 ({selectedStudentGuardians?.length || 0})
-                </Button>
-                <Button
-                  variant={layerMenuTab === 'consultations' ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => handleTabChange('consultations')}
-                >
-                  {terms.CONSULTATION_LABEL_PLURAL} ({selectedStudentConsultations?.length || 0})
-                </Button>
-                <Button
-                  variant={layerMenuTab === 'tags' ? 'solid' : 'outline'}
-                  size="sm"
-                  onClick={() => handleTabChange('tags')}
-                >
-                  {terms.TAG_LABEL} 관리
+                  기본정보
                 </Button>
                 <Button
                   variant={layerMenuTab === 'classes' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('classes')}
                 >
-                  {terms.GROUP_LABEL} 배정 ({(selectedStudentClasses ?? []).filter((sc) => sc.is_active).length})
+                  {terms.GROUP_LABEL}배정 ({(selectedStudentClasses ?? []).filter((sc) => sc.is_active).length})
+                </Button>
+                <Button
+                  variant={layerMenuTab === 'consultations' ? 'solid' : 'outline'}
+                  size="sm"
+                  onClick={() => handleTabChange('consultations')}
+                >
+                  {terms.CONSULTATION_LABEL}내역 ({selectedStudentConsultations?.length || 0})
+                </Button>
+                <Button
+                  variant={layerMenuTab === 'tags' ? 'solid' : 'outline'}
+                  size="sm"
+                  onClick={() => handleTabChange('tags')}
+                >
+                  {terms.TAG_LABEL}
                 </Button>
                 <Button
                   variant={layerMenuTab === 'attendance' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('attendance')}
                 >
-                  {terms.ATTENDANCE_LABEL} 기록
+                  {terms.ATTENDANCE_LABEL}
                 </Button>
                 <Button
                   variant={layerMenuTab === 'risk' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('risk')}
                 >
-                  {terms.EMERGENCY_RISK_LABEL}
+                  이탈위험
                 </Button>
                 <Button
                   variant={layerMenuTab === 'message' ? 'solid' : 'outline'}
                   size="sm"
                   onClick={() => handleTabChange('message')}
                 >
-                  {terms.MESSAGE_LABEL} 발송
+                  문자발송
                 </Button>
               </div>
               {/* 탭 내용 */}
@@ -882,48 +864,14 @@ export function StudentsPage() {
                     onEdit={() => setIsEditing(true)}
                     onDelete={async () => {
                       const confirmed = await showConfirm(
-                        `정말 삭제하시겠습니까?\n(문서 기준: ${terms.PERSON_LABEL_PRIMARY}${p.은는(terms.PERSON_LABEL_PRIMARY)} 삭제 시 상태가 퇴원(withdrawn)으로 변경됩니다.)`,
+                        `정말 삭제하시겠습니까?\n(삭제된 ${terms.PERSON_LABEL_PRIMARY}${p.은는(terms.PERSON_LABEL_PRIMARY)} 목록에서 숨겨지며, 동일한 정보로 재등록 시 복원됩니다.)`,
                         `${terms.PERSON_LABEL_PRIMARY} ${terms.MESSAGES.DELETE_CONFIRM}`
                       );
                       if (!confirmed) return;
                       await deleteStudent.mutateAsync(selectedStudent.id);
-                      toast(`${terms.PERSON_LABEL_PRIMARY}${p.이가(terms.PERSON_LABEL_PRIMARY)} 삭제(퇴원 처리)되었습니다.`, 'success');
+                      toast(`${terms.PERSON_LABEL_PRIMARY}${p.이가(terms.PERSON_LABEL_PRIMARY)} 삭제되었습니다.`, 'success');
                       handleStudentSelect(null);
                     }}
-                  />
-                )}
-                {layerMenuTab === 'guardians' && selectedStudent && (
-                  <GuardiansTab
-                    guardians={selectedStudentGuardians || []}
-                    isLoading={selectedStudentGuardiansLoading}
-                    showForm={showGuardianForm}
-                    editingGuardianId={editingGuardianId}
-                    effectiveGuardianFormSchema={effectiveGuardianFormSchema}
-                    onShowForm={() => setShowGuardianForm(true)}
-                    onHideForm={() => {
-                      setShowGuardianForm(false);
-                      setEditingGuardianId(null);
-                    }}
-                    onEdit={(guardianId) => {
-                      setEditingGuardianId(guardianId);
-                      setShowGuardianForm(true);
-                    }}
-                    onCreate={async (data) => {
-                      await createGuardian.mutateAsync({ studentId: selectedStudent.id, guardian: data as Omit<Guardian, 'id' | 'tenant_id' | 'student_id' | 'created_at' | 'updated_at'> });
-                      setShowGuardianForm(false);
-                    }}
-                    onUpdate={async (guardianId, data) => {
-                      await updateGuardian.mutateAsync({ guardianId, guardian: data, studentId: selectedStudent.id });
-                      setShowGuardianForm(false);
-                      setEditingGuardianId(null);
-                    }}
-                    onDelete={async (guardianId) => {
-                      const confirmed = await showConfirm(terms.MESSAGES.DELETE_CONFIRM, `${terms.GUARDIAN_LABEL} 삭제`);
-                      if (confirmed) {
-                        await deleteGuardian.mutateAsync({ guardianId, studentId: selectedStudent.id });
-                      }
-                    }}
-                    isEditable={userRole !== 'teacher' && userRole !== 'assistant'}
                   />
                 )}
                 {layerMenuTab === 'consultations' && selectedStudent && (
@@ -1384,7 +1332,6 @@ export function StudentsPage() {
 // ============================================================================
 
 // StudentInfoTab은 별도 파일(./students/tabs/StudentInfoTab.tsx)로 분리됨
-// GuardiansTab은 별도 파일(./students/tabs/GuardiansTab.tsx)로 분리됨
 // ConsultationsTab은 별도 파일(./students/tabs/ConsultationsTab.tsx)로 분리됨
 // TagsTab은 별도 파일(./students/tabs/TagsTab.tsx)로 분리됨
 // ClassesTab은 별도 파일(./students/tabs/ClassesTab.tsx)로 분리됨

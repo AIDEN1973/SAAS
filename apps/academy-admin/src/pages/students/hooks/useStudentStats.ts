@@ -13,6 +13,7 @@
  */
 
 import { useMemo } from 'react';
+import { useChartColors } from '@ui-core/react';
 import type { Student, StudentConsultation } from '@services/student-service';
 import type { PeriodFilter } from '../../../components/stats';
 
@@ -217,6 +218,9 @@ export function useStudentStats({
     other: '기타',
   },
 }: UseStudentStatsProps): UseStudentStatsReturn {
+  // CSS 변수를 실제 값으로 해석 (SVG 차트용)
+  const chartColors = useChartColors();
+
   // 기간 필터 적용된 학생 목록 (향후 기간별 필터링에 사용 예정)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const filteredStudents = useMemo(() => {
@@ -285,11 +289,12 @@ export function useStudentStats({
       counts[category]++;
     });
 
+    // chartColors를 사용하여 CSS 변수를 실제 값으로 해석 (SVG fill 호환)
     const colors = {
-      초등: 'var(--color-success)',
-      중등: 'var(--color-primary)',
-      고등: 'var(--color-warning)',
-      기타: 'var(--color-gray-400)',
+      초등: chartColors.success,
+      중등: chartColors.primary,
+      고등: chartColors.warning,
+      기타: chartColors.gray400,
     };
 
     return Object.entries(counts)
@@ -299,7 +304,7 @@ export function useStudentStats({
         value,
         color: colors[name as keyof typeof colors],
       }));
-  }, [students]);
+  }, [students, chartColors]);
 
   // 성별 분포
   const genderDistribution = useMemo<GenderDistribution[]>(() => {
@@ -319,11 +324,12 @@ export function useStudentStats({
       else counts.unknown++;
     });
 
+    // chartColors를 사용하여 CSS 변수를 실제 값으로 해석 (SVG fill 호환)
     const colors = {
-      male: 'var(--color-primary)',
-      female: 'var(--color-error)',
-      other: 'var(--color-warning)',
-      unknown: 'var(--color-gray-400)',
+      male: chartColors.primary,
+      female: chartColors.error,
+      other: chartColors.warning,
+      unknown: chartColors.gray400,
     };
 
     return Object.entries(counts)
@@ -333,7 +339,7 @@ export function useStudentStats({
         value,
         color: colors[key as keyof typeof colors],
       }));
-  }, [students, genderLabels]);
+  }, [students, genderLabels, chartColors]);
 
   // 태그별 분포
   const tagDistribution = useMemo<TagDistribution[]>(() => {
@@ -351,11 +357,11 @@ export function useStudentStats({
         id: tag.id,
         name: tag.name,
         value: tagCounts.get(tag.id) || 0,
-        color: tag.color || 'var(--color-primary)',
+        color: tag.color || chartColors.primary,
       }))
       .filter((item) => item.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [tags, tagAssignments]);
+  }, [tags, tagAssignments, chartColors]);
 
   // 상담 유형별 분포
   const consultationTypeDistribution = useMemo<ConsultationTypeDistribution[]>(() => {
@@ -374,11 +380,12 @@ export function useStudentStats({
       }
     });
 
+    // chartColors를 사용하여 CSS 변수를 실제 값으로 해석 (SVG fill 호환)
     const colors = {
-      learning: 'var(--color-success)',
-      counseling: 'var(--color-primary)',
-      behavior: 'var(--color-warning)',
-      other: 'var(--color-gray-400)',
+      learning: chartColors.success,
+      counseling: chartColors.primary,
+      behavior: chartColors.warning,
+      other: chartColors.gray400,
     };
 
     return Object.entries(counts)
@@ -390,7 +397,7 @@ export function useStudentStats({
         color: colors[type as keyof typeof colors],
       }))
       .sort((a, b) => b.value - a.value);
-  }, [consultations, consultationTypeLabels]);
+  }, [consultations, consultationTypeLabels, chartColors]);
 
   // KPI 지표
   const kpiStats = useMemo<KPIStats>(() => {

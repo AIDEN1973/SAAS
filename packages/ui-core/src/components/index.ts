@@ -10,6 +10,9 @@ export type { CardLayoutType } from '../contexts/CardLayoutContext';
 export { Input } from './Input';
 export type { InputProps } from './Input';
 
+export { AddressInput } from './AddressInput';
+export type { AddressInputProps } from './AddressInput';
+
 export { Textarea } from './Textarea';
 export type { TextareaProps } from './Textarea';
 
@@ -128,6 +131,9 @@ export type { FormFieldLayoutProps } from './FormFieldLayout';
 
 export { DatePicker } from './DatePicker';
 export type { DatePickerProps } from './DatePicker';
+
+export { DateInput } from './DateInput';
+export type { DateInputProps } from './DateInput';
 
 export { Popover } from './Popover';
 export type { PopoverProps } from './Popover';

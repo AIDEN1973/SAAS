@@ -12,25 +12,24 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { useModal , useResponsiveMode, isMobile, isTablet } from '@ui-core/react';
-import { useStudentsPaged, useStudentTags, useStudentTagsByStudent, useAllStudentTagAssignments, useCreateStudent, useBulkCreateStudents, useStudent, useGuardians, useConsultations, useAllConsultations, useStudentClasses, useAllStudentClasses, useUpdateStudent, useDeleteStudent, useCreateGuardian, useUpdateGuardian, useDeleteGuardian, useCreateConsultation, useUpdateConsultation, useDeleteConsultation, useGenerateConsultationAISummary, useUpdateStudentTags, useAssignStudentToClass, useUnassignStudentFromClass, useUpdateStudentClassEnrolledAt } from '@hooks/use-student';
+import { useStudentsPaged, useStudentTags, useStudentTagsByStudent, useAllStudentTagAssignments, useCreateStudent, useBulkCreateStudents, useStudent, useConsultations, useAllConsultations, useStudentClasses, useAllStudentClasses, useUpdateStudent, useDeleteStudent, useCreateConsultation, useUpdateConsultation, useDeleteConsultation, useGenerateConsultationAISummary, useUpdateStudentTags, useAssignStudentToClass, useUnassignStudentFromClass, useUpdateStudentClassEnrolledAt } from '@hooks/use-student';
 import { useClasses } from '@hooks/use-class';
 import { useSession, useUserRole } from '@hooks/use-auth';
 import { useSchema } from '@hooks/use-schema';
 import { toKST } from '@lib/date-utils';
-import type { StudentFilter, StudentStatus, Student, CreateStudentInput, Gender, ConsultationType, Guardian, StudentConsultation } from '@services/student-service';
+import type { StudentFilter, StudentStatus, Student, CreateStudentInput, Gender, ConsultationType, StudentConsultation } from '@services/student-service';
 import type { Class } from '@services/class-service';
 import { studentFormSchema } from '../../schemas/student.schema';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES } from '../../constants';
 import { createSafeNavigate } from '../../utils';
-import { guardianFormSchema } from '../../schemas/guardian.schema';
 import { consultationFormSchema } from '../../schemas/consultation.schema';
 import { classAssignmentFormSchema } from '../../schemas/class-assignment.schema';
 import { createStudentFilterSchema } from '../../schemas/student.filter.schema';
 import { studentTableSchema } from '../../schemas/student.table.schema';
 import type { FormSchema, FilterSchema, TableSchema } from '@schema-engine/types';
 
-export type LayerMenuTab = 'info' | 'guardians' | 'consultations' | 'tags' | 'classes' | 'attendance' | 'risk' | 'message';
+export type LayerMenuTab = 'info' | 'consultations' | 'tags' | 'classes' | 'attendance' | 'risk' | 'message';
 
 export interface UseStudentPageReturn {
   // 상태
@@ -39,9 +38,7 @@ export interface UseStudentPageReturn {
   layerMenuTab: LayerMenuTab;
   isEditing: boolean;
   showCreateForm: boolean;
-  showGuardianForm: boolean;
   showConsultationForm: boolean;
-  editingGuardianId: string | null;
   editingConsultationId: string | null;
   consultationTypeFilter: ConsultationType | 'all';
   isTagListExpanded: boolean;
@@ -62,8 +59,6 @@ export interface UseStudentPageReturn {
   classes: Class[] | undefined;
   selectedStudent: Student | null | undefined;
   selectedStudentLoading: boolean;
-  selectedStudentGuardians: Guardian[] | undefined;
-  selectedStudentGuardiansLoading: boolean;
   selectedStudentConsultations: StudentConsultation[];
   selectedStudentConsultationsLoading: boolean;
   selectedStudentTags: Array<{ id: string; name: string; color: string }> | undefined;
@@ -83,7 +78,6 @@ export interface UseStudentPageReturn {
   effectiveFormSchema: FormSchema;
   effectiveFilterSchema: FilterSchema;
   effectiveTableSchema: TableSchema;
-  effectiveGuardianFormSchema: FormSchema;
   effectiveConsultationFormSchema: FormSchema;
   effectiveClassAssignmentFormSchema: FormSchema;
 
@@ -107,9 +101,7 @@ export interface UseStudentPageReturn {
   handleFileUpload: (file: File) => Promise<void>;
   setShowCreateForm: (show: boolean) => void;
   setIsEditing: (editing: boolean) => void;
-  setShowGuardianForm: (show: boolean) => void;
   setShowConsultationForm: (show: boolean) => void;
-  setEditingGuardianId: (id: string | null) => void;
   setEditingConsultationId: (id: string | null) => void;
   setConsultationTypeFilter: (filter: ConsultationType | 'all') => void;
   setIsTagListExpanded: React.Dispatch<React.SetStateAction<boolean>>;
@@ -120,9 +112,6 @@ export interface UseStudentPageReturn {
   bulkCreateStudents: ReturnType<typeof useBulkCreateStudents>;
   updateStudent: ReturnType<typeof useUpdateStudent>;
   deleteStudent: ReturnType<typeof useDeleteStudent>;
-  createGuardian: ReturnType<typeof useCreateGuardian>;
-  updateGuardian: ReturnType<typeof useUpdateGuardian>;
-  deleteGuardian: ReturnType<typeof useDeleteGuardian>;
   createConsultation: ReturnType<typeof useCreateConsultation>;
   updateConsultation: ReturnType<typeof useUpdateConsultation>;
   deleteConsultation: ReturnType<typeof useDeleteConsultation>;
@@ -164,9 +153,7 @@ export function useStudentPage(): UseStudentPageReturn {
   // UI 상태
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [showGuardianForm, setShowGuardianForm] = useState(false);
   const [showConsultationForm, setShowConsultationForm] = useState(false);
-  const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
   const [editingConsultationId, setEditingConsultationId] = useState<string | null>(null);
   const [consultationTypeFilter, setConsultationTypeFilter] = useState<ConsultationType | 'all'>('all');
   const [selectedConsultationId, setSelectedConsultationId] = useState<string | null>(null);
@@ -174,7 +161,7 @@ export function useStudentPage(): UseStudentPageReturn {
   // 타입 가드 함수 (P0-E)
   const isLayerMenuTab = useCallback((value: string | null): value is LayerMenuTab => {
     if (!value) return false;
-    const validTabs: LayerMenuTab[] = ['info', 'guardians', 'consultations', 'tags', 'classes', 'attendance', 'risk', 'message'];
+    const validTabs: LayerMenuTab[] = ['info', 'consultations', 'tags', 'classes', 'attendance', 'risk', 'message'];
     return validTabs.includes(value as LayerMenuTab);
   }, []);
 
@@ -197,7 +184,6 @@ export function useStudentPage(): UseStudentPageReturn {
     if (path.includes('/attendance')) return 'attendance';
     if (path.includes('/risk')) return 'risk';
     if (path.includes('/welcome') || path.includes('/message')) return 'message';
-    if (path.includes('/guardians')) return 'guardians';
     if (path.includes('/consultations')) return 'consultations';
     if (path.includes('/tags')) return 'tags';
     if (path.includes('/classes')) return 'classes';
@@ -303,7 +289,6 @@ export function useStudentPage(): UseStudentPageReturn {
   const { data: studentFormSchemaData } = useSchema('student', studentFormSchema, 'form');
   const { data: studentFilterSchemaData } = useSchema('student_filter', studentFilterSchema, 'filter');
   const { data: studentTableSchemaData } = useSchema('student_table', studentTableSchema, 'table');
-  const { data: guardianFormSchemaData } = useSchema('guardian', guardianFormSchema, 'form');
   const { data: consultationFormSchemaData } = useSchema('consultation', consultationFormSchema, 'form');
   const { data: classAssignmentFormSchemaData } = useSchema('class_assignment', classAssignmentFormSchema, 'form');
 
@@ -311,17 +296,11 @@ export function useStudentPage(): UseStudentPageReturn {
   const effectiveFormSchema = studentFormSchemaData || studentFormSchema;
   const effectiveFilterSchema: FilterSchema = studentFilterSchemaData || studentFilterSchema;
   const effectiveTableSchema: TableSchema = studentTableSchemaData || studentTableSchema;
-  const effectiveGuardianFormSchema = guardianFormSchemaData || guardianFormSchema;
   const effectiveConsultationFormSchema = consultationFormSchemaData || consultationFormSchema;
   const effectiveClassAssignmentFormSchema = classAssignmentFormSchemaData || classAssignmentFormSchema;
 
   // 선택된 학생 데이터
   const { data: selectedStudent, isLoading: selectedStudentLoading } = useStudent(selectedStudentId);
-  const { data: selectedStudentGuardiansData, isLoading: selectedStudentGuardiansLoading } = useGuardians(selectedStudentId);
-  const selectedStudentGuardians = useMemo<Guardian[] | undefined>(() => {
-    if (!selectedStudentGuardiansData) return undefined;
-    return (selectedStudentGuardiansData as unknown) as Guardian[];
-  }, [selectedStudentGuardiansData]);
   const { data: allSelectedStudentConsultations, isLoading: selectedStudentConsultationsLoading } = useConsultations(selectedStudentId);
   const { data: selectedStudentTags, isLoading: selectedStudentTagsLoading } = useStudentTagsByStudent(selectedStudentId);
   const { data: selectedStudentClasses, isLoading: selectedStudentClassesLoading } = useStudentClasses(selectedStudentId);
@@ -362,9 +341,6 @@ export function useStudentPage(): UseStudentPageReturn {
   const bulkCreateStudents = useBulkCreateStudents();
   const updateStudent = useUpdateStudent();
   const deleteStudent = useDeleteStudent();
-  const createGuardian = useCreateGuardian();
-  const updateGuardian = useUpdateGuardian();
-  const deleteGuardian = useDeleteGuardian();
   const createConsultation = useCreateConsultation();
   const updateConsultation = useUpdateConsultation();
   const deleteConsultation = useDeleteConsultation();
@@ -431,9 +407,7 @@ export function useStudentPage(): UseStudentPageReturn {
   useEffect(() => {
     if (selectedStudentId) {
       setIsEditing(false);
-      setShowGuardianForm(false);
       setShowConsultationForm(false);
-      setEditingGuardianId(null);
       setEditingConsultationId(null);
       setConsultationTypeFilter('all');
     }
@@ -503,7 +477,9 @@ export function useStudentPage(): UseStudentPageReturn {
         생년월일: student.birth_date || '',
         성별: student.gender || '',
         전화번호: student.phone || '',
-        이메일: student.email || '',
+        출결번호: student.attendance_number || '',
+        아버지전화번호: student.father_phone || '',
+        어머니전화번호: student.mother_phone || '',
         주소: student.address || '',
         학교: student.school_name || '',
         학년: student.grade || '',
@@ -535,7 +511,9 @@ export function useStudentPage(): UseStudentPageReturn {
         생년월일: '',
         성별: '',
         전화번호: '',
-        이메일: '',
+        출결번호: '',
+        아버지전화번호: '',
+        어머니전화번호: '',
         주소: '',
         학교: '',
         학년: '',
@@ -578,7 +556,9 @@ export function useStudentPage(): UseStudentPageReturn {
         birth_date: row['생년월일'] || row['birth_date'] ? String(row['생년월일'] || row['birth_date']) : undefined,
         gender: (row['성별'] || row['gender'] || undefined) as Gender | undefined,
         phone: row['전화번호'] || row['phone'] ? String(row['전화번호'] || row['phone']) : undefined,
-        email: row['이메일'] || row['email'] ? String(row['이메일'] || row['email']) : undefined,
+        attendance_number: row['출결번호'] || row['attendance_number'] ? String(row['출결번호'] || row['attendance_number']) : undefined,
+        father_phone: row['아버지전화번호'] || row['father_phone'] ? String(row['아버지전화번호'] || row['father_phone']) : undefined,
+        mother_phone: row['어머니전화번호'] || row['mother_phone'] ? String(row['어머니전화번호'] || row['mother_phone']) : undefined,
         address: row['주소'] || row['address'] ? String(row['주소'] || row['address']) : undefined,
         school_name: row['학교'] || row['school_name'] ? String(row['학교'] || row['school_name']) : undefined,
         grade: row['학년'] || row['grade'] ? String(row['학년'] || row['grade']) : undefined,
@@ -626,9 +606,7 @@ export function useStudentPage(): UseStudentPageReturn {
     layerMenuTab,
     isEditing,
     showCreateForm,
-    showGuardianForm,
     showConsultationForm,
-    editingGuardianId,
     editingConsultationId,
     consultationTypeFilter,
     isTagListExpanded,
@@ -649,8 +627,6 @@ export function useStudentPage(): UseStudentPageReturn {
     classes,
     selectedStudent,
     selectedStudentLoading,
-    selectedStudentGuardians,
-    selectedStudentGuardiansLoading,
     selectedStudentConsultations,
     selectedStudentConsultationsLoading,
     selectedStudentTags,
@@ -673,7 +649,6 @@ export function useStudentPage(): UseStudentPageReturn {
     effectiveFormSchema,
     effectiveFilterSchema,
     effectiveTableSchema,
-    effectiveGuardianFormSchema,
     effectiveConsultationFormSchema,
     effectiveClassAssignmentFormSchema,
 
@@ -697,9 +672,7 @@ export function useStudentPage(): UseStudentPageReturn {
     handleFileUpload,
     setShowCreateForm,
     setIsEditing,
-    setShowGuardianForm,
     setShowConsultationForm,
-    setEditingGuardianId,
     setEditingConsultationId,
     setConsultationTypeFilter,
     setIsTagListExpanded,
@@ -710,9 +683,6 @@ export function useStudentPage(): UseStudentPageReturn {
     bulkCreateStudents,
     updateStudent,
     deleteStudent,
-    createGuardian,
-    updateGuardian,
-    deleteGuardian,
     createConsultation,
     updateConsultation,
     deleteConsultation,

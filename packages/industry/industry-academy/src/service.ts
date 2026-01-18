@@ -68,6 +68,7 @@ export class AcademyService {
             status,
             notes,
             profile_image_url,
+            deleted_at,
             created_at,
             updated_at,
             created_by,
@@ -92,30 +93,43 @@ export class AcademyService {
     }
 
     // 데이터 변환: persons + academy_students → Student
-    let students = (data || []).map((person) => {
-      const personWithStudents = person as Person & { academy_students?: Array<Record<string, unknown>> };
-      const academyData = personWithStudents.academy_students?.[0] || {};
-      return {
-        id: personWithStudents.id,
-        tenant_id: personWithStudents.tenant_id,
-        industry_type: 'academy', // 고정값
-        name: personWithStudents.name,
-        birth_date: academyData.birth_date,
-        gender: academyData.gender,
-        phone: personWithStudents.phone,
-        email: personWithStudents.email,
-        address: personWithStudents.address,
-        school_name: academyData.school_name,
-        grade: academyData.grade,
-        status: academyData.status || 'active',
-        notes: academyData.notes,
-        profile_image_url: academyData.profile_image_url,
-        created_at: personWithStudents.created_at,
-        updated_at: personWithStudents.updated_at,
-        created_by: academyData.created_by,
-        updated_by: academyData.updated_by,
-      } as Student;
-    });
+    // [소프트 삭제] deleted_at이 NULL인 학생만 포함
+    // [P0-FIX] PostgREST는 1:1 관계에서 단일 객체를, 1:N 관계에서 배열을 반환
+    const getAcademyData = (raw: unknown): Record<string, unknown> | undefined => {
+      if (!raw) return undefined;
+      return Array.isArray(raw) ? raw[0] : (raw as Record<string, unknown>);
+    };
+    let students = (data || [])
+      .filter((person) => {
+        const personWithStudents = person as Person & { academy_students?: unknown };
+        const academyData = getAcademyData(personWithStudents.academy_students);
+        // academy_students가 없거나 deleted_at이 설정된 경우 제외
+        return academyData && !academyData.deleted_at;
+      })
+      .map((person) => {
+        const personWithStudents = person as Person & { academy_students?: unknown };
+        const academyData = getAcademyData(personWithStudents.academy_students) || {};
+        return {
+          id: personWithStudents.id,
+          tenant_id: personWithStudents.tenant_id,
+          industry_type: 'academy', // 고정값
+          name: personWithStudents.name,
+          birth_date: academyData.birth_date,
+          gender: academyData.gender,
+          phone: personWithStudents.phone,
+          email: personWithStudents.email,
+          address: personWithStudents.address,
+          school_name: academyData.school_name,
+          grade: academyData.grade,
+          status: academyData.status || 'active',
+          notes: academyData.notes,
+          profile_image_url: academyData.profile_image_url,
+          created_at: personWithStudents.created_at,
+          updated_at: personWithStudents.updated_at,
+          created_by: academyData.created_by,
+          updated_by: academyData.updated_by,
+        } as Student;
+      });
 
     // 상태 필터
     if (filter?.status) {
@@ -175,6 +189,7 @@ export class AcademyService {
             status,
             notes,
             profile_image_url,
+            deleted_at,
             created_at,
             updated_at,
             created_by,
@@ -194,7 +209,16 @@ export class AcademyService {
     }
 
     // 데이터 변환: persons + academy_students → Student
-    const academyData = data.academy_students?.[0] || {};
+    // [소프트 삭제] deleted_at이 설정된 경우 null 반환
+    // [P0-FIX] PostgREST는 1:1 관계에서 단일 객체를, 1:N 관계에서 배열을 반환
+    const rawAcademyData = data.academy_students;
+    const academyData = Array.isArray(rawAcademyData)
+      ? rawAcademyData[0]
+      : rawAcademyData;
+    if (!academyData || academyData.deleted_at) {
+      return null;
+    }
+
     return {
       id: data.id,
       tenant_id: data.tenant_id,

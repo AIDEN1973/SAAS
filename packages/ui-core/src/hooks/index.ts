@@ -9,4 +9,4 @@ export { AILayerMenuProvider, useAILayerMenu } from './useAILayerMenu';
 export { useGlobalSearch, DEFAULT_SEARCH_ENTITY_TYPES, SEARCH_ENTITY_TYPE_LABELS, SEARCH_ENTITY_TYPE_ICONS } from './useGlobalSearch';
 export type { UseGlobalSearchOptions, UseGlobalSearchReturn, GlobalSearchInput } from './useGlobalSearch';
 export { registerOpenDropdown, unregisterDropdown, closeActiveDropdown } from './useDropdownManager';
-
+export { resolveCssVariable, useChartColors, createBadgeColorMap, COLOR_MAP } from './useCssVariable';

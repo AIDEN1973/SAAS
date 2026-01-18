@@ -6,11 +6,11 @@
  * [업종중립] 라벨은 IndustryTerms를 통해 동적으로 생성
  */
 
-import { User, Users, MessageSquare, Tag, BookOpen, Calendar, AlertTriangle, Send } from 'lucide-react';
+import { User, MessageSquare, Tag, BookOpen, Calendar, AlertTriangle, Send } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { IndustryTerms } from '@industry/registry';
 
-export type StudentTabId = 'info' | 'guardians' | 'consultations' | 'tags' | 'classes' | 'attendance' | 'risk' | 'message';
+export type StudentTabId = 'info' | 'consultations' | 'tags' | 'classes' | 'attendance' | 'risk' | 'message';
 
 export interface StudentTab {
   id: StudentTabId;
@@ -35,10 +35,6 @@ const TAB_CONFIG: Record<StudentTabId, Omit<StudentTab, 'id' | 'label'>> = {
   info: {
     icon: User,
   },
-  guardians: {
-    icon: Users,
-    showCount: true,
-  },
   consultations: {
     icon: MessageSquare,
     showCount: true,
@@ -62,9 +58,9 @@ const TAB_CONFIG: Record<StudentTabId, Omit<StudentTab, 'id' | 'label'>> = {
 };
 
 /**
- * 탭 순서
+ * 탭 순서: 기본정보 → 수업배정 → 상담내역 → 태그 → 출결 → 이탈위험 → 문자발송
  */
-const TAB_ORDER: StudentTabId[] = ['info', 'guardians', 'consultations', 'tags', 'classes', 'attendance', 'risk', 'message'];
+const TAB_ORDER: StudentTabId[] = ['info', 'classes', 'consultations', 'tags', 'attendance', 'risk', 'message'];
 
 /**
  * PERSON 상세 레이어 메뉴 탭 설정 생성 함수
@@ -74,13 +70,12 @@ const TAB_ORDER: StudentTabId[] = ['info', 'guardians', 'consultations', 'tags',
 export function getStudentTabs(terms: IndustryTerms): readonly StudentTab[] {
   const labelMap: Record<StudentTabId, string> = {
     info: '기본정보',
-    guardians: `${terms.GUARDIAN_LABEL} 정보`,
-    consultations: terms.CONSULTATION_LABEL_PLURAL,
-    tags: `${terms.TAG_LABEL} 관리`,
-    classes: `${terms.GROUP_LABEL} 배정`,
-    attendance: `${terms.ATTENDANCE_LABEL} 기록`,
+    classes: terms.GROUP_LABEL + '배정',
+    consultations: terms.CONSULTATION_LABEL + '내역',
+    tags: terms.TAG_LABEL,
+    attendance: terms.ATTENDANCE_LABEL,
     risk: '이탈위험',
-    message: '메시지 발송',
+    message: '문자발송',
   };
 
   return TAB_ORDER.map((id) => ({
@@ -101,31 +96,25 @@ export const STUDENT_TABS: readonly StudentTab[] = [
     icon: User,
   },
   {
-    id: 'guardians',
-    label: '학부모정보',
-    icon: Users,
-    showCount: true,
-  },
-  {
-    id: 'consultations',
-    label: '상담일지',
-    icon: MessageSquare,
-    showCount: true,
-  },
-  {
-    id: 'tags',
-    label: '태그관리',
-    icon: Tag,
-  },
-  {
     id: 'classes',
     label: '수업배정',
     icon: BookOpen,
     showCount: true,
   },
   {
+    id: 'consultations',
+    label: '상담내역',
+    icon: MessageSquare,
+    showCount: true,
+  },
+  {
+    id: 'tags',
+    label: '태그',
+    icon: Tag,
+  },
+  {
     id: 'attendance',
-    label: '출결기록',
+    label: '출결',
     icon: Calendar,
   },
   {
@@ -135,7 +124,7 @@ export const STUDENT_TABS: readonly StudentTab[] = [
   },
   {
     id: 'message',
-    label: '메시지 발송',
+    label: '문자발송',
     icon: Send,
   },
 ];

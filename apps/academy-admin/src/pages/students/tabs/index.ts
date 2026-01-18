@@ -12,10 +12,6 @@ export const StudentInfoTab = lazy(() =>
   import('./StudentInfoTab').then(module => ({ default: module.StudentInfoTab }))
 );
 
-export const GuardiansTab = lazy(() =>
-  import('./GuardiansTab').then(module => ({ default: module.GuardiansTab }))
-);
-
 export const ConsultationsTab = lazy(() =>
   import('./ConsultationsTab').then(module => ({ default: module.ConsultationsTab }))
 );
