@@ -93,10 +93,10 @@ export type DynamicMenuLabelId =
   | 'consultation_list'  // 상담관리
   | 'tag_management'     // 태그관리
   // 출결 관련
-  | 'attendance_today'   // 오늘 출결
-  | 'attendance_history' // 출결 기록
-  | 'attendance_stats'   // 출결 통계
-  | 'attendance_settings' // 출결 설정
+  | 'attendance_today'   // 오늘출결
+  | 'attendance_history' // 출결기록
+  | 'attendance_stats'   // 출결통계
+  | 'attendance_settings' // 출결설정
   | 'attendance_management'; // 출결관리
 
 /**
@@ -153,10 +153,10 @@ export function getDynamicMenuLabel(
     consultation_list: `${terms.CONSULTATION_LABEL}관리`,
     tag_management: `${terms.TAG_LABEL}관리`,
     // 출결 관련
-    attendance_today: `오늘 ${terms.ATTENDANCE_LABEL}`,
-    attendance_history: `${terms.ATTENDANCE_LABEL} 기록`,
-    attendance_stats: `${terms.ATTENDANCE_LABEL} 통계`,
-    attendance_settings: `${terms.ATTENDANCE_LABEL} 설정`,
+    attendance_today: `오늘${terms.ATTENDANCE_LABEL}`,
+    attendance_history: `${terms.ATTENDANCE_LABEL}기록`,
+    attendance_stats: `${terms.ATTENDANCE_LABEL}통계`,
+    attendance_settings: `${terms.ATTENDANCE_LABEL}설정`,
     attendance_management: `${terms.ATTENDANCE_LABEL}관리`,
   };
 

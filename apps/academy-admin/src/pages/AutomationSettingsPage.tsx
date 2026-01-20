@@ -17,7 +17,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, Container, Card, PageHeader, Switch, NotificationCardLayout, Badge, Input, Select, Button, useResponsiveMode, isMobile, SubSidebar } from '@ui-core/react';
+import { ErrorBoundary, useModal, Container, Card, PageHeader, Switch, NotificationCardLayout, Badge, Input, Select, Button, useResponsiveMode, isMobile, isTablet, SubSidebar } from '@ui-core/react';
 import { getApiContext, apiClient } from '@api-sdk/core';
 import { AUTOMATION_EVENT_CATALOG, AUTOMATION_EVENT_PLANNED } from '@core/core-automation';
 // [SSOT] Barrel export를 통한 통합 import
@@ -635,6 +635,13 @@ export function AutomationSettingsPage() {
   const mode = useResponsiveMode();
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
+  // 서브사이드바 축소 상태 (태블릿 모드 기본값, 사용자 토글 가능)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isTabletMode);
+  // 태블릿 모드 변경 시 축소 상태 동기화
+  useEffect(() => {
+    setSidebarCollapsed(isTabletMode);
+  }, [isTabletMode]);
   const updateConfig = useUpdateConfig();
   const { data: currentConfigData } = useConfig();
   const terms = useIndustryTerms();
@@ -914,13 +921,15 @@ export function AutomationSettingsPage() {
   return (
     <ErrorBoundary>
       <div style={{ display: 'flex', height: 'var(--height-full)' }}>
-        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {/* 서브 사이드바 (모바일에서는 숨김, 태블릿에서는 축소) */}
         {!isMobileMode && (
           <SubSidebar
             title="자동화 설정"
             items={AUTOMATION_SUB_MENU_ITEMS}
             selectedId={selectedSubMenu}
             onSelect={handleSubMenuChange}
+            collapsed={sidebarCollapsed}
+            onCollapsedChange={setSidebarCollapsed}
             testId="automation-sub-sidebar"
           />
         )}

@@ -126,6 +126,12 @@ export function ClassesPage() {
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
   const isTabletMode = isTablet(modeUpper);
+  // 서브사이드바 축소 상태 (태블릿 모드 기본값, 사용자 토글 가능)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isTabletMode);
+  // 태블릿 모드 변경 시 축소 상태 동기화
+  useEffect(() => {
+    setSidebarCollapsed(isTabletMode);
+  }, [isTabletMode]);
 
   // 서브 메뉴 상태
   const validIds = CLASSES_SUB_MENU_ITEMS.map(item => item.id) as readonly ClassesSubMenuId[];
@@ -333,7 +339,7 @@ export function ClassesPage() {
       }
 
       // 일정 변경이 있으면 충돌 감지
-      // Note: RPC 함수가 없어도 수업 수정은 계속 진행
+      // Note: 161_fix_student_classes_status_column.sql migration 적용 완료
       if (input.day_of_week || input.start_time || input.end_time || input.teacher_ids || input.room) {
         const classData = classes?.find((c) => c.id === classId);
         if (classData) {
@@ -381,13 +387,15 @@ export function ClassesPage() {
   return (
     <ErrorBoundary>
       <div style={{ display: 'flex', height: 'var(--height-full)' }}>
-        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {/* 서브 사이드바 (모바일에서는 숨김, 태블릿에서는 축소) */}
         {!isMobileMode && (
           <SubSidebar
             title={templates.management(terms.GROUP_LABEL)}
             items={subMenuItemsWithDynamicLabels}
             selectedId={selectedSubMenu}
             onSelect={handleSubMenuChange}
+            collapsed={sidebarCollapsed}
+            onCollapsedChange={setSidebarCollapsed}
             testId="classes-sub-sidebar"
           />
         )}
@@ -816,14 +824,20 @@ function EditClassModal({
     [classTeachers]
   );
 
+  // 시간 포맷 헬퍼 함수: "HH:MM" → "HH:MM:SS"
+  const formatTimeForDB = (time: string): string => {
+    const parts = time.split(':');
+    return parts.length === 2 ? `${time}:00` : time;
+  };
+
   const handleSubmit = (data: Record<string, unknown>) => {
     const input: UpdateClassInput = {
       name: data.name ? String(data.name) : undefined,
       subject: data.subject ? String(data.subject) : undefined,
       grade: data.grade ? String(data.grade) : undefined,
       day_of_week: data.day_of_week as DayOfWeek | undefined,
-      start_time: data.start_time ? String(data.start_time) : undefined,
-      end_time: data.end_time ? String(data.end_time) : undefined,
+      start_time: data.start_time ? formatTimeForDB(String(data.start_time)) : undefined,
+      end_time: data.end_time ? formatTimeForDB(String(data.end_time)) : undefined,
       capacity: data.capacity ? Number(data.capacity) : undefined,
       color: data.color ? String(data.color) : undefined,
       room: data.room ? String(data.room) : undefined,
@@ -888,8 +902,8 @@ function EditClassModal({
           subject: classData.subject || '',
           grade: classData.grade || '',
           day_of_week: classData.day_of_week,
-          start_time: classData.start_time,
-          end_time: classData.end_time,
+          start_time: classData.start_time.substring(0, 5), // "HH:MM:SS" → "HH:MM"
+          end_time: classData.end_time.substring(0, 5),     // "HH:MM:SS" → "HH:MM"
           capacity: classData.capacity,
           color: classData.color || 'var(--color-primary)',
           room: classData.room || '',

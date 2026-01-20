@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Card, Button, Modal, EmptyState, EntityCard, DataTable, Input, Select } from '@ui-core/react';
+import { Card, Button, Modal, EmptyState, EntityCard, DataTable, Input, Select, useResponsiveMode, isMobile, isTablet } from '@ui-core/react';
 import type { DataTableColumn } from '@ui-core/react';
 import { GraduationCap, Check, LayoutGrid, List } from 'lucide-react';
 import { StatsTableLayout } from '../../../components';
@@ -120,6 +120,12 @@ export function StudentClassAssignmentSubPage({
   currentSubMenuLabel,
   terms,
 }: StudentClassAssignmentSubPageProps) {
+  // 반응형 모드 감지
+  const mode = useResponsiveMode();
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
+
   // 수업배정 모달 상태 (학생 선택 모드)
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
@@ -655,11 +661,11 @@ export function StudentClassAssignmentSubPage({
               {/* 수업 목록 (카드형 / 테이블형) */}
               {activeClasses.length > 0 ? (
                 viewMode === 'card' ? (
-                  // 카드형 보기 (3열 그리드)
+                  // 카드형 보기 (반응형 그리드: 모바일 1열, 태블릿 2열, 데스크톱 3열)
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gridTemplateColumns: isMobileMode ? '1fr' : isTabletMode ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
                       gap: 'var(--spacing-md)',
                     }}
                   >
@@ -1057,32 +1063,22 @@ export function StudentClassAssignmentSubPage({
                         }
                       }}
                     >
-                      {/* 체크박스 영역 */}
-                      <div style={{ flex: '0 0 24px', display: 'flex', alignItems: 'center' }}>
+                      {/* 체크박스 */}
+                      <div
+                        style={{
+                          width: 'var(--size-icon-base)',
+                          height: 'var(--size-icon-base)',
+                          borderRadius: 'var(--border-radius-xs)',
+                          border: `var(--border-width-thin) solid ${isSelected ? 'var(--color-primary)' : 'var(--color-gray-200)'}`,
+                          backgroundColor: isSelected ? 'var(--color-primary)' : 'transparent',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
                         {isSelected && (
-                          <div
-                            style={{
-                              width: '20px',
-                              height: '20px',
-                              borderRadius: 'var(--border-radius-xs)',
-                              backgroundColor: 'var(--color-primary)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <Check size={14} color="var(--color-white)" strokeWidth={3} />
-                          </div>
-                        )}
-                        {!isSelected && (
-                          <div
-                            style={{
-                              width: '20px',
-                              height: '20px',
-                              borderRadius: 'var(--border-radius-xs)',
-                              border: 'var(--border-width-medium) solid var(--color-gray-300)',
-                            }}
-                          />
+                          <Check size={12} color="var(--color-white)" strokeWidth={3} />
                         )}
                       </div>
 

@@ -9,7 +9,7 @@
 
 import React, { useMemo, createElement } from 'react';
 import { Card, PageHeader, NotificationCardLayout, useResponsiveMode, isDesktop, EmptyState, useChartColors } from '@ui-core/react';
-import { Users, UserCheck, Clock, UserX, TrendingUp, TrendingDown, UserPlus, Percent, BarChart3, GraduationCap } from 'lucide-react';
+import { Users, UserCheck, Clock, UserX, TrendingUp, TrendingDown, UserPlus, Percent, BarChart3 } from 'lucide-react';
 import { DistributionChart, HorizontalBarChart } from '../../../components/stats';
 import { CardGridLayout } from '../../../components';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, DefaultLegendContent } from 'recharts';
@@ -115,15 +115,6 @@ export function StudentStatsSubPage({
         unit: '명',
         iconBackgroundColor: 'var(--color-warning-50)',
         trend: calculateTrend(statusStats.onLeave, lastMonthStatusStats.onLeave),
-      },
-      {
-        key: 'graduated',
-        icon: GraduationCap,
-        title: '졸업',
-        value: statusStats.graduated,
-        unit: '명',
-        iconBackgroundColor: 'var(--color-info-50)',
-        trend: calculateTrend(statusStats.graduated, lastMonthStatusStats.graduated),
       },
       {
         key: 'withdrawn',
@@ -272,8 +263,8 @@ export function StudentStatsSubPage({
         {/* 통계 카드 */}
         <CardGridLayout
           cards={statsCards}
-          desktopColumns={5}
-          tabletColumns={3}
+          desktopColumns={4}
+          tabletColumns={2}
           mobileColumns={1}
         />
 
@@ -310,8 +301,8 @@ export function StudentStatsSubPage({
                       content={({ active, payload, label }) => {
                         if (!active || !payload || payload.length === 0) return null;
 
-                        // 정렬 순서: total, active, onLeave, withdrawn, graduated
-                        const order = ['total', 'active', 'onLeave', 'withdrawn', 'graduated'];
+                        // 정렬 순서: total, active, onLeave, withdrawn
+                        const order = ['total', 'active', 'onLeave', 'withdrawn'];
                         type PayloadEntry = { dataKey?: string; color?: string; value?: number | string };
                         const sortedPayload = [...(payload as PayloadEntry[])].sort((a, b) => {
                           const indexA = order.indexOf(String(a.dataKey));
@@ -323,7 +314,6 @@ export function StudentStatsSubPage({
                           total: `전체 ${terms.PERSON_LABEL_PRIMARY}`,
                           active: '재원',
                           onLeave: terms.STAFF_LEAVE === '휴직' ? '휴원' : '휴회',
-                          graduated: '졸업',
                           withdrawn: terms.STAFF_RESIGNED === '퇴직' ? '퇴원' : '탈퇴',
                         };
 
@@ -364,14 +354,12 @@ export function StudentStatsSubPage({
                           total: `전체 ${terms.PERSON_LABEL_PRIMARY}`,
                           active: '재원',
                           onLeave: terms.STAFF_LEAVE === '휴직' ? '휴원' : '휴회',
-                          graduated: '졸업',
                           withdrawn: terms.STAFF_RESIGNED === '퇴직' ? '퇴원' : '탈퇴',
                         };
                         const customPayload = [
                           { value: labels.total, type: 'line' as const, color: chartColors.primary },
                           { value: labels.active, type: 'line' as const, color: chartColors.success },
                           { value: labels.onLeave, type: 'line' as const, color: chartColors.warning },
-                          { value: labels.graduated, type: 'line' as const, color: chartColors.info },
                           { value: labels.withdrawn, type: 'line' as const, color: chartColors.error },
                         ];
                         return <DefaultLegendContent payload={customPayload} />;
@@ -404,16 +392,6 @@ export function StudentStatsSubPage({
                       strokeWidth={2}
                       fill={chartColors.warning50}
                       dot={{ fill: chartColors.warning, r: 3 }}
-                      activeDot={{ r: 5 }}
-                      isAnimationActive={false}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="graduated"
-                      stroke={chartColors.info}
-                      strokeWidth={2}
-                      fill={chartColors.info50}
-                      dot={{ fill: chartColors.info, r: 3 }}
                       activeDot={{ r: 5 }}
                       isAnimationActive={false}
                     />

@@ -350,7 +350,10 @@ export function useStudentPage(): UseStudentPageReturn {
   const unassignStudentFromClass = useUnassignStudentFromClass();
   const updateStudentClassEnrolledAt = useUpdateStudentClassEnrolledAt();
 
-  // URL 동기화
+  // ============================================================
+  // URL → State 동기화 (브라우저 뒤로가기, 직접 URL 입력 등 지원)
+  // [SSOT] 출결관리와 동일한 단순 패턴
+  // ============================================================
   useEffect(() => {
     if (urlStudentId && urlStudentId !== selectedStudentId) {
       setSelectedStudentId(urlStudentId);
@@ -361,6 +364,7 @@ export function useStudentPage(): UseStudentPageReturn {
     }
   }, [urlStudentId, selectedStudentId, urlPanel, urlTab, getInitialTab]);
 
+  // 탭 동기화
   useEffect(() => {
     const newTab: LayerMenuTab = (urlPanel || urlTab || getInitialTab()) as LayerMenuTab;
     if (newTab !== layerMenuTab) {
@@ -369,24 +373,23 @@ export function useStudentPage(): UseStudentPageReturn {
   }, [urlPanel, urlTab, getInitialTab, layerMenuTab]);
 
   // 학생 선택 핸들러
+  // [SSOT] 출결관리(AttendancePage)와 동일한 단순 패턴
+  // - 출결관리: setState만 사용 (URL 동기화 없음)
+  // - 학생관리: setState + URL 동기화 (브라우저 히스토리 지원)
   const handleStudentSelect = useCallback((studentId: string | null) => {
     setSelectedStudentId(studentId);
     if (studentId) {
-      // canonical URL 사용
-      // [P0-2 수정] SSOT: ROUTES 상수 사용으로 안전성 확보 (동적 파라미터는 ROUTES 함수로 처리)
-      // [P0-2 수정] SSOT: safeNavigate 사용 (일관성)
+      // 열기: URL도 함께 업데이트
       const targetPath = ROUTES.STUDENT_DETAIL(studentId, layerMenuTab);
       safeNavigate(targetPath, { replace: true });
     } else {
+      // 닫기: URL도 함께 업데이트
       const newSearchParams = new URLSearchParams(searchParams);
       newSearchParams.delete('studentId');
       newSearchParams.delete('student');  // legacy 제거
       newSearchParams.delete('panel');
       newSearchParams.delete('tab');  // legacy 제거
-      // [P0-2 수정] SSOT: ROUTES 상수 사용으로 안전성 확보
       const targetPath = `/students/list?${newSearchParams.toString()}`;
-      // URL 파라미터는 이미 내부에서 생성되므로 안전하지만, 검증을 위해 isSafeInternalPath 사용
-      // [P0-2 수정] SSOT: safeNavigate 사용 (일관성, 내부적으로 isSafeInternalPath 검증)
       safeNavigate(targetPath, { replace: true });
     }
   }, [safeNavigate, layerMenuTab, searchParams]);

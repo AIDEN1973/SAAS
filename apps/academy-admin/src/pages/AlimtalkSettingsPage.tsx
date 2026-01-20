@@ -24,6 +24,7 @@ import {
   EmptyState,
   useResponsiveMode,
   isMobile,
+  isTablet,
   SubSidebar,
 } from '@ui-core/react';
 import {
@@ -845,6 +846,13 @@ export function AlimtalkSettingsPage() {
   const mode = useResponsiveMode();
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
+  // 서브사이드바 축소 상태 (태블릿 모드 기본값, 사용자 토글 가능)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isTabletMode);
+  // 태블릿 모드 변경 시 축소 상태 동기화
+  useEffect(() => {
+    setSidebarCollapsed(isTabletMode);
+  }, [isTabletMode]);
 
   // 서브 메뉴 상태
   const validIds = ALIMTALK_SUB_MENU_ITEMS.map(item => item.id) as readonly AlimtalkSubMenuId[];
@@ -868,13 +876,15 @@ export function AlimtalkSettingsPage() {
   return (
     <ErrorBoundary>
       <div style={{ display: 'flex', height: 'var(--height-full)' }}>
-        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {/* 서브 사이드바 (모바일에서는 숨김, 태블릿에서는 축소) */}
         {!isMobileMode && (
           <SubSidebar
             title="알림톡 설정"
             items={ALIMTALK_SUB_MENU_ITEMS}
             selectedId={selectedSubMenu}
             onSelect={handleSubMenuChange}
+            collapsed={sidebarCollapsed}
+            onCollapsedChange={setSidebarCollapsed}
             testId="alimtalk-sub-sidebar"
           />
         )}

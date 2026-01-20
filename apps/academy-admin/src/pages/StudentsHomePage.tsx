@@ -10,12 +10,12 @@
  * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
  */
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 // [SSOT] Barrel export를 통한 통합 import
 import { ROUTES, STUDENTS_SUB_MENU_ITEMS, DEFAULT_STUDENTS_SUB_MENU, STUDENTS_MENU_LABEL_MAPPING, getSubMenuFromUrl, setSubMenuToUrl, applyDynamicLabels } from '../constants';
 import type { StudentsSubMenuId } from '../constants';
-import { ErrorBoundary, Container, Button, PageHeader, SubSidebar, useResponsiveMode, isMobile, Card, useModal, EmptyState, NotificationCardLayout } from '@ui-core/react';
+import { ErrorBoundary, Container, Button, PageHeader, SubSidebar, useResponsiveMode, isMobile, isTablet, Card, useModal, EmptyState, NotificationCardLayout } from '@ui-core/react';
 import { createSafeNavigate, templates, p } from '../utils';
 import { StudentStatsCard } from '../components/dashboard-cards/StudentStatsCard';
 import { AttendanceStatsCard } from '../components/dashboard-cards/AttendanceStatsCard';
@@ -40,6 +40,13 @@ export function StudentsHomePage() {
   const mode = useResponsiveMode();
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
+  // 서브사이드바 축소 상태 (태블릿 모드 기본값, 사용자 토글 가능)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isTabletMode);
+  // 태블릿 모드 변경 시 축소 상태 동기화
+  useEffect(() => {
+    setSidebarCollapsed(isTabletMode);
+  }, [isTabletMode]);
   const { showAlert } = useModal();
   const terms = useIndustryTerms();
   const context = getApiContext();
@@ -250,13 +257,15 @@ export function StudentsHomePage() {
   return (
     <ErrorBoundary>
       <div style={{ display: 'flex', minHeight: 'var(--height-full)' }}>
-        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {/* 서브 사이드바 (모바일에서는 숨김, 태블릿에서는 축소) */}
         {!isMobileMode && (
           <SubSidebar
             title={templates.management(terms.PERSON_LABEL_PRIMARY)}
             items={subMenuItemsWithIcons}
             selectedId={selectedSubMenu}
             onSelect={handleSubMenuChange}
+            collapsed={sidebarCollapsed}
+            onCollapsedChange={setSidebarCollapsed}
             testId="students-sub-sidebar"
           />
         )}

@@ -10,7 +10,7 @@
 import { useMemo, useState, useEffect, useRef, createElement } from 'react';
 import { Card, NotificationCardLayout, EmptyState, useIconSize, useChartColors } from '@ui-core/react';
 import { CardGridLayout } from '../CardGridLayout';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import type { LucideIcon } from 'lucide-react';
 import { BarChart3, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -60,6 +60,14 @@ export interface StatsDashboardProps {
   chartTooltipLabel?: string;
   /** 데스크탑 컬럼 수 (기본값: statsItems 개수) */
   desktopColumns?: number;
+  /** 태블릿 컬럼 수 (기본값: 2) */
+  tabletColumns?: number;
+  /** 모바일 컬럼 수 (기본값: 1) */
+  mobileColumns?: number;
+  /** 차트 타입 (기본값: 'area') */
+  chartType?: 'area' | 'bar';
+  /** 0 값 데이터 표시 여부 (기본값: false, 0 값 필터링) */
+  showZeroValues?: boolean;
 }
 
 /**
@@ -76,13 +84,17 @@ export function StatsDashboard({
   // 향후 확장을 위해 props 유지 (현재 미사용)
   // chartLabelFormatter,
   // legendFormatter,
-  // showPeriodFilter = true,
+  showPeriodFilter = true,
   selectedStatsKey,
   onStatsCardClick,
   hideChart = false,
   chartTooltipUnit = '명',
   chartTooltipLabel = '총 학생수',
   desktopColumns,
+  tabletColumns = 2,
+  mobileColumns = 1,
+  chartType = 'area',
+  showZeroValues = false,
 }: StatsDashboardProps) {
   // [SSOT] 아이콘 크기 (CSS 변수 기반)
   const iconSize = useIconSize();
@@ -90,10 +102,20 @@ export function StatsDashboard({
   // [SSOT] 차트 색상 (SVG 속성용)
   const chartColors = useChartColors();
 
-  // 0이 아닌 데이터만 필터링
+  // 차트 데이터 필터링 (0 값 포함 여부에 따라)
   const filteredChartData = useMemo(() => {
-    return chartData.filter(item => item.value > 0);
-  }, [chartData]);
+    console.log('[StatsDashboard] Raw chartData:', chartData);
+    console.log('[StatsDashboard] showZeroValues:', showZeroValues);
+
+    if (showZeroValues) {
+      console.log('[StatsDashboard] Returning all data (showZeroValues=true)');
+      return chartData;
+    }
+
+    const filtered = chartData.filter(item => item.value > 0);
+    console.log('[StatsDashboard] Filtered data (value > 0):', filtered);
+    return filtered;
+  }, [chartData, showZeroValues]);
 
   // [성능 최적화] 차트 스타일 객체 메모이제이션 (매 렌더링마다 새 객체 생성 방지)
   const chartStyles = useMemo(() => ({
@@ -127,10 +149,14 @@ export function StatsDashboard({
   const [showChart, setShowChart] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(CHART_VISIBLE_KEY);
+      console.log('[StatsDashboard] Chart visibility from localStorage:', saved);
       if (saved === 'false') return false;
     }
     return true;
   });
+
+  console.log('[StatsDashboard] Current showChart state:', showChart);
+  console.log('[StatsDashboard] hideChart prop:', hideChart);
 
   // 그래프 애니메이션 상태
   const chartContentRef = useRef<HTMLDivElement>(null);
@@ -158,7 +184,8 @@ export function StatsDashboard({
       display: 'flex',
       flexDirection: 'column',
     }}>
-      {/* 기간 필터 배지 (통계카드 외부 우측 상단) */}
+      {/* 기간 필터 배지 (통계카드 외부 우측 상단) - showPeriodFilter가 true일 때만 표시 */}
+      {showPeriodFilter && (
       <div style={{
         display: 'flex',
         justifyContent: 'flex-end',
@@ -246,6 +273,7 @@ export function StatsDashboard({
           })}
         </div>
       </div>
+      )}
 
       {/* 통계 카드 (100% 너비, 4개 가로 배열) */}
       <div style={{ width: '100%', position: 'relative' }}>
@@ -268,8 +296,8 @@ export function StatsDashboard({
             );
           })}
           desktopColumns={desktopColumns ?? statsItems.length}
-          tabletColumns={2}
-          mobileColumns={1}
+          tabletColumns={tabletColumns}
+          mobileColumns={mobileColumns}
         />
 
         {/* CardGridLayout 하단 구분선에 붙는 토글 버튼 (hideChart가 false일 때만 표시) */}
@@ -328,10 +356,10 @@ export function StatsDashboard({
         <div ref={chartContentRef} style={{ width: '100%' }}>
         <Card padding="lg" variant="default" style={{ height: '100%', display: 'flex', flexDirection: 'column', paddingTop: 'calc(var(--spacing-lg) + var(--spacing-lg))' }}>
           {/* 그래프 */}
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', maxHeight: chartType === 'bar' ? '600px' : '300px', overflowY: chartType === 'bar' ? 'auto' : 'visible' }}>
             {filteredChartData.length > 0 ? (
               <div
-                style={{ width: '100%', height: 300 }}
+                style={{ width: '100%', height: chartType === 'bar' ? Math.max(300, filteredChartData.length * 40) : 300 }}
                 className="chart-animate-up"
               >
                 <style>
@@ -344,67 +372,132 @@ export function StatsDashboard({
                     }
                   `}
                 </style>
-                <ResponsiveContainer width="100%" height={300} debounce={50}>
-                  <AreaChart data={filteredChartData} margin={chartStyles.margin}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-gray-200)" />
-                    <XAxis
-                      dataKey="name"
-                      tick={chartStyles.tick}
-                      tickMargin={8}
-                    />
-                    <YAxis
-                      tick={chartStyles.tick}
-                      tickFormatter={(value: number | string) => {
-                        const numValue = typeof value === 'number' ? value : Number(value);
-                        return numValue === 0 ? '' : numValue.toString();
-                      }}
-                      tickMargin={8}
-                      width={30}
-                    />
-                    <RechartsTooltip
-                      content={({ active, payload, label }) => {
-                        if (!active || !payload || payload.length === 0) return null;
+                <ResponsiveContainer width="100%" height={Math.max(300, filteredChartData.length * 40)} debounce={50}>
+                  {chartType === 'bar' ? (
+                    <BarChart
+                      data={filteredChartData}
+                      layout="horizontal"
+                      margin={{ left: 10, right: 40, top: 10, bottom: 10 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-gray-200)" />
+                      <XAxis
+                        type="number"
+                        tick={chartStyles.tick}
+                        tickMargin={8}
+                        tickFormatter={(value: number | string) => {
+                          const numValue = typeof value === 'number' ? value : Number(value);
+                          return numValue === 0 ? '' : numValue.toString();
+                        }}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        tick={chartStyles.tick}
+                        tickMargin={8}
+                        width={100}
+                      />
+                      <RechartsTooltip
+                        content={({ active, payload, label }) => {
+                          if (!active || !payload || payload.length === 0) return null;
 
-                        return (
-                          <div style={{
-                            backgroundColor: 'var(--color-white)',
-                            border: 'var(--border-width-thin) solid var(--color-gray-200)',
-                            borderRadius: 'var(--border-radius-sm)',
-                            padding: 'var(--spacing-sm)',
-                          }}>
+                          return (
                             <div style={{
-                              marginBottom: 'var(--spacing-xs)',
-                              fontSize: 'var(--font-size-sm)',
+                              backgroundColor: 'var(--color-white)',
+                              border: 'var(--border-width-thin) solid var(--color-gray-200)',
+                              borderRadius: 'var(--border-radius-sm)',
+                              padding: 'var(--spacing-sm)',
                             }}>
-                              날짜 : {label}
-                            </div>
-                            {payload.map((entry: { value?: number | string }, index: number) => (
-                              <div
-                                key={`item-${index}`}
-                                style={{
-                                  fontSize: 'var(--font-size-xs)',
-                                  lineHeight: 1.2,
-                                  color: 'var(--color-text)',
-                                }}
-                              >
-                                {chartTooltipLabel} : {entry.value}{chartTooltipUnit}
+                              <div style={{
+                                marginBottom: 'var(--spacing-xs)',
+                                fontSize: 'var(--font-size-sm)',
+                              }}>
+                                수업명 : {label}
                               </div>
-                            ))}
-                          </div>
-                        );
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="value"
-                      stroke={chartColors.primary}
-                      strokeWidth={2}
-                      fill={chartColors.primary50}
-                      dot={chartStyles.dot}
-                      activeDot={chartStyles.activeDot}
-                      isAnimationActive={false}
-                    />
-                  </AreaChart>
+                              {payload.map((entry: { value?: number | string }, index: number) => (
+                                <div
+                                  key={`item-${index}`}
+                                  style={{
+                                    fontSize: 'var(--font-size-xs)',
+                                    lineHeight: 1.2,
+                                    color: 'var(--color-text)',
+                                  }}
+                                >
+                                  {chartTooltipLabel} : {entry.value}{chartTooltipUnit}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }}
+                      />
+                      <Bar
+                        dataKey="value"
+                        fill={chartColors.primary}
+                        radius={[0, 4, 4, 0]}
+                        isAnimationActive={false}
+                      />
+                    </BarChart>
+                  ) : (
+                    <AreaChart data={filteredChartData} margin={chartStyles.margin}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-gray-200)" />
+                      <XAxis
+                        dataKey="name"
+                        tick={chartStyles.tick}
+                        tickMargin={8}
+                      />
+                      <YAxis
+                        tick={chartStyles.tick}
+                        tickFormatter={(value: number | string) => {
+                          const numValue = typeof value === 'number' ? value : Number(value);
+                          return numValue === 0 ? '' : numValue.toString();
+                        }}
+                        tickMargin={8}
+                        width={30}
+                      />
+                      <RechartsTooltip
+                        content={({ active, payload, label }) => {
+                          if (!active || !payload || payload.length === 0) return null;
+
+                          return (
+                            <div style={{
+                              backgroundColor: 'var(--color-white)',
+                              border: 'var(--border-width-thin) solid var(--color-gray-200)',
+                              borderRadius: 'var(--border-radius-sm)',
+                              padding: 'var(--spacing-sm)',
+                            }}>
+                              <div style={{
+                                marginBottom: 'var(--spacing-xs)',
+                                fontSize: 'var(--font-size-sm)',
+                              }}>
+                                날짜 : {label}
+                              </div>
+                              {payload.map((entry: { value?: number | string }, index: number) => (
+                                <div
+                                  key={`item-${index}`}
+                                  style={{
+                                    fontSize: 'var(--font-size-xs)',
+                                    lineHeight: 1.2,
+                                    color: 'var(--color-text)',
+                                  }}
+                                >
+                                  {chartTooltipLabel} : {entry.value}{chartTooltipUnit}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="value"
+                        stroke={chartColors.primary}
+                        strokeWidth={2}
+                        fill={chartColors.primary50}
+                        dot={chartStyles.dot}
+                        activeDot={chartStyles.activeDot}
+                        isAnimationActive={false}
+                      />
+                    </AreaChart>
+                  )}
                 </ResponsiveContainer>
               </div>
             ) : (

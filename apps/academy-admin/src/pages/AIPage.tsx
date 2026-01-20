@@ -34,7 +34,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Badge, PageHeader, isMobile, Modal, Drawer, EmptyState, SubSidebar } from '@ui-core/react';
+import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Badge, PageHeader, isMobile, isTablet, Modal, Drawer, EmptyState, SubSidebar } from '@ui-core/react';
 import { MapPin, Sparkles, FileText } from 'lucide-react';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { toKST } from '@lib/date-utils';
@@ -66,6 +66,13 @@ export function AIPage() {
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
+  // 서브사이드바 축소 상태 (태블릿 모드 기본값, 사용자 토글 가능)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isTabletMode);
+  // 태블릿 모드 변경 시 축소 상태 동기화
+  useEffect(() => {
+    setSidebarCollapsed(isTabletMode);
+  }, [isTabletMode]);
   const navigate = useNavigate();
   // [P0-2 수정] SSOT: 네비게이션 보안 유틸리티 사용
   const safeNavigate = useMemo(
@@ -537,13 +544,15 @@ export function AIPage() {
   return (
     <ErrorBoundary>
       <div style={{ display: 'flex', height: 'var(--height-full)' }}>
-        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {/* 서브 사이드바 (모바일에서는 숨김, 태블릿에서는 축소) */}
         {!isMobileMode && (
           <SubSidebar
             title="인공지능"
             items={AI_SUB_MENU_ITEMS}
             selectedId={selectedSubMenu}
             onSelect={handleSubMenuChange}
+            collapsed={sidebarCollapsed}
+            onCollapsedChange={setSidebarCollapsed}
             testId="ai-sub-sidebar"
           />
         )}

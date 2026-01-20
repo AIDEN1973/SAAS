@@ -14,7 +14,7 @@
  * - StudentStatsSubPage: 학생 통계 탭
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ErrorBoundary, useIconSize, useIconStrokeWidth, useToast, Input, Container, Button, RightLayerMenuLayout, SubSidebar, Modal } from '@ui-core/react';
 import { Users, UserCheck, UserX, Clock } from 'lucide-react';
@@ -214,6 +214,13 @@ export function StudentsPage() {
     // 모달
     showConfirm,
   } = useStudentPage();
+
+  // 서브사이드바 축소 상태 (태블릿 모드 기본값, 사용자 토글 가능)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isTabletMode);
+  // 태블릿 모드 변경 시 축소 상태 동기화
+  useEffect(() => {
+    setSidebarCollapsed(isTabletMode);
+  }, [isTabletMode]);
 
   // 서브메뉴 변경 핸들러 (useStudentPage 훅 다음에 선언하여 setShowCreateForm 사용 가능)
   const handleSubMenuChange = useCallback((id: StudentsSubMenuId) => {
@@ -749,12 +756,15 @@ export function StudentsPage() {
   return (
     <ErrorBoundary>
       <div style={{ display: 'flex', height: '100vh' }}>
+        {/* 서브 사이드바 (태블릿에서는 축소) */}
         <SubSidebar
           title={templates.management(terms.PERSON_LABEL_PRIMARY)}
           items={subMenuItemsWithDynamicLabels}
           selectedId={selectedSubMenu}
           onSelect={handleSubMenuChange}
           relatedMenus={STUDENTS_RELATED_MENUS}
+          collapsed={sidebarCollapsed}
+          onCollapsedChange={setSidebarCollapsed}
           testId="students-sub-sidebar"
         />
         <div style={{ flex: 1 }}>
@@ -790,7 +800,7 @@ export function StudentsPage() {
               </span>
             </span>
           ) : `${terms.PERSON_LABEL_PRIMARY} 상세`,
-          width: isTabletMode ? 'var(--width-layer-menu-tablet)' : 'var(--width-layer-menu)',
+          // width는 RightLayerMenuLayout에서 자동으로 모바일/태블릿/데스크톱에 맞게 계산
           children: selectedStudentLoading ? (
             <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
               {terms.MESSAGES.LOADING}
@@ -798,7 +808,7 @@ export function StudentsPage() {
           ) : selectedStudent ? (
             <div style={{ display: 'flex', flexDirection: 'column', height: 'var(--height-full)' }}>
               {/* 탭 버튼: 기본정보 → 수업배정 → 상담내역 → 태그 → 출결 → 이탈위험 → 문자발송 */}
-              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-lg)', flexWrap: 'wrap', borderBottom: 'var(--border-width-thin) solid var(--color-gray-200)', paddingBottom: 'var(--spacing-lg)' }}>
+              <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginTop: 'calc(var(--spacing-xl) - var(--spacing-lg))', flexWrap: 'wrap' }}>
                 <Button
                   variant={layerMenuTab === 'info' ? 'solid' : 'outline'}
                   size="sm"
@@ -849,6 +859,8 @@ export function StudentsPage() {
                   문자발송
                 </Button>
               </div>
+              {/* 구분선 - CardGridLayout 상단 테두리와 수평 정렬 */}
+              <div style={{ borderBottom: 'var(--border-width-thin) solid var(--color-text)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }} />
               {/* 탭 내용 */}
               <div className="academyAdmin-hiddenScrollbar" style={{ flex: 1, overflowY: 'auto' }}>
                 {layerMenuTab === 'info' && selectedStudent && (

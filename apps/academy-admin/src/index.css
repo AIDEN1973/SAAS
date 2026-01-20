@@ -23,3 +23,16 @@
   width: 0;
   height: 0;
 }
+
+/**
+ * Fade In 애니메이션
+ * 컴포넌트 등장 시 사용
+ */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

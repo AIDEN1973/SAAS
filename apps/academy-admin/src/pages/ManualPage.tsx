@@ -8,15 +8,27 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { SubSidebar } from '@ui-core/react';
+import { SubSidebar, useResponsiveMode, isMobile, isTablet } from '@ui-core/react';
 import { ManualBody } from '../components/ManualBody';
 import { getManualById, allManualPages } from '../data/manuals';
-import { MANUAL_SUB_MENU_ITEMS, DEFAULT_MANUAL_SUB_MENU, getSubMenuFromUrl } from '../constants';
+import { MANUAL_SUB_MENU_ITEMS, DEFAULT_MANUAL_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
 import type { ManualSubMenuId } from '../constants';
 
 export function ManualPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  // 반응형 모드 감지
+  const mode = useResponsiveMode();
+  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
+  const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
+  // 서브사이드바 축소 상태 (태블릿 모드 기본값, 사용자 토글 가능)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isTabletMode);
+  // 태블릿 모드 변경 시 축소 상태 동기화
+  useEffect(() => {
+    setSidebarCollapsed(isTabletMode);
+  }, [isTabletMode]);
 
   // URL에서 매뉴얼 ID와 섹션 ID 가져오기
   const sectionId = searchParams.get('section');
@@ -48,13 +60,8 @@ export function ManualPage() {
   // 매뉴얼 페이지 선택 핸들러 (SubSidebar에서 호출)
   const handleSelectManual = useCallback(
     (id: ManualSubMenuId) => {
-      // 섹션 파라미터 제거하고 id만 설정
-      const searchParams = new URLSearchParams();
-      if (id !== DEFAULT_MANUAL_SUB_MENU) {
-        searchParams.set('id', id);
-      }
-      const queryString = searchParams.toString();
-      const newUrl = queryString ? `?${queryString}` : window.location.pathname;
+      // SSOT 헬퍼 함수 사용하여 URL 생성
+      const newUrl = setSubMenuToUrl(id, DEFAULT_MANUAL_SUB_MENU);
       navigate(newUrl);
     },
     [navigate]
@@ -65,14 +72,9 @@ export function ManualPage() {
     (newSectionId: string) => {
       setCurrentSectionId(newSectionId);
       if (currentManual) {
-        const searchParams = new URLSearchParams();
-        if (currentManual.id !== DEFAULT_MANUAL_SUB_MENU) {
-          searchParams.set('id', currentManual.id);
-        }
+        const searchParams = new URLSearchParams(window.location.search);
         searchParams.set('section', newSectionId);
-        const queryString = searchParams.toString();
-        const newUrl = queryString ? `?${queryString}` : window.location.pathname;
-        navigate(newUrl);
+        navigate(`?${searchParams.toString()}`);
       }
     },
     [currentManual, navigate]
@@ -86,13 +88,18 @@ export function ManualPage() {
         backgroundColor: 'var(--color-background)',
       }}
     >
-      <SubSidebar
-        title="매뉴얼"
-        items={MANUAL_SUB_MENU_ITEMS}
-        selectedId={selectedManualId}
-        onSelect={handleSelectManual}
-        testId="manual-sub-sidebar"
-      />
+      {/* 서브 사이드바 (모바일에서는 숨김, 태블릿에서는 축소) */}
+      {!isMobileMode && (
+        <SubSidebar
+          title="매뉴얼"
+          items={MANUAL_SUB_MENU_ITEMS}
+          selectedId={selectedManualId}
+          onSelect={handleSelectManual}
+          collapsed={sidebarCollapsed}
+          onCollapsedChange={setSidebarCollapsed}
+          testId="manual-sub-sidebar"
+        />
+      )}
       <ManualBody
         manual={currentManual}
         currentSectionId={currentSectionId}

@@ -146,7 +146,7 @@
   --width-agent-history-sidebar: 14rem; /* 224px - 에이전트 히스토리 사이드바 너비 (서브사이드바 공통 너비) */
   --width-agent-timeline-sidebar: 26rem; /* 416px - 에이전트 타임라인 사이드바 너비 */
   --width-agent-chat-max: 50rem;       /* 800px - 에이전트 채팅 영역 최대 너비 */
-  --width-overlay-threshold: 90rem;  /* 1440px - 오버레이 모드 전환 기준 너비 */
+  --width-overlay-threshold: 104.3125rem;  /* 1669px - 오버레이 모드 전환 기준 너비 (데스크톱에서 레이어 메뉴가 본문 위로 덮이는 기준) */
   --breakpoint-tablet: 48rem;        /* 768px - 태블릿 브레이크포인트 (유아이 문서 6-0 준수) */
   --transition-debounce: 150ms;     /* 디바운싱 지연 시간 */
   --width-content-max: 43.75rem;    /* 700px - 콘텐츠 최대 너비 */
@@ -347,7 +347,8 @@
   --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-smooth: 500ms cubic-bezier(0.34, 1.56, 0.64, 1); /* 매우 부드러운 전환 (아이콘 확대 등, elastic-out 효과) */
-  --transition-layer-slide: 500ms cubic-bezier(0.4, 0, 0.2, 1); /* 레이어 메뉴 슬라이드 */
+  --transition-layer-slide: 300ms cubic-bezier(0.25, 0.1, 0.25, 1); /* 레이어 메뉴 슬라이드 (열림/닫힘 동일 속도) */
+  --transition-layer-slide-duration: 300ms; /* 레이어 메뉴 슬라이드 duration (visibility delay용) */
   --transition-transform: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-all: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -355,7 +356,7 @@
   --duration-fast: 150;    /* ms */
   --duration-base: 200;    /* ms */
   --duration-slow: 300;    /* ms */
-  --duration-layer-slide: 500; /* ms - 레이어 슬라이드 */
+  --duration-layer-slide: 300; /* ms - 레이어 슬라이드 */
 
   /* Focus Ring - 접근성 포커스 링 */
   --focus-ring-width: 0.125rem; /* 2px - 포커스 링 두께 */
@@ -382,10 +383,6 @@
     --glass-background: rgba(30, 41, 59, 0.8);
     --glass-border: rgba(255, 255, 255, 0.1);
   }
-
-  /* body {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  } */
 }
 
 /* High Contrast Mode (접근성) */
@@ -499,7 +496,7 @@ textarea::placeholder {
 
   /* RightLayerMenu (StudentDetailLayer) 슬라이드 및 확대/축소 애니메이션 */
   .student-detail-layer {
-    transition: transform 0.5s ease-in-out, width 0.5s ease-in-out !important;
+    transition: transform 0.3s ease-in-out, width 0.3s ease-in-out !important;
   }
 
   /* 차트 애니메이션 예외 - 데이터 시각화에 필요한 애니메이션 (Line, Area만) */
@@ -623,4 +620,11 @@ textarea::placeholder {
 .chart-animate-up .recharts-line,
 .chart-animate-up-stagger .recharts-line {
   animation: chartRevealRight 800ms ease-out forwards;
+}
+
+/* 반응형 레이아웃 - 서브사이드바 너비 축소 (1669px 이하) */
+@media (max-width: 104.3125rem) {
+  :root {
+    --width-agent-history-sidebar: 11rem; /* 176px - 좁은 화면에서 서브사이드바 너비 축소 */
+  }
 }

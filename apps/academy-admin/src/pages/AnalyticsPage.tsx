@@ -22,10 +22,10 @@
  * - 유아이 문서: 6. Responsive UX (반응형 브레이크포인트 표준)
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ErrorBoundary, useModal, Container, Card, Button, PageHeader, useResponsiveMode, isMobile, SubSidebar } from '@ui-core/react';
+import { ErrorBoundary, useModal, Container, Card, Button, PageHeader, useResponsiveMode, isMobile, isTablet, SubSidebar } from '@ui-core/react';
 // [SSOT] Barrel export를 통한 통합 import
 import { ANALYTICS_SUB_MENU_ITEMS, DEFAULT_ANALYTICS_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
 import type { AnalyticsSubMenuId } from '../constants';
@@ -73,6 +73,13 @@ export function AnalyticsPage() {
   const { percentileFactors } = useAnalyticsConfig();
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
+  const isTabletMode = isTablet(modeUpper);
+  // 서브사이드바 축소 상태 (태블릿 모드 기본값, 사용자 토글 가능)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isTabletMode);
+  // 태블릿 모드 변경 시 축소 상태 동기화
+  useEffect(() => {
+    setSidebarCollapsed(isTabletMode);
+  }, [isTabletMode]);
 
   // 서브 메뉴 상태 (URL에서 직접 읽음 - StudentsHomePage 패턴)
   const validIds = ANALYTICS_SUB_MENU_ITEMS.map(item => item.id) as readonly AnalyticsSubMenuId[];
@@ -1119,13 +1126,15 @@ export function AnalyticsPage() {
   return (
     <ErrorBoundary>
       <div style={{ display: 'flex', height: 'var(--height-full)' }}>
-        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {/* 서브 사이드바 (모바일에서는 숨김, 태블릿에서는 축소) */}
         {!isMobileMode && (
           <SubSidebar
             title="통계분석"
             items={ANALYTICS_SUB_MENU_ITEMS}
             selectedId={selectedSubMenu}
             onSelect={handleSubMenuChange}
+            collapsed={sidebarCollapsed}
+            onCollapsedChange={setSidebarCollapsed}
             testId="analytics-sub-sidebar"
           />
         )}

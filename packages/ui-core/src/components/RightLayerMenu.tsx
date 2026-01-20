@@ -11,6 +11,7 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { clsx } from 'clsx';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 import { useIconSize, useIconStrokeWidth } from '../hooks/useIconSize';
+import { getCSSVariableAsMs } from '../utils/css-variables';
 import { Button } from './Button';
 import { ArrowLeftFromLine, ArrowRightFromLine } from 'lucide-react';
 
@@ -61,6 +62,26 @@ export const RightLayerMenu: React.FC<RightLayerMenuProps> = ({
   const isMobile = mode === 'xs' || mode === 'sm';
   const isTablet = mode === 'md';
   const [isExpandHovered, setIsExpandHovered] = useState(false);
+
+  // ============================================================================
+  // 닫힘 애니메이션을 위한 visibility 지연 처리
+  // ============================================================================
+  // visibility를 즉시 hidden으로 변경하면 닫힘 애니메이션이 보이지 않음
+  // 열림: 즉시 visible, 닫힘: 애니메이션 완료 후 hidden
+  const [isVisible, setIsVisible] = useState(isOpen);
+
+  useEffect(() => {
+    if (isOpen) {
+      // 열림: 즉시 visible
+      setIsVisible(true);
+    } else {
+      // 닫힘: 애니메이션 완료 후 hidden (CSS transition duration과 동기화)
+      const timer = setTimeout(() => {
+        setIsVisible(false);
+      }, getCSSVariableAsMs('--transition-layer-slide-duration', 300));
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   // 요구사항: 기본 1px, 롤오버 2px (CSS 변수 기반, 하드코딩 금지)
   const iconSize = useIconSize('--size-icon-base', 16);
@@ -117,7 +138,11 @@ export const RightLayerMenu: React.FC<RightLayerMenuProps> = ({
           paddingTop: 'var(--spacing-xl)',
           // 슬라이딩 애니메이션: transform으로 우측에서 들어옴
           transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+          // [SSOT] 열림/닫힘 동일한 트랜지션 속도 사용
+          // transition은 항상 고정 (isOpen에 따라 변경하면 닫힘 애니메이션이 동작하지 않음)
           transition: 'transform var(--transition-layer-slide), width var(--transition-layer-slide)',
+          // visibility는 JS로 지연 처리 (닫힘 애니메이션 완료 후 hidden)
+          visibility: isVisible ? 'visible' : 'hidden',
           boxSizing: 'border-box', // 패딩과 보더를 포함한 너비 계산
           overflow: 'hidden', // 내용이 넘치지 않도록
           // 닫혔을 때 포인터 이벤트 차단 (화면 밖에 있지만 클릭 방지)

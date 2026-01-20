@@ -15,12 +15,28 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ErrorBoundary, Container, Card, Button, Badge, Select, useModal, BottomActionBar, PageHeader, useResponsiveMode, isMobile, isTablet, NotificationCardLayout, DataTable, SubSidebar, EmptyState } from '@ui-core/react';
+import { ErrorBoundary, Container, Card, Badge, useModal, PageHeader, useResponsiveMode, isMobile, isTablet, NotificationCardLayout, SubSidebar, EmptyState, RightLayerMenuLayout, EntityCard } from '@ui-core/react';
 import { CardGridLayout } from '../components/CardGridLayout';
-import { Users, UserCheck, Clock, UserX, CalendarCheck, History, BarChart3, Settings, CheckCircle, Smartphone, TrendingUp, Bell } from 'lucide-react';
+import { StatsDashboard } from '../components/stats/StatsDashboard';
+// StatsItem type은 StatsDashboard에서 내부적으로 사용됨
+import { Users, UserCheck, Clock, UserX, CalendarCheck, History, BarChart3, Settings, CheckCircle, Smartphone, TrendingUp, Bell, Play, CalendarClock, CalendarX } from 'lucide-react';
+import {
+  ClassAttendanceLayer,
+  DailyAttendanceSection,
+  calculateClassStats,
+  groupAttendanceByDate,
+  getDefaultDateRange,
+  createAttendanceRecords,
+  TIME_RANGE_CONFIG,
+  DAY_OF_WEEK_MAP,
+  DAY_NAMES,
+  DATA_FETCH_LIMITS,
+  type ClassInfo,
+  type StudentAttendanceState,
+} from '../components/attendance';
 import { ATTENDANCE_SUB_MENU_ITEMS, DEFAULT_ATTENDANCE_SUB_MENU, ATTENDANCE_MENU_LABEL_MAPPING, getSubMenuFromUrl, setSubMenuToUrl, applyDynamicLabels } from '../constants';
 import type { AttendanceSubMenuId } from '../constants';
-import { templates, p } from '../utils';
+import { templates } from '../utils';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAttendanceLogs, useUpsertAttendanceLog } from '@hooks/use-attendance';
 import { useStudents } from '@hooks/use-student';
@@ -34,19 +50,6 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useConfig, useUpdateConfig } from '@hooks/use-config';
 
-// 학생 출결 상태 인터페이스
-interface StudentAttendanceState {
-  student_id: string;
-  check_in: boolean;
-  check_out: boolean;
-  status: AttendanceStatus;
-  check_in_time?: string; // [시간 기록 중심] 등원 시간 (HH:mm 형식)
-  check_out_time?: string; // [시간 기록 중심] 하원 시간 (HH:mm 형식)
-  ai_predicted?: boolean; // AI 예측값 여부
-  user_modified?: boolean; // 사용자가 수정했는지 여부 (사용자 입력 시 AI 데이터 override)
-  manual_status_override?: boolean; // [시간 기록 중심] 사용자가 상태를 수동으로 변경했는지 여부
-}
-
 export function AttendancePage() {
   const mode = useResponsiveMode();
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
@@ -54,6 +57,12 @@ export function AttendancePage() {
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
   const isTabletMode = isTablet(modeUpper); // 아키텍처 문서 3.3.9: 태블릿 모드 감지 (768px ~ 1024px)
+  // 서브사이드바 축소 상태 (태블릿 모드 기본값, 사용자 토글 가능)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isTabletMode);
+  // 태블릿 모드 변경 시 축소 상태 동기화
+  useEffect(() => {
+    setSidebarCollapsed(isTabletMode);
+  }, [isTabletMode]);
   // const { data: userRole } = useUserRole(); // TODO: 권한 체크 구현 시 사용
   const terms = useIndustryTerms();
   const context = getApiContext();
@@ -82,9 +91,12 @@ export function AttendancePage() {
       return null;
     }
   });
-  const [selectedDate, setSelectedDate] = useState<string>(toKST().format('YYYY-MM-DD'));
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [checkInMethodFilter, setCheckInMethodFilter] = useState<string>('');
+  const [selectedDate, _setSelectedDate] = useState<string>(toKST().format('YYYY-MM-DD'));
+  void _setSelectedDate; // TODO: 날짜 선택 UI 구현 시 사용
+  const [searchQuery, _setSearchQuery] = useState<string>('');
+  void _setSearchQuery; // TODO: 검색 UI 구현 시 사용
+  const [checkInMethodFilter, _setCheckInMethodFilter] = useState<string>('');
+  void _setCheckInMethodFilter; // TODO: 필터 UI 구현 시 사용
   const [studentAttendanceStates, setStudentAttendanceStates] = useState<Record<string, StudentAttendanceState>>({});
   const studentAttendanceStatesRef = useRef<Record<string, StudentAttendanceState>>({});
   // 최신 상태를 ref에 동기화 (useEffect 내에서 클로저 문제 방지)
@@ -93,11 +105,23 @@ export function AttendancePage() {
   }, [studentAttendanceStates]);
   const [isSaving, setIsSaving] = useState(false);
 
+  // 새로운 UI 관련 상태
+  const [selectedClassIdForLayer, setSelectedClassIdForLayer] = useState<string | null>(null);
+
   // 필터 상태 (출결 기록 조회는 Advanced 메뉴로 이동 - 아키텍처 문서에 명시되지 않음)
+  const defaultDateRange = getDefaultDateRange();
   const [filter, setFilter] = useState<AttendanceFilter>({
-    date_from: toKST().format('YYYY-MM-DD'),
-    date_to: toKST().format('YYYY-MM-DD'),
+    date_from: defaultDateRange.dateFrom,
+    date_to: defaultDateRange.dateTo,
   });
+
+  // History 탭 전용 상태
+  const [historySearchQuery, setHistorySearchQuery] = useState<string>('');
+  const [expandedHistoryClasses, setExpandedHistoryClasses] = useState<Set<string>>(new Set());
+
+  // 시간대 필터 상태 (전체/오전/오후/저녁)
+  type TimeRangeFilter = 'all' | 'morning' | 'afternoon' | 'evening';
+  const [timeRangeFilter, setTimeRangeFilter] = useState<TimeRangeFilter>('all');
 
 
   // 통계/히트맵 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8)
@@ -153,7 +177,8 @@ export function AttendancePage() {
   }, [terms]);
 
 
-  const handleClassIdChange = useCallback((classId: string | null) => {
+  // TODO: 수업 선택 UI 구현 시 사용
+  const _handleClassIdChange = useCallback((classId: string | null) => {
     setSelectedClassId(classId);
     try {
       // [버그 수정] "all" 또는 빈 문자열은 저장하지 않음 (유효한 UUID만 저장)
@@ -168,6 +193,7 @@ export function AttendancePage() {
       }
     }
   }, []);
+  void _handleClassIdChange;
 
   // [P0-FIX] Policy Registry 기반 출결 설정 (Automation Config First 원칙)
   // Fail Closed: Policy가 없으면 지각/결석 판정 불가 (기본값 null)
@@ -202,20 +228,31 @@ export function AttendancePage() {
     // selectedDate의 요일 계산 (KST 기준)
     const dateKST = toKST(selectedDate);
     const dayOfWeekNumber = dateKST.day(); // 0(일) ~ 6(토)
-    const dayOfWeekMap: Record<number, string> = {
-      0: 'sunday',
-      1: 'monday',
-      2: 'tuesday',
-      3: 'wednesday',
-      4: 'thursday',
-      5: 'friday',
-      6: 'saturday',
-    };
-    const targetDayOfWeek = dayOfWeekMap[dayOfWeekNumber];
+    const targetDayOfWeek = DAY_OF_WEEK_MAP[dayOfWeekNumber];
 
     // 해당 요일에 수업이 있는 활성 반만 필터링
     return classes.filter(c => c.day_of_week === targetDayOfWeek && c.status === 'active');
   }, [classes, selectedDate]);
+
+  // 시간대별로 수업 필터링
+  const filteredByTimeRange = useMemo(() => {
+    if (timeRangeFilter === 'all') return selectedDateClasses;
+
+    return selectedDateClasses.filter(cls => {
+      const startHour = parseInt(cls.start_time.substring(0, 2), 10);
+
+      switch (timeRangeFilter) {
+        case 'morning':
+          return startHour >= TIME_RANGE_CONFIG.MORNING.START && startHour < TIME_RANGE_CONFIG.MORNING.END;
+        case 'afternoon':
+          return startHour >= TIME_RANGE_CONFIG.AFTERNOON.START && startHour < TIME_RANGE_CONFIG.AFTERNOON.END;
+        case 'evening':
+          return startHour >= TIME_RANGE_CONFIG.EVENING.START && startHour < TIME_RANGE_CONFIG.EVENING.END;
+        default:
+          return true;
+      }
+    });
+  }, [selectedDateClasses, timeRangeFilter]);
 
   // 선택된 날짜에 수업이 있는 반의 ID 목록
   const selectedDateClassIds = useMemo(() => {
@@ -236,7 +273,7 @@ export function AttendancePage() {
           class_id: selectedDateClassIds,
           is_active: true
         },
-        limit: 5000,
+        limit: DATA_FETCH_LIMITS.STUDENT_CLASSES,
       });
       /* eslint-enable no-restricted-syntax */
 
@@ -431,7 +468,9 @@ export function AttendancePage() {
   const isLoading = isLoadingLogs || isLoadingStudents || isLoadingClasses || isLoadingPredictions;
 
   // 전체 에러 상태 (아키텍처 문서 3.3.3: error 상태)
-  const error = errorLogs || errorStudents || errorClasses;
+  // TODO: 에러 UI 표시 구현 시 사용
+  const _error = errorLogs || errorStudents || errorClasses;
+  void _error;
 
   // [근본 수정] attendanceLogs 데이터 기반으로 studentAttendanceStates 동기화
   // React Query가 데이터를 새로 가져오면 자동으로 상태가 업데이트됨
@@ -587,8 +626,8 @@ export function AttendancePage() {
   // handleCreateAttendance 함수 제거됨 (미사용)
 
 
-  // 출결 저장 핸들러
-  const handleSaveAttendance = useCallback(async () => {
+  // 출결 저장 핸들러 - TODO: 레이어 UI 외부 저장 버튼 구현 시 사용
+  const _handleSaveAttendance = useCallback(async () => {
     if (isSaving) return;
 
     if (import.meta.env?.DEV) {
@@ -607,85 +646,28 @@ export function AttendancePage() {
           return;
         }
 
-        // 등원 기록 또는 결석 기록
-        if (state.check_in || state.status === 'absent' || state.status === 'excused') {
-          // [수정] 등원 시간이 있으면 사용, 없으면 (결석의 경우) 기본 시간 사용
-          let occurredAt: string;
+        // createAttendanceRecords 유틸리티 사용
+        const selectedClass = classes?.find(c => c.id === selectedClassId);
+        const records = createAttendanceRecords(
+          state,
+          selectedDate,
+          selectedClass?.start_time
+        );
 
-          if (state.check_in && state.check_in_time) {
-            // 등원 시간이 있는 경우
-            const checkInTimeStr = state.check_in_time;
-            const [hour, minute] = checkInTimeStr.split(':');
-            occurredAt = toKST(selectedDate)
-              .hour(parseInt(hour))
-              .minute(parseInt(minute))
-              .second(0)
-              .format('YYYY-MM-DDTHH:mm:ssZ');
-          } else {
-            // 결석이거나 시간 정보가 없는 경우: 선택된 반의 수업 시작 시간 사용
-            const selectedClass = classes?.find(c => c.id === selectedClassId);
-            if (selectedClass?.start_time) {
-              const [hour, minute] = selectedClass.start_time.split(':').map(Number);
-              occurredAt = toKST(selectedDate)
-                .hour(hour)
-                .minute(minute)
-                .second(0)
-                .format('YYYY-MM-DDTHH:mm:ssZ');
-            } else {
-              // 수업 정보가 없으면 현재 시간 사용
-              occurredAt = toKST().format('YYYY-MM-DDTHH:mm:ssZ');
-            }
-          }
-
-          // [수정] RPC 함수가 날짜 기준으로 UPSERT하므로 id 불필요
-          const record: CreateAttendanceLogInput = {
-            student_id: state.student_id,
-            class_id: selectedClassId || undefined,
-            occurred_at: occurredAt,
-            attendance_type: 'check_in',
-            status: state.status,
-            check_in_method: 'manual',
-          };
+        // class_id 추가 (유틸리티에서는 undefined로 생성됨)
+        records.forEach(record => {
+          record.class_id = selectedClassId || undefined;
 
           if (import.meta.env?.DEV) {
             console.log('[AttendancePage] 📝 출결 기록:', {
-              student_id: state.student_id,
-              status: state.status,
-              has_check_in_time: !!state.check_in_time,
+              student_id: record.student_id,
+              type: record.attendance_type,
+              status: record.status,
             });
           }
 
           attendanceRecords.push(record);
-        }
-
-        // 하원 기록
-        if (state.check_out) {
-          const checkOutTimeStr = state.check_out_time || toKST().format('HH:mm');
-          const [hour, minute] = checkOutTimeStr.split(':');
-          const occurredAt = toKST(selectedDate)
-            .hour(parseInt(hour))
-            .minute(parseInt(minute))
-            .second(0)
-            .format('YYYY-MM-DDTHH:mm:ssZ');
-
-          // [수정] RPC 함수가 날짜 기준으로 UPSERT하므로 id 불필요
-          const record: CreateAttendanceLogInput = {
-            student_id: state.student_id,
-            class_id: selectedClassId || undefined,
-            occurred_at: occurredAt,
-            attendance_type: 'check_out',
-            status: state.status,
-          };
-
-          if (import.meta.env?.DEV) {
-            console.log('[AttendancePage] 📝 하원 기록:', {
-              student_id: state.student_id,
-              time: checkOutTimeStr,
-            });
-          }
-
-          attendanceRecords.push(record);
-        }
+        });
       });
 
       // 출결 기록 생성/수정 (아키텍처 문서 3.3.3: 출결 저장)
@@ -728,9 +710,10 @@ export function AttendancePage() {
       setIsSaving(false);
     }
   }, [studentAttendanceStates, selectedClassId, selectedDate, isSaving, upsertAttendance, showAlert, terms, classes]);
+  void _handleSaveAttendance;
 
-  // 일괄 등원/하원 핸들러
-  const handleBulkCheckIn = useCallback(() => {
+  // 일괄 등원/하원 핸들러 - TODO: 레이어 UI 외부 일괄 등원 버튼 구현 시 사용
+  const _handleBulkCheckIn = useCallback(() => {
     const newStates = { ...studentAttendanceStates };
     const currentTime = toKST().format('HH:mm'); // [시간 기록 중심] 현재 시간 자동 설정
 
@@ -756,8 +739,10 @@ export function AttendancePage() {
     });
     setStudentAttendanceStates(newStates);
   }, [filteredStudents, studentAttendanceStates]);
+  void _handleBulkCheckIn;
 
-  const handleBulkCheckOut = useCallback(() => {
+  // TODO: 레이어 UI 외부 일괄 하원 버튼 구현 시 사용
+  const _handleBulkCheckOut = useCallback(() => {
     const newStates = { ...studentAttendanceStates };
     const currentTime = toKST().format('HH:mm'); // [시간 기록 중심] 현재 시간 자동 설정
 
@@ -783,679 +768,628 @@ export function AttendancePage() {
     });
     setStudentAttendanceStates(newStates);
   }, [filteredStudents, studentAttendanceStates]);
+  void _handleBulkCheckOut;
 
-  // 출결 요약 통계
+  // 출결 요약 통계 (시간대 필터 적용)
   const attendanceSummary = useMemo(() => {
-    const states = Object.values(studentAttendanceStates);
-    const total = filteredStudents.length;
-    const present = states.filter(s => s.check_in && s.status === 'present').length;
-    const late = states.filter(s => s.check_in && s.status === 'late').length;
-    const absent = states.filter(s => s.status === 'absent').length;
+    // 시간대 필터링된 수업에 속한 학생들만 집계
+    const filteredClassIds = new Set(filteredByTimeRange.map(cls => cls.id));
+    const relevantStudents = studentClassesData?.filter(sc =>
+      filteredClassIds.has(sc.class_id)
+    ).map(sc => sc.student_id) || [];
 
-    // [키오스크 연동] 키오스크 출석 통계
-    // [성능 최적화] Map 크기를 사용하여 O(1) 조회
-    const totalCheckIns = attendanceLogsMap.checkInMap.size;
-    let kioskCheckIns = 0;
-    attendanceLogsMap.checkInMap.forEach(log => {
-      if (log.check_in_method === 'kiosk_phone') {
-        kioskCheckIns++;
+    const relevantStudentSet = new Set(relevantStudents);
+    const states = Object.entries(studentAttendanceStates).filter(([studentId]) =>
+      relevantStudentSet.has(studentId)
+    );
+
+    const total = relevantStudents.length;
+    const present = states.filter(([, s]) => s.check_in && s.status === 'present').length;
+    const late = states.filter(([, s]) => s.check_in && s.status === 'late').length;
+    const absent = states.filter(([, s]) => s.status === 'absent').length;
+
+    return { total, present, late, absent };
+  }, [studentAttendanceStates, filteredByTimeRange, studentClassesData]);
+
+  // 차트 데이터 생성 (수업별 출석 현황)
+  const attendanceChartData = useMemo(() => {
+    if (!filteredByTimeRange || filteredByTimeRange.length === 0) {
+      if (import.meta.env?.DEV) {
+        console.log('[Chart] No classes in time range');
+      }
+      return [];
+    }
+
+    const chartData = filteredByTimeRange.map((cls) => {
+      // 해당 수업의 학생들
+      const classStudents = studentClassesData?.filter(sc => sc.class_id === cls.id) || [];
+      const studentIds = new Set(classStudents.map(sc => sc.student_id));
+
+      // 출석 통계 계산
+      const states = Object.entries(studentAttendanceStates).filter(([studentId]) =>
+        studentIds.has(studentId)
+      );
+
+      const present = states.filter(([, s]) => s.check_in && s.status === 'present').length;
+      const late = states.filter(([, s]) => s.check_in && s.status === 'late').length;
+      // absent는 현재 차트에서 미사용이나 향후 확장을 위해 계산
+      void states.filter(([, s]) => s.status === 'absent').length;
+
+      return {
+        name: cls.name,
+        value: present + late, // 출석 + 지각 = 등원한 학생
+        color: 'var(--color-primary)',
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name)); // 수업명 가나다순 정렬
+
+    if (import.meta.env?.DEV) {
+      console.log('[Chart] Attendance Chart Data:', chartData);
+      console.log('[Chart] Chart Data Length:', chartData.length);
+      console.log('[Chart] Sample Data:', chartData[0]);
+    }
+
+    return chartData;
+  }, [filteredByTimeRange, studentClassesData, studentAttendanceStates]);
+
+  // ========== 새로운 시간대별 그룹화 UI ==========
+
+  // 수업별 학생 매핑 (studentClassesData 기반)
+  const studentsByClass = useMemo(() => {
+    const map = new Map<string, Student[]>();
+    if (!studentClassesData || !students) return map;
+
+    studentClassesData.forEach((sc) => {
+      const student = students.find((s) => s.id === sc.student_id);
+      if (student) {
+        if (!map.has(sc.class_id)) {
+          map.set(sc.class_id, []);
+        }
+        map.get(sc.class_id)!.push(student);
       }
     });
-    const kioskRate = totalCheckIns > 0 ? Math.round((kioskCheckIns / totalCheckIns) * 100) : 0;
 
-    return { total, present, late, absent, kioskRate };
-  }, [studentAttendanceStates, filteredStudents, attendanceLogsMap]);
+    return map;
+  }, [studentClassesData, students]);
+
+  // 선택된 수업 정보
+  const selectedClassForLayer = useMemo(() => {
+    if (!selectedClassIdForLayer) return null;
+    const cls = selectedDateClasses.find((c) => c.id === selectedClassIdForLayer);
+    if (!cls) return null;
+    return {
+      id: cls.id,
+      name: cls.name,
+      start_time: cls.start_time,
+      end_time: cls.end_time,
+      day_of_week: cls.day_of_week,
+      status: cls.status,
+    } as ClassInfo;
+  }, [selectedClassIdForLayer, selectedDateClasses]);
+
+  // 선택된 수업의 학생 목록
+  const studentsInSelectedClass = useMemo(() => {
+    if (!selectedClassIdForLayer) return [];
+    return studentsByClass.get(selectedClassIdForLayer) || [];
+  }, [selectedClassIdForLayer, studentsByClass]);
+
+  // 수업 클릭 핸들러 (레이어 열기)
+  const handleClassClick = useCallback((classId: string) => {
+    setSelectedClassIdForLayer(classId);
+  }, []);
+
+  // 레이어 닫기 핸들러
+  const handleLayerClose = useCallback(() => {
+    setSelectedClassIdForLayer(null);
+  }, []);
+
+  // 레이어 내 출결 상태 변경 핸들러
+  const handleLayerAttendanceChange = useCallback(
+    (studentId: string, changes: Partial<StudentAttendanceState>) => {
+      setStudentAttendanceStates((prev) => {
+        const current = prev[studentId] || {
+          student_id: studentId,
+          check_in: false,
+          check_out: false,
+          status: 'present' as AttendanceStatus,
+          user_modified: false,
+        };
+        return {
+          ...prev,
+          [studentId]: {
+            ...current,
+            ...changes,
+          },
+        };
+      });
+    },
+    []
+  );
+
+  // 레이어 내 일괄 등원 핸들러
+  const handleLayerBulkCheckIn = useCallback(() => {
+    const currentTime = toKST().format('HH:mm');
+    studentsInSelectedClass.forEach((student) => {
+      handleLayerAttendanceChange(student.id, {
+        check_in: true,
+        check_in_time: currentTime,
+        status: 'present',
+        user_modified: true,
+        ai_predicted: false,
+      });
+    });
+  }, [studentsInSelectedClass, handleLayerAttendanceChange]);
+
+  // 레이어 내 일괄 하원 핸들러
+  const handleLayerBulkCheckOut = useCallback(() => {
+    const currentTime = toKST().format('HH:mm');
+    studentsInSelectedClass.forEach((student) => {
+      handleLayerAttendanceChange(student.id, {
+        check_out: true,
+        check_out_time: currentTime,
+        user_modified: true,
+        ai_predicted: false,
+      });
+    });
+  }, [studentsInSelectedClass, handleLayerAttendanceChange]);
+
+  // 레이어 내 저장 핸들러
+  const handleLayerSave = useCallback(async () => {
+    if (isSaving || !selectedClassIdForLayer) return;
+
+    if (import.meta.env?.DEV) {
+      console.log('[AttendancePage] 💾 레이어 저장 시작:', selectedClassIdForLayer);
+    }
+
+    setIsSaving(true);
+    try {
+      const attendanceRecords: CreateAttendanceLogInput[] = [];
+
+      studentsInSelectedClass.forEach((student) => {
+        const state = studentAttendanceStates[student.id];
+        if (!state?.user_modified) return;
+
+        // createAttendanceRecords 유틸리티 사용
+        const selectedClass = selectedDateClasses.find((c) => c.id === selectedClassIdForLayer);
+        const records = createAttendanceRecords(
+          state,
+          selectedDate,
+          selectedClass?.start_time
+        );
+
+        // class_id 추가 (유틸리티에서는 undefined로 생성됨)
+        records.forEach(record => {
+          record.class_id = selectedClassIdForLayer;
+          attendanceRecords.push(record);
+        });
+      });
+
+      if (import.meta.env?.DEV) {
+        console.log('[AttendancePage] 📤 레이어 저장:', attendanceRecords.length, '개 레코드');
+      }
+
+      for (const record of attendanceRecords) {
+        await upsertAttendance.mutateAsync(record);
+      }
+
+      showAlert(terms.MESSAGES.SAVE_SUCCESS, terms.MESSAGES.SUCCESS, 'success');
+
+      // user_modified 플래그 초기화
+      setStudentAttendanceStates((prevStates) => {
+        const newStates: Record<string, StudentAttendanceState> = {};
+        Object.entries(prevStates).forEach(([studentId, state]) => {
+          newStates[studentId] = {
+            ...state,
+            user_modified: false,
+          };
+        });
+        return newStates;
+      });
+    } catch (error) {
+      showAlert(terms.MESSAGES.SAVE_ERROR, terms.MESSAGES.ERROR, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [
+    isSaving,
+    selectedClassIdForLayer,
+    studentsInSelectedClass,
+    studentAttendanceStates,
+    selectedDate,
+    selectedDateClasses,
+    upsertAttendance,
+    showAlert,
+    terms,
+  ]);
+
+  // ========== END 새로운 시간대별 그룹화 UI ==========
 
   return (
     <ErrorBoundary>
       <div style={{ display: 'flex', height: 'var(--height-full)' }}>
-        {/* 서브 사이드바 (모바일에서는 숨김) */}
+        {/* 서브 사이드바 (모바일에서는 숨김, 태블릿에서는 축소) */}
         {!isMobileMode && (
           <SubSidebar
             title={templates.management(terms.ATTENDANCE_LABEL)}
             items={subMenuItemsWithIcons}
             selectedId={selectedSubMenu}
             onSelect={handleSubMenuChange}
+            collapsed={sidebarCollapsed}
+            onCollapsedChange={setSidebarCollapsed}
             testId="attendance-sub-sidebar"
           />
         )}
 
         {/* 메인 콘텐츠 */}
-        <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
-          <PageHeader
-            title={subMenuItemsWithIcons.find(item => item.id === selectedSubMenu)?.label || templates.management(terms.ATTENDANCE_LABEL)}
-          />
+        <div style={{ flex: 1 }}>
+          {/* 오늘 출결 탭 */}
+          {selectedSubMenu === 'today' && (
+            <RightLayerMenuLayout
+              layerMenu={{
+                isOpen: !!selectedClassIdForLayer,
+                onClose: handleLayerClose,
+                title: selectedClassForLayer ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 'var(--spacing-sm)', minWidth: 0 }}>
+                    <span
+                      style={{
+                        fontSize: 'var(--font-size-3xl)',
+                        fontWeight: 'var(--font-weight-extrabold)',
+                        lineHeight: 'var(--line-height-tight)',
+                        color: 'var(--color-text)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: '100%',
+                      }}
+                    >
+                      {selectedClassForLayer.name}
+                    </span>
+                    <span style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                      {terms.ATTENDANCE_LABEL} {selectedClassForLayer.start_time.substring(0, 5)} ~ {selectedClassForLayer.end_time.substring(0, 5)}
+                    </span>
+                  </span>
+                ) : terms.ATTENDANCE_LABEL,
+                contentKey: selectedClassIdForLayer || undefined,
+                children: selectedClassForLayer && (
+                  <ClassAttendanceLayer
+                    classInfo={selectedClassForLayer}
+                    students={studentsInSelectedClass}
+                    attendanceStates={studentAttendanceStates}
+                    checkInLogsMap={attendanceLogsMap.checkInMap}
+                    onAttendanceChange={handleLayerAttendanceChange}
+                    onBulkCheckIn={handleLayerBulkCheckIn}
+                    onBulkCheckOut={handleLayerBulkCheckOut}
+                    onSave={handleLayerSave}
+                    isSaving={isSaving}
+                    onClose={handleLayerClose}
+                  />
+                ),
+              }}
+            >
+              {/* 메인 콘텐츠 */}
+              <Container maxWidth="xl" padding="lg">
+                <PageHeader
+                  title={subMenuItemsWithIcons.find(item => item.id === selectedSubMenu)?.label || templates.management(terms.ATTENDANCE_LABEL)}
+                  style={{ marginBottom: 'var(--spacing-xl)' }}
+                />
 
-        {/* 오늘 출결 탭 */}
-        {selectedSubMenu === 'today' && (
-        <>
               {/* AttendanceSummary: 총원/출석/지각/결석 (아키텍처 문서 3.3.3: 상단 통계) */}
-              <div style={{ marginBottom: 'var(--spacing-xl)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
-                <CardGridLayout
-                  cards={[
-                    <NotificationCardLayout
-                      key="total"
-                      icon={<Users />}
-                      title={terms.TOTAL_LABEL}
-                      value={attendanceSummary.total}
-                      unit="명"
-                      layoutMode="stats"
-                      iconBackgroundColor="var(--color-gray-100)"
-                    />,
-                    <NotificationCardLayout
-                      key="present"
-                      icon={<UserCheck />}
-                      title={terms.PRESENT_LABEL}
-                      value={attendanceSummary.present}
-                      unit="명"
-                      layoutMode="stats"
-                      iconBackgroundColor="var(--color-success-50)"
-                    />,
-                    <NotificationCardLayout
-                      key="late"
-                      icon={<Clock />}
-                      title={terms.LATE_LABEL}
-                      value={attendanceSummary.late}
-                      unit="명"
-                      layoutMode="stats"
-                      iconBackgroundColor="var(--color-warning-50)"
-                    />,
-                    <NotificationCardLayout
-                      key="absent"
-                      icon={<UserX />}
-                      title={terms.ABSENCE_LABEL}
-                      value={attendanceSummary.absent}
-                      unit="명"
-                      layoutMode="stats"
-                      iconBackgroundColor="var(--color-error-50)"
-                    />,
-                    <NotificationCardLayout
-                      key="kiosk"
-                      icon={<Smartphone />}
-                      title="키오스크 출석률"
-                      value={attendanceSummary.kioskRate}
-                      unit="%"
-                      layoutMode="stats"
-                      iconBackgroundColor="var(--color-primary-50)"
-                      description="전체 출석 중 키오스크 사용 비율"
-                    />,
+              <div style={{ marginBottom: 'calc(var(--spacing-xl) * 2)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
+                {/* 시간대 필터 배지 */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  marginBottom: 'var(--spacing-md)',
+                }}>
+                  <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
+                    {[
+                      { value: 'all', label: '전체' },
+                      { value: 'morning', label: '오전' },
+                      { value: 'afternoon', label: '오후' },
+                      { value: 'evening', label: '저녁' },
+                    ].map((option) => {
+                      const isSelected = timeRangeFilter === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          onClick={() => setTimeRangeFilter(option.value as TimeRangeFilter)}
+                          style={{
+                            padding: 'var(--spacing-xs) var(--spacing-sm)',
+                            fontSize: 'var(--font-size-sm)',
+                            fontWeight: 'var(--font-weight-medium)',
+                            backgroundColor: isSelected ? 'var(--color-primary)' : 'var(--color-white)',
+                            color: isSelected ? 'var(--color-white)' : 'var(--color-text-secondary)',
+                            border: isSelected ? 'none' : 'var(--border-width-thin) solid var(--color-gray-200)',
+                            borderRadius: 'var(--border-radius-xs)',
+                            cursor: 'pointer',
+                            transition: 'var(--transition-all)',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.backgroundColor = 'var(--color-white)';
+                            }
+                          }}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 통계 카드 */}
+                <StatsDashboard
+                  statsItems={[
+                    {
+                      key: 'total',
+                      icon: Users,
+                      title: terms.TOTAL_LABEL,
+                      value: attendanceSummary.total,
+                      unit: '명',
+                      iconBackgroundColor: 'var(--color-gray-100)',
+                    },
+                    {
+                      key: 'present',
+                      icon: UserCheck,
+                      title: terms.PRESENT_LABEL,
+                      value: attendanceSummary.present,
+                      unit: '명',
+                      iconBackgroundColor: 'var(--color-success-50)',
+                    },
+                    {
+                      key: 'late',
+                      icon: Clock,
+                      title: terms.LATE_LABEL,
+                      value: attendanceSummary.late,
+                      unit: '명',
+                      iconBackgroundColor: 'var(--color-warning-50)',
+                    },
+                    {
+                      key: 'absent',
+                      icon: UserX,
+                      title: terms.ABSENCE_LABEL,
+                      value: attendanceSummary.absent,
+                      unit: '명',
+                      iconBackgroundColor: 'var(--color-error-50)',
+                    },
                   ]}
-                  desktopColumns={5}
-                  tabletColumns={3}
+                  chartData={attendanceChartData}
+                  hideChart={true}
+                  showPeriodFilter={false}
+                  chartType="bar"
+                  showZeroValues={true}
+                  desktopColumns={4}
+                  tabletColumns={2}
                   mobileColumns={2}
+                  chartTooltipUnit="명"
+                  chartTooltipLabel="등원 학생수"
                 />
               </div>
 
-              {/* AttendanceStudentList: 학생 리스트 + 체크박스 UI (아키텍처 문서 3.3.3: 통계 다음에 StudentList) */}
-              {/* 모바일: Bottom Action Bar를 위한 하단 패딩 추가 */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--spacing-sm)',
-                // HARD-CODE-EXCEPTION: paddingBottom 0은 레이아웃용 특수 값 (Bottom Action Bar 높이만큼 패딩)
-                paddingBottom: isMobileMode ? 'var(--spacing-bottom-action-bar)' : '0',
-              }}>
-                {/* 로딩 상태 (아키텍처 문서 3.3.3: loading 상태) */}
-                {isLoading && (
-                  <Card padding="lg">
-                    <div style={{
-                      textAlign: 'center',
-                      padding: 'var(--spacing-xl)',
-                      pointerEvents: 'none',
-                      opacity: 'var(--opacity-secondary)'
-                    }}>
-                      <div style={{
-                        color: 'var(--color-text-secondary)',
-                        marginBottom: 'var(--spacing-md)'
-                      }}>
-                        {`출결 정보를 ${terms.MESSAGES.LOADING}`}
-                      </div>
-                      {/* 스켈레톤 UI (아키텍처 문서 3.3.3: show_skeleton: true) */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
-                        {[1, 2, 3].map(i => (
-                          <div
-                            key={i}
-                            style={{
-                              height: 'var(--spacing-bottom-action-bar)',
-                              backgroundColor: 'var(--color-gray-100)',
-                              borderRadius: 'var(--border-radius-md)',
-                              opacity: 'var(--opacity-secondary)',
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </Card>
-                )}
+              {/* 수업 카드 목록 - 시간대별 분류 */}
+              {(() => {
+                const now = toKST();
+                const today = now.format('YYYY-MM-DD');
+                const currentTime = now.format('HH:mm');
 
-                {/* 에러 상태 (아키텍처 문서 3.3.3: error 상태) */}
-                {!isLoading && error && (
-                  <Card padding="lg">
-                    <div style={{
-                      textAlign: 'center',
-                      padding: 'var(--spacing-lg)',
-                      color: 'var(--color-error)'
-                    }}>
-                      <div style={{
-                        fontWeight: 'var(--font-weight-semibold)',
-                        marginBottom: 'var(--spacing-md)'
-                      }}>
-                        출결 정보를 불러올 수 없습니다.
-                      </div>
-                      <div style={{
-                        color: 'var(--color-text-secondary)',
-                        marginBottom: 'var(--spacing-md)'
-                      }}>
-                        {error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'}
-                      </div>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          // 데이터 재조회를 위해 쿼리 무효화 및 재시도
-                          window.location.reload();
+                // 수업 분류
+                const pastClasses: typeof filteredByTimeRange = [];
+                const currentClasses: typeof filteredByTimeRange = [];
+                const upcomingClasses: typeof filteredByTimeRange = [];
+
+                filteredByTimeRange.forEach((cls) => {
+                  const startTime = cls.start_time.substring(0, 5);
+                  const endTime = cls.end_time.substring(0, 5);
+
+                  if (selectedDate !== today) {
+                    // 오늘이 아닌 경우
+                    if (selectedDate < today) {
+                      pastClasses.push(cls);
+                    } else {
+                      upcomingClasses.push(cls);
+                    }
+                  } else {
+                    // 오늘인 경우
+                    if (currentTime >= endTime) {
+                      pastClasses.push(cls);
+                    } else if (currentTime >= startTime && currentTime < endTime) {
+                      currentClasses.push(cls);
+                    } else {
+                      upcomingClasses.push(cls);
+                    }
+                  }
+                });
+
+                // 과목별 배지 색상 매핑
+                const getBadgeColor = (subject?: string, isEnded?: boolean): 'primary' | 'success' | 'warning' | 'error' | 'secondary' | 'gray' => {
+                  if (isEnded) return 'gray';
+                  const subjectLower = (subject || '').toLowerCase();
+                  if (subjectLower.includes('국어') || subjectLower.includes('korean')) return 'primary';
+                  if (subjectLower.includes('수학') || subjectLower.includes('math')) return 'error';
+                  if (subjectLower.includes('과학') || subjectLower.includes('science')) return 'success';
+                  if (subjectLower.includes('영어') || subjectLower.includes('english')) return 'warning';
+                  return 'secondary';
+                };
+
+                // 수업 카드 렌더링 함수
+                const renderClassCard = (classInfo: typeof filteredByTimeRange[0], type: 'past' | 'current' | 'upcoming') => {
+                  const classStudents = studentsByClass.get(classInfo.id) || [];
+                  const stats = calculateClassStats(classStudents, studentAttendanceStates);
+                  const isEnded = type === 'past';
+                  const isCurrent = type === 'current';
+
+                  // 지각/결석 있는지 확인 (진행 중인 수업만)
+                  const hasIssues = isCurrent && (stats.late > 0 || stats.absent > 0);
+
+                  // 카드 스타일
+                  const cardStyle: React.CSSProperties = isEnded
+                    ? { opacity: 0.75 }
+                    : hasIssues
+                    ? {
+                        border: '2px solid var(--color-error)',
+                        animation: 'pulse-border 2s ease-in-out infinite',
+                      }
+                    : {};
+
+                  return (
+                    <React.Fragment key={classInfo.id}>
+                      {hasIssues && (
+                        <style>
+                          {`
+                            @keyframes pulse-border {
+                              0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-error) 40%, transparent); }
+                              50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-error) 0%, transparent); }
+                            }
+                          `}
+                        </style>
+                      )}
+                      <EntityCard
+                        badge={{
+                          label: classInfo.subject || '수업',
+                          color: getBadgeColor(classInfo.subject, isEnded),
                         }}
-                      >
-                        다시 시도
-                      </Button>
-                    </div>
-                  </Card>
-                )}
+                        secondaryLabel="-"
+                        title={classInfo.name}
+                        mainValue={stats.present + stats.late}
+                        subValue={` / ${stats.total}`}
+                        description={`${classInfo.start_time.substring(0, 5)}~${classInfo.end_time.substring(0, 5)}`}
+                        onClick={() => handleClassClick(classInfo.id)}
+                        disabled={isEnded}
+                        style={cardStyle}
+                      />
+                    </React.Fragment>
+                  );
+                };
 
-                {/* 정상 상태: 학생 리스트 - DataTable */}
-                {!isLoading && !error && (
-                  <DataTable
-                    data={filteredStudents}
-                    keyExtractor={(student) => student.id}
-                    emptyMessage={`오늘 수업 ${terms.PERSON_LABEL_PRIMARY}${p.이가(terms.PERSON_LABEL_PRIMARY)} 없습니다.`}
-                    emptyIcon={Users}
-                    loading={isLoading}
-                    filters={[
-                      {
-                        type: 'select',
-                        columnKey: 'class_id',
-                        label: '수업 선택',
-                        options: [
-                          { value: '', label: '전체 수업' },
-                          ...(classes || []).map(c => ({
-                            value: c.id,
-                            label: c.name
-                          }))
-                        ],
-                      },
-                      {
-                        type: 'dateRange',
-                        columnKey: 'date',
-                        label: '날짜',
-                        placeholder: '날짜 선택',
-                      },
-                      {
-                        type: 'text',
-                        columnKey: 'search',
-                        label: '검색',
-                        placeholder: `${terms.PERSON_LABEL_PRIMARY} 이름 검색`,
-                      },
-                      {
-                        type: 'select',
-                        columnKey: 'check_in_method',
-                        label: '체크인 방법',
-                        options: [
-                          { value: '', label: '전체' },
-                          { value: 'manual', label: '수동 입력' },
-                          { value: 'kiosk_phone', label: '키오스크' },
-                          { value: 'qr_scan', label: 'QR 스캔' },
-                          { value: 'phone_auth', label: 'SMS 인증' },
-                        ],
-                      },
-                    ]}
-                    initialFilterState={{
-                      class_id: { selected: selectedClassId || '' },
-                      date: { dateRange: { start: selectedDate, end: selectedDate } },
-                      search: { text: searchQuery },
-                      check_in_method: { selected: '' },
-                    }}
-                    onFilterChange={(filterState) => {
-                      if (filterState.class_id?.selected !== undefined) {
-                        handleClassIdChange(filterState.class_id.selected || null);
-                      }
-                      if (filterState.date?.dateRange?.start) {
-                        setSelectedDate(filterState.date.dateRange.start);
-                      }
-                      if (filterState.search?.text !== undefined) {
-                        setSearchQuery(filterState.search.text);
-                      }
-                      if (filterState.check_in_method?.selected !== undefined) {
-                        setCheckInMethodFilter(filterState.check_in_method.selected);
-                      }
-                    }}
-                    enableClientSideFiltering={false}
-                    columns={[
-                      {
-                        key: 'name',
-                        label: terms.PERSON_LABEL_PRIMARY,
-                        width: '20%',
-                        render: (_, student) => {
-                          const studentWithExtras = student as Student & { primary_class_name?: string };
-                          const studentGrade = student.grade ? `${student.grade}${terms.GRADE_LABEL}` : '';
-                          const studentClass = studentWithExtras.primary_class_name || '';
-                          const gradeClassInfo = [studentGrade, studentClass].filter(Boolean).join(' ');
+                // 섹션 헤더 스타일 - TODO: 섹션 헤더 UI 구현 시 사용
+                const _sectionHeaderStyle: React.CSSProperties = {
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--spacing-sm)',
+                  marginBottom: 'var(--spacing-md)',
+                };
+                void _sectionHeaderStyle;
 
-                          return (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-                              {student.profile_image_url && (
-                                <img
-                                  src={student.profile_image_url}
-                                  alt={student.name}
-                                  loading="lazy"
-                                  decoding="async"
-                                  style={{
-                                    width: 'var(--spacing-xl)',
-                                    height: 'var(--spacing-xl)',
-                                    borderRadius: 'var(--border-radius-full)',
-                                    objectFit: 'cover',
-                                    flexShrink: 0,
-                                  }}
-                                />
-                              )}
-                              <div>
-                                <div style={{
-                                  fontSize: 'var(--font-size-base)',
-                                  fontWeight: 'var(--font-weight-semibold)',
-                                  marginBottom: 'var(--spacing-2xs)'
-                                }}>
-                                  {student.name}
-                                </div>
-                                {gradeClassInfo && (
-                                  <div style={{
-                                    fontSize: 'var(--font-size-sm)',
-                                    color: 'var(--color-text-secondary)'
-                                  }}>
-                                    {gradeClassInfo}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        },
-                      },
-                      {
-                        key: 'check_in',
-                        label: '등원 시간',
-                        width: '15%',
-                        align: 'center' as const,
-                        render: (_, student) => {
-                          const state = studentAttendanceStates[student.id] || {
-                            student_id: student.id,
-                            check_in: false,
-                            check_out: false,
-                            status: 'present' as AttendanceStatus,
-                            ai_predicted: false,
-                            user_modified: false,
-                          };
+                const sectionTitleStyle: React.CSSProperties = {
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--spacing-sm)',
+                  fontSize: 'var(--font-size-2xl)',
+                  fontWeight: 'var(--font-weight-extrabold)',
+                  color: 'var(--color-text-primary)',
+                  marginBottom: 'var(--spacing-md)',
+                };
 
-                          // [키오스크 연동] 해당 학생의 출석 로그에서 체크인 방법 확인
-                          // [성능 최적화] Map을 사용하여 O(1) 조회
-                          const log = attendanceLogsMap.checkInMap.get(student.id);
-                          const isKioskCheckIn = log?.check_in_method === 'kiosk_phone';
+                const gridStyle: React.CSSProperties = {
+                  display: 'grid',
+                  gridTemplateColumns: isMobileMode ? '1fr' : isTabletMode ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
+                  gap: 'var(--spacing-md)',
+                };
 
-                          // [시간 기록 중심] 수정된 시간 우선, 없으면 로그의 시간 사용
-                          const checkInTime = state.check_in_time || (log ? toKST(log.occurred_at).format('HH:mm') : '');
+                return (
+                  <div style={{ marginBottom: 'var(--spacing-2xl)' }}>
+                    {/* 진행 중 수업 */}
+                    {currentClasses.length > 0 && (
+                      <div style={{ marginBottom: 'var(--spacing-2xl)' }}>
+                        <div style={sectionTitleStyle}>
+                          <Play size={22} strokeWidth={1.5} style={{ color: 'var(--color-text-primary)' }} />
+                          진행 중 수업 ({currentClasses.length}개)
+                        </div>
+                        <div style={gridStyle}>
+                          {currentClasses.map((cls) => renderClassCard(cls, 'current'))}
+                        </div>
+                      </div>
+                    )}
 
-                          // [시간 기록 중심] 수업 시작 시간 조회 (자동 상태 판정용)
-                          const selectedClass = classes?.find(c => c.id === selectedClassId);
+                    {/* 다음 수업 */}
+                    {upcomingClasses.length > 0 && (
+                      <div style={{ marginBottom: 'var(--spacing-2xl)' }}>
+                        <div style={sectionTitleStyle}>
+                          <CalendarClock size={22} strokeWidth={1.5} style={{ color: 'var(--color-text-primary)' }} />
+                          다음 수업 ({upcomingClasses.length}개)
+                        </div>
+                        <div style={gridStyle}>
+                          {upcomingClasses.map((cls) => renderClassCard(cls, 'upcoming'))}
+                        </div>
+                      </div>
+                    )}
 
-                          return (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', justifyContent: 'center', flexDirection: 'column' }}>
-                              {/* [시간 기록 중심] 시간 입력 필드로 변경 */}
-                              <input
-                                type="time"
-                                value={checkInTime}
-                                onChange={(e) => {
-                                  const newTime = e.target.value;
-                                  if (!newTime) {
-                                    // 시간 삭제 (빈 값 입력)
-                                    setStudentAttendanceStates(prev => ({
-                                      ...prev,
-                                      [student.id]: {
-                                        ...state,
-                                        check_in: false,
-                                        check_in_time: undefined,
-                                        status: 'absent',
-                                        manual_status_override: false, // 시간 삭제 시 플래그 초기화
-                                        user_modified: true,
-                                        ai_predicted: false,
-                                      },
-                                    }));
-                                    return;
-                                  }
+                    {/* 지난 수업 */}
+                    {pastClasses.length > 0 && (
+                      <div style={{ marginBottom: 'var(--spacing-2xl)' }}>
+                        <div style={sectionTitleStyle}>
+                          <CalendarX size={22} strokeWidth={1.5} style={{ color: 'var(--color-text-primary)' }} />
+                          지난 수업 ({pastClasses.length}개)
+                        </div>
+                        <div style={gridStyle}>
+                          {pastClasses.map((cls) => renderClassCard(cls, 'past'))}
+                        </div>
+                      </div>
+                    )}
 
-                                  // [시간 기록 중심] 등원 시간 기반 자동 상태 판정
-                                  // 단, 사용자가 수동으로 상태를 변경한 경우 자동 판정 스킵
-                                  let newStatus = state.status; // 기존 상태 유지
-
-                                  if (!state.manual_status_override) {
-                                    // 자동 판정: 수동 변경이 없는 경우만
-                                    newStatus = 'present';
-
-                                    if (selectedClass) {
-                                      const [inputHour, inputMinute] = newTime.split(':').map(Number);
-                                      const [classHour, classMinute] = selectedClass.start_time.split(':').map(Number);
-
-                                      const inputMinutes = inputHour * 60 + inputMinute;
-                                      const classMinutes = classHour * 60 + classMinute;
-                                      const diffMinutes = inputMinutes - classMinutes;
-
-                                      // 10분 이후 등원 = 지각
-                                      if (diffMinutes > 10) {
-                                        newStatus = 'late';
-                                      }
-                                    }
-                                  }
-
-                                  // 상태 업데이트 (시간 저장 + 조건부 자동 상태 판정)
-                                  setStudentAttendanceStates(prev => ({
-                                    ...prev,
-                                    [student.id]: {
-                                      ...state,
-                                      check_in: true,
-                                      check_in_time: newTime,
-                                      status: newStatus,
-                                      user_modified: true,
-                                      ai_predicted: false,
-                                    },
-                                  }));
-                                }}
-                                style={{
-                                  padding: 'var(--spacing-2xs) var(--spacing-xs)',
-                                  border: `var(--border-width-thin) solid ${isKioskCheckIn ? 'var(--color-success-300)' : 'var(--color-border)'}`,
-                                  borderRadius: 'var(--border-radius-sm)',
-                                  fontSize: 'var(--font-size-sm)',
-                                  backgroundColor: isKioskCheckIn ? 'var(--color-success-50)' : 'var(--color-bg-primary)',
-                                  color: 'var(--color-text-primary)',
-                                  width: '100px',
-                                }}
-                              />
-
-                              {/* 키오스크 출석 배지 */}
-                              {isKioskCheckIn && (
-                                <Badge variant="soft" color="success" style={{ fontSize: 'var(--font-size-xs)' }}>
-                                  키오스크
-                                </Badge>
-                              )}
-
-                              {/* 지각 경고 배지 */}
-                              {state.status === 'late' && state.check_in && (
-                                <Badge variant="soft" color="warning" style={{ fontSize: 'var(--font-size-xs)' }}>
-                                  지각
-                                </Badge>
-                              )}
-
-                              {/* AI 예측 배지 */}
-                              {state.ai_predicted && !state.user_modified && (
-                                <Badge variant="soft" color="info" style={{ fontSize: 'var(--font-size-xs)' }}>
-                                  AI 예측
-                                </Badge>
-                              )}
-                            </div>
-                          );
-                        },
-                      },
-                      {
-                        key: 'check_in_method',
-                        label: '체크인 방법',
-                        width: '10%',
-                        align: 'center' as const,
-                        render: (_, student) => {
-                          // [성능 최적화] Map을 사용하여 O(1) 조회
-                          const log = attendanceLogsMap.checkInMap.get(student.id);
-                          if (!log?.check_in_method || log.check_in_method === 'manual') return <span style={{ color: 'var(--color-text-tertiary)' }}>-</span>;
-
-                          return (
-                            <Badge
-                              variant="soft"
-                              color={log.check_in_method === 'kiosk_phone' ? 'success' : 'info'}
-                            >
-                              {log.check_in_method === 'kiosk_phone' && '키오스크'}
-                              {log.check_in_method === 'qr_scan' && 'QR'}
-                              {log.check_in_method === 'phone_auth' && 'SMS'}
-                            </Badge>
-                          );
-                        },
-                      },
-                      {
-                        key: 'check_out',
-                        label: '하원 시간',
-                        width: '12%',
-                        align: 'center' as const,
-                        render: (_, student) => {
-                          const state = studentAttendanceStates[student.id] || {
-                            student_id: student.id,
-                            check_in: false,
-                            check_out: false,
-                            status: 'present' as AttendanceStatus,
-                            ai_predicted: false,
-                            user_modified: false,
-                          };
-
-                          // [성능 최적화] Map을 사용하여 O(1) 조회
-                          const checkOutLog = attendanceLogsMap.checkOutMap.get(student.id);
-
-                          // [시간 기록 중심] 수정된 시간 우선, 없으면 로그의 시간 사용
-                          const checkOutTime = state.check_out_time || (checkOutLog ? toKST(checkOutLog.occurred_at).format('HH:mm') : '');
-
-                          return (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', justifyContent: 'center' }}>
-                              {/* [시간 기록 중심] 시간 입력 필드로 변경 */}
-                              <input
-                                type="time"
-                                value={checkOutTime}
-                                onChange={(e) => {
-                                  const newTime = e.target.value;
-                                  if (!newTime) {
-                                    // 시간 삭제 (빈 값 입력)
-                                    setStudentAttendanceStates(prev => ({
-                                      ...prev,
-                                      [student.id]: {
-                                        ...state,
-                                        check_out: false,
-                                        check_out_time: undefined,
-                                        user_modified: true,
-                                        ai_predicted: false,
-                                      },
-                                    }));
-                                    return;
-                                  }
-
-                                  // 상태 업데이트 (시간 저장)
-                                  setStudentAttendanceStates(prev => ({
-                                    ...prev,
-                                    [student.id]: {
-                                      ...state,
-                                      check_out: true,
-                                      check_out_time: newTime,
-                                      user_modified: true,
-                                      ai_predicted: false,
-                                    },
-                                  }));
-                                }}
-                                style={{
-                                  padding: 'var(--spacing-2xs) var(--spacing-xs)',
-                                  border: 'var(--border-width-thin) solid var(--color-border)',
-                                  borderRadius: 'var(--border-radius-sm)',
-                                  fontSize: 'var(--font-size-sm)',
-                                  backgroundColor: 'var(--color-bg-primary)',
-                                  color: 'var(--color-text-primary)',
-                                  width: '100px',
-                                }}
-                              />
-                            </div>
-                          );
-                        },
-                      },
-                      {
-                        key: 'duration',
-                        label: '체류 시간',
-                        width: '10%',
-                        align: 'center' as const,
-                        render: (_, student) => {
-                          // [시간 기록 중심] 등원~하원 간 체류 시간 계산
-                          const checkInLog = attendanceLogsMap.checkInMap.get(student.id);
-                          const checkOutLog = attendanceLogsMap.checkOutMap.get(student.id);
-
-                          if (!checkInLog || !checkOutLog) {
-                            return <span style={{ color: 'var(--color-text-tertiary)' }}>-</span>;
+                    {/* 수업이 없는 경우 */}
+                    {filteredByTimeRange.length === 0 && (
+                      <Card padding="xl">
+                        <EmptyState
+                          icon={Users}
+                          message={
+                            timeRangeFilter === 'all'
+                              ? `${selectedDate} (${DAY_NAMES[toKST(selectedDate).day()]})에 예정된 수업이 없습니다.`
+                              : `${selectedDate} (${DAY_NAMES[toKST(selectedDate).day()]}) ${TIME_RANGE_CONFIG[timeRangeFilter.toUpperCase() as keyof typeof TIME_RANGE_CONFIG].LABEL}에 예정된 수업이 없습니다.`
                           }
-
-                          const checkInTime = toKST(checkInLog.occurred_at);
-                          const checkOutTime = toKST(checkOutLog.occurred_at);
-                          const durationMinutes = checkOutTime.diff(checkInTime, 'minute');
-
-                          if (durationMinutes < 0) {
-                            return <span style={{ color: 'var(--color-error)' }}>오류</span>;
-                          }
-
-                          const hours = Math.floor(durationMinutes / 60);
-                          const minutes = durationMinutes % 60;
-
-                          return (
-                            <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                              {hours > 0 && `${hours}시간 `}{minutes}분
-                            </span>
-                          );
-                        },
-                      },
-                      {
-                        key: 'status',
-                        label: '출석 상태',
-                        width: '15%',
-                        align: 'center' as const,
-                        render: (_, student) => {
-                          const state = studentAttendanceStates[student.id] || {
-                            student_id: student.id,
-                            check_in: false,
-                            check_out: false,
-                            status: 'present' as AttendanceStatus,
-                            ai_predicted: false,
-                            user_modified: false,
-                          };
-
-                          // [개념 통합] 상태 선택 드롭다운으로 통합 (배지 제거)
-                          return (
-                            <Select
-                              value={state.status}
-                              onChange={(value) => {
-                                // [시간 기록 중심] 수동 변경 시 플래그 설정
-                                setStudentAttendanceStates(prev => ({
-                                  ...prev,
-                                  [student.id]: {
-                                    ...state,
-                                    status: value as AttendanceStatus,
-                                    manual_status_override: true, // 수동 변경 플래그
-                                    user_modified: true,
-                                    ai_predicted: false,
-                                  },
-                                }));
-                              }}
-                              options={[
-                                { value: 'present', label: terms.PRESENT_LABEL },
-                                { value: 'late', label: terms.LATE_LABEL },
-                                { value: 'absent', label: terms.ABSENCE_LABEL },
-                                { value: 'excused', label: terms.EXCUSED_LABEL },
-                              ]}
-                              size="sm"
-                            />
-                          );
-                        },
-                      },
-                    ]}
-                  />
-                )}
-              </div>
-
-              {/* AttendanceActions: 일괄 등원/하원/저장 버튼 (아키텍처 문서 3.3.3: StudentList 다음에 Actions) */}
-              {/* 모바일: Bottom Action Bar, 태블릿/데스크톱: Card */}
-              {/* 아키텍처 문서 3.3.9: 태블릿 모드에서는 큰 터치 버튼 (최소 120px × 60px) */}
-              {isMobileMode ? (
-                <BottomActionBar style={{ pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleBulkCheckIn}
-                    disabled={isSaving || isLoading}
-                  >
-                    일괄 {terms.CHECK_IN_LABEL}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleBulkCheckOut}
-                    disabled={isSaving || isLoading}
-                  >
-                    일괄 {terms.CHECK_OUT_LABEL}
-                  </Button>
-                  <div style={{ flex: 1 }} />
-                  <Button
-                    variant="solid"
-                    color="primary"
-                    size="sm"
-                    onClick={handleSaveAttendance}
-                    disabled={isSaving || isLoading}
-                  >
-                    {isSaving ? terms.MESSAGES.LOADING : terms.MESSAGES.SAVE}
-                  </Button>
-                </BottomActionBar>
-              ) : (
-                <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)', pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? 'var(--opacity-loading)' : 'var(--opacity-full)' }}>
-                  <div style={{ display: 'flex', gap: isTabletMode ? 'max(var(--spacing-md), var(--tablet-spacing-min))' : 'var(--spacing-sm)', flexWrap: 'wrap' }}> {/* 아키텍처 문서 3.3.9: 버튼 간 간격 최소 8px */}
-                    <Button
-                      variant="outline"
-                      size={isTabletMode ? 'lg' : 'md'}
-                      onClick={handleBulkCheckIn}
-                      disabled={isSaving || isLoading}
-                      style={isTabletMode ? {
-                        minWidth: 'var(--width-button-min)',
-                        minHeight: 'var(--height-button-min)',
-                        fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
-                      } : undefined}
-                    >
-                      일괄 {terms.CHECK_IN_LABEL}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size={isTabletMode ? 'lg' : 'md'}
-                      onClick={handleBulkCheckOut}
-                      disabled={isSaving || isLoading}
-                      style={isTabletMode ? {
-                        minWidth: 'var(--width-button-min)',
-                        minHeight: 'var(--height-button-min)',
-                        fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
-                      } : undefined}
-                    >
-                      일괄 {terms.CHECK_OUT_LABEL}
-                    </Button>
-                    <div style={{ flex: 1 }} />
-                    {/* 통계 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8) */}
-                    <Button
-                      variant="solid"
-                      color="primary"
-                      size={isTabletMode ? 'lg' : 'md'}
-                      onClick={handleSaveAttendance}
-                      disabled={isSaving || isLoading}
-                      style={isTabletMode ? {
-                        minWidth: 'var(--width-button-min)',
-                        minHeight: 'var(--height-button-min)',
-                        fontSize: 'max(var(--font-size-lg), var(--tablet-font-size-button-min))', // 아키텍처 문서 3.3.9: 버튼 텍스트 최소 18px
-                      } : undefined}
-                    >
-                      {isSaving ? `${terms.MESSAGES.LOADING}` : terms.MESSAGES.SAVE}
-                    </Button>
+                        />
+                      </Card>
+                    )}
                   </div>
-                </Card>
-              )}
-        </>
-        )}
+                );
+              })()}
+              </Container>
+            </RightLayerMenuLayout>
+          )}
 
-        {/* 출결 기록 탭 */}
-        {selectedSubMenu === 'history' && (
+        {/* 출결기록 탭 */}
+        {selectedSubMenu === 'history' && (() => {
+          // 수업 맵 생성 (classId -> classInfo)
+          const classMap = new Map<string, { id: string; name: string; start_time: string; end_time: string }>();
+          (classes || []).forEach(c => {
+            classMap.set(c.id, { id: c.id, name: c.name, start_time: c.start_time, end_time: c.end_time });
+          });
+
+          // 학생 맵 생성 (studentId -> studentName)
+          const studentMap = new Map<string, string>();
+          (students || []).forEach(s => {
+            studentMap.set(s.id, s.name);
+          });
+
+          // 로그 필터링 (학생명 검색)
+          const filteredLogs = historySearchQuery
+            ? attendanceLogs.filter(log => {
+                const studentName = studentMap.get(log.student_id) || '';
+                return studentName.toLowerCase().includes(historySearchQuery.toLowerCase());
+              })
+            : attendanceLogs;
+
+          // 날짜별 그룹화
+          const dailyGroups = groupAttendanceByDate(filteredLogs, classMap, studentMap);
+
+          // 수업 펼침/접힘 토글 핸들러
+          const handleToggleClass = (classKey: string) => {
+            setExpandedHistoryClasses(prev => {
+              const next = new Set(prev);
+              if (next.has(classKey)) {
+                next.delete(classKey);
+              } else {
+                next.add(classKey);
+              }
+              return next;
+            });
+          };
+
+          return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
             <Card padding="lg">
               <h3 style={{
@@ -1467,11 +1401,11 @@ export function AttendancePage() {
                 gap: 'var(--spacing-sm)',
               }}>
                 <History size={20} />
-                출결 기록 조회
+                출결기록
               </h3>
               {/* 필터 */}
               <div style={{ display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap', marginBottom: 'var(--spacing-lg)' }}>
-                <div style={{ flex: 1, minWidth: '200px' }}>
+                <div style={{ flex: 1, minWidth: '140px', maxWidth: '180px' }}>
                   <label style={{
                     display: 'block',
                     fontSize: 'var(--font-size-sm)',
@@ -1493,7 +1427,7 @@ export function AttendancePage() {
                     }}
                   />
                 </div>
-                <div style={{ flex: 1, minWidth: '200px' }}>
+                <div style={{ flex: 1, minWidth: '140px', maxWidth: '180px' }}>
                   <label style={{
                     display: 'block',
                     fontSize: 'var(--font-size-sm)',
@@ -1515,7 +1449,7 @@ export function AttendancePage() {
                     }}
                   />
                 </div>
-                <div style={{ flex: 1, minWidth: '200px' }}>
+                <div style={{ flex: 1, minWidth: '140px', maxWidth: '200px' }}>
                   <label style={{
                     display: 'block',
                     fontSize: 'var(--font-size-sm)',
@@ -1541,68 +1475,82 @@ export function AttendancePage() {
                     ))}
                   </select>
                 </div>
+                <div style={{ flex: 2, minWidth: '200px' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    marginBottom: 'var(--spacing-xs)',
+                  }}>
+                    {terms.PERSON_LABEL_PRIMARY}명 검색
+                  </label>
+                  <input
+                    type="text"
+                    value={historySearchQuery}
+                    onChange={(e) => setHistorySearchQuery(e.target.value)}
+                    placeholder={`${terms.PERSON_LABEL_PRIMARY}명으로 검색...`}
+                    style={{
+                      width: '100%',
+                      padding: 'var(--spacing-sm) var(--spacing-md)',
+                      border: 'var(--border-width-thin) solid var(--color-border)',
+                      borderRadius: 'var(--border-radius-md)',
+                      fontSize: 'var(--font-size-base)',
+                    }}
+                  />
+                </div>
               </div>
-              {/* 출결 기록 목록 */}
+
+              {/* 범례 */}
+              <div style={{
+                display: 'flex',
+                gap: 'var(--spacing-lg)',
+                padding: 'var(--spacing-sm) var(--spacing-md)',
+                backgroundColor: 'var(--color-bg-secondary)',
+                borderRadius: 'var(--border-radius-md)',
+                marginBottom: 'var(--spacing-lg)',
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-secondary)',
+                flexWrap: 'wrap',
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2xs)' }}>
+                  <span style={{ color: 'var(--color-success)' }}>✓</span> {terms.PRESENT_LABEL}
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2xs)' }}>
+                  <span style={{ color: 'var(--color-warning)' }}>△</span> {terms.LATE_LABEL}
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2xs)' }}>
+                  <span style={{ color: 'var(--color-error)' }}>✗</span> {terms.ABSENCE_LABEL}
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2xs)' }}>
+                  <span style={{ color: 'var(--color-info)' }}>○</span> {terms.EXCUSED_LABEL}
+                </span>
+              </div>
+
+              {/* 출결 기록 - 날짜별 타임라인 뷰 */}
               {isLoadingLogs ? (
                 <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
                   {terms.MESSAGES.LOADING}
                 </div>
-              ) : attendanceLogs && attendanceLogs.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
-                  {attendanceLogs.slice(0, 50).map((log) => {
-                    const student = students?.find(s => s.id === log.student_id);
-                    return (
-                      <div
-                        key={log.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: 'var(--spacing-md)',
-                          backgroundColor: 'var(--color-bg-secondary)',
-                          borderRadius: 'var(--border-radius-md)',
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--spacing-2xs)' }}>
-                            {student?.name || log.student_id}
-                          </div>
-                          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                            {toKST(log.occurred_at).format('YYYY-MM-DD HH:mm')}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-                          <Badge
-                            variant="soft"
-                            color={log.attendance_type === 'check_in' ? 'blue' : 'green'}
-                          >
-                            {log.attendance_type === 'check_in' ? terms.CHECK_IN_LABEL : terms.CHECK_OUT_LABEL}
-                          </Badge>
-                          <Badge
-                            variant="soft"
-                            color={
-                              log.status === 'present' ? 'success' :
-                              log.status === 'late' ? 'warning' :
-                              log.status === 'absent' ? 'error' : 'gray'
-                            }
-                          >
-                            {log.status === 'present' ? terms.PRESENT_LABEL :
-                             log.status === 'late' ? terms.LATE_LABEL :
-                             log.status === 'absent' ? terms.ABSENCE_LABEL : terms.EXCUSED_LABEL}
-                          </Badge>
-                        </div>
-                      </div>
-                    );
-                  })}
+              ) : dailyGroups.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {dailyGroups.map((group) => (
+                    <DailyAttendanceSection
+                      key={group.date}
+                      group={group}
+                      expandedClassIds={expandedHistoryClasses}
+                      onToggleClass={handleToggleClass}
+                    />
+                  ))}
                 </div>
               ) : (
-                <EmptyState icon={History} message="출결 기록이 없습니다." />
+                <EmptyState icon={History} message="선택한 기간에 출결 기록이 없습니다." />
               )}
             </Card>
           </div>
-        )}
+          );
+        })()}
 
-        {/* 출결 통계 탭 */}
+        {/* 출결통계 탭 */}
         {selectedSubMenu === 'statistics' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
             {/* 요약 통계 */}
@@ -1793,7 +1741,7 @@ export function AttendancePage() {
           </div>
         )}
 
-        {/* 출결 설정 탭 */}
+        {/* 출결설정 탭 */}
         {selectedSubMenu === 'settings' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
             {/* 지각/결석 기준 설정 */}
@@ -1961,7 +1909,7 @@ export function AttendancePage() {
         )}
 
         {/* 통계/히트맵/패턴 분석 기능은 통계 또는 AI 인사이트 메뉴로 이동 (아키텍처 문서 3.3.8) */}
-        </Container>
+        </div>
       </div>
     </ErrorBoundary>
   );
