@@ -19,12 +19,6 @@ export const invoiceTableSchema: TableSchema = {
     },
     columns: [
       {
-        key: 'status',
-        label: '상태',
-        sortable: true,
-        type: 'badge',
-      },
-      {
         key: 'amount',
         label: '금액',
         sortable: true,
@@ -41,6 +35,12 @@ export const invoiceTableSchema: TableSchema = {
         label: '생성일',
         sortable: true,
         type: 'date',
+      },
+      {
+        key: 'status',
+        label: '상태',
+        sortable: true,
+        type: 'badge',
       },
     ],
     rowActions: ['view', 'edit'],

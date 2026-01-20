@@ -30,6 +30,17 @@ const DAYS_OF_WEEK: { value: string; label: string }[] = [
   { value: 'sunday', label: '일요일' },
 ];
 
+// day_of_week를 표시용 문자열로 변환하는 헬퍼 함수
+function formatDayOfWeek(dayOfWeek: string | string[] | undefined): string {
+  if (!dayOfWeek) return '';
+  if (Array.isArray(dayOfWeek)) {
+    return dayOfWeek
+      .map(d => DAYS_OF_WEEK.find(day => day.value === d)?.label || d)
+      .join(', ');
+  }
+  return DAYS_OF_WEEK.find(d => d.value === dayOfWeek)?.label || dayOfWeek;
+}
+
 // 수업 배정 탭 컴포넌트
 export interface ClassesTabProps {
   studentClasses: Array<{
@@ -201,7 +212,7 @@ export function ClassesTab({
                               .filter((sc) => sc.class && sc.class_id === editingClassId)
                               .map((sc) => {
                                 const classItem = sc.class!;
-                                const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
+                                const dayLabel = formatDayOfWeek(classItem.day_of_week);
                                 return {
                                   label: `${classItem.name} (${dayLabel} ${classItem.start_time}~${classItem.end_time})`,
                                   value: classItem.id,
@@ -210,7 +221,7 @@ export function ClassesTab({
                           : []),
                         // 배정 가능한 수업만 포함 (이미 배정된 수업 제외)
                         ...availableClasses.map((classItem) => {
-                          const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
+                          const dayLabel = formatDayOfWeek(classItem.day_of_week);
                           return {
                             label: `${classItem.name} (${dayLabel} ${classItem.start_time}~${classItem.end_time})`,
                             value: classItem.id,

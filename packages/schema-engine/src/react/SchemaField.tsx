@@ -24,6 +24,8 @@ import type { FormFieldSchema, ConditionRule, MultiConditionRule } from '../type
 import { loadWidget } from '../widgets/registry';
 import {
   Input,
+  NumberInput,
+  TimeInput,
   Select,
   Checkbox,
   DatePicker,
@@ -315,8 +317,11 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
     );
   }
 
-  // number → Controller 사용 (reset 후 값 반영을 위해)
+  // number → NumberInput 사용 (단위 표시 지원)
   if (kind === 'number') {
+    // UI에서 unit 속성 확인
+    const unit = ui?.unit;
+
     return (
       <FormFieldLayout colSpan={colSpan}>
         <Controller
@@ -324,8 +329,36 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
           control={control}
           rules={finalRules as any}
           render={({ field: f }) => (
-            <Input
-              type="number"
+            <NumberInput
+              label={placeholder ? undefined : label}
+              placeholder={placeholder}
+              error={error}
+              disabled={isDisabled}
+              fullWidth
+              showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
+              unit={unit}
+              value={(f.value ?? '') as string}
+              onChange={f.onChange}
+              onBlur={f.onBlur}
+              name={f.name}
+              ref={f.ref}
+            />
+          )}
+        />
+      </FormFieldLayout>
+    );
+  }
+
+  // time → TimeInput 사용 (시계 아이콘 + 드롭다운)
+  if (kind === 'time') {
+    return (
+      <FormFieldLayout colSpan={colSpan}>
+        <Controller
+          name={name}
+          control={control}
+          rules={finalRules as any}
+          render={({ field: f }) => (
+            <TimeInput
               label={placeholder ? undefined : label}
               placeholder={placeholder}
               error={error}

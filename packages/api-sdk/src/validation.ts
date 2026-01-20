@@ -302,7 +302,7 @@ export const timeSchema = z
  * 수업 생성 입력 스키마
  */
 export const createClassInputSchema = z.object({
-  name: z.string().min(1, '수업 이름을 입력해주세요').max(100),
+  name: z.string().min(1, '수업명을 입력해주세요').max(100),
   subject: z.string().max(100).optional().nullable(),
   grade: gradeSchema,
   day_of_week: dayOfWeekSchema,

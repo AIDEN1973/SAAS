@@ -23,7 +23,7 @@ export const classFilterSchema: FilterSchema = {
         kind: 'text',
         ui: {
           label: '검색',
-          placeholder: '수업 이름 검색..',
+          placeholder: '수업명을 검색하세요.',
           colSpan: 1,
         },
       },
@@ -31,13 +31,14 @@ export const classFilterSchema: FilterSchema = {
         name: 'status',
         kind: 'select',
         ui: {
-          label: '상태',
+          label: '운영 상태',
+          placeholder: '운영 상태를 선택하세요.',
           colSpan: 1,
         },
         options: [
           { label: '전체', value: '' },
-          { label: '운영중', value: 'active' },
-          { label: '비활성', value: 'inactive' },
+          { label: '운영 중', value: 'active' },
+          { label: '중단', value: 'inactive' },
         ],
         defaultValue: '',
       },
@@ -46,10 +47,11 @@ export const classFilterSchema: FilterSchema = {
         kind: 'select',
         ui: {
           label: '요일',
+          placeholder: '요일을 선택하세요.',
           colSpan: 1,
         },
         options: [
-          { label: '전체 요일', value: '' },
+          { label: '전체', value: '' },
           { label: '월요일', value: 'monday' },
           { label: '화요일', value: 'tuesday' },
           { label: '수요일', value: 'wednesday' },

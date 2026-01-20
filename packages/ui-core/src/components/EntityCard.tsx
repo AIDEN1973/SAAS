@@ -28,8 +28,8 @@ export interface EntityCardProps {
   subValue?: string;
   /** 하단 설명 텍스트 */
   description?: string;
-  /** 요일 (원형 배경 적용) */
-  dayOfWeek?: string;
+  /** 요일 (원형 배경 적용) - 단일 문자열 또는 배열 지원 */
+  dayOfWeek?: string | string[];
   /** 클릭 이벤트 핸들러 */
   onClick?: () => void;
   /** 선택 상태 */
@@ -41,12 +41,66 @@ export interface EntityCardProps {
 }
 
 /**
- * 요일 색상 결정 (토요일: 블루, 일요일: 레드, 나머지: 그레이)
+ * 요일 배지 배경색 결정 (토요일: 블루, 일요일: 레드, 나머지: 연한 그레이)
  */
-const getDayColor = (day: string): string => {
-  if (day.includes('토') || day.toLowerCase().includes('sat')) return 'var(--color-primary)'; // 블루
-  if (day.includes('일') || day.toLowerCase().includes('sun')) return 'var(--color-error)'; // 레드
-  return 'var(--color-gray-400)'; // 그레이
+const getDayBgColor = (day: string): string => {
+  if (!day) return 'var(--color-gray-200)';
+  const lowerDay = day.toLowerCase();
+  if (day.includes('토') || lowerDay.includes('sat') || lowerDay === 'saturday') return 'var(--color-primary)'; // 블루
+  if (day.includes('일') || lowerDay.includes('sun') || lowerDay === 'sunday') return 'var(--color-error)'; // 레드
+  return 'var(--color-gray-200)'; // 연한 그레이
+};
+
+/**
+ * 요일 배지 텍스트 색상 결정 (토/일: 흰색, 나머지: 진한 그레이)
+ */
+const getDayTextColor = (day: string): string => {
+  if (!day) return 'var(--color-gray-600)';
+  const lowerDay = day.toLowerCase();
+  if (day.includes('토') || lowerDay.includes('sat') || lowerDay === 'saturday') return 'var(--color-white)';
+  if (day.includes('일') || lowerDay.includes('sun') || lowerDay === 'sunday') return 'var(--color-white)';
+  return 'var(--color-gray-600)'; // 진한 그레이 텍스트
+};
+
+/** 요일 영문→한글 약자 매핑 */
+const DAY_SHORT_LABELS: Record<string, string> = {
+  monday: '월',
+  tuesday: '화',
+  wednesday: '수',
+  thursday: '목',
+  friday: '금',
+  saturday: '토',
+  sunday: '일',
+};
+
+/** 요일 정렬 순서 (월~일) */
+const DAY_ORDER: string[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+/**
+ * 요일 문자열을 한 글자 약자로 변환
+ * "monday" → "월", "월요일" → "월", "월" → "월"
+ */
+const getDayShortLabel = (day: string): string => {
+  const lowerDay = day.toLowerCase();
+  // 영문 요일인 경우
+  if (DAY_SHORT_LABELS[lowerDay]) return DAY_SHORT_LABELS[lowerDay];
+  // 한글 요일인 경우 첫 글자만 반환 (월요일 → 월)
+  if (day.length > 0) return day.charAt(0);
+  return day;
+};
+
+/**
+ * 요일 배열을 월~일 순서로 정렬
+ */
+const sortDays = (days: string[]): string[] => {
+  return [...days].sort((a, b) => {
+    const aIndex = DAY_ORDER.indexOf(a.toLowerCase());
+    const bIndex = DAY_ORDER.indexOf(b.toLowerCase());
+    // 매핑되지 않은 요일은 뒤로 보냄
+    if (aIndex === -1) return 1;
+    if (bIndex === -1) return -1;
+    return aIndex - bIndex;
+  });
 };
 
 /**
@@ -165,19 +219,14 @@ export const EntityCard: React.FC<EntityCardProps> = ({
           {dayOfWeek && (
             <span
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 'var(--size-icon-xl)',
-                height: 'var(--size-icon-xl)',
-                borderRadius: '50%',
-                backgroundColor: getDayColor(dayOfWeek),
-                color: 'var(--color-white)',
-                fontSize: 'var(--font-size-xs)',
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-secondary)',
                 fontWeight: 'var(--font-weight-medium)',
               }}
             >
-              {dayOfWeek}
+              {Array.isArray(dayOfWeek)
+                ? sortDays(dayOfWeek).map(getDayShortLabel).join(', ')
+                : getDayShortLabel(dayOfWeek)}
             </span>
           )}
           {description && (

@@ -1637,6 +1637,8 @@ export function useAllConsultations() {
     queryKey: ['consultations', tenantId, 'all'],
     queryFn: () => fetchConsultations(tenantId!, undefined),
     enabled: !!tenantId,
+    staleTime: 5 * 60 * 1000,  // 5분 (상담 데이터는 자주 변경되지 않음)
+    gcTime: 10 * 60 * 1000,    // 10분
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
@@ -2185,6 +2187,8 @@ export function useAllStudentClasses() {
       }));
     },
     enabled: !!tenantId,
+    staleTime: 5 * 60 * 1000,  // 5분 (수업 배정은 자주 변경되지 않음)
+    gcTime: 10 * 60 * 1000,    // 10분
   });
 }
 

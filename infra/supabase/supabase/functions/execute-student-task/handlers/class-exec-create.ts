@@ -71,7 +71,7 @@ export const class_exec_createHandler: IntentHandler = {
         return {
           status: 'failed',
           error_code: 'INVALID_PARAMS',
-          message: '수업 이름이 필요합니다.',
+          message: '수업명이 필요합니다.',
         };
       }
 

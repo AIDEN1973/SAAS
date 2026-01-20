@@ -118,8 +118,8 @@ export function useCreateClass() {
           p_start_time: input.start_time || '14:00:00',
           p_end_time: input.end_time || '15:30:00',
           p_capacity: input.capacity || 20,
-          p_color: input.color,
-          p_room: input.room,
+          p_color: null,  // 색상은 RPC 함수에서 자동 할당
+          p_room: null,   // room 필드는 CreateClassInput에서 제거됨
           p_notes: input.notes,
           p_status: input.status || 'active',
           p_teacher_ids: input.teacher_ids,
@@ -166,8 +166,8 @@ export function useCreateClass() {
         p_start_time: input.start_time || '14:00:00',
         p_end_time: input.end_time || '15:30:00',
         p_capacity: input.capacity || 20,
-        p_color: input.color,
-        p_room: input.room,
+        p_color: null,  // 색상은 RPC 함수에서 자동 할당
+        p_room: null,   // room 필드는 CreateClassInput에서 제거됨
         p_notes: input.notes,
         p_status: input.status || 'active',
         p_teacher_ids: null,
@@ -324,9 +324,9 @@ export function useDeleteClass() {
         throw new Error('Tenant ID is required');
       }
 
-      // 소프트 삭제: status를 'archived'로 변경
+      // 소프트 삭제: status를 'inactive'로 변경 (ClassStatus 타입: 'active' | 'inactive')
       const response = await apiClient.patch<Class>('academy_classes', classId, {
-        status: 'archived',
+        status: 'inactive',
       });
 
       if (response.error) {
@@ -340,10 +340,10 @@ export function useDeleteClass() {
           {
             operation_type: 'class.delete',
             status: 'success',
-            summary: `${response.data.name || '수업'} 삭제 완료 (archived)`,
+            summary: `${response.data.name || '수업'} 삭제 완료 (inactive)`,
             details: {
               class_id: classId,
-              new_status: 'archived',
+              new_status: 'inactive',
             },
             reference: {
               entity_type: 'class',
@@ -938,7 +938,7 @@ export function useCheckScheduleConflicts() {
     Error,
     {
       classId?: string;
-      dayOfWeek: DayOfWeek;
+      dayOfWeek: DayOfWeek | DayOfWeek[];
       startTime: string;
       endTime: string;
       teacherIds?: string[];
@@ -950,9 +950,12 @@ export function useCheckScheduleConflicts() {
         throw new Error('Tenant ID is required');
       }
 
+      // dayOfWeek가 배열이면 첫 번째 값만 사용 (RPC 함수가 단일 값만 지원)
+      const dayOfWeek = Array.isArray(params.dayOfWeek) ? params.dayOfWeek[0] : params.dayOfWeek;
+
       const response = await apiClient.callRPC<ScheduleConflictResult>('check_schedule_conflicts', {
         p_tenant_id: tenantId,
-        p_day_of_week: params.dayOfWeek,
+        p_day_of_week: dayOfWeek,
         p_start_time: params.startTime,
         p_end_time: params.endTime,
         p_class_id: params.classId || null,

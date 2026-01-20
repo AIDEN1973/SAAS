@@ -34,6 +34,33 @@ import { TEACHERS_SUB_MENU_ITEMS, DEFAULT_TEACHERS_SUB_MENU, TEACHERS_MENU_LABEL
 import type { TeachersSubMenuId } from '../constants';
 import { templates } from '../utils';
 
+/** 요일 레이블 매핑 */
+const DAY_LABELS: Record<string, string> = {
+  monday: '월',
+  tuesday: '화',
+  wednesday: '수',
+  thursday: '목',
+  friday: '금',
+  saturday: '토',
+  sunday: '일',
+};
+
+/**
+ * 요일 배열을 표시용 문자열로 변환
+ * 단일 요일: "월"
+ * 복수 요일: "월, 화, 수"
+ */
+function formatDayOfWeek(dayOfWeek: string | string[] | null | undefined): string {
+  if (!dayOfWeek) return '-';
+
+  if (Array.isArray(dayOfWeek)) {
+    if (dayOfWeek.length === 0) return '-';
+    return dayOfWeek.map(d => DAY_LABELS[d] || d).join(', ');
+  }
+
+  return DAY_LABELS[dayOfWeek] || dayOfWeek;
+}
+
 export function TeachersPage() {
   const { showConfirm, showAlert } = useModal();
   const terms = useIndustryTerms();
@@ -540,16 +567,6 @@ function TeacherCard({
     resigned: 'var(--color-error)',
   };
 
-  const dayLabels: Record<string, string> = {
-    monday: '월',
-    tuesday: '화',
-    wednesday: '수',
-    thursday: '목',
-    friday: '금',
-    saturday: '토',
-    sunday: '일',
-  };
-
   return (
     <Card
       padding="md"
@@ -622,7 +639,7 @@ function TeacherCard({
 
       {/* P1-3: 강사 통계 카드 */}
       {stats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-xs)', marginTop: 'var(--spacing-sm)', paddingTop: 'var(--spacing-sm)', borderTop: '1px solid var(--color-border)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-xs)', marginTop: 'var(--spacing-sm)', paddingTop: 'var(--spacing-sm)', borderTop: 'var(--border-width-thin) solid var(--color-border)' }}>
           <div style={{ textAlign: 'center', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-bg-secondary)', borderRadius: 'var(--border-radius-sm)' }}>
             <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
               {stats.total_classes}
@@ -654,7 +671,7 @@ function TeacherCard({
 
       {/* P1-1: 담당 수업 목록 */}
       {assignedClasses && assignedClasses.length > 0 && (
-        <div style={{ marginTop: 'var(--spacing-sm)', paddingTop: 'var(--spacing-sm)', borderTop: '1px solid var(--color-border)' }}>
+        <div style={{ marginTop: 'var(--spacing-sm)', paddingTop: 'var(--spacing-sm)', borderTop: 'var(--border-width-thin) solid var(--color-border)' }}>
           <div style={{ fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)' }}>
             담당 {terms.GROUP_LABEL} 목록 ({assignedClasses.length})
           </div>
@@ -686,7 +703,7 @@ function TeacherCard({
                   </div>
                 </div>
                 <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                  {dayLabels[ct.academy_classes.day_of_week]} {ct.academy_classes.start_time.substring(0, 5)} ~ {ct.academy_classes.end_time.substring(0, 5)}
+                  {formatDayOfWeek(ct.academy_classes.day_of_week)} {ct.academy_classes.start_time.substring(0, 5)} ~ {ct.academy_classes.end_time.substring(0, 5)}
                   {ct.academy_classes.room && ` | ${ct.academy_classes.room}`}
                   {ct.academy_classes.subject && ` | ${ct.academy_classes.subject}`}
                 </div>
@@ -916,16 +933,6 @@ function TeacherAssignmentsTab({ terms }: { terms: ReturnType<typeof useIndustry
     );
   }
 
-  const dayLabels: Record<string, string> = {
-    monday: '월',
-    tuesday: '화',
-    wednesday: '수',
-    thursday: '목',
-    friday: '금',
-    saturday: '토',
-    sunday: '일',
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
       <Card padding="lg">
@@ -934,7 +941,7 @@ function TeacherAssignmentsTab({ terms }: { terms: ReturnType<typeof useIndustry
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
           {teachers?.filter(t => t.status === 'active').map(teacher => (
-            <TeacherAssignmentItem key={teacher.id} teacher={teacher} terms={terms} dayLabels={dayLabels} />
+            <TeacherAssignmentItem key={teacher.id} teacher={teacher} terms={terms} />
           ))}
           {teachers?.filter(t => t.status === 'active').length === 0 && (
             <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
@@ -953,11 +960,9 @@ function TeacherAssignmentsTab({ terms }: { terms: ReturnType<typeof useIndustry
 function TeacherAssignmentItem({
   teacher,
   terms,
-  dayLabels,
 }: {
   teacher: Teacher;
   terms: ReturnType<typeof useIndustryTerms>;
-  dayLabels: Record<string, string>;
 }) {
   const { data: stats } = useTeacherStatistics(teacher.id);
   const { data: assignedClasses } = useTeacherClasses(teacher.id);
@@ -1004,7 +1009,7 @@ function TeacherAssignmentItem({
             >
               <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{ct.academy_classes.name}</span>
               <span style={{ color: 'var(--color-text-secondary)', marginLeft: 'var(--spacing-xs)' }}>
-                {dayLabels[ct.academy_classes.day_of_week]} {ct.academy_classes.start_time.substring(0, 5)}
+                {formatDayOfWeek(ct.academy_classes.day_of_week)} {ct.academy_classes.start_time.substring(0, 5)}
               </span>
               {ct.role === 'assistant' && (
                 <span style={{ color: 'var(--color-warning)', marginLeft: 'var(--spacing-xs)' }}>({terms.ASSISTANT_TEACHER})</span>

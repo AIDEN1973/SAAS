@@ -231,7 +231,15 @@ export function AttendancePage() {
     const targetDayOfWeek = DAY_OF_WEEK_MAP[dayOfWeekNumber];
 
     // 해당 요일에 수업이 있는 활성 반만 필터링
-    return classes.filter(c => c.day_of_week === targetDayOfWeek && c.status === 'active');
+    // day_of_week가 배열이므로 includes로 확인
+    return classes.filter(c => {
+      const dayOfWeek = c.day_of_week;
+      // 배열인 경우 includes 사용, 단일 값인 경우 직접 비교 (하위 호환)
+      const hasDay = Array.isArray(dayOfWeek)
+        ? dayOfWeek.includes(targetDayOfWeek as typeof dayOfWeek[number])
+        : dayOfWeek === targetDayOfWeek;
+      return hasDay && c.status === 'active';
+    });
   }, [classes, selectedDate]);
 
   // 시간대별로 수업 필터링

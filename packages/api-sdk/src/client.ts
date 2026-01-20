@@ -147,6 +147,19 @@ export class ApiClient {
           delete searchFilters.name;
         }
 
+        // day_of_week 필터: 배열 컬럼이므로 contains 연산자 사용
+        // 단일 값이면 해당 요일을 포함하는 수업 찾기, 배열이면 overlaps 사용
+        if (searchFilters.day_of_week && searchFilters.day_of_week !== '') {
+          if (Array.isArray(searchFilters.day_of_week)) {
+            // 배열 필터: 주어진 요일 중 하나라도 포함하는 수업 (overlaps)
+            baseQuery = baseQuery.overlaps('day_of_week', searchFilters.day_of_week);
+          } else {
+            // 단일 값 필터: 해당 요일을 포함하는 수업 (contains)
+            baseQuery = baseQuery.contains('day_of_week', [searchFilters.day_of_week]);
+          }
+          delete searchFilters.day_of_week;
+        }
+
         // 나머지 필터 적용 (undefined, 빈 문자열은 제외)
         // null은 IS NULL 쿼리로 처리해야 하므로 별도 처리
         Object.entries(searchFilters).forEach(([key, value]) => {

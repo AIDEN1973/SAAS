@@ -173,7 +173,8 @@
       "Bash(do sed -i 's/navigate\\(newUrl, { replace: true }\\);/navigate\\(newUrl\\);/g' \"$file\")",
       "Bash(cd:*)",
       "Bash(pnpm build:*)",
-      "Bash(pnpm tsc:*)"
+      "Bash(pnpm tsc:*)",
+      "Bash(supabase db remote-commit:*)"
     ]
   }
 }

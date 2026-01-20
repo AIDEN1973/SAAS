@@ -180,8 +180,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
     boxSizing: 'border-box', // 테두리 포함 크기 계산
     fontFamily: 'var(--font-family)', // Select와 동일한 폰트
     fontSize: 'var(--font-size-base)', // Select와 동일한 폰트 크기
-    // 버튼 높이 일관성을 위해 tight lineHeight 적용 (styles.css 준수)
-    lineHeight: 'var(--line-height-tight)',
+    // Select 컴포넌트와 동일한 lineHeight 적용하여 높이 일치
+    lineHeight: 'var(--line-height)',
     ...sizeStyles[size],
     ...(fullWidth && { width: '100%' }),
   };

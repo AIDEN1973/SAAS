@@ -163,11 +163,37 @@ const AuthGuard = lazy(() => import('../../super-admin/src/components/AuthGuard'
 const AgentPage = lazy(() => import('./pages/AgentPage').then(m => ({ default: m.AgentPage })));
 const ManualPage = lazy(() => import('./pages/ManualPage').then(m => ({ default: m.ManualPage })));
 
-// 로딩 컴포넌트
+// 로딩 컴포넌트 - 스켈레톤 형태로 체감 로딩 속도 개선
 // [SSOT] 하드코딩 금지: CSS 변수 사용
 const PageLoader = () => (
-  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'var(--spacing-3xl)' }}>
-    <div>로딩 중...</div>
+  <div style={{ padding: 'var(--spacing-lg)' }}>
+    {/* 페이지 제목 스켈레톤 */}
+    <div
+      style={{
+        height: '28px',
+        width: '180px',
+        backgroundColor: 'var(--color-bg-tertiary)',
+        borderRadius: 'var(--border-radius-md)',
+        marginBottom: 'var(--spacing-lg)',
+        animation: 'pageLoaderPulse 1.5s ease-in-out infinite',
+      }}
+    />
+    {/* 콘텐츠 카드 스켈레톤 */}
+    <div
+      style={{
+        height: '160px',
+        backgroundColor: 'var(--color-bg-tertiary)',
+        borderRadius: 'var(--border-radius-lg)',
+        animation: 'pageLoaderPulse 1.5s ease-in-out infinite',
+        animationDelay: '0.2s',
+      }}
+    />
+    <style>{`
+      @keyframes pageLoaderPulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+    `}</style>
   </div>
 );
 

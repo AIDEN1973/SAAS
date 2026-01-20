@@ -74,7 +74,7 @@ export const ClassDailyCard: React.FC<ClassDailyCardProps> = ({
             <ChevronDown size={18} />
           </div>
 
-          {/* 수업 이름 */}
+          {/* 수업명 */}
           <span
             style={{
               fontSize: 'var(--font-size-base)',

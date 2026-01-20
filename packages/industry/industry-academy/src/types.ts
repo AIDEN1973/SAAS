@@ -117,7 +117,7 @@ export interface StudentFilter {
 }
 
 // 반(Class) 관리용
-export type ClassStatus = 'active' | 'inactive' | 'archived';
+export type ClassStatus = 'active' | 'inactive';
 export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 
 export interface Class {
@@ -125,13 +125,13 @@ export interface Class {
   tenant_id: string;
   name: string;
   subject?: string;
-  grade?: string;
-  day_of_week: DayOfWeek;
+  grade?: string | string[];  // 단일 또는 복수 학년 지원
+  day_of_week: DayOfWeek | DayOfWeek[];  // 단일 또는 복수 요일 지원
   start_time: string;  // time 형식 (예: "14:00:00")
   end_time: string;  // time 형식 (예: "15:30:00")
   capacity: number;
   current_count: number;
-  color: string;  // 동일 상세 태깅
+  color?: string;  // 색상 필드 optional로 변경
   room?: string;
   notes?: string;
   status: ClassStatus;
@@ -144,13 +144,11 @@ export interface Class {
 export interface CreateClassInput {
   name: string;
   subject?: string;
-  grade?: string;
-  day_of_week: DayOfWeek;
-  start_time: string;
-  end_time: string;
-  capacity: number;
-  color?: string;  // 지?하지 ?으동 ?성
-  room?: string;
+  grade?: string | string[];  // 단일 또는 복수 학년 지원
+  day_of_week?: DayOfWeek | DayOfWeek[];  // 단일 또는 복수 요일 지원 (optional)
+  start_time?: string;  // optional로 변경
+  end_time?: string;  // optional로 변경
+  capacity?: number;  // optional로 변경
   notes?: string;
   status?: ClassStatus;
   teacher_ids?: string[];  // 강사 배정 (person_id 배열)
@@ -159,13 +157,11 @@ export interface CreateClassInput {
 export interface UpdateClassInput {
   name?: string;
   subject?: string;
-  grade?: string;
-  day_of_week?: DayOfWeek;
+  grade?: string | string[];  // 단일 또는 복수 학년 지원
+  day_of_week?: DayOfWeek | DayOfWeek[];  // 단일 또는 복수 요일 지원
   start_time?: string;
   end_time?: string;
   capacity?: number;
-  color?: string;
-  room?: string;
   notes?: string;
   status?: ClassStatus;
   teacher_ids?: string[];  // 강사 배정 수정 (person_id 배열)
@@ -173,9 +169,9 @@ export interface UpdateClassInput {
 
 export interface ClassFilter {
   status?: ClassStatus | ClassStatus[];
-  day_of_week?: DayOfWeek;
+  day_of_week?: DayOfWeek | DayOfWeek[];  // 단일 또는 복수 요일 지원
   subject?: string;
-  grade?: string;
+  grade?: string | string[];  // 단일 또는 복수 학년 지원
   teacher_id?: string;
   search?: string;  // 이름 검색
 }

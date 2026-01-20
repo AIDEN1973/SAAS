@@ -37,6 +37,18 @@ export const studentTableSchema: TableSchema = {
         type: 'text',
       },
       {
+        key: 'phone',
+        label: '연락처',
+        sortable: false,
+        type: 'text',
+      },
+      {
+        key: 'attendance_number',
+        label: '출결번호',
+        sortable: true,
+        type: 'text',
+      },
+      {
         key: 'status',
         label: '상태',
         sortable: true,
@@ -48,18 +60,6 @@ export const studentTableSchema: TableSchema = {
           withdrawn: { color: 'gray', label: '퇴원' },
           graduated: { color: 'blue', label: '졸업' },
         },
-      },
-      {
-        key: 'phone',
-        label: '연락처',
-        sortable: false,
-        type: 'text',
-      },
-      {
-        key: 'attendance_number',
-        label: '출결번호',
-        sortable: true,
-        type: 'text',
       },
     ],
     rowActions: ['view', 'edit', 'delete'],

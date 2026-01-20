@@ -23,7 +23,7 @@ export const teacherFilterSchema: FilterSchema = {
         kind: 'text',
         ui: {
           label: '검색',
-          placeholder: '강사 이름 검색..',
+          placeholder: '강사명을 검색하세요.',
           colSpan: 1,
         },
       },
@@ -32,6 +32,7 @@ export const teacherFilterSchema: FilterSchema = {
         kind: 'select',
         ui: {
           label: '상태',
+          placeholder: '재직상태를 선택하세요.',
           colSpan: 1,
         },
         options: [

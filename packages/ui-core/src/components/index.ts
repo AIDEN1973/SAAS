@@ -10,6 +10,12 @@ export type { CardLayoutType } from '../contexts/CardLayoutContext';
 export { Input } from './Input';
 export type { InputProps } from './Input';
 
+export { NumberInput } from './NumberInput';
+export type { NumberInputProps } from './NumberInput';
+
+export { TimeInput } from './TimeInput';
+export type { TimeInputProps } from './TimeInput';
+
 export { AddressInput } from './AddressInput';
 export type { AddressInputProps } from './AddressInput';
 

@@ -59,6 +59,8 @@ if (import.meta.env.DEV) {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      staleTime: 60 * 1000,        // 기본 1분 (불필요한 백그라운드 리페치 방지)
+      gcTime: 10 * 60 * 1000,      // 기본 10분 (캐시 유지 시간 연장)
       refetchOnWindowFocus: false,
       retry: 1,
     },

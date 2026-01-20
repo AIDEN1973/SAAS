@@ -116,8 +116,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
     ...sizeStyles[size],
     border: 'none',
     borderRadius: 'var(--border-radius-xs)',
-    backgroundColor: 'var(--color-white)',
-    color: 'var(--color-text)',
+    backgroundColor: props.disabled ? 'var(--color-gray-100)' : 'var(--color-white)',
+    color: props.disabled ? 'var(--color-text-disabled)' : 'var(--color-text)',
     outline: 'none',
     width: fullWidth ? '100%' : 'auto',
     transition: 'var(--transition-all)',
@@ -126,19 +126,23 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
     fontWeight: 'var(--font-weight-normal)',
     lineHeight: 'var(--line-height)',
     boxSizing: 'border-box',
+    cursor: props.disabled ? 'not-allowed' : 'text',
   };
 
   // 래퍼 스타일: input을 감싸고 사방 테두리 적용 (카드 스타일과 동일)
   const wrapperStyle: React.CSSProperties = {
     position: 'relative',
     width: fullWidth ? '100%' : 'auto',
-    backgroundColor: 'var(--color-white)',
-    border: isFocused
+    backgroundColor: props.disabled ? 'var(--color-gray-100)' : 'var(--color-white)',
+    border: props.disabled
+      ? 'var(--border-width-thin) solid var(--color-gray-200)'
+      : isFocused
       ? (error ? 'var(--border-width-thin) solid var(--color-form-error)' : 'var(--border-width-thin) solid var(--color-primary)')
       : (error ? 'var(--border-width-thin) solid var(--color-form-error)' : 'var(--border-width-thin) solid var(--color-gray-200)'),
     borderRadius: 'var(--border-radius-xs)',
     boxSizing: 'border-box',
     transition: 'var(--transition-all)',
+    opacity: props.disabled ? 0.6 : 1,
   };
 
   // 래퍼 ref

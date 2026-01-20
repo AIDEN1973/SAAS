@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Card, Button, Modal, EmptyState, EntityCard, DataTable, Input, Select, useResponsiveMode, isMobile, isTablet } from '@ui-core/react';
+import { Card, Button, Modal, EmptyState, EntityCard, DataTable, Input, Select, useResponsiveMode, isMobile, isTablet, Badge } from '@ui-core/react';
 import type { DataTableColumn } from '@ui-core/react';
 import { GraduationCap, Check, LayoutGrid, List } from 'lucide-react';
 import { StatsTableLayout } from '../../../components';
@@ -32,6 +32,31 @@ const DAY_LABELS: Record<string, string> = {
   saturday: '토',
   sunday: '일',
 };
+
+/**
+ * 요일 배열을 표시용 문자열로 변환
+ * 단일 요일: "월요일"
+ * 복수 요일: "월, 화, 수요일" (마지막만 '요일' 붙임)
+ */
+function formatDayOfWeek(dayOfWeek: string | string[] | null | undefined): string {
+  if (!dayOfWeek) return '-';
+
+  if (Array.isArray(dayOfWeek)) {
+    if (dayOfWeek.length === 0) return '-';
+    if (dayOfWeek.length === 1) {
+      const label = DAY_LABELS[dayOfWeek[0]] || dayOfWeek[0];
+      return `${label}요일`;
+    }
+    // 복수 요일: 마지막만 '요일' 붙임
+    const abbreviated = dayOfWeek.slice(0, -1).map(d => DAY_LABELS[d] || d);
+    const lastDay = DAY_LABELS[dayOfWeek[dayOfWeek.length - 1]] || dayOfWeek[dayOfWeek.length - 1];
+    return [...abbreviated, `${lastDay}요일`].join(', ');
+  }
+
+  // 문자열인 경우 (레거시 호환)
+  const label = DAY_LABELS[dayOfWeek] || dayOfWeek;
+  return `${label}요일`;
+}
 
 export interface StudentClassAssignmentSubPageProps {
   // 로딩/에러 상태
@@ -81,6 +106,8 @@ export interface StudentClassAssignmentSubPageProps {
   terms: {
     PERSON_LABEL_PRIMARY: string;
     GROUP_LABEL: string;
+    SUBJECT_LABEL?: string;
+    CAPACITY_LABEL?: string;
     MESSAGES: {
       LOADING: string;
       ERROR: string;
@@ -214,7 +241,7 @@ export function StudentClassAssignmentSubPage({
   const totalStudentPages = Math.ceil(filteredStudents.length / STUDENTS_PER_PAGE);
 
 
-  // 수업배정 열이 추가된 테이블 스키마
+  // 수업배정 열이 추가된 테이블 스키마 (상태 열을 마지막으로 이동)
   const tableSchemaWithAssignment: TableSchema | undefined = useMemo(() => {
     if (!effectiveTableSchema) return undefined;
 
@@ -225,11 +252,20 @@ export function StudentClassAssignmentSubPage({
       type: 'text',
     };
 
+    // 상태 열을 분리하고 마지막에 배치
+    const originalColumns = effectiveTableSchema.table.columns;
+    const statusColumn = originalColumns.find(col => col.key === 'status');
+    const columnsWithoutStatus = originalColumns.filter(col => col.key !== 'status');
+
     return {
       ...effectiveTableSchema,
       table: {
         ...effectiveTableSchema.table,
-        columns: [...effectiveTableSchema.table.columns, assignmentColumn],
+        columns: [
+          ...columnsWithoutStatus,
+          assignmentColumn,
+          ...(statusColumn ? [statusColumn] : []),
+        ],
       },
     };
   }, [effectiveTableSchema, terms.GROUP_LABEL]);
@@ -671,7 +707,12 @@ export function StudentClassAssignmentSubPage({
                   >
                     {activeClasses.map((classItem) => {
                       const studentCount = classStudentCounts[classItem.id] || 0;
-                      const dayLabel = DAY_LABELS[classItem.day_of_week] || classItem.day_of_week;
+                      // 요일을 배열로 전달하여 개별 원형 배지로 표시
+                      const dayOfWeekArray = Array.isArray(classItem.day_of_week)
+                        ? classItem.day_of_week
+                        : classItem.day_of_week
+                          ? [classItem.day_of_week]
+                          : [];
 
                       return (
                         <EntityCard
@@ -684,7 +725,7 @@ export function StudentClassAssignmentSubPage({
                           title={classItem.name}
                           mainValue={studentCount}
                           subValue={` / ${classItem.capacity}`}
-                          dayOfWeek={dayLabel}
+                          dayOfWeek={dayOfWeekArray.length > 0 ? dayOfWeekArray : undefined}
                           description={`${classItem.start_time?.slice(0, 5)}~${classItem.end_time?.slice(0, 5)}`}
                           onClick={() => handleClassCardClick(classItem.id)}
                         />
@@ -692,64 +733,121 @@ export function StudentClassAssignmentSubPage({
                     })}
                   </div>
                 ) : (
-                  // 테이블형 보기 (DataTable 공통 컴포넌트 사용)
+                  // 테이블형 보기 (수업관리 테이블과 동일한 형식)
                   <DataTable
                     data={activeClasses.map((classItem) => ({
                       ...classItem,
                       studentCount: classStudentCounts[classItem.id] || 0,
-                      dayLabel: DAY_LABELS[classItem.day_of_week] || classItem.day_of_week,
                     }))}
+                    onRowClick={(row) => handleClassCardClick((row as Class).id)}
                     columns={[
                       {
                         key: 'subject',
-                        label: '과목',
-                        align: 'center',
-                        render: (value) => (
-                          <span style={{ fontWeight: 'var(--font-weight-bold)' }}>
-                            {(value as string) || terms.GROUP_LABEL}
-                          </span>
+                        label: terms.SUBJECT_LABEL || '과목',
+                        width: '12%',
+                        render: (_, row) => (
+                          <span>{(row as Class).subject || '-'}</span>
                         ),
                       },
                       {
                         key: 'name',
                         label: `${terms.GROUP_LABEL}명`,
-                        align: 'left',
+                        width: '18%',
+                        render: (_, row) => (
+                          <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{(row as Class).name}</span>
+                        ),
                       },
                       {
-                        key: 'studentCount',
-                        label: '인원',
-                        align: 'center',
-                        render: (value, row) => {
-                          const classData = row as Class & { studentCount: number };
-                          return `${value as number}/${classData.capacity}`;
+                        key: 'schedule',
+                        label: '일정',
+                        width: '18%',
+                        render: (_, row) => {
+                          const classItem = row as Class;
+                          const dayOfWeek = classItem.day_of_week;
+                          let dayLabelsStr: string;
+                          if (Array.isArray(dayOfWeek) && dayOfWeek.length > 0) {
+                            if (dayOfWeek.length === 1) {
+                              // 단일 요일: 전체 표기 (예: 월요일)
+                              dayLabelsStr = DAY_LABELS[dayOfWeek[0]] ? `${DAY_LABELS[dayOfWeek[0]]}요일` : dayOfWeek[0];
+                            } else {
+                              // 멀티 요일: 마지막만 전체 표기, 나머지는 첫 글자만 (예: 월, 화, 수, 목, 금요일)
+                              const abbreviated = dayOfWeek.slice(0, -1).map(d => DAY_LABELS[d] || d);
+                              const lastDay = DAY_LABELS[dayOfWeek[dayOfWeek.length - 1]] || dayOfWeek[dayOfWeek.length - 1];
+                              dayLabelsStr = [...abbreviated, `${lastDay}요일`].join(', ');
+                            }
+                          } else if (dayOfWeek) {
+                            dayLabelsStr = DAY_LABELS[dayOfWeek as string] ? `${DAY_LABELS[dayOfWeek as string]}요일` : String(dayOfWeek);
+                          } else {
+                            dayLabelsStr = '-';
+                          }
+                          return <span>{dayLabelsStr}</span>;
                         },
                       },
                       {
-                        key: 'dayLabel',
-                        label: '시간',
+                        key: 'time',
+                        label: '수업시간',
+                        width: '15%',
+                        render: (_, row) => {
+                          const classItem = row as Class;
+                          const formatTime = (time: string | null | undefined) => {
+                            if (!time) return null;
+                            const match = time.match(/^(\d{2}:\d{2})/);
+                            return match ? match[1] : time;
+                          };
+                          const startTime = formatTime(classItem.start_time);
+                          const endTime = formatTime(classItem.end_time);
+                          return (
+                            <span>
+                              {startTime && endTime ? `${startTime} ~ ${endTime}` : '-'}
+                            </span>
+                          );
+                        },
+                      },
+                      {
+                        key: 'capacity',
+                        label: terms.CAPACITY_LABEL || '정원',
+                        width: '12%',
                         align: 'center',
-                        render: (value, row) => {
-                          const classData = row as Class & { dayLabel: string };
-                          return `${value as string} ${classData.start_time?.slice(0, 5)}~${classData.end_time?.slice(0, 5)}`;
+                        render: (_, row) => {
+                          const classItem = row as Class & { studentCount: number };
+                          return (
+                            <span>
+                              {classItem.capacity ? `${classItem.studentCount || 0}/${classItem.capacity}명` : '-'}
+                            </span>
+                          );
+                        },
+                      },
+                      {
+                        key: 'teacher',
+                        label: '담당',
+                        width: '12%',
+                        render: (_, row) => {
+                          const teacherNames = (row as unknown as { teachers?: Array<{ name: string }> }).teachers;
+                          if (teacherNames && teacherNames.length > 0) {
+                            return <span>{teacherNames.map(t => t.name).join(', ')}</span>;
+                          }
+                          return <span style={{ color: 'var(--color-text-tertiary)' }}>-</span>;
                         },
                       },
                       {
                         key: 'status',
                         label: '상태',
+                        width: '10%',
                         align: 'center',
-                        render: () => (
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              width: 'var(--spacing-sm)',
-                              height: 'var(--spacing-sm)',
-                              borderRadius: '50%',
-                              backgroundColor: 'var(--color-success)',
-                            }}
-                          />
-                        ),
+                        render: (_, row) => {
+                          const isActive = (row as Class).status === 'active';
+                          return (
+                            <Badge
+                              color={isActive ? 'success' : 'gray'}
+                              variant="solid"
+                              size="sm"
+                            >
+                              {isActive ? '운영 중' : '중단'}
+                            </Badge>
+                          );
+                        },
                       },
-                    ] as DataTableColumn<Class & { studentCount: number; dayLabel: string }>[]}
+                    ] as DataTableColumn<Class & { studentCount: number }>[]}
                     keyExtractor={(row) => (row as Class).id}
                     hideFilterControls
                     stickyHeader={false}
@@ -833,7 +931,7 @@ export function StudentClassAssignmentSubPage({
               >
                 {activeClasses.map((classItem, index) => {
                   const isSelected = selectedClassIds.includes(classItem.id);
-                  const dayLabel = DAY_LABELS[classItem.day_of_week] || classItem.day_of_week;
+                  const dayLabel = formatDayOfWeek(classItem.day_of_week);
                   const studentCount = classStudentCounts[classItem.id] || 0;
                   const isLastItem = index === activeClasses.length - 1;
 

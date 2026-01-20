@@ -12,11 +12,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@lib/supabase-client';
 import { loginService, signupService } from '@core/auth';
-import type { LoginInput, OAuthLoginInput, OTPLoginInput, LoginResult, TenantSelectionResult, B2BSignupInput, SignupResult } from '@core/auth';
+import type { LoginInput, OAuthLoginInput, OTPLoginInput, LoginResult, TenantSelectionResult, B2BSignupInput, SignupResult, TenantInfo } from '@core/auth';
 import { apiClient, getApiContext } from '@api-sdk/core';
 
 /**
  * 현재 세션 조회 Hook
+ * [성능 최적화] gcTime 설정으로 캐시 보존 시간 연장
  */
 export function useSession() {
   return useQuery({
@@ -31,7 +32,8 @@ export function useSession() {
 
       return session;
     },
-    staleTime: 5 * 60 * 1000, // 5분
+    staleTime: 5 * 60 * 1000,   // 5분 (stale 상태 지속)
+    gcTime: 30 * 60 * 1000,     // 30분 (캐시 유지 시간 연장)
   });
 }
 
@@ -90,22 +92,72 @@ export function useLoginWithOTP() {
   });
 }
 
+/** localStorage 캐시 키 */
+const TENANTS_CACHE_KEY = 'user-tenants-cache';
+
+/** localStorage에서 테넌트 캐시 로드 */
+function loadTenantsFromCache(userId: string) {
+  try {
+    const cached = localStorage.getItem(TENANTS_CACHE_KEY);
+    if (!cached) return null;
+    const { userId: cachedUserId, tenants, timestamp } = JSON.parse(cached);
+    // 같은 사용자의 캐시이고, 5분 이내인 경우에만 사용
+    if (cachedUserId === userId && Date.now() - timestamp < 5 * 60 * 1000) {
+      return tenants;
+    }
+  } catch {
+    // 캐시 파싱 실패 시 무시
+  }
+  return null;
+}
+
+/** localStorage에 테넌트 캐시 저장 */
+function saveTenantsToCache(userId: string, tenants: unknown[]) {
+  try {
+    localStorage.setItem(TENANTS_CACHE_KEY, JSON.stringify({
+      userId,
+      tenants,
+      timestamp: Date.now(),
+    }));
+  } catch {
+    // 저장 실패 시 무시
+  }
+}
+
 /**
  * 사용자의 테넌트 목록 조회 Hook
+ * [성능 최적화] localStorage 캐시로 초기 로딩 시간 단축
  */
 export function useUserTenants() {
   const { data: session } = useSession();
 
-  return useQuery({
+  return useQuery<TenantInfo[]>({
     queryKey: ['auth', 'user-tenants', session?.user?.id],
-    queryFn: async () => {
+    queryFn: async (): Promise<TenantInfo[]> => {
       if (!session?.user?.id) {
         return [];
       }
-      return loginService.getUserTenants(session.user.id);
+      const tenants = await loginService.getUserTenants(session.user.id);
+      // 성공 시 캐시 저장
+      if (tenants.length > 0) {
+        saveTenantsToCache(session.user.id, tenants);
+      }
+      return tenants;
     },
     enabled: !!session?.user?.id,
     staleTime: 5 * 60 * 1000, // 5분
+    // [성능 최적화] 초기값으로 캐시된 데이터 사용 (네트워크 요청 전에 즉시 표시)
+    initialData: (): TenantInfo[] | undefined => {
+      if (!session?.user?.id) return undefined;
+      return (loadTenantsFromCache(session.user.id) as TenantInfo[] | null) || undefined;
+    },
+    initialDataUpdatedAt: () => {
+      // 캐시된 데이터가 있으면 현재 시간을 반환하여 즉시 사용
+      if (session?.user?.id && loadTenantsFromCache(session.user.id)) {
+        return Date.now();
+      }
+      return 0;
+    },
   });
 }
 
@@ -191,9 +243,44 @@ export function useResendVerificationEmail() {
   });
 }
 
+/** localStorage 캐시 키 - 역할 정보 */
+const ROLE_CACHE_KEY = 'user-role-cache';
+
+/** localStorage에서 역할 캐시 로드 */
+function loadRoleFromCache(userId: string, tenantId: string) {
+  try {
+    const cached = localStorage.getItem(ROLE_CACHE_KEY);
+    if (!cached) return null;
+    const data = JSON.parse(cached);
+    // 같은 사용자 + 테넌트의 캐시이고, 5분 이내인 경우에만 사용
+    if (data.userId === userId && data.tenantId === tenantId &&
+        Date.now() - data.timestamp < 5 * 60 * 1000) {
+      return data.role;
+    }
+  } catch {
+    // 캐시 파싱 실패 시 무시
+  }
+  return null;
+}
+
+/** localStorage에 역할 캐시 저장 */
+function saveRoleToCache(userId: string, tenantId: string, role: string | null) {
+  try {
+    localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify({
+      userId,
+      tenantId,
+      role,
+      timestamp: Date.now(),
+    }));
+  } catch {
+    // 저장 실패 시 무시
+  }
+}
+
 /**
  * 현재 테넌트에서의 사용자 역할 조회 Hook
  * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ * [성능 최적화] localStorage 캐시로 초기 로딩 시간 단축
  */
 export function useUserRole() {
   const { data: session } = useSession();
@@ -201,9 +288,9 @@ export function useUserRole() {
   const context = getApiContext();
   const tenantId = context?.tenantId;
 
-  return useQuery({
+  return useQuery<string | null>({
     queryKey: ['auth', 'user-role', session?.user?.id, tenantId],
-    queryFn: async () => {
+    queryFn: async (): Promise<string | null> => {
       console.log('[useUserRole] Fetching user role:', {
         userId: session?.user?.id,
         hasSession: !!session,
@@ -241,11 +328,13 @@ export function useUserRole() {
         limit: 1,
       });
 
+      const roleData = response.data as UserTenantRole[] | undefined;
+
       console.log('[useUserRole] Response:', {
         error: response.error,
-        data: response.data,
-        dataLength: response.data?.length,
-        role: (response.data?.[0] as UserTenantRole | undefined)?.role,
+        data: roleData,
+        dataLength: roleData?.length,
+        role: roleData?.[0]?.role,
       });
 
       if (response.error) {
@@ -254,11 +343,30 @@ export function useUserRole() {
         return null;
       }
 
-      const role = (response.data?.[0] as UserTenantRole | undefined)?.role || null;
+      const role = roleData?.[0]?.role || null;
       console.log('[useUserRole] Returning role:', role);
+
+      // 성공 시 캐시 저장
+      if (role) {
+        saveRoleToCache(session.user.id, tenantId, role);
+      }
+
       return role;
     },
     enabled: !!session?.user?.id && !!tenantId,
     staleTime: 5 * 60 * 1000, // 5분
+    gcTime: 30 * 60 * 1000,   // 30분 (캐시 유지 시간 연장)
+    // [성능 최적화] 초기값으로 캐시된 데이터 사용 (네트워크 요청 전에 즉시 표시)
+    initialData: (): string | null | undefined => {
+      if (!session?.user?.id || !tenantId) return undefined;
+      return (loadRoleFromCache(session.user.id, tenantId) as string | null) || undefined;
+    },
+    initialDataUpdatedAt: () => {
+      // 캐시된 데이터가 있으면 현재 시간을 반환하여 즉시 사용
+      if (session?.user?.id && tenantId && loadRoleFromCache(session.user.id, tenantId)) {
+        return Date.now();
+      }
+      return 0;
+    },
   });
 }

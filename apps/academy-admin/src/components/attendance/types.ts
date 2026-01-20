@@ -129,7 +129,7 @@ export interface StudentDailyAttendance {
 export interface ClassDailyAttendance {
   /** 수업 ID */
   classId: string;
-  /** 수업 이름 */
+  /** 수업명 */
   className: string;
   /** 수업 시작 시간 (HH:mm) */
   startTime: string;

@@ -10,20 +10,21 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet, DataTable, NotificationCardLayout, SubSidebar } from '@ui-core/react';
+import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, PageHeader, isMobile, isTablet, DataTable, NotificationCardLayout, SubSidebar, RightLayerMenuLayout, Badge, IconButtonGroup } from '@ui-core/react';
 // [SSOT] Barrel export를 통한 통합 import
 import { CLASSES_SUB_MENU_ITEMS, DEFAULT_CLASSES_SUB_MENU, CLASSES_MENU_LABEL_MAPPING, getSubMenuFromUrl, setSubMenuToUrl, applyDynamicLabels } from '../constants';
 import { templates, p } from '../utils';
 import type { ClassesSubMenuId } from '../constants';
-import { BookOpen, Users, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { BookOpen, Users, CheckCircle, XCircle, AlertTriangle, Trash2, Pencil } from 'lucide-react';
 import { SchemaForm } from '@schema-engine';
 import { apiClient } from '@api-sdk/core';
+import { useQuery } from '@tanstack/react-query';
+import { CreateClassForm } from './classes/components/CreateClassForm';
 import { useSchema } from '@hooks/use-schema';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { toKST } from '@lib/date-utils';
 import {
   useClasses,
-  useClass,
   useCreateClass,
   useUpdateClass,
   useDeleteClass,
@@ -161,19 +162,26 @@ export function ClassesPage() {
   });
 
   const [filter, setFilter] = useState<ClassFilter>({});
+  const [timeSlotFilter, setTimeSlotFilter] = useState<string>(''); // 시간대 필터 (클라이언트 사이드)
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingClassId, setEditingClassId] = useState<string | null>(null);
 
-  // URL 파라미터로 클래스 ID가 전달되면 자동으로 상세 모달 열기
+  // 수업 상세 레이어 메뉴 상태
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [layerMenuTab, setLayerMenuTab] = useState<'info' | 'students' | 'teachers'>('info');
+  const [isEditingInLayer, setIsEditingInLayer] = useState(false);
+
+  // URL 파라미터로 클래스 ID가 전달되면 자동으로 레이어 메뉴 열기
   useEffect(() => {
     if (urlClassId) {
-      setEditingClassId(urlClassId);
+      setSelectedClassId(urlClassId);
     }
   }, [urlClassId]);
 
-  // 상세 모달 닫을 때 URL도 업데이트
-  const handleCloseEditModal = useCallback(() => {
-    setEditingClassId(null);
+  // 레이어 메뉴 닫을 때 URL도 업데이트
+  const handleCloseLayerMenu = useCallback(() => {
+    setSelectedClassId(null);
+    setIsEditingInLayer(false);
+    setLayerMenuTab('info');
     // URL에서 ID가 있었다면 기본 classes 페이지로 이동
     if (urlClassId) {
       navigate('/classes', { replace: true });
@@ -234,10 +242,57 @@ export function ClassesPage() {
     ...todayFilter,
     search: todayFilter.search?.trim() || undefined, // 빈 문자열이면 undefined로 변환
   });
+
+  // 시간대 필터링 (클라이언트 사이드)
+  const filteredClasses = useMemo(() => {
+    if (!classes) return [];
+    if (!timeSlotFilter) return classes;
+
+    return classes.filter((classItem) => {
+      if (!classItem.start_time) return false;
+      const hour = parseInt(classItem.start_time.split(':')[0], 10);
+
+      switch (timeSlotFilter) {
+        case 'morning':
+          return hour >= 6 && hour < 12;
+        case 'afternoon':
+          return hour >= 12 && hour < 18;
+        case 'evening':
+          return hour >= 18 && hour < 24;
+        default:
+          return true;
+      }
+    });
+  }, [classes, timeSlotFilter]);
+
   const { data: teachers } = useTeachers();
   const createClass = useCreateClass();
   const updateClass = useUpdateClass();
   const deleteClass = useDeleteClass();
+
+  // 선택된 수업 데이터 (레이어 메뉴용) - 이미 로드된 classes 배열에서 찾아서 즉시 표시 (API 호출 없음)
+  const selectedClass = useMemo(() => {
+    if (!selectedClassId || !classes) return null;
+    return classes.find((c) => c.id === selectedClassId) || null;
+  }, [selectedClassId, classes]);
+  const selectedClassLoading = isLoading; // classes 로딩 상태와 동기화
+
+  // 강사 목록은 별도 API 호출 필요 (class_teachers 테이블 조회)
+  const { data: selectedClassTeachers, isLoading: selectedClassTeachersLoading } = useClassTeachers(selectedClassId || '');
+
+  // 수업 선택 핸들러
+  const handleClassSelect = useCallback((classId: string | null) => {
+    setSelectedClassId(classId);
+    setIsEditingInLayer(false);
+    if (classId) {
+      setLayerMenuTab('info'); // 새 수업 선택 시 기본 탭으로 리셋
+    }
+  }, []);
+
+  // 탭 변경 핸들러
+  const handleTabChange = useCallback((tab: 'info' | 'students' | 'teachers') => {
+    setLayerMenuTab(tab);
+  }, []);
 
   // Schema Registry 연동 (아키텍처 문서 S3 참조)
   const { data: classFormSchemaData } = useSchema('class', createClassFormSchema(teachers || [], terms), 'form');
@@ -283,7 +338,7 @@ export function ClassesPage() {
   const handleCreateClass = async (input: CreateClassInput) => {
     try {
       // 시간 범위 검증
-      if (input.start_time >= input.end_time) {
+      if (input.start_time && input.end_time && input.start_time >= input.end_time) {
         showAlert('시작 시간은 종료 시간보다 빨라야 합니다.', '입력 오류', 'error');
         return;
       }
@@ -292,11 +347,10 @@ export function ClassesPage() {
       // Note: RPC 함수가 없어도 수업 생성은 계속 진행
       try {
         const conflictResult = await checkConflicts.mutateAsync({
-          dayOfWeek: input.day_of_week,
-          startTime: input.start_time,
-          endTime: input.end_time,
+          dayOfWeek: input.day_of_week || [],
+          startTime: input.start_time || '',
+          endTime: input.end_time || '',
           teacherIds: input.teacher_ids,
-          room: input.room,
         });
 
         // 충돌이 있으면 사용자 확인
@@ -340,7 +394,7 @@ export function ClassesPage() {
 
       // 일정 변경이 있으면 충돌 감지
       // Note: 161_fix_student_classes_status_column.sql migration 적용 완료
-      if (input.day_of_week || input.start_time || input.end_time || input.teacher_ids || input.room) {
+      if (input.day_of_week || input.start_time || input.end_time || input.teacher_ids) {
         const classData = classes?.find((c) => c.id === classId);
         if (classData) {
           try {
@@ -350,7 +404,6 @@ export function ClassesPage() {
               startTime: input.start_time || classData.start_time,
               endTime: input.end_time || classData.end_time,
               teacherIds: input.teacher_ids,
-              room: input.room || classData.room,
             });
 
             if (conflictResult.has_conflicts) {
@@ -373,7 +426,7 @@ export function ClassesPage() {
       }
 
       await updateClass.mutateAsync({ classId, input });
-      handleCloseEditModal();
+      setIsEditingInLayer(false);
     } catch (error) {
       // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
       showAlert(
@@ -401,7 +454,120 @@ export function ClassesPage() {
         )}
 
         {/* 메인 콘텐츠 */}
-        <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
+        <div style={{ flex: 1 }}>
+          <RightLayerMenuLayout
+            layerMenu={{
+              isOpen: !!selectedClassId,
+              onClose: handleCloseLayerMenu,
+              // 중요: 내용 변경 감지를 위해 selectedClassId를 contentKey로 전달
+              contentKey: selectedClassId || undefined,
+              // 중요: 수업 상세 레이어 메뉴는 모달 레벨의 z-index를 가져야 함
+              style: {
+                zIndex: 'var(--z-modal)',
+              },
+              title: selectedClassLoading ? '로딩 중...' : selectedClass ? (
+                <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 'var(--spacing-sm)', minWidth: 0 }}>
+                  <span
+                    style={{
+                      fontSize: 'var(--font-size-3xl)',
+                      fontWeight: 'var(--font-weight-extrabold)',
+                      lineHeight: 'var(--line-height-tight)',
+                      color: 'var(--color-text)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      maxWidth: '100%',
+                    }}
+                  >
+                    {selectedClass.name}
+                  </span>
+                  <span style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                    {terms.GROUP_LABEL} 상세정보
+                  </span>
+                </span>
+              ) : `${terms.GROUP_LABEL} 상세`,
+              children: selectedClassLoading ? (
+                <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
+                  로딩 중...
+                </div>
+              ) : selectedClass ? (
+                <div style={{ display: 'flex', flexDirection: 'column', height: 'var(--height-full)' }}>
+                  {/* 탭 버튼 */}
+                  <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginTop: 'calc(var(--spacing-xl) - var(--spacing-lg))', flexWrap: 'wrap' }}>
+                    <Button
+                      variant={layerMenuTab === 'info' ? 'solid' : 'outline'}
+                      size="sm"
+                      onClick={() => handleTabChange('info')}
+                    >
+                      기본정보
+                    </Button>
+                    <Button
+                      variant={layerMenuTab === 'students' ? 'solid' : 'outline'}
+                      size="sm"
+                      onClick={() => handleTabChange('students')}
+                    >
+                      {terms.PERSON_LABEL_PRIMARY} ({selectedClass.current_count || 0})
+                    </Button>
+                    <Button
+                      variant={layerMenuTab === 'teachers' ? 'solid' : 'outline'}
+                      size="sm"
+                      onClick={() => handleTabChange('teachers')}
+                    >
+                      담당강사 ({selectedClassTeachers?.length || 0})
+                    </Button>
+                  </div>
+                  {/* 구분선 */}
+                  <div style={{ borderBottom: 'var(--border-width-thin) solid var(--color-border)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }} />
+                  {/* 탭 내용 */}
+                  <div className="academyAdmin-hiddenScrollbar" style={{ flex: 1, overflowY: 'auto' }}>
+                    {layerMenuTab === 'info' && (
+                      <ClassInfoTab
+                        classData={selectedClass}
+                        isEditing={isEditingInLayer}
+                        effectiveFormSchema={effectiveFormSchema}
+                        onEdit={() => setIsEditingInLayer(true)}
+                        onCancel={() => setIsEditingInLayer(false)}
+                        onSave={handleUpdateClass}
+                        onDelete={async () => {
+                          const confirmed = await showConfirm(
+                            `정말 이 ${terms.GROUP_LABEL}${p.을를(terms.GROUP_LABEL)} 삭제하시겠습니까?`,
+                            `${terms.GROUP_LABEL} 삭제`
+                          );
+                          if (confirmed) {
+                            try {
+                              await deleteClass.mutateAsync(selectedClass.id);
+                              handleCloseLayerMenu();
+                            } catch (err) {
+                              showAlert(
+                                err instanceof Error ? err.message : `${terms.GROUP_LABEL} 삭제에 실패했습니다.`,
+                                '오류',
+                                'error'
+                              );
+                            }
+                          }
+                        }}
+                      />
+                    )}
+                    {layerMenuTab === 'students' && (
+                      <ClassStudentsTab classId={selectedClass.id} />
+                    )}
+                    {layerMenuTab === 'teachers' && (
+                      <ClassTeachersTab
+                        classTeachers={selectedClassTeachers || []}
+                        isLoading={selectedClassTeachersLoading}
+                        allTeachers={teachers || []}
+                      />
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
+                  {terms.GROUP_LABEL} 정보를 불러올 수 없습니다.
+                </div>
+              ),
+            }}
+          >
+          <Container maxWidth="xl" padding="lg">
           <PageHeader
             title={subMenuItemsWithDynamicLabels.find(item => item.id === selectedSubMenu)?.label || templates.management(terms.GROUP_LABEL)}
             actions={
@@ -444,37 +610,6 @@ export function ClassesPage() {
               {/* 통계 카드 */}
               <StatisticsCards />
 
-              {/* 수업 생성 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
-          {showCreateForm && (
-            <>
-              {isMobileMode || isTabletMode ? (
-                // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
-                <Drawer
-                  isOpen={showCreateForm}
-                  onClose={() => setShowCreateForm(false)}
-                  title={`${terms.GROUP_LABEL} 생성`}
-                  position={isMobileMode ? 'bottom' : 'right'}
-                  width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
-                >
-                  <CreateClassForm
-                    effectiveFormSchema={effectiveFormSchema}
-                    onSubmit={handleCreateClass}
-                    onCancel={() => setShowCreateForm(false)}
-                  />
-                </Drawer>
-              ) : (
-                // 데스크톱: 인라인 폼 (기존 방식)
-                <CreateClassForm
-                  effectiveFormSchema={effectiveFormSchema}
-                  onSubmit={(input) => {
-                    void handleCreateClass(input);
-                  }}
-                  onCancel={() => setShowCreateForm(false)}
-                />
-              )}
-            </>
-          )}
-
           {/* 수업 목록 또는 캘린더 뷰 */}
           {isLoading ? (
             <Card padding="lg">
@@ -490,173 +625,196 @@ export function ClassesPage() {
             </Card>
           ) : (
             <DataTable
-              data={classes || []}
+              data={filteredClasses}
+              onRowClick={(classItem) => handleClassSelect(classItem.id)}
               filters={[
                 {
                   type: 'text',
                   columnKey: 'search',
                   label: '검색',
-                  placeholder: `${terms.GROUP_LABEL} 이름 검색`,
+                  placeholder: `${terms.GROUP_LABEL}명을 검색하세요.`,
                 },
                 {
                   type: 'select',
-                  columnKey: 'status',
-                  label: '상태',
+                  columnKey: 'subject',
+                  label: terms.SUBJECT_LABEL || '과목',
+                  placeholder: '과목을 선택하세요.',
                   options: [
-                    { value: '', label: '전체 상태' },
-                    { value: 'active', label: '활성' },
-                    { value: 'inactive', label: '비활성' },
-                    { value: 'completed', label: '완료' },
+                    { value: '', label: '전체' },
+                    { value: '국어', label: '국어' },
+                    { value: '영어', label: '영어' },
+                    { value: '수학', label: '수학' },
+                    { value: '과학', label: '과학' },
                   ],
                 },
                 {
                   type: 'select',
                   columnKey: 'day_of_week',
                   label: '요일',
+                  placeholder: '요일을 선택하세요.',
                   options: [
-                    { value: '', label: '전체 요일' },
+                    { value: '', label: '전체' },
                     ...DAYS_OF_WEEK.map(d => ({ value: d.value, label: d.label })),
+                  ],
+                },
+                {
+                  type: 'select',
+                  columnKey: 'time_slot',
+                  label: '시간대',
+                  placeholder: '시간대를 선택하세요.',
+                  options: [
+                    { value: '', label: '전체' },
+                    { value: 'morning', label: '오전 (06~12시)' },
+                    { value: 'afternoon', label: '오후 (12~18시)' },
+                    { value: 'evening', label: '저녁 (18~24시)' },
+                  ],
+                },
+                {
+                  type: 'select',
+                  columnKey: 'status',
+                  label: '상태',
+                  placeholder: '상태를 선택하세요.',
+                  options: [
+                    { value: '', label: '전체' },
+                    { value: 'active', label: '운영 중' },
+                    { value: 'inactive', label: '중단' },
                   ],
                 },
               ]}
               initialFilterState={{
                 search: { text: filter.search || '' },
+                subject: { selected: filter.subject || '' },
+                day_of_week: { selected: typeof filter.day_of_week === 'string' ? filter.day_of_week : '' },
+                time_slot: { selected: timeSlotFilter },
                 status: { selected: typeof filter.status === 'string' ? filter.status : '' },
-                day_of_week: { selected: filter.day_of_week || '' },
               }}
               onFilterChange={(filterState) => {
                 if (filterState.search?.text !== undefined) {
                   setFilter(prev => ({ ...prev, search: filterState.search.text }));
                 }
-                if (filterState.status?.selected !== undefined) {
-                  setFilter(prev => ({ ...prev, status: filterState.status.selected as ClassStatus | undefined }));
+                if (filterState.subject?.selected !== undefined) {
+                  setFilter(prev => ({ ...prev, subject: filterState.subject.selected || undefined }));
                 }
                 if (filterState.day_of_week?.selected !== undefined) {
                   setFilter(prev => ({ ...prev, day_of_week: filterState.day_of_week.selected as DayOfWeek | undefined }));
+                }
+                if (filterState.time_slot?.selected !== undefined) {
+                  setTimeSlotFilter(filterState.time_slot.selected || '');
+                }
+                if (filterState.status?.selected !== undefined) {
+                  setFilter(prev => ({ ...prev, status: filterState.status.selected as ClassStatus | undefined }));
                 }
               }}
               enableClientSideFiltering={false}
               columns={[
                 {
-                  key: 'name',
-                  label: `${terms.GROUP_LABEL} 이름`,
-                  width: '20%',
+                  key: 'subject',
+                  label: terms.SUBJECT_LABEL || '과목',
+                  width: '12%',
                   render: (_, classItem) => (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-                      <div
-                        style={{
-                          width: 'var(--spacing-sm)',
-                          height: '100%',
-                          backgroundColor: classItem.color,
-                          borderRadius: 'var(--border-radius-sm)',
-                          minHeight: 'var(--spacing-lg)',
-                        }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 'var(--font-weight-semibold)' }}>{classItem.name}</div>
-                        {classItem.subject && (
-                          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                            {classItem.subject}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    <span>{classItem.subject || '-'}</span>
+                  ),
+                },
+                {
+                  key: 'name',
+                  label: `${terms.GROUP_LABEL}명`,
+                  width: '18%',
+                  render: (_, classItem) => (
+                    <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{classItem.name}</span>
                   ),
                 },
                 {
                   key: 'schedule',
                   label: '일정',
-                  width: '20%',
+                  width: '18%',
                   render: (_, classItem) => {
-                    const dayLabel = DAYS_OF_WEEK.find((d) => d.value === classItem.day_of_week)?.label || classItem.day_of_week;
+                    // day_of_week가 배열인 경우 처리
+                    // 멀티 요일: "월, 화, 수, 목, 금요일" 형식 (마지막만 전체 표기)
+                    const dayOfWeek = classItem.day_of_week;
+                    let dayLabels: string;
+                    if (Array.isArray(dayOfWeek) && dayOfWeek.length > 0) {
+                      if (dayOfWeek.length === 1) {
+                        // 단일 요일: 전체 표기 (예: 월요일)
+                        dayLabels = DAYS_OF_WEEK.find((day) => day.value === dayOfWeek[0])?.label || dayOfWeek[0];
+                      } else {
+                        // 멀티 요일: 마지막만 전체 표기, 나머지는 첫 글자만 (예: 월, 화, 수, 목, 금요일)
+                        const abbreviated = dayOfWeek.slice(0, -1).map(d => {
+                          const label = DAYS_OF_WEEK.find((day) => day.value === d)?.label || d;
+                          return label.charAt(0); // 첫 글자만 (월, 화, 수, 목, 금, 토, 일)
+                        });
+                        const lastDay = DAYS_OF_WEEK.find((day) => day.value === dayOfWeek[dayOfWeek.length - 1])?.label || dayOfWeek[dayOfWeek.length - 1];
+                        dayLabels = [...abbreviated, lastDay].join(', ');
+                      }
+                    } else if (dayOfWeek) {
+                      // 단일 값 (배열이 아닌 경우)
+                      dayLabels = DAYS_OF_WEEK.find((d) => d.value === dayOfWeek)?.label || String(dayOfWeek);
+                    } else {
+                      dayLabels = '-';
+                    }
+                    return <span>{dayLabels}</span>;
+                  },
+                },
+                {
+                  key: 'time',
+                  label: '수업시간',
+                  width: '18%',
+                  render: (_, classItem) => {
+                    // HH:mm:ss 형식에서 HH:mm만 추출
+                    const formatTime = (time: string | null | undefined) => {
+                      if (!time) return null;
+                      const match = time.match(/^(\d{2}:\d{2})/);
+                      return match ? match[1] : time;
+                    };
+                    const startTime = formatTime(classItem.start_time);
+                    const endTime = formatTime(classItem.end_time);
                     return (
-                      <div>
-                        <div>{dayLabel}</div>
-                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                          {classItem.start_time} ~ {classItem.end_time}
-                        </div>
-                      </div>
+                      <span>
+                        {startTime && endTime ? `${startTime} ~ ${endTime}` : '-'}
+                      </span>
                     );
                   },
                 },
                 {
                   key: 'capacity',
                   label: `${terms.CAPACITY_LABEL}`,
-                  width: '15%',
+                  width: '12%',
                   align: 'center',
                   render: (_, classItem) => (
-                    <div>
-                      <div style={{ fontWeight: 'var(--font-weight-semibold)' }}>
-                        {classItem.current_count} / {classItem.capacity}
-                      </div>
-                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                        {((classItem.current_count / classItem.capacity) * 100).toFixed(0)}%
-                      </div>
-                    </div>
+                    <span>
+                      {classItem.capacity ? `${classItem.current_count || 0}/${classItem.capacity}명` : '-'}
+                    </span>
                   ),
                 },
                 {
-                  key: 'room',
-                  label: '강의실',
-                  width: '15%',
-                  align: 'center',
-                  render: (value) => (value ? String(value) : '-'),
+                  key: 'teacher',
+                  label: '담당',
+                  width: '12%',
+                  render: (_, classItem) => {
+                    // classItem에 teachers 정보가 있으면 표시, 없으면 - 표시
+                    const teacherNames = (classItem as unknown as { teachers?: Array<{ name: string }> }).teachers;
+                    if (teacherNames && teacherNames.length > 0) {
+                      return <span>{teacherNames.map(t => t.name).join(', ')}</span>;
+                    }
+                    return <span style={{ color: 'var(--color-text-tertiary)' }}>-</span>;
+                  },
                 },
                 {
                   key: 'status',
                   label: '상태',
                   width: '10%',
                   align: 'center',
-                  render: (_, classItem) => (
-                    <span
-                      style={{
-                        padding: 'var(--spacing-2xs) var(--spacing-xs)',
-                        borderRadius: 'var(--border-radius-sm)',
-                        fontSize: 'var(--font-size-sm)',
-                        fontWeight: 'var(--font-weight-medium)',
-                        backgroundColor: classItem.status === 'active' ? 'var(--color-success-50)' : 'var(--color-gray-100)',
-                        color: classItem.status === 'active' ? 'var(--color-success-700)' : 'var(--color-text-secondary)',
-                      }}
-                    >
-                      {classItem.status === 'active' ? '활성' : classItem.status === 'inactive' ? '비활성' : '완료'}
-                    </span>
-                  ),
-                },
-                {
-                  key: 'actions',
-                  label: '작업',
-                  width: '20%',
-                  align: 'right',
-                  render: (_, classItem) => (
-                    <div style={{ display: 'flex', gap: 'var(--spacing-xs)', justifyContent: 'flex-end' }}>
-                      <Button size="xs" variant="outline" onClick={() => setEditingClassId(classItem.id)}>
-                        수정
-                      </Button>
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        onClick={async () => {
-                          const confirmed = await showConfirm(
-                            `정말 이 ${terms.GROUP_LABEL}${p.을를(terms.GROUP_LABEL)} 삭제하시겠습니까?`,
-                            `${terms.GROUP_LABEL} 삭제`
-                          );
-                          if (confirmed) {
-                            try {
-                              await deleteClass.mutateAsync(classItem.id);
-                            } catch (error) {
-                              showAlert(
-                                error instanceof Error ? error.message : `${terms.GROUP_LABEL} 삭제에 실패했습니다.`,
-                                '오류',
-                                'error'
-                              );
-                            }
-                          }
-                        }}
+                  render: (_, classItem) => {
+                    const isActive = classItem.status === 'active';
+                    return (
+                      <Badge
+                        color={isActive ? 'success' : 'gray'}
+                        variant="solid"
+                        size="sm"
                       >
-                        삭제
-                      </Button>
-                    </div>
-                  ),
+                        {isActive ? '운영 중' : '중단'}
+                      </Badge>
+                    );
+                  },
                 },
               ]}
             />
@@ -674,7 +832,7 @@ export function ClassesPage() {
                   </div>
                 </Card>
               ) : (
-                <ClassCalendarView classes={classes || []} />
+                <ClassCalendarView classes={classes || []} onClassSelect={handleClassSelect} />
               )}
             </>
           )}
@@ -693,392 +851,714 @@ export function ClassesPage() {
             </>
           )}
 
-          {/* 수업 수정 모달 */}
-          {editingClassId && (
-            <EditClassModal
-              classId={editingClassId}
-              teachers={teachers || []}
-              onSave={handleUpdateClass}
-              onClose={handleCloseEditModal}
-            />
-          )}
+          {/* [업종중립] 수업 등록 폼 - 모달로 표시 (학생관리 > 학생등록 모달과 동일한 스타일) */}
+          {showCreateForm && (() => {
+            let triggerSubmit: (() => void) | null = null;
+            return (
+              <Modal
+                isOpen={showCreateForm}
+                onClose={() => setShowCreateForm(false)}
+                title={`${terms.GROUP_LABEL}생성`}
+                size="lg"
+                footer={
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowCreateForm(false)}
+                      style={{ flex: 1 }}
+                    >
+                      취소
+                    </Button>
+                    <Button
+                      variant="solid"
+                      color="primary"
+                      onClick={() => triggerSubmit?.()}
+                      style={{ flex: 1 }}
+                    >
+                      저장
+                    </Button>
+                  </>
+                }
+              >
+                <CreateClassForm
+                  onClose={() => setShowCreateForm(false)}
+                  onSubmit={async (data) => {
+                    await handleCreateClass(data);
+                  }}
+                  effectiveFormSchema={effectiveFormSchema}
+                  onSubmitTrigger={(fn) => { triggerSubmit = fn; }}
+                />
+              </Modal>
+            );
+          })()}
         </Container>
+        </RightLayerMenuLayout>
+        </div>
       </div>
     </ErrorBoundary>
   );
 }
 
 /**
- * 수업 생성 폼
+ * 수업 기본정보 탭 컴포넌트
  */
-function CreateClassForm({
+function ClassInfoTab({
+  classData,
+  isEditing,
   effectiveFormSchema,
-  onSubmit,
+  onEdit,
+  onDelete,
   onCancel,
+  onSave,
 }: {
+  classData: Class;
+  isEditing: boolean;
   effectiveFormSchema: FormSchema;
-  onSubmit: (input: CreateClassInput) => void;
+  onEdit: () => void;
+  onDelete: () => void;
   onCancel: () => void;
+  onSave: (classId: string, input: UpdateClassInput) => Promise<void>;
 }) {
-  const mode = useResponsiveMode();
   const terms = useIndustryTerms();
-  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
+  const mode = useResponsiveMode();
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
-  const isTabletMode = isTablet(modeUpper);
-  const showHeader = !isMobileMode && !isTabletMode;
+  const dayLabel = Array.isArray(classData.day_of_week)
+    ? classData.day_of_week.map(d => DAYS_OF_WEEK.find((day) => day.value === d)?.label || d).join(', ')
+    : DAYS_OF_WEEK.find((d) => d.value === classData.day_of_week)?.label || classData.day_of_week;
 
-  const handleSubmit = (data: Record<string, unknown>) => {
-    // 스키마에서 받은 데이터를 CreateClassInput 형식으로 변환
-    const input: CreateClassInput = {
-      name: String(data.name ?? ''),
-      subject: data.subject ? String(data.subject) : undefined,
-      grade: data.grade ? String(data.grade) : undefined,
-      day_of_week: (data.day_of_week || 'monday') as DayOfWeek,
-      start_time: String(data.start_time ?? '14:00'),
-      end_time: String(data.end_time ?? '15:30'),
-      capacity: Number(data.capacity ?? 20),
-      color: data.color ? String(data.color) : undefined,
-      room: data.room ? String(data.room) : undefined,
-      notes: data.notes ? String(data.notes) : undefined,
-      status: (data.status || 'active') as ClassStatus,
-      teacher_ids: data.teacher_ids && Array.isArray(data.teacher_ids) && data.teacher_ids.length > 0
-        ? data.teacher_ids
-        : undefined,
+  const gradeLabel = Array.isArray(classData.grade)
+    ? classData.grade.join(', ')
+    : classData.grade || '-';
+
+  const formDefaultValues = useMemo(() => {
+    // subject 값이 기본 옵션에 없으면 직접입력으로 처리
+    const predefinedSubjects = ['국어', '영어', '수학', '과학'];
+    const isCustomSubject = classData.subject && !predefinedSubjects.includes(classData.subject);
+
+    return {
+      name: classData.name || '',
+      subject: isCustomSubject ? '__custom__' : (classData.subject || ''),
+      subject_custom: isCustomSubject ? classData.subject : '',
+      grade: classData.grade || undefined,
+      day_of_week: classData.day_of_week || undefined,
+      start_time: classData.start_time?.substring(0, 5) || '14:00',
+      end_time: classData.end_time?.substring(0, 5) || '15:30',
+      capacity: classData.capacity || 20,
+      notes: classData.notes || '',
+      status: classData.status || 'active',
     };
-    onSubmit(input);
-  };
+  }, [classData]);
 
+  const editSchema = useMemo(() => ({
+    ...effectiveFormSchema,
+    form: {
+      ...effectiveFormSchema.form,
+      submit: {
+        label: '저장',
+        variant: 'solid' as const,
+        color: 'primary' as const,
+        size: 'md' as const,
+      },
+    },
+  }), [effectiveFormSchema]);
+
+  const readOnlyFields = useMemo(() => [
+    { label: `${terms.GROUP_LABEL}명`, value: classData.name || '-' },
+    { label: '과목', value: classData.subject || '-' },
+    { label: '요일', value: dayLabel },
+    { label: '시간', value: `${classData.start_time?.substring(0, 5) || ''} ~ ${classData.end_time?.substring(0, 5) || ''}` },
+    { label: terms.CAPACITY_LABEL, value: `${classData.current_count} / ${classData.capacity}명 (${((classData.current_count / classData.capacity) * 100).toFixed(0)}%)` },
+    { label: '학년', value: gradeLabel },
+    { label: '운영 상태', value: classData.status === 'active' ? '운영 중' : '중단' },
+    { label: '메모', value: classData.notes || '-', colSpan: 2 },
+  ], [classData, dayLabel, gradeLabel, terms]);
+
+  const handleSubmit = useCallback(async (data: Record<string, unknown>) => {
+    // subject: 직접입력 선택 시 subject_custom 값 사용
+    const subjectValue = data.subject === '__custom__'
+      ? (data.subject_custom ? String(data.subject_custom) : undefined)
+      : (data.subject ? String(data.subject) : undefined);
+
+    const input: UpdateClassInput = {
+      name: data.name ? String(data.name) : undefined,
+      subject: subjectValue,
+      // grade: 배열 또는 단일 값 지원
+      grade: data.grade && Array.isArray(data.grade) && data.grade.length > 0
+        ? data.grade
+        : data.grade
+        ? String(data.grade)
+        : undefined,
+      // day_of_week: 배열 또는 단일 값 지원
+      day_of_week: data.day_of_week && Array.isArray(data.day_of_week) && data.day_of_week.length > 0
+        ? data.day_of_week as DayOfWeek[]
+        : data.day_of_week
+        ? data.day_of_week as DayOfWeek
+        : undefined,
+      start_time: data.start_time ? `${String(data.start_time)}:00` : undefined,
+      end_time: data.end_time ? `${String(data.end_time)}:00` : undefined,
+      capacity: data.capacity ? Number(data.capacity) : undefined,
+      notes: data.notes ? String(data.notes) : undefined,
+      status: data.status as ClassStatus | undefined,
+    };
+    await onSave(classData.id, input);
+  }, [classData.id, onSave]);
+
+  if (!isEditing) {
+    return (
+      <div>
+        <Card padding="md">
+          {/* 수정폼과 동일한 2열 그리드 레이아웃, 텍스트만 출력 */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: isMobileMode ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+              gap: 'var(--spacing-md)',
+            }}
+          >
+            {readOnlyFields.map((field, idx) => (
+              <div
+                key={idx}
+                style={{
+                  gridColumn: field.colSpan === 2 ? (isMobileMode ? 'span 1' : 'span 2') : undefined,
+                  display: 'flex',
+                  width: '100%',
+                  alignItems: field.label === '메모' ? 'flex-start' : 'center',
+                  paddingTop: 'var(--spacing-sm)',
+                  paddingBottom: 'var(--spacing-sm)',
+                  paddingLeft: 'var(--spacing-form-horizontal-left)',
+                  paddingRight: 'var(--spacing-form-horizontal-right)',
+                  borderBottom: 'var(--border-width-thin) solid var(--color-table-row-border)',
+                }}
+              >
+                <span
+                  style={{
+                    color: 'var(--color-form-inline-label)',
+                    fontSize: 'var(--font-size-base)',
+                    fontFamily: 'var(--font-family)',
+                    fontWeight: 'var(--font-weight-normal)',
+                    lineHeight: 'var(--line-height)',
+                    minWidth: 'var(--width-form-inline-label)',
+                    flexShrink: 0,
+                    marginRight: 'var(--spacing-form-inline-label-gap)',
+                  }}
+                >
+                  {field.label}
+                </span>
+                <span
+                  style={{
+                    color: 'var(--color-text)',
+                    fontSize: 'var(--font-size-base)',
+                    fontFamily: 'var(--font-family)',
+                    fontWeight: 'var(--font-weight-normal)',
+                    lineHeight: 'var(--line-height)',
+                    whiteSpace: field.label === '메모' ? 'pre-wrap' : 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {field.value}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 'var(--spacing-md)', display: 'flex', justifyContent: 'flex-end' }}>
+            <IconButtonGroup
+              align="right"
+              items={[
+                {
+                  icon: Trash2,
+                  tooltip: '삭제',
+                  variant: 'outline' as const,
+                  color: 'error' as const,
+                  onClick: onDelete,
+                },
+                {
+                  icon: Pencil,
+                  tooltip: '수정',
+                  variant: 'outline' as const,
+                  onClick: onEdit,
+                },
+              ]}
+            />
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // 수정 모드
   return (
-    <div style={showHeader ? { marginBottom: 'var(--spacing-md)' } : {}}>
-      {showHeader && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>{terms.GROUP_LABEL} 생성</h3>
-          <Button variant="ghost" size="sm" onClick={onCancel}>
-            취소
-          </Button>
-        </div>
-      )}
+    <div>
       <SchemaForm
-        schema={effectiveFormSchema}
+        schema={editSchema}
+        defaultValues={formDefaultValues}
         onSubmit={handleSubmit}
-        defaultValues={{
-          day_of_week: 'monday',
-          start_time: '14:00',
-          end_time: '15:30',
-          capacity: 20,
-          status: 'active',
-        }}
-        actionContext={{
-          apiCall: async (endpoint: string, method: string, body?: unknown) => {
-            if (method === 'POST') {
-              const response = await apiClient.post(endpoint, body as Record<string, unknown>);
-              if (response.error) {
-                throw new Error(response.error.message);
-              }
-              return response.data;
-            }
-            const response = await apiClient.get(endpoint);
-            if (response.error) {
-              throw new Error(response.error.message);
-            }
-            return response.data;
-          },
-        }}
+        onCancel={onCancel}
+        disableCardPadding={false}
+        cardTitle={undefined}
       />
     </div>
   );
 }
 
 /**
- * 수업 수정 모달
+ * 수업 수강생 탭 컴포넌트
  */
-function EditClassModal({
-  classId,
-  teachers,
-  onSave,
-  onClose,
-}: {
-  classId: string;
-  teachers: Teacher[];
-  onSave: (classId: string, input: UpdateClassInput) => Promise<void>;
-  onClose: () => void;
-}) {
-  const { showAlert } = useModal();
-  const mode = useResponsiveMode();
+function ClassStudentsTab({ classId }: { classId: string }) {
   const terms = useIndustryTerms();
-  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
-  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
-  const isMobileMode = isMobile(modeUpper);
-  const isTabletMode = isTablet(modeUpper);
-  const { data: classData, isLoading } = useClass(classId);
-  const { data: classTeachers } = useClassTeachers(classId);
+  // [예외] classId 기반 student_classes 조회는 아직 hook이 없어 직접 조회
+  const { data: studentClasses, isLoading } = useQuery({
+    queryKey: ['student_classes', 'by_class', classId],
+    queryFn: async () => {
+      // eslint-disable-next-line no-restricted-syntax
+      const response = await apiClient.get<{ id: string; student_id: string; class_id: string; is_active: boolean; enrolled_at: string | null; left_at: string | null }>('student_classes', {
+        filters: { class_id: classId, is_active: true },
+        limit: 100,
+      });
+      if (response.error) throw new Error(response.error.message);
+      return response.data || [];
+    },
+    enabled: !!classId,
+  });
 
-  // Schema Registry 연동 (아키텍처 문서 S3 참조)
-  const { data: classFormSchemaData } = useSchema('class', createClassFormSchema(teachers || [], terms), 'form');
-  const classFormSchema = useMemo(() => classFormSchemaData || createClassFormSchema(teachers || [], terms), [classFormSchemaData, teachers, terms]);
+  // 학생 정보 조회
+  const studentIds = useMemo(() => studentClasses?.map(sc => sc.student_id) || [], [studentClasses]);
+  const { data: students, isLoading: studentsLoading } = useQuery({
+    queryKey: ['persons', 'bulk', classId, studentIds.length],
+    queryFn: async () => {
+      if (studentIds.length === 0) return [];
 
-  // 현재 배정된 강사 ID 목록
-  const currentTeacherIds = useMemo(
-    () => classTeachers?.map((ct) => ct.teacher_id) || [],
-    [classTeachers]
-  );
+      // [최적화] 모든 학생 정보를 한 번에 조회
+      // Supabase는 in 필터를 배열로 받지 않으므로, 개별 조회를 병렬로 수행
+      const studentPromises = studentIds.map(async (studentId) => {
+        const response = await apiClient.get<{ id: string; name: string; phone?: string }>('persons', {
+          filters: { id: studentId },
+          limit: 1,
+        });
+        if (response.error) {
+          // 개별 학생 조회 실패는 무시하고 계속 진행
+          console.warn(`Failed to fetch student ${studentId}:`, response.error.message);
+          return null;
+        }
+        return response.data?.[0] || null;
+      });
 
-  // 시간 포맷 헬퍼 함수: "HH:MM" → "HH:MM:SS"
-  const formatTimeForDB = (time: string): string => {
-    const parts = time.split(':');
-    return parts.length === 2 ? `${time}:00` : time;
-  };
+      const results = await Promise.all(studentPromises);
+      return results.filter((s): s is { id: string; name: string; phone?: string } => s !== null);
+    },
+    enabled: studentIds.length > 0,
+  });
 
-  const handleSubmit = (data: Record<string, unknown>) => {
-    const input: UpdateClassInput = {
-      name: data.name ? String(data.name) : undefined,
-      subject: data.subject ? String(data.subject) : undefined,
-      grade: data.grade ? String(data.grade) : undefined,
-      day_of_week: data.day_of_week as DayOfWeek | undefined,
-      start_time: data.start_time ? formatTimeForDB(String(data.start_time)) : undefined,
-      end_time: data.end_time ? formatTimeForDB(String(data.end_time)) : undefined,
-      capacity: data.capacity ? Number(data.capacity) : undefined,
-      color: data.color ? String(data.color) : undefined,
-      room: data.room ? String(data.room) : undefined,
-      notes: data.notes ? String(data.notes) : undefined,
-      status: data.status as ClassStatus | undefined,
-      teacher_ids: data.teacher_ids && Array.isArray(data.teacher_ids) && data.teacher_ids.length > 0
-        ? data.teacher_ids
-        : undefined,
-    };
-    void onSave(classId, input);
-  };
-
-  // 반응형 처리: 모바일/태블릿은 Drawer, 데스크톱은 Modal (아키텍처 문서 6-1 참조)
-  if (isLoading) {
-    if (isMobileMode || isTabletMode) {
-      return (
-        <Drawer
-          isOpen={true}
-          onClose={onClose}
-          title={`${terms.GROUP_LABEL} 수정`}
-          position={isMobileMode ? 'bottom' : 'right'}
-          width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
-        >
-          <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>
-        </Drawer>
-      );
-    }
+  if (isLoading || studentsLoading) {
     return (
-      <Modal isOpen={true} onClose={onClose} title={`${terms.GROUP_LABEL} 수정`} size="lg">
-        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>
-      </Modal>
+      <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+        로딩 중...
+      </div>
     );
   }
 
-  if (!classData) {
-    if (isMobileMode || isTabletMode) {
-      return (
-        <Drawer
-          isOpen={true}
-          onClose={onClose}
-          title={`${terms.GROUP_LABEL} 수정`}
-          position={isMobileMode ? 'bottom' : 'right'}
-          width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
-        >
-          <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>{`${terms.GROUP_LABEL}${p.을를(terms.GROUP_LABEL)} 찾을 수 없습니다.`}</div>
-        </Drawer>
-      );
-    }
+  if (!studentClasses || studentClasses.length === 0) {
     return (
-      <Modal isOpen={true} onClose={onClose} title={`${terms.GROUP_LABEL} 수정`} size="lg">
-        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>{`${terms.GROUP_LABEL}${p.을를(terms.GROUP_LABEL)} 찾을 수 없습니다.`}</div>
-      </Modal>
+      <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+        배정된 {terms.PERSON_LABEL_PRIMARY}이 없습니다.
+      </div>
     );
   }
 
-  const formContent = (
-      <SchemaForm
-        schema={classFormSchema}
-        onSubmit={handleSubmit}
-        defaultValues={{
-          name: classData.name,
-          subject: classData.subject || '',
-          grade: classData.grade || '',
-          day_of_week: classData.day_of_week,
-          start_time: classData.start_time.substring(0, 5), // "HH:MM:SS" → "HH:MM"
-          end_time: classData.end_time.substring(0, 5),     // "HH:MM:SS" → "HH:MM"
-          capacity: classData.capacity,
-          color: classData.color || 'var(--color-primary)',
-          room: classData.room || '',
-          teacher_ids: currentTeacherIds,
-          notes: classData.notes || '',
-          status: classData.status,
-        }}
-        actionContext={{
-          apiCall: async (endpoint: string, method: string, body?: unknown) => {
-            if (method === 'POST') {
-              const response = await apiClient.post(endpoint, body as Record<string, unknown>);
-              if (response.error) {
-                throw new Error(response.error.message);
-              }
-              return response.data;
-            }
-            const response = await apiClient.get(endpoint);
-            if (response.error) {
-              throw new Error(response.error.message);
-            }
-            return response.data;
-          },
-          showToast: (message: string, variant?: string) => {
-            showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-          },
-        }}
-      />
-  );
-
-  // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
-  if (isMobileMode || isTabletMode) {
-    return (
-      <Drawer
-        isOpen={true}
-        onClose={onClose}
-        title={`${terms.GROUP_LABEL} 수정`}
-        position={isMobileMode ? 'bottom' : 'right'}
-        width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
-      >
-        {formContent}
-      </Drawer>
-    );
-  }
-
-  // 데스크톱: Modal 사용
   return (
-    <Modal isOpen={true} onClose={onClose} title={`${terms.GROUP_LABEL} 수정`} size="lg">
-      {formContent}
-    </Modal>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+      {studentClasses.map((sc) => {
+        const student = students?.find(s => s.id === sc.student_id);
+        return (
+          <Card key={sc.id} padding="sm">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 'var(--font-weight-semibold)' }}>
+                  {student?.name || '알 수 없음'}
+                </div>
+                {student?.phone && (
+                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                    {student.phone}
+                  </div>
+                )}
+              </div>
+              {sc.enrolled_at && (
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                  {toKST(sc.enrolled_at).format('YYYY-MM-DD')} 등록
+                </div>
+              )}
+            </div>
+          </Card>
+        );
+      })}
+    </div>
   );
 }
 
 /**
- * 수업 캘린더 뷰
- * [요구사항] 수업 편성표(Calendar-like) 제공
- * 시간대별 그리드 형태로 개선
+ * 수업 담당강사 탭 컴포넌트
  */
-function ClassCalendarView({ classes }: { classes: Class[] }) {
+function ClassTeachersTab({
+  classTeachers,
+  isLoading,
+  allTeachers,
+}: {
+  classTeachers: Array<{ id: string; teacher_id: string; class_id: string }>;
+  isLoading: boolean;
+  allTeachers: Teacher[];
+}) {
   const terms = useIndustryTerms();
-  // 시간대 생성 (08:00 ~ 22:00, 30분 단위)
-  const timeSlots = useMemo(() => {
-    const slots: string[] = [];
-    for (let hour = 8; hour < 22; hour++) {
-      slots.push(`${hour.toString().padStart(2, '0')}:00`);
-      slots.push(`${hour.toString().padStart(2, '0')}:30`);
-    }
-    return slots;
+
+  if (isLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+        로딩 중...
+      </div>
+    );
+  }
+
+  if (!classTeachers || classTeachers.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
+        담당 {terms.PERSON_LABEL_SECONDARY}가 없습니다.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+      {classTeachers.map((ct) => {
+        const teacher = allTeachers.find(t => t.id === ct.teacher_id);
+        return (
+          <Card key={ct.id} padding="sm">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 'var(--font-weight-semibold)' }}>
+                  {teacher?.name || '알 수 없음'}
+                </div>
+                {teacher?.specialization && (
+                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                    {teacher.specialization}
+                  </div>
+                )}
+              </div>
+              {teacher?.phone && (
+                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                  {teacher.phone}
+                </div>
+              )}
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 요일 번호 -> 영문 키 맵 (일요일부터 시작) */
+const DAY_OF_WEEK_MAP: Record<number, DayOfWeek> = {
+  0: 'sunday',
+  1: 'monday',
+  2: 'tuesday',
+  3: 'wednesday',
+  4: 'thursday',
+  5: 'friday',
+  6: 'saturday',
+};
+
+/** 요일 이름 (일요일부터 시작) */
+const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'] as const;
+
+/**
+ * 수업 캘린더 뷰 (월 바둑판 달력)
+ * [요구사항] 수업 편성표 - 월별 달력 형태로 해당 날짜에 수업 목록 표시
+ */
+function ClassCalendarView({ classes, onClassSelect }: { classes: Class[]; onClassSelect?: (classId: string) => void }) {
+  const [currentMonth, setCurrentMonth] = useState<Date>(() => toKST().toDate());
+
+  // 월 이동 핸들러
+  const handlePrevMonth = useCallback(() => {
+    setCurrentMonth((prev) => {
+      const newDate = new Date(prev);
+      newDate.setMonth(newDate.getMonth() - 1);
+      return newDate;
+    });
   }, []);
 
-  // 요일별로 수업 그룹화
-  const classesByDay = DAYS_OF_WEEK.map((day) => ({
-    day,
-    classes: classes.filter((c) => c.day_of_week === day.value),
-  }));
-
-  // P1-5: 시간대에 해당하는 모든 수업 조회 (겹침 표시)
-  const getClassesAtTime = (dayClasses: Class[], timeSlot: string): Class[] => {
-    return dayClasses.filter((c) => {
-      const start = c.start_time;
-      const end = c.end_time;
-      return timeSlot >= start && timeSlot < end;
+  const handleNextMonth = useCallback(() => {
+    setCurrentMonth((prev) => {
+      const newDate = new Date(prev);
+      newDate.setMonth(newDate.getMonth() + 1);
+      return newDate;
     });
+  }, []);
+
+  // 달력 그리드 데이터 생성 (6주 × 7일 = 42일)
+  const calendarDays = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+    const days: { date: Date; isCurrentMonth: boolean }[] = [];
+    const currentDate = new Date(startDate);
+
+    for (let i = 0; i < 42; i++) {
+      days.push({
+        date: new Date(currentDate),
+        isCurrentMonth: currentDate.getMonth() === month,
+      });
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    return days;
+  }, [currentMonth]);
+
+  // 날짜별 수업 필터링 (day_of_week 배열 지원)
+  const getClassesForDate = useCallback(
+    (date: Date): Class[] => {
+      const dayIndex = date.getDay(); // 0(일) ~ 6(토)
+      const dayOfWeekKey = DAY_OF_WEEK_MAP[dayIndex];
+
+      return classes.filter((classItem) => {
+        const dayOfWeek = classItem.day_of_week;
+        if (Array.isArray(dayOfWeek)) {
+          return dayOfWeek.includes(dayOfWeekKey);
+        }
+        return dayOfWeek === dayOfWeekKey;
+      });
+    },
+    [classes]
+  );
+
+  // 오늘 날짜 확인
+  const isToday = useCallback((date: Date): boolean => {
+    const today = toKST().toDate();
+    return (
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate()
+    );
+  }, []);
+
+  // 현재 월 표시 라벨
+  const currentMonthLabel = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth() + 1;
+    return `${year}년 ${month}월`;
+  }, [currentMonth]);
+
+  // 시간 포맷 (HH:mm:ss -> HH:mm)
+  const formatTime = (time: string): string => {
+    return time.slice(0, 5);
   };
 
   return (
     <div style={{ overflowX: 'auto' }}>
       <Card padding="lg">
-        <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)' }}>
-          {terms.GROUP_LABEL} 편성표
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'var(--width-grid-column) repeat(7, 1fr)', gap: 'var(--spacing-xs)', minWidth: 'var(--width-grid-min)' }}>
-          {/* 헤더 */}
-          <div style={{ padding: 'var(--spacing-sm)', fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)' }}>
-            시간
-          </div>
-          {DAYS_OF_WEEK.map((day) => (
+        {/* 월 헤더 (네비게이션) */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 'var(--spacing-md)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={handlePrevMonth}
+            style={{
+              padding: 'var(--spacing-sm)',
+              border: 'var(--border-width-thin) solid var(--color-gray-200)',
+              backgroundColor: 'var(--color-white)',
+              cursor: 'pointer',
+              borderRadius: 'var(--border-radius-sm)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--color-text)',
+              transition: 'background-color var(--transition-base)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-white)';
+            }}
+          >
+            <svg viewBox="0 0 16 16" fill="none" style={{ width: 'var(--size-icon-sm)', height: 'var(--size-icon-sm)' }}>
+              <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <h2
+            style={{
+              fontSize: 'var(--font-size-xl)',
+              fontWeight: 'var(--font-weight-bold)',
+              margin: 0,
+            }}
+          >
+            {currentMonthLabel}
+          </h2>
+          <button
+            type="button"
+            onClick={handleNextMonth}
+            style={{
+              padding: 'var(--spacing-sm)',
+              border: 'var(--border-width-thin) solid var(--color-gray-200)',
+              backgroundColor: 'var(--color-white)',
+              cursor: 'pointer',
+              borderRadius: 'var(--border-radius-sm)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--color-text)',
+              transition: 'background-color var(--transition-base)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-white)';
+            }}
+          >
+            <svg viewBox="0 0 16 16" fill="none" style={{ width: 'var(--size-icon-sm)', height: 'var(--size-icon-sm)' }}>
+              <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+
+        {/* 요일 헤더 */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, 1fr)',
+            gap: 'var(--spacing-xs)',
+            marginBottom: 'var(--spacing-sm)',
+          }}
+        >
+          {DAY_NAMES.map((day, index) => (
             <div
-              key={day.value}
+              key={day}
               style={{
-                padding: 'var(--spacing-sm)',
-                fontWeight: 'var(--font-weight-semibold)',
-                fontSize: 'var(--font-size-sm)',
                 textAlign: 'center',
+                fontWeight: 'var(--font-weight-semibold)',
+                color:
+                  index === 0
+                    ? 'var(--color-primary)'
+                    : index === 6
+                      ? 'var(--color-secondary)'
+                      : 'var(--color-text)',
+                fontSize: 'var(--font-size-sm)',
+                padding: 'var(--spacing-sm)',
                 backgroundColor: 'var(--color-background-secondary)',
                 borderRadius: 'var(--border-radius-sm)',
               }}
             >
-            {day.label}
+              {day}
             </div>
           ))}
+        </div>
 
-          {/* 시간대별 행 */}
-          {timeSlots.map((timeSlot) => (
-            <React.Fragment key={timeSlot}>
+        {/* 달력 그리드 (7열 × 6행) */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, 1fr)',
+            gap: 'var(--spacing-xs)',
+          }}
+        >
+          {calendarDays.map(({ date, isCurrentMonth }, index) => {
+            const classesForDate = getClassesForDate(date);
+            const isTodayDate = isToday(date);
+            const dayIndex = date.getDay();
+
+            return (
               <div
+                key={index}
                 style={{
-                  padding: 'var(--spacing-xs)',
-                  fontSize: 'var(--font-size-xs)',
-                  color: 'var(--color-text-secondary)',
-                  textAlign: 'right',
+                  minHeight: '120px',
+                  padding: 'var(--spacing-sm)',
+                  backgroundColor: isCurrentMonth ? 'var(--color-white)' : 'var(--color-gray-50)',
+                  borderRadius: 'var(--border-radius-sm)',
+                  border: isTodayDate
+                    ? 'var(--border-width-base) solid var(--color-primary)'
+                    : 'var(--border-width-thin) solid var(--color-gray-200)',
+                  opacity: isCurrentMonth ? 1 : 0.5,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--spacing-xs)',
+                  overflow: 'hidden',
                 }}
               >
-                {timeSlot}
-              </div>
-              {DAYS_OF_WEEK.map((day) => {
-                const dayClasses = classesByDay.find((d) => d.day.value === day.value)?.classes || [];
-                const classesAtTime = getClassesAtTime(dayClasses, timeSlot);
-                const hasClasses = classesAtTime.length > 0;
-                const firstClass = classesAtTime[0];
-                const isStartTime = firstClass?.start_time === timeSlot;
-                const hasOverlap = classesAtTime.length > 1;
+                {/* 날짜 숫자 */}
+                <div
+                  style={{
+                    fontWeight: isTodayDate ? 'var(--font-weight-bold)' : 'var(--font-weight-medium)',
+                    fontSize: 'var(--font-size-sm)',
+                    color: isTodayDate
+                      ? 'var(--color-primary)'
+                      : dayIndex === 0
+                        ? 'var(--color-primary)'
+                        : dayIndex === 6
+                          ? 'var(--color-secondary)'
+                          : 'var(--color-text)',
+                    marginBottom: 'var(--spacing-2xs)',
+                  }}
+                >
+                  {date.getDate()}
+                </div>
 
-                return (
-                  <div
-                    key={`${day.value}-${timeSlot}`}
-                    style={{
-                      minHeight: 'var(--height-row-min)',
-                      // HARD-CODE-EXCEPTION: padding 0은 레이아웃용 특수 값
-                      padding: isStartTime ? 'var(--spacing-xs)' : '0',
-                      backgroundColor: hasClasses
-                        ? `${firstClass.color}20`
-                        : 'transparent',
-                      borderLeft: isStartTime ? `var(--border-width-thick) solid ${firstClass.color}` : 'none',
-                      // HARD-CODE-EXCEPTION: borderRadius 0은 레이아웃용 특수 값
-                      borderRadius: isStartTime ? 'var(--border-radius-sm)' : '0',
-                      // P1-5: 겹침 표시 (점선 테두리)
-                      border: hasOverlap && isStartTime ? 'var(--border-width-base) dashed var(--color-warning)' : undefined,
-                      position: 'relative',
-                    }}
-                  >
-                    {isStartTime && firstClass && (
-                      <>
-                        <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)' }}>
-                          {firstClass.name}
-                        </div>
-                        {/* P1-5: 겹침 개수 표시 */}
-                        {hasOverlap && (
-                          <div
-                            style={{
-                              fontSize: 'var(--font-size-2xs)',
-                              color: 'var(--color-warning)',
-                              fontWeight: 'var(--font-weight-bold)',
-                              marginTop: 'var(--spacing-2xs)',
-                            }}
-                          >
-                            +{classesAtTime.length - 1} 겹침
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </React.Fragment>
-          ))}
+                {/* 수업 목록 */}
+                <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2xs)' }}>
+                  {classesForDate.slice(0, 3).map((classItem) => (
+                    <div
+                      key={classItem.id}
+                      onClick={() => onClassSelect?.(classItem.id)}
+                      style={{
+                        padding: 'var(--spacing-2xs) var(--spacing-xs)',
+                        backgroundColor: classItem.color ? `${classItem.color}20` : 'var(--color-gray-100)',
+                        borderLeft: `var(--border-width-thick) solid ${classItem.color || 'var(--color-primary)'}`,
+                        borderRadius: 'var(--border-radius-xs)',
+                        fontSize: 'var(--font-size-xs)',
+                        cursor: 'pointer',
+                        transition: 'background-color var(--transition-fast)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = classItem.color ? `${classItem.color}40` : 'var(--color-gray-200)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = classItem.color ? `${classItem.color}20` : 'var(--color-gray-100)';
+                      }}
+                    >
+                      <div style={{ fontWeight: 'var(--font-weight-medium)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {classItem.name}
+                      </div>
+                      <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-2xs)' }}>
+                        {formatTime(classItem.start_time)}~{formatTime(classItem.end_time)}
+                      </div>
+                    </div>
+                  ))}
+                  {classesForDate.length > 3 && (
+                    <div
+                      style={{
+                        fontSize: 'var(--font-size-2xs)',
+                        color: 'var(--color-text-secondary)',
+                        textAlign: 'center',
+                        padding: 'var(--spacing-2xs)',
+                      }}
+                    >
+                      +{classesForDate.length - 3}개 더보기
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* 범례 */}
@@ -1103,11 +1583,11 @@ function ClassCalendarView({ classes }: { classes: Class[] }) {
                   }}
                 />
                 <span>{classItem.name}</span>
-                  </div>
-                ))}
-            </div>
-          )}
-        </Card>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
@@ -1134,7 +1614,6 @@ function ClassStatisticsTab() {
     const byStatus = {
       active: allClasses.filter(c => c.status === 'active').length,
       inactive: allClasses.filter(c => c.status === 'inactive').length,
-      archived: allClasses.filter(c => c.status === 'archived').length,
     };
 
     // 정원 대비 현재 인원 비율
@@ -1253,24 +1732,18 @@ function ClassStatisticsTab() {
         <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--spacing-md)' }}>
           상태별 분포
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--spacing-md)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-md)' }}>
           <div style={{ textAlign: 'center', padding: 'var(--spacing-md)', backgroundColor: 'var(--color-success-50)', borderRadius: 'var(--border-radius-md)' }}>
             <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
               {statistics.byStatus.active}
             </div>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>활성</div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>운영 중</div>
           </div>
           <div style={{ textAlign: 'center', padding: 'var(--spacing-md)', backgroundColor: 'var(--color-gray-50)', borderRadius: 'var(--border-radius-md)' }}>
             <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-secondary)' }}>
               {statistics.byStatus.inactive}
             </div>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>비활성</div>
-          </div>
-          <div style={{ textAlign: 'center', padding: 'var(--spacing-md)', backgroundColor: 'var(--color-primary-50)', borderRadius: 'var(--border-radius-md)' }}>
-            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
-              {statistics.byStatus.archived}
-            </div>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>보관됨</div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>중단</div>
           </div>
         </div>
       </Card>

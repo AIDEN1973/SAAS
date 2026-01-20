@@ -19,12 +19,6 @@ export const notificationTableSchema: TableSchema = {
     },
     columns: [
       {
-        key: 'status',
-        label: '상태',
-        sortable: true,
-        type: 'badge',
-      },
-      {
         key: 'channel',
         label: '채널',
         sortable: true,
@@ -46,6 +40,12 @@ export const notificationTableSchema: TableSchema = {
         label: '발송일시',
         sortable: true,
         type: 'date',
+      },
+      {
+        key: 'status',
+        label: '상태',
+        sortable: true,
+        type: 'badge',
       },
     ],
     rowActions: ['view'],

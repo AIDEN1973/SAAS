@@ -169,7 +169,7 @@ const multiConditionRuleSchema = z.object({
  */
 const formFieldSchema = z.object({
   name: z.string().min(1),
-  kind: z.enum(['text', 'email', 'phone', 'number', 'password', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'date', 'datetime', 'dateRange', 'address', 'custom']),  // SDUI v1.1: dateRange, address, custom 추가
+  kind: z.enum(['text', 'email', 'phone', 'number', 'password', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'date', 'datetime', 'dateRange', 'time', 'address', 'custom']),  // SDUI v1.1: dateRange, time, address, custom 추가
   ui: z.object({
     // SDUI v1.1: i18n 지원
     labelKey: z.string().optional(),
@@ -181,6 +181,7 @@ const formFieldSchema = z.object({
     tooltipKey: z.string().optional(),
     tooltip: z.string().optional(),  // 하위 호환성
     colSpan: z.number().min(1).max(12).optional(),
+    unit: z.string().optional(),  // 단위 표시 (number 필드용)
   }).optional(),
   // SDUI v1.1: options의 i18n 지원
   options: z.array(z.object({

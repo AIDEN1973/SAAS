@@ -569,8 +569,8 @@ export const Select: React.FC<SelectProps> = ({
                             style={{
                               width: 'var(--spacing-md)', // styles.css 준수: 16px
                               height: 'var(--spacing-md)', // styles.css 준수: 16px
-                              border: `var(--border-width-base) solid ${isSelected ? 'var(--color-primary)' : 'var(--color-gray-300)'}`,
-                              borderRadius: 'var(--border-radius-sm)',
+                              border: `var(--border-width-thin) solid ${isSelected ? 'var(--color-primary)' : 'var(--color-gray-300)'}`,
+                              borderRadius: 'var(--border-radius-xs)', // 라운드 사각형 체크박스
                               backgroundColor: isSelected ? 'var(--color-primary)' : 'transparent',
                               display: 'flex',
                               alignItems: 'center',
@@ -621,7 +621,7 @@ export const Select: React.FC<SelectProps> = ({
                       color: 'var(--color-text-secondary)',
           }}
                   >
-                    옵션이 없습니다
+                    등록된 항목이 없습니다
                   </div>
                 )}
               </div>

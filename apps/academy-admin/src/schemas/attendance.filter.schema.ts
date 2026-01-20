@@ -41,6 +41,7 @@ export function createAttendanceFilterSchema(
           kind: 'date',
           ui: {
             label: '시작일',
+            placeholder: '시작일을 선택하세요.',
             colSpan: 1,
           },
         },
@@ -49,6 +50,7 @@ export function createAttendanceFilterSchema(
           kind: 'date',
           ui: {
             label: '종료일',
+            placeholder: '종료일을 선택하세요.',
             colSpan: 1,
           },
         },
@@ -57,6 +59,7 @@ export function createAttendanceFilterSchema(
           kind: 'select',
           ui: {
             label: terms ? terms.PERSON_LABEL_PRIMARY : '학생',
+            placeholder: terms ? `${terms.PERSON_LABEL_PRIMARY}을 선택하세요.` : '학생을 선택하세요.',
             colSpan: 1,
           },
           options: studentOptions,
@@ -66,6 +69,7 @@ export function createAttendanceFilterSchema(
           kind: 'select',
           ui: {
             label: terms ? terms.GROUP_LABEL : '수업',
+            placeholder: terms ? `${terms.GROUP_LABEL}을 선택하세요.` : '수업을 선택하세요.',
             colSpan: 1,
           },
           options: classOptions,
@@ -75,6 +79,7 @@ export function createAttendanceFilterSchema(
           kind: 'select',
           ui: {
             label: '타입',
+            placeholder: '출결 타입을 선택하세요.',
             colSpan: 1,
           },
           options: [
@@ -91,6 +96,7 @@ export function createAttendanceFilterSchema(
           kind: 'select',
           ui: {
             label: '상태',
+            placeholder: '출결 상태를 선택하세요.',
             colSpan: 1,
           },
           options: [
@@ -138,6 +144,7 @@ export function createAttendanceHeaderFilterSchema(
           kind: 'select',
           ui: {
             label: terms ? terms.GROUP_LABEL : '수업',
+            placeholder: terms ? `${terms.GROUP_LABEL}을 선택하세요.` : '수업을 선택하세요.',
             colSpan: 1,
           },
           options: classOptions,
@@ -148,6 +155,7 @@ export function createAttendanceHeaderFilterSchema(
           kind: 'date',
           ui: {
             label: '날짜',
+            placeholder: '날짜를 선택하세요.',
             colSpan: 1,
           },
         },
@@ -157,8 +165,8 @@ export function createAttendanceHeaderFilterSchema(
           ui: {
             label: '검색',
             placeholder: terms
-              ? `${terms.PERSON_LABEL_PRIMARY} 이름 또는 전화번호 검색`
-              : '학생 이름 또는 전화번호 검색',
+              ? `${terms.PERSON_LABEL_PRIMARY} 이름 또는 전화번호를 검색하세요.`
+              : '학생 이름 또는 전화번호를 검색하세요.',
             colSpan: 1,
           },
         },

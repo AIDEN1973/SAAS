@@ -635,7 +635,7 @@ export function DataTable<T = unknown>({
           value={effectiveSearchValue}
           onChange={handleSearchChange}
           placeholder={searchPlaceholder}
-          size="sm"
+          size="md"
         />
 
         {/* 필터 버튼 */}
@@ -645,7 +645,7 @@ export function DataTable<T = unknown>({
             type="button"
             onClick={() => setShowFilterPanel((prev) => !prev)}
             variant="outline"
-            size="sm"
+            size="md"
             selected={showFilterPanel || activeFilterCount > 0}
             style={{
               display: 'flex',
@@ -684,7 +684,7 @@ export function DataTable<T = unknown>({
               value: String(option),
               label: `${option}개`,
             }))}
-            size="sm"
+            size="md"
             autoDropdownWidth={true}
             dropdownMinWidth={80}
             style={{
