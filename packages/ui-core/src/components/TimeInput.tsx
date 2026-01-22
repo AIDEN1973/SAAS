@@ -51,6 +51,15 @@ export const TimeInput = React.forwardRef<HTMLInputElement, TimeInputProps>(({
   const value = valueProp ?? '';
   const isEmpty = value === undefined || value === null || value === '';
 
+  // [불변 규칙] 명시적 height 사용으로 Button/Select와 높이 일관성 유지 (SSOT)
+  const sizeStyles: Record<SizeToken, React.CSSProperties> = {
+    xs: { height: 'var(--height-control-xs)' },
+    sm: { height: 'var(--height-control-sm)' },
+    md: { height: 'var(--height-control-md)' },
+    lg: { height: 'var(--height-control-lg)' },
+    xl: { height: 'var(--height-control-xl)' },
+  };
+
   // HH:mm 형식을 24시간제 시, 분으로 파싱
   const parseTime = React.useCallback((timeStr: string) => {
     if (!timeStr || typeof timeStr !== 'string') return { hour: 14, minute: 0 };
@@ -268,11 +277,13 @@ export const TimeInput = React.forwardRef<HTMLInputElement, TimeInputProps>(({
         width: fullWidth ? '100%' : 'auto',
       }}
     >
+      {/* [불변 규칙] wrapper에 height 적용 + boxSizing: border-box로 border 포함 높이 계산 */}
       <div
         ref={wrapperRef}
         style={{
           position: 'relative',
           width: fullWidth ? '100%' : 'auto',
+          height: sizeStyles[size].height, // wrapper에 height 적용
           backgroundColor: props.disabled ? 'var(--color-gray-100)' : 'var(--color-white)',
           border: props.disabled
             ? 'var(--border-width-thin) solid var(--color-gray-200)'
@@ -309,7 +320,8 @@ export const TimeInput = React.forwardRef<HTMLInputElement, TimeInputProps>(({
           }}
           disabled={props.disabled}
           style={{
-            padding: 'var(--spacing-sm) var(--spacing-form-horizontal-left)',
+            height: '100%', // wrapper의 height를 채움
+            paddingLeft: 'var(--spacing-form-horizontal-left)',
             paddingRight: 'calc(var(--spacing-sm) + 24px)',
             border: 'none',
             outline: 'none',
@@ -318,7 +330,8 @@ export const TimeInput = React.forwardRef<HTMLInputElement, TimeInputProps>(({
             fontFamily: 'var(--font-family)',
             fontSize: 'var(--font-size-base)',
             fontWeight: 'var(--font-weight-normal)',
-            lineHeight: 'var(--line-height)',
+            // [불변 규칙] lineHeight: 1로 설정하여 height 기반 정렬 (Button, Select와 동일)
+            lineHeight: 1,
             color: props.disabled ? 'var(--color-text-disabled)' : 'var(--color-text)',
             cursor: props.disabled ? 'not-allowed' : 'text',
             boxSizing: 'border-box',

@@ -228,7 +228,7 @@ export const BadgeSelect: React.FC<BadgeSelectProps> = ({
         borderRadius: 'var(--border-radius-xs)',
         backgroundColor,
         overflow: 'visible', // 드롭다운이 보이도록 visible로 변경
-        height: 'var(--size-pagination-button)', // IconButtonGroup과 동일한 높이
+        height: 'var(--height-control-sm)', // Button sm과 동일한 높이 토큰 사용
         // 동적 너비: 옵션 텍스트 기반으로 계산
         width: calculatedWidth ? `${calculatedWidth}px` : 'auto',
         minWidth: calculatedWidth ? `${calculatedWidth}px` : 'auto',

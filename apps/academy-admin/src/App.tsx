@@ -20,6 +20,7 @@ import { sendChatOpsMessageStreaming } from '@hooks/use-chatops';
 import { useIndustryConfig } from '@hooks/use-industry-config';
 import { getApiContext } from '@api-sdk/core';
 import type { TenantRole } from '@core/tenancy';
+import { useCurrentTeacherPosition, useRolePermissions, DEFAULT_PERMISSIONS } from '@hooks/use-class';
 import { createSafeNavigate, logError, logWarn, logInfo } from './utils';
 import { maskPII } from '@core/pii-utils';
 
@@ -157,6 +158,7 @@ const AllCardsPage = lazy(() => import('./pages/AllCardsPage').then(m => ({ defa
 const StudentTasksPage = lazy(() => import('./pages/StudentTasksPage').then(m => ({ default: m.StudentTasksPage })));
 const AutomationSettingsPage = lazy(() => import('./pages/AutomationSettingsPage').then(m => ({ default: m.AutomationSettingsPage })));
 const AlimtalkSettingsPage = lazy(() => import('./pages/AlimtalkSettingsPage').then(m => ({ default: m.AlimtalkSettingsPage })));
+const SettingsPermissionsPage = lazy(() => import('./pages/SettingsPermissionsPage').then(m => ({ default: m.SettingsPermissionsPage })));
 const IntentPatternsPage = lazy(() => import('./pages/IntentPatternsPage').then(m => ({ default: m.IntentPatternsPage })));
 const SchemaEditorPage = lazy(() => import('../../super-admin/src/pages/SchemaEditorPage').then(m => ({ default: m.SchemaEditorPage })));
 const AuthGuard = lazy(() => import('../../super-admin/src/components/AuthGuard').then(m => ({ default: m.AuthGuard })));
@@ -211,6 +213,8 @@ function AppContent() {
   const logout = useLogout();
   const { data: session } = useSession();
   const { data: userRole } = useUserRole();
+  const { data: teacherPosition } = useCurrentTeacherPosition();
+  const { data: rolePermissions } = useRolePermissions(teacherPosition || undefined);
   const aiLayerMenu = useAILayerMenu();
   // 업종별 설정 (Phase 3: Industry-Based Page Visibility)
   const { terms, isPageVisible } = useIndustryConfig();
@@ -687,7 +691,73 @@ function AppContent() {
   // NOTE: 사이드바 아이템은 getSidebarItemsForRole()에서 생성합니다.
 
   /**
+   * 권한 확인 헬퍼 함수
+   * - DB의 role_permissions 테이블에서 권한 확인
+   * - 해당 직급의 권한이 DB에 하나라도 있으면 DB만 사용 (명시적 권한 관리)
+   * - 해당 직급의 권한이 DB에 전혀 없으면 기본 권한 사용 (초기 상태)
+   * - 관리자 역할은 항상 전체 접근 허용
+   * - 경로 매칭: /students 권한이 있으면 /students/home도 접근 가능
+   */
+  const hasPagePermission = (pagePath: string): boolean => {
+    // 최고 관리자 역할은 항상 전체 접근 허용 (권한 설정 불가)
+    if (userRole && ['admin', 'owner', 'super_admin'].includes(userRole)) {
+      return true;
+    }
+
+    // 강사 직급이 없으면 staff, counselor 등 기타 역할 → 기본 허용
+    if (!teacherPosition) {
+      return true;
+    }
+
+    // 해당 직급의 권한이 DB에 있는지 확인
+    const positionPermissions = rolePermissions?.filter(p => p.position === teacherPosition) || [];
+    const hasPositionPermissionsInDB = positionPermissions.length > 0;
+
+    if (hasPositionPermissionsInDB) {
+      // DB에 권한이 있으면 DB 우선 사용, 없으면 기본 권한 fallback
+      // 가장 구체적인 경로(긴 경로)가 먼저 매칭되도록 정렬
+      const sortedPermissions = [...positionPermissions].sort(
+        (a, b) => b.page_path.length - a.page_path.length
+      );
+
+      // 경로 매칭: pagePath가 DB 경로로 시작하면 매칭
+      const permission = sortedPermissions.find(p => pagePath.startsWith(p.page_path));
+
+      // DB에 명시적으로 권한이 있으면 DB 값 사용
+      if (permission) {
+        console.log('[hasPagePermission] DB 권한 사용:', {
+          pagePath,
+          permission: { page_path: permission.page_path, can_access: permission.can_access },
+          result: permission.can_access,
+        });
+        return permission.can_access;
+      }
+
+      // DB에 해당 경로가 없으면 기본 권한으로 fallback
+      console.log('[hasPagePermission] DB에 없음, 기본 권한 fallback:', { pagePath });
+    }
+
+    // DB에 권한이 전혀 없거나, DB에 해당 경로가 없으면 기본 권한 사용
+    const defaultPaths = DEFAULT_PERMISSIONS[teacherPosition];
+    if (defaultPaths.includes('*')) {
+      console.log('[hasPagePermission] 기본 권한: 전체 접근');
+      return true;
+    }
+
+    // 기본 권한도 구체적인 경로 우선 매칭
+    const sortedDefaultPaths = [...defaultPaths].sort((a, b) => b.length - a.length);
+    const hasDefaultAccess = sortedDefaultPaths.some(dp => pagePath.startsWith(dp));
+    console.log('[hasPagePermission] 기본 권한 사용:', {
+      pagePath,
+      defaultPaths,
+      result: hasDefaultAccess,
+    });
+    return hasDefaultAccess;
+  };
+
+  /**
    * 역할별 + 업종별 사이드바 메뉴 필터링 (Phase 3: Industry-Based Filtering)
+   * ✅ Phase 4: 권한 기반 메뉴 필터링 (role_permissions 테이블 사용)
    *
    * 역할별 UI 단순화 원칙:
    * - Assistant: 출결만 노출
@@ -797,6 +867,18 @@ function AppContent() {
       });
     }
 
+    // ✅ 직급별 권한 설정: 관리자만 접근 가능
+    advancedMenuChildren.push({
+      id: 'permissions-settings-advanced',
+      label: '권한 설정',
+      path: '/settings/permissions',
+      icon: (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      ),
+    });
+
     const advancedMenuItems: SidebarItem[] = [
       {
         id: 'advanced',
@@ -878,7 +960,7 @@ function AppContent() {
       });
     }
 
-    // 문자발송 (모든 업종 공통)
+    // ✅ 문자발송 (모든 업종 공통)
     coreMenuItems.push({
       id: 'notifications',
       label: '문자발송',
@@ -959,20 +1041,63 @@ function AppContent() {
       );
     }
 
-    // Teacher: 핵심 메뉴만 (Advanced 메뉴 없음, 수업 관리는 읽기 전용)
-    // 아키텍처 문서 2.3: "오늘의 수업 + 학생 리스트 + 출결 체크만 노출"
-    // 아키텍처 문서 2.4: "/analytics/** 접근 금지 (요약만 제공)"
-    // 통계와 AI는 핵심 메뉴이므로 Advanced에 들어가면 안 됨 (4.8)
+    // Teacher: 권한 기반 필터링 (role_permissions 테이블 사용)
+    // DB에서 설정된 권한에 따라 메뉴 노출
     if (role === 'teacher') {
-      return coreMenuItems.filter(item =>
-        ['home', 'students', 'attendance', 'appointments', 'ai'].includes(item.id)
-        // analytics는 제외 (요약만 제공, 상세 분석 제한)
-      );
+      console.log('[getSidebarItemsForRole] Teacher 필터링 시작:', {
+        coreMenuItemsCount: coreMenuItems.length,
+        advancedMenuItemsCount: advancedMenuItems.length,
+        advancedChildren: advancedMenuItems[0]?.children?.map(c => ({ id: c.id, path: c.path })),
+      });
+
+      const filteredCoreItems = coreMenuItems.filter(item => {
+        if (!item.path) return true; // path가 없으면 보여줌
+        const hasPermission = hasPagePermission(item.path);
+        console.log('[Core 메뉴 필터링]', item.id, item.path, '→', hasPermission);
+        return hasPermission;
+      });
+
+      const filteredAdvancedItems = advancedMenuItems
+        .filter(item => item.id === 'advanced')
+        .map(item => ({
+          ...item,
+          children: item.children?.filter(child => {
+            if (!child.path) return true;
+            const hasPermission = hasPagePermission(child.path);
+            console.log('[Advanced 메뉴 필터링]', child.id, child.path, '→', hasPermission);
+            return hasPermission;
+          }),
+        }))
+        .filter(item => item.children && item.children.length > 0); // children이 비어있으면 제외
+
+      console.log('[getSidebarItemsForRole] Teacher 필터링 결과:', {
+        filteredCoreItemsCount: filteredCoreItems.length,
+        filteredAdvancedItemsCount: filteredAdvancedItems.length,
+        filteredAdvancedChildren: filteredAdvancedItems[0]?.children?.map(c => ({ id: c.id, path: c.path })),
+      });
+
+      return [...filteredCoreItems, ...filteredAdvancedItems];
     }
 
-    // Assistant: 출결만 노출 (아키텍처 문서 2.3: "출결 버튼만 노출")
+    // Assistant: 권한 기반 필터링 (role_permissions 테이블 사용)
     if (role === 'assistant') {
-      return coreMenuItems.filter(item => item.id === 'attendance');
+      const filteredCoreItems = coreMenuItems.filter(item => {
+        if (!item.path) return true;
+        return hasPagePermission(item.path);
+      });
+
+      const filteredAdvancedItems = advancedMenuItems
+        .filter(item => item.id === 'advanced')
+        .map(item => ({
+          ...item,
+          children: item.children?.filter(child => {
+            if (!child.path) return true;
+            return hasPagePermission(child.path);
+          }),
+        }))
+        .filter(item => item.children && item.children.length > 0); // children이 비어있으면 제외
+
+      return [...filteredCoreItems, ...filteredAdvancedItems];
     }
 
     // 기본값: 빈 배열
@@ -1139,15 +1264,17 @@ function AppContent() {
                 <Route path="/billing/home" element={<IndustryBasedRoute page="billing"><RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><BillingHomePage /></Suspense></RoleBasedRoute></IndustryBasedRoute>} />
                 <Route path="/billing/list" element={<IndustryBasedRoute page="billing"><RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><BillingPage /></Suspense></RoleBasedRoute></IndustryBasedRoute>} />
                 <Route path="/billing" element={<IndustryBasedRoute page="billing"><RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><BillingHomePage /></Suspense></RoleBasedRoute></IndustryBasedRoute>} />
-                <Route path="/notifications" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><NotificationsPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/notifications" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><NotificationsPage /></Suspense></RoleBasedRoute>} />
                 {/* ✅ Phase 3: 통계분석 - analytics 페이지가 visible일 때만 접근 가능 */}
-                <Route path="/analytics" element={<IndustryBasedRoute page="analytics"><RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><AnalyticsPage /></Suspense></RoleBasedRoute></IndustryBasedRoute>} />
+                <Route path="/analytics" element={<IndustryBasedRoute page="analytics"><RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><AnalyticsPage /></Suspense></RoleBasedRoute></IndustryBasedRoute>} />
                 {/* ✅ Phase 3: 인공지능 - ai 페이지가 visible일 때만 접근 가능 */}
                 <Route path="/ai" element={<IndustryBasedRoute page="ai"><RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><AIPage /></Suspense></RoleBasedRoute></IndustryBasedRoute>} />
                 {/* ✅ Phase 3: 자동화 설정 - automation 페이지가 visible일 때만 접근 가능 */}
                 <Route path="/settings/automation" element={<IndustryBasedRoute page="automation"><RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'super_admin']}><Suspense fallback={<PageLoader />}><AutomationSettingsPage /></Suspense></RoleBasedRoute></IndustryBasedRoute>} />
                 {/* ✅ Phase 3: 알림톡 설정 - alimtalk 페이지가 visible일 때만 접근 가능 */}
                 <Route path="/settings/alimtalk" element={<IndustryBasedRoute page="alimtalk"><RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'super_admin']}><Suspense fallback={<PageLoader />}><AlimtalkSettingsPage /></Suspense></RoleBasedRoute></IndustryBasedRoute>} />
+                {/* ✅ 직급별 권한 설정 - 관리자만 접근 가능 */}
+                <Route path="/settings/permissions" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'super_admin']}><Suspense fallback={<PageLoader />}><SettingsPermissionsPage /></Suspense></RoleBasedRoute>} />
                 <Route path="/settings/intent-patterns" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'super_admin']}><Suspense fallback={<PageLoader />}><IntentPatternsPage /></Suspense></RoleBasedRoute>} />
                 <Route
                   path="/super-admin"

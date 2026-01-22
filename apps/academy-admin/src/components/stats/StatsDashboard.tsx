@@ -8,7 +8,7 @@
  */
 
 import { useMemo, useState, useEffect, useRef, createElement } from 'react';
-import { Card, NotificationCardLayout, EmptyState, useIconSize, useChartColors } from '@ui-core/react';
+import { Card, NotificationCardLayout, EmptyState, useIconSize, useChartColors, useLayerMenuTransition } from '@ui-core/react';
 import { CardGridLayout } from '../CardGridLayout';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import type { LucideIcon } from 'lucide-react';
@@ -101,6 +101,9 @@ export function StatsDashboard({
 
   // [SSOT] 차트 색상 (SVG 속성용)
   const chartColors = useChartColors();
+
+  // [깜빡임 방지] 레이어 메뉴 transition 상태 감지
+  const isLayerMenuTransitioning = useLayerMenuTransition();
 
   // 차트 데이터 필터링 (0 값 포함 여부에 따라)
   const filteredChartData = useMemo(() => {
@@ -352,14 +355,33 @@ export function StatsDashboard({
           transition: 'max-height var(--transition-slow), opacity var(--transition-slow)',
           opacity: showChart ? 1 : 0,
           marginTop: showChart ? 'var(--spacing-2xl)' : 0,
+          contain: 'layout style paint',
+          willChange: 'max-height, opacity',
         }}>
-        <div ref={chartContentRef} style={{ width: '100%' }}>
+        <div ref={chartContentRef} style={{ width: '100%', contain: 'layout style' }}>
         <Card padding="lg" variant="default" style={{ height: '100%', display: 'flex', flexDirection: 'column', paddingTop: 'calc(var(--spacing-lg) + var(--spacing-lg))' }}>
-          {/* 그래프 */}
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', maxHeight: chartType === 'bar' ? '600px' : '300px', overflowY: chartType === 'bar' ? 'auto' : 'visible' }}>
+          {/* 그래프 - transition 중에는 숨겨서 깜빡임 방지 */}
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              maxHeight: chartType === 'bar' ? '600px' : '300px',
+              overflowY: chartType === 'bar' ? 'auto' : 'visible',
+              // transition 중에는 차트를 숨김
+              visibility: isLayerMenuTransitioning ? 'hidden' : 'visible',
+              opacity: isLayerMenuTransitioning ? 0 : 1,
+              transition: 'opacity 0.15s ease-out',
+            }}
+          >
             {filteredChartData.length > 0 ? (
               <div
-                style={{ width: '100%', height: chartType === 'bar' ? Math.max(300, filteredChartData.length * 40) : 300 }}
+                style={{
+                  width: '100%',
+                  height: chartType === 'bar' ? Math.max(300, filteredChartData.length * 40) : 300,
+                  contain: 'strict',
+                }}
                 className="chart-animate-up"
               >
                 <style>
@@ -372,7 +394,7 @@ export function StatsDashboard({
                     }
                   `}
                 </style>
-                <ResponsiveContainer width="100%" height={Math.max(300, filteredChartData.length * 40)} debounce={50}>
+                <ResponsiveContainer width="100%" height={Math.max(300, filteredChartData.length * 40)} debounce={300}>
                   {chartType === 'bar' ? (
                     <BarChart
                       data={filteredChartData}

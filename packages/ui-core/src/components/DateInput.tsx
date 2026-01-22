@@ -8,6 +8,7 @@
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Calendar } from 'lucide-react';
+import { SizeToken } from '@design-system/core';
 import { DatePicker } from './DatePicker';
 import { parseBirthDate, formatDateInput } from '@lib/normalization';
 
@@ -21,6 +22,7 @@ export interface DateInputProps {
   label?: string;
   error?: string;
   fullWidth?: boolean;
+  size?: SizeToken;
 }
 
 /**
@@ -39,7 +41,16 @@ export function DateInput({
   label,
   error,
   fullWidth = false,
+  size = 'sm',
 }: DateInputProps) {
+  // Size를 CSS Variables로 매핑 (Button, Select와 동일한 높이 보장)
+  const sizeStyles: Record<SizeToken, React.CSSProperties> = {
+    xs: { height: 'var(--height-control-xs)' },
+    sm: { height: 'var(--height-control-sm)' },
+    md: { height: 'var(--height-control-md)' },
+    lg: { height: 'var(--height-control-lg)' },
+    xl: { height: 'var(--height-control-xl)' },
+  };
   const inputRef = useRef<HTMLInputElement>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [inputValue, setInputValue] = useState(value);
@@ -143,8 +154,7 @@ export function DateInput({
           style={{
             flex: 1,
             minWidth: 0, // flex item이 축소될 수 있도록 함
-            paddingTop: 'var(--spacing-sm)',
-            paddingBottom: 'var(--spacing-sm)',
+            ...sizeStyles[size],
             paddingLeft: 'var(--spacing-form-horizontal-left)',
             paddingRight: 'var(--spacing-form-horizontal-right)',
             border: `var(--border-width-thin) solid ${borderColor}`,
@@ -155,7 +165,8 @@ export function DateInput({
             fontFamily: 'var(--font-family)',
             fontSize: 'var(--font-size-base)',
             fontWeight: 'var(--font-weight-normal)',
-            lineHeight: 'var(--line-height)',
+            // [불변 규칙] lineHeight: 1로 설정하여 height 기반 정렬 (Button, Select와 동일)
+            lineHeight: 1,
             transition: 'var(--transition-all)',
             cursor: disabled ? 'not-allowed' : 'text',
             boxSizing: 'border-box',
@@ -173,6 +184,7 @@ export function DateInput({
           disabled={disabled}
           aria-label="달력 열기"
           style={{
+            height: sizeStyles[size].height, // input과 동일한 높이 토큰 사용
             padding: 'var(--spacing-sm)',
             border: 'var(--border-width-thin) solid var(--color-primary)',
             borderRadius: 'var(--border-radius-xs)',
@@ -186,8 +198,6 @@ export function DateInput({
             outline: 'none',
             boxSizing: 'border-box',
             aspectRatio: 'var(--aspect-ratio-square)', // 정사각형
-            minWidth: '40px',
-            minHeight: '40px',
           }}
           onMouseEnter={(e) => {
             if (!disabled) {

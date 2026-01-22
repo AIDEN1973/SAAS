@@ -253,10 +253,11 @@ export function StatsTableLayout({
         flexDirection: 'column',
         opacity: isAnimating ? 0 : 1,
         transition: 'opacity 0.2s ease-in-out',
+        contain: 'layout style',
       }}>
         {/* 통계 대시보드 - 순서에 따라 위치 변경 (hideStats가 false일 때만 표시) */}
         {!hideStats && sectionOrder === 'stats-first' && statsItems.length > 0 && (
-          <div style={{ marginBottom: 'calc(var(--spacing-xl) * 2)' }}>
+          <div style={{ marginBottom: 'calc(var(--spacing-xl) * 2)', contain: 'layout style' }}>
             <StatsDashboard
               statsItems={statsItems}
               chartData={chartData}
@@ -298,7 +299,7 @@ export function StatsTableLayout({
 
         {/* table-first일 때 통계 대시보드를 아래에 표시 (hideStats가 false일 때만) */}
         {!hideStats && sectionOrder === 'table-first' && statsItems.length > 0 && (
-          <div style={{ marginTop: 'calc(var(--spacing-xl) * 2)' }}>
+          <div style={{ marginTop: 'calc(var(--spacing-xl) * 2)', contain: 'layout style' }}>
             <StatsDashboard
               statsItems={statsItems}
               chartData={chartData}

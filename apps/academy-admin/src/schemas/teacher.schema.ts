@@ -5,11 +5,12 @@
  */
 
 import type { FormSchema } from '@schema-engine';
+import { ACADEMY_SPECIALIZATIONS } from '@industry/academy';
 
 export const teacherFormSchema: FormSchema = {
   version: '1.0.0',
   minSupportedClient: '1.0.0',
-  entity: 'teacher',
+  entity: 'academy_teachers',
   type: 'form',
   form: {
     layout: {
@@ -19,10 +20,20 @@ export const teacherFormSchema: FormSchema = {
     },
     fields: [
       {
+        name: 'profile_image',
+        kind: 'file',
+        ui: {
+          label: '프로필 사진',
+          colSpan: 1,
+          rowSpan: 6,
+        },
+      },
+      {
         name: 'name',
         kind: 'text',
         ui: {
-          label: '이름',
+          labelKey: 'TEACHER.NAME',
+          label: '선생님 이름',
           colSpan: 1,
         },
         validation: {
@@ -30,56 +41,90 @@ export const teacherFormSchema: FormSchema = {
         },
       },
       {
-        name: 'email',
-        kind: 'email',
-        ui: {
-          label: '이메일',
-          colSpan: 1,
-        },
-      },
-      {
         name: 'phone',
         kind: 'phone',
         ui: {
-          label: '전화번호',
+          label: '휴대폰 번호',
+          colSpan: 1,
+        },
+        validation: {
+          required: true,
+        },
+      },
+      {
+        name: 'login_id',
+        kind: 'email',
+        ui: {
+          label: '로그인용 이메일',
+          colSpan: 1,
+          placeholder: '이메일 주소 입력',
+          description: '로그인에 사용할 이메일',
+        },
+        validation: {
+          required: true,
+        },
+      },
+      {
+        name: 'password',
+        kind: 'password',
+        ui: {
+          label: '비밀번호',
+          colSpan: 1,
+          placeholder: '비밀번호 입력',
+          description: '8자 이상',
+        },
+        validation: {
+          required: true,
+          minLength: 8,
+        },
+      },
+      {
+        name: 'password_confirm',
+        kind: 'password',
+        ui: {
+          label: '비밀번호 확인',
+          colSpan: 1,
+          placeholder: '비밀번호 재입력',
+          description: '비밀번호를 다시 입력하세요',
+        },
+        validation: {
+          required: true,
+          minLength: 8,
+        },
+      },
+      {
+        name: 'profile_image_button',
+        kind: 'custom',
+        customComponentType: 'profile_image_button',
+        ui: {
           colSpan: 1,
         },
       },
       {
-        name: 'address',
-        kind: 'text',
+        name: 'position',
+        kind: 'select',
+        options: [
+          { value: 'vice_principal', label: '부원장' },
+          { value: 'manager', label: '실장' },
+          { value: 'teacher', label: '선생님' },
+          { value: 'assistant', label: '조교' },
+          { value: 'other', label: '기타' },
+        ],
         ui: {
-          label: '주소',
-          colSpan: 2,
-        },
-      },
-      {
-        name: 'employee_id',
-        kind: 'text',
-        ui: {
-          label: '사원번호',
+          label: '구분',
           colSpan: 1,
+        },
+        validation: {
+          required: true,
         },
       },
       {
         name: 'specialization',
         kind: 'select',
-        options: [
-          { value: '수학', label: '수학' },
-          { value: '영어', label: '영어' },
-          { value: '국어', label: '국어' },
-          { value: '과학', label: '과학' },
-          { value: '사회', label: '사회' },
-          { value: '예체능', label: '예체능' },
-          { value: '음악', label: '음악' },
-          { value: '미술', label: '미술' },
-          { value: '체육', label: '체육' },
-          { value: '코딩', label: '코딩' },
-          { value: '논술', label: '논술' },
-          { value: '기타', label: '기타' },
-        ],
+        options: [...ACADEMY_SPECIALIZATIONS],
         ui: {
-          label: '전문 분야',
+          labelKey: 'TEACHER.SPECIALIZATION',
+          label: '담당과목',
           colSpan: 1,
         },
       },
@@ -108,20 +153,64 @@ export const teacherFormSchema: FormSchema = {
         },
       },
       {
-        name: 'profile_image_url',
+        name: 'employee_id',
         kind: 'text',
         ui: {
-          label: '프로필 이미지 URL',
-          placeholder: 'https://example.com/profile.jpg',
-          description: '프로필 이미지 URL을 입력하세요 (선택사항)',
-          colSpan: 2,
+          label: '사번',
+          colSpan: 1,
         },
       },
       {
-        name: 'bio',
+        name: 'pay_type',
+        kind: 'select',
+        options: [
+          { value: 'monthly', label: '월급' },
+          { value: 'hourly', label: '시급' },
+        ],
+        ui: {
+          label: '급여 유형',
+          colSpan: 1,
+        },
+      },
+      {
+        name: 'base_salary',
+        kind: 'number',
+        ui: {
+          label: '기본급 (월)',
+          colSpan: 1,
+          placeholder: '원',
+        },
+      },
+      {
+        name: 'hourly_rate',
+        kind: 'number',
+        ui: {
+          label: '시급',
+          colSpan: 1,
+          placeholder: '원',
+        },
+      },
+      {
+        name: 'bank_name',
+        kind: 'text',
+        ui: {
+          label: '은행명',
+          colSpan: 1,
+        },
+      },
+      {
+        name: 'bank_account',
+        kind: 'text',
+        ui: {
+          label: '계좌번호',
+          colSpan: 1,
+        },
+      },
+      {
+        name: 'salary_notes',
         kind: 'textarea',
         ui: {
-          label: '강사 소개',
+          label: '급여 메모',
           colSpan: 2,
         },
       },
@@ -133,67 +222,6 @@ export const teacherFormSchema: FormSchema = {
           colSpan: 2,
         },
       },
-      {
-        name: 'pay_type',
-        kind: 'select',
-        options: [
-          { value: 'monthly', label: '월급제' },
-          { value: 'hourly', label: '시급제' },
-          { value: 'class_based', label: '수업별' },
-        ],
-        ui: {
-          label: '급여 유형',
-          colSpan: 1,
-        },
-      },
-      {
-        name: 'base_salary',
-        kind: 'number',
-        ui: {
-          label: '기본급 (원)',
-          placeholder: '2500000',
-          colSpan: 1,
-          description: '월급제 또는 수업별 기본 급여',
-        },
-      },
-      {
-        name: 'hourly_rate',
-        kind: 'number',
-        ui: {
-          label: '시급 (원)',
-          placeholder: '25000',
-          colSpan: 1,
-          description: '시급제 적용 시',
-        },
-      },
-      {
-        name: 'bank_name',
-        kind: 'text',
-        ui: {
-          label: '은행명',
-          placeholder: '국민은행',
-          colSpan: 1,
-        },
-      },
-      {
-        name: 'bank_account',
-        kind: 'text',
-        ui: {
-          label: '계좌번호',
-          placeholder: '123-45-678901',
-          colSpan: 1,
-          description: '급여 지급 계좌',
-        },
-      },
-      {
-        name: 'salary_notes',
-        kind: 'textarea',
-        ui: {
-          label: '급여 메모',
-          colSpan: 2,
-          description: '급여 관련 특이사항 또는 조정 이력',
-        },
-      },
     ],
     submit: {
       label: '등록',
@@ -202,14 +230,8 @@ export const teacherFormSchema: FormSchema = {
       size: 'md',
     },
     // SDUI v1.1: Action Engine 지원
+    // Note: onSubmit은 TeachersPage에서 handleCreateTeacher로 직접 처리
     actions: [
-      {
-        event: 'onSubmit',
-        type: 'api.call',
-        endpoint: 'teachers',
-        method: 'POST',
-        body: 'form',
-      },
       {
         event: 'onSubmitSuccess',
         type: 'toast',

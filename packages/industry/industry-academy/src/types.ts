@@ -5,6 +5,22 @@
  * [불변 규칙] Industry Layer는 Core Layer를 import하여 사용, Core는 Industry를 import하지 않음
  */
 
+// 학원 업종 전문 분야 (과목)
+export const ACADEMY_SPECIALIZATIONS = [
+  { value: '수학', label: '수학' },
+  { value: '영어', label: '영어' },
+  { value: '국어', label: '국어' },
+  { value: '과학', label: '과학' },
+  { value: '사회', label: '사회' },
+  { value: '예체능', label: '예체능' },
+  { value: '음악', label: '음악' },
+  { value: '미술', label: '미술' },
+  { value: '체육', label: '체육' },
+  { value: '코딩', label: '코딩' },
+  { value: '논술', label: '논술' },
+  { value: '기타', label: '기타' },
+] as const;
+
 export type StudentStatus = 'active' | 'on_leave' | 'graduated' | 'withdrawn';
 export type Gender = 'male' | 'female' | 'other';
 export type GuardianRelationship = 'parent' | 'guardian' | 'other';
@@ -177,8 +193,9 @@ export interface ClassFilter {
 }
 
 // 강사(Teacher) 관리용
-export type TeacherStatus = 'active' | 'on_leave' | 'resigned';
+export type TeacherStatus = 'active' | 'on_leave' | 'resigned' | 'pending';
 export type TeacherRole = 'teacher' | 'assistant';  // 담임/부담임
+export type TeacherPosition = 'vice_principal' | 'manager' | 'teacher' | 'assistant' | 'other';  // 직급: 부원장, 실장, 선생님, 조교, 기타
 
 export interface Teacher {
   id: string;  // person_id
@@ -191,9 +208,18 @@ export interface Teacher {
   specialization?: string;
   hire_date?: string;
   status: TeacherStatus;
+  position?: TeacherPosition;  // 직급
+  login_id?: string;  // 로그인 아이디
+  user_id?: string;  // auth.users 연결
   profile_image_url?: string;
   bio?: string;
   notes?: string;
+  pay_type?: string;  // 급여 유형 (월급제, 시급제, 수업별)
+  base_salary?: number;  // 기본급
+  hourly_rate?: number;  // 시급
+  bank_name?: string;  // 은행명
+  bank_account?: string;  // 계좌번호
+  salary_notes?: string;  // 급여 메모
   created_at: string;
   updated_at: string;
   created_by?: string;
@@ -201,31 +227,69 @@ export interface Teacher {
 }
 
 export interface CreateTeacherInput {
-  name: string;
-  email?: string;
-  phone?: string;
-  address?: string;
+  name: string;           // 이름
+  email?: string;         // 이메일
+  phone?: string;         // 전화번호
+  address?: string;       // 주소
+  login_id?: string;      // 로그인 ID
   employee_id?: string;
   specialization?: string;
   hire_date?: string;
   status?: TeacherStatus;
+  position: TeacherPosition;  // 직급 (필수)
   profile_image_url?: string;
   bio?: string;
   notes?: string;
+  pay_type?: string;
+  base_salary?: number;
+  hourly_rate?: number;
+  bank_name?: string;
+  bank_account?: string;
+  salary_notes?: string;
+}
+
+// 계정 생성 포함 강사 등록 입력
+export interface CreateTeacherWithAuthInput {
+  name: string;
+  phone: string;
+  position: TeacherPosition;
+  login_id: string;
+  password: string;
+  email?: string;
+  specialization?: string;
+  hire_date?: string;
+  employee_id?: string;
+  profile_image_url?: string;
+  bio?: string;
+  notes?: string;
+  pay_type?: string;
+  base_salary?: number;
+  hourly_rate?: number;
+  bank_name?: string;
+  bank_account?: string;
+  salary_notes?: string;
+  status?: TeacherStatus;
 }
 
 export interface UpdateTeacherInput {
-  name?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
+  name?: string;  // 이름 변경
+  phone?: string;  // 전화번호 변경
+  login_id?: string;  // 로그인 이메일 변경
+  password?: string;  // 비밀번호 변경 (선택사항)
   employee_id?: string;
   specialization?: string;
   hire_date?: string;
   status?: TeacherStatus;
+  position?: TeacherPosition;  // 직급
   profile_image_url?: string;
   bio?: string;
   notes?: string;
+  pay_type?: string;
+  base_salary?: number;
+  hourly_rate?: number;
+  bank_name?: string;
+  bank_account?: string;
+  salary_notes?: string;
 }
 
 export interface TeacherFilter {
@@ -310,5 +374,45 @@ export interface ScheduleConflictResult {
   has_conflicts: boolean;
   conflict_count: number;
   conflicts: ScheduleConflict[];
+}
+
+// 강사 초대 링크 관련
+export interface TeacherInvitation {
+  id: string;
+  tenant_id: string;
+  token: string;
+  position: TeacherPosition;
+  expires_at: string;
+  used_at?: string;
+  used_by?: string;
+  created_by?: string;
+  created_at: string;
+  tenant_name?: string;  // 조인 결과
+}
+
+export interface CreateTeacherInvitationInput {
+  position: TeacherPosition;
+  expires_days?: number;  // 기본 7일
+}
+
+export interface ValidateTeacherInvitationResult {
+  id?: string;
+  tenant_id?: string;
+  tenant_name?: string;
+  position?: TeacherPosition;
+  expires_at?: string;
+  used_at?: string;
+  is_valid: boolean;
+  error?: string;
+}
+
+// 강사 자체 등록 입력
+export interface SelfRegisterTeacherInput {
+  name: string;
+  phone: string;
+  login_id: string;
+  password: string;
+  email?: string;
+  token: string;  // 초대 토큰
 }
 

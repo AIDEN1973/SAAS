@@ -146,7 +146,8 @@ export function AddressInput({
             fontFamily: 'var(--font-family)',
             fontSize: 'var(--font-size-base)',
             fontWeight: 'var(--font-weight-normal)',
-            lineHeight: 'var(--line-height)',
+            // [불변 규칙] lineHeight: 1로 설정하여 height 기반 정렬 (Button, Select와 동일)
+            lineHeight: 1,
             boxSizing: 'border-box',
             cursor: disabled ? 'not-allowed' : 'text',
           }}

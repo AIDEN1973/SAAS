@@ -10,29 +10,34 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, Drawer, PageHeader, isMobile, isTablet, EmptyState, SubSidebar } from '@ui-core/react';
-import { UserCog } from 'lucide-react';
-import { SchemaForm, SchemaFilter } from '@schema-engine';
-import { useSchema } from '@hooks/use-schema';
+import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, PageHeader, isMobile, isTablet, EmptyState, SubSidebar, EntityCard } from '@ui-core/react';
+import { UserCog, Link2, Copy, Check } from 'lucide-react';
+import { SchemaFilter } from '@schema-engine';
 import {
   useTeachers,
-  useTeacher,
-  useCreateTeacher,
   useUpdateTeacher,
   useDeleteTeacher,
-  useTeacherStatistics,
+  useResignTeacher,
+  useTeachersWithStats,
   useTeacherClasses,
+  useCreateTeacherInvitation,
+  usePendingTeacherRegistrations,
+  useApproveTeacherRegistration,
+  useRejectTeacherRegistration,
+  usePositionPermissionDescription,
+  POSITION_LABELS,
 } from '@hooks/use-class';
-import type { Teacher, CreateTeacherInput, UpdateTeacherInput, TeacherFilter, TeacherStatus } from '@services/class-service';
+import type { TeacherWithStats } from '@hooks/use-class';
+import type { UpdateTeacherInput, TeacherFilter, TeacherStatus, TeacherPosition } from '@services/class-service';
+import type { CreateTeacherWithAuthInput } from '@industry/academy';
 import { apiClient } from '@api-sdk/core';
-import { teacherFormSchema } from '../schemas/teacher.schema';
-import type { FormSchema } from '@schema-engine/types';
 import { teacherFilterSchema } from '../schemas/teacher.filter.schema';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
 import { TEACHERS_SUB_MENU_ITEMS, DEFAULT_TEACHERS_SUB_MENU, TEACHERS_MENU_LABEL_MAPPING, getSubMenuFromUrl, setSubMenuToUrl, applyDynamicLabels } from '../constants';
 import type { TeachersSubMenuId } from '../constants';
 import { templates } from '../utils';
+import { TeacherForm } from './teachers/components/TeacherForm';
 
 /** 요일 레이블 매핑 */
 const DAY_LABELS: Record<string, string> = {
@@ -95,22 +100,49 @@ export function TeachersPage() {
   const [filter, setFilter] = useState<TeacherFilter>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null);
+  // 초대 링크 생성 모달 상태
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [invitePosition, setInvitePosition] = useState<TeacherPosition>('teacher');
+  const [generatedInviteUrl, setGeneratedInviteUrl] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
+  // 승인 모달 상태 (request_id 기반으로 변경)
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [approvingRequestId, setApprovingRequestId] = useState<string | null>(null);
+  const [approvingRequestName, setApprovingRequestName] = useState<string>('');
 
-  const { data: teachers, isLoading, error } = useTeachers({
+  // [최적화] useTeachersWithStats로 N+1 문제 해결
+  // 기존: useTeachers + 각 카드에서 useTeacherStatistics 개별 호출 (N+1)
+  // 변경: useTeachersWithStats로 한 번에 조회 (1 query)
+  const { data: teachers, isLoading, error } = useTeachersWithStats({
     ...filter,
     search: filter.search?.trim() || undefined, // 빈 문자열이면 undefined로 변환
   });
-  const createTeacher = useCreateTeacher();
   const updateTeacher = useUpdateTeacher();
   const deleteTeacher = useDeleteTeacher();
+  const resignTeacher = useResignTeacher();
+  const createInvitation = useCreateTeacherInvitation();
 
-  // Schema Registry 연동 (아키텍처 문서 S3 참조)
-  const { data: teacherFormSchemaData } = useSchema('teacher', teacherFormSchema, 'form');
-  const { data: teacherFilterSchemaData } = useSchema('teacher_filter', teacherFilterSchema, 'filter');
+  // 가입 신청 관련 훅
+  const { data: pendingRegistrations } = usePendingTeacherRegistrations();
+  const approveRegistration = useApproveTeacherRegistration();
+  const rejectRegistration = useRejectTeacherRegistration();
 
-  // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
-  const effectiveFormSchema = teacherFormSchemaData || teacherFormSchema;
-  const effectiveFilterSchema = teacherFilterSchemaData || teacherFilterSchema;
+  // 직급별 권한 설명 (설정 페이지와 연동)
+  // [업종중립] terms 전달하여 동적 라벨 생성
+  const permissionDescription = usePositionPermissionDescription(invitePosition, terms);
+
+  // 모든 직급의 권한 설명 맵
+  // const permissionDescriptionMap: Record<TeacherPosition, string> = {
+  //   vice_principal: usePositionPermissionDescription('vice_principal', terms),
+  //   manager: usePositionPermissionDescription('manager', terms),
+  //   teacher: usePositionPermissionDescription('teacher', terms),
+  //   assistant: usePositionPermissionDescription('assistant', terms),
+  //   other: usePositionPermissionDescription('other', terms),
+  // };
+
+  // Schema Registry 연동 (아키텍처 문서 S3 참조) - 필터 스키마만 조회
+  // teacherFormSchema는 TeacherForm 컴포넌트 내부에서 직접 관리
+  const effectiveFilterSchema = teacherFilterSchema;
 
   const handleFilterChange = useCallback((filters: Record<string, unknown>) => {
     setFilter({
@@ -119,11 +151,65 @@ export function TeachersPage() {
     });
   }, []);
 
-  const handleCreateTeacher = async (input: CreateTeacherInput) => {
+  const handleCreateTeacher = async (data: Record<string, unknown>) => {
+    let profileImageUrl: string | undefined = undefined;
+
     try {
-      await createTeacher.mutateAsync(input);
+      // 프로필 이미지 업로드 처리
+      const imageFile = data.profile_image instanceof File ? data.profile_image : undefined;
+
+      if (imageFile) {
+        const uploadResponse = await apiClient.uploadFile(
+          imageFile,
+          'teacher-profiles',
+          'profiles'
+        );
+
+        if (!uploadResponse.success) {
+          throw new Error(uploadResponse.error?.message || '프로필 이미지 업로드에 실패했습니다.');
+        }
+
+        profileImageUrl = uploadResponse.data;
+      }
+
+      // CreateTeacherWithAuthInput 타입으로 변환
+      const input: CreateTeacherWithAuthInput = {
+        name: String(data.name || ''),
+        phone: String(data.phone || ''),
+        position: String(data.position || 'teacher') as TeacherPosition,
+        login_id: String(data.login_id || ''),
+        password: String(data.password || ''),
+        email: data.email ? String(data.email) : undefined,
+        specialization: data.specialization ? String(data.specialization) : undefined,
+        hire_date: data.hire_date ? String(data.hire_date) : undefined,
+        employee_id: data.employee_id ? String(data.employee_id) : undefined,
+        profile_image_url: profileImageUrl,
+        bio: data.bio ? String(data.bio) : undefined,
+        notes: data.notes ? String(data.notes) : undefined,
+        pay_type: data.pay_type ? String(data.pay_type) : undefined,
+        base_salary: data.base_salary ? Number(data.base_salary) : undefined,
+        hourly_rate: data.hourly_rate ? Number(data.hourly_rate) : undefined,
+        bank_name: data.bank_name ? String(data.bank_name) : undefined,
+        bank_account: data.bank_account ? String(data.bank_account) : undefined,
+        salary_notes: data.salary_notes ? String(data.salary_notes) : undefined,
+        status: data.status ? (data.status as TeacherStatus) : 'active',
+      };
+
+      // Edge Function 호출하여 강사 생성 (auth.users + persons + academy_teachers)
+      const response = await apiClient.invokeFunction('create-teacher-direct', input as unknown as Record<string, unknown>);
+
+      if (!response.success) {
+        throw new Error(response.error?.message || '강사 등록에 실패했습니다.');
+      }
+
       setShowCreateForm(false);
+      showAlert('강사가 등록되었습니다.', '성공', 'success');
     } catch (error) {
+      // 롤백: 이미지 업로드 성공 후 강사 생성 실패 시 이미지 삭제
+      if (profileImageUrl) {
+        await apiClient.deleteFile('teacher-profiles', profileImageUrl);
+      }
+
       // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
       showAlert(
         error instanceof Error ? error.message : `${terms.PERSON_LABEL_SECONDARY} 등록에 실패했습니다.`,
@@ -141,6 +227,92 @@ export function TeachersPage() {
       // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
       showAlert(
         error instanceof Error ? error.message : `${terms.PERSON_LABEL_SECONDARY} 수정에 실패했습니다.`,
+        '오류',
+        'error'
+      );
+    }
+  };
+
+  // 초대 링크 생성 핸들러
+  const handleCreateInvitation = async () => {
+    try {
+      const result = await createInvitation.mutateAsync({ position: invitePosition });
+      setGeneratedInviteUrl(result.invite_url);
+    } catch (error) {
+      showAlert(
+        error instanceof Error ? error.message : '초대 링크 생성에 실패했습니다.',
+        '오류',
+        'error'
+      );
+    }
+  };
+
+  // 클립보드 복사 핸들러
+  const handleCopyInviteUrl = async () => {
+    if (!generatedInviteUrl) return;
+    try {
+      await navigator.clipboard.writeText(generatedInviteUrl);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (error) {
+      showAlert('클립보드 복사에 실패했습니다.', '오류', 'error');
+    }
+  };
+
+  // 초대 모달 닫기 핸들러
+  const handleCloseInviteModal = () => {
+    setShowInviteModal(false);
+    setGeneratedInviteUrl(null);
+    setInvitePosition('teacher');
+    setIsCopied(false);
+  };
+
+  // 승인 모달 열기 핸들러 (request_id 기반)
+  const handleOpenApproveModal = (requestId: string, name: string) => {
+    setApprovingRequestId(requestId);
+    setApprovingRequestName(name);
+    setShowApproveModal(true);
+  };
+
+  // 승인 모달 닫기 핸들러
+  const handleCloseApproveModal = () => {
+    setShowApproveModal(false);
+    setApprovingRequestId(null);
+    setApprovingRequestName('');
+  };
+
+  // 가입 신청 승인 핸들러
+  const handleApproveRegistration = async () => {
+    if (!approvingRequestId) return;
+
+    try {
+      await approveRegistration.mutateAsync({
+        request_id: approvingRequestId,
+      });
+      showAlert(`${terms.PERSON_LABEL_SECONDARY} 승인이 완료되었습니다.`, '성공', 'success');
+      handleCloseApproveModal();
+    } catch (error) {
+      showAlert(
+        error instanceof Error ? error.message : '승인에 실패했습니다.',
+        '오류',
+        'error'
+      );
+    }
+  };
+
+  // 가입 신청 거절 핸들러
+  const handleRejectRegistration = async (requestId: string) => {
+    const confirmed = await showConfirm('정말 이 신청을 거절하시겠습니까?', '신청 거절');
+    if (!confirmed) return;
+
+    try {
+      await rejectRegistration.mutateAsync({
+        request_id: requestId,
+      });
+      showAlert('신청이 거절되었습니다.', '알림', 'info');
+    } catch (error) {
+      showAlert(
+        error instanceof Error ? error.message : '거절에 실패했습니다.',
         '오류',
         'error'
       );
@@ -168,19 +340,102 @@ export function TeachersPage() {
           <PageHeader
             title={TEACHERS_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu)?.label || `${terms.PERSON_LABEL_SECONDARY} 관리`}
             actions={
-              <Button
-                variant="solid"
-                size="sm"
-                onClick={() => setShowCreateForm(!showCreateForm)}
-              >
-                {terms.PERSON_LABEL_SECONDARY} 등록
-              </Button>
+              <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowInviteModal(true)}
+                >
+                  <Link2 size={16} style={{ marginRight: 'var(--spacing-xs)' }} />
+                  초대 링크
+                </Button>
+                <Button
+                  variant="solid"
+                  size="sm"
+                  onClick={() => setShowCreateForm(!showCreateForm)}
+                >
+                  {terms.PERSON_LABEL_SECONDARY} 등록
+                </Button>
+              </div>
             }
           />
 
           {/* 강사 목록 탭 (기본) */}
           {selectedSubMenu === 'list' && (
             <>
+              {/* 대기 중인 가입 신청 섹션 */}
+              {pendingRegistrations && pendingRegistrations.length > 0 && (
+                <Card padding="md" style={{ marginBottom: 'var(--spacing-lg)', borderLeft: 'var(--border-width-thick) solid var(--color-info)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-md)' }}>
+                    <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-info)' }}>
+                      가입 승인 대기 ({pendingRegistrations.length}건)
+                    </h3>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(280px, 1fr))`, gap: 'var(--spacing-md)' }}>
+                    {pendingRegistrations.map((request) => (
+                      <div
+                        key={request.id}
+                        style={{
+                          padding: 'var(--spacing-md)',
+                          backgroundColor: 'var(--color-info-50)',
+                          borderRadius: 'var(--border-radius-md)',
+                          border: 'var(--border-width-thin) solid var(--color-info-200)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--spacing-sm)' }}>
+                          <div>
+                            <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-md)' }}>
+                              {request.name}
+                            </div>
+                            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                              {POSITION_LABELS[request.position] || request.position}
+                            </div>
+                          </div>
+                          <span
+                            style={{
+                              fontSize: 'var(--font-size-xs)',
+                              padding: 'var(--spacing-2xs) var(--spacing-xs)',
+                              borderRadius: 'var(--border-radius-full)',
+                              backgroundColor: 'var(--color-info-100)',
+                              color: 'var(--color-info)',
+                            }}
+                          >
+                            승인 대기
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-sm)' }}>
+                          <div>전화: {request.phone}</div>
+                          <div>이메일: {request.login_id}</div>
+                          <div>신청일: {new Date(request.created_at).toLocaleDateString('ko-KR')}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
+                          <Button
+                            size="sm"
+                            variant="solid"
+                            color="primary"
+                            onClick={() => handleOpenApproveModal(request.id, request.name)}
+                            disabled={approveRegistration.isPending}
+                            style={{ flex: 1 }}
+                          >
+                            승인
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            color="error"
+                            onClick={() => handleRejectRegistration(request.id)}
+                            disabled={rejectRegistration.isPending}
+                            style={{ flex: 1 }}
+                          >
+                            거절
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
               {/* 검색 및 필터 패널 */}
               <SchemaFilter
                 schema={effectiveFilterSchema}
@@ -191,36 +446,7 @@ export function TeachersPage() {
                 }}
               />
 
-              {/* 강사 등록 폼 - 반응형: 모바일/태블릿은 드로어, 데스크톱은 인라인 */}
-          {showCreateForm && (
-            <>
-              {isMobileMode || isTabletMode ? (
-                // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
-                <Drawer
-                  isOpen={showCreateForm}
-                  onClose={() => setShowCreateForm(false)}
-                  title={`${terms.PERSON_LABEL_SECONDARY} 등록`}
-                  position={isMobileMode ? 'bottom' : 'right'}
-                  width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
-                >
-                  <CreateTeacherForm
-                    onSubmit={handleCreateTeacher}
-                    onCancel={() => setShowCreateForm(false)}
-                    effectiveFormSchema={effectiveFormSchema}
-                    terms={terms}
-                  />
-                </Drawer>
-              ) : (
-                // 데스크톱: 인라인 폼 (기존 방식)
-                <CreateTeacherForm
-                  onSubmit={handleCreateTeacher}
-                  onCancel={() => setShowCreateForm(false)}
-                  effectiveFormSchema={effectiveFormSchema}
-                  terms={terms}
-                />
-              )}
-            </>
-          )}
+              {/* 강사 등록 폼은 Container 밖의 Modal로 이동 */}
 
           {/* 강사 목록 */}
           {isLoading ? (
@@ -236,19 +462,26 @@ export function TeachersPage() {
               </div>
             </Card>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(var(--width-card-min), 1fr))`, gap: 'var(--spacing-md)' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobileMode
+                ? '1fr'
+                : isTabletMode
+                ? 'repeat(2, 1fr)'
+                : 'repeat(3, 1fr)',
+              gap: 'var(--spacing-md)'
+            }}>
               {teachers?.map((teacher) => (
                 <TeacherCard
                   key={teacher.id}
                   teacher={teacher}
                   onEdit={(teacherId) => setEditingTeacherId(teacherId)}
                   onDelete={async (teacherId) => {
-                    const confirmed = await showConfirm(`정말 이 ${terms.PERSON_LABEL_SECONDARY}를 삭제하시겠습니까?`, `${terms.PERSON_LABEL_SECONDARY} 삭제`);
+                    const confirmed = await showConfirm(`정말 이 ${terms.PERSON_LABEL_SECONDARY}를 삭제하시겠습니까? 삭제된 데이터는 복구할 수 없습니다.`, `${terms.PERSON_LABEL_SECONDARY} 삭제`);
                     if (confirmed) {
                       try {
-                      await deleteTeacher.mutateAsync(teacherId);
+                        await deleteTeacher.mutateAsync(teacherId);
                       } catch (error) {
-                        // 에러는 showAlert로 사용자에게 표시 (아키텍처 문서 6-3 참조)
                         showAlert(
                           error instanceof Error ? error.message : `${terms.PERSON_LABEL_SECONDARY} 삭제에 실패했습니다.`,
                           '오류',
@@ -257,7 +490,20 @@ export function TeachersPage() {
                       }
                     }
                   }}
-                  terms={terms}
+                  onResign={async (teacherId) => {
+                    const confirmed = await showConfirm(`이 ${terms.PERSON_LABEL_SECONDARY}를 퇴직 처리하시겠습니까?`, `${terms.PERSON_LABEL_SECONDARY} 퇴직`);
+                    if (confirmed) {
+                      try {
+                        await resignTeacher.mutateAsync(teacherId);
+                      } catch (error) {
+                        showAlert(
+                          error instanceof Error ? error.message : `${terms.PERSON_LABEL_SECONDARY} 퇴직 처리에 실패했습니다.`,
+                          '오류',
+                          'error'
+                        );
+                      }
+                    }
+                  }}
                 />
               ))}
               {teachers?.length === 0 && (
@@ -294,242 +540,355 @@ export function TeachersPage() {
             </>
           )}
 
-          {/* 강사 수정 모달 */}
-          {editingTeacherId && (
-            <EditTeacherModal
-              teacherId={editingTeacherId}
-              onSave={handleUpdateTeacher}
-              onClose={() => setEditingTeacherId(null)}
-              terms={terms}
-            />
-          )}
+          {/* 강사 수정 모달 - 통합 TeacherForm 사용 */}
+          {editingTeacherId && (() => {
+            let triggerSubmit: (() => void) | null = null;
+            return (
+              <Modal
+                isOpen={true}
+                onClose={() => setEditingTeacherId(null)}
+                title={`${terms.PERSON_LABEL_SECONDARY} 수정`}
+                size="lg"
+                footer={
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditingTeacherId(null)}
+                      style={{ flex: 1 }}
+                    >
+                      {terms.MESSAGES.CANCEL}
+                    </Button>
+                    <Button
+                      variant="solid"
+                      color="primary"
+                      onClick={() => triggerSubmit?.()}
+                      style={{ flex: 1 }}
+                    >
+                      {terms.MESSAGES.SAVE}
+                    </Button>
+                  </>
+                }
+              >
+                <TeacherForm
+                  mode="edit"
+                  teacherId={editingTeacherId}
+                  onSubmit={async (data) => {
+                    // 프로필 이미지 업로드 처리
+                    let profileImageUrl: string | undefined = undefined;
+                    if (data.profile_image && data.profile_image instanceof File) {
+                      const uploadResponse = await apiClient.uploadFile(
+                        data.profile_image,
+                        'teacher-profiles',
+                        'profiles'
+                      );
+                      if (!uploadResponse.success) {
+                        throw new Error(uploadResponse.error?.message || '프로필 이미지 업로드에 실패했습니다.');
+                      }
+                      profileImageUrl = uploadResponse.data;
+                    }
+
+                    // 비밀번호 검증 (입력된 경우에만)
+                    const password = typeof data.password === 'string' && data.password !== '' ? data.password : undefined;
+                    const passwordConfirm = typeof data.password_confirm === 'string' && data.password_confirm !== '' ? data.password_confirm : undefined;
+
+                    if (password || passwordConfirm) {
+                      if (password !== passwordConfirm) {
+                        throw new Error('비밀번호가 일치하지 않습니다.');
+                      }
+                      if (password && password.length < 8) {
+                        throw new Error('비밀번호는 8자 이상이어야 합니다.');
+                      }
+                    }
+
+                    const input: UpdateTeacherInput = {
+                      name: typeof data.name === 'string' && data.name !== '' ? data.name : undefined,
+                      phone: typeof data.phone === 'string' && data.phone !== '' ? data.phone : undefined,
+                      login_id: typeof data.login_id === 'string' && data.login_id !== '' ? data.login_id : undefined,
+                      password: password,
+                      employee_id: typeof data.employee_id === 'string' && data.employee_id !== '' ? data.employee_id : undefined,
+                      specialization: typeof data.specialization === 'string' && data.specialization !== '' ? data.specialization : undefined,
+                      hire_date: typeof data.hire_date === 'string' && data.hire_date !== '' ? data.hire_date : undefined,
+                      status: data.status as TeacherStatus | undefined,
+                      profile_image_url: profileImageUrl || (typeof data.profile_image_url === 'string' && data.profile_image_url !== '' ? data.profile_image_url : undefined),
+                      bio: typeof data.bio === 'string' && data.bio !== '' ? data.bio : undefined,
+                      notes: typeof data.notes === 'string' && data.notes !== '' ? data.notes : undefined,
+                      position: typeof data.position === 'string' && data.position !== '' ? data.position as TeacherPosition : undefined,
+                      pay_type: typeof data.pay_type === 'string' && data.pay_type !== '' ? data.pay_type : undefined,
+                      base_salary: typeof data.base_salary === 'number' ? data.base_salary : undefined,
+                      hourly_rate: typeof data.hourly_rate === 'number' ? data.hourly_rate : undefined,
+                      bank_name: typeof data.bank_name === 'string' && data.bank_name !== '' ? data.bank_name : undefined,
+                      bank_account: typeof data.bank_account === 'string' && data.bank_account !== '' ? data.bank_account : undefined,
+                      salary_notes: typeof data.salary_notes === 'string' && data.salary_notes !== '' ? data.salary_notes : undefined,
+                    };
+                    await handleUpdateTeacher(editingTeacherId, input);
+                  }}
+                  onSubmitTrigger={(fn) => { triggerSubmit = fn; }}
+                />
+              </Modal>
+            );
+          })()}
         </Container>
+
+        {/* [요구사항] 강사 등록 모달 - 통합 TeacherForm 사용 */}
+        {showCreateForm && (() => {
+          let triggerSubmit: (() => void) | null = null;
+          return (
+            <Modal
+              isOpen={showCreateForm}
+              onClose={() => setShowCreateForm(false)}
+              title={`${terms.PERSON_LABEL_SECONDARY} 등록`}
+              size="lg"
+              footer={
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCreateForm(false)}
+                    style={{ flex: 1 }}
+                  >
+                    {terms.MESSAGES.CANCEL}
+                  </Button>
+                  <Button
+                    variant="solid"
+                    color="primary"
+                    onClick={() => triggerSubmit?.()}
+                    style={{ flex: 1 }}
+                  >
+                    {terms.MESSAGES.SAVE}
+                  </Button>
+                </>
+              }
+            >
+              <TeacherForm
+                mode="create"
+                onSubmit={async (data) => {
+                  await handleCreateTeacher(data);
+                }}
+                onSubmitTrigger={(fn) => { triggerSubmit = fn; }}
+              />
+            </Modal>
+          );
+        })()}
+
+        {/* [요구사항] 초대 링크 생성 모달 */}
+        <Modal
+          isOpen={showInviteModal}
+          onClose={handleCloseInviteModal}
+          title="초대링크 생성"
+          size="md"
+          footer={!generatedInviteUrl ? (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleCloseInviteModal}
+                style={{ flex: 1 }}
+              >
+                {terms.MESSAGES.CANCEL}
+              </Button>
+              <Button
+                variant="solid"
+                color="primary"
+                onClick={handleCreateInvitation}
+                disabled={createInvitation.isPending}
+                style={{ flex: 1 }}
+              >
+                {createInvitation.isPending ? '생성 중...' : '링크 생성'}
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="solid"
+              color="primary"
+              onClick={handleCloseInviteModal}
+              style={{ flex: 1 }}
+            >
+              완료
+            </Button>
+          )}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+            {!generatedInviteUrl ? (
+              <>
+                {/* 직급 선택 버튼 */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-sm)' }}>
+                  {(Object.entries(POSITION_LABELS) as [TeacherPosition, string][]).map(([value, label]) => {
+                    const isSelected = invitePosition === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setInvitePosition(value)}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.backgroundColor = 'var(--color-gray-100)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.backgroundColor = 'var(--color-white)';
+                          }
+                        }}
+                        style={{
+                          padding: 'var(--spacing-md)',
+                          border: isSelected
+                            ? 'var(--border-width-thin) solid var(--color-primary)'
+                            : 'var(--border-width-thin) solid var(--color-gray-200)',
+                          borderRadius: 'var(--border-radius-md)',
+                          backgroundColor: isSelected ? 'var(--color-primary-50)' : 'var(--color-white)',
+                          color: isSelected ? 'var(--color-primary)' : 'var(--color-text)',
+                          cursor: 'pointer',
+                          fontWeight: isSelected ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* 직급별 권한 설명 */}
+                <div
+                  style={{
+                    padding: 'var(--spacing-md)',
+                    backgroundColor: 'var(--color-gray-50)',
+                    borderRadius: 'var(--border-radius-md)',
+                    color: 'var(--color-text)',
+                    fontSize: 'var(--font-size-base)',
+                    lineHeight: 'var(--line-height)',
+                  }}
+                >
+                  <strong>{POSITION_LABELS[invitePosition]}</strong> : {permissionDescription}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* 생성된 링크 표시 */}
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      marginBottom: 'var(--spacing-sm)',
+                      fontWeight: 'var(--font-weight-semibold)',
+                      color: 'var(--color-text-primary)',
+                    }}
+                  >
+                    생성된 초대 링크
+                  </label>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--spacing-sm)',
+                      padding: 'var(--spacing-sm)',
+                      backgroundColor: 'var(--color-background-secondary)',
+                      borderRadius: 'var(--border-radius-md)',
+                      border: 'var(--border-width-thin) solid var(--color-border)',
+                    }}
+                  >
+                    <input
+                      type="text"
+                      value={generatedInviteUrl}
+                      readOnly
+                      style={{
+                        flex: 1,
+                        border: 'none',
+                        background: 'transparent',
+                        fontSize: 'var(--font-size-base)',
+                        color: 'var(--color-text-primary)',
+                        outline: 'none',
+                      }}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCopyInviteUrl}
+                    >
+                      {isCopied ? <Check size={16} /> : <Copy size={16} />}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* 직급 정보 */}
+                <div
+                  style={{
+                    padding: 'var(--spacing-md)',
+                    backgroundColor: 'var(--color-success-50)',
+                    borderRadius: 'var(--border-radius-md)',
+                    color: 'var(--color-success)',
+                    fontSize: 'var(--font-size-base)',
+                  }}
+                >
+                  <strong>직급</strong> : {POSITION_LABELS[invitePosition]}
+                  <br />
+                  <span style={{ color: 'var(--color-text-secondary)' }}>
+                    이 링크는 7일 후 만료됩니다.
+                  </span>
+                </div>
+
+                {/* 복사 완료 메시지 */}
+                {isCopied && (
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      color: 'var(--color-success)',
+                      fontSize: 'var(--font-size-base)',
+                    }}
+                  >
+                    클립보드에 복사되었습니다!
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </Modal>
+
+        {/* [요구사항] 가입 신청 승인 모달 */}
+        <Modal
+          isOpen={showApproveModal}
+          onClose={handleCloseApproveModal}
+          title={`${terms.PERSON_LABEL_SECONDARY} 가입 승인`}
+          size="sm"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+            <div
+              style={{
+                padding: 'var(--spacing-md)',
+                backgroundColor: 'var(--color-info-50)',
+                borderRadius: 'var(--border-radius-md)',
+                color: 'var(--color-info)',
+                fontSize: 'var(--font-size-sm)',
+              }}
+            >
+              <strong>{approvingRequestName}</strong>님의 가입 신청을 승인하시겠습니까?
+              <br />
+              <br />
+              승인 시 {terms.PERSON_LABEL_SECONDARY}의 로그인 계정이 생성됩니다.
+              <br />
+              (신청 시 입력한 비밀번호가 사용됩니다)
+            </div>
+
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginTop: 'var(--spacing-sm)' }}>
+              <Button
+                variant="outline"
+                onClick={handleCloseApproveModal}
+                style={{ flex: 1 }}
+              >
+                취소
+              </Button>
+              <Button
+                variant="solid"
+                color="primary"
+                onClick={handleApproveRegistration}
+                disabled={approveRegistration.isPending}
+                style={{ flex: 1 }}
+              >
+                {approveRegistration.isPending ? '처리 중...' : '승인'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </ErrorBoundary>
-  );
-}
-
-/**
- * 강사 등록 폼
- */
-function CreateTeacherForm({
-  onSubmit,
-  onCancel,
-  effectiveFormSchema,
-  terms,
-}: {
-  onSubmit: (input: CreateTeacherInput) => void;
-  onCancel: () => void;
-  effectiveFormSchema: FormSchema;
-  terms: ReturnType<typeof useIndustryTerms>;
-}) {
-  const mode = useResponsiveMode();
-  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
-  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
-  const isMobileMode = isMobile(modeUpper);
-  const isTabletMode = isTablet(modeUpper);
-  const showHeader = !isMobileMode && !isTabletMode;
-
-  const handleSubmit = (data: Record<string, unknown>) => {
-    // 스키마에서 받은 데이터를 CreateTeacherInput 형식으로 변환
-    const input: CreateTeacherInput = {
-      name: typeof data.name === 'string' ? data.name : '',
-      email: typeof data.email === 'string' ? data.email : undefined,
-      phone: typeof data.phone === 'string' ? data.phone : undefined,
-      address: typeof data.address === 'string' ? data.address : undefined,
-      employee_id: typeof data.employee_id === 'string' ? data.employee_id : undefined,
-      specialization: typeof data.specialization === 'string' ? data.specialization : undefined,
-      hire_date: typeof data.hire_date === 'string' ? data.hire_date : undefined,
-      status: (data.status as TeacherStatus) || 'active',
-      profile_image_url: typeof data.profile_image_url === 'string' ? data.profile_image_url : undefined,
-      bio: typeof data.bio === 'string' ? data.bio : undefined,
-      notes: typeof data.notes === 'string' ? data.notes : undefined,
-    };
-    onSubmit(input);
-  };
-
-  return (
-    <div style={showHeader ? { marginBottom: 'var(--spacing-md)' } : {}}>
-      {showHeader && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>{terms.PERSON_LABEL_SECONDARY} 등록</h3>
-          <Button variant="ghost" size="sm" onClick={onCancel}>
-            취소
-          </Button>
-        </div>
-      )}
-      <SchemaForm
-        schema={effectiveFormSchema}
-        onSubmit={handleSubmit}
-        defaultValues={{
-          status: 'active',
-        }}
-        actionContext={{
-          apiCall: async (endpoint: string, method: string, body?: unknown) => {
-            if (method === 'POST') {
-              const response = await apiClient.post(endpoint, body as Record<string, unknown>);
-              if (response.error) {
-                throw new Error(response.error.message);
-              }
-              return response.data;
-            }
-            const response = await apiClient.get(endpoint);
-            if (response.error) {
-              throw new Error(response.error.message);
-            }
-            return response.data;
-          },
-        }}
-      />
-    </div>
-  );
-}
-
-/**
- * 강사 수정 모달
- */
-function EditTeacherModal({
-  teacherId,
-  onSave,
-  onClose,
-  terms,
-}: {
-  teacherId: string;
-  onSave: (teacherId: string, input: UpdateTeacherInput) => Promise<void>;
-  onClose: () => void;
-  terms: ReturnType<typeof useIndustryTerms>;
-}) {
-  const { showAlert } = useModal();
-  const mode = useResponsiveMode();
-  // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
-  const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
-  const isMobileMode = isMobile(modeUpper);
-  const isTabletMode = isTablet(modeUpper);
-  const { data: teacher, isLoading } = useTeacher(teacherId);
-
-  // Schema Registry 연동 (아키텍처 문서 S3 참조)
-  const { data: teacherFormSchemaData } = useSchema('teacher', teacherFormSchema, 'form');
-  const effectiveFormSchema = teacherFormSchemaData || teacherFormSchema;
-
-  const handleSubmit = async (data: Record<string, unknown>) => {
-    const input: UpdateTeacherInput = {
-      name: typeof data.name === 'string' ? data.name : undefined,
-      email: typeof data.email === 'string' ? data.email : undefined,
-      phone: typeof data.phone === 'string' ? data.phone : undefined,
-      address: typeof data.address === 'string' ? data.address : undefined,
-      employee_id: typeof data.employee_id === 'string' ? data.employee_id : undefined,
-      specialization: typeof data.specialization === 'string' ? data.specialization : undefined,
-      hire_date: typeof data.hire_date === 'string' ? data.hire_date : undefined,
-      status: data.status as TeacherStatus | undefined,
-      profile_image_url: typeof data.profile_image_url === 'string' ? data.profile_image_url : undefined,
-      bio: typeof data.bio === 'string' ? data.bio : undefined,
-      notes: typeof data.notes === 'string' ? data.notes : undefined,
-    };
-    await onSave(teacherId, input);
-  };
-
-  // 반응형 처리: 모바일/태블릿은 Drawer, 데스크톱은 Modal (아키텍처 문서 6-1 참조)
-  if (isLoading) {
-    if (isMobileMode || isTabletMode) {
-      return (
-        <Drawer
-          isOpen={true}
-          onClose={onClose}
-          title={`${terms.PERSON_LABEL_SECONDARY} 수정`}
-          position={isMobileMode ? 'bottom' : 'right'}
-          width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
-        >
-          <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>
-        </Drawer>
-      );
-    }
-    return (
-      <Modal isOpen={true} onClose={onClose} title={`${terms.PERSON_LABEL_SECONDARY} 수정`} size="lg">
-        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>
-      </Modal>
-    );
-  }
-
-  if (!teacher) {
-    if (isMobileMode || isTabletMode) {
-      return (
-        <Drawer
-          isOpen={true}
-          onClose={onClose}
-          title={`${terms.PERSON_LABEL_SECONDARY} 수정`}
-          position={isMobileMode ? 'bottom' : 'right'}
-          width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
-        >
-          <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>{terms.PERSON_LABEL_SECONDARY}를 찾을 수 없습니다.</div>
-        </Drawer>
-      );
-    }
-    return (
-      <Modal isOpen={true} onClose={onClose} title={`${terms.PERSON_LABEL_SECONDARY} 수정`} size="lg">
-        <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>{terms.PERSON_LABEL_SECONDARY}를 찾을 수 없습니다.</div>
-      </Modal>
-    );
-  }
-
-  const formContent = (
-      <SchemaForm
-        schema={effectiveFormSchema}
-        onSubmit={handleSubmit}
-        defaultValues={{
-          name: teacher.name,
-          email: teacher.email || '',
-          phone: teacher.phone || '',
-          address: teacher.address || '',
-          employee_id: teacher.employee_id || '',
-          specialization: teacher.specialization || '',
-          hire_date: teacher.hire_date || '',
-          status: teacher.status,
-          profile_image_url: teacher.profile_image_url || '',
-          bio: teacher.bio || '',
-          notes: teacher.notes || '',
-        }}
-        actionContext={{
-          apiCall: async (endpoint: string, method: string, body?: unknown) => {
-            if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
-              const response = await apiClient.post(endpoint, (body ?? {}) as Record<string, unknown>);
-              if (response.error) {
-                throw new Error(response.error.message);
-              }
-              return response.data;
-            }
-            const response = await apiClient.get(endpoint);
-            if (response.error) {
-              throw new Error(response.error.message);
-            }
-            return response.data;
-          },
-          showToast: (message: string, variant?: string) => {
-          showAlert(message, variant === 'success' ? '성공' : variant === 'error' ? '오류' : '알림');
-          },
-        }}
-      />
-  );
-
-  // 모바일/태블릿: Drawer 사용 (아키텍처 문서 6-1 참조)
-  if (isMobileMode || isTabletMode) {
-    return (
-      <Drawer
-        isOpen={true}
-        onClose={onClose}
-        title={`${terms.PERSON_LABEL_SECONDARY} 수정`}
-        position={isMobileMode ? 'bottom' : 'right'}
-        width={isTabletMode ? 'var(--width-drawer-tablet)' : '100%'}
-      >
-        {formContent}
-      </Drawer>
-    );
-  }
-
-  // 데스크톱: Modal 사용
-  return (
-    <Modal isOpen={true} onClose={onClose} title={`${terms.PERSON_LABEL_SECONDARY} 수정`} size="lg">
-      {formContent}
-    </Modal>
   );
 }
 
@@ -538,184 +897,95 @@ function EditTeacherModal({
  * [요구사항] 강사 프로필 보기
  * [P1-1] 담당 수업 목록 표시
  * [P1-3] 강사 통계 표시
+ *
+ * [최적화] TeacherWithStats 타입 사용으로 N+1 문제 해결
+ * - 기존: 각 카드에서 useTeacherStatistics 개별 호출 (N+1 쿼리)
+ * - 변경: 부모에서 통계 포함된 데이터를 받아서 사용 (0 추가 쿼리)
  */
 function TeacherCard({
   teacher,
   onEdit,
   onDelete,
-  terms,
+  onResign,
 }: {
-  teacher: Teacher;
+  teacher: TeacherWithStats;
   onEdit: (teacherId: string) => void;
   onDelete: (teacherId: string) => Promise<void>;
-  terms: ReturnType<typeof useIndustryTerms>;
+  onResign: (teacherId: string) => Promise<void>;
 }) {
-  // P1-3: 강사 통계 조회
-  const { data: stats } = useTeacherStatistics(teacher.id);
-  // P1-1: 담당 수업 목록 조회
-  const { data: assignedClasses } = useTeacherClasses(teacher.id);
+  // [최적화] 통계는 이미 teacher 객체에 포함되어 있음
+  // 기존 코드 (제거됨):
+  // const { data: stats } = useTeacherStatistics(teacher.id);
+  // const { data: assignedClasses } = useTeacherClasses(teacher.id);
 
-  const statusLabels: Record<TeacherStatus, string> = {
-    active: terms.STAFF_ACTIVE,
-    on_leave: terms.STAFF_LEAVE,
-    resigned: terms.STAFF_RESIGNED,
+  // const statusLabels: Record<TeacherStatus, string> = {
+  //   active: terms.STAFF_ACTIVE,
+  //   on_leave: terms.STAFF_LEAVE,
+  //   resigned: terms.STAFF_RESIGNED,
+  //   pending: '승인 대기',
+  // };
+
+  // 직급별 색상 매핑
+  const getPositionBadgeColor = (position?: string): 'primary' | 'success' | 'warning' | 'error' | 'secondary' => {
+    if (!position) return 'secondary';
+    if (position === 'vice_principal') return 'error';
+    if (position === 'manager') return 'warning';
+    if (position === 'teacher') return 'primary';
+    if (position === 'assistant') return 'success';
+    return 'secondary';
   };
 
-  const statusColors: Record<TeacherStatus, string> = {
-    active: 'var(--color-success)',
-    on_leave: 'var(--color-warning)',
-    resigned: 'var(--color-error)',
-  };
+  // 직급 레이블 (SSOT: use-class Hook의 POSITION_LABELS 사용)
+  const positionLabel = teacher.position ? POSITION_LABELS[teacher.position] || teacher.position : '직급 미지정';
 
   return (
-    <Card
-      padding="md"
-      style={{
-        borderLeft: `var(--border-width-thick) solid ${statusColors[teacher.status]}`,
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--spacing-sm)' }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
-            <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>
-              {teacher.name}
-            </h3>
-            <span
-              style={{
-                fontSize: 'var(--font-size-xs)',
-                padding: 'var(--spacing-xs) var(--spacing-sm)',
-                borderRadius: 'var(--border-radius-full)',
-                backgroundColor: `${statusColors[teacher.status]}20`,
-                color: statusColors[teacher.status],
-              }}
-            >
-              {statusLabels[teacher.status]}
-            </span>
-          </div>
-          {teacher.employee_id && (
-            <div style={{ color: 'var(--color-text-secondary)' }}>
-              {terms.STAFF_ID_LABEL}: {teacher.employee_id}
-            </div>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
-          <Button size="xs" variant="ghost" onClick={() => onEdit(teacher.id)}>
-            수정
+    <div style={{ position: 'relative' }}>
+      <EntityCard
+        badge={{
+          label: teacher.specialization || '전문 분야',
+          color: getPositionBadgeColor(teacher.position),
+        }}
+        secondaryLabel={positionLabel}
+        title={teacher.name}
+        mainValue={teacher.total_classes || 0}
+        subValue={` / ${teacher.total_students || 0}명`}
+        description={teacher.phone || teacher.email || '-'}
+        onClick={() => onEdit(teacher.id)}
+      />
+
+      {/* 액션 버튼 오버레이 */}
+      <div style={{
+        position: 'absolute',
+        top: 'var(--spacing-sm)',
+        right: 'var(--spacing-sm)',
+        display: 'flex',
+        gap: 'var(--spacing-xs)',
+        zIndex: 1,
+      }}>
+        <Button size="xs" variant="ghost" onClick={(e) => {
+          e.stopPropagation();
+          onEdit(teacher.id);
+        }}>
+          수정
+        </Button>
+        {(teacher.status === 'active' || teacher.status === 'on_leave') && (
+          <Button size="xs" variant="ghost" onClick={(e) => {
+            e.stopPropagation();
+            void onResign(teacher.id);
+          }}>
+            퇴직
           </Button>
-          <Button size="xs" variant="ghost" onClick={() => onDelete(teacher.id)}>
+        )}
+        {teacher.status === 'resigned' && (
+          <Button size="xs" variant="ghost" color="error" onClick={(e) => {
+            e.stopPropagation();
+            void onDelete(teacher.id);
+          }}>
             삭제
           </Button>
-        </div>
-      </div>
-
-      {teacher.profile_image_url && (
-        <div style={{ marginBottom: 'var(--spacing-sm)' }}>
-          <img
-            src={teacher.profile_image_url}
-            alt={teacher.name}
-            loading="lazy"
-            decoding="async"
-            style={{
-              width: '100%',
-              maxWidth: 'var(--width-student-info-min)',
-              height: 'auto',
-              borderRadius: 'var(--border-radius-md)',
-            }}
-          />
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)', color: 'var(--color-text-secondary)' }}>
-        {teacher.specialization && <div>전문 분야: {teacher.specialization}</div>}
-        {teacher.phone && <div>전화: {teacher.phone}</div>}
-        {teacher.email && <div>이메일: {teacher.email}</div>}
-        {teacher.hire_date && <div>입사일: {teacher.hire_date}</div>}
-        {teacher.bio && (
-          <div style={{ marginTop: 'var(--spacing-xs)', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-bg-secondary)', borderRadius: 'var(--border-radius-md)' }}>
-            {teacher.bio}
-          </div>
         )}
       </div>
-
-      {/* P1-3: 강사 통계 카드 */}
-      {stats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-xs)', marginTop: 'var(--spacing-sm)', paddingTop: 'var(--spacing-sm)', borderTop: 'var(--border-width-thin) solid var(--color-border)' }}>
-          <div style={{ textAlign: 'center', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-bg-secondary)', borderRadius: 'var(--border-radius-sm)' }}>
-            <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
-              {stats.total_classes}
-            </div>
-            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-              담당 {terms.GROUP_LABEL}
-            </div>
-            {stats.main_teacher_classes > 0 && (
-              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--spacing-xs)' }}>
-                {terms.HOMEROOM_TEACHER} {stats.main_teacher_classes}개
-              </div>
-            )}
-          </div>
-          <div style={{ textAlign: 'center', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-bg-secondary)', borderRadius: 'var(--border-radius-sm)' }}>
-            <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
-              {stats.total_students}
-            </div>
-            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-              담당 {terms.PERSON_LABEL_PRIMARY}
-            </div>
-            {stats.assistant_classes > 0 && (
-              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--spacing-xs)' }}>
-                {terms.ASSISTANT_TEACHER} {stats.assistant_classes}개
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* P1-1: 담당 수업 목록 */}
-      {assignedClasses && assignedClasses.length > 0 && (
-        <div style={{ marginTop: 'var(--spacing-sm)', paddingTop: 'var(--spacing-sm)', borderTop: 'var(--border-width-thin) solid var(--color-border)' }}>
-          <div style={{ fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)' }}>
-            담당 {terms.GROUP_LABEL} 목록 ({assignedClasses.length})
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
-            {assignedClasses.map((ct) => (
-              <div
-                key={ct.class_id}
-                style={{
-                  padding: 'var(--spacing-xs)',
-                  backgroundColor: 'var(--color-bg-tertiary)',
-                  borderRadius: 'var(--border-radius-sm)',
-                  borderLeft: `3px solid ${ct.academy_classes.color || 'var(--color-border)'}`,
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ fontWeight: 'var(--font-weight-medium)', fontSize: 'var(--font-size-sm)' }}>
-                    {ct.academy_classes.name}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 'var(--font-size-xs)',
-                      padding: '2px var(--spacing-xs)',
-                      borderRadius: 'var(--border-radius-full)',
-                      backgroundColor: ct.role === 'teacher' ? 'var(--color-primary)20' : 'var(--color-secondary)20',
-                      color: ct.role === 'teacher' ? 'var(--color-primary)' : 'var(--color-secondary)',
-                    }}
-                  >
-                    {ct.role === 'teacher' ? terms.HOMEROOM_TEACHER : terms.ASSISTANT_TEACHER}
-                  </div>
-                </div>
-                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                  {formatDayOfWeek(ct.academy_classes.day_of_week)} {ct.academy_classes.start_time.substring(0, 5)} ~ {ct.academy_classes.end_time.substring(0, 5)}
-                  {ct.academy_classes.room && ` | ${ct.academy_classes.room}`}
-                  {ct.academy_classes.subject && ` | ${ct.academy_classes.subject}`}
-                </div>
-                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginTop: '2px' }}>
-                  {ct.academy_classes.current_count}/{ct.academy_classes.capacity}명
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </Card>
+    </div>
   );
 }
 
@@ -724,6 +994,7 @@ function TeacherCard({
  * 전체 강사 현황 통계를 표시
  */
 function TeacherStatisticsTab({ terms }: { terms: ReturnType<typeof useIndustryTerms> }) {
+  // resigned 상태 제외하고 조회
   const { data: teachers, isLoading: isLoadingTeachers } = useTeachers();
 
   // 통계 계산
@@ -768,12 +1039,14 @@ function TeacherStatisticsTab({ terms }: { terms: ReturnType<typeof useIndustryT
     active: terms.STAFF_ACTIVE,
     on_leave: terms.STAFF_LEAVE,
     resigned: terms.STAFF_RESIGNED,
+    pending: '승인 대기',
   };
 
   const statusColors: Record<TeacherStatus, string> = {
     active: 'var(--color-success)',
     on_leave: 'var(--color-warning)',
     resigned: 'var(--color-error)',
+    pending: 'var(--color-info)',
   };
 
   return (
@@ -917,11 +1190,11 @@ function TeacherStatisticsTab({ terms }: { terms: ReturnType<typeof useIndustryT
 /**
  * 담당 과목 탭 컴포넌트
  * 강사별 담당 과목/수업 현황을 표시
+ * [최적화] useTeachersWithStats로 N+1 문제 해결
  */
 function TeacherAssignmentsTab({ terms }: { terms: ReturnType<typeof useIndustryTerms> }) {
-  const { data: teachers, isLoading: isLoadingTeachers } = useTeachers();
-
-  // 각 강사의 담당 수업 수는 TeacherAssignmentItem에서 개별 조회
+  // [최적화] useTeachersWithStats로 통계 포함된 강사 목록 조회
+  const { data: teachers, isLoading: isLoadingTeachers } = useTeachersWithStats();
 
   if (isLoadingTeachers) {
     return (
@@ -956,15 +1229,18 @@ function TeacherAssignmentsTab({ terms }: { terms: ReturnType<typeof useIndustry
 
 /**
  * 강사 담당 과목 아이템 컴포넌트
+ * [최적화] TeacherWithStats 사용으로 통계 쿼리 제거
+ * 수업 상세 정보는 여전히 useTeacherClasses 사용 (필요시)
  */
 function TeacherAssignmentItem({
   teacher,
   terms,
 }: {
-  teacher: Teacher;
+  teacher: TeacherWithStats;
   terms: ReturnType<typeof useIndustryTerms>;
 }) {
-  const { data: stats } = useTeacherStatistics(teacher.id);
+  // [최적화] 통계는 teacher 객체에 이미 포함됨, 수업 목록은 별도 조회 필요
+  // 수업 상세 정보(이름, 시간 등)가 필요하므로 useTeacherClasses 유지
   const { data: assignedClasses } = useTeacherClasses(teacher.id);
 
   return (
@@ -987,29 +1263,29 @@ function TeacherAssignmentItem({
         </div>
         <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
           <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-primary)', fontWeight: 'var(--font-weight-semibold)' }}>
-            {stats?.total_classes || 0}개 {terms.GROUP_LABEL}
+            {teacher.total_classes || 0}개 {terms.GROUP_LABEL}
           </span>
           <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-success)', fontWeight: 'var(--font-weight-semibold)' }}>
-            {stats?.total_students || 0}명 {terms.PERSON_LABEL_PRIMARY}
+            {teacher.total_students || 0}명 {terms.PERSON_LABEL_PRIMARY}
           </span>
         </div>
       </div>
 
       {assignedClasses && assignedClasses.length > 0 ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xs)' }}>
-          {assignedClasses.map(ct => (
+          {assignedClasses.map((ct) => (
             <div
               key={ct.class_id}
               style={{
                 padding: 'var(--spacing-xs) var(--spacing-sm)',
-                backgroundColor: ct.academy_classes.color || 'var(--color-gray-200)',
+                backgroundColor: ct.academy_classes?.color || 'var(--color-gray-200)',
                 borderRadius: 'var(--border-radius-sm)',
                 fontSize: 'var(--font-size-xs)',
               }}
             >
-              <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{ct.academy_classes.name}</span>
+              <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{ct.academy_classes?.name}</span>
               <span style={{ color: 'var(--color-text-secondary)', marginLeft: 'var(--spacing-xs)' }}>
-                {formatDayOfWeek(ct.academy_classes.day_of_week)} {ct.academy_classes.start_time.substring(0, 5)}
+                {formatDayOfWeek(ct.academy_classes?.day_of_week)} {ct.academy_classes?.start_time?.substring(0, 5)}
               </span>
               {ct.role === 'assistant' && (
                 <span style={{ color: 'var(--color-warning)', marginLeft: 'var(--spacing-xs)' }}>({terms.ASSISTANT_TEACHER})</span>
@@ -1029,9 +1305,11 @@ function TeacherAssignmentItem({
 /**
  * 강사 성과 탭 컴포넌트
  * 강사별 성과 분석을 표시
+ * [최적화] useTeachersWithStats로 N+1 문제 해결
  */
 function TeacherPerformanceTab({ terms }: { terms: ReturnType<typeof useIndustryTerms> }) {
-  const { data: teachers, isLoading: isLoadingTeachers } = useTeachers();
+  // [최적화] useTeachersWithStats로 통계 포함된 강사 목록 조회
+  const { data: teachers, isLoading: isLoadingTeachers } = useTeachersWithStats();
 
   if (isLoadingTeachers) {
     return (
@@ -1069,18 +1347,20 @@ function TeacherPerformanceTab({ terms }: { terms: ReturnType<typeof useIndustry
 
 /**
  * 강사 성과 아이템 컴포넌트
+ * [최적화] TeacherWithStats 사용으로 개별 통계 쿼리 제거
  */
 function TeacherPerformanceItem({
   teacher,
   terms,
 }: {
-  teacher: Teacher;
+  teacher: TeacherWithStats;
   terms: ReturnType<typeof useIndustryTerms>;
 }) {
-  const { data: stats } = useTeacherStatistics(teacher.id);
+  // [최적화] 통계는 teacher 객체에 이미 포함됨
+  // 기존 코드 (제거됨): const { data: stats } = useTeacherStatistics(teacher.id);
 
   // 성과 점수 계산 (담당 수업 수 * 2 + 담당 학생 수)
-  const performanceScore = (stats?.total_classes || 0) * 2 + (stats?.total_students || 0);
+  const performanceScore = (teacher.total_classes || 0) * 2 + (teacher.total_students || 0);
 
   return (
     <div
@@ -1116,25 +1396,25 @@ function TeacherPerformanceItem({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--spacing-sm)' }}>
         <div style={{ textAlign: 'center', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-primary-50)', borderRadius: 'var(--border-radius-sm)' }}>
           <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
-            {stats?.total_classes || 0}
+            {teacher.total_classes || 0}
           </div>
           <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>담당 {terms.GROUP_LABEL}</div>
         </div>
         <div style={{ textAlign: 'center', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-success-50)', borderRadius: 'var(--border-radius-sm)' }}>
           <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>
-            {stats?.total_students || 0}
+            {teacher.total_students || 0}
           </div>
           <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>담당 {terms.PERSON_LABEL_PRIMARY}</div>
         </div>
         <div style={{ textAlign: 'center', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-warning-50)', borderRadius: 'var(--border-radius-sm)' }}>
           <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-warning)' }}>
-            {stats?.main_teacher_classes || 0}
+            {teacher.main_teacher_classes || 0}
           </div>
           <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>{terms.HOMEROOM_TEACHER}</div>
         </div>
         <div style={{ textAlign: 'center', padding: 'var(--spacing-sm)', backgroundColor: 'var(--color-gray-100)', borderRadius: 'var(--border-radius-sm)' }}>
           <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-secondary)' }}>
-            {stats?.assistant_classes || 0}
+            {teacher.assistant_classes || 0}
           </div>
           <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>{terms.ASSISTANT_TEACHER}</div>
         </div>

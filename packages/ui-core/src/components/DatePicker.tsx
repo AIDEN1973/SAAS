@@ -86,36 +86,32 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     return `${year}-${month}-${day}`;
   }, [selectedDate, dateTime]);
 
+  // [불변 규칙] 명시적 height 사용으로 Button/Select와 높이 일관성 유지 (SSOT)
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
-      paddingTop: 'var(--spacing-xs)',
-      paddingBottom: 'var(--spacing-xs)',
-      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
-      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (아이콘 공간 포함)
+      height: 'var(--height-control-xs)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)',
+      paddingRight: 'var(--spacing-form-horizontal-right)',
     },
     sm: {
-      paddingTop: 'var(--spacing-xs)',
-      paddingBottom: 'var(--spacing-xs)',
-      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
-      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (아이콘 공간 포함)
+      height: 'var(--height-control-sm)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)',
+      paddingRight: 'var(--spacing-form-horizontal-right)',
     },
     md: {
-      paddingTop: 'var(--spacing-sm)',
-      paddingBottom: 'var(--spacing-sm)',
-      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
-      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (아이콘 공간 포함)
+      height: 'var(--height-control-md)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)',
+      paddingRight: 'var(--spacing-form-horizontal-right)',
     },
     lg: {
-      paddingTop: 'var(--spacing-md)',
-      paddingBottom: 'var(--spacing-md)',
-      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
-      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (아이콘 공간 포함)
+      height: 'var(--height-control-lg)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)',
+      paddingRight: 'var(--spacing-form-horizontal-right)',
     },
     xl: {
-      paddingTop: 'var(--spacing-lg)',
-      paddingBottom: 'var(--spacing-lg)',
-      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
-      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용 (아이콘 공간 포함)
+      height: 'var(--height-control-xl)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)',
+      paddingRight: 'var(--spacing-form-horizontal-right)',
     },
   };
 
@@ -124,7 +120,9 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   const showInlineLabel = showInlineLabelWhenHasValue && hasValue;
 
   const inputStyle: React.CSSProperties = {
-    ...sizeStyles[size],
+    height: '100%', // wrapper의 height를 채움
+    paddingLeft: sizeStyles[size].paddingLeft,
+    paddingRight: sizeStyles[size].paddingRight,
     border: 'none',
     borderRadius: 'var(--border-radius-xs)',
     backgroundColor: disabled ? 'var(--color-form-disabled-bg)' : 'var(--color-white)',
@@ -135,7 +133,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     fontFamily: 'var(--font-family)',
     fontSize: 'var(--font-size-base)',
     fontWeight: 'var(--font-weight-normal)',
-    lineHeight: 'var(--line-height)',
+    // [불변 규칙] lineHeight: 1로 설정하여 height 기반 정렬 (Button, Select와 동일)
+    lineHeight: 1,
     cursor: disabled ? 'not-allowed' : 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -143,9 +142,11 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   };
 
   // 래퍼 스타일: input을 감싸고 사방 테두리 적용 (카드 스타일과 동일)
+  // [불변 규칙] wrapper에 height 적용 + boxSizing: border-box로 border 포함 높이 계산
   const wrapperStyle: React.CSSProperties = {
     position: 'relative',
     width: fullWidth ? '100%' : 'auto',
+    height: sizeStyles[size].height, // wrapper에 height 적용
     backgroundColor: disabled ? 'var(--color-form-disabled-bg)' : 'var(--color-white)',
     border: isOpen
       ? (error ? 'var(--border-width-thin) solid var(--color-form-error)' : 'var(--border-width-thin) solid var(--color-primary)')

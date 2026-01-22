@@ -165,7 +165,7 @@ export interface MultiConditionRule {
  */
 export interface FormFieldSchema {
   name: string;
-  kind: 'text' | 'email' | 'phone' | 'number' | 'password' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'datetime' | 'dateRange' | 'time' | 'address' | 'custom';
+  kind: 'text' | 'email' | 'phone' | 'number' | 'password' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'datetime' | 'dateRange' | 'time' | 'address' | 'file' | 'custom';
   ui?: {
     // SDUI v1.1: i18n 키 지원 (label/placeholder/description은 하위 호환성)
     labelKey?: string;  // i18n 키 (우선순위)
@@ -177,7 +177,9 @@ export interface FormFieldSchema {
     tooltipKey?: string;
     tooltip?: string;
     colSpan?: number;  // Grid column span (1-12)
+    rowSpan?: number;  // Grid row span (1-12)
     unit?: string;  // 단위 표시 (예: "명", "개", "원" 등) - number 필드에서 사용
+    readOnly?: boolean;  // 읽기 전용 필드 (disabled로 처리됨)
   };
   // SDUI v1.1: options도 i18n 키 지원
   options?: Array<{

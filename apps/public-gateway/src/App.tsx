@@ -15,6 +15,7 @@ import { QRAttendancePage } from './pages/QRAttendancePage';
 import { PaymentPage } from './pages/PaymentPage';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { HomePage } from './pages/HomePage';
+import { TeacherRegisterPage } from './pages/TeacherRegisterPage';
 
 function App() {
   // 테넌트별 테마 적용 (public-gateway는 로그인 전 접근 가능하므로 기본 테마 사용)
@@ -33,6 +34,7 @@ function App() {
           <Route path="/attend" element={<QRAttendancePage />} />
           <Route path="/payment" element={<PaymentPage />} />
           <Route path="/payment/success" element={<PaymentSuccessPage />} />
+          <Route path="/teacher-register" element={<TeacherRegisterPage />} />
         </Routes>
     </ErrorBoundary>
     </BrowserRouter>

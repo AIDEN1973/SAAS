@@ -148,22 +148,28 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
   const effectiveColor: ColorToken = selected ? 'primary' : color;
   const colorVars = colorMap[effectiveColor];
 
-  // Size를 CSS Variables로 매핑 (Select 컴포넌트와 높이 일치)
+  // Size를 CSS Variables로 매핑 (모든 variant에서 동일한 높이 보장)
+  // [불변 규칙] 명시적 height 사용으로 variant(solid/outline/ghost) 간 높이 일관성 유지
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
-      padding: 'var(--spacing-xs) var(--spacing-xs)',
+      height: 'var(--height-control-xs)',
+      padding: '0 var(--spacing-xs)',
     },
     sm: {
-      padding: 'calc(var(--spacing-xs) + var(--spacing-xs) / 2) var(--spacing-sm)',
+      height: 'var(--height-control-sm)',
+      padding: '0 var(--spacing-sm)',
     },
     md: {
-      padding: 'var(--spacing-sm) var(--spacing-sm)', // Select md와 동일한 높이
+      height: 'var(--height-control-md)',
+      padding: '0 var(--spacing-md)',
     },
     lg: {
-      padding: 'var(--spacing-md) var(--spacing-md)', // Select lg와 동일한 높이
+      height: 'var(--height-control-lg)',
+      padding: '0 var(--spacing-lg)',
     },
     xl: {
-      padding: 'var(--spacing-lg) var(--spacing-lg)', // Select xl와 동일한 높이
+      height: 'var(--height-control-xl)',
+      padding: '0 var(--spacing-xl)',
     },
   };
 
@@ -180,8 +186,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
     boxSizing: 'border-box', // 테두리 포함 크기 계산
     fontFamily: 'var(--font-family)', // Select와 동일한 폰트
     fontSize: 'var(--font-size-base)', // Select와 동일한 폰트 크기
-    // Select 컴포넌트와 동일한 lineHeight 적용하여 높이 일치
-    lineHeight: 'var(--line-height)',
+    // [불변 규칙] lineHeight: 1로 설정하여 height + flexbox alignItems 조합으로 텍스트 세로 중앙 정렬
+    lineHeight: 1,
     ...sizeStyles[size],
     ...(fullWidth && { width: '100%' }),
   };

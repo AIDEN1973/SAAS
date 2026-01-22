@@ -135,11 +135,11 @@ export function getDynamicMenuLabel(
     primary_statistics: `${terms.PERSON_LABEL_PRIMARY}통계`,
     primary_management: `${terms.PERSON_LABEL_PRIMARY}관리`,
     // 보조 대상 관련
-    secondary_list: `${terms.PERSON_LABEL_SECONDARY} 목록`,
+    secondary_list: `${terms.PERSON_LABEL_SECONDARY}목록`,
     secondary_add: `${terms.PERSON_LABEL_SECONDARY} 등록`,
-    secondary_statistics: `${terms.PERSON_LABEL_SECONDARY} 통계`,
-    secondary_assignments: `담당 과목`,
-    secondary_performance: `${terms.PERSON_LABEL_SECONDARY} 성과`,
+    secondary_statistics: `${terms.PERSON_LABEL_SECONDARY}통계`,
+    secondary_assignments: `담당과목`,
+    secondary_performance: `${terms.PERSON_LABEL_SECONDARY}성과`,
     secondary_management: `${terms.PERSON_LABEL_SECONDARY}관리`,
     // 그룹 관련
     group_list: `${terms.GROUP_LABEL} 목록`,
@@ -188,12 +188,12 @@ export function getDynamicAriaLabel(
     primary_statistics: `${terms.PERSON_LABEL_PRIMARY} 통계 화면으로 이동`,
     primary_management: `${terms.PERSON_LABEL_PRIMARY} 관리 화면으로 이동`,
     // 보조 대상 관련
-    secondary_list: `${terms.PERSON_LABEL_SECONDARY} 목록 화면으로 이동`,
+    secondary_list: `${terms.PERSON_LABEL_SECONDARY}목록 화면으로 이동`,
     secondary_add: `${terms.PERSON_LABEL_SECONDARY} 등록 화면으로 이동`,
-    secondary_statistics: `${terms.PERSON_LABEL_SECONDARY} 통계 화면으로 이동`,
-    secondary_assignments: `담당 과목 화면으로 이동`,
-    secondary_performance: `${terms.PERSON_LABEL_SECONDARY} 성과 화면으로 이동`,
-    secondary_management: `${terms.PERSON_LABEL_SECONDARY} 관리 화면으로 이동`,
+    secondary_statistics: `${terms.PERSON_LABEL_SECONDARY}통계 화면으로 이동`,
+    secondary_assignments: `담당과목 화면으로 이동`,
+    secondary_performance: `${terms.PERSON_LABEL_SECONDARY}성과 화면으로 이동`,
+    secondary_management: `${terms.PERSON_LABEL_SECONDARY}관리 화면으로 이동`,
     // 그룹 관련
     group_list: `${terms.GROUP_LABEL} 목록 화면으로 이동`,
     group_add: `${terms.GROUP_LABEL} 등록 화면으로 이동`,
@@ -656,10 +656,10 @@ export type TeachersSubMenuId =
 
 /** 강사관리 페이지 서브 메뉴 설정 */
 export const TEACHERS_SUB_MENU_ITEMS: SubSidebarMenuItem<TeachersSubMenuId>[] = [
-  { id: 'list', label: '강사 목록', icon: createElement(List, { size: ICON_SIZE }), ariaLabel: '강사 목록 화면으로 이동' },
-  { id: 'statistics', label: '강사 통계', icon: createElement(BarChart3, { size: ICON_SIZE }), ariaLabel: '강사 통계 화면으로 이동' },
-  { id: 'assignments', label: '담당 과목', icon: createElement(BookOpen, { size: ICON_SIZE }), ariaLabel: '담당 과목 화면으로 이동' },
-  { id: 'performance', label: '강사 성과', icon: createElement(Award, { size: ICON_SIZE }), ariaLabel: '강사 성과 화면으로 이동' },
+  { id: 'list', label: '강사목록', icon: createElement(List, { size: ICON_SIZE }), ariaLabel: '강사목록 화면으로 이동' },
+  { id: 'statistics', label: '강사통계', icon: createElement(BarChart3, { size: ICON_SIZE }), ariaLabel: '강사통계 화면으로 이동' },
+  { id: 'assignments', label: '담당과목', icon: createElement(BookOpen, { size: ICON_SIZE }), ariaLabel: '담당과목 화면으로 이동' },
+  { id: 'performance', label: '강사성과', icon: createElement(Award, { size: ICON_SIZE }), ariaLabel: '강사성과 화면으로 이동' },
 ];
 
 /** 기본 강사관리 서브 메뉴 ID */

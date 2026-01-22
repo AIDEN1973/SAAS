@@ -172,6 +172,13 @@
   --height-input-min: 1.25rem;       /* 20px - 입력 필드 최소 높이 */
   --height-button-min: 3.75rem;       /* 60px - 버튼 최소 높이 */
   --height-row-min: 1.875rem;        /* 30px - 행 최소 높이 */
+
+  /* Button/Input Height Tokens by Size - 버튼/인풋 사이즈별 높이 (SSOT: 이 값만 변경하면 전체 반영) */
+  --height-control-xs: 2rem;         /* 32px - xs 사이즈 컨트롤 높이 */
+  --height-control-sm: 2.25rem;      /* 36px - sm 사이즈 컨트롤 높이 */
+  --height-control-md: 2.75rem;      /* 44px - md 사이즈 컨트롤 높이 */
+  --height-control-lg: 3.25rem;      /* 52px - lg 사이즈 컨트롤 높이 */
+  --height-control-xl: 3.75rem;      /* 60px - xl 사이즈 컨트롤 높이 */
   --height-header: 4.5rem;            /* 72px - 헤더 높이 (태블릿/데스크탑 일관성 유지) */
   --padding-header-vertical: var(--spacing-sm); /* 8px - 헤더 상하 패딩 (태블릿/데스크탑 일관성 유지) */
   --height-modal-max: 85vh;          /* 모달 최대 높이 (데스크톱) */
@@ -620,6 +627,50 @@ textarea::placeholder {
 .chart-animate-up .recharts-line,
 .chart-animate-up-stagger .recharts-line {
   animation: chartRevealRight 800ms ease-out forwards;
+}
+
+/* 체크박스 커스텀 스타일 */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 1rem;  /* 16px - 기존 20px에서 축소 */
+  height: 1rem; /* 16px - 기존 20px에서 축소 */
+  min-width: 1rem;
+  min-height: 1rem;
+  border: var(--border-width-thin) solid var(--color-gray-300); /* 연한 테두리 */
+  border-radius: var(--border-radius-xs); /* 라운드 추가 */
+  background-color: var(--color-white);
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.1s ease; /* 체크 상태 변경은 즉시, 호버만 빠른 전환 */
+}
+
+input[type="checkbox"]:hover:not(:disabled) {
+  border-color: var(--color-primary);
+}
+
+input[type="checkbox"]:checked {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  transition: none; /* 체크 시 즉시 반응 */
+}
+
+input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.25rem; /* 4px */
+  height: 0.4375rem; /* 7px */
+  border: solid var(--color-white);
+  border-width: 0 2px 2px 0;
+  transform: translate(-50%, -60%) rotate(45deg);
+}
+
+input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* 반응형 레이아웃 - 서브사이드바 너비 축소 (1669px 이하) */

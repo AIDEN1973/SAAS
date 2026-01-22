@@ -195,14 +195,15 @@ export function StudentListSubPage({
                     transition: 'max-height var(--transition-fast)',
                   }}
                 >
-                  {/* 태그 라벨 배지 */}
+                  {/* 태그 라벨 배지 - Button sm과 동일한 높이 */}
                   <div
                     style={{
-                      padding: 'var(--spacing-xs) var(--spacing-sm)',
+                      height: 'var(--height-control-sm)',
+                      padding: '0 var(--spacing-sm)',
                       fontSize: 'var(--font-size-xs)',
                       fontWeight: 'var(--font-weight-bold)',
                       fontFamily: 'var(--font-family)',
-                      lineHeight: 'var(--line-height)',
+                      lineHeight: 1,
                       borderRadius: 'var(--border-radius-xs)',
                       border: 'var(--border-width-thin) solid var(--color-text)',
                       color: 'var(--color-white)',
@@ -211,6 +212,7 @@ export function StudentListSubPage({
                       alignItems: 'center',
                       justifyContent: 'center',
                       whiteSpace: 'nowrap',
+                      boxSizing: 'border-box',
                     }}
                   >
                     {terms.TAG_LABEL}

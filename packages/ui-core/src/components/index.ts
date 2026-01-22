@@ -147,7 +147,7 @@ export type { PopoverProps } from './Popover';
 export { RightLayerMenu } from './RightLayerMenu';
 export type { RightLayerMenuProps } from './RightLayerMenu';
 
-export { RightLayerMenuLayout } from './RightLayerMenuLayout';
+export { RightLayerMenuLayout, useLayerMenuTransition } from './RightLayerMenuLayout';
 export type { RightLayerMenuLayoutProps } from './RightLayerMenuLayout';
 
 export { ContextRecommendationBanner } from './ContextRecommendationBanner';

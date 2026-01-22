@@ -108,10 +108,11 @@ export const IconButtonGroup: React.FC<IconButtonGroupProps> = ({
               onClick={item.onClick}
               disabled={item.disabled}
               style={{
-                padding: 'var(--spacing-sm)',
+                padding: 0,
                 minWidth: 'auto',
-                width: 'var(--size-pagination-button)',
-                height: 'var(--size-pagination-button)',
+                // [불변 규칙] Button sm과 동일한 높이 토큰 사용으로 일관성 보장
+                width: 'var(--height-control-sm)',
+                height: 'var(--height-control-sm)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

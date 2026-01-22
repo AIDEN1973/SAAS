@@ -78,42 +78,41 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
     return String(currentValue).trim() === '';
   }, [isControlled, valueProp, internalValue]);
 
+  // Size를 CSS Variables로 매핑 (Button/Select 컴포넌트와 동일한 높이 보장)
+  // [불변 규칙] 명시적 height 사용으로 Button/Select와 높이 일관성 유지
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
-      paddingTop: 'var(--spacing-xs)',
-      paddingBottom: 'var(--spacing-xs)',
-      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
-      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용
+      height: 'var(--height-control-xs)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)',
+      paddingRight: 'var(--spacing-form-horizontal-right)',
     },
     sm: {
-      paddingTop: 'var(--spacing-xs)',
-      paddingBottom: 'var(--spacing-xs)',
-      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
-      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용
+      height: 'var(--height-control-sm)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)',
+      paddingRight: 'var(--spacing-form-horizontal-right)',
     },
     md: {
-      paddingTop: 'var(--spacing-sm)',
-      paddingBottom: 'var(--spacing-sm)',
-      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
-      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용
+      height: 'var(--height-control-md)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)',
+      paddingRight: 'var(--spacing-form-horizontal-right)',
     },
     lg: {
-      paddingTop: 'var(--spacing-md)',
-      paddingBottom: 'var(--spacing-md)',
-      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
-      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용
+      height: 'var(--height-control-lg)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)',
+      paddingRight: 'var(--spacing-form-horizontal-right)',
     },
     xl: {
-      paddingTop: 'var(--spacing-lg)',
-      paddingBottom: 'var(--spacing-lg)',
-      paddingLeft: 'var(--spacing-form-horizontal-left)', // styles.css 준수: 폼 필드 좌측 여백 토큰 사용
-      paddingRight: 'var(--spacing-form-horizontal-right)', // styles.css 준수: 폼 필드 우측 여백 토큰 사용
+      height: 'var(--height-control-xl)',
+      paddingLeft: 'var(--spacing-form-horizontal-left)',
+      paddingRight: 'var(--spacing-form-horizontal-right)',
     },
   };
 
   // 단순 입력 폼: input 요소의 스타일 (테두리 없음, 래퍼에서 처리)
   const inputStyle: React.CSSProperties = {
-    ...sizeStyles[size],
+    height: '100%', // wrapper의 height를 채움
+    paddingLeft: sizeStyles[size].paddingLeft,
+    paddingRight: sizeStyles[size].paddingRight,
     border: 'none',
     borderRadius: 'var(--border-radius-xs)',
     backgroundColor: props.disabled ? 'var(--color-gray-100)' : 'var(--color-white)',
@@ -124,15 +123,18 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
     fontFamily: 'var(--font-family)',
     fontSize: 'var(--font-size-base)',
     fontWeight: 'var(--font-weight-normal)',
-    lineHeight: 'var(--line-height)',
+    // [불변 규칙] lineHeight: 1로 설정하여 height 기반 정렬 (Button, Select와 동일)
+    lineHeight: 1,
     boxSizing: 'border-box',
     cursor: props.disabled ? 'not-allowed' : 'text',
   };
 
   // 래퍼 스타일: input을 감싸고 사방 테두리 적용 (카드 스타일과 동일)
+  // [불변 규칙] wrapper에 height 적용 + boxSizing: border-box로 border 포함 높이 계산
   const wrapperStyle: React.CSSProperties = {
     position: 'relative',
     width: fullWidth ? '100%' : 'auto',
+    height: sizeStyles[size].height, // wrapper에 height 적용
     backgroundColor: props.disabled ? 'var(--color-gray-100)' : 'var(--color-white)',
     border: props.disabled
       ? 'var(--border-width-thin) solid var(--color-gray-200)'

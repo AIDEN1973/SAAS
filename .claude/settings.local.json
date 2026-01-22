@@ -174,7 +174,16 @@
       "Bash(cd:*)",
       "Bash(pnpm build:*)",
       "Bash(pnpm tsc:*)",
-      "Bash(supabase db remote-commit:*)"
+      "Bash(supabase db remote-commit:*)",
+      "mcp__supabase__get_project_url",
+      "mcp__github__search_repositories",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__apply_migration",
+      "mcp__supabase__deploy_edge_function",
+      "Bash(pnpm supabase db push:*)",
+      "mcp__supabase__list_edge_functions",
+      "mcp__supabase__get_logs"
     ]
   }
 }

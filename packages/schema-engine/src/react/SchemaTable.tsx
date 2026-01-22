@@ -393,7 +393,6 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: 'var(--spacing-xs)',
-                lineHeight: 'var(--line-height)', // Select와 높이 일치
               }}
             >
               <Funnel size={16} weight={showFilterPanel || activeFilterCount > 0 ? 'fill' : 'regular'} />

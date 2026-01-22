@@ -34,27 +34,23 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
   className,
   style,
 }, ref) => {
-  // Size를 CSS Variables로 매핑 (Button, Select와 동일)
+  // Size를 CSS Variables로 매핑 (Button, Select와 동일한 높이 보장)
+  // [불변 규칙] 명시적 height 사용으로 Button/Select와 높이 일관성 유지
   const sizeStyles: Record<SizeToken, React.CSSProperties> = {
     xs: {
-      paddingTop: 'calc(var(--spacing-xs) + var(--spacing-xs) / 2)',
-      paddingBottom: 'calc(var(--spacing-xs) + var(--spacing-xs) / 2)',
+      height: 'var(--height-control-xs)',
     },
     sm: {
-      paddingTop: 'calc(var(--spacing-xs) + var(--spacing-xs) / 2)',
-      paddingBottom: 'calc(var(--spacing-xs) + var(--spacing-xs) / 2)',
+      height: 'var(--height-control-sm)',
     },
     md: {
-      paddingTop: 'var(--spacing-sm)',
-      paddingBottom: 'var(--spacing-sm)',
+      height: 'var(--height-control-md)',
     },
     lg: {
-      paddingTop: 'calc(var(--spacing-sm) + var(--spacing-xs) / 2)',
-      paddingBottom: 'calc(var(--spacing-sm) + var(--spacing-xs) / 2)',
+      height: 'var(--height-control-lg)',
     },
     xl: {
-      paddingTop: 'calc(var(--spacing-md) + var(--spacing-xs) / 2)',
-      paddingBottom: 'calc(var(--spacing-md) + var(--spacing-xs) / 2)',
+      height: 'var(--height-control-xl)',
     },
   };
 
@@ -93,7 +89,8 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           paddingRight: 'var(--spacing-sm)',
           fontSize: 'var(--font-size-base)',
           fontFamily: 'var(--font-family)',
-          lineHeight: 'var(--line-height)',
+          // [불변 규칙] lineHeight: 1로 설정하여 height 기반 정렬
+          lineHeight: 1,
           border: 'var(--border-width-thin) solid var(--color-gray-200)',
           borderRadius: 'var(--border-radius-xs)',
           backgroundColor: disabled ? 'var(--color-background-disabled)' : 'var(--color-white)',

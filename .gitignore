@@ -35,6 +35,9 @@ yarn-error.log*
 .env.production.local
 .env.staging
 
+# MCP configuration with secrets
+.mcp.json
+
 # Vercel
 .vercel
 

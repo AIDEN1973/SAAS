@@ -203,6 +203,8 @@ export const SchemaFilter: React.FC<SchemaFilterProps> = ({
             control={control}
             // 필터 UI에서는 값 입력/선택 시 placeholder가 제거되어야 하므로 인라인 라벨 비활성화
             showInlineLabelWhenHasValue={false}
+            // 필터 UI는 sm 사이즈 사용 (SchemaTable 상단 컨트롤과 일관성 유지)
+            size="sm"
           />
         ))}
       </Grid>

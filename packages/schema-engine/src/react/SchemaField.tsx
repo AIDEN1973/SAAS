@@ -41,6 +41,237 @@ import {
 // ⚠️ 참고: Input 컴포넌트는 TextInput의 역할을 수행합니다.
 // 기술문서에서는 TextInput으로 명시되어 있으나, 실제 구현은 Input 컴포넌트를 사용합니다.
 
+/**
+ * 샘플 캐릭터 목록 (향후 DB에서 관리 예정)
+ * [업종중립] 프로필 캐릭터 선택 기능
+ */
+const SAMPLE_CHARACTERS = [
+  { id: 'char_1', name: '캐릭터 1', url: '/characters/character_1.png' },
+  { id: 'char_2', name: '캐릭터 2', url: '/characters/character_2.png' },
+  { id: 'char_3', name: '캐릭터 3', url: '/characters/character_3.png' },
+  { id: 'char_4', name: '캐릭터 4', url: '/characters/character_4.png' },
+  { id: 'char_5', name: '캐릭터 5', url: '/characters/character_5.png' },
+  { id: 'char_6', name: '캐릭터 6', url: '/characters/character_6.png' },
+];
+
+/**
+ * ProfileImageButtonGroup Component
+ *
+ * [업종중립] 프로필 이미지 선택 버튼 그룹 (캐릭터 선택 + 사진 선택)
+ * [불변 규칙] CSS 변수 사용
+ */
+interface ProfileImageButtonGroupProps {
+  isDisabled: boolean;
+  setFormValue?: UseFormSetValue<Record<string, unknown>>;
+}
+
+const ProfileImageButtonGroup: React.FC<ProfileImageButtonGroupProps> = ({
+  isDisabled,
+  setFormValue,
+}) => {
+  const [showCharacterMenu, setShowCharacterMenu] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+
+  // 외부 클릭 시 메뉴 닫기
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowCharacterMenu(false);
+      }
+    };
+
+    if (showCharacterMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCharacterMenu]);
+
+  // 캐릭터 선택 핸들러
+  const handleCharacterSelect = (character: typeof SAMPLE_CHARACTERS[0]) => {
+    if (setFormValue) {
+      // profile_image 필드에 캐릭터 URL 설정
+      setFormValue('profile_image', character.url, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+    setShowCharacterMenu(false);
+  };
+
+  // 사진 선택 핸들러
+  const handlePhotoSelect = () => {
+    const fileInput = document.querySelector(
+      'input[data-field-name="profile_image"][type="file"]'
+    ) as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    } else {
+      console.error('Profile image file input not found');
+    }
+  };
+
+  return (
+    <div
+      ref={menuRef}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--spacing-xs)',
+        position: 'relative',
+      }}
+    >
+      {/* 버튼 그룹 */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 'var(--spacing-xs)',
+          marginTop: '-1px',
+        }}
+      >
+        {/* 캐릭터 선택 버튼 */}
+        <Button
+          type="button"
+          variant="outline"
+          color="secondary"
+          size="sm"
+          onClick={() => setShowCharacterMenu(!showCharacterMenu)}
+          disabled={isDisabled}
+          style={{
+            flex: 1,
+            height: 'var(--height-control-sm)',
+          }}
+        >
+          캐릭터 선택
+        </Button>
+
+        {/* 사진 선택 버튼 */}
+        <Button
+          type="button"
+          variant="solid"
+          color="primary"
+          size="sm"
+          onClick={handlePhotoSelect}
+          disabled={isDisabled}
+          style={{
+            flex: 1,
+            height: 'var(--height-control-sm)',
+          }}
+        >
+          사진 선택
+        </Button>
+      </div>
+
+      {/* 캐릭터 선택 레이어 메뉴 */}
+      {showCharacterMenu && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            marginTop: 'var(--spacing-xs)',
+            padding: 'var(--spacing-sm)',
+            backgroundColor: 'var(--color-background)',
+            border: 'var(--border-width-thin) solid var(--color-gray-200)',
+            borderRadius: 'var(--border-radius-sm)',
+            boxShadow: 'var(--shadow-lg)',
+            zIndex: 100,
+          }}
+        >
+          <div
+            style={{
+              marginBottom: 'var(--spacing-xs)',
+              fontSize: 'var(--font-size-sm)',
+              fontWeight: 'var(--font-weight-medium)',
+              color: 'var(--color-text-secondary)',
+            }}
+          >
+            캐릭터를 선택하세요
+          </div>
+
+          {/* 캐릭터 그리드 */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 'var(--spacing-xs)',
+            }}
+          >
+            {SAMPLE_CHARACTERS.map((character) => (
+              <div
+                key={character.id}
+                onClick={() => handleCharacterSelect(character)}
+                style={{
+                  aspectRatio: '1',
+                  borderRadius: 'var(--border-radius-sm)',
+                  backgroundColor: 'var(--color-background-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  overflow: 'hidden',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-gray-100)';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-background-secondary)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                {/* 캐릭터 이미지 (향후 실제 이미지로 교체) */}
+                <div
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 'var(--font-size-xs)',
+                    color: 'var(--color-text-tertiary)',
+                  }}
+                >
+                  {/* 임시 플레이스홀더 아이콘 */}
+                  <svg
+                    width="32"
+                    height="32"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M18 20a6 6 0 0 0-12 0" />
+                  </svg>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 안내 메시지 */}
+          <div
+            style={{
+              marginTop: 'var(--spacing-sm)',
+              fontSize: 'var(--font-size-xs)',
+              color: 'var(--color-text-tertiary)',
+              textAlign: 'center',
+            }}
+          >
+            캐릭터는 향후 추가 예정입니다
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export interface SchemaFieldProps {
   field: FormFieldSchema;
   register: UseFormRegister<Record<string, unknown>>;
@@ -64,6 +295,11 @@ export interface SchemaFieldProps {
    * - 필터/검색 UI에서는 false로 전달하여 placeholder가 값 입력 시 제거되도록 함
    */
   showInlineLabelWhenHasValue?: boolean;
+  /**
+   * 폼 컨트롤 사이즈 (xs, sm, md, lg, xl)
+   * - 기본값: 'sm' (SchemaTable 필터 UI와 일관성 유지)
+   */
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 }
 
 /**
@@ -86,6 +322,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
   apiClient,
   gridColumns,
   showInlineLabelWhenHasValue = true,
+  size = 'sm',
 }) => {
   const { name, kind, ui, options } = field;
 
@@ -140,7 +377,10 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
   // 2) 조건 평가
   // ⚠️ 중요: getConditionalActions는 field.conditions를 우선 처리하고, 없으면 field.condition을 처리합니다.
   // 따라서 항상 호출해야 하며, field.condition만 체크하면 안 됩니다.
-  const { isHidden, isDisabled, isRequired, actions: conditionalActions } = getConditionalActions(field, watchedValues);
+  const conditionalResult = getConditionalActions(field, watchedValues);
+  const { isHidden, isRequired, actions: conditionalActions } = conditionalResult;
+  // readOnly 필드는 항상 disabled 처리
+  const isDisabled = conditionalResult.isDisabled || field.ui?.readOnly === true;
 
   // SDUI v1.1: 동적 옵션 처리 (setOptions 액션)
   // ⚠️ 중요: dynamicOptions는 API 기반 옵션만 저장하며, 초기값은 undefined입니다.
@@ -229,7 +469,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
     ? { ...baseRules, required: '필수 입력 항목입니다.' }
     : baseRules;
 
-  const error = errors[name]?.message as string | undefined;
+  const error = errors[name]?.message;
 
   // ⚠️ 중요: Tailwind 클래스를 직접 사용하지 않고, props 기반으로 core-ui에 전달
   // 스키마는 논리적 구조만 정의하고, 스타일은 core-ui가 담당합니다.
@@ -238,6 +478,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
   // 반응형 처리: Grid의 실제 컬럼 수보다 큰 colSpan은 Grid 컬럼 수로 제한
   const baseColSpan = ui?.colSpan ?? 12;
   const colSpan = gridColumns && baseColSpan > gridColumns ? gridColumns : baseColSpan;
+  const rowSpan = ui?.rowSpan;
 
   // 🍀 4) 각 필드 렌더링에 isDisabled 적용
 
@@ -287,6 +528,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               error={error}
               disabled={isDisabled}
               fullWidth
+              size={size}
               showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
               value={(f.value ?? '') as string}
               onChange={(e) => {
@@ -335,6 +577,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               error={error}
               disabled={isDisabled}
               fullWidth
+              size={size}
               showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
               unit={unit}
               value={(f.value ?? '') as string}
@@ -364,6 +607,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               error={error}
               disabled={isDisabled}
               fullWidth
+              size={size}
               showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
               value={(f.value ?? '') as string}
               onChange={f.onChange}
@@ -427,7 +671,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         : (opt.label || opt.value);  // label이 없으면 value를 사용
       return {
         value: opt.value,
-        label: translatedLabel as string,  // 항상 string으로 보장
+        label: translatedLabel,  // 항상 string으로 보장
         disabled: (opt as any).disabled,  // divider/disabled는 schema types에 정의됨
         divider: (opt as any).divider,    // divider 속성 전달
       };
@@ -445,6 +689,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               error={error}
               disabled={isDisabled}
               fullWidth
+              size={size}
               showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
               value={(f.value ?? (kind === 'multiselect' ? [] : '')) as string | number | readonly string[]}
               onChange={f.onChange}
@@ -543,6 +788,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               disabled={isDisabled}
               error={error}
               fullWidth
+              size={size}
             />
           )}
         />
@@ -566,6 +812,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               disabled={isDisabled}
               error={error}
               fullWidth
+              size={size}
               showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
               dateTime={true}
             />
@@ -689,7 +936,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
                       disabled={isDisabled}
                       error={error}
                       fullWidth
-                      size="md"
+                      size={size}
                       showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
                     />
                   </div>
@@ -702,7 +949,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
                       disabled={isDisabled}
                       error={error}
                       fullWidth
-                      size="md"
+                      size={size}
                       showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
                     />
                   </div>
@@ -715,8 +962,208 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
     );
   }
 
+  // file (이미지 파일 첨부)
+  if (kind === 'file') {
+    // profile_image 필드인 경우 버튼 없이 preview만 표시
+    const isPreviewOnly = name === 'profile_image';
+
+    return (
+      <FormFieldLayout colSpan={colSpan} rowSpan={rowSpan}>
+        <Controller
+          name={name}
+          control={control}
+          rules={finalRules as any}
+          render={({ field: f }) => {
+            // 초기값이 URL인 경우 preview 초기값으로 설정 (http 또는 / 로 시작하는 경로)
+            const isUrlValue = (val: unknown): val is string =>
+              typeof val === 'string' && (val.startsWith('http') || val.startsWith('/'));
+            const initialPreview = isUrlValue(f.value) ? f.value : null;
+            const [preview, setPreview] = React.useState<string | null>(initialPreview);
+            const [isHovering, setIsHovering] = React.useState(false);
+            const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+            // defaultValue가 URL 문자열인 경우 초기 preview로 설정 (값이 변경될 때)
+            React.useEffect(() => {
+              if (isUrlValue(f.value)) {
+                setPreview(f.value);
+              }
+            }, [f.value]);
+
+            const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                // 파일 객체 저장
+                f.onChange(file);
+
+                // 이미지 미리보기
+                if (file.type.startsWith('image/')) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    setPreview(reader.result as string);
+                  };
+                  reader.readAsDataURL(file);
+                } else {
+                  setPreview(null);
+                }
+              }
+            };
+
+            const handleButtonClick = () => {
+              fileInputRef.current?.click();
+            };
+
+            return (
+              <div style={{ width: '100%' }}>
+                {/* 숨겨진 file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  name={name}
+                  data-field-name={name}
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  disabled={isDisabled}
+                  style={{ display: 'none' }}
+                />
+
+                {/* 커스텀 이미지 영역 */}
+                <div
+                  onMouseEnter={() => !isPreviewOnly && setIsHovering(true)}
+                  onMouseLeave={() => !isPreviewOnly && setIsHovering(false)}
+                  style={{
+                    position: 'relative',
+                    border: 'var(--border-width-thin) solid var(--color-gray-200)',
+                    borderRadius: 'var(--border-radius-sm)',
+                    minHeight: '300px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'var(--color-background-secondary)',
+                    overflow: 'visible',
+                    cursor: isDisabled || isPreviewOnly ? 'default' : 'pointer',
+                    opacity: isDisabled ? 0.6 : 1,
+                    boxSizing: 'border-box',
+                  }}
+                  onClick={!isDisabled && !isPreviewOnly ? handleButtonClick : undefined}
+                >
+                  {preview ? (
+                    <>
+                      <img
+                        src={preview}
+                        alt="프로필 이미지"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          position: 'absolute',
+                          top: '0',
+                          left: '0',
+                          borderRadius: 'var(--border-radius-sm)',
+                        }}
+                      />
+                      {/* 이미지 위 호버 오버레이 - preview only면 표시하지 않음 */}
+                      {!isPreviewOnly && isHovering && !isDisabled && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 1,
+                        }}>
+                          <Button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleButtonClick();
+                            }}
+                            size="sm"
+                            variant="solid"
+                            color="primary"
+                          >
+                            파일 선택
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 'var(--spacing-md)',
+                      padding: 'var(--spacing-lg)',
+                    }}>
+                      {/* 루시드 프로필 아이콘 */}
+                      <svg
+                        width="128"
+                        height="128"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="var(--color-gray-300)"
+                        strokeWidth="0.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="8" r="5" />
+                        <path d="M20 21a8 8 0 1 0-16 0" />
+                      </svg>
+                      {/* preview only 모드가 아닐 때만 버튼 표시 */}
+                      {!isPreviewOnly && (
+                        <Button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleButtonClick();
+                          }}
+                          disabled={isDisabled}
+                          size="sm"
+                          variant="solid"
+                          color="primary"
+                        >
+                          파일 선택
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {error && (
+                  <div style={{
+                    marginTop: 'var(--spacing-xs)',
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--color-error)',
+                  }}>
+                    {error}
+                  </div>
+                )}
+              </div>
+            );
+          }}
+        />
+      </FormFieldLayout>
+    );
+  }
+
+  // profile_image_button 특수 처리 (캐릭터 선택 + 사진 선택)
+  if (kind === 'custom' && (name === 'profile_image_button' || effectiveComponentType === 'profile_image_button')) {
+    return (
+      <FormFieldLayout colSpan={colSpan} rowSpan={rowSpan}>
+        <ProfileImageButtonGroup
+          isDisabled={isDisabled}
+          setFormValue={setFormValue}
+        />
+      </FormFieldLayout>
+    );
+  }
+
   // SDUI v1.1: Custom Widget 지원 (동적 로딩)
-  if (kind === 'custom' && effectiveComponentType) {
+  if (kind === 'custom' && effectiveComponentType && effectiveComponentType !== 'profile_image_button') {
     return (
       <CustomWidgetField
         componentType={effectiveComponentType}
@@ -843,7 +1290,7 @@ const CustomWidgetField: React.FC<{
     placeholder: field.ui?.placeholder,
     placeholderKey: field.ui?.placeholderKey,
     disabled: isDisabled,
-    error: errors[field.name]?.message as string | undefined,
+    error: errors[field.name]?.message,
     fullWidth: true, // 모든 입력 필드는 기본적으로 fullWidth
     control,
     rules: finalRules,

@@ -407,9 +407,9 @@ export class ApiClient {
         };
       }
 
-      // [불변 규칙] academy_students 테이블은 person_id를 PRIMARY KEY로 사용
+      // [불변 규칙] academy_students, academy_teachers 테이블은 person_id를 PRIMARY KEY로 사용
       // 다른 테이블은 id를 PRIMARY KEY로 사용
-      const primaryKey = table === 'academy_students' ? 'person_id' : 'id';
+      const primaryKey = (table === 'academy_students' || table === 'academy_teachers') ? 'person_id' : 'id';
 
       // 스키마 접두사 처리
       let updateQuery;
@@ -674,6 +674,164 @@ export class ApiClient {
       return {
         success: true,
         data: data as T,
+        error: undefined,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'UNKNOWN_ERROR',
+        },
+        data: undefined,
+      };
+    }
+  }
+
+  /**
+   * 파일 업로드 (Supabase Storage)
+   *
+   * [불변 규칙] 테넌트별 폴더 구조: `{tenant_id}/{bucket_path}/{file_name}`
+   * [불변 규칙] 공개 URL 반환 (RLS 기반 권한 관리)
+   *
+   * @param file 업로드할 파일 객체
+   * @param bucket Storage 버킷 이름 (예: 'teacher-profiles', 'student-profiles')
+   * @param path 버킷 내 경로 (기본값: 빈 문자열)
+   * @returns 업로드된 파일의 공개 URL
+   */
+  async uploadFile(
+    file: File,
+    bucket: string,
+    path: string = ''
+  ): Promise<ApiResponse<string>> {
+    try {
+      const context = getApiContext();
+
+      if (!context?.tenantId) {
+        return {
+          success: false,
+          error: {
+            message: 'Tenant ID is required',
+            code: 'TENANT_ID_REQUIRED',
+          },
+          data: undefined,
+        };
+      }
+
+      // 파일명 생성: 타임스탬프 + 랜덤 UUID + 확장자
+      const timestamp = Date.now();
+      const randomId = crypto.randomUUID().split('-')[0];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${timestamp}-${randomId}.${fileExt}`;
+
+      // 파일 경로: {tenant_id}/{path}/{file_name}
+      const filePath = path
+        ? `${context.tenantId}/${path}/${fileName}`
+        : `${context.tenantId}/${fileName}`;
+
+      // Storage에 업로드
+      const { data, error } = await this.supabase.storage
+        .from(bucket)
+        .upload(filePath, file, {
+          contentType: file.type || 'application/octet-stream',
+          upsert: false,
+        });
+
+      if (error) {
+        return {
+          success: false,
+          error: {
+            message: error.message || '파일 업로드에 실패했습니다.',
+            code: 'UPLOAD_ERROR',
+          },
+          data: undefined,
+        };
+      }
+
+      // 공개 URL 가져오기
+      const { data: urlData } = this.supabase.storage
+        .from(bucket)
+        .getPublicUrl(filePath);
+
+      if (!urlData?.publicUrl) {
+        return {
+          success: false,
+          error: {
+            message: '파일 URL을 가져오는데 실패했습니다.',
+            code: 'URL_ERROR',
+          },
+          data: undefined,
+        };
+      }
+
+      return {
+        success: true,
+        data: urlData.publicUrl,
+        error: undefined,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'UNKNOWN_ERROR',
+        },
+        data: undefined,
+      };
+    }
+  }
+
+  /**
+   * 파일 삭제 (Supabase Storage)
+   *
+   * [불변 규칙] 테넌트별 폴더 구조 확인
+   * [불변 규칙] RLS 정책으로 권한 관리
+   *
+   * @param bucket Storage 버킷 이름
+   * @param fileUrl 파일 공개 URL
+   * @returns 삭제 성공 여부
+   */
+  async deleteFile(
+    bucket: string,
+    fileUrl: string
+  ): Promise<ApiResponse<void>> {
+    try {
+      // URL에서 파일 경로 추출
+      const url = new URL(fileUrl);
+      const pathParts = url.pathname.split('/');
+      // /storage/v1/object/public/{bucket}/{path} 형식
+      const bucketIndex = pathParts.indexOf(bucket);
+      if (bucketIndex === -1) {
+        return {
+          success: false,
+          error: {
+            message: 'Invalid file URL',
+            code: 'INVALID_URL',
+          },
+          data: undefined,
+        };
+      }
+      const filePath = pathParts.slice(bucketIndex + 1).join('/');
+
+      // Storage에서 삭제
+      const { error } = await this.supabase.storage
+        .from(bucket)
+        .remove([filePath]);
+
+      if (error) {
+        return {
+          success: false,
+          error: {
+            message: error.message || '파일 삭제에 실패했습니다.',
+            code: 'DELETE_ERROR',
+          },
+          data: undefined,
+        };
+      }
+
+      return {
+        success: true,
+        data: undefined,
         error: undefined,
       };
     } catch (error) {

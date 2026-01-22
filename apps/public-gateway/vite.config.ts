@@ -3,23 +3,22 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  // 프로젝트 루트의 .env.local 파일을 로드
-  envDir: path.resolve(__dirname, '../..'),
+  // 앱 디렉토리의 .env.local 파일 사용
   // Vite 캐시를 루트로 통합
   cacheDir: path.resolve(__dirname, '../../node_modules/.vite'),
-  // Vercel 빌드 시 환경변수를 빌드 타임에 주입
-  define: {
-    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ''),
-    'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''),
-    'import.meta.env.VITE_KAKAO_JS_KEY': JSON.stringify(process.env.VITE_KAKAO_JS_KEY || process.env.NEXT_PUBLIC_KAKAO_JS_KEY || ''),
-  },
+  // define 옵션 제거 - Vite가 .env.local에서 VITE_* 변수를 자동 로드
   plugins: [react()],
   test: {
     // Vitest 설정: e2e 폴더와 playwright 파일 제외
     exclude: ['node_modules', 'dist', 'e2e', '**/*.e2e.{test,spec}.{js,ts}', '**/playwright.config.ts'],
     environment: 'jsdom',
   },
+  // React 중복 인스턴스 방지
+  optimizeDeps: {
+    include: ['react', 'react-dom', '@tanstack/react-query'],
+  },
   resolve: {
+    dedupe: ['react', 'react-dom', '@tanstack/react-query'],
     alias: [
       { find: '@ui-core/react/styles', replacement: path.resolve(__dirname, '../../packages/ui-core/src/styles.css') },
       { find: '@ui-core/react', replacement: path.resolve(__dirname, '../../packages/ui-core/src') },
@@ -51,7 +50,10 @@ export default defineConfig({
       { find: '@industry', replacement: path.resolve(__dirname, '../../packages/industry') },
       { find: '@api-sdk/core', replacement: path.resolve(__dirname, '../../packages/api-sdk/src') },
       { find: '@api-sdk', replacement: path.resolve(__dirname, '../../packages/api-sdk/src') },
+      { find: '@services/class-service', replacement: path.resolve(__dirname, '../../packages/services/class-service/src') },
       { find: '@services', replacement: path.resolve(__dirname, '../../packages/services') },
+      { find: '@hooks/use-class', replacement: path.resolve(__dirname, '../../packages/hooks/use-class/src') },
+      { find: '@hooks/use-auth', replacement: path.resolve(__dirname, '../../packages/hooks/use-auth/src') },
       { find: '@hooks', replacement: path.resolve(__dirname, '../../packages/hooks') },
       { find: '@core', replacement: path.resolve(__dirname, '../../packages/core') },
     ],

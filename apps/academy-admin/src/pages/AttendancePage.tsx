@@ -1130,6 +1130,7 @@ export function AttendancePage() {
                 </div>
 
                 {/* 통계 카드 */}
+                <div style={{ contain: 'layout style' }}>
                 <StatsDashboard
                   statsItems={[
                     {
@@ -1176,6 +1177,7 @@ export function AttendancePage() {
                   chartTooltipUnit="명"
                   chartTooltipLabel="등원 학생수"
                 />
+                </div>
               </div>
 
               {/* 수업 카드 목록 - 시간대별 분류 */}

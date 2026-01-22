@@ -242,34 +242,14 @@ export function useUpdateClass() {
 
       // teacher_ids가 제공된 경우 강사 배정 업데이트
       if (teacher_ids !== undefined) {
-        // 1. 기존 배정 모두 비활성화
-        const existingAssignments = await apiClient.get('class_teachers', {
-          filters: { class_id: classId, is_active: true },
+        // RPC 함수 호출로 bulk 업데이트 (N+1 쿼리 방지)
+        const rpcResponse = await apiClient.callRPC('update_class_teachers', {
+          p_class_id: classId,
+          p_teacher_ids: teacher_ids,
         });
 
-        if (existingAssignments.data) {
-          for (const assignment of existingAssignments.data) {
-            const typedAssignment = assignment as { id?: string };
-            if (typedAssignment.id) {
-              await apiClient.patch('class_teachers', typedAssignment.id, {
-                is_active: false,
-                unassigned_at: toKST().format('YYYY-MM-DD'),
-              });
-            }
-          }
-        }
-
-        // 2. 신규 배정
-        if (teacher_ids.length > 0) {
-          for (const teacherId of teacher_ids) {
-            await apiClient.post('class_teachers', {
-              class_id: classId,
-              teacher_id: teacherId,
-              role: 'teacher',
-              assigned_at: toKST().format('YYYY-MM-DD'),
-              is_active: true,
-            });
-          }
+        if (!rpcResponse.success) {
+          throw new Error(rpcResponse.error?.message || '강사 배정 업데이트에 실패했습니다.');
         }
       }
 
@@ -415,24 +395,38 @@ export function useTeachers(filter?: TeacherFilter) {
       interface PersonWithAcademyTeachers extends Person {
         academy_teachers?: Array<Record<string, unknown>>;
       }
+      // [Soft Delete] deleted_at IS NULL 필터를 위해 !inner 조인 사용
       const response = await apiClient.get<PersonWithAcademyTeachers[]>('persons', {
         select: `
           *,
-          academy_teachers (
+          academy_teachers!inner (
             employee_id,
             specialization,
             hire_date,
             status,
+            position,
+            login_id,
+            user_id,
             profile_image_url,
             bio,
             notes,
+            pay_type,
+            base_salary,
+            hourly_rate,
+            bank_name,
+            bank_account,
+            salary_notes,
             created_at,
             updated_at,
             created_by,
-            updated_by
+            updated_by,
+            deleted_at
           )
         `,
-        filters: { person_type: 'teacher' },
+        filters: {
+          person_type: 'teacher',
+          'academy_teachers.deleted_at': null,  // Soft Delete 필터
+        },
       });
 
       if (response.error) {
@@ -442,8 +436,10 @@ export function useTeachers(filter?: TeacherFilter) {
       // 데이터 변환 persons + academy_teachers -> Teacher
       const personsData = response.data || [];
       let teachers: Teacher[] = personsData.map((person) => {
-        const personWithTeachers = person as unknown as Person & { academy_teachers?: Array<Record<string, unknown>> };
-        const teacherData = personWithTeachers.academy_teachers?.[0] || {};
+        const personWithTeachers = person as unknown as Person & { academy_teachers?: Array<Record<string, unknown>> | Record<string, unknown> };
+        // academy_teachers가 배열이면 [0], 객체면 그대로 사용
+        const academyTeachers = personWithTeachers.academy_teachers;
+        const teacherData = Array.isArray(academyTeachers) ? (academyTeachers[0] || {}) : (academyTeachers || {});
         return {
           id: personWithTeachers.id,
           tenant_id: personWithTeachers.tenant_id,
@@ -455,9 +451,18 @@ export function useTeachers(filter?: TeacherFilter) {
           specialization: teacherData.specialization,
           hire_date: teacherData.hire_date,
           status: teacherData.status || 'active',
+          position: teacherData.position,
+          login_id: teacherData.login_id,
+          user_id: teacherData.user_id,
           profile_image_url: teacherData.profile_image_url,
           bio: teacherData.bio,
           notes: teacherData.notes,
+          pay_type: teacherData.pay_type,
+          base_salary: teacherData.base_salary,
+          hourly_rate: teacherData.hourly_rate,
+          bank_name: teacherData.bank_name,
+          bank_account: teacherData.bank_account,
+          salary_notes: teacherData.salary_notes,
           created_at: personWithTeachers.created_at,
           updated_at: personWithTeachers.updated_at,
           created_by: teacherData.created_by,
@@ -492,6 +497,7 @@ export function useTeachers(filter?: TeacherFilter) {
 
 /**
  * 강사 상세 조회 Hook
+ * [수정] academy_teachers.id로 조회하도록 변경 (useTeachersWithStats와 일관성 유지)
  */
 export function useTeacher(teacherId: string | null) {
   const context = getApiContext();
@@ -502,27 +508,77 @@ export function useTeacher(teacherId: string | null) {
     queryFn: async () => {
       if (!tenantId || !teacherId) return null;
 
-      interface PersonWithAcademyTeachers extends Person {
-        academy_teachers?: Array<Record<string, unknown>>;
-      }
-      const response = await apiClient.get<PersonWithAcademyTeachers[]>('persons', {
+      // academy_teachers 테이블에서 조회 (persons JOIN)
+      const response = await apiClient.get<{
+        id: string;
+        tenant_id: string;
+        person_id: string;
+        position: string;
+        specialization: string | null;
+        employee_id: string | null;
+        hire_date: string | null;
+        status: string;
+        login_id: string | null;
+        user_id: string | null;
+        profile_image_url: string | null;
+        bio: string | null;
+        notes: string | null;
+        pay_type: string | null;
+        base_salary: number | null;
+        hourly_rate: number | null;
+        bank_name: string | null;
+        bank_account: string | null;
+        salary_notes: string | null;
+        created_at: string;
+        updated_at: string;
+        created_by: string | null;
+        updated_by: string | null;
+        deleted_at: string | null;
+        persons: {
+          id: string;
+          name: string;
+          phone: string | null;
+          email: string | null;
+          address: string | null;
+        };
+      }>('academy_teachers', {
         select: `
-          *,
-          academy_teachers (
-            employee_id,
-            specialization,
-            hire_date,
-            status,
-            profile_image_url,
-            bio,
-            notes,
-            created_at,
-            updated_at,
-            created_by,
-            updated_by
+          id,
+          tenant_id,
+          person_id,
+          position,
+          specialization,
+          employee_id,
+          hire_date,
+          status,
+          login_id,
+          user_id,
+          profile_image_url,
+          bio,
+          notes,
+          pay_type,
+          base_salary,
+          hourly_rate,
+          bank_name,
+          bank_account,
+          salary_notes,
+          created_at,
+          updated_at,
+          created_by,
+          updated_by,
+          deleted_at,
+          persons (
+            id,
+            name,
+            phone,
+            email,
+            address
           )
         `,
-        filters: { id: teacherId, person_type: 'teacher' },
+        filters: {
+          id: teacherId,
+          deleted_at: null,
+        },
         limit: 1,
       });
 
@@ -530,29 +586,36 @@ export function useTeacher(teacherId: string | null) {
         throw new Error(response.error.message);
       }
 
-      const person = response.data?.[0];
-      if (!person) return null;
+      const teacherData = response.data?.[0];
+      if (!teacherData) return null;
 
-      const personWithTeachers = person as unknown as Person & { academy_teachers?: Array<Record<string, unknown>> };
-      const teacherData = personWithTeachers.academy_teachers?.[0] || {};
       return {
-        id: personWithTeachers.id,
-        tenant_id: personWithTeachers.tenant_id,
-        name: personWithTeachers.name,
-        email: personWithTeachers.email,
-        phone: personWithTeachers.phone,
-        address: personWithTeachers.address,
-        employee_id: teacherData.employee_id,
-        specialization: teacherData.specialization,
-        hire_date: teacherData.hire_date,
+        id: teacherData.id,
+        tenant_id: teacherData.tenant_id,
+        name: teacherData.persons?.name || '',
+        email: teacherData.persons?.email || undefined,
+        phone: teacherData.persons?.phone || undefined,
+        address: teacherData.persons?.address || undefined,
+        employee_id: teacherData.employee_id || undefined,
+        specialization: teacherData.specialization || undefined,
+        hire_date: teacherData.hire_date || undefined,
         status: teacherData.status || 'active',
-        profile_image_url: teacherData.profile_image_url,
-        bio: teacherData.bio,
-        notes: teacherData.notes,
-        created_at: personWithTeachers.created_at,
-        updated_at: personWithTeachers.updated_at,
-        created_by: teacherData.created_by,
-        updated_by: teacherData.updated_by,
+        position: teacherData.position || undefined,
+        login_id: teacherData.login_id || undefined,
+        user_id: teacherData.user_id || undefined,
+        profile_image_url: teacherData.profile_image_url || undefined,
+        bio: teacherData.bio || undefined,
+        notes: teacherData.notes || undefined,
+        pay_type: teacherData.pay_type || undefined,
+        base_salary: teacherData.base_salary || undefined,
+        hourly_rate: teacherData.hourly_rate || undefined,
+        bank_name: teacherData.bank_name || undefined,
+        bank_account: teacherData.bank_account || undefined,
+        salary_notes: teacherData.salary_notes || undefined,
+        created_at: teacherData.created_at,
+        updated_at: teacherData.updated_at,
+        created_by: teacherData.created_by || undefined,
+        updated_by: teacherData.updated_by || undefined,
       } as Teacher;
     },
     enabled: !!tenantId && !!teacherId,
@@ -577,6 +640,7 @@ export function useCreateTeacher() {
       }
 
       // P0-2: DB RPC 함수 사용 (트랜잭션 보장)
+      // [요구사항] position, login_id 파라미터 추가
       const response = await apiClient.callRPC<Teacher>('create_teacher', {
         p_tenant_id: tenantId,
         p_name: input.name,
@@ -591,6 +655,8 @@ export function useCreateTeacher() {
         p_bio: input.bio,
         p_notes: input.notes,
         p_created_by: session?.user?.id,
+        p_position: input.position || 'teacher',
+        p_login_id: input.login_id,
       });
 
       if (response.error) {
@@ -621,7 +687,9 @@ export function useCreateTeacher() {
       return response.data!;
     },
     onSuccess: () => {
+      // [최적화] teachers와 teachers-with-stats 쿼리 모두 invalidate
       queryClient.invalidateQueries({ queryKey: ['teachers', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['teachers-with-stats', tenantId] });
     },
   });
 }
@@ -642,35 +710,68 @@ export function useUpdateTeacher() {
     }: {
       teacherId: string;
       input: UpdateTeacherInput;
-    }) => {
+    }): Promise<Teacher> => {
       const startTime = Date.now();
       if (!tenantId) {
         throw new Error('Tenant ID is required');
       }
 
-      // 1. persons 테이블 업데이트
-      const personUpdate: Partial<{ name?: string; email?: string; phone?: string; address?: string }> = {};
-      if (input.name !== undefined) personUpdate.name = input.name;
-      if (input.email !== undefined) personUpdate.email = input.email;
-      if (input.phone !== undefined) personUpdate.phone = input.phone;
-      if (input.address !== undefined) personUpdate.address = input.address;
+      // name, phone, login_id, password가 있으면 Edge Function 호출
+      // (persons, auth.users, academy_teachers 모두 업데이트)
+      if (input.name || input.phone || input.login_id || input.password) {
+        const response = await apiClient.invokeFunction('update-teacher', {
+          teacher_id: teacherId,
+          ...input,
+        });
 
-      if (Object.keys(personUpdate).length > 0) {
-        const personResponse = await apiClient.patch('persons', teacherId, personUpdate);
-        if (personResponse.error) {
-          throw new Error(personResponse.error.message);
+        if (!response.success || !response.data) {
+          throw new Error(response.error?.message || '정보 수정에 실패했습니다.');
         }
+
+        // Audit log 기록 (비동기 - 응답 대기하지 않음)
+        if (session?.user?.id) {
+          const changedFields = Object.keys(input);
+          apiClient.post('execution_audit_runs', {
+            tenant_id: tenantId,
+            occurred_at: new Date().toISOString(),
+            operation_type: 'teacher.update',
+            status: 'success',
+            source: 'manual',
+            actor_type: 'user',
+            actor_id: `user:${session.user.id}`,
+            reference: {
+              entity_type: 'teacher',
+              entity_id: teacherId,
+              source_event_id: `manual:teacher.update:${teacherId}:${startTime}`,
+            },
+            summary: `${input.name || 'teacher'} 정보 수정 완료 (${changedFields.join(', ')})`,
+            details: {
+              teacher_id: teacherId,
+              changed_fields: changedFields,
+            },
+            duration_ms: Date.now() - startTime,
+          }).catch(() => {}); // 실패해도 무시
+        }
+
+        return response.data as Teacher;
       }
 
-      // 2. academy_teachers 테이블 업데이트
+      // academy_teachers 테이블만 업데이트하는 경우
       const teacherUpdate: Partial<Teacher> = {};
       if (input.employee_id !== undefined) teacherUpdate.employee_id = input.employee_id;
       if (input.specialization !== undefined) teacherUpdate.specialization = input.specialization;
       if (input.hire_date !== undefined) teacherUpdate.hire_date = input.hire_date;
       if (input.status !== undefined) teacherUpdate.status = input.status;
+      if (input.position !== undefined) teacherUpdate.position = input.position;
       if (input.profile_image_url !== undefined) teacherUpdate.profile_image_url = input.profile_image_url;
       if (input.bio !== undefined) teacherUpdate.bio = input.bio;
       if (input.notes !== undefined) teacherUpdate.notes = input.notes;
+      if (input.pay_type !== undefined) teacherUpdate.pay_type = input.pay_type;
+      if (input.base_salary !== undefined) teacherUpdate.base_salary = input.base_salary;
+      if (input.hourly_rate !== undefined) teacherUpdate.hourly_rate = input.hourly_rate;
+      if (input.bank_name !== undefined) teacherUpdate.bank_name = input.bank_name;
+      if (input.bank_account !== undefined) teacherUpdate.bank_account = input.bank_account;
+      if (input.salary_notes !== undefined) teacherUpdate.salary_notes = input.salary_notes;
 
       if (Object.keys(teacherUpdate).length > 0) {
         // academy_teachers는 person_id를 PK로 사용
@@ -704,9 +805,18 @@ export function useUpdateTeacher() {
             specialization,
             hire_date,
             status,
+            position,
+            login_id,
+            user_id,
             profile_image_url,
             bio,
             notes,
+            pay_type,
+            base_salary,
+            hourly_rate,
+            bank_name,
+            bank_account,
+            salary_notes,
             created_at,
             updated_at,
             created_by,
@@ -726,8 +836,10 @@ export function useUpdateTeacher() {
         throw new Error('Teacher not found');
       }
 
-      const personWithTeachers = person as unknown as Person & { academy_teachers?: Array<Record<string, unknown>> };
-      const teacherData = personWithTeachers.academy_teachers?.[0] || {};
+      const personWithTeachers = person as unknown as Person & { academy_teachers?: Array<Record<string, unknown>> | Record<string, unknown> };
+      // academy_teachers가 배열이면 [0], 객체면 그대로 사용
+      const academyTeachers = personWithTeachers.academy_teachers;
+      const teacherData = Array.isArray(academyTeachers) ? (academyTeachers[0] || {}) : (academyTeachers || {});
       const teacher = {
         id: personWithTeachers.id,
         tenant_id: personWithTeachers.tenant_id,
@@ -739,20 +851,29 @@ export function useUpdateTeacher() {
         specialization: teacherData.specialization,
         hire_date: teacherData.hire_date,
         status: teacherData.status || 'active',
+        position: teacherData.position,
+        login_id: teacherData.login_id,
+        user_id: teacherData.user_id,
         profile_image_url: teacherData.profile_image_url,
         bio: teacherData.bio,
         notes: teacherData.notes,
+        pay_type: teacherData.pay_type,
+        base_salary: teacherData.base_salary,
+        hourly_rate: teacherData.hourly_rate,
+        bank_name: teacherData.bank_name,
+        bank_account: teacherData.bank_account,
+        salary_notes: teacherData.salary_notes,
         created_at: personWithTeachers.created_at,
         updated_at: personWithTeachers.updated_at,
         created_by: teacherData.created_by,
         updated_by: teacherData.updated_by,
       } as Teacher;
 
-      // Execution Audit 기록 생성 (액티비티.md 3.3, 12 참조)
+      // Execution Audit 기록 생성 (비동기 - 응답 대기하지 않음)
       if (session?.user?.id) {
         const durationMs = Date.now() - startTime;
         const changedFields = Object.keys(input).filter((key) => input[key as keyof UpdateTeacherInput] !== undefined);
-        await createExecutionAuditRecord(
+        createExecutionAuditRecord(
           {
             operation_type: 'teacher.update',
             status: 'success',
@@ -768,13 +889,15 @@ export function useUpdateTeacher() {
             duration_ms: durationMs,
           },
           session.user.id
-        );
+        ).catch(() => {}); // 실패해도 무시
       }
 
       return teacher;
     },
-    onSuccess: (data) => {
+    onSuccess: (data: Teacher) => {
+      // [최적화] teachers와 teachers-with-stats 쿼리 모두 invalidate
       queryClient.invalidateQueries({ queryKey: ['teachers', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['teachers-with-stats', tenantId] });
       queryClient.invalidateQueries({
         queryKey: ['teacher', tenantId, data.id],
       });
@@ -816,6 +939,80 @@ export function useDeleteTeacher() {
           {
             operation_type: 'teacher.delete',
             status: 'success',
+            summary: `강사 삭제 완료`,
+            details: {
+              teacher_id: teacherId,
+            },
+            reference: {
+              entity_type: 'teacher',
+              entity_id: teacherId,
+            },
+            duration_ms: durationMs,
+          },
+          session.user.id
+        );
+      }
+
+      return response.data!;
+    },
+    onSuccess: () => {
+      // [최적화] teachers와 teachers-with-stats 쿼리 모두 invalidate
+      queryClient.invalidateQueries({ queryKey: ['teachers', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['teachers-with-stats', tenantId] });
+    },
+  });
+}
+
+/**
+ * 강사 퇴직 처리 Hook
+ * status를 'resigned'로 변경 (삭제가 아닌 퇴직 상태로 표시)
+ */
+export function useResignTeacher() {
+  const queryClient = useQueryClient();
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+  const { data: session } = useSession();
+
+  return useMutation({
+    mutationFn: async (teacherId: string) => {
+      const startTime = Date.now();
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      // academy_teachers는 person_id를 FK로 사용
+      // teacherId는 persons.id이므로, person_id로 조회 후 업데이트
+      const teacherResponse = await apiClient.get('academy_teachers', {
+        filters: { person_id: teacherId },
+        limit: 1,
+      });
+
+      if (teacherResponse.error) {
+        throw new Error(teacherResponse.error.message);
+      }
+
+      const academyTeacher = teacherResponse.data?.[0] as { person_id?: string } | undefined;
+      if (!academyTeacher || !academyTeacher.person_id) {
+        throw new Error('강사 정보를 찾을 수 없습니다.');
+      }
+
+      // patch는 id 기반이 아닌 person_id 기반으로 업데이트 필요
+      // academy_students처럼 person_id를 사용하므로 직접 Supabase 쿼리 실행
+      const response = await apiClient.patch('academy_teachers', academyTeacher.person_id, {
+        status: 'resigned',
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      // Execution Audit 기록 생성
+      if (session?.user?.id) {
+        const durationMs = Date.now() - startTime;
+        await createExecutionAuditRecord(
+          {
+            operation_type: 'teacher.resign',
+            status: 'success',
             summary: `강사 퇴직 처리 완료`,
             details: {
               teacher_id: teacherId,
@@ -834,7 +1031,9 @@ export function useDeleteTeacher() {
       return response.data!;
     },
     onSuccess: () => {
+      // [최적화] teachers와 teachers-with-stats 쿼리 모두 invalidate
       queryClient.invalidateQueries({ queryKey: ['teachers', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['teachers-with-stats', tenantId] });
     },
   });
 }

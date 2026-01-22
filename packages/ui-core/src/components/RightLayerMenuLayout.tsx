@@ -6,11 +6,35 @@
  * [불변 규칙] 1669px 이하: 레이어 메뉴가 바디 위에 오버레이됩니다 (overlay 방식).
  */
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { clsx } from 'clsx';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 import { RightLayerMenu, RightLayerMenuProps } from './RightLayerMenu';
-import { getCSSVariableAsPx, getCSSVariableAsMs, parseWidthToPx } from '../utils/css-variables';
+import { getCSSVariableAsMs } from '../utils/css-variables';
+
+// 레이어 메뉴 transition 상태를 전역으로 공유 (간단한 boolean)
+let layerMenuTransitioning = false;
+const transitionListeners: Set<(transitioning: boolean) => void> = new Set();
+
+export const useLayerMenuTransition = () => {
+  const [isTransitioning, setIsTransitioning] = useState(layerMenuTransitioning);
+
+  useEffect(() => {
+    const listener = (transitioning: boolean) => {
+      setIsTransitioning(transitioning);
+    };
+    transitionListeners.add(listener);
+    setIsTransitioning(layerMenuTransitioning);
+    return () => { transitionListeners.delete(listener); };
+  }, []);
+
+  return isTransitioning;
+};
+
+const setLayerMenuTransitioning = (value: boolean) => {
+  layerMenuTransitioning = value;
+  transitionListeners.forEach(listener => listener(layerMenuTransitioning));
+};
 
 // 오버레이 모드 기준 너비 (1669px)
 const OVERLAY_THRESHOLD_PX = 1669;
@@ -92,11 +116,6 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
     return layerMenu.width || (isMobile ? '100%' : isTablet ? 'var(--width-layer-menu-tablet)' : 'var(--width-layer-menu)');
   }, [layerMenu.width, isMobile, isTablet]);
 
-  // CSS 변수를 픽셀 값으로 변환
-  const menuWidthPx = useMemo(() => {
-    return parseWidthToPx(menuWidth, isMobile, isTablet);
-  }, [menuWidth, isMobile, isTablet]);
-
   // 확장 시 너비
   const effectiveMenuWidth = useMemo(() => {
     if (isMobile) return menuWidth;
@@ -118,6 +137,23 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
     prevIsOpenRef.current = layerMenu.isOpen;
   }, [layerMenu.isOpen, isExpanded]);
 
+  // 이전 isOpen 상태를 추적하여 transition 시작 감지
+  const prevIsOpenForTransition = useRef(layerMenu.isOpen);
+  useEffect(() => {
+    // isOpen 상태가 변경되고 오버레이 모드가 아니면 transition 시작
+    if (prevIsOpenForTransition.current !== layerMenu.isOpen && !effectiveUseOverlayMode) {
+      setLayerMenuTransitioning(true);
+    }
+    prevIsOpenForTransition.current = layerMenu.isOpen;
+  }, [layerMenu.isOpen, effectiveUseOverlayMode]);
+
+  // Transition 종료 이벤트 핸들러
+  const handleTransitionEnd = useCallback((e: React.TransitionEvent) => {
+    if (e.propertyName === 'margin-right') {
+      setLayerMenuTransitioning(false);
+    }
+  }, []);
+
   return (
     <div
       className={clsx(className)}
@@ -131,6 +167,7 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
       {/* 바디 영역 */}
       <div
         ref={bodyRef}
+        onTransitionEnd={handleTransitionEnd}
         style={{
           flex: 1,
           width: '100%',
