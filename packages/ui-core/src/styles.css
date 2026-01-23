@@ -85,6 +85,16 @@
   --color-info-dark: #0EBDD4;
   --color-info-50: #E0F7FA;
 
+  /* Status Background Colors (10% opacity) - 성능 모니터링 품질 지표용 */
+  --color-success-bg: rgba(34, 197, 94, 0.1);
+  --color-success-bg-subtle: rgba(34, 197, 94, 0.05);
+  --color-info-bg: rgba(59, 130, 246, 0.1);
+  --color-info-bg-subtle: rgba(59, 130, 246, 0.05);
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-warning-bg-subtle: rgba(245, 158, 11, 0.05);
+  --color-error-bg: rgba(239, 68, 68, 0.1);
+  --color-error-bg-subtle: rgba(239, 68, 68, 0.05);
+
   --color-secondary: #9371F0;
   --color-secondary-light: #A78BFA;
   --color-secondary-dark: #9371F0;
@@ -156,6 +166,8 @@
   --width-table-mobile-label: 3.75rem; /* 60px - 모바일 테이블 라벨 컬럼 너비 */
   --width-button-min: 7.5rem;         /* 120px - 버튼 최소 너비 */
   --width-card-min: 18.75rem;         /* 300px - 카드 최소 너비 */
+  --width-metric-card-min: 9.375rem;  /* 150px - 메트릭 카드 최소 너비 */
+  --width-query-cell-max: 25rem;      /* 400px - 쿼리 셀 최대 너비 */
   --width-calendar: 20rem;            /* 320px - 달력 너비 */
   --width-modal-sm: 25rem;           /* 400px - 모달 작은 크기 */
   --width-modal-md: 31.25rem;        /* 500px - 모달 중간 크기 */

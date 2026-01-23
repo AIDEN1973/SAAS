@@ -42,6 +42,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
 }, ref) => {
   // hover 상태 관리 (inline style 직접 조작 대신 state 사용)
   const [isHovered, setIsHovered] = React.useState(false);
+  // [P2-3 접근성] focus 상태 관리 (키보드 포커스 시각화)
+  const [isFocused, setIsFocused] = React.useState(false);
 
   // 버튼 텍스트에 따라 아이콘 매핑 (성능 최적화: useCallback + useMemo)
   const getIconByText = React.useCallback((text: React.ReactNode): React.ReactNode | null => {
@@ -182,7 +184,9 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
       : `var(--border-width-thin) solid transparent`,
     cursor: 'pointer',
     transition: 'var(--transition-all)',
-    outline: 'none',
+    // [P2-3 접근성] 기본 outline 제거하고 focus 시 커스텀 outline 적용
+    outline: isFocused ? `2px solid var(--color-primary)` : 'none',
+    outlineOffset: isFocused ? '2px' : '0',
     boxSizing: 'border-box', // 테두리 포함 크기 계산
     fontFamily: 'var(--font-family)', // Select와 동일한 폰트
     fontSize: 'var(--font-size-base)', // Select와 동일한 폰트 크기
@@ -260,6 +264,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => setIsFocused(false)}
       {...restProps}
     >
       {icon && (

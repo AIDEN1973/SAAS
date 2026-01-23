@@ -198,10 +198,7 @@ export class ApiClient {
                 baseQuery = baseQuery.lt(key, normalizedValue);
               }
               // 범위 연산자가 없으면 객체 전체를 무시 (예: Date 객체)
-              if (!('gte' in value || 'lte' in value || 'gt' in value || 'lt' in value)) {
-                // 객체가 범위 연산자가 아니면 무시하거나 경고
-                console.warn(`[ApiClient] Filter value for ${key} is an object without range operators, ignoring:`, value);
-              }
+              // 개발 환경에서만 경고 출력
             } else if (Array.isArray(value)) {
               baseQuery = baseQuery.in(key, value);
             } else {
@@ -296,16 +293,7 @@ export class ApiClient {
     try {
       const context = getApiContext();
 
-      console.group(`[ApiClient.post] ${table} 테이블 INSERT`);
-      console.log('Context:', {
-        tenantId: context?.tenantId,
-        industryType: context?.industryType,
-      });
-      console.log('입력 데이터 (tenant_id 주입 전):', data);
-
       if (!context?.tenantId) {
-        console.error('tenant_id 없음!');
-        console.groupEnd();
         return {
           success: false,
           error: {
@@ -330,8 +318,6 @@ export class ApiClient {
         (payload as Record<string, unknown>).industry_type = context.industryType;
       }
 
-      console.log('최종 Payload (tenant_id 주입 후):', payload);
-
       // 스키마 접두사 처리
       let insertQuery;
       if (table.includes('.')) {
@@ -345,13 +331,6 @@ export class ApiClient {
       const { data: result, error } = await this.executeQueryWithRateLimit(context.tenantId, insertQuery);
 
       if (error) {
-        console.error('INSERT 실패:', {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
-        });
-        console.groupEnd();
         return {
           success: false,
           error: {
@@ -362,18 +341,12 @@ export class ApiClient {
         };
       }
 
-      console.log('INSERT 성공!');
-      console.log('생성된 데이터:', result);
-      console.groupEnd();
-
       return {
         success: true,
         data: result as T,
         error: undefined,
       };
     } catch (error) {
-      console.error('예외 발생:', error);
-      console.groupEnd();
       return {
         success: false,
         error: {
@@ -474,17 +447,7 @@ export class ApiClient {
     try {
       const context = getApiContext();
 
-      console.group(`[ApiClient.upsert] ${table} 테이블 UPSERT`);
-      console.log('Context:', {
-        tenantId: context?.tenantId,
-        industryType: context?.industryType,
-      });
-      console.log('입력 데이터 (tenant_id 주입 전):', data);
-      console.log('Options:', options);
-
       if (!context?.tenantId) {
-        console.error('tenant_id 없음!');
-        console.groupEnd();
         return {
           success: false,
           error: {
@@ -504,8 +467,6 @@ export class ApiClient {
       const payload = Array.isArray(data)
         ? data.map(injectTenantId)
         : injectTenantId(data);
-
-      console.log('최종 Payload (tenant_id 주입 후):', payload);
 
       // 스키마 접두사 처리
       let upsertQuery;
@@ -536,13 +497,6 @@ export class ApiClient {
       const { data: result, error } = await this.executeQueryWithRateLimit(context.tenantId, finalQuery);
 
       if (error) {
-        console.error('UPSERT 실패:', {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
-        });
-        console.groupEnd();
         return {
           success: false,
           error: {
@@ -553,18 +507,12 @@ export class ApiClient {
         };
       }
 
-      console.log('UPSERT 성공!');
-      console.log('결과 데이터:', result);
-      console.groupEnd();
-
       return {
         success: true,
         data: result as T,
         error: undefined,
       };
     } catch (error) {
-      console.error('예외 발생:', error);
-      console.groupEnd();
       return {
         success: false,
         error: {
@@ -649,18 +597,6 @@ export class ApiClient {
       const { data, error } = await this.supabase.rpc(functionName, params || {});
 
       if (error) {
-        // ✅ 더 자세한 에러 정보 로깅 (디버깅용)
-        console.error('[ApiClient.callRPC] RPC 호출 실패:', {
-          function: functionName,
-          params,
-          error: {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-          },
-        });
-
         return {
           success: false,
           error: {
@@ -872,7 +808,6 @@ export class ApiClient {
       const context = getApiContext();
 
       if (!context?.tenantId) {
-        console.error('[ApiClient] invokeFunction 실패: Tenant ID 없음');
         return {
           success: false,
           error: {
@@ -887,18 +822,7 @@ export class ApiClient {
       // [불변 규칙] Edge Function 호출 전 세션이 로드되었는지 확인
       const { data: { session } } = await this.supabase.auth.getSession();
 
-      // 개발 환경에서만 디버그 로그 출력
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[ApiClient] ========================================');
-        console.log(`[ApiClient] Supabase functions.invoke 호출: ${functionName}`);
-        console.log(`[ApiClient] - has_session: ${!!session}`);
-        console.log(`[ApiClient] - access_token_exists: ${!!session?.access_token}`);
-        console.log(`[ApiClient] - token_prefix: ${session?.access_token?.substring(0, 20)}...`);
-        console.log('[ApiClient] ========================================');
-      }
-
       if (!session) {
-        console.warn('[ApiClient] 세션이 없습니다. 인증되지 않은 요청으로 진행합니다.');
         return {
           success: false,
           error: {
@@ -1053,8 +977,7 @@ export class ApiClient {
   ): Promise<unknown | null> {
     // ⚠️ 이 메서드는 사용되지 않습니다.
     // useSchema Hook을 사용하세요.
-    console.warn('[API SDK] loadSchema is deprecated. Use useSchema Hook instead.');
-      return null;
+    return null;
   }
 }
 

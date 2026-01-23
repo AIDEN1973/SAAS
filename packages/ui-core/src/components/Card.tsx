@@ -33,6 +33,12 @@ export interface CardProps {
   titleIcon?: React.ReactNode;
   /** 타이틀 영역 우측에 표시할 컨텐츠 */
   titleRightContent?: React.ReactNode;
+  /** [P2-3 접근성] ARIA role 속성 */
+  role?: string;
+  /** [P2-3 접근성] 모달 여부 (dialog role일 때 사용) */
+  'aria-modal'?: boolean;
+  /** [P2-3 접근성] 레이블 참조 ID */
+  'aria-labelledby'?: string;
 }
 
 export const Card: React.FC<CardProps> = ({
@@ -52,6 +58,9 @@ export const Card: React.FC<CardProps> = ({
   titlePosition = 'top-left',
   titleIcon,
   titleRightContent,
+  role,
+  'aria-modal': ariaModal,
+  'aria-labelledby': ariaLabelledby,
 }) => {
   const layoutType = useCardLayout();
 
@@ -156,6 +165,9 @@ export const Card: React.FC<CardProps> = ({
       onKeyDown={onKeyDown}
       tabIndex={tabIndex}
       aria-label={ariaLabel}
+      role={role}
+      aria-modal={ariaModal}
+      aria-labelledby={ariaLabelledby}
     >
       {title && (
         <>

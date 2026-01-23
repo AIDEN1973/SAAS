@@ -1,8 +1,27 @@
+import { Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ErrorBoundary, useTheme } from '@ui-core/react';
 import { SchemaEditorPage } from './pages/SchemaEditorPage';
+import { PerformanceMonitoringPageLazy } from './pages/PerformanceMonitoringPage.lazy';
 import { LoginPage } from './pages/LoginPage';
 import { AuthGuard } from './components/AuthGuard';
+import { Navigation } from './components/Navigation';
+
+// Lazy loading fallback
+function PageLoader() {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '50vh',
+      }}
+    >
+      <p style={{ color: 'var(--color-text-secondary)' }}>페이지 로딩 중...</p>
+    </div>
+  );
+}
 
 function App() {
   // 테넌트별 테마 적용 (super-admin은 본사 관리자용이므로 기본 테마 사용)
@@ -24,10 +43,21 @@ function App() {
             path="/*"
             element={
               <AuthGuard>
-                <Routes>
-                  <Route path="/" element={<SchemaEditorPage />} />
-                  <Route path="/schemas" element={<SchemaEditorPage />} />
-                </Routes>
+                <>
+                  <Navigation />
+                  <Routes>
+                    <Route path="/" element={<SchemaEditorPage />} />
+                    <Route path="/schemas" element={<SchemaEditorPage />} />
+                    <Route
+                      path="/performance"
+                      element={
+                        <Suspense fallback={<PageLoader />}>
+                          <PerformanceMonitoringPageLazy />
+                        </Suspense>
+                      }
+                    />
+                  </Routes>
+                </>
               </AuthGuard>
             }
           />

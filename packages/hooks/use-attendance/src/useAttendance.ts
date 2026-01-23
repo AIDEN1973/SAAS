@@ -588,6 +588,68 @@ export function useUpsertAttendanceLog() {
         return upsertedData;
       }
     },
+    // [P2-4] Optimistic Update: 출결 입력 시 즉시 UI 업데이트
+    onMutate: async (input) => {
+      // 진행 중인 쿼리 취소
+      await queryClient.cancelQueries({
+        predicate: (query) => {
+          const key = query.queryKey;
+          return Array.isArray(key) && key[0] === 'attendance-logs' && key[1] === tenantId;
+        },
+      });
+
+      // 이전 데이터 스냅샷 (여러 쿼리 키에 대해)
+      const previousData: { queryKey: readonly unknown[]; data: AttendanceLog[] }[] = [];
+      queryClient.getQueriesData<AttendanceLog[]>({
+        predicate: (query) => {
+          const key = query.queryKey;
+          return Array.isArray(key) && key[0] === 'attendance-logs' && key[1] === tenantId;
+        },
+      }).forEach(([queryKey, data]) => {
+        if (data) {
+          previousData.push({ queryKey, data });
+        }
+      });
+
+      // 낙관적 업데이트: 모든 관련 쿼리에 새 로그 추가 또는 업데이트
+      const optimisticLog: AttendanceLog = {
+        id: String(input.id || `temp-${Date.now()}`),
+        tenant_id: tenantId!,
+        student_id: input.student_id,
+        class_id: input.class_id,
+        attendance_type: input.attendance_type,
+        status: input.status,
+        occurred_at: input.occurred_at,
+        notes: input.notes,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as AttendanceLog;
+
+      previousData.forEach(({ queryKey }) => {
+        queryClient.setQueryData<AttendanceLog[]>(queryKey, (old): AttendanceLog[] => {
+          if (!old) return [optimisticLog];
+          if (input.id) {
+            // 업데이트: 기존 로그 교체
+            return old.map((log): AttendanceLog =>
+              String(log.id) === String(input.id) ? { ...log, ...input, id: String(input.id) } as AttendanceLog : log
+            );
+          } else {
+            // 새 로그 추가 (맨 앞에)
+            return [optimisticLog, ...old];
+          }
+        });
+      });
+
+      return { previousData };
+    },
+    // 에러 발생 시 이전 데이터로 롤백
+    onError: (_err, _input, context) => {
+      if (context?.previousData) {
+        context.previousData.forEach(({ queryKey, data }) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+    },
     onSuccess: () => {
       // [근본 수정] 헬퍼 함수를 사용하여 모든 관련 쿼리 무효화
       invalidateAttendanceLogsQueries(queryClient, tenantId);

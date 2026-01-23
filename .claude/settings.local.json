@@ -184,7 +184,18 @@
       "Bash(pnpm supabase db push:*)",
       "mcp__supabase__list_edge_functions",
       "mcp__supabase__get_logs",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "mcp__supabase__list_migrations",
+      "mcp__supabase__get_advisors",
+      "mcp__supabase__search_docs",
+      "mcp__supabase__list_extensions",
+      "Bash(pnpm --filter super-admin typecheck:*)",
+      "mcp__supabase__get_edge_function",
+      "Bash(pnpm supabase functions deploy:*)",
+      "Bash(supabase secrets --help:*)",
+      "Bash(supabase secrets set --help:*)",
+      "Bash(supabase secrets set:*)",
+      "Bash(supabase secrets list:*)"
     ]
   }
 }

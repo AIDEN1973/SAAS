@@ -222,7 +222,9 @@ export function RoleBasedRoute({ children, fallbackPath = '/home' }: RoleBasedRo
   }
 
   // 3. 기타 역할 (staff, counselor)은 기존 roleRouteRules 사용
-  const allowedPaths = roleRouteRules[(userRole as unknown) as TenantRole] || [];
+  // P1-2: Type Safety 개선 - userRole이 이미 TenantRole 타입인지 확인 후 캐스팅
+  const validUserRole = userRole as TenantRole;
+  const allowedPaths = roleRouteRules[validUserRole] || [];
   const isPathAllowedResult = isPathAllowed(location.pathname, allowedPaths);
 
   if (isPathAllowedResult) {

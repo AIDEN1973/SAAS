@@ -43,6 +43,8 @@ export interface ModalProps {
   inlineFields?: InlineFormField[];
   /** 닫기 버튼의 aria-label (접근성 및 다국어 지원) */
   closeButtonAriaLabel?: string;
+  /** 모달 dialog의 aria-label (title이 없을 때 사용) */
+  ariaLabel?: string;
 }
 
 /**
@@ -64,7 +66,10 @@ export const Modal: React.FC<ModalProps> = ({
   bodyLayout = 'default',
   inlineFields,
   closeButtonAriaLabel = 'Close',
+  ariaLabel,
 }) => {
+  // 접근성을 위한 고유 ID 생성
+  const modalTitleId = React.useId();
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
 
@@ -155,6 +160,10 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Modal Content */}
       <Card
         variant="elevated"
+        role="dialog"
+        aria-modal={true}
+        aria-labelledby={title ? modalTitleId : undefined}
+        aria-label={!title ? ariaLabel : undefined}
         style={{
           position: 'relative',
           zIndex: 'var(--z-modal)',
@@ -183,6 +192,7 @@ export const Modal: React.FC<ModalProps> = ({
             }}
           >
             <h2
+              id={modalTitleId}
               style={{
                 fontWeight: 'var(--font-weight-semibold)',
                 color: 'var(--color-white)',

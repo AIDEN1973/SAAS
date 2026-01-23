@@ -22,6 +22,8 @@ export interface DrawerProps {
   closeOnOverlayClick?: boolean;
   closeOnEscape?: boolean;
   className?: string;
+  /** [P2-3 접근성] 드로어 dialog의 aria-label (title이 없을 때 사용) */
+  ariaLabel?: string;
 }
 
 /**
@@ -41,7 +43,10 @@ export const Drawer: React.FC<DrawerProps> = ({
   closeOnOverlayClick = true,
   closeOnEscape = true,
   className,
+  ariaLabel,
 }) => {
+  // [P2-3 접근성] 고유 ID 생성
+  const drawerTitleId = React.useId();
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
 
@@ -136,6 +141,10 @@ export const Drawer: React.FC<DrawerProps> = ({
       <Card
         variant="elevated"
         padding="lg"
+        role="dialog"
+        aria-modal={true}
+        aria-labelledby={title ? drawerTitleId : undefined}
+        aria-label={!title ? ariaLabel : undefined}
         style={{
           position: 'absolute',
           zIndex: 'var(--z-modal)',
@@ -163,6 +172,7 @@ export const Drawer: React.FC<DrawerProps> = ({
             }}
           >
             <h2
+              id={drawerTitleId}
               style={{
                 fontWeight: 'var(--font-weight-bold)',
                 fontSize: 'var(--font-size-lg)',

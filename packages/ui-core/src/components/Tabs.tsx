@@ -22,6 +22,8 @@ export interface TabsProps {
   className?: string;
   style?: React.CSSProperties;
   variant?: 'default' | 'pills';
+  /** [P2-3 접근성] tablist의 aria-label */
+  ariaLabel?: string;
 }
 
 /**
@@ -37,7 +39,10 @@ export const Tabs: React.FC<TabsProps> = ({
   className,
   style,
   variant = 'default',
+  ariaLabel,
 }) => {
+  // [P2-3 접근성] 고유 ID 생성
+  const tabsId = React.useId();
   const [internalActiveKey, setInternalActiveKey] = useState(defaultActiveKey || items[0]?.key || '');
   const activeKey = controlledActiveKey !== undefined ? controlledActiveKey : internalActiveKey;
 
@@ -57,6 +62,8 @@ export const Tabs: React.FC<TabsProps> = ({
   return (
     <div className={className} style={style}>
       <div
+        role="tablist"
+        aria-label={ariaLabel}
         style={{
           display: 'flex',
           gap: isPills ? 'var(--spacing-xs)' : 0,
@@ -65,9 +72,16 @@ export const Tabs: React.FC<TabsProps> = ({
       >
         {items.map((item, index) => {
           const isActive = index === activeIndex;
+          const tabId = `${tabsId}-tab-${item.key}`;
+          const panelId = `${tabsId}-panel-${item.key}`;
           return (
             <button
               key={item.key}
+              id={tabId}
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={panelId}
+              tabIndex={isActive ? 0 : -1}
               onClick={() => !item.disabled && handleTabChange(index)}
               disabled={item.disabled}
               style={{
@@ -104,13 +118,23 @@ export const Tabs: React.FC<TabsProps> = ({
           );
         })}
       </div>
-      {items.map((item, index) => (
-        index === activeIndex && (
-          <div key={item.key} style={{ padding: 'var(--spacing-lg)' }}>
+      {items.map((item, index) => {
+        const isActive = index === activeIndex;
+        const tabId = `${tabsId}-tab-${item.key}`;
+        const panelId = `${tabsId}-panel-${item.key}`;
+        return isActive && (
+          <div
+            key={item.key}
+            id={panelId}
+            role="tabpanel"
+            aria-labelledby={tabId}
+            tabIndex={0}
+            style={{ padding: 'var(--spacing-lg)' }}
+          >
             {item.content}
           </div>
-        )
-      ))}
+        );
+      })}
     </div>
   );
 };

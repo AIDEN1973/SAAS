@@ -17,6 +17,8 @@ export interface SearchInputProps {
   disabled?: boolean;
   className?: string;
   style?: React.CSSProperties;
+  /** [P2-3 접근성] 검색 입력 필드의 aria-label */
+  ariaLabel?: string;
 }
 
 /**
@@ -33,6 +35,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
   disabled = false,
   className,
   style,
+  ariaLabel,
 }, ref) => {
   // Size를 CSS Variables로 매핑 (Button, Select와 동일한 높이 보장)
   // [불변 규칙] 명시적 height 사용으로 Button/Select와 높이 일관성 유지
@@ -78,7 +81,9 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
       />
       <input
         ref={ref}
-        type="text"
+        type="search"
+        role="searchbox"
+        aria-label={ariaLabel || placeholder}
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
         placeholder={placeholder}

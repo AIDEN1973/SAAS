@@ -22,6 +22,12 @@ import { toKST } from '@lib/date-utils'; // 기술문서 5-2: KST 변환 필수
 import { normalizePhoneNumber } from '@lib/normalization'; // [불변 규칙] 전화번호 정규화
 import { useSession } from '@hooks/use-auth';
 import { createExecutionAuditRecord } from './execution-audit-utils';
+import {
+  createOptimisticUpdate,
+  createListItemUpdater,
+  createListItemRemover,
+  type OptimisticContext,
+} from './optimistic-utils';
 import type {
   CreateStudentInput,
   UpdateStudentInput,
@@ -297,6 +303,295 @@ export function useStudents(filter?: StudentFilter) {
     staleTime: 30 * 1000, // 30초간 캐시 유지 (검색 성능 최적화)
     gcTime: 5 * 60 * 1000, // 5분간 가비지 컬렉션 방지 (이전 cacheTime)
     // [성능 개선] 네트워크 오류 자동 재시도
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
+}
+
+/**
+ * [P1-6] 페이지네이션 옵션
+ * 10만+ 학생 규모에서도 성능 저하 없이 동작하도록 서버사이드 페이지네이션 지원
+ */
+export interface PaginationOptions {
+  /** 페이지 번호 (1부터 시작) */
+  page: number;
+  /** 페이지당 항목 수 (기본값: 50) */
+  pageSize?: number;
+}
+
+/**
+ * [P1-6] 페이지네이션 결과
+ */
+export interface PaginatedResult<T> {
+  /** 현재 페이지 데이터 */
+  data: T[];
+  /** 전체 항목 수 */
+  totalCount: number;
+  /** 전체 페이지 수 */
+  totalPages: number;
+  /** 현재 페이지 번호 */
+  currentPage: number;
+  /** 다음 페이지 존재 여부 */
+  hasNextPage: boolean;
+  /** 이전 페이지 존재 여부 */
+  hasPrevPage: boolean;
+}
+
+/**
+ * [P1-6] 서버사이드 페이지네이션이 적용된 학생 목록 조회
+ * 10만+ 학생 규모에서도 성능 저하 없이 동작
+ *
+ * @param tenantId 테넌트 ID
+ * @param filter 필터 조건
+ * @param pagination 페이지네이션 옵션
+ * @returns 페이지네이션된 학생 목록
+ */
+export async function fetchStudentsPaginated(
+  tenantId: string,
+  filter?: StudentFilter,
+  pagination?: PaginationOptions
+): Promise<PaginatedResult<Student>> {
+  const page = pagination?.page ?? 1;
+  const pageSize = pagination?.pageSize ?? 50;
+  const offset = (page - 1) * pageSize;
+
+  // 1. 먼저 전체 카운트 조회 (ID 필터링 로직 적용)
+  let restrictedStudentIds: string[] | undefined;
+
+  const intersect = (a: string[] | undefined, b: string[] | undefined): string[] | undefined => {
+    if (!a && !b) return undefined;
+    if (!a) return b;
+    if (!b) return a;
+    const setB = new Set(b);
+    return a.filter((id) => setB.has(id));
+  };
+
+  // 태그 필터
+  if (filter?.tag_ids && filter.tag_ids.length > 0) {
+    const assignmentsResponse = await apiClient.get<TagAssignment>('tag_assignments', {
+      filters: { entity_type: 'student', tag_id: filter.tag_ids },
+    });
+    if (!assignmentsResponse.error && assignmentsResponse.data) {
+      const assignments = assignmentsResponse.data;
+      if (assignments.length === 0) {
+        return { data: [], totalCount: 0, totalPages: 0, currentPage: page, hasNextPage: false, hasPrevPage: false };
+      }
+      restrictedStudentIds = [...new Set(assignments.map((a) => a.entity_id))];
+    }
+  }
+
+  // status/grade 필터
+  if (filter?.status || filter?.grade) {
+    const academyFilters: Record<string, unknown> = { deleted_at: null };
+    if (filter?.grade) academyFilters.grade = filter.grade;
+    if (filter?.status) academyFilters.status = filter.status;
+
+    const academyIdsResponse = await apiClient.get<{ person_id: string }>('academy_students', {
+      select: 'person_id',
+      filters: academyFilters,
+    });
+
+    if (!academyIdsResponse.error && academyIdsResponse.data) {
+      const idsFromAcademy = [...new Set(academyIdsResponse.data.map((r) => r.person_id))];
+      if (idsFromAcademy.length === 0) {
+        return { data: [], totalCount: 0, totalPages: 0, currentPage: page, hasNextPage: false, hasPrevPage: false };
+      }
+      restrictedStudentIds = intersect(restrictedStudentIds, idsFromAcademy);
+    }
+  }
+
+  // class_id 필터
+  if (filter?.class_id && filter.class_id.trim() !== '' && filter.class_id !== 'all') {
+    const studentClassesResponse = await apiClient.get<StudentClass>('student_classes', {
+      filters: { class_id: filter.class_id, is_active: true },
+    });
+
+    if (!studentClassesResponse.error && studentClassesResponse.data) {
+      const idsInClass = [...new Set(studentClassesResponse.data.map((sc) => sc.student_id))];
+      if (idsInClass.length === 0) {
+        return { data: [], totalCount: 0, totalPages: 0, currentPage: page, hasNextPage: false, hasPrevPage: false };
+      }
+      restrictedStudentIds = intersect(restrictedStudentIds, idsInClass);
+    }
+  }
+
+  // 삭제되지 않은 학생만 필터
+  const nonDeletedResponse = await apiClient.get<{ person_id: string }>('academy_students', {
+    select: 'person_id',
+    filters: { deleted_at: null },
+  });
+
+  if (!nonDeletedResponse.error && nonDeletedResponse.data) {
+    const nonDeletedIds = nonDeletedResponse.data.map((r) => r.person_id);
+    restrictedStudentIds = restrictedStudentIds
+      ? intersect(restrictedStudentIds, nonDeletedIds)
+      : nonDeletedIds;
+  }
+
+  if (restrictedStudentIds && restrictedStudentIds.length === 0) {
+    return { data: [], totalCount: 0, totalPages: 0, currentPage: page, hasNextPage: false, hasPrevPage: false };
+  }
+
+  // 2. 전체 카운트 조회
+  const countResponse = await apiClient.get<Person>('persons', {
+    filters: {
+      person_type: 'student',
+      ...(filter?.search ? { search: filter.search } : {}),
+      ...(restrictedStudentIds ? { id: restrictedStudentIds } : {}),
+    },
+    count: 'exact',
+    limit: 0,
+  });
+
+  const totalCount = countResponse.count ?? 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
+
+  if (totalCount === 0) {
+    return { data: [], totalCount: 0, totalPages: 0, currentPage: page, hasNextPage: false, hasPrevPage: false };
+  }
+
+  // 3. 페이지네이션된 데이터 조회
+  interface PersonWithAcademyStudents extends Person {
+    academy_students?: Array<Record<string, unknown>>;
+  }
+
+  const response = await apiClient.get<PersonWithAcademyStudents>('persons', {
+    select: `
+      *,
+      academy_students (
+        birth_date, gender, school_name, grade, class_name,
+        attendance_number, father_phone, mother_phone, status,
+        notes, profile_image_url, deleted_at, created_at, updated_at,
+        created_by, updated_by
+      )
+    `,
+    filters: {
+      person_type: 'student',
+      ...(filter?.search ? { search: filter.search } : {}),
+      ...(restrictedStudentIds ? { id: restrictedStudentIds } : {}),
+    },
+    orderBy: { column: 'created_at', ascending: false },
+    range: { from: offset, to: offset + pageSize - 1 },
+  });
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  const personsData = response.data || [];
+  const studentIds = personsData.map((p) => p.id);
+
+  // 4. 학부모/반 정보 병렬 조회
+  const [guardiansResponse, studentClassesResponse] = await Promise.all([
+    apiClient.get<Guardian>('guardians', {
+      filters: { student_id: studentIds, is_primary: true },
+    }),
+    apiClient.get<StudentClass>('student_classes', {
+      filters: { student_id: studentIds, is_active: true },
+    }),
+  ]);
+
+  const guardiansMap = new Map<string, string>();
+  if (!guardiansResponse.error && guardiansResponse.data) {
+    guardiansResponse.data.forEach((g) => {
+      if (!guardiansMap.has(g.student_id)) {
+        guardiansMap.set(g.student_id, g.name);
+      }
+    });
+  }
+
+  const studentClassMap = new Map<string, string>();
+  if (!studentClassesResponse.error && studentClassesResponse.data) {
+    const classIds = [...new Set(studentClassesResponse.data.map((sc) => sc.class_id))];
+    if (classIds.length > 0) {
+      const classesResponse = await apiClient.get<Class>('academy_classes', {
+        filters: { id: classIds },
+      });
+      if (!classesResponse.error && classesResponse.data) {
+        const classMap = new Map(classesResponse.data.map((c) => [c.id, c.name]));
+        studentClassesResponse.data.forEach((sc) => {
+          if (!studentClassMap.has(sc.student_id) && classMap.has(sc.class_id)) {
+            studentClassMap.set(sc.student_id, classMap.get(sc.class_id)!);
+          }
+        });
+      }
+    }
+  }
+
+  // 5. 데이터 변환
+  const students: Student[] = personsData.map((person) => {
+    const rawAcademyData = person.academy_students;
+    const academyData: Record<string, unknown> = Array.isArray(rawAcademyData)
+      ? (rawAcademyData[0] || {})
+      : (rawAcademyData || {});
+
+    return {
+      id: person.id,
+      tenant_id: person.tenant_id,
+      industry_type: 'academy',
+      name: person.name,
+      birth_date: academyData.birth_date,
+      gender: academyData.gender,
+      phone: person.phone,
+      attendance_number: academyData.attendance_number,
+      email: person.email,
+      father_phone: academyData.father_phone,
+      mother_phone: academyData.mother_phone,
+      address: person.address,
+      school_name: academyData.school_name,
+      grade: academyData.grade,
+      status: academyData.status || 'active',
+      notes: academyData.notes,
+      profile_image_url: academyData.profile_image_url,
+      created_at: person.created_at,
+      updated_at: person.updated_at,
+      created_by: academyData.created_by,
+      updated_by: academyData.updated_by,
+      primary_guardian_name: guardiansMap.get(person.id) || undefined,
+      primary_class_name: studentClassMap.get(person.id) || undefined,
+    } as Student & { primary_guardian_name?: string; primary_class_name?: string };
+  });
+
+  return {
+    data: students,
+    totalCount,
+    totalPages,
+    currentPage: page,
+    hasNextPage: page < totalPages,
+    hasPrevPage: page > 1,
+  };
+}
+
+/**
+ * [P1-6] 페이지네이션된 학생 목록 조회 Hook
+ * 10만+ 학생 규모에서도 성능 저하 없이 동작
+ *
+ * @param filter 필터 조건
+ * @param pagination 페이지네이션 옵션
+ * @returns React Query 결과 (페이지네이션 정보 포함)
+ *
+ * @example
+ * const { data, isLoading } = useStudentsPaginated(
+ *   { status: 'active' },
+ *   { page: 1, pageSize: 50 }
+ * );
+ * // data.data: 학생 배열
+ * // data.totalCount: 전체 학생 수
+ * // data.hasNextPage: 다음 페이지 존재 여부
+ */
+export function useStudentsPaginated(
+  filter?: StudentFilter,
+  pagination?: PaginationOptions
+) {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+
+  return useQuery({
+    queryKey: ['students', 'paginated', tenantId, filter, pagination],
+    queryFn: () => fetchStudentsPaginated(tenantId!, filter, pagination),
+    enabled: !!tenantId,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
@@ -1318,6 +1613,54 @@ export function useUpdateStudent() {
 
       return updatedStudent;
     },
+    // [P2-4] Optimistic Update: 네트워크 응답 전에 즉시 UI 업데이트
+    onMutate: async ({ studentId, input }) => {
+      // 진행 중인 쿼리 취소
+      await queryClient.cancelQueries({ queryKey: ['student', tenantId, studentId] });
+      await queryClient.cancelQueries({ queryKey: ['students', tenantId] });
+
+      // 이전 데이터 스냅샷
+      const previousStudent = queryClient.getQueryData<Student>(['student', tenantId, studentId]);
+      const previousStudents = queryClient.getQueryData<Student[]>(['students', tenantId]);
+
+      // 낙관적 업데이트: 개별 학생
+      if (previousStudent) {
+        const normalizedPhone = input.phone !== undefined ? normalizePhoneNumber(input.phone) : undefined;
+        queryClient.setQueryData<Student>(['student', tenantId, studentId], {
+          ...previousStudent,
+          ...input,
+          phone: normalizedPhone ?? previousStudent.phone,
+        });
+      }
+
+      // 낙관적 업데이트: 학생 목록
+      if (previousStudents) {
+        queryClient.setQueryData<Student[]>(['students', tenantId], (old) =>
+          old?.map((student) => {
+            if (student.id === studentId) {
+              const normalizedPhone = input.phone !== undefined ? normalizePhoneNumber(input.phone) : undefined;
+              return {
+                ...student,
+                ...input,
+                phone: normalizedPhone ?? student.phone,
+              };
+            }
+            return student;
+          })
+        );
+      }
+
+      return { previousStudent, previousStudents };
+    },
+    // 에러 발생 시 이전 데이터로 롤백
+    onError: (_err, { studentId }, context) => {
+      if (context?.previousStudent) {
+        queryClient.setQueryData(['student', tenantId, studentId], context.previousStudent);
+      }
+      if (context?.previousStudents) {
+        queryClient.setQueryData(['students', tenantId], context.previousStudents);
+      }
+    },
     onSuccess: (data) => {
       // 학생 목록 및 상세 쿼리 무효화
       // students-paged 쿼리도 무효화하여 테이블에 즉시 반영되도록 함
@@ -1389,7 +1732,31 @@ export function useDeleteStudent() {
         );
       }
 
-      return;
+      return studentId;
+    },
+    // [P2-4] Optimistic Update: 삭제 시 즉시 UI에서 제거
+    onMutate: async (studentId: string) => {
+      // 진행 중인 쿼리 취소
+      await queryClient.cancelQueries({ queryKey: ['students', tenantId] });
+      await queryClient.cancelQueries({ queryKey: ['student', tenantId, studentId] });
+
+      // 이전 데이터 스냅샷
+      const previousStudents = queryClient.getQueryData<Student[]>(['students', tenantId]);
+
+      // 낙관적 업데이트: 학생 목록에서 즉시 제거
+      if (previousStudents) {
+        queryClient.setQueryData<Student[]>(['students', tenantId], (old) =>
+          old?.filter((student) => student.id !== studentId)
+        );
+      }
+
+      return { previousStudents, studentId };
+    },
+    // 에러 발생 시 이전 데이터로 롤백
+    onError: (_err, _studentId, context) => {
+      if (context?.previousStudents) {
+        queryClient.setQueryData(['students', tenantId], context.previousStudents);
+      }
     },
     onSuccess: () => {
       // 학생 목록 쿼리 무효화

@@ -107,6 +107,7 @@ export const IconButtonGroup: React.FC<IconButtonGroupProps> = ({
               color={item.color || 'primary'}
               onClick={item.onClick}
               disabled={item.disabled}
+              aria-label={item.tooltip}
               style={{
                 padding: 0,
                 minWidth: 'auto',

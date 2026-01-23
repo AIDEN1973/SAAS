@@ -61,3 +61,11 @@ export {
   type CreateTagInput,
 } from './validation';
 
+// Cache utilities
+export {
+  CACHE_TTL,
+  queryKeys,
+  getCacheInvalidationKeys,
+  defaultQueryOptions,
+} from './cache';
+

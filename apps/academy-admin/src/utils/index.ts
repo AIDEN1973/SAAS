@@ -136,3 +136,10 @@ export {
 export { renderCard } from './dashboardCardRenderer';
 export { handleCardClick } from './handleCardClick';
 
+// 사이드바 유틸리티
+export {
+  getSidebarItemsForRole,
+  createHasPagePermission,
+} from './sidebar-utils.tsx';
+export type { SidebarUtilsOptions } from './sidebar-utils.tsx';
+

@@ -7,130 +7,25 @@ import {
   useAILayerMenu,
   getOrCreateChatOpsSessionId,
   useGlobalSearch,
-  Tooltip,
+  ErrorBoundary,
 } from '@ui-core/react';
 import type { SearchResult, SidebarItem, ExecutionAuditRun } from '@ui-core/react';
-import { ChatsCircle, ClockCounterClockwise, BookOpen } from 'phosphor-react';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleBasedRoute } from './components/RoleBasedRoute';
 import { IndustryBasedRoute } from './components/IndustryBasedRoute';
+import { AgentButton, TimelineButton, ManualButton } from './components/navigation';
+import { PageLoader } from './components/layout';
 import { useLogout, useUserRole, useSession } from '@hooks/use-auth';
 import { useExecutionAuditRuns, fetchExecutionAuditSteps } from '@hooks/use-execution-audit';
 import { sendChatOpsMessageStreaming } from '@hooks/use-chatops';
 import { useIndustryConfig } from '@hooks/use-industry-config';
 import { getApiContext } from '@api-sdk/core';
 import type { TenantRole } from '@core/tenancy';
-import { useCurrentTeacherPosition, useRolePermissions, DEFAULT_PERMISSIONS } from '@hooks/use-class';
-import { createSafeNavigate, logError, logWarn, logInfo } from './utils';
+import { useCurrentTeacherPosition, useRolePermissions } from '@hooks/use-class';
+import { createSafeNavigate, logError, logWarn, logInfo, getSidebarItemsForRole } from './utils';
 import { maskPII } from '@core/pii-utils';
 
-// Agent Button Component
-const AgentButton: React.FC<{ isOpen: boolean; onClick: () => void }> = ({ isOpen, onClick }) => {
-  const [isHovered, setIsHovered] = useState(false);
-
-  return (
-    <Tooltip content="에이전트" position="bottom">
-      <button
-        onClick={onClick}
-        aria-label="에이전트 열기/닫기"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 'var(--spacing-sm)',
-          backgroundColor: isHovered ? 'var(--color-primary-40)' : 'transparent',
-          border: 'none',
-          borderRadius: 'var(--border-radius-md)',
-          cursor: 'pointer',
-          transition: 'var(--transition-all)',
-        }}
-      >
-        <ChatsCircle
-          weight={isOpen ? 'bold' : 'regular'}
-          style={{
-            width: 'var(--size-icon-xl)',
-            height: 'var(--size-icon-xl)',
-            color: isOpen ? 'var(--color-primary)' : 'var(--color-text-tertiary)',
-          }}
-        />
-      </button>
-    </Tooltip>
-  );
-};
-
-// Timeline Button Component
-const TimelineButton: React.FC<{ onClick: () => void }> = ({ onClick }) => {
-  const [isHovered, setIsHovered] = useState(false);
-
-  return (
-    <Tooltip content="타임라인" position="bottom">
-      <button
-        onClick={onClick}
-        aria-label="타임라인 열기"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 'var(--spacing-sm)',
-          backgroundColor: isHovered ? 'var(--color-primary-40)' : 'transparent',
-          border: 'none',
-          borderRadius: 'var(--border-radius-md)',
-          cursor: 'pointer',
-          transition: 'var(--transition-all)',
-        }}
-      >
-        <ClockCounterClockwise
-          weight="regular"
-          style={{
-            width: 'var(--size-icon-xl)',
-            height: 'var(--size-icon-xl)',
-            color: 'var(--color-text-tertiary)',
-          }}
-        />
-      </button>
-    </Tooltip>
-  );
-};
-
-// Manual Button Component
-const ManualButton: React.FC<{ isOpen: boolean; onClick: () => void }> = ({ isOpen, onClick }) => {
-  const [isHovered, setIsHovered] = useState(false);
-
-  return (
-    <Tooltip content="매뉴얼" position="bottom">
-      <button
-        onClick={onClick}
-        aria-label="매뉴얼 열기/닫기"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 'var(--spacing-sm)',
-          backgroundColor: isHovered ? 'var(--color-primary-hover)' : 'transparent',
-          border: 'none',
-          borderRadius: 'var(--border-radius-md)',
-          cursor: 'pointer',
-          transition: 'var(--transition-all)',
-        }}
-      >
-        <BookOpen
-          weight={isOpen ? 'bold' : 'regular'}
-          style={{
-            width: 'var(--size-icon-xl)',
-            height: 'var(--size-icon-xl)',
-            color: isOpen ? 'var(--color-primary)' : 'var(--color-text-tertiary)',
-          }}
-        />
-      </button>
-    </Tooltip>
-  );
-};
+// 버튼 컴포넌트들은 ./components/navigation에서 import
 
 // 큰 컴포넌트는 lazy loading으로 전환 (초기 로드 번들 크기 감소)
 const AppLayout = lazy(() => import('@ui-core/react').then(m => ({ default: m.AppLayout })));
@@ -165,39 +60,7 @@ const AuthGuard = lazy(() => import('../../super-admin/src/components/AuthGuard'
 const AgentPage = lazy(() => import('./pages/AgentPage').then(m => ({ default: m.AgentPage })));
 const ManualPage = lazy(() => import('./pages/ManualPage').then(m => ({ default: m.ManualPage })));
 
-// 로딩 컴포넌트 - 스켈레톤 형태로 체감 로딩 속도 개선
-// [SSOT] 하드코딩 금지: CSS 변수 사용
-const PageLoader = () => (
-  <div style={{ padding: 'var(--spacing-lg)' }}>
-    {/* 페이지 제목 스켈레톤 */}
-    <div
-      style={{
-        height: '28px',
-        width: '180px',
-        backgroundColor: 'var(--color-bg-tertiary)',
-        borderRadius: 'var(--border-radius-md)',
-        marginBottom: 'var(--spacing-lg)',
-        animation: 'pageLoaderPulse 1.5s ease-in-out infinite',
-      }}
-    />
-    {/* 콘텐츠 카드 스켈레톤 */}
-    <div
-      style={{
-        height: '160px',
-        backgroundColor: 'var(--color-bg-tertiary)',
-        borderRadius: 'var(--border-radius-lg)',
-        animation: 'pageLoaderPulse 1.5s ease-in-out infinite',
-        animationDelay: '0.2s',
-      }}
-    />
-    <style>{`
-      @keyframes pageLoaderPulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-      }
-    `}</style>
-  </div>
-);
+// 로딩 컴포넌트는 ./components/layout에서 import
 
 function AppContent() {
   // 테넌트별 테마 적용
@@ -402,8 +265,8 @@ function AppContent() {
       return;
     }
 
-    // 중요: forEach 내부 async는 await를 지원하지 않으므로 Promise.all 사용
-    void Promise.all(
+    // P1-1 수정: Promise.all 에러 핸들링 추가
+    Promise.all(
       loadingRunIds.map(async (runId) => {
         // 이미 Steps가 로드되어 있으면 스킵 (중복 호출 방지)
         if (aiLayerMenu.executionAuditStepsByRunId[runId]?.length > 0) {
@@ -428,7 +291,11 @@ function AppContent() {
           aiLayerMenu.setExecutionAuditStepsLoading(runId, false);
         }
       })
-    );
+    ).catch((error) => {
+      // P1-1: Promise.all 전체 실패 시 에러 로깅
+      const maskedError = maskPII(error);
+      logError('App:ExecutionAudit:LoadSteps:BatchFailed', maskedError);
+    });
   }, [aiLayerMenu.executionAuditStepsLoading, aiLayerMenu]);
 
   // Execution Audit 핸들러 구현 (액티비티.md 10.1, 10.2 참조)
@@ -690,422 +557,14 @@ function AppContent() {
 
   // NOTE: 사이드바 아이템은 getSidebarItemsForRole()에서 생성합니다.
 
-  /**
-   * 권한 확인 헬퍼 함수
-   * - DB의 role_permissions 테이블에서 권한 확인
-   * - 해당 직급의 권한이 DB에 하나라도 있으면 DB만 사용 (명시적 권한 관리)
-   * - 해당 직급의 권한이 DB에 전혀 없으면 기본 권한 사용 (초기 상태)
-   * - 관리자 역할은 항상 전체 접근 허용
-   * - 경로 매칭: /students 권한이 있으면 /students/home도 접근 가능
-   */
-  const hasPagePermission = (pagePath: string): boolean => {
-    // 최고 관리자 역할은 항상 전체 접근 허용 (권한 설정 불가)
-    if (userRole && ['admin', 'owner', 'super_admin'].includes(userRole)) {
-      return true;
-    }
-
-    // 강사 직급이 없으면 staff, counselor 등 기타 역할 → 기본 허용
-    if (!teacherPosition) {
-      return true;
-    }
-
-    // 해당 직급의 권한이 DB에 있는지 확인
-    const positionPermissions = rolePermissions?.filter(p => p.position === teacherPosition) || [];
-    const hasPositionPermissionsInDB = positionPermissions.length > 0;
-
-    if (hasPositionPermissionsInDB) {
-      // DB에 권한이 있으면 DB 우선 사용, 없으면 기본 권한 fallback
-      // 가장 구체적인 경로(긴 경로)가 먼저 매칭되도록 정렬
-      const sortedPermissions = [...positionPermissions].sort(
-        (a, b) => b.page_path.length - a.page_path.length
-      );
-
-      // 경로 매칭: pagePath가 DB 경로로 시작하면 매칭
-      const permission = sortedPermissions.find(p => pagePath.startsWith(p.page_path));
-
-      // DB에 명시적으로 권한이 있으면 DB 값 사용
-      if (permission) {
-        console.log('[hasPagePermission] DB 권한 사용:', {
-          pagePath,
-          permission: { page_path: permission.page_path, can_access: permission.can_access },
-          result: permission.can_access,
-        });
-        return permission.can_access;
-      }
-
-      // DB에 해당 경로가 없으면 기본 권한으로 fallback
-      console.log('[hasPagePermission] DB에 없음, 기본 권한 fallback:', { pagePath });
-    }
-
-    // DB에 권한이 전혀 없거나, DB에 해당 경로가 없으면 기본 권한 사용
-    const defaultPaths = DEFAULT_PERMISSIONS[teacherPosition];
-    if (defaultPaths.includes('*')) {
-      console.log('[hasPagePermission] 기본 권한: 전체 접근');
-      return true;
-    }
-
-    // 기본 권한도 구체적인 경로 우선 매칭
-    const sortedDefaultPaths = [...defaultPaths].sort((a, b) => b.length - a.length);
-    const hasDefaultAccess = sortedDefaultPaths.some(dp => pagePath.startsWith(dp));
-    console.log('[hasPagePermission] 기본 권한 사용:', {
-      pagePath,
-      defaultPaths,
-      result: hasDefaultAccess,
-    });
-    return hasDefaultAccess;
-  };
-
-  /**
-   * 역할별 + 업종별 사이드바 메뉴 필터링 (Phase 3: Industry-Based Filtering)
-   * ✅ Phase 4: 권한 기반 메뉴 필터링 (role_permissions 테이블 사용)
-   *
-   * 역할별 UI 단순화 원칙:
-   * - Assistant: 출결만 노출
-   * - Teacher: 홈, 학생 관리, 출결 관리, AI 분석만 노출 (수업 관리는 읽기 전용)
-   * - Admin/Owner/Sub Admin: 전체 메뉴 노출
-   * - 통계와 AI는 핵심 메뉴이므로 Advanced에 들어가면 안 됨
-   * - 수업/강사관리, 수납/청구, 메시지/공지는 Advanced 메뉴 (일부 역할만)
-   *
-   * 업종별 페이지 가시성 (Phase 3):
-   * - Academy/Gym: attendance=true, appointments=false
-   * - Salon/Nail Salon: attendance=false, appointments=true
-   * - Real Estate: billing=false, appointments=true, properties=true
-   *
-   * Advanced 메뉴 구조 (아키텍처 문서 4.8):
-   * - 수업/강사관리
-   * - 출결 설정
-   * - 상품/청구 설정
-   * - 메시지 템플릿/예약발송
-   * - 정산/매출 상세
-   * - 시스템 설정
-   */
-  const getSidebarItemsForRole = (role: TenantRole | undefined): SidebarItem[] => {
-    if (!role) {
-      // 역할이 아직 로드되지 않은 경우 빈 배열 반환
-      return [];
-    }
-
-    // Advanced 메뉴 아이템 정의 (아키텍처 문서 4.8 참조)
-    // ✅ Phase 3: 업종별 필터링 적용
-    const advancedMenuChildren: SidebarItem[] = [];
-
-    // ✅ 수업관리: classes 페이지가 visible일 때만 표시
-    if (isPageVisible('classes')) {
-      advancedMenuChildren.push({
-        id: 'classes-advanced',
-        label: terms.GROUP_LABEL + '관리',
-        path: terms.ROUTES.CLASSES || '/classes',
-        icon: (
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 .83.18 2 2 0 0 0 .83-.18l8.58-3.9a1 1 0 0 0 0-1.831z"/>
-            <path d="M16 17h6"/>
-            <path d="M19 14v6"/>
-            <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 .825.178"/>
-            <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l2.116-.962"/>
-          </svg>
-        ),
-      });
-    }
-
-    // ✅ 강사관리: teachers 페이지가 visible일 때만 표시
-    if (isPageVisible('teachers')) {
-      advancedMenuChildren.push({
-        id: 'teachers-advanced',
-        label: terms.PERSON_LABEL_SECONDARY + '관리',
-        path: terms.ROUTES.TEACHERS || '/teachers',
-        icon: (
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M13 21h8"/>
-            <path d="m15 5 4 4"/>
-            <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>
-          </svg>
-        ),
-      });
-    }
-
-    // ✅ 수납관리: billing 페이지가 visible일 때만 표시
-    if (isPageVisible('billing')) {
-      advancedMenuChildren.push({
-        id: 'billing-advanced',
-        label: '수납관리',
-        path: '/billing/home',
-        icon: (
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect width="20" height="14" x="2" y="5" rx="2"/>
-            <line x1="2" x2="22" y1="10" y2="10"/>
-          </svg>
-        ),
-      });
-    }
-
-    // ✅ 자동화 설정: automation 페이지가 visible일 때만 표시
-    if (isPageVisible('automation')) {
-      advancedMenuChildren.push({
-        id: 'automation-settings-advanced',
-        label: '자동화 설정',
-        path: '/settings/automation',
-        icon: (
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        ),
-      });
-    }
-
-    // ✅ 알림톡 설정: alimtalk 페이지가 visible일 때만 표시
-    if (isPageVisible('alimtalk')) {
-      advancedMenuChildren.push({
-        id: 'alimtalk-settings-advanced',
-        label: '알림톡 설정',
-        path: '/settings/alimtalk',
-        icon: (
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          </svg>
-        ),
-      });
-    }
-
-    // ✅ 직급별 권한 설정: 관리자만 접근 가능
-    advancedMenuChildren.push({
-      id: 'permissions-settings-advanced',
-      label: '권한 설정',
-      path: '/settings/permissions',
-      icon: (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        </svg>
-      ),
-    });
-
-    const advancedMenuItems: SidebarItem[] = [
-      {
-        id: 'advanced',
-        label: '더보기',
-        isAdvanced: true,
-        icon: (
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 5H3"/>
-            <path d="M15 12H3"/>
-            <path d="M17 19H3"/>
-          </svg>
-        ),
-        children: advancedMenuChildren,
-      },
-    ];
-
-    // 기본 메뉴 아이템 (핵심 메뉴 - Advanced에 포함되지 않음)
-    // ✅ Phase 3: 업종별 필터링 적용
-    const coreMenuItems: SidebarItem[] = [
-      {
-        id: 'home',
-        label: '대시보드',
-        path: '/home',
-        icon: (
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/>
-            <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
-          </svg>
-        ),
-      },
-    ];
-
-    // ✅ 학생/회원/고객 관리: primary 페이지가 visible일 때만 표시
-    if (isPageVisible('primary')) {
-      coreMenuItems.push({
-        id: 'students',
-        label: terms.PERSON_LABEL_PRIMARY + '관리',
-        path: terms.ROUTES.PRIMARY_LIST || '/students/home',
-        icon: (
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-            <line x1="9" x2="9.01" y1="9" y2="9"/>
-            <line x1="15" x2="15.01" y1="9" y2="9"/>
-          </svg>
-        ),
-      });
-    }
-
-    // ✅ 출결관리: attendance 페이지가 visible일 때만 표시 (academy, gym만)
-    if (isPageVisible('attendance')) {
-      coreMenuItems.push({
-        id: 'attendance',
-        label: '출결관리',
-        path: '/attendance',
-        icon: (
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21.801 10A10 10 0 1 1 17 3.335"/>
-            <path d="m9 11 3 3L22 4"/>
-          </svg>
-        ),
-      });
-    }
-
-    // ✅ 예약관리: appointments 페이지가 visible일 때만 표시 (salon, nail_salon, real_estate만)
-    if (isPageVisible('appointments')) {
-      coreMenuItems.push({
-        id: 'appointments',
-        label: '예약관리',
-        path: terms.ROUTES.APPOINTMENTS || '/appointments',
-        icon: (
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
-            <line x1="16" x2="16" y1="2" y2="6"/>
-            <line x1="8" x2="8" y1="2" y2="6"/>
-            <line x1="3" x2="21" y1="10" y2="10"/>
-          </svg>
-        ),
-      });
-    }
-
-    // ✅ 문자발송 (모든 업종 공통)
-    coreMenuItems.push({
-      id: 'notifications',
-      label: '문자발송',
-      path: '/notifications',
-      icon: (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/>
-          <rect x="2" y="4" width="20" height="16" rx="2"/>
-        </svg>
-      ),
-    });
-
-    // ✅ 통계분석: analytics 페이지가 visible일 때만 표시
-    if (isPageVisible('analytics')) {
-      coreMenuItems.push({
-        id: 'analytics',
-        label: '통계분석',
-        path: '/analytics',
-        icon: (
-          <svg fill="none" viewBox="0 0 24 24">
-            <path d="M5 21v-6"/>
-            <path d="M12 21V9"/>
-            <path d="M19 21V3"/>
-          </svg>
-        ),
-      });
-    }
-
-    // ✅ 인공지능: ai 페이지가 visible일 때만 표시
-    if (isPageVisible('ai')) {
-      coreMenuItems.push({
-        id: 'ai',
-        label: '인공지능',
-        path: '/ai',
-        icon: (
-          <svg fill="none" viewBox="0 0 24 24">
-            <path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/>
-          </svg>
-        ),
-      });
-    }
-
-    // Admin, Owner, Sub Admin, Super Admin: 전체 메뉴 노출 (핵심 메뉴 + Advanced 메뉴)
-    if (['admin', 'owner', 'sub_admin', 'super_admin'].includes(role)) {
-      return [...coreMenuItems, ...advancedMenuItems];
-    }
-
-    // Manager: 핵심 메뉴 + Advanced 메뉴 (수납/청구 포함)
-    if (role === 'manager') {
-      return [
-        ...coreMenuItems.filter(item => ['home', 'students', 'attendance', 'appointments', 'analytics', 'ai'].includes(item.id)),
-        ...advancedMenuItems.filter(item => item.id === 'advanced').map(item => ({
-          ...item,
-          children: item.children?.filter(child =>
-            ['classes-advanced', 'teachers-advanced', 'billing-advanced'].includes(child.id)
-          ),
-        })),
-      ];
-    }
-
-    // Staff: 핵심 메뉴 + Advanced 메뉴 (메시지/공지 포함)
-    if (role === 'staff') {
-      return [
-        ...coreMenuItems.filter(item => ['home', 'students', 'attendance', 'appointments', 'notifications'].includes(item.id)),
-        ...advancedMenuItems.filter(item => item.id === 'advanced').map(item => ({
-          ...item,
-          children: item.children?.filter(child =>
-            ['classes-advanced', 'teachers-advanced'].includes(child.id)
-          ),
-        })),
-      ];
-    }
-
-    // Counselor: 핵심 메뉴만 (Advanced 메뉴 없음)
-    if (role === 'counselor') {
-      return coreMenuItems.filter(item =>
-        ['home', 'students', 'attendance', 'appointments'].includes(item.id)
-      );
-    }
-
-    // Teacher: 권한 기반 필터링 (role_permissions 테이블 사용)
-    // DB에서 설정된 권한에 따라 메뉴 노출
-    if (role === 'teacher') {
-      console.log('[getSidebarItemsForRole] Teacher 필터링 시작:', {
-        coreMenuItemsCount: coreMenuItems.length,
-        advancedMenuItemsCount: advancedMenuItems.length,
-        advancedChildren: advancedMenuItems[0]?.children?.map(c => ({ id: c.id, path: c.path })),
-      });
-
-      const filteredCoreItems = coreMenuItems.filter(item => {
-        if (!item.path) return true; // path가 없으면 보여줌
-        const hasPermission = hasPagePermission(item.path);
-        console.log('[Core 메뉴 필터링]', item.id, item.path, '→', hasPermission);
-        return hasPermission;
-      });
-
-      const filteredAdvancedItems = advancedMenuItems
-        .filter(item => item.id === 'advanced')
-        .map(item => ({
-          ...item,
-          children: item.children?.filter(child => {
-            if (!child.path) return true;
-            const hasPermission = hasPagePermission(child.path);
-            console.log('[Advanced 메뉴 필터링]', child.id, child.path, '→', hasPermission);
-            return hasPermission;
-          }),
-        }))
-        .filter(item => item.children && item.children.length > 0); // children이 비어있으면 제외
-
-      console.log('[getSidebarItemsForRole] Teacher 필터링 결과:', {
-        filteredCoreItemsCount: filteredCoreItems.length,
-        filteredAdvancedItemsCount: filteredAdvancedItems.length,
-        filteredAdvancedChildren: filteredAdvancedItems[0]?.children?.map(c => ({ id: c.id, path: c.path })),
-      });
-
-      return [...filteredCoreItems, ...filteredAdvancedItems];
-    }
-
-    // Assistant: 권한 기반 필터링 (role_permissions 테이블 사용)
-    if (role === 'assistant') {
-      const filteredCoreItems = coreMenuItems.filter(item => {
-        if (!item.path) return true;
-        return hasPagePermission(item.path);
-      });
-
-      const filteredAdvancedItems = advancedMenuItems
-        .filter(item => item.id === 'advanced')
-        .map(item => ({
-          ...item,
-          children: item.children?.filter(child => {
-            if (!child.path) return true;
-            return hasPagePermission(child.path);
-          }),
-        }))
-        .filter(item => item.children && item.children.length > 0); // children이 비어있으면 제외
-
-      return [...filteredCoreItems, ...filteredAdvancedItems];
-    }
-
-    // 기본값: 빈 배열
-    return [];
-  };
-
-  // 역할별 필터링된 사이드바 아이템
-  const sidebarItems = getSidebarItemsForRole(userRole as TenantRole | undefined);
+  // 역할별 필터링된 사이드바 아이템 (utils/sidebar-utils.tsx에서 import한 함수 사용)
+  const sidebarItems = useMemo(() => getSidebarItemsForRole({
+    userRole: userRole as TenantRole | undefined,
+    teacherPosition,
+    rolePermissions,
+    terms,
+    isPageVisible,
+  }), [userRole, teacherPosition, rolePermissions, terms, isPageVisible]);
 
   const handleSidebarItemClick = (item: SidebarItem) => {
     // P0: PII 마스킹 필수 (체크리스트.md 4. PII 마스킹)
@@ -1164,10 +623,39 @@ function AppContent() {
         path="/*"
         element={
           <ProtectedRoute>
+            <ErrorBoundary
+              fallback={
+                <div style={{ padding: '2rem', textAlign: 'center' }}>
+                  <h2 style={{ color: 'var(--color-red-600)', marginBottom: '1rem' }}>
+                    오류가 발생했습니다
+                  </h2>
+                  <p style={{ marginBottom: '1rem' }}>
+                    페이지를 불러오는 중 문제가 발생했습니다.
+                  </p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      backgroundColor: 'var(--color-primary)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    페이지 새로고침
+                  </button>
+                </div>
+              }
+              onError={(error, errorInfo) => {
+                // Sentry 등 에러 트래킹 서비스로 전송
+                logError('App:ErrorBoundary', { error: maskPII(error), errorInfo: maskPII(errorInfo) });
+              }}
+            >
             <Suspense fallback={<PageLoader />}>
               <AppLayout
               header={{
-                title: '디어쌤 학원관리',
+                title: `디어쌤 ${terms.PERSON_LABEL_PRIMARY}관리`,
                 search: {
                   query: globalSearch.query,
                   onQueryChange: globalSearch.setQuery,
@@ -1177,14 +665,14 @@ function AppContent() {
                   onResultClick: (result: SearchResult) => {
                     void handleSearchResultClick(result);
                   },
-                  placeholder: '학생, 수업, 보호자 검색 (Ctrl+K)',
-                  inputPlaceholder: '학생, 수업, 보호자 등을 검색하세요...',
-                  emptyStateMessage: '학생, 수업, 보호자, 상담 등을 검색할 수 있습니다.',
+                  placeholder: `${terms.PERSON_LABEL_PRIMARY}, ${terms.GROUP_LABEL}, ${terms.GUARDIAN_LABEL} 검색 (Ctrl+K)`,
+                  inputPlaceholder: `${terms.PERSON_LABEL_PRIMARY}, ${terms.GROUP_LABEL}, ${terms.GUARDIAN_LABEL} 등을 검색하세요...`,
+                  emptyStateMessage: `${terms.PERSON_LABEL_PRIMARY}, ${terms.GROUP_LABEL}, ${terms.GUARDIAN_LABEL}, 상담 등을 검색할 수 있습니다.`,
                   entityTypeLabels: {
-                    student: '학생',
-                    teacher: '강사',
-                    class: '수업',
-                    guardian: '보호자',
+                    student: terms.PERSON_LABEL_PRIMARY,
+                    teacher: terms.PERSON_LABEL_SECONDARY,
+                    class: terms.GROUP_LABEL,
+                    guardian: terms.GUARDIAN_LABEL,
                     consultation: '상담',
                     announcement: '공지사항',
                     tag: '태그',
@@ -1293,6 +781,7 @@ function AppContent() {
               </Routes>
               </AppLayout>
             </Suspense>
+            </ErrorBoundary>
           </ProtectedRoute>
         }
       />

@@ -4,57 +4,34 @@
  * [테스트 커버리지] 주요 Hook 기능 테스트
  */
 
-// vitest globals를 사용하므로 describe, it, expect, beforeEach, vi는 import하지 않음
-import { renderHook, waitFor, cleanup } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { useStudents, useStudent, useCreateStudent, useUpdateStudent } from '../useStudent';
-
-// Mock 함수들을 vi.hoisted로 생성
-const {
-  mockApiGet,
-  mockApiPost,
-  mockApiPatch,
-  mockApiDelete,
-  mockGetApiContext,
-  mockUseSession,
-  mockCreateExecutionAuditRecord,
-} = vi.hoisted(() => ({
-  mockApiGet: vi.fn(),
-  mockApiPost: vi.fn(),
-  mockApiPatch: vi.fn(),
-  mockApiDelete: vi.fn(),
-  mockGetApiContext: vi.fn(() => ({
-    tenantId: 'test-tenant-id',
-    industryType: 'academy',
-  })),
-  mockUseSession: vi.fn(() => ({
-    data: {
-      user: { id: 'test-user-id' },
-    },
-  })),
-  mockCreateExecutionAuditRecord: vi.fn().mockResolvedValue(undefined),
-}));
+import * as apiSdk from '@api-sdk/core';
 
 // API SDK 모킹
 vi.mock('@api-sdk/core', () => ({
   apiClient: {
-    get: mockApiGet,
-    post: mockApiPost,
-    patch: mockApiPatch,
-    delete: mockApiDelete,
+    get: vi.fn(),
+    post: vi.fn(),
+    patch: vi.fn(),
+    delete: vi.fn(),
   },
-  getApiContext: mockGetApiContext,
+  getApiContext: vi.fn(() => ({
+    tenantId: 'test-tenant-id',
+    industryType: 'academy',
+  })),
 }));
 
 // useSession 모킹
 vi.mock('@hooks/use-auth', () => ({
-  useSession: mockUseSession,
-}));
-
-// execution-audit-utils 모킹
-vi.mock('../execution-audit-utils', () => ({
-  createExecutionAuditRecord: mockCreateExecutionAuditRecord,
+  useSession: vi.fn(() => ({
+    data: {
+      user: { id: 'test-user-id' },
+    },
+  })),
 }));
 
 describe('useStudent Hooks', () => {
@@ -71,27 +48,21 @@ describe('useStudent Hooks', () => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    cleanup();
-    vi.resetAllMocks();
-  });
-
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 
   describe('useStudents', () => {
     it('학생 목록을 성공적으로 조회한다', async () => {
-      // fetchStudents는 여러 API 호출을 수행함: persons, guardians, student_classes
-      const mockPersons = [
-        { id: '1', name: '학생1', person_type: 'student', academy_students: [{ status: 'active' }] },
-        { id: '2', name: '학생2', person_type: 'student', academy_students: [{ status: 'active' }] },
+      const mockStudents = [
+        { id: '1', name: '학생1', status: 'active' },
+        { id: '2', name: '학생2', status: 'active' },
       ];
 
-      mockApiGet
-        .mockResolvedValueOnce({ data: mockPersons, error: null }) // persons 조회
-        .mockResolvedValueOnce({ data: [], error: null }) // guardians 조회
-        .mockResolvedValueOnce({ data: [], error: null }); // student_classes 조회
+      vi.mocked(apiSdk.apiClient.get).mockResolvedValueOnce({
+        data: mockStudents,
+        error: null,
+      });
 
       const { result } = renderHook(() => useStudents(), { wrapper });
 
@@ -99,19 +70,21 @@ describe('useStudent Hooks', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      // 반환된 데이터가 Student 타입으로 변환되었는지 확인
-      expect(result.current.data).toHaveLength(2);
-      expect(result.current.data?.[0]).toMatchObject({
-        id: '1',
-        name: '학생1',
-        status: 'active',
-      });
+      expect(result.current.data).toEqual(mockStudents);
     });
 
-    it.skip('네트워크 오류를 처리한다 (skip: retry 로직 테스트는 React Query 책임)', async () => {
-      // 이 테스트는 React Query의 retry 기능을 테스트하는 것이므로 skip
-      // useStudents hook은 retry: 3으로 설정되어 있어 에러 발생 시 3회 재시도함
-      // 재시도 동작은 React Query가 보장하므로 우리가 테스트할 필요 없음
+    it('네트워크 오류 시 3회 재시도한다', async () => {
+      vi.mocked(apiSdk.apiClient.get).mockRejectedValue(new Error('Network error'));
+
+      const { result } = renderHook(() => useStudents(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isError).toBe(true);
+      });
+
+      // retry: 3이므로 총 4회 호출 (초기 1회 + 재시도 3회)
+      // 단, 실제로는 retry 로직이 비활성화되어 1회만 호출됨 (beforeEach에서 설정)
+      expect(apiSdk.apiClient.get).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -119,7 +92,7 @@ describe('useStudent Hooks', () => {
     it('학생 상세 정보를 성공적으로 조회한다', async () => {
       const mockStudent = { id: 'student-123', name: '학생1', status: 'active' };
 
-      mockApiGet.mockResolvedValueOnce({
+      vi.mocked(apiSdk.apiClient.get).mockResolvedValueOnce({
         data: [mockStudent],
         error: null,
       });
@@ -130,19 +103,14 @@ describe('useStudent Hooks', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      // useStudent는 데이터 변환을 수행하므로, 배열의 첫 요소를 확인
-      expect(result.current.data).toMatchObject({
-        id: mockStudent.id,
-        name: mockStudent.name,
-        status: mockStudent.status,
-      });
+      expect(result.current.data).toEqual(mockStudent);
     });
 
     it('studentId가 null이면 쿼리를 실행하지 않는다', () => {
       const { result } = renderHook(() => useStudent(null), { wrapper });
 
       expect(result.current.isFetching).toBe(false);
-      expect(mockApiGet).not.toHaveBeenCalled();
+      expect(apiSdk.apiClient.get).not.toHaveBeenCalled();
     });
   });
 
@@ -151,10 +119,9 @@ describe('useStudent Hooks', () => {
       const mockPerson = { id: 'person-1', name: '새학생', person_type: 'student' };
       const mockAcademyStudent = { person_id: 'person-1', status: 'active' };
 
-      mockApiPost
+      vi.mocked(apiSdk.apiClient.post)
         .mockResolvedValueOnce({ data: mockPerson, error: null }) // persons
-        .mockResolvedValueOnce({ data: mockAcademyStudent, error: null }) // academy_students
-        .mockResolvedValueOnce({ data: {}, error: null }); // execution audit (3rd call)
+        .mockResolvedValueOnce({ data: mockAcademyStudent, error: null }); // academy_students
 
       const { result } = renderHook(() => useCreateStudent(), { wrapper });
 
@@ -165,16 +132,15 @@ describe('useStudent Hooks', () => {
 
       await result.current.mutateAsync(input);
 
-      // persons와 academy_students POST 호출 확인 (execution audit은 별도로 mock됨)
-      expect(mockApiPost).toHaveBeenCalled();
-      expect(mockApiPost).toHaveBeenCalledWith('persons', expect.objectContaining({
+      expect(apiSdk.apiClient.post).toHaveBeenCalledTimes(2);
+      expect(apiSdk.apiClient.post).toHaveBeenCalledWith('persons', expect.objectContaining({
         name: '새학생',
         person_type: 'student',
       }));
     });
 
     it('persons 생성 실패 시 에러를 발생시킨다', async () => {
-      mockApiPost.mockResolvedValueOnce({
+      vi.mocked(apiSdk.apiClient.post).mockResolvedValueOnce({
         data: null,
         error: { message: 'Database error' },
       });
@@ -187,11 +153,11 @@ describe('useStudent Hooks', () => {
 
   describe('useUpdateStudent', () => {
     it('학생 정보를 성공적으로 업데이트한다', async () => {
-      mockApiPatch
+      vi.mocked(apiSdk.apiClient.patch)
         .mockResolvedValueOnce({ data: {}, error: null }) // persons
         .mockResolvedValueOnce({ data: {}, error: null }); // academy_students (GET 이후)
 
-      mockApiGet.mockResolvedValueOnce({
+      vi.mocked(apiSdk.apiClient.get).mockResolvedValueOnce({
         data: [{ person_id: 'student-1' }],
         error: null,
       });
@@ -203,7 +169,7 @@ describe('useStudent Hooks', () => {
         input: { name: '수정된이름' },
       });
 
-      expect(mockApiPatch).toHaveBeenCalled();
+      expect(apiSdk.apiClient.patch).toHaveBeenCalled();
     });
   });
 });

@@ -3,12 +3,14 @@
  *
  * 최근 활동 카드 (최근 등록된 학생, 최근 상담 기록, 최근 출결 이벤트, 최근 태그 추가/변경)
  * [불변 규칙] CSS 변수 사용, 하드코딩 금지
+ * [SSOT] useIndustryTerms로 동적 라벨 사용
  */
 
 import React, { useState } from 'react';
 import { Card, Button } from '@ui-core/react';
 import type { RecentActivity } from '@hooks/use-student';
 import { toKST } from '@lib/date-utils';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
 import { DATE_FORMATS } from '../../constants';
 import { User, MessageSquare, Calendar, Tag } from 'lucide-react';
@@ -22,6 +24,9 @@ export interface RecentActivityCardProps {
 type ActivityTab = 'students' | 'consultations' | 'attendance' | 'tags';
 
 export function RecentActivityCard({ activity, isLoading, onAction }: RecentActivityCardProps) {
+  const terms = useIndustryTerms();
+  const personLabel = terms.PERSON_LABEL_PRIMARY;
+
   const isEmpty = !activity || isLoading;
   const [activeTab, setActiveTab] = useState<ActivityTab>('students');
 
@@ -46,7 +51,7 @@ export function RecentActivityCard({ activity, isLoading, onAction }: RecentActi
   const getTabLabel = (tab: ActivityTab) => {
     switch (tab) {
       case 'students':
-        return '학생';
+        return personLabel;
       case 'consultations':
         return '상담';
       case 'attendance':
