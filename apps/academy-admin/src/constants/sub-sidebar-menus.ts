@@ -434,6 +434,7 @@ export const STUDENTS_SUB_MENU_ITEMS: SubSidebarMenuItem<StudentsSubMenuId>[] = 
     label: '학생등록',
     icon: createElement(Users, { size: ICON_SIZE }),
     ariaLabel: '학생 등록 화면으로 이동',
+    opensInModalOrNewWindow: true,
   },
   {
     id: 'tags',
@@ -650,6 +651,7 @@ export const CLASSES_RELATED_MENUS: RelatedMenuSection = {
 /** 강사관리 페이지 서브 메뉴 ID */
 export type TeachersSubMenuId =
   | 'list'
+  | 'add'
   | 'statistics'
   | 'assignments'
   | 'performance';
@@ -657,6 +659,7 @@ export type TeachersSubMenuId =
 /** 강사관리 페이지 서브 메뉴 설정 */
 export const TEACHERS_SUB_MENU_ITEMS: SubSidebarMenuItem<TeachersSubMenuId>[] = [
   { id: 'list', label: '강사목록', icon: createElement(List, { size: ICON_SIZE }), ariaLabel: '강사목록 화면으로 이동' },
+  { id: 'add', label: '강사등록', icon: createElement(UserPen, { size: ICON_SIZE }), ariaLabel: '강사 등록 화면으로 이동', opensInModalOrNewWindow: true },
   { id: 'statistics', label: '강사통계', icon: createElement(BarChart3, { size: ICON_SIZE }), ariaLabel: '강사통계 화면으로 이동' },
   { id: 'assignments', label: '담당과목', icon: createElement(BookOpen, { size: ICON_SIZE }), ariaLabel: '담당과목 화면으로 이동' },
   { id: 'performance', label: '강사성과', icon: createElement(Award, { size: ICON_SIZE }), ariaLabel: '강사성과 화면으로 이동' },
@@ -668,6 +671,7 @@ export const DEFAULT_TEACHERS_SUB_MENU: TeachersSubMenuId = 'list';
 /** 강사관리 메뉴의 동적 라벨 매핑 */
 export const TEACHERS_MENU_LABEL_MAPPING: Partial<Record<TeachersSubMenuId, DynamicMenuLabelId>> = {
   list: 'secondary_list',
+  add: 'secondary_add',
   statistics: 'secondary_statistics',
   assignments: 'secondary_assignments',
   performance: 'secondary_performance',

@@ -588,7 +588,7 @@ export function StudentClassAssignmentSubPage({
                             borderRadius: 'var(--border-radius-xs)',
                             whiteSpace: 'nowrap',
                             pointerEvents: 'none',
-                            zIndex: 1000,
+                            zIndex: 'var(--z-tooltip)',
                           }}>
                             카드형
                             {/* 화살표 */}
@@ -668,7 +668,7 @@ export function StudentClassAssignmentSubPage({
                             borderRadius: 'var(--border-radius-xs)',
                             whiteSpace: 'nowrap',
                             pointerEvents: 'none',
-                            zIndex: 1000,
+                            zIndex: 'var(--z-tooltip)',
                           }}>
                             테이블형
                             {/* 화살표 */}

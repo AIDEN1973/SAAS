@@ -165,6 +165,9 @@ export type { ListCardLayoutProps, ListCardItem } from './ListCardLayout';
 export { EntityCard } from './EntityCard';
 export type { EntityCardProps } from './EntityCard';
 
+export { ProfileEntityCard } from './ProfileEntityCard';
+export type { ProfileEntityCardProps } from './ProfileEntityCard';
+
 export { ChatOpsPanel } from './ChatOpsPanel';
 export type { ChatOpsPanelProps, ChatOpsMessage, ChatOpsMessageType, ChatOpsIndustryTerms } from './ChatOpsPanel';
 
