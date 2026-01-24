@@ -3,6 +3,11 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ErrorBoundary, useTheme } from '@ui-core/react';
 import { SchemaEditorPage } from './pages/SchemaEditorPage';
 import { PerformanceMonitoringPageLazy } from './pages/PerformanceMonitoringPage.lazy';
+import { TenantsPage } from './pages/TenantsPage';
+import { BusinessMetricsPage } from './pages/BusinessMetricsPage';
+import { RevenueAnalyticsPage } from './pages/RevenueAnalyticsPage';
+import { RegionalAnalyticsPage } from './pages/RegionalAnalyticsPage';
+import { AlimtalkSettingsPage } from './pages/AlimtalkSettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { AuthGuard } from './components/AuthGuard';
 import { Navigation } from './components/Navigation';
@@ -56,6 +61,13 @@ function App() {
                         </Suspense>
                       }
                     />
+                    {/* Phase 1-3: 비즈니스 메트릭 */}
+                    <Route path="/tenants" element={<TenantsPage />} />
+                    <Route path="/business-metrics" element={<BusinessMetricsPage />} />
+                    <Route path="/revenue" element={<RevenueAnalyticsPage />} />
+                    <Route path="/regional" element={<RegionalAnalyticsPage />} />
+                    {/* 알림톡 설정 */}
+                    <Route path="/alimtalk" element={<AlimtalkSettingsPage />} />
                   </Routes>
                 </>
               </AuthGuard>

@@ -74,7 +74,7 @@ export const Container: React.FC<ContainerProps> = ({
         paddingLeft: paddingMap[effectivePadding],
         paddingRight: paddingMap[effectivePadding],
         paddingTop: effectivePaddingTop,
-        paddingBottom: paddingMap[effectivePadding], // 하단 여백도 동일하게 적용
+        paddingBottom: paddingMap['2xl'], // 하단 여백: 콘텐츠가 브라우저 하단에 맞닿지 않도록 충분한 여백 적용
         transition: 'var(--transition-all)',
         ...style,
       }}

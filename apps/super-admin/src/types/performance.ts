@@ -7,21 +7,23 @@
 
 /**
  * 성능 모니터링 탭 타입
- * - overview: 개요
- * - realtime: 실시간 모니터링
- * - queries: 쿼리 분석
- * - storage: 스토리지 관리
- * - connections: 연결 상태
- * - security: 보안 모니터링
- * - edge-functions: Edge Function 통계
- * - realtime-monitoring: Realtime 통계
+ * - overview: 전체 현황
+ * - database: 데이터베이스
+ * - edge-functions: Edge Functions
+ * - storage: 스토리지
+ * - realtime: Realtime
+ * - auth: 인증
+ * - errors: 에러 로그
+ * - optimization: 최적화 제안
+ *
+ * [SSOT] sub-sidebar-menus.ts의 PerformanceSubMenuId와 동기화 필요
  */
 export type TabType =
   | 'overview'
-  | 'realtime'
-  | 'queries'
-  | 'storage'
-  | 'connections'
-  | 'security'
+  | 'database'
   | 'edge-functions'
-  | 'realtime-monitoring';
+  | 'storage'
+  | 'realtime'
+  | 'auth'
+  | 'errors'
+  | 'optimization';

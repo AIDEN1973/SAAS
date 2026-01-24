@@ -175,6 +175,8 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
           transition: 'margin-right var(--transition-layer-slide)',
           overflowY: 'auto',
           overflowX: 'hidden',
+          // Container의 paddingBottom과 동일하게 하단 여백 적용
+          paddingBottom: 'var(--spacing-2xl)',
         }}
       >
         {children}

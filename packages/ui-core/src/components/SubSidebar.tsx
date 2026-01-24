@@ -228,16 +228,21 @@ export function SubSidebar<T extends string = string>({
       style={{
         width: currentWidth,
         minWidth: currentWidth,
-        height: 'var(--height-viewport)', // 100vh - 뷰포트 전체 높이 사용하여 우측 구분선이 화면 전체 높이에 표시
+        // sticky 동작: 부모 스크롤 컨테이너 기준 상단 고정
+        // height는 calc(100vh - 헤더높이)로 설정하여 콘텐츠 영역에 맞춤
+        height: 'calc(100vh - var(--height-header))',
+        maxHeight: 'calc(100vh - var(--height-header))',
+        position: 'sticky',
+        top: 0,
+        alignSelf: 'flex-start',
         borderRight: 'var(--border-width-thin) solid var(--color-gray-200)',
         display: 'flex',
         flexDirection: 'column',
         flexShrink: 0,
         paddingTop: 'var(--spacing-xl)', // Container의 paddingTop과 동일 (32px)
         transition: 'var(--transition-base)',
-        position: 'sticky',
-        top: 0,
         boxSizing: 'border-box', // padding을 height에 포함
+        overflowY: 'auto', // 내부 스크롤 지원 (메뉴가 많을 경우)
         ...style,
       }}
     >

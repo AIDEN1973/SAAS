@@ -432,6 +432,258 @@ async function processConsultationReminder(
 }
 
 /**
+ * 첫 결석일 알림 (absence_first_day)
+ * 학생의 첫 결석 시 보호자에게 알림
+ */
+async function processAbsenceFirstDay(
+  supabase: any,
+  tenantId: string,
+  kstTime: Date
+): Promise<number> {
+  const eventType = 'absence_first_day';
+  assertAutomationEventType(eventType);
+
+  const enabled = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.enabled`
+  );
+  if (!enabled || enabled !== true) {
+    return 0;
+  }
+
+  const channel = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.channel`
+  ) as string;
+
+  if (!channel) {
+    return 0; // Fail Closed
+  }
+
+  // ⚠️ 중요: 자동화 안전성 체크 (AI_자동화_기능_정리.md Section 10.4)
+  const safetyCheck = await checkAndUpdateAutomationSafety(
+    supabase,
+    tenantId,
+    'send_notification',
+    kstTime,
+    `auto_notification.${eventType}.throttle.daily_limit`
+  );
+  if (!safetyCheck.canExecute) {
+    console.warn(`[${eventType}] Skipping due to safety check: ${safetyCheck.reason}`);
+    return 0;
+  }
+
+  const today = toKSTDate(kstTime);
+
+  // 오늘 결석한 학생 조회
+  const { data: absences, error } = await withTenant(
+    supabase
+      .from('attendance_logs')
+      .select('id, student_id, class_id, occurred_at')
+      .eq('status', 'absent')
+      .gte('occurred_at', `${today}T00:00:00`)
+      .lte('occurred_at', `${today}T23:59:59`),
+    tenantId
+  );
+
+  if (error || !absences) {
+    return 0;
+  }
+
+  let sentCount = 0;
+  for (const absence of absences) {
+    // 이전 결석 기록 확인 (첫 결석인지 판단)
+    const { data: previousAbsences } = await withTenant(
+      supabase
+        .from('attendance_logs')
+        .select('id')
+        .eq('student_id', absence.student_id)
+        .eq('status', 'absent')
+        .lt('occurred_at', `${today}T00:00:00`)
+        .limit(1),
+      tenantId
+    );
+
+    // 첫 결석인 경우에만 알림 발송
+    if (!previousAbsences || previousAbsences.length === 0) {
+      const { data: guardian } = await withTenant(
+        supabase
+          .from('guardians')
+          .select('id, phone')
+          .eq('student_id', absence.student_id)
+          .eq('is_primary', true)
+          .single(),
+        tenantId
+      );
+
+      if (guardian) {
+        const dedupKey = `${tenantId}:${eventType}:student:${absence.student_id}:guardian:${guardian.id}:${today}`;
+        await supabase.from('automation_actions').insert({
+          tenant_id: tenantId,
+          action_type: 'send_notification',
+          executor_role: 'system',
+          dedup_key: dedupKey,
+          execution_context: {
+            event_type: eventType,
+            student_id: absence.student_id,
+            class_id: absence.class_id,
+            recipient_id: guardian.id,
+            channel,
+            absence_date: today,
+          },
+        });
+        sentCount++;
+      }
+    }
+  }
+
+  return sentCount;
+}
+
+/**
+ * AI 이탈 위험 집중 관리 제안 (ai_suggest_churn_focus)
+ * 매주 월요일 09:10 실행
+ */
+async function processAISuggestChurnFocus(
+  supabase: any,
+  tenantId: string,
+  kstTime: Date
+): Promise<number> {
+  const eventType = 'ai_suggest_churn_focus';
+  assertAutomationEventType(eventType);
+
+  const enabled = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.enabled`
+  );
+  if (!enabled || enabled !== true) {
+    return 0;
+  }
+
+  // AI 사용 여부 확인
+  const useAI = await shouldUseAI(supabase, tenantId);
+  if (!useAI) {
+    return 0; // AI 미사용 시 실행하지 않음
+  }
+
+  // Policy에서 임계값 조회 (출석률이 이 값 미만이면 이탈 위험으로 간주)
+  const threshold = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.threshold`
+  ) as number;
+  if (!threshold || typeof threshold !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 priority 조회 (Fail-Closed)
+  const priorityPolicy = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.priority`
+  ) as number | null;
+  if (!priorityPolicy || typeof priorityPolicy !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 TTL 조회 (Fail-Closed)
+  const ttlDays = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.ttl_days`
+  ) as number | null;
+  if (!ttlDays || typeof ttlDays !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // ⚠️ 중요: 자동화 안전성 체크 (AI_자동화_기능_정리.md Section 10.4)
+  const safetyCheck = await checkAndUpdateAutomationSafety(
+    supabase,
+    tenantId,
+    'create_task',
+    kstTime,
+    `auto_notification.${eventType}.throttle.daily_limit`
+  );
+  if (!safetyCheck.canExecute) {
+    console.warn(`[${eventType}] Skipping due to safety check: ${safetyCheck.reason}`);
+    return 0;
+  }
+
+  const today = toKSTDate(kstTime);
+  const twoWeeksAgo = toKSTDate(new Date(kstTime.getTime() - 14 * 24 * 60 * 60 * 1000));
+
+  // 활성 학생 목록 조회
+  const { data: students } = await withTenant(
+    supabase
+      .from('persons')
+      .select('id, name')
+      .eq('person_type', 'student')
+      .eq('status', 'active'),
+    tenantId
+  );
+
+  if (!students || students.length === 0) {
+    return 0;
+  }
+
+  // 최근 2주간 출석률이 낮은 학생 찾기
+  const riskStudents: { id: string; name: string; attendanceRate: number }[] = [];
+
+  for (const student of students) {
+    const { data: logs } = await withTenant(
+      supabase
+        .from('attendance_logs')
+        .select('status')
+        .eq('student_id', student.id)
+        .gte('occurred_at', `${twoWeeksAgo}T00:00:00`)
+        .lte('occurred_at', `${today}T23:59:59`),
+      tenantId
+    );
+
+    if (logs && logs.length > 0) {
+      const presentCount = logs.filter((log: any) => log.status === 'present').length;
+      const attendanceRate = (presentCount / logs.length) * 100;
+
+      if (attendanceRate < threshold) {
+        riskStudents.push({
+          id: student.id,
+          name: student.name,
+          attendanceRate,
+        });
+      }
+    }
+  }
+
+  if (riskStudents.length === 0) {
+    return 0;
+  }
+
+  // 이탈 위험 학생 Top 10 추출
+  const topRiskStudents = riskStudents
+    .sort((a, b) => a.attendanceRate - b.attendanceRate)
+    .slice(0, 10);
+
+  const dedupKey = `${tenantId}:${eventType}:tenant:${tenantId}:${today}`;
+  await createTaskCardWithDedup(supabase, {
+    tenant_id: tenantId,
+    entity_id: tenantId,
+    entity_type: 'tenant',
+    task_type: 'ai_suggested',
+    title: 'AI 이탈 위험 학생 집중 관리 제안',
+    description: `최근 2주간 출석률이 ${threshold}% 미만인 학생 ${riskStudents.length}명이 있습니다. 상위 위험 학생: ${topRiskStudents.map(s => `${s.name}(${s.attendanceRate.toFixed(0)}%)`).join(', ')}`,
+    priority: priorityPolicy,
+    dedup_key: dedupKey,
+    expires_at: new Date(kstTime.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'pending',
+  });
+
+  return 1;
+}
+
+/**
  * 이탈 증가 알림 (churn_increase)
  * 매주 월요일 09:20 실행
  */
@@ -732,9 +984,17 @@ serve(async (req) => {
         // 매일: 상담 일정 리마인더
         totalProcessed += await processConsultationReminder(supabase, tenant.id, kstTime);
 
+        // 매일: 첫 결석일 알림
+        totalProcessed += await processAbsenceFirstDay(supabase, tenant.id, kstTime);
+
         // 매주 월요일 09:00: 주간 출석률 하락
         if (dayOfWeek === 1 && hour === 9 && minute < 5) {
           totalProcessed += await processAttendanceRateDropWeekly(supabase, tenant.id, kstTime);
+        }
+
+        // 매주 월요일 09:10: AI 이탈 위험 집중 관리 제안
+        if (dayOfWeek === 1 && hour === 9 && minute >= 10 && minute < 15) {
+          totalProcessed += await processAISuggestChurnFocus(supabase, tenant.id, kstTime);
         }
 
         // 매주 월요일 09:20: 이탈 증가

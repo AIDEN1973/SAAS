@@ -54,13 +54,13 @@ function getStatusStyle(status: HealthStatus): StatusStyle {
 }
 
 const categoryLabels: Record<keyof Omit<OverallHealth, 'overall' | 'issues'>, { label: string; tab: TabType }> = {
-  database: { label: '데이터베이스', tab: 'overview' },
+  database: { label: '데이터베이스', tab: 'database' },
   cache: { label: '캐시', tab: 'storage' },
-  connections: { label: '연결', tab: 'connections' },
-  security: { label: '보안', tab: 'security' },
+  connections: { label: '연결', tab: 'database' },
+  security: { label: '보안', tab: 'auth' },
   storage: { label: '스토리지', tab: 'storage' },
   edgeFunctions: { label: 'Edge Functions', tab: 'edge-functions' },
-  realtime: { label: 'Realtime', tab: 'realtime-monitoring' },
+  realtime: { label: 'Realtime', tab: 'realtime' },
 };
 
 export function OverallHealthSummary({ health, isLoading, onNavigateToTab }: OverallHealthSummaryProps) {

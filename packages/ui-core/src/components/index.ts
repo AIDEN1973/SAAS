@@ -214,3 +214,9 @@ export type { AgentModeContainerProps } from './AgentModeContainer';
 
 export { SubSidebar } from './SubSidebar';
 export type { SubSidebarProps, SubSidebarMenuItem, RelatedMenuSection } from './SubSidebar';
+
+export { SettingsRow } from './SettingsRow';
+export type { SettingsRowProps } from './SettingsRow';
+
+export { SettingsSection } from './SettingsSection';
+export type { SettingsSectionProps } from './SettingsSection';

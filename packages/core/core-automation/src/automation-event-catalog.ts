@@ -101,14 +101,13 @@ export type AutomationEventStatus = 'active' | 'planned';
  *
  * [SSOT] 이 목록은 AutomationSettingsPage에서 "준비중 포함" 토글에 사용됩니다.
  * 새로운 자동화를 planned 상태로 추가하려면 이 배열에 추가하세요.
+ *
+ * ⚠️ 2026-01-24 업데이트: 모든 자동화가 구현되어 planned 목록이 비어있습니다.
+ * 향후 새로운 자동화 추가 시 이 배열에 추가하세요.
  */
 export const AUTOMATION_EVENT_PLANNED: readonly AutomationEventType[] = [
-  'inquiry_conversion_drop',
-  'birthday_greeting',
-  'enrollment_anniversary',
-  'announcement_urgent',
-  'announcement_digest',
-  'staff_absence_schedule_risk',
+  // 모든 자동화가 구현되어 planned 항목이 없습니다.
+  // 새로운 자동화 추가 시 여기에 추가하세요.
 ] as const;
 
 /**

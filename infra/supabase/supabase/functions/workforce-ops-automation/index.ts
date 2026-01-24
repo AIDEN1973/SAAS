@@ -177,52 +177,87 @@ async function processStaffAbsenceScheduleRisk(
     return 0;
   }
 
+  // Policy에서 priority 조회 (Fail-Closed)
+  const priorityPolicy = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.priority`
+  ) as number | null;
+  if (!priorityPolicy || typeof priorityPolicy !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 TTL 조회 (Fail-Closed)
+  const ttlDays = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.ttl_days`
+  ) as number | null;
+  if (!ttlDays || typeof ttlDays !== 'number') {
+    return 0; // Fail Closed
+  }
+
   const tomorrow = toKSTDate(new Date(kstTime.getTime() + 24 * 60 * 60 * 1000));
 
-  // ⚠️ 참고: staff 테이블이나 academy_teachers 테이블에서 결근 예정인 직원 조회
-  // 예시: academy_teachers 테이블에서 내일 수업이 있는데 결근 예정인 강사 조회
-  // const { data: tomorrowClasses } = await withTenant(
-  //   supabase
-  //     .from('academy_classes')
-  //     .select('id, teacher_id')
-  //     .gte('start_time', `${tomorrow}T00:00:00`)
-  //     .lte('start_time', `${tomorrow}T23:59:59`),
-  //   tenantId
-  // );
+  // 내일 수업이 있는 강사 조회
+  const { data: tomorrowClasses } = await withTenant(
+    supabase
+      .from('class_teachers')
+      .select(`
+        teacher_id,
+        academy_classes!inner (
+          id,
+          name,
+          start_time
+        )
+      `)
+      .gte('academy_classes.start_time', `${tomorrow}T00:00:00`)
+      .lte('academy_classes.start_time', `${tomorrow}T23:59:59`)
+      .eq('is_active', true),
+    tenantId
+  );
 
-  // if (!tomorrowClasses || tomorrowClasses.length === 0) {
-  //   return 0;
-  // }
+  if (!tomorrowClasses || tomorrowClasses.length === 0) {
+    return 0;
+  }
 
-  // // 결근 예정인 강사 확인 (attendance_logs 또는 별도 테이블)
-  // const teacherIds = [...new Set(tomorrowClasses.map((c: any) => c.teacher_id))];
-  // const { data: absences } = await withTenant(
-  //   supabase
-  //     .from('attendance_logs')
-  //     .select('person_id')
-  //     .in('person_id', teacherIds)
-  //     .eq('status', 'absent')
-  //     .eq('occurred_at::date', tomorrow),
-  //   tenantId
-  // );
+  // 내일 수업을 담당하는 강사 ID 목록
+  const teacherIds = [...new Set(tomorrowClasses.map((c: any) => c.teacher_id))];
 
-  // if (absences && absences.length > 0) {
-  //   const dedupKey = `${tenantId}:${eventType}:tenant:${tenantId}:${tomorrow}`;
-  //   await supabase.from('task_cards').upsert({
-  //     tenant_id: tenantId,
-  //     task_type: 'risk',
-  //     title: '직원 결근 일정 리스크',
-  //     description: `내일 결근 예정인 직원이 있어 수업 일정에 영향을 줄 수 있습니다.`,
-  //     priority: 80,
-  //     dedup_key: dedupKey,
-  //     expires_at: new Date(kstTime.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-  //   }, {
-  //     onConflict: 'tenant_id,dedup_key',
-  //     ignoreDuplicates: false,
-  //   });
+  // staff_absences 테이블에서 내일 결근 예정인 강사 조회
+  const { data: absences } = await withTenant(
+    supabase
+      .from('staff_absences')
+      .select('teacher_id, absence_type, reason')
+      .in('teacher_id', teacherIds)
+      .lte('start_date', tomorrow)
+      .gte('end_date', tomorrow)
+      .eq('status', 'approved'),
+    tenantId
+  );
 
-  //   return 1;
-  // }
+  if (absences && absences.length > 0) {
+    // 결근 예정인 강사가 담당하는 수업 찾기
+    const affectedClasses = tomorrowClasses.filter((tc: any) =>
+      absences.some((a: any) => a.teacher_id === tc.teacher_id)
+    );
+
+    const dedupKey = `${tenantId}:${eventType}:tenant:${tenantId}:${tomorrow}`;
+    await createTaskCardWithDedup(supabase, {
+      tenant_id: tenantId,
+      entity_id: tenantId,
+      entity_type: 'tenant',
+      task_type: 'risk',
+      title: '직원 결근 일정 리스크',
+      description: `내일 결근 예정인 강사 ${absences.length}명으로 인해 ${affectedClasses.length}개 수업에 영향이 있을 수 있습니다. 대체 강사 배정을 확인해주세요.`,
+      priority: priorityPolicy,
+      dedup_key: dedupKey,
+      expires_at: new Date(kstTime.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'pending',
+    });
+
+    return 1;
+  }
 
   return 0;
 }

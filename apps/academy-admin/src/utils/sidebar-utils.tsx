@@ -206,29 +206,12 @@ export function getSidebarItemsForRole(options: SidebarUtilsOptions): SidebarIte
     });
   }
 
-  if (isPageVisible('automation')) {
-    advancedMenuChildren.push({
-      id: 'automation-settings-advanced',
-      label: '자동화 설정',
-      path: '/settings/automation',
-      icon: SIDEBAR_ICONS.settings,
-    });
-  }
-
-  if (isPageVisible('alimtalk')) {
-    advancedMenuChildren.push({
-      id: 'alimtalk-settings-advanced',
-      label: '알림톡 설정',
-      path: '/settings/alimtalk',
-      icon: SIDEBAR_ICONS.alimtalk,
-    });
-  }
-
+  // 통합 설정 메뉴 (자동화, 알림톡, 권한 통합)
   advancedMenuChildren.push({
-    id: 'permissions-settings-advanced',
-    label: '권한 설정',
-    path: '/settings/permissions',
-    icon: SIDEBAR_ICONS.permissions,
+    id: 'settings-advanced',
+    label: '설정',
+    path: '/settings',
+    icon: SIDEBAR_ICONS.settings,
   });
 
   const advancedMenuItems: SidebarItem[] = [

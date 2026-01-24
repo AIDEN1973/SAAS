@@ -1079,3 +1079,23 @@ export const DEFAULT_INDUSTRY_TYPE = 'academy';
  * 기본 용어 (Fallback)
  */
 export const DEFAULT_TERMS = ACADEMY_TERMS;
+
+/**
+ * 업종 타입 라벨 매핑 (SSOT)
+ *
+ * UI에서 업종 타입을 표시할 때 사용하는 라벨
+ *
+ * @example
+ * ```typescript
+ * import { INDUSTRY_TYPE_LABELS } from '@industry/registry';
+ *
+ * const label = INDUSTRY_TYPE_LABELS['academy']; // '학원'
+ * ```
+ */
+export const INDUSTRY_TYPE_LABELS: Record<string, string> = {
+  academy: '학원',
+  gym: '헬스장',
+  salon: '미용실',
+  nail_salon: '네일샵',
+  real_estate: '부동산',
+};

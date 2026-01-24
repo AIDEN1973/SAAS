@@ -755,7 +755,7 @@ export function StudentsPage() {
 
   return (
     <ErrorBoundary>
-      <div style={{ display: 'flex', height: '100vh' }}>
+      <div style={{ display: 'flex', minHeight: 'var(--height-full)' }}>
         {/* 서브 사이드바 (태블릿에서는 축소) */}
         <SubSidebar
           title={templates.management(terms.PERSON_LABEL_PRIMARY)}

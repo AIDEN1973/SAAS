@@ -51,9 +51,8 @@ const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(m => ({ de
 const AIPage = lazy(() => import('./pages/AIPage').then(m => ({ default: m.AIPage })));
 const AllCardsPage = lazy(() => import('./pages/AllCardsPage').then(m => ({ default: m.AllCardsPage })));
 const StudentTasksPage = lazy(() => import('./pages/StudentTasksPage').then(m => ({ default: m.StudentTasksPage })));
-const AutomationSettingsPage = lazy(() => import('./pages/AutomationSettingsPage').then(m => ({ default: m.AutomationSettingsPage })));
-const AlimtalkSettingsPage = lazy(() => import('./pages/AlimtalkSettingsPage').then(m => ({ default: m.AlimtalkSettingsPage })));
-const SettingsPermissionsPage = lazy(() => import('./pages/SettingsPermissionsPage').then(m => ({ default: m.SettingsPermissionsPage })));
+// 통합 설정 페이지 (자동화, 알림톡, 권한 통합)
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
 const IntentPatternsPage = lazy(() => import('./pages/IntentPatternsPage').then(m => ({ default: m.IntentPatternsPage })));
 const SchemaEditorPage = lazy(() => import('../../super-admin/src/pages/SchemaEditorPage').then(m => ({ default: m.SchemaEditorPage })));
 const AuthGuard = lazy(() => import('../../super-admin/src/components/AuthGuard').then(m => ({ default: m.AuthGuard })));
@@ -757,12 +756,11 @@ function AppContent() {
                 <Route path="/analytics" element={<IndustryBasedRoute page="analytics"><RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><AnalyticsPage /></Suspense></RoleBasedRoute></IndustryBasedRoute>} />
                 {/* ✅ Phase 3: 인공지능 - ai 페이지가 visible일 때만 접근 가능 */}
                 <Route path="/ai" element={<IndustryBasedRoute page="ai"><RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'teacher', 'counselor', 'staff', 'manager', 'super_admin']}><Suspense fallback={<PageLoader />}><AIPage /></Suspense></RoleBasedRoute></IndustryBasedRoute>} />
-                {/* ✅ Phase 3: 자동화 설정 - automation 페이지가 visible일 때만 접근 가능 */}
-                <Route path="/settings/automation" element={<IndustryBasedRoute page="automation"><RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'super_admin']}><Suspense fallback={<PageLoader />}><AutomationSettingsPage /></Suspense></RoleBasedRoute></IndustryBasedRoute>} />
-                {/* ✅ Phase 3: 알림톡 설정 - alimtalk 페이지가 visible일 때만 접근 가능 */}
-                <Route path="/settings/alimtalk" element={<IndustryBasedRoute page="alimtalk"><RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'super_admin']}><Suspense fallback={<PageLoader />}><AlimtalkSettingsPage /></Suspense></RoleBasedRoute></IndustryBasedRoute>} />
-                {/* ✅ 직급별 권한 설정 - 관리자만 접근 가능 */}
-                <Route path="/settings/permissions" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'super_admin']}><Suspense fallback={<PageLoader />}><SettingsPermissionsPage /></Suspense></RoleBasedRoute>} />
+                {/* ✅ 통합 설정 페이지 (매장 정보, 자동화, 알림톡, 권한) - 관리자만 접근 가능 */}
+                <Route path="/settings" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'super_admin']}><Suspense fallback={<PageLoader />}><SettingsPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/settings/store" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'super_admin']}><Suspense fallback={<PageLoader />}><SettingsPage /></Suspense></RoleBasedRoute>} />
+                <Route path="/settings/automation" element={<IndustryBasedRoute page="automation"><RoleBasedRoute allowedRoles={['admin', 'owner', 'sub_admin', 'super_admin']}><Suspense fallback={<PageLoader />}><SettingsPage /></Suspense></RoleBasedRoute></IndustryBasedRoute>} />
+                <Route path="/settings/permissions" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'super_admin']}><Suspense fallback={<PageLoader />}><SettingsPage /></Suspense></RoleBasedRoute>} />
                 <Route path="/settings/intent-patterns" element={<RoleBasedRoute allowedRoles={['admin', 'owner', 'super_admin']}><Suspense fallback={<PageLoader />}><IntentPatternsPage /></Suspense></RoleBasedRoute>} />
                 <Route
                   path="/super-admin"

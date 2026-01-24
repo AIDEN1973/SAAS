@@ -341,46 +341,49 @@ async function processAnnouncementUrgent(
     return 0;
   }
 
-  // ⚠️ 참고: announcements 테이블이 없을 수 있으므로, 실제 구현 시 테이블 확인 필요
-  // const { data: announcement } = await withTenant(
-  //   supabase
-  //     .from('announcements')
-  //     .select('id, title, urgent, target_audience')
-  //     .eq('id', announcementId)
-  //     .single(),
-  //   tenantId
-  // );
+  // announcements 테이블에서 긴급 공지 조회
+  const { data: announcement } = await withTenant(
+    supabase
+      .from('announcements')
+      .select('id, title, urgent, target_audience')
+      .eq('id', announcementId)
+      .single(),
+    tenantId
+  );
 
-  // if (!announcement || !announcement.urgent) {
-  //   return 0;
-  // }
+  if (!announcement || !announcement.urgent) {
+    return 0;
+  }
 
-  // // 대상자에게 알림 발송
-  // // 예시: 모든 보호자에게 발송
-  // const { data: guardians } = await withTenant(
-  //   supabase
-  //     .from('guardians')
-  //     .select('id, phone')
-  //     .eq('is_primary', true),
-  //   tenantId
-  // );
+  // 대상자에게 알림 발송
+  // 예시: 모든 보호자에게 발송
+  const { data: guardians } = await withTenant(
+    supabase
+      .from('guardians')
+      .select('id, phone')
+      .eq('is_primary', true),
+    tenantId
+  );
 
-  // if (guardians) {
-  //   for (const guardian of guardians) {
-  //     await supabase.from('automation_actions').insert({
-  //       tenant_id: tenantId,
-  //       action_type: 'send_notification',
-  //       executor_role: 'system',
-  //       execution_context: {
-  //         event_type: eventType,
-  //         announcement_id: announcementId,
-  //         recipient_id: guardian.id,
-  //         channel,
-  //       },
-  //     });
-  //   }
-  //   return guardians.length;
-  // }
+  if (guardians) {
+    for (const guardian of guardians) {
+      const dedupKey = `${tenantId}:${eventType}:announcement:${announcementId}:guardian:${guardian.id}:${toKSTDate(kstTime)}`;
+      await supabase.from('automation_actions').insert({
+        tenant_id: tenantId,
+        action_type: 'send_notification',
+        executor_role: 'system',
+        dedup_key: dedupKey,
+        execution_context: {
+          event_type: eventType,
+          announcement_id: announcementId,
+          announcement_title: announcement.title,
+          recipient_id: guardian.id,
+          channel,
+        },
+      });
+    }
+    return guardians.length;
+  }
 
   return 0;
 }
@@ -429,49 +432,51 @@ async function processAnnouncementDigest(
     return 0;
   }
 
-  // ⚠️ 참고: announcements 테이블이 없을 수 있으므로, 실제 구현 시 테이블 확인 필요
-  // const today = toKSTDate(kstTime);
-  // const lastWeek = toKSTDate(new Date(kstTime.getTime() - 7 * 24 * 60 * 60 * 1000));
+  // announcements 테이블에서 최근 1주일 공지 조회
+  const today = toKSTDate(kstTime);
+  const lastWeek = toKSTDate(new Date(kstTime.getTime() - 7 * 24 * 60 * 60 * 1000));
 
-  // const { data: announcements } = await withTenant(
-  //   supabase
-  //     .from('announcements')
-  //     .select('id, title, created_at')
-  //     .gte('created_at', `${lastWeek}T00:00:00`)
-  //     .lte('created_at', `${today}T23:59:59`),
-  //   tenantId
-  // );
+  const { data: announcements } = await withTenant(
+    supabase
+      .from('announcements')
+      .select('id, title, created_at')
+      .gte('created_at', `${lastWeek}T00:00:00`)
+      .lte('created_at', `${today}T23:59:59`),
+    tenantId
+  );
 
-  // if (!announcements || announcements.length === 0) {
-  //   return 0;
-  // }
+  if (!announcements || announcements.length === 0) {
+    return 0;
+  }
 
-  // // 모든 보호자에게 주간 공지 요약 발송
-  // const { data: guardians } = await withTenant(
-  //   supabase
-  //     .from('guardians')
-  //     .select('id, phone')
-  //     .eq('is_primary', true),
-  //   tenantId
-  // );
+  // 모든 보호자에게 주간 공지 요약 발송
+  const { data: guardians } = await withTenant(
+    supabase
+      .from('guardians')
+      .select('id, phone')
+      .eq('is_primary', true),
+    tenantId
+  );
 
-  // if (guardians) {
-  //   for (const guardian of guardians) {
-  //     await supabase.from('automation_actions').insert({
-  //       tenant_id: tenantId,
-  //       action_type: 'send_notification',
-  //       executor_role: 'system',
-  //       execution_context: {
-  //         event_type: eventType,
-  //         recipient_id: guardian.id,
-  //         channel,
-  //         announcement_count: announcements.length,
-  //         announcements: announcements.map(a => ({ id: a.id, title: a.title })),
-  //       },
-  //     });
-  //   }
-  //   return guardians.length;
-  // }
+  if (guardians) {
+    for (const guardian of guardians) {
+      const dedupKey = `${tenantId}:${eventType}:guardian:${guardian.id}:${today}`;
+      await supabase.from('automation_actions').insert({
+        tenant_id: tenantId,
+        action_type: 'send_notification',
+        executor_role: 'system',
+        dedup_key: dedupKey,
+        execution_context: {
+          event_type: eventType,
+          recipient_id: guardian.id,
+          channel,
+          announcement_count: announcements.length,
+          announcements: announcements.map((a: any) => ({ id: a.id, title: a.title })),
+        },
+      });
+    }
+    return guardians.length;
+  }
 
   return 0;
 }

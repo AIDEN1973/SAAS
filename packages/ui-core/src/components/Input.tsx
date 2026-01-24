@@ -21,6 +21,12 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
    * - 필터/검색 UI: false (값이 들어가면 placeholder가 사라져야 함)
    */
   showInlineLabelWhenHasValue?: boolean;
+  /**
+   * 숫자 입력 필드의 스피너(상하 화살표) 숨김 여부
+   * - true: 기본 브라우저 스피너 숨김 (커스텀 스피너 사용 시)
+   * - false: 기본 브라우저 스피너 표시 (기본값)
+   */
+  hideSpinner?: boolean;
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
@@ -37,8 +43,11 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   onChange,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   showInlineLabelWhenHasValue = true,
+  hideSpinner = false,
   ...props
 }, ref) => {
+  // type="number"인 경우 커스텀 스피너 사용
+  const isNumberInput = props.type === 'number';
   // 라벨을 플레이스홀더로 사용
   const inputPlaceholder = placeholder || label;
 
@@ -112,7 +121,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   const inputStyle: React.CSSProperties = {
     height: '100%', // wrapper의 height를 채움
     paddingLeft: sizeStyles[size].paddingLeft,
-    paddingRight: sizeStyles[size].paddingRight,
+    // 숫자 입력 필드는 커스텀 스피너 영역을 위해 우측 패딩 증가 (Select와 동일하게 설정)
+    paddingRight: isNumberInput ? 'var(--spacing-xl)' : sizeStyles[size].paddingRight,
     border: 'none',
     borderRadius: 'var(--border-radius-xs)',
     backgroundColor: props.disabled ? 'var(--color-gray-100)' : 'var(--color-white)',
@@ -127,7 +137,43 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
     lineHeight: 1,
     boxSizing: 'border-box',
     cursor: props.disabled ? 'not-allowed' : 'text',
+    // 숫자 입력 필드의 기본 브라우저 스피너 숨김 (CSS-in-JS로는 ::-webkit 선택자 적용 불가)
+    // 대신 appearance: 'textfield'로 Firefox에서 스피너 숨김
+    ...(isNumberInput ? { MozAppearance: 'textfield' as React.CSSProperties['MozAppearance'] } : {}),
   };
+
+  // 숫자 입력 필드 증가/감소 핸들러
+  const handleIncrement = React.useCallback(() => {
+    if (props.disabled) return;
+    const currentValue = Number(isControlled ? valueProp : internalValue) || 0;
+    const step = Number(props.step) || 1;
+    const max = props.max !== undefined ? Number(props.max) : Infinity;
+    const newValue = Math.min(currentValue + step, max);
+
+    // 합성 이벤트 생성하여 onChange 호출
+    if (inputRef.current) {
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      nativeInputValueSetter?.call(inputRef.current, String(newValue));
+      const event = new Event('input', { bubbles: true });
+      inputRef.current.dispatchEvent(event);
+    }
+  }, [props.disabled, props.step, props.max, isControlled, valueProp, internalValue]);
+
+  const handleDecrement = React.useCallback(() => {
+    if (props.disabled) return;
+    const currentValue = Number(isControlled ? valueProp : internalValue) || 0;
+    const step = Number(props.step) || 1;
+    const min = props.min !== undefined ? Number(props.min) : -Infinity;
+    const newValue = Math.max(currentValue - step, min);
+
+    // 합성 이벤트 생성하여 onChange 호출
+    if (inputRef.current) {
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      nativeInputValueSetter?.call(inputRef.current, String(newValue));
+      const event = new Event('input', { bubbles: true });
+      inputRef.current.dispatchEvent(event);
+    }
+  }, [props.disabled, props.step, props.min, isControlled, valueProp, internalValue]);
 
   // 래퍼 스타일: input을 감싸고 사방 테두리 적용 (카드 스타일과 동일)
   // [불변 규칙] wrapper에 height 적용 + boxSizing: border-box로 border 포함 높이 계산
@@ -264,10 +310,124 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              width: `calc(100% - ${sizeStyles[size].paddingLeft} - ${sizeStyles[size].paddingRight})`,
+              width: `calc(100% - ${sizeStyles[size].paddingLeft} - ${isNumberInput ? 'var(--spacing-xl)' : sizeStyles[size].paddingRight})`,
             }}
           >
             {inputPlaceholder}
+          </div>
+        )}
+        {/* 숫자 입력 필드 커스텀 스피너 (Select 화살표 스타일과 동일) */}
+        {isNumberInput && (
+          <div
+            style={{
+              position: 'absolute',
+              right: 'var(--spacing-sm)', // Select와 동일한 우측 여백
+              top: '50%',
+              transform: 'translateY(-50%)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0px',
+              pointerEvents: props.disabled ? 'none' : 'auto',
+              width: 'var(--spacing-md)', // Select와 동일: 16px
+              height: 'var(--spacing-md)', // Select와 동일: 16px
+            }}
+          >
+            {/* 증가 버튼 */}
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={handleIncrement}
+              disabled={props.disabled}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 'var(--spacing-md)', // Select와 동일: 16px
+                height: 'calc(var(--spacing-md) / 2)', // 8px
+                padding: 0,
+                border: 'none',
+                backgroundColor: 'transparent',
+                cursor: props.disabled ? 'not-allowed' : 'pointer',
+                color: error ? 'var(--color-form-error)' : 'var(--color-text-tertiary)',
+                transition: 'color var(--transition-base)',
+              }}
+              onMouseEnter={(e) => {
+                if (!props.disabled) {
+                  e.currentTarget.style.color = 'var(--color-primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = error ? 'var(--color-form-error)' : 'var(--color-text-tertiary)';
+              }}
+              aria-label="증가"
+            >
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                style={{
+                  width: 'var(--size-icon-base)', // Select와 동일
+                  height: 'var(--size-icon-base)', // Select와 동일
+                }}
+              >
+                <path
+                  d="M11.5 9.5L8 6L4.5 9.5"
+                  stroke="currentColor"
+                  strokeWidth="var(--stroke-width-icon)"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </svg>
+            </button>
+            {/* 감소 버튼 */}
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={handleDecrement}
+              disabled={props.disabled}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 'var(--spacing-md)', // Select와 동일: 16px
+                height: 'calc(var(--spacing-md) / 2)', // 8px
+                padding: 0,
+                border: 'none',
+                backgroundColor: 'transparent',
+                cursor: props.disabled ? 'not-allowed' : 'pointer',
+                color: error ? 'var(--color-form-error)' : 'var(--color-text-tertiary)',
+                transition: 'color var(--transition-base)',
+              }}
+              onMouseEnter={(e) => {
+                if (!props.disabled) {
+                  e.currentTarget.style.color = 'var(--color-primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = error ? 'var(--color-form-error)' : 'var(--color-text-tertiary)';
+              }}
+              aria-label="감소"
+            >
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                style={{
+                  width: 'var(--size-icon-base)', // Select와 동일
+                  height: 'var(--size-icon-base)', // Select와 동일
+                }}
+              >
+                <path
+                  d="M4.5 6.5L8 10L11.5 6.5"
+                  stroke="currentColor"
+                  strokeWidth="var(--stroke-width-icon)"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </svg>
+            </button>
           </div>
         )}
       </div>

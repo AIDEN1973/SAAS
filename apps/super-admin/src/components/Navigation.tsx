@@ -16,6 +16,11 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: '/schemas', label: '스키마 에디터' },
   { path: '/performance', label: '성능 모니터링' },
+  { path: '/tenants', label: '테넌트 관리' },
+  { path: '/business-metrics', label: '비즈니스 메트릭' },
+  { path: '/revenue', label: '매출 분석' },
+  { path: '/regional', label: '지역별 분석' },
+  { path: '/alimtalk', label: '알림톡 설정' },
 ];
 
 export function Navigation() {

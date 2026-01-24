@@ -515,14 +515,13 @@ async function processBirthdayGreeting(
   const todayMonthDay = `${String(kstTime.getMonth() + 1).padStart(2, '0')}-${String(kstTime.getDate()).padStart(2, '0')}`;
 
   // 오늘 생일인 학생 조회
-  // ⚠️ 참고: persons 테이블에 birth_date 필드가 없을 수 있으므로, 필요시 마이그레이션 추가 필요
-  // 현재는 created_at 기반으로 처리하지 않음 (정확한 생일 정보 필요)
   const { data: students } = await withTenant(
     supabase
       .from('persons')
-      .select('id, name')
+      .select('id, name, birth_date')
       .eq('person_type', 'student')
-      .eq('status', 'active'),
+      .eq('status', 'active')
+      .not('birth_date', 'is', null),
     tenantId
   );
 
@@ -531,36 +530,38 @@ async function processBirthdayGreeting(
   }
 
   let sentCount = 0;
-  // ⚠️ 임시: birth_date 필드가 없으면 처리하지 않음 (정확한 생일 정보 필요)
-  // 실제 구현 시 persons 테이블에 birth_date 필드 추가 필요
-  // for (const student of students) {
-  //   if (student.birth_date && student.birth_date.slice(5) === todayMonthDay) {
-  //     const { data: guardian } = await withTenant(
-  //       supabase
-  //         .from('guardians')
-  //         .select('id, phone')
-  //         .eq('student_id', student.id)
-  //         .eq('is_primary', true)
-  //         .single(),
-  //       tenantId
-  //     );
+  for (const student of students) {
+    // birth_date에서 월-일 추출하여 오늘과 비교
+    if (student.birth_date && student.birth_date.slice(5) === todayMonthDay) {
+      const { data: guardian } = await withTenant(
+        supabase
+          .from('guardians')
+          .select('id, phone')
+          .eq('student_id', student.id)
+          .eq('is_primary', true)
+          .single(),
+        tenantId
+      );
 
-  //     if (guardian) {
-  //       await supabase.from('automation_actions').insert({
-  //         tenant_id: tenantId,
-  //         action_type: 'send_notification',
-  //         executor_role: 'system',
-  //         execution_context: {
-  //           event_type: eventType,
-  //           student_id: student.id,
-  //           recipient_id: guardian.id,
-  //           channel,
-  //         },
-  //       });
-  //       sentCount++;
-  //     }
-  //   }
-  // }
+      if (guardian) {
+        const dedupKey = `${tenantId}:${eventType}:student:${student.id}:guardian:${guardian.id}:${toKSTDate(kstTime)}`;
+        await supabase.from('automation_actions').insert({
+          tenant_id: tenantId,
+          action_type: 'send_notification',
+          executor_role: 'system',
+          dedup_key: dedupKey,
+          execution_context: {
+            event_type: eventType,
+            student_id: student.id,
+            student_name: student.name,
+            recipient_id: guardian.id,
+            channel,
+          },
+        });
+        sentCount++;
+      }
+    }
+  }
 
   return sentCount;
 }

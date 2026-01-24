@@ -920,7 +920,7 @@ export function AutomationSettingsPage() {
 
   return (
     <ErrorBoundary>
-      <div style={{ display: 'flex', height: 'var(--height-full)' }}>
+      <div style={{ display: 'flex', minHeight: 'var(--height-full)' }}>
         {/* 서브 사이드바 (모바일에서는 숨김, 태블릿에서는 축소) */}
         {!isMobileMode && (
           <SubSidebar
@@ -1219,102 +1219,6 @@ export function AutomationSettingsPage() {
             </div>
           );
         })}
-            </>
-          )}
-
-          {/* 결제 자동화 탭 */}
-          {selectedSubMenu === 'payment' && (
-            <>
-              <Card padding="lg">
-                <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>결제 자동화</h3>
-                <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
-                  결제 관련 자동화만 표시됩니다.
-                </p>
-                <CardGridLayout
-                  cards={AUTOMATION_EVENT_CATALOG
-                    .filter(eventType => AUTOMATION_EVENT_DESCRIPTIONS[eventType]?.policyKey === 'payment')
-                    .map((eventType) => (
-                      <AutomationCardWithState
-                        key={eventType}
-                        eventType={eventType}
-                        isEditing={editingEventType === eventType}
-                        onEdit={() => setEditingEventType(eventType)}
-                        onCancel={() => setEditingEventType(null)}
-                        stats={executionStats?.[eventType]}
-                        showStats={showStats}
-                        terms={terms}
-                      />
-                    ))}
-                  desktopColumns={3}
-                  tabletColumns={2}
-                  mobileColumns={1}
-                />
-              </Card>
-            </>
-          )}
-
-          {/* 출결 자동화 탭 */}
-          {selectedSubMenu === 'attendance' && (
-            <>
-              <Card padding="lg">
-                <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>출결 자동화</h3>
-                <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
-                  출결 관련 자동화만 표시됩니다.
-                </p>
-                <CardGridLayout
-                  cards={AUTOMATION_EVENT_CATALOG
-                    .filter(eventType => AUTOMATION_EVENT_DESCRIPTIONS[eventType]?.policyKey === 'attendance')
-                    .map((eventType) => (
-                      <AutomationCardWithState
-                        key={eventType}
-                        eventType={eventType}
-                        isEditing={editingEventType === eventType}
-                        onEdit={() => setEditingEventType(eventType)}
-                        onCancel={() => setEditingEventType(null)}
-                        stats={executionStats?.[eventType]}
-                        showStats={showStats}
-                        terms={terms}
-                      />
-                    ))}
-                  desktopColumns={3}
-                  tabletColumns={2}
-                  mobileColumns={1}
-                />
-              </Card>
-            </>
-          )}
-
-          {/* 알림 자동화 탭 */}
-          {selectedSubMenu === 'notification' && (
-            <>
-              <Card padding="lg">
-                <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>알림 자동화</h3>
-                <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' }}>
-                  알림 관련 자동화만 표시됩니다.
-                </p>
-                <CardGridLayout
-                  cards={AUTOMATION_EVENT_CATALOG
-                    .filter(eventType =>
-                      AUTOMATION_EVENT_DESCRIPTIONS[eventType]?.policyKey === 'notification' ||
-                      AUTOMATION_EVENT_DESCRIPTIONS[eventType]?.policyKey === 'report'
-                    )
-                    .map((eventType) => (
-                      <AutomationCardWithState
-                        key={eventType}
-                        eventType={eventType}
-                        isEditing={editingEventType === eventType}
-                        onEdit={() => setEditingEventType(eventType)}
-                        onCancel={() => setEditingEventType(null)}
-                        stats={executionStats?.[eventType]}
-                        showStats={showStats}
-                        terms={terms}
-                      />
-                    ))}
-                  desktopColumns={3}
-                  tabletColumns={2}
-                  mobileColumns={1}
-                />
-              </Card>
             </>
           )}
 

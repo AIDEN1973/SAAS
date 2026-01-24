@@ -49,8 +49,6 @@ import {
   AlertCircle,
   Award,
   BookOpen,
-  CreditCard as PaymentIcon,
-  CheckCircle,
   MessageSquare,
   Activity,
 } from 'lucide-react';
@@ -748,17 +746,11 @@ export const BILLING_RELATED_MENUS: RelatedMenuSection = {
 /** 자동화 설정 페이지 서브 메뉴 ID */
 export type AutomationSubMenuId =
   | 'rules'
-  | 'payment'
-  | 'attendance'
-  | 'notification'
   | 'statistics';
 
 /** 자동화 설정 페이지 서브 메뉴 설정 */
 export const AUTOMATION_SUB_MENU_ITEMS: SubSidebarMenuItem<AutomationSubMenuId>[] = [
   { id: 'rules', label: '자동화 규칙', icon: createElement(Cog, { size: ICON_SIZE }), ariaLabel: '자동화 규칙 화면으로 이동' },
-  { id: 'payment', label: '결제 자동화', icon: createElement(PaymentIcon, { size: ICON_SIZE }), ariaLabel: '결제 자동화 화면으로 이동' },
-  { id: 'attendance', label: '출결 자동화', icon: createElement(CheckCircle, { size: ICON_SIZE }), ariaLabel: '출결 자동화 화면으로 이동' },
-  { id: 'notification', label: '알림 자동화', icon: createElement(Bell, { size: ICON_SIZE }), ariaLabel: '알림 자동화 화면으로 이동' },
   { id: 'statistics', label: '자동화 통계', icon: createElement(Activity, { size: ICON_SIZE }), ariaLabel: '자동화 통계 화면으로 이동' },
 ];
 
@@ -788,3 +780,24 @@ export const ALIMTALK_SUB_MENU_ITEMS: SubSidebarMenuItem<AlimtalkSubMenuId>[] = 
 
 /** 기본 알림톡 설정 서브 메뉴 ID */
 export const DEFAULT_ALIMTALK_SUB_MENU: AlimtalkSubMenuId = 'status';
+
+// ============================================================================
+// 통합 설정 페이지 서브 메뉴 설정
+// ============================================================================
+
+/** 통합 설정 페이지 서브 메뉴 ID */
+export type SettingsSubMenuId =
+  | 'store'        // 매장 정보
+  | 'automation'   // 자동화
+  | 'permissions'; // 권한 관리
+// NOTE: 알림톡(alimtalk) 설정은 super-admin으로 이동됨
+
+/** 통합 설정 페이지 서브 메뉴 설정 */
+export const SETTINGS_SUB_MENU_ITEMS: SubSidebarMenuItem<SettingsSubMenuId>[] = [
+  { id: 'store', label: '매장정보', icon: createElement(Briefcase, { size: ICON_SIZE }), ariaLabel: '매장 정보 설정 화면으로 이동' },
+  { id: 'automation', label: '자동화', icon: createElement(Cog, { size: ICON_SIZE }), ariaLabel: '자동화 설정 화면으로 이동' },
+  { id: 'permissions', label: '권한관리', icon: createElement(Settings, { size: ICON_SIZE }), ariaLabel: '권한 관리 화면으로 이동' },
+];
+
+/** 기본 통합 설정 서브 메뉴 ID */
+export const DEFAULT_SETTINGS_SUB_MENU: SettingsSubMenuId = 'store';

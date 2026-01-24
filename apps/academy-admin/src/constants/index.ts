@@ -86,6 +86,9 @@ export {
   // 알림톡 설정 페이지
   ALIMTALK_SUB_MENU_ITEMS,
   DEFAULT_ALIMTALK_SUB_MENU,
+  // 통합 설정 페이지
+  SETTINGS_SUB_MENU_ITEMS,
+  DEFAULT_SETTINGS_SUB_MENU,
   // 공통
   SUB_SIDEBAR_WIDTH,
   SUB_MENU_QUERY_PARAM,
@@ -108,5 +111,6 @@ export type {
   BillingSubMenuId,
   AutomationSubMenuId,
   AlimtalkSubMenuId,
+  SettingsSubMenuId,
   DynamicMenuLabelId,
 } from './sub-sidebar-menus';

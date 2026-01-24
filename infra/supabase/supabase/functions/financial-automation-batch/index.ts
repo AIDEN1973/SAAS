@@ -483,6 +483,224 @@ async function processRevenueRequiredPerDay(
 }
 
 /**
+ * 반복 결제 실패 알림 (recurring_payment_failed)
+ * 결제 실패 즉시 트리거 또는 배치 확인
+ */
+async function processRecurringPaymentFailed(
+  supabase: any,
+  tenantId: string,
+  kstTime: Date
+): Promise<number> {
+  const eventType = 'recurring_payment_failed';
+  assertAutomationEventType(eventType);
+
+  const enabled = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.enabled`
+  );
+  if (!enabled || enabled !== true) {
+    return 0;
+  }
+
+  const channel = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.channel`
+  ) as string;
+
+  if (!channel) {
+    return 0; // Fail Closed
+  }
+
+  // ⚠️ 중요: 자동화 안전성 체크 (AI_자동화_기능_정리.md Section 10.4)
+  const safetyCheck = await checkAndUpdateAutomationSafety(
+    supabase,
+    tenantId,
+    'send_notification',
+    kstTime,
+    `auto_notification.${eventType}.throttle.daily_limit`
+  );
+  if (!safetyCheck.canExecute) {
+    console.warn(`[${eventType}] Skipping due to safety check: ${safetyCheck.reason}`);
+    return 0;
+  }
+
+  const today = toKSTDate(kstTime);
+  const yesterday = toKSTDate(new Date(kstTime.getTime() - 24 * 60 * 60 * 1000));
+
+  // 최근 24시간 내 실패한 결제 조회
+  const { data: failedPayments, error } = await withTenant(
+    supabase
+      .from('payments')
+      .select('id, invoice_id, payer_id, amount, failed_at, failure_reason')
+      .eq('status', 'failed')
+      .gte('failed_at', `${yesterday}T00:00:00`)
+      .lte('failed_at', `${today}T23:59:59`),
+    tenantId
+  );
+
+  if (error || !failedPayments) {
+    return 0;
+  }
+
+  let sentCount = 0;
+  for (const payment of failedPayments) {
+    const { data: guardian } = await withTenant(
+      supabase
+        .from('guardians')
+        .select('id, phone')
+        .eq('student_id', payment.payer_id)
+        .eq('is_primary', true)
+        .single(),
+      tenantId
+    );
+
+    if (guardian) {
+      const dedupKey = `${tenantId}:${eventType}:payment:${payment.id}:guardian:${guardian.id}:${toKSTDate(kstTime)}`;
+      await supabase.from('automation_actions').insert({
+        tenant_id: tenantId,
+        action_type: 'send_notification',
+        executor_role: 'system',
+        dedup_key: dedupKey,
+        execution_context: {
+          event_type: eventType,
+          payment_id: payment.id,
+          invoice_id: payment.invoice_id,
+          recipient_id: guardian.id,
+          channel,
+          amount: payment.amount,
+          failure_reason: payment.failure_reason,
+        },
+      });
+      sentCount++;
+    }
+  }
+
+  return sentCount;
+}
+
+/**
+ * 매출 목표 미달 알림 (revenue_target_under)
+ * 매일 07:10 실행
+ */
+async function processRevenueTargetUnder(
+  supabase: any,
+  tenantId: string,
+  kstTime: Date
+): Promise<number> {
+  const eventType = 'revenue_target_under';
+  assertAutomationEventType(eventType);
+
+  const enabled = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.enabled`
+  );
+  if (!enabled || enabled !== true) {
+    return 0;
+  }
+
+  // Policy에서 월 목표 매출 조회
+  const monthlyTarget = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.monthly_target`
+  ) as number;
+  if (!monthlyTarget || typeof monthlyTarget !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 임계값 조회 (목표 대비 몇 % 미달 시 알림)
+  const threshold = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.threshold`
+  ) as number;
+  if (!threshold || typeof threshold !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 priority 조회 (Fail-Closed)
+  const priorityPolicy = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.priority`
+  ) as number | null;
+  if (!priorityPolicy || typeof priorityPolicy !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 TTL 조회 (Fail-Closed)
+  const ttlDays = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.ttl_days`
+  ) as number | null;
+  if (!ttlDays || typeof ttlDays !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // ⚠️ 중요: 자동화 안전성 체크 (AI_자동화_기능_정리.md Section 10.4)
+  const safetyCheck = await checkAndUpdateAutomationSafety(
+    supabase,
+    tenantId,
+    'create_task',
+    kstTime,
+    `auto_notification.${eventType}.throttle.daily_limit`
+  );
+  if (!safetyCheck.canExecute) {
+    console.warn(`[${eventType}] Skipping due to safety check: ${safetyCheck.reason}`);
+    return 0;
+  }
+
+  const currentMonth = toKSTMonth(kstTime);
+  const today = toKSTDate(kstTime);
+  const dayOfMonth = kstTime.getDate();
+  const daysInMonth = new Date(kstTime.getFullYear(), kstTime.getMonth() + 1, 0).getDate();
+
+  // 이번 달 현재 매출
+  const { data: invoices } = await withTenant(
+    supabase
+      .from('invoices')
+      .select('amount_paid')
+      .gte('period_start', `${currentMonth}-01`)
+      .lte('period_start', today),
+    tenantId
+  );
+
+  const currentRevenue = invoices
+    ? invoices.reduce((sum: number, inv: any) => sum + (inv.amount_paid || 0), 0)
+    : 0;
+
+  // 예상 일일 진도율 계산
+  const expectedProgressRate = dayOfMonth / daysInMonth;
+  const expectedRevenue = monthlyTarget * expectedProgressRate;
+  const achievementRate = expectedRevenue > 0 ? (currentRevenue / expectedRevenue) * 100 : 100;
+
+  // 목표 대비 threshold% 미달인 경우
+  if (achievementRate < (100 - threshold)) {
+    const dedupKey = `${tenantId}:${eventType}:tenant:${tenantId}:${today}`;
+    await createTaskCardWithDedup(supabase, {
+      tenant_id: tenantId,
+      entity_id: tenantId,
+      entity_type: 'tenant',
+      task_type: 'risk',
+      title: '매출 목표 미달 알림',
+      description: `이번 달 매출이 예상 진도 대비 ${(100 - achievementRate).toFixed(1)}% 미달입니다. (현재: ${currentRevenue.toLocaleString()}원, 예상: ${Math.round(expectedRevenue).toLocaleString()}원)`,
+      priority: priorityPolicy,
+      dedup_key: dedupKey,
+      expires_at: new Date(kstTime.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'pending',
+    });
+
+    return 1;
+  }
+
+  return 0;
+}
+
+/**
  * 환불 급증 알림 (refund_spike)
  * 매일 07:40 실행
  */
@@ -632,7 +850,8 @@ serve(async (req) => {
         // 스케줄에 따라 실행
         if (hour === 7) {
           if (minute >= 10 && minute < 20) {
-            // revenue_target_under는 daily-statistics-update에서 처리
+            // revenue_target_under: 매일 07:10 실행
+            totalProcessed += await processRevenueTargetUnder(supabase, tenant.id, kstTime);
           } else if (minute >= 20 && minute < 30) {
             totalProcessed += await processCollectionRateDrop(supabase, tenant.id, kstTime);
           } else if (minute >= 30 && minute < 40) {
@@ -648,6 +867,8 @@ serve(async (req) => {
         totalProcessed += await processPaymentDueReminder(supabase, tenant.id, kstTime);
         // invoice_partial_balance는 트리거 기반이지만 배치로도 확인
         totalProcessed += await processInvoicePartialBalance(supabase, tenant.id, kstTime);
+        // recurring_payment_failed는 매일 실행 (결제 실패 확인)
+        totalProcessed += await processRecurringPaymentFailed(supabase, tenant.id, kstTime);
       } catch (error) {
         console.error(`[Financial Automation] Error for tenant ${tenant.id}:`, error);
       }

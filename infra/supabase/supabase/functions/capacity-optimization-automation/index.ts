@@ -370,6 +370,151 @@ async function processHighFillRateExpandCandidate(
 }
 
 /**
+ * AI 반 병합 제안 (ai_suggest_class_merge)
+ * 매주 월요일 08:30 실행
+ */
+async function processAISuggestClassMerge(
+  supabase: any,
+  tenantId: string,
+  kstTime: Date
+): Promise<number> {
+  const eventType = 'ai_suggest_class_merge';
+  assertAutomationEventType(eventType);
+
+  const enabled = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.enabled`
+  );
+  if (!enabled || enabled !== true) {
+    return 0;
+  }
+
+  // AI 사용 여부 확인
+  const useAI = await shouldUseAI(supabase, tenantId);
+  if (!useAI) {
+    return 0; // AI 미사용 시 실행하지 않음
+  }
+
+  // Policy에서 병합 임계값 조회 (각 반의 정원률이 이 값 미만이면 병합 대상)
+  const threshold = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.threshold`
+  ) as number;
+  if (!threshold || typeof threshold !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 priority 조회 (Fail-Closed)
+  const priorityPolicy = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.priority`
+  ) as number | null;
+  if (!priorityPolicy || typeof priorityPolicy !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // Policy에서 TTL 조회 (Fail-Closed)
+  const ttlDays = await getTenantSettingByPath(
+    supabase,
+    tenantId,
+    `auto_notification.${eventType}.ttl_days`
+  ) as number | null;
+  if (!ttlDays || typeof ttlDays !== 'number') {
+    return 0; // Fail Closed
+  }
+
+  // ⚠️ 중요: 자동화 안전성 체크 (AI_자동화_기능_정리.md Section 10.4)
+  const safetyCheck = await checkAndUpdateAutomationSafety(
+    supabase,
+    tenantId,
+    'create_task',
+    kstTime,
+    `auto_notification.${eventType}.throttle.daily_limit`
+  );
+  if (!safetyCheck.canExecute) {
+    console.warn(`[${eventType}] Skipping due to safety check: ${safetyCheck.reason}`);
+    return 0;
+  }
+
+  // Industry Adapter: 업종별 클래스 테이블명 동적 조회
+  const classTableName = await getTenantTableName(supabase, tenantId, 'class');
+
+  // 정원률이 낮은 반 조회
+  const { data: classes, error } = await withTenant(
+    supabase
+      .from(classTableName || 'academy_classes')
+      .select('id, name, max_students, current_students, start_time, subject')
+      .eq('status', 'active'),
+    tenantId
+  );
+
+  if (error || !classes) {
+    return 0;
+  }
+
+  // 정원률이 임계값 미만인 반 필터링
+  const lowFillClasses = classes.filter((cls: any) => {
+    const fillRate = cls.max_students > 0
+      ? (cls.current_students / cls.max_students) * 100
+      : 0;
+    return fillRate < threshold && fillRate > 0; // 학생이 최소 1명 이상 있는 경우만
+  });
+
+  if (lowFillClasses.length < 2) {
+    return 0; // 병합 대상이 2개 미만이면 제안하지 않음
+  }
+
+  // 같은 과목 또는 유사한 시간대의 반끼리 그룹화하여 병합 제안
+  const subjectGroups = new Map<string, any[]>();
+  for (const cls of lowFillClasses) {
+    const subject = cls.subject || 'general';
+    if (!subjectGroups.has(subject)) {
+      subjectGroups.set(subject, []);
+    }
+    subjectGroups.get(subject)!.push(cls);
+  }
+
+  let createdCount = 0;
+  for (const [subject, subjectClasses] of subjectGroups.entries()) {
+    if (subjectClasses.length >= 2) {
+      // 병합 가능한 후보 쌍 찾기
+      for (let i = 0; i < subjectClasses.length - 1; i++) {
+        for (let j = i + 1; j < subjectClasses.length; j++) {
+          const cls1 = subjectClasses[i];
+          const cls2 = subjectClasses[j];
+
+          // 병합 후 정원 초과 여부 확인
+          const combinedStudents = (cls1.current_students || 0) + (cls2.current_students || 0);
+          const maxCapacity = Math.max(cls1.max_students || 0, cls2.max_students || 0);
+
+          if (combinedStudents <= maxCapacity) {
+            const dedupKey = `${tenantId}:${eventType}:class:${cls1.id}:${cls2.id}:${toKSTDate(kstTime)}`;
+            await createTaskCardWithDedup(supabase, {
+              tenant_id: tenantId,
+              entity_id: cls1.id,
+              entity_type: 'class',
+              task_type: 'ai_suggested',
+              title: `반 병합 제안: ${cls1.name} + ${cls2.name}`,
+              description: `정원률이 낮은 두 반을 병합하면 효율적인 운영이 가능합니다. 현재 인원: ${combinedStudents}명 (정원: ${maxCapacity}명)`,
+              priority: priorityPolicy,
+              dedup_key: dedupKey,
+              expires_at: new Date(kstTime.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString(),
+              status: 'pending',
+            });
+            createdCount++;
+          }
+        }
+      }
+    }
+  }
+
+  return createdCount;
+}
+
+/**
  * 미사용 반 지속 알림 (unused_class_persistent)
  * 매주 월요일 08:50 실행
  */
@@ -536,6 +681,9 @@ serve(async (req) => {
             totalProcessed += await processHighFillRateExpandCandidate(supabase, tenant.id, kstTime);
           } else if (minute >= 20 && minute < 25) {
             totalProcessed += await processTimeSlotFillRateLow(supabase, tenant.id, kstTime);
+          } else if (minute >= 30 && minute < 35) {
+            // ai_suggest_class_merge: 매주 월요일 08:30 실행
+            totalProcessed += await processAISuggestClassMerge(supabase, tenant.id, kstTime);
           } else if (minute >= 50 && minute < 55) {
             totalProcessed += await processUnusedClassPersistent(supabase, tenant.id, kstTime);
           }

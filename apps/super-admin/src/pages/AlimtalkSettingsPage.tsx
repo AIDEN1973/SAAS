@@ -1,10 +1,10 @@
 /**
- * 알림톡 설정 페이지
+ * 알림톡 설정 페이지 (Super Admin)
  *
  * [LAYER: UI_PAGE]
  *
  * [불변 규칙] api-sdk를 통해서만 API 요청
- * [불변 규칙] Zero-Trust: UI는 tenantId를 직접 전달하지 않음, Context에서 자동 가져옴
+ * [불변 규칙] Super Admin 전용 - 전체 테넌트의 알림톡 설정 관리
  * [요구사항] 채널 인증, 템플릿 CRUD, 발송 내역, 잔여 포인트 관리
  */
 
@@ -26,6 +26,7 @@ import {
   isMobile,
   isTablet,
   SubSidebar,
+  type SubSidebarMenuItem,
 } from '@ui-core/react';
 import {
   useAlimtalkSettings,
@@ -36,10 +37,6 @@ import {
   type TemplateMessageType,
   type EmphasisType,
 } from '@hooks/use-alimtalk';
-import { useIndustryTerms } from '@hooks/use-industry-terms';
-// [SSOT] Barrel export를 통한 통합 import
-import { ALIMTALK_SUB_MENU_ITEMS, DEFAULT_ALIMTALK_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
-import type { AlimtalkSubMenuId } from '../constants';
 import {
   MessageSquare,
   Settings,
@@ -53,13 +50,31 @@ import {
   RefreshCw,
   CheckCircle,
   XCircle,
+  Bell,
+  Link,
+  History,
+  CircleDollarSign,
 } from 'lucide-react';
 
 // ============================================================================
-// 탭 타입 정의
+// 서브 메뉴 설정
 // ============================================================================
 
-// Tab 관련 타입은 SubSidebar 적용으로 제거됨 (ALIMTALK_SUB_MENU_ITEMS 사용)
+const ICON_SIZE = 16;
+
+type AlimtalkSubMenuId = 'status' | 'channels' | 'templates' | 'history' | 'points';
+
+const ALIMTALK_SUB_MENU_ITEMS: SubSidebarMenuItem<AlimtalkSubMenuId>[] = [
+  { id: 'status', label: '연동 현황', icon: <Bell size={ICON_SIZE} />, ariaLabel: '연동 현황 화면으로 이동' },
+  { id: 'channels', label: '채널 관리', icon: <Link size={ICON_SIZE} />, ariaLabel: '채널 관리 화면으로 이동' },
+  { id: 'templates', label: '템플릿 관리', icon: <FileText size={ICON_SIZE} />, ariaLabel: '템플릿 관리 화면으로 이동' },
+  { id: 'history', label: '발송 내역', icon: <History size={ICON_SIZE} />, ariaLabel: '발송 내역 화면으로 이동' },
+  { id: 'points', label: '포인트 관리', icon: <CircleDollarSign size={ICON_SIZE} />, ariaLabel: '포인트 관리 화면으로 이동' },
+];
+
+const DEFAULT_ALIMTALK_SUB_MENU: AlimtalkSubMenuId = 'status';
+
+// Tab 관련 타입은 SubSidebar 적용으로 제거됨
 void [Settings, MessageSquare, FileText, Clock, CreditCard]; // 아이콘 타입 보존
 
 // ============================================================================
@@ -68,7 +83,6 @@ void [Settings, MessageSquare, FileText, Clock, CreditCard]; // 아이콘 타입
 
 const StatusTab = memo(function StatusTab() {
   const { status, isLoading, error, fetchStatus } = useAlimtalkSettings();
-  // React Query가 자동으로 데이터 fetch - useEffect 불필요!
 
   if (isLoading) {
     return <div style={{ padding: 'var(--spacing-lg)', textAlign: 'center' }}>로딩 중...</div>;
@@ -145,7 +159,6 @@ const ChannelsTab = memo(function ChannelsTab() {
   const { showAlert, showConfirm } = useModal();
   const [plusid, setPlusid] = useState('');
   const [phonenumber, setPhonenumber] = useState('');
-  // React Query가 자동으로 데이터 fetch - useEffect 불필요!
 
   const handleAuthRequest = async () => {
     if (!plusid || !phonenumber) {
@@ -269,7 +282,6 @@ const ChannelsTab = memo(function ChannelsTab() {
 // ============================================================================
 
 const TemplatesTab = memo(function TemplatesTab() {
-  const terms = useIndustryTerms();
   const {
     templates,
     isLoading,
@@ -281,7 +293,6 @@ const TemplatesTab = memo(function TemplatesTab() {
     requestReview,
   } = useAlimtalkSettings();
   const { showAlert, showConfirm } = useModal();
-  // React Query가 자동으로 데이터 fetch - useEffect 불필요!
   const [isAdding, setIsAdding] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [formData, setFormData] = useState<AddTemplateRequest>({
@@ -476,7 +487,7 @@ const TemplatesTab = memo(function TemplatesTab() {
                   템플릿 내용 (최대 1000자)
                 </label>
                 <textarea
-                  placeholder={`#{고객명}님, 오늘 ${terms.SESSION_LABEL}이 있습니다.`}
+                  placeholder="#{고객명}님, 오늘 수업이 있습니다."
                   value={formData.tpl_content}
                   onChange={(e) => setFormData({ ...formData, tpl_content: e.target.value })}
                   maxLength={1000}
@@ -492,7 +503,7 @@ const TemplatesTab = memo(function TemplatesTab() {
                   }}
                 />
                 <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-xs)' }}>
-                  변수: #{'{변수명}'} 형식으로 사용 (예: #{'{고객명}'}, #{`{${terms.SESSION_LABEL}시간}`})
+                  변수: #{'{변수명}'} 형식으로 사용 (예: #{'{고객명}'}, #{'{수업시간}'})
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
@@ -749,7 +760,6 @@ const HistoryTab = memo(function HistoryTab() {
 
 const PointsTab = memo(function PointsTab() {
   const { remainPoints, isLoading, error, fetchRemainPoints } = useAlimtalkSettings();
-  // React Query가 자동으로 데이터 fetch - useEffect 불필요!
 
   const formatNumber = (num: number) => num.toLocaleString();
 
@@ -847,21 +857,29 @@ export function AlimtalkSettingsPage() {
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
   const isTabletMode = isTablet(modeUpper);
-  // 서브사이드바 축소 상태 (태블릿 모드 기본값, 사용자 토글 가능)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(isTabletMode);
-  // 태블릿 모드 변경 시 축소 상태 동기화
+
   useEffect(() => {
     setSidebarCollapsed(isTabletMode);
   }, [isTabletMode]);
 
   // 서브 메뉴 상태
-  const validIds = ALIMTALK_SUB_MENU_ITEMS.map(item => item.id) as readonly AlimtalkSubMenuId[];
-  const selectedSubMenu = getSubMenuFromUrl(searchParams, validIds, DEFAULT_ALIMTALK_SUB_MENU);
+  const tabParam = searchParams.get('tab');
+  const validIds = ALIMTALK_SUB_MENU_ITEMS.map(item => item.id);
+  const selectedSubMenu: AlimtalkSubMenuId = tabParam && validIds.includes(tabParam as AlimtalkSubMenuId)
+    ? tabParam as AlimtalkSubMenuId
+    : DEFAULT_ALIMTALK_SUB_MENU;
 
   const handleSubMenuChange = useCallback((id: AlimtalkSubMenuId) => {
-    const newUrl = setSubMenuToUrl(id, DEFAULT_ALIMTALK_SUB_MENU);
-    navigate(newUrl);
-  }, [navigate]);
+    const newSearchParams = new URLSearchParams(searchParams);
+    if (id === DEFAULT_ALIMTALK_SUB_MENU) {
+      newSearchParams.delete('tab');
+    } else {
+      newSearchParams.set('tab', id);
+    }
+    const queryString = newSearchParams.toString();
+    navigate(queryString ? `?${queryString}` : '/alimtalk');
+  }, [navigate, searchParams]);
 
   // 조건부 렌더링: 한 번에 1개 탭만 마운트
   const renderTabContent = () => {
@@ -899,3 +917,5 @@ export function AlimtalkSettingsPage() {
     </ErrorBoundary>
   );
 }
+
+export default AlimtalkSettingsPage;

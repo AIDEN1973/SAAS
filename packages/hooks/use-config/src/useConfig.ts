@@ -6,6 +6,7 @@
  * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
  */
 
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useSession } from '@hooks/use-auth';
@@ -95,105 +96,40 @@ export function useConfig() {
  *
  * 프론트엔드 래퍼 함수: 서버/Edge Function의 getTenantSettingByPath와 동일한 기능을 제공합니다.
  * SSOT-1: tenant_settings는 KV 구조이며, config는 컬럼이 아니라 key='config' row의 value(JSONB)입니다.
- * 내부 동작: 1) tenant_settings에서 tenant_id + key='config' row의 value(JSONB) 획득, 2) value(JSONB)에서 경로 추출
+ *
+ * [최적화] useConfig의 캐시를 재사용하여 중복 API 호출 방지
+ * - 별도 쿼리 대신 useConfig 결과에서 경로 추출
+ * - useUpdateConfig가 setQueryData로 캐시 업데이트 시 즉시 반영됨
  *
  * @param path 점으로 구분된 경로 (예: 'auto_notification.overdue_outstanding_over_limit.enabled')
  * @returns 설정 값 또는 null (Policy가 없으면 null 반환, Fail Closed)
  */
 export function useTenantSettingByPath(path: string) {
-  const context = getApiContext();
-  const tenantId = context.tenantId;
+  // useConfig 캐시 재사용 - 별도 API 호출 없이 캐시된 config에서 경로 추출
+  const { data: configData, isLoading } = useConfig();
 
-  return useQuery({
-    queryKey: ['config', tenantId, 'path', path],
-    queryFn: async () => {
-      if (!tenantId) {
-        return null;
-      }
+  // 경로 추출 (useMemo로 최적화)
+  const value = React.useMemo(() => {
+    if (!configData || !path) {
+      return null;
+    }
 
-      // 전체 config 조회
-      const response = await apiClient.get<{ key: string; value: TenantConfig }>('tenant_settings', {
-        filters: { key: 'config' },
-      });
+    const keys = path.split('.');
+    let current: unknown = configData;
 
-      if (response.error) {
-        if (response.error.code === 'PGRST116' || response.error.code === 'PGRST205') {
-          return null; // Fail Closed
-        }
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Failed to fetch config:', response.error);
-        }
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      if (current && typeof current === 'object' && key in current) {
+        current = (current as Record<string, unknown>)[key];
+      } else {
         return null; // Fail Closed
       }
+    }
 
-      if (!response.data || response.data.length === 0) {
-        return null; // Fail Closed
-      }
+    return current;
+  }, [configData, path]);
 
-      const configRecord = response.data.find((item) => item.key === 'config');
-      if (!configRecord || !configRecord.value) {
-        return null; // Fail Closed
-      }
-
-      // 경로 추출
-      const keys = path.split('.');
-      let current: unknown = configRecord.value;
-
-      // 디버깅: 전체 config와 경로 추출 과정 로그
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[useTenantSettingByPath] 경로: ${path}`, {
-          fullConfig: configRecord.value,
-          keys,
-          autoNotificationKeys: configRecord.value && typeof configRecord.value === 'object' && 'auto_notification' in configRecord.value
-            ? Object.keys((configRecord.value as Record<string, unknown>).auto_notification as Record<string, unknown> || {})
-            : [],
-        });
-      }
-
-      for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
-        if (current && typeof current === 'object' && key in current) {
-          current = (current as Record<string, unknown>)[key];
-          // 디버깅: 각 단계별 로그
-          if (process.env.NODE_ENV === 'development' && i < keys.length - 1) {
-            console.log(`[useTenantSettingByPath] 경로 단계 ${i + 1}/${keys.length}: ${key}`, {
-              found: true,
-              value: current,
-              type: typeof current,
-              availableKeys: current && typeof current === 'object' ? Object.keys(current as Record<string, unknown>) : [],
-            });
-          }
-        } else {
-          // 디버깅: 경로를 찾지 못한 경우
-          if (process.env.NODE_ENV === 'development') {
-            console.warn(`[useTenantSettingByPath] 경로를 찾지 못함: ${path}`, {
-              currentKey: key,
-              currentValue: current,
-              currentType: typeof current,
-              isObject: current && typeof current === 'object',
-              hasKey: current && typeof current === 'object' && key in current,
-              availableKeys: current && typeof current === 'object' ? Object.keys(current as Record<string, unknown>) : [],
-              step: `${i + 1}/${keys.length}`,
-              pathSoFar: keys.slice(0, i).join('.'),
-            });
-          }
-          return null; // Fail Closed
-        }
-      }
-
-      // 디버깅: 최종 결과
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[useTenantSettingByPath] 최종 결과: ${path}`, {
-          value: current,
-          type: typeof current,
-        });
-      }
-
-      return current;
-    },
-    enabled: !!tenantId && !!path,
-    staleTime: 5 * 60 * 1000, // 5분
-  });
+  return { data: value, isLoading };
 }
 
 /**
@@ -317,8 +253,10 @@ export function useUpdateConfig() {
 
       return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['config', tenantId] });
+    onSuccess: (data) => {
+      // setQueryData로 캐시 직접 업데이트 - API 호출 없이 즉시 반영
+      // useTenantSettingByPath가 useConfig를 재사용하므로 자동으로 업데이트됨
+      queryClient.setQueryData(['config', tenantId], data);
     },
   });
 }

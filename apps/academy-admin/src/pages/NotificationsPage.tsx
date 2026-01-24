@@ -347,7 +347,7 @@ export function NotificationsPage() {
 
   return (
     <ErrorBoundary>
-      <div style={{ display: 'flex', height: 'var(--height-full)' }}>
+      <div style={{ display: 'flex', minHeight: 'var(--height-full)' }}>
         {/* 서브 사이드바 (모바일에서는 숨김, 태블릿에서는 축소) */}
         {!isMobileMode && (
           <SubSidebar
