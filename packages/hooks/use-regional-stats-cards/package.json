@@ -5,11 +5,11 @@
   "types": "src/index.ts",
   "dependencies": {
     "@tanstack/react-query": "^5.90.12",
-    "@api-sdk/core": "workspace:*",
-    "@hooks/use-student": "workspace:*",
-    "@hooks/use-billing": "workspace:*",
-    "@hooks/use-attendance": "workspace:*",
-    "@hooks/use-daily-region-metrics": "workspace:*",
-    "@lib/date-utils": "workspace:*"
+    "@api-sdk/core": "file:../../api-sdk",
+    "@hooks/use-student": "file:../use-student",
+    "@hooks/use-billing": "file:../use-billing",
+    "@hooks/use-attendance": "file:../use-attendance",
+    "@hooks/use-daily-region-metrics": "file:../use-daily-region-metrics",
+    "@lib/date-utils": "file:../../lib/date-utils"
   }
 }

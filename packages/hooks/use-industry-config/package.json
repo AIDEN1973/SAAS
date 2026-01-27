@@ -5,7 +5,7 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
-    "@hooks/use-industry-terms": "workspace:*",
-    "@industry/registry": "workspace:*"
+    "@hooks/use-industry-terms": "file:../use-industry-terms",
+    "@industry/registry": "file:../../industry/registry"
   }
 }

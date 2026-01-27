@@ -6,6 +6,6 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@tanstack/react-query": "^5.64.2",
-    "@api-sdk/core": "workspace:*"
+    "@api-sdk/core": "file:../../api-sdk"
   }
 }

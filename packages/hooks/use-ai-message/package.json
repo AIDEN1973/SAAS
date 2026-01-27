@@ -6,6 +6,6 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@tanstack/react-query": "^5.64.2",
-    "@env-registry/client": "workspace:*"
+    "@env-registry/client": "file:../../env-registry"
   }
 }
