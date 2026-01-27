@@ -16,6 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "agentation": "^1.3.2",
     "@api-sdk/core": "file:../../packages/api-sdk",
     "@core/tags": "file:../../packages/core/core-tags",
     "@env-registry/core": "file:../../packages/env-registry",

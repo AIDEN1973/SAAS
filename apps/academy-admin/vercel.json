@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cp ../../turbo.json.template ../../turbo.json && npm run build",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "vite",

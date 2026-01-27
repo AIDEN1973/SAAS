@@ -15,6 +15,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "agentation": "^1.3.2",
     "@env-registry/core": "file:../../packages/env-registry",
     "@hooks/use-auth": "file:../../packages/hooks/use-auth",
     "@hooks/use-schema-registry": "file:../../packages/hooks/use-schema-registry",
