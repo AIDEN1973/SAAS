@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd ../.. && npx turbo@2 run build --filter=@app/super-admin",
+  "buildCommand": "cd ../.. && rm -rf .turbo && npx turbo@2 run build --filter=@app/super-admin",
   "outputDirectory": "dist",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "vite",
