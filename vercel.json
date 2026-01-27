@@ -1,4 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null
+  "framework": null,
+  "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "turbo run build --filter={apps/[PROJECT_NAME]}..."
 }
