@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd ../.. && turbo run build --filter=@app/academy-admin",
+  "buildCommand": "cd ../.. && npx turbo@2 run build --filter=@app/academy-admin",
   "outputDirectory": "dist",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "vite",
