@@ -53,21 +53,67 @@ Claude Desktop 앱을 사용하는 경우:
 
 ### 환경변수
 
-MCP 서버들은 다음 환경변수를 사용합니다 (`.env.local`에서 자동으로 로드됨):
+MCP 서버들은 다음 환경변수를 사용합니다:
 
-#### Supabase
-```env
-SUPABASE_URL=https://xawypsrotrfoyozhrsbb.supabase.co
-SUPABASE_ACCESS_TOKEN=sbp_***
-SUPABASE_PROJECT_REF=xawypsrotrfoyozhrsbb
+#### 설정 방법
+
+**옵션 1: 시스템 환경변수 사용 (권장)**
+
+Windows (PowerShell):
+```powershell
+$env:SUPABASE_URL="https://xawypsrotrfoyozhrsbb.supabase.co"
+$env:SUPABASE_ACCESS_TOKEN="your_token_here"
+$env:GITHUB_PERSONAL_ACCESS_TOKEN="your_token_here"
 ```
 
-#### GitHub
-```env
-GITHUB_PERSONAL_ACCESS_TOKEN=github_pat_***
+macOS/Linux (Bash):
+```bash
+export SUPABASE_URL="https://xawypsrotrfoyozhrsbb.supabase.co"
+export SUPABASE_ACCESS_TOKEN="your_token_here"
+export GITHUB_PERSONAL_ACCESS_TOKEN="your_token_here"
 ```
 
-⚠️ **보안**: 이 환경변수들은 이미 `.gitignore`에 포함되어 있으며, 절대 커밋하지 마세요.
+**옵션 2: mcp.json 직접 수정**
+
+1. `mcp.json.example`을 `mcp.json`으로 복사:
+   ```bash
+   cp .claude/mcp.json.example .claude/mcp.json
+   ```
+
+2. `mcp.json`에서 `${VARIABLE_NAME}` 부분을 실제 값으로 변경
+
+⚠️ **보안 경고**:
+- **절대로 실제 토큰 값이 포함된 `mcp.json`을 커밋하지 마세요!**
+- `.claude/mcp.json`은 `.gitignore`에 포함되어 있습니다
+- 토큰 발급 방법은 아래 "토큰 발급" 섹션 참조
+
+#### 필요한 환경변수
+
+**Supabase**:
+- `SUPABASE_URL`: Supabase 프로젝트 URL
+- `SUPABASE_ACCESS_TOKEN`: Supabase Access Token (Management API용)
+
+**GitHub**:
+- `GITHUB_PERSONAL_ACCESS_TOKEN`: GitHub Personal Access Token
+
+### 토큰 발급
+
+#### Supabase Access Token
+1. [Supabase Dashboard](https://app.supabase.com) 로그인
+2. Settings → Access Tokens 이동
+3. "Generate new token" 클릭
+4. 토큰 이름 입력 후 생성
+5. 생성된 토큰 복사 (한 번만 표시됨!)
+
+#### GitHub Personal Access Token
+1. [GitHub Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens) 이동
+2. "Generate new token (classic)" 클릭
+3. 필요한 권한 선택:
+   - `repo` (전체 저장소 접근)
+   - `read:org` (조직 정보 읽기)
+   - `read:user` (사용자 정보 읽기)
+4. "Generate token" 클릭
+5. 생성된 토큰 복사 (한 번만 표시됨!)
 
 ### 사용 가능한 MCP 도구들
 
