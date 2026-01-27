@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd ../.. && node node_modules/turbo/bin/turbo run build --filter=@app/academy-parent",
+  "buildCommand": "cp ../../turbo.json.template ../../turbo.json && npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "vite",
