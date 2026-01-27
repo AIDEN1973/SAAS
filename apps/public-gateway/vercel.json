@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd ../.. && rm -rf .turbo && npx turbo@2 run build --filter=@app/public-gateway",
+  "buildCommand": "cd ../.. && node node_modules/turbo/bin/turbo run build --filter=@app/public-gateway",
   "outputDirectory": "dist",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "vite",
