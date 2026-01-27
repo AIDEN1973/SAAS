@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd ../.. && rm -rf .turbo && npx turbo@2 run build --filter=@app/academy-admin",
+  "buildCommand": "cd ../.. && echo '=== turbo.json content ===' && cat turbo.json && echo '=== end ===' && npx turbo@2 run build --filter=@app/academy-admin --force",
   "outputDirectory": "dist",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "vite",
