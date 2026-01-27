@@ -76,11 +76,12 @@ const TagButtonLarge = memo(function TagButtonLarge({ tag, isSelected, onClick, 
         <div
           onClick={() => setIsEditing(true)}
           style={{
-            padding: 'var(--spacing-sm) var(--spacing-sm)',
+            height: 'var(--height-control-sm)',
+            padding: '0 var(--spacing-sm)',
             fontSize: 'var(--font-size-base)',
             fontWeight: 'var(--font-weight-normal)',
             fontFamily: 'var(--font-family)',
-            lineHeight: 'var(--line-height-tight)',
+            lineHeight: 1,
             backgroundColor: isSelected ? tag.color : 'var(--color-white)',
             color: isSelected ? 'var(--color-white)' : 'var(--color-text)',
             border: isSelected
@@ -92,7 +93,7 @@ const TagButtonLarge = memo(function TagButtonLarge({ tag, isSelected, onClick, 
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            minHeight: 'calc(var(--spacing-sm) * 2 + var(--font-size-base) * var(--line-height-tight))',
+            boxSizing: 'border-box',
           }}
         >
           {tag.name} ({count})
@@ -113,24 +114,24 @@ const TagButtonLarge = memo(function TagButtonLarge({ tag, isSelected, onClick, 
             }
           }}
           style={{
-            padding: 'var(--spacing-sm) var(--spacing-sm)',
+            height: 'var(--height-control-sm)',
+            padding: '0 var(--spacing-sm)',
             fontSize: 'var(--font-size-base)',
             fontWeight: 'var(--font-weight-normal)',
             fontFamily: 'var(--font-family)',
-            lineHeight: 'var(--line-height-tight)',
+            lineHeight: 1,
             backgroundColor: 'var(--color-white)',
             color: 'var(--color-text)',
             border: 'var(--border-width-thin) solid var(--color-primary)',
             borderRadius: 'var(--border-radius-xs)',
             outline: 'none',
-            height: 'calc(var(--spacing-sm) * 2 + var(--font-size-base) * var(--line-height-tight))',
             boxSizing: 'border-box',
           }}
         />
       ) : (
         <Button
           variant={isSelected ? 'solid' : 'outline'}
-          size="md"
+          size="sm"
           onClick={onClick}
           style={{
             backgroundColor: isSelected ? tag.color : 'var(--color-white)',
@@ -611,7 +612,7 @@ export function StudentTagsSubPage({
               {/* 전체 보기 버튼 */}
               <Button
                 variant={selectedTagIds.length === 0 ? 'solid' : 'outline'}
-                size="md"
+                size="sm"
                 onClick={() => setSelectedTagIds([])}
                 style={{
                   backgroundColor: selectedTagIds.length === 0 ? 'var(--color-text)' : 'var(--color-white)',

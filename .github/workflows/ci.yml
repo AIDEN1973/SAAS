@@ -43,6 +43,10 @@ jobs:
         run: npm run verify:catalog-sync
         continue-on-error: false
 
+      - name: Verify manual synchronization
+        run: npm run verify:manual-sync
+        continue-on-error: false
+
   # ============================================
   # 2. Database Contract Tests
   # ============================================

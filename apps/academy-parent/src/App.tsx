@@ -17,6 +17,7 @@ import { BillingPage } from './pages/BillingPage';
 import { AttendanceNotificationsPage } from './pages/AttendanceNotificationsPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useLogout } from '@hooks/use-auth';
+import { Agentation } from 'agentation';
 
 function AppContent() {
   // 테넌트별 테마 적용
@@ -131,14 +132,18 @@ function AppContent() {
 
 function App() {
   return (
-    <BrowserRouter
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true,
-      }}
-    >
-      <AppContent />
-    </BrowserRouter>
+    <>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
+        <AppContent />
+      </BrowserRouter>
+      {/* 개발 환경에서만 agentation 활성화 */}
+      {import.meta.env.DEV && <Agentation />}
+    </>
   );
 }
 

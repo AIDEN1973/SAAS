@@ -12,6 +12,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Card, Button, EmptyState } from '@ui-core/react';
 import { MapPin } from 'lucide-react';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 
 export interface HeatmapData {
   date: string;
@@ -39,12 +40,6 @@ export interface HeatmapCardProps {
   tenantId: string | null;
 }
 
-const HEATMAP_TYPE_LABELS: Record<'growth' | 'attendance' | 'students', string> = {
-  growth: '성장률',
-  attendance: '출석률',
-  students: '학생 수',
-};
-
 export function HeatmapCard({
   heatmapType,
   onTypeChange,
@@ -53,12 +48,20 @@ export function HeatmapCard({
   locationInfo,
   tenantId,
 }: HeatmapCardProps) {
+  const terms = useIndustryTerms();
   const [hoveredCell, setHoveredCell] = useState<HeatmapData | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set([0, 1, 2, 3])); // 기본 4주 펼침
   const containerRef = useRef<HTMLDivElement>(null);
   const [touchStartX, setTouchStartX] = useState<number>(0);
   const [scrollOffset, setScrollOffset] = useState<number>(0);
+
+  // [SSOT] 업종별 동적 라벨
+  const HEATMAP_TYPE_LABELS: Record<'growth' | 'attendance' | 'students', string> = useMemo(() => ({
+    growth: '성장률',
+    attendance: terms.ATTENDANCE_LABEL + '률',
+    students: `${terms.PERSON_LABEL_PRIMARY} 수`,
+  }), [terms]);
 
   // 주차별 데이터 그룹화 (React Hooks는 조건문 위에서 호출해야 함)
   const weeklyData = useMemo(() => {

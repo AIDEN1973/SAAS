@@ -6,7 +6,7 @@
  * [불변 규칙] api-sdk를 통해서만 데이터 요청
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 
 export interface NotificationTemplate {
@@ -21,6 +21,12 @@ export interface NotificationTemplate {
 export interface NotificationTemplateFilter {
   channel?: 'sms' | 'kakao' | 'email' | 'push';
   name?: string;
+}
+
+export interface CreateNotificationTemplateInput {
+  name: string;
+  channel?: 'sms' | 'kakao' | 'email' | 'push';
+  content: string;
 }
 
 /**
@@ -74,6 +80,39 @@ export function useNotificationTemplates(filter?: NotificationTemplateFilter) {
     queryKey: ['notification-templates', tenantId, filter],
     queryFn: () => fetchNotificationTemplates(tenantId!, filter),
     enabled: !!tenantId,
+  });
+}
+
+/**
+ * 알림 템플릿 생성 Hook
+ */
+export function useCreateNotificationTemplate() {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: CreateNotificationTemplateInput) => {
+      if (!tenantId) throw new Error('tenantId is required');
+
+      const response = await apiClient.post<NotificationTemplate>('notification_templates', {
+        tenant_id: tenantId,
+        name: input.name,
+        channel: input.channel || 'kakao_at', // 알림톡 기본
+        content: input.content,
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      return response.data as NotificationTemplate;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['notification-templates', tenantId],
+      });
+    },
   });
 }
 

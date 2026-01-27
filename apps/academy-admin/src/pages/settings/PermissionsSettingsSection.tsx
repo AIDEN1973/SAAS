@@ -32,8 +32,8 @@ export function PermissionsSettingsSection() {
   const { data: permissions, isLoading } = useRolePermissions();
   const updatePermission = useUpdateRolePermission();
 
-  // 툴팁 표시 상태 (현재 미사용, 향후 툴팁 UI 구현시 활용)
-  const [, setTooltipPageKey] = useState<PagePathKey | null>(null);
+  // 툴팁 표시 상태 (클릭으로 관리)
+  const [tooltipPageKey, setTooltipPageKey] = useState<PagePathKey | null>(null);
 
   const handleTooltipToggle = (key: PagePathKey) => {
     setTooltipPageKey((prev) => (prev === key ? null : key));
@@ -287,30 +287,92 @@ export function PermissionsSettingsSection() {
                   >
                     <td
                       style={{
+                        textAlign: 'center',
                         padding: 'var(--spacing-md)',
                         fontSize: 'var(--font-size-base)',
                         color: 'var(--color-text)',
                         fontWeight: 'var(--font-weight-medium)',
                         borderBottom: isLastRow ? 'none' : 'var(--border-width-thin) solid var(--color-gray-200)',
+                        position: 'relative',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-                        {label}
-                        <button
-                          onClick={() => handleTooltipToggle(key)}
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 'var(--spacing-xs)',
+                        }}
+                      >
+                        <span>{label}</span>
+                        <div
                           style={{
-                            background: 'none',
-                            border: 'none',
+                            position: 'relative',
+                            display: 'inline-flex',
                             cursor: 'pointer',
-                            padding: 0,
-                            display: 'flex',
-                            alignItems: 'center',
-                            color: 'var(--color-text-tertiary)',
                           }}
-                          title={PAGE_DESCRIPTIONS[key]}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTooltipToggle(key);
+                          }}
                         >
-                          <HelpCircle size={14} />
-                        </button>
+                          <HelpCircle
+                            size={14}
+                            style={{
+                              color: 'var(--color-text-secondary)',
+                              opacity: 0.6,
+                            }}
+                          />
+                          {tooltipPageKey === key && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                left: 'calc(100% + var(--spacing-sm))',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                backgroundColor: 'var(--color-white)',
+                                color: 'var(--color-text)',
+                                padding: 'var(--spacing-sm) var(--spacing-md)',
+                                borderRadius: 'var(--border-radius-sm)',
+                                fontSize: 'var(--font-size-sm)',
+                                fontWeight: 'var(--font-weight-normal)',
+                                whiteSpace: 'nowrap',
+                                zIndex: 1000,
+                                boxShadow: 'var(--shadow-lg)',
+                                border: 'var(--border-width-thin) solid var(--color-gray-300)',
+                              }}
+                            >
+                              {/* 삼각형 테두리 (뒤쪽) */}
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  right: '100%',
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  width: 0,
+                                  height: 0,
+                                  borderTop: '6px solid transparent',
+                                  borderBottom: '6px solid transparent',
+                                  borderRight: '6px solid var(--color-gray-300)',
+                                }}
+                              />
+                              {/* 삼각형 내부 (앞쪽) */}
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  right: '100%',
+                                  top: '50%',
+                                  transform: 'translateY(-50%) translateX(1px)',
+                                  width: 0,
+                                  height: 0,
+                                  borderTop: '6px solid transparent',
+                                  borderBottom: '6px solid transparent',
+                                  borderRight: '6px solid var(--color-white)',
+                                }}
+                              />
+                              {PAGE_DESCRIPTIONS[key]}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                     {positions.map((position) => {
@@ -324,11 +386,13 @@ export function PermissionsSettingsSection() {
                             borderBottom: isLastRow ? 'none' : 'var(--border-width-thin) solid var(--color-gray-200)',
                           }}
                         >
-                          <Checkbox
-                            checked={canAccess}
-                            onChange={() => handleTogglePermission(position, path, canAccess)}
-                            disabled={updatePermission.isPending}
-                          />
+                          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                            <Checkbox
+                              checked={canAccess}
+                              onChange={() => handleTogglePermission(position, path, canAccess)}
+                              disabled={updatePermission.isPending}
+                            />
+                          </div>
                         </td>
                       );
                     })}

@@ -7,7 +7,7 @@
  * [불변 규칙] SSOT UI 디자인 준수
  */
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useResponsiveMode, useToast, IconButtonGroup, Card, isMobile, isTablet, useIconSize, useIconStrokeWidth, Drawer, ActionButtonGroup, EmptyState } from '@ui-core/react';
+import { useResponsiveMode, useToast, IconButtonGroup, Card, isMobile, isTablet, useIconSize, useIconStrokeWidth, Drawer, ActionButtonGroup, EmptyState, Button } from '@ui-core/react';
 import { Tag as TagIcon, Pencil, X as XIcon, Save } from 'lucide-react';
 import { SchemaFormWithMethods } from '@schema-engine';
 import { useIndustryTranslations } from '@hooks/use-industry-translations';
@@ -450,33 +450,22 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
                           {allTags.map((tag) => {
                             const isSelected = tempSelectedTagIds.includes(tag.id);
                             return (
-                              <button
+                              <Button
                                 key={tag.id}
                                 type="button"
                                 onClick={() => handleTagToggle(tag.id)}
-                                // [P1-4] 수정 모드에서는 disabled 불필요 (임시 상태만 변경)
+                                variant="outline"
+                                size="sm"
+                                selected={isSelected}
                                 style={{
-                                  padding: 'var(--spacing-sm) var(--spacing-md)',
-                                  fontSize: 'var(--font-size-base)',
-                                  fontWeight: 'var(--font-weight-medium)',
-                                  fontFamily: 'var(--font-family)',
-                                  lineHeight: 'var(--line-height)',
-                                  // 요구사항: 카드 라운드 한 단계 축소 (xl -> lg)
-                                  // 요구사항: 태그배지 라운드 한 단계 증가 (lg -> xl)
                                   borderRadius: 'var(--border-radius-xl)',
                                   border: `var(--border-width-thin) solid ${isSelected ? tag.color : 'var(--color-gray-300)'}`,
                                   color: isSelected ? tag.color : 'var(--color-text-secondary)',
                                   backgroundColor: isSelected ? hexToRgba(tag.color, 0.1) : 'transparent',
-                                  cursor: 'pointer',
-                                  transition: 'var(--transition-all)',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  whiteSpace: 'nowrap',
                                 }}
                               >
                                 {tag.name}
-                              </button>
+                              </Button>
                             );
                           })}
                         </div>
@@ -523,32 +512,22 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
                       {allTags.map((tag) => {
                         const isSelected = tempSelectedTagIds.includes(tag.id);
                         return (
-                          <button
+                          <Button
                             key={tag.id}
                             type="button"
                             onClick={() => handleTagToggle(tag.id)}
+                            variant="outline"
+                            size="sm"
+                            selected={isSelected}
                             style={{
-                              padding: 'var(--spacing-sm) var(--spacing-md)',
-                              fontSize: 'var(--font-size-base)',
-                              fontWeight: 'var(--font-weight-medium)',
-                              fontFamily: 'var(--font-family)',
-                              lineHeight: 'var(--line-height)',
-                              // 요구사항: 카드 라운드 한 단계 축소 (xl -> lg)
-                              // 요구사항: 태그배지 라운드 한 단계 증가 (lg -> xl)
                               borderRadius: 'var(--border-radius-xl)',
                               border: `var(--border-width-thin) solid ${isSelected ? tag.color : 'var(--color-gray-300)'}`,
                               color: isSelected ? tag.color : 'var(--color-text-secondary)',
                               backgroundColor: isSelected ? hexToRgba(tag.color, 0.1) : 'transparent',
-                              cursor: 'pointer',
-                              transition: 'var(--transition-all)',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              whiteSpace: 'nowrap',
                             }}
                           >
                             {tag.name}
-                          </button>
+                          </Button>
                         );
                       })}
                     </div>
@@ -642,28 +621,24 @@ export function TagsTab({ studentTags, isLoading, studentId, onUpdateTags, isEdi
               {allTags
                 .filter((tag) => selectedTagIds.includes(tag.id))
                 .map((tag) => (
-                  <div
+                  <Button
                     key={tag.id}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    selected={true}
+                    onClick={() => {}} // 읽기 모드이므로 클릭 동작 없음
                     style={{
-                      padding: 'var(--spacing-sm) var(--spacing-md)',
-                      fontSize: 'var(--font-size-base)',
-                      fontWeight: 'var(--font-weight-medium)',
-                      fontFamily: 'var(--font-family)',
-                      lineHeight: 'var(--line-height)',
-                      // 요구사항: 카드 라운드 한 단계 축소 (xl -> lg)
-                      // 요구사항: 태그배지 라운드 한 단계 증가 (lg -> xl)
                       borderRadius: 'var(--border-radius-xl)',
                       border: `var(--border-width-thin) solid ${tag.color}`,
                       color: tag.color,
                       backgroundColor: hexToRgba(tag.color, 0.1),
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      whiteSpace: 'nowrap',
+                      cursor: 'default',
+                      pointerEvents: 'none', // 클릭 이벤트 차단
                     }}
                   >
                     {tag.name}
-                  </div>
+                  </Button>
                 ))}
             </div>
           </div>

@@ -24,6 +24,8 @@ import type { TenantRole } from '@core/tenancy';
 import { useCurrentTeacherPosition, useRolePermissions } from '@hooks/use-class';
 import { createSafeNavigate, logError, logWarn, logInfo, getSidebarItemsForRole } from './utils';
 import { maskPII } from '@core/pii-utils';
+import { Agentation } from 'agentation';
+import { ProactiveAlertBanner } from './components/ProactiveAlertBanner';
 
 // 버튼 컴포넌트들은 ./components/navigation에서 import
 
@@ -102,8 +104,12 @@ function AppContent() {
   const handleGlobalSearch = useCallback(async (input: { query: string; entity_types?: string[]; limit?: number }) => {
     const context = getApiContext();
     const tenantId = context?.tenantId;
+
+    console.log('[GlobalSearch] 검색 시작:', { query: input.query, tenantId, entity_types: input.entity_types });
+
     if (!tenantId) {
-      return [];
+      console.error('[GlobalSearch] Tenant ID를 찾을 수 없습니다');
+      throw new Error('Tenant ID를 찾을 수 없습니다. 로그인 상태를 확인해주세요.');
     }
 
     try {
@@ -119,19 +125,23 @@ function AppContent() {
         created_at: string;
       };
 
-      const response = await apiClient.callRPC<GlobalSearchResult[]>('global_search', {
+      const entityTypes = input.entity_types || ['student', 'teacher', 'class', 'guardian', 'consultation', 'announcement', 'tag'];
+      const rpcParams = {
         p_tenant_id: tenantId,
         p_query: input.query,
-        p_entity_types: input.entity_types || ['student', 'teacher', 'class', 'guardian', 'consultation', 'announcement', 'tag'],
+        p_entity_types: entityTypes.join(','),
         p_limit: input.limit || 20,
-      });
+      };
+
+      const response = await apiClient.callRPC<GlobalSearchResult[]>('global_search', rpcParams);
 
       if (!response.success) {
-        console.error('[GlobalSearch] RPC error:', response.error);
-        return [];
+        throw new Error(`검색 실패: ${response.error?.message || '알 수 없는 오류'}`);
       }
 
       const results = response.data || [];
+      console.log('[GlobalSearch] 검색 결과 반환:', results.length, '건');
+
       return results.map((item) => ({
         id: item.id,
         entity_type: item.entity_type as SearchResult['entity_type'],
@@ -141,8 +151,8 @@ function AppContent() {
         created_at: item.created_at,
       }));
     } catch (error) {
-      console.error('[GlobalSearch] Error:', error);
-      return [];
+      console.error('[GlobalSearch] 예외 발생:', error);
+      throw error;
     }
   }, []);
 
@@ -655,6 +665,7 @@ function AppContent() {
               <AppLayout
               header={{
                 title: `디어쌤 ${terms.PERSON_LABEL_PRIMARY}관리`,
+                onTitleClick: () => safeNavigate('/home'),
                 search: {
                   query: globalSearch.query,
                   onQueryChange: globalSearch.setQuery,
@@ -816,7 +827,15 @@ function AppContent() {
 }
 
 function App() {
-  return <AppContent />;
+  return (
+    <>
+      <AppContent />
+      {/* 선제적 알림 배너 (AI 기반) */}
+      <ProactiveAlertBanner />
+      {/* 개발 환경에서만 agentation 활성화 */}
+      {import.meta.env.DEV && <Agentation />}
+    </>
+  );
 }
 
 export default App;

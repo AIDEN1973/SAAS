@@ -1,3 +1,13 @@
 npm run type-check
 npm run test
 
+# 매뉴얼 동기화 검증 (변경된 페이지 감지)
+npm run watch:manual-changes -- --check-only || {
+  echo ""
+  echo "⚠️  매뉴얼 업데이트가 필요합니다."
+  echo "   다음 명령으로 자동 업데이트하세요:"
+  echo "   npm run watch:manual-changes -- --auto-update"
+  echo ""
+  # 경고만 표시하고 푸시는 허용 (CI에서 자동 업데이트됨)
+}
+

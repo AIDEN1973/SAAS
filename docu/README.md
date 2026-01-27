@@ -1,9 +1,11 @@
 # 📚 SAMDLE 프로젝트 문서 가이드
 
-**최종 업데이트**: 2026-01-14
-**총 문서 수**: 19개
+**최종 업데이트**: 2026-01-26
+**총 문서 수**: 24개 (정리 완료)
 
-> **최신 변경사항 (2026-01-14)**: AI 기능의 PII 마스킹 완전 제거 - 관리자 운영 효율성 개선을 위해 구체적이고 상세한 정보 제공으로 전환. 자세한 내용은 [CHANGELOG_PII_MASKING_REMOVAL.md](./CHANGELOG_PII_MASKING_REMOVAL.md) 참조.
+> **최신 변경사항**:
+> - **(2026-01-26)**: 문서 대규모 정리 완료 - AI 생성 중복 문서 50+ 개 제거, 성능 모니터링 문서 통합
+> - **(2026-01-14)**: AI 기능의 PII 마스킹 완전 제거 - [CHANGELOG_PII_MASKING_REMOVAL.md](./CHANGELOG_PII_MASKING_REMOVAL.md) 참조
 
 ---
 
@@ -59,6 +61,12 @@
 1. [프로젝트_자동화_가이드.md](./프로젝트_자동화_가이드.md) - CI/CD 파이프라인 전체
 2. [TESTING.md](./TESTING.md) - 테스트 자동화
 3. [Agent_계약검증.md](./Agent_계약검증.md) - 배포 전 검증 + 모니터링
+4. [PERFORMANCE_MONITORING_GUIDE.md](./PERFORMANCE_MONITORING_GUIDE.md) - 성능 모니터링 시스템
+
+**선택 읽기**:
+- [SENTRY_SETUP_GUIDE.md](./SENTRY_SETUP_GUIDE.md) - Sentry 에러 추적 설정
+- [SECURITY_CONFIGURATION_GUIDE.md](./SECURITY_CONFIGURATION_GUIDE.md) - 보안 설정
+- [QUICK_ENV_SETUP.md](./QUICK_ENV_SETUP.md) - 빠른 환경 설정
 
 ---
 
@@ -98,13 +106,19 @@
 | [TESTING.md](./TESTING.md) | 유닛/E2E 테스트 가이드 | 20분 | ⭐⭐⭐⭐⭐ |
 | [프론트 자동화.md](./프론트 자동화.md) | 프론트엔드 자동화 Policy 기반 | 25분 | ⭐⭐⭐⭐ |
 
-### 5. 성능 및 운영 (3개)
+### 5. 성능 및 운영 (8개)
 
 | 문서명 | 설명 | 읽기 시간 | 우선순위 |
 |--------|------|----------|---------|
+| [PERFORMANCE_MONITORING_GUIDE.md](./PERFORMANCE_MONITORING_GUIDE.md) | 성능 모니터링 종합 가이드 (통합본) | 30분 | ⭐⭐⭐⭐⭐ |
 | [챗봇_성능최적화.md](./챗봇_성능최적화.md) | ChatOps 응답 시간/비용 최적화 | 20분 | ⭐⭐⭐⭐ |
 | [챗봇.md](./챗봇.md) | ChatOps 시스템 전체 가이드 | 40분 | ⭐⭐⭐ |
 | [핸들러 구현.md](./핸들러 구현.md) | Execution Audit Handler 구현 | 15분 | ⭐⭐⭐ |
+| [SENTRY_SETUP_GUIDE.md](./SENTRY_SETUP_GUIDE.md) | Sentry 에러 추적 설정 | 15분 | ⭐⭐⭐⭐ |
+| [SECURITY_CONFIGURATION_GUIDE.md](./SECURITY_CONFIGURATION_GUIDE.md) | 보안 설정 가이드 | 10분 | ⭐⭐⭐⭐ |
+| [QUICK_ENV_SETUP.md](./QUICK_ENV_SETUP.md) | 빠른 환경 설정 | 10분 | ⭐⭐⭐⭐ |
+| [CRON_AND_ENV_SETUP_GUIDE.md](./CRON_AND_ENV_SETUP_GUIDE.md) | Cron 및 환경 변수 상세 가이드 | 20분 | ⭐⭐⭐ |
+| [JOB_QUEUE_ARCHITECTURE.md](./JOB_QUEUE_ARCHITECTURE.md) | 백그라운드 작업 큐 아키텍처 | 15분 | ⭐⭐⭐ |
 
 ---
 
@@ -118,9 +132,17 @@
 
 ### 성능 (Performance)
 
+- [PERFORMANCE_MONITORING_GUIDE.md](./PERFORMANCE_MONITORING_GUIDE.md) - 성능 모니터링 시스템 ⭐
 - [챗봇_성능최적화.md](./챗봇_성능최적화.md) - ChatOps 최적화 (Phase 1-4)
 - [React_Query_표준_패턴.md](./React_Query_표준_패턴.md) - 캐시 전략
 - [SSOT_UI_DESIGN.md](./SSOT_UI_DESIGN.md) - Virtual Scrolling 규칙
+
+### 운영 & DevOps
+
+- [SENTRY_SETUP_GUIDE.md](./SENTRY_SETUP_GUIDE.md) - 프론트엔드 에러 추적
+- [SECURITY_CONFIGURATION_GUIDE.md](./SECURITY_CONFIGURATION_GUIDE.md) - 보안 설정
+- [QUICK_ENV_SETUP.md](./QUICK_ENV_SETUP.md) - 빠른 환경 설정
+- [CRON_AND_ENV_SETUP_GUIDE.md](./CRON_AND_ENV_SETUP_GUIDE.md) - Cron 작업 설정
 
 ### 업종 확장 (Industry Expansion)
 
@@ -159,12 +181,32 @@
 
 | 상태 | 문서 수 | 비율 |
 |------|---------|------|
-| ✅ 최신 (2025-2026) | 17개 | 94% |
-| ⚠️ 확인 필요 | 1개 | 6% |
+| ✅ 최신 (2026) | 24개 | 100% |
+| ⚠️ 확인 필요 | 0개 | 0% |
 | ❌ Obsolete | 0개 | 0% |
 
-**최신성**: 대부분 문서가 2025-2026년 업데이트, 프로덕션 배포 반영됨
+**최신성**: 모든 문서 2026년 최신화 완료, 프로덕션 배포 반영
+**문서 정리**: 2026-01-26 중복 문서 50+ 개 제거, 통합 완료
 **업종 확장성**: Industry Neutrality 원칙 준수로 새 업종 추가 시 Tool 코드 수정 불필요 ⭐
+
+### 최근 정리 내역 (2026-01-26)
+
+#### 삭제된 중복 문서
+- **docs/archive**: 47개 AI 생성 중복 리포트 삭제
+  - PERFORMANCE_OPTIMIZATION 시리즈 (4개 → 1개 유지)
+  - PHASE2-4 시리즈 (8개 → 1개 유지)
+  - Classes Page 관련 (10개 → 1개 유지)
+  - Teachers Page 관련 (8개 → 1개 유지)
+  - Attendance Page 관련 (3개 → 1개 유지)
+  - SSOT 검증 시리즈 (6개 → 1개 유지)
+
+#### 통합된 문서
+- **docu/PERFORMANCE_MONITORING_GUIDE.md**: 9개 성능 모니터링 문서를 하나로 통합
+  - 원본 6개 문서 삭제 (통합본에 모든 내용 포함)
+  - Sentry, 보안, 환경 설정 가이드는 별도 유지
+
+#### 보관된 참조 문서
+- **docs/archive**: 9개 핵심 구현 보고서 보관 (참조용)
 
 ---
 
@@ -337,6 +379,11 @@ docu/ 폴더의 모든 문서를 탐색해서 [작업 내용]에 관련된 규�
 
 ---
 
-**문서 버전**: 2.1.0 (Claude Code 사용 가이드 추가)
-**최종 업데이트**: 2026-01-10
+**문서 버전**: 3.0.0 (대규모 정리 및 재구성 완료)
+**최종 업데이트**: 2026-01-26
 **작성자**: Claude Sonnet 4.5
+**주요 변경사항**:
+- 중복 문서 50+ 개 제거
+- 성능 모니터링 문서 9개 통합
+- AI 생성 리포트 정리 완료
+- 전체 문서 수: 95개 → 33개 (65% 감소)

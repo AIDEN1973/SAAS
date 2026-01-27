@@ -49,6 +49,8 @@ export interface RelatedMenuSection {
   title: string;
   /** 관련 메뉴 아이템 목록 */
   items: SubSidebarMenuItem[];
+  /** 관련 메뉴 아이템 클릭 핸들러 (optional) */
+  onItemClick?: (item: SubSidebarMenuItem) => void;
 }
 
 export interface SubSidebarProps<T extends string = string> {
@@ -641,8 +643,14 @@ export function SubSidebar<T extends string = string>({
               <div ref={relatedMenuInnerRef}>
               {relatedMenus.items.map((relatedItem) => {
                 const handleRelatedItemClick = () => {
+                  // 커스텀 핸들러가 있으면 호출하고 기본 동작 스킵
+                  if (relatedMenus.onItemClick) {
+                    relatedMenus.onItemClick(relatedItem);
+                    return;
+                  }
+
                   if (relatedItem.href) {
-                    // 외부 링크로 이동
+                    // 외부 링크로 이동 (커스텀 핸들러가 없는 경우만)
                     window.location.href = relatedItem.href;
                   }
                 };

@@ -16,7 +16,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ErrorBoundary, useIconSize, useIconStrokeWidth, useToast, Input, Container, Button, RightLayerMenuLayout, SubSidebar, Modal } from '@ui-core/react';
+import { ErrorBoundary, useIconSize, useIconStrokeWidth, useToast, Input, Container, Button, RightLayerMenuLayout, SubSidebar, Modal, useSidebarAdvancedItem } from '@ui-core/react';
 import { Users, UserCheck, UserX, Clock } from 'lucide-react';
 import type { StatsItem, ChartDataItem, PeriodFilter } from '../components/stats';
 import { registerWidget } from '@schema-engine';
@@ -221,6 +221,34 @@ export function StudentsPage() {
   useEffect(() => {
     setSidebarCollapsed(isTabletMode);
   }, [isTabletMode]);
+
+  // 사이드바 Advanced Item 관리를 위한 Context Hook
+  const { setSelectedAdvancedItem } = useSidebarAdvancedItem();
+
+  // 관련 메뉴 클릭 핸들러 - SubSidebar의 관련 메뉴를 클릭하면 Sidebar의 Advanced 메뉴에 추가 후 이동
+  const handleRelatedMenuClick = useCallback((item: typeof STUDENTS_RELATED_MENUS.items[number]) => {
+    // 관련 메뉴 ID를 Advanced 메뉴 ID로 매핑 (예: 'classes' → 'classes-advanced')
+    const advancedMenuIdMap: Record<string, string> = {
+      classes: 'classes-advanced',
+      teachers: 'teachers-advanced',
+      billing: 'billing-advanced',
+      settings: 'settings-advanced',
+    };
+
+    const advancedMenuId = advancedMenuIdMap[item.id];
+    if (advancedMenuId && item.href) {
+      // Advanced menu item 구성 (Sidebar에 표시될 정보)
+      // Note: item.icon은 createElement로 생성된 ReactElement이므로 타입 단언 안전
+      setSelectedAdvancedItem({
+        id: advancedMenuId,
+        label: item.label,
+        path: item.href,
+        icon: item.icon as React.ReactElement | undefined,
+      });
+      // React Router로 페이지 이동
+      navigate(item.href);
+    }
+  }, [setSelectedAdvancedItem, navigate]);
 
   // 서브메뉴 변경 핸들러 (useStudentPage 훅 다음에 선언하여 setShowCreateForm 사용 가능)
   const handleSubMenuChange = useCallback((id: StudentsSubMenuId) => {
@@ -762,7 +790,10 @@ export function StudentsPage() {
           items={subMenuItemsWithDynamicLabels}
           selectedId={selectedSubMenu}
           onSelect={handleSubMenuChange}
-          relatedMenus={STUDENTS_RELATED_MENUS}
+          relatedMenus={{
+            ...STUDENTS_RELATED_MENUS,
+            onItemClick: handleRelatedMenuClick,
+          }}
           collapsed={sidebarCollapsed}
           onCollapsedChange={setSidebarCollapsed}
           testId="students-sub-sidebar"

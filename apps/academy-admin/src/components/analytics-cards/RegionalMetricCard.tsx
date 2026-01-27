@@ -4,10 +4,13 @@
  * 지역 통계 메트릭 카드 (Phase 1-3 전체 메트릭 지원)
  * [불변 규칙] UI Core Component (NotificationCardLayout) 사용
  * [불변 규칙] SSOT 원칙 준수: 렌더링 로직은 이 컴포넌트에만 존재
+ * [SSOT] useIndustryTerms로 동적 라벨 사용
  */
 
+import { useMemo } from 'react';
 import { Users, DollarSign, ClipboardCheck, TrendingUp, UserPlus, Wallet, Target, AlertCircle, UserMinus, Clock, UserX } from 'lucide-react';
 import { NotificationCardLayout } from '@ui-core/react';
+import { useIndustryTerms } from '@hooks/use-industry-terms';
 
 export interface RegionalStats {
   region: string;
@@ -44,22 +47,24 @@ export interface RegionalMetricCardProps {
   metricValue: number;
 }
 
-const metricLabels: Record<MetricType, string> = {
-  students: '학생 수',
-  revenue: '매출',
-  attendance: '출석률',
-  growth: '성장률',
-  new_enrollments: '신규 등록',
-  arpu: 'ARPU',
-  capacity_rate: '정원률',
-  overdue_rate: '미납률',
-  churn_rate: '퇴원율',
-  late_rate: '지각률',
-  absent_rate: '결석률',
-};
-
 export function RegionalMetricCard({ metric, regionalStats, selectedMetric, onSelect, metricValue }: RegionalMetricCardProps) {
+  const terms = useIndustryTerms();
   const isSelected = selectedMetric === metric;
+
+  // [SSOT] 업종별 동적 라벨
+  const metricLabels: Record<MetricType, string> = useMemo(() => ({
+    students: `${terms.PERSON_LABEL_PRIMARY} 수`,
+    revenue: '매출',
+    attendance: `${terms.ATTENDANCE_LABEL}률`,
+    growth: '성장률',
+    new_enrollments: '신규 등록',
+    arpu: 'ARPU',
+    capacity_rate: '정원률',
+    overdue_rate: '미납률',
+    churn_rate: '퇴원율',
+    late_rate: `${terms.LATE_LABEL}률`,
+    absent_rate: `${terms.ABSENCE_LABEL}률`,
+  }), [terms]);
 
   // 값 포맷팅 - 각 메트릭의 독립적인 값을 항상 표시
   const formatValue = (): string => {

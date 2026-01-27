@@ -35,17 +35,24 @@
     "setup:env": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-env.ps1",
     "check:shared-catalog": "tsx scripts/check-shared-catalog.ts",
     "verify:catalog-sync": "tsx scripts/verify-catalog-sync.ts",
+    "verify:manual-sync": "tsx scripts/verify-manual-sync.ts",
     "scan:todos": "tsx scripts/scan-todos.ts",
     "test:chatops-intents": "tsx scripts/test-chatops-all-intents.ts",
     "gen:intent-examples": "tsx scripts/generate-intent-examples.ts",
+    "gen:manual-draft": "tsx scripts/generate-manual-draft.ts",
+    "gen:manual-changelog": "tsx scripts/generate-manual-changelog.ts",
+    "capture:manual-screenshots": "tsx scripts/capture-manual-screenshots.ts",
+    "auto:manual-update": "tsx scripts/auto-update-manual.ts",
+    "watch:manual-changes": "tsx scripts/watch-manual-changes.ts",
     "test:db-contract": "tsx scripts/test-db-contract.ts",
-    "ci:local": "npm run verify:catalog-sync && npm run test:db-contract && npm run scan:todos && npm run lint && npm run type-check && npm run test:unit && npm run build",
-    "ci:local:quick": "npm run verify:catalog-sync && npm run test:db-contract && npm run scan:todos && npm run lint && npm run type-check && npm run test:unit",
+    "ci:local": "npm run verify:catalog-sync && npm run verify:manual-sync && npm run test:db-contract && npm run scan:todos && npm run lint && npm run type-check && npm run test:unit && npm run build",
+    "ci:local:quick": "npm run verify:catalog-sync && npm run verify:manual-sync && npm run test:db-contract && npm run scan:todos && npm run lint && npm run type-check && npm run test:unit",
     "ci:local:full": "npm run ci:local:quick && npm run build && npm run test:e2e",
     "prepare": "node -e \"try { if (!process.env.CI && !process.env.VERCEL && require('fs').existsSync('node_modules/husky')) { require('husky').install(); } } catch(e) {}\" || true"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
+    "@supabase/mcp-server-supabase": "^0.6.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
@@ -73,6 +80,7 @@
   "dependencies": {
     "@sentry/react": "^10.34.0",
     "@supabase/supabase-js": "^2.39.0",
+    "agentation": "^1.3.2",
     "turbo": "^2.7.3"
   }
 }

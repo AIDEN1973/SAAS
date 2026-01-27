@@ -153,9 +153,9 @@ export function StatsDashboard({
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(CHART_VISIBLE_KEY);
       console.log('[StatsDashboard] Chart visibility from localStorage:', saved);
-      if (saved === 'false') return false;
+      if (saved === 'true') return true;
     }
-    return true;
+    return false;
   });
 
   console.log('[StatsDashboard] Current showChart state:', showChart);

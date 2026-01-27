@@ -51,6 +51,7 @@ import {
   BookOpen,
   MessageSquare,
   Activity,
+  Tag,
 } from 'lucide-react';
 
 /** 아이콘 크기 (CSS 변수 참조) */
@@ -134,17 +135,17 @@ export function getDynamicMenuLabel(
     primary_management: `${terms.PERSON_LABEL_PRIMARY}관리`,
     // 보조 대상 관련
     secondary_list: `${terms.PERSON_LABEL_SECONDARY}목록`,
-    secondary_add: `${terms.PERSON_LABEL_SECONDARY} 등록`,
+    secondary_add: `${terms.PERSON_LABEL_SECONDARY}등록`,
     secondary_statistics: `${terms.PERSON_LABEL_SECONDARY}통계`,
     secondary_assignments: `담당과목`,
     secondary_performance: `${terms.PERSON_LABEL_SECONDARY}성과`,
     secondary_management: `${terms.PERSON_LABEL_SECONDARY}관리`,
     // 그룹 관련
-    group_list: `${terms.GROUP_LABEL} 목록`,
-    group_add: `${terms.GROUP_LABEL} 등록`,
-    group_calendar: `${terms.GROUP_LABEL} 편성표`,
-    group_statistics: `${terms.GROUP_LABEL} 통계`,
-    group_conflicts: `일정 충돌`,
+    group_list: `${terms.GROUP_LABEL}목록`,
+    group_add: `${terms.GROUP_LABEL}등록`,
+    group_calendar: `${terms.GROUP_LABEL}편성표`,
+    group_statistics: `${terms.GROUP_LABEL}통계`,
+    group_conflicts: `일정충돌`,
     group_management: `${terms.GROUP_LABEL}관리`,
     group_assignment: `${terms.GROUP_LABEL}배정`,
     // 상담/태그 관련
@@ -501,6 +502,7 @@ export type NotificationsSubMenuId =
   | 'send'
   | 'templates'
   | 'bulk'
+  | 'tag-filter'
   | 'auto-settings';
 
 /** 문자발송 페이지 서브 메뉴 설정 */
@@ -509,6 +511,7 @@ export const NOTIFICATIONS_SUB_MENU_ITEMS: SubSidebarMenuItem<NotificationsSubMe
   { id: 'send', label: '문자 발송', icon: createElement(Send, { size: ICON_SIZE }), ariaLabel: '문자 발송 화면으로 이동' },
   { id: 'templates', label: '템플릿 관리', icon: createElement(FileText, { size: ICON_SIZE }), ariaLabel: '템플릿 관리 화면으로 이동' },
   { id: 'bulk', label: '단체/예약 발송', icon: createElement(Calendar, { size: ICON_SIZE }), ariaLabel: '단체/예약 발송 화면으로 이동' },
+  { id: 'tag-filter', label: '태그 필터 발송', icon: createElement(Tag, { size: ICON_SIZE }), ariaLabel: '태그 필터 발송 화면으로 이동' },
   { id: 'auto-settings', label: '자동 알림 설정', icon: createElement(Bell, { size: ICON_SIZE }), ariaLabel: '자동 알림 설정 화면으로 이동' },
 ];
 
@@ -575,9 +578,9 @@ export type AISubMenuId =
 /** 인공지능 페이지 서브 메뉴 설정 */
 export const AI_SUB_MENU_ITEMS: SubSidebarMenuItem<AISubMenuId>[] = [
   { id: 'insights', label: 'AI 인사이트', icon: createElement(Brain, { size: ICON_SIZE }), ariaLabel: 'AI 인사이트 화면으로 이동' },
-  { id: 'consultation-summary', label: '상담 요약', icon: createElement(MessageSquare, { size: ICON_SIZE }), ariaLabel: '상담 요약 화면으로 이동' },
-  { id: 'anomaly-detection', label: '이상 탐지', icon: createElement(AlertTriangle, { size: ICON_SIZE }), ariaLabel: '이상 탐지 화면으로 이동' },
-  { id: 'performance', label: '성과 분석', icon: createElement(Award, { size: ICON_SIZE }), ariaLabel: '성과 분석 화면으로 이동' },
+  { id: 'consultation-summary', label: '상담요약', icon: createElement(MessageSquare, { size: ICON_SIZE }), ariaLabel: '상담 요약 화면으로 이동' },
+  { id: 'anomaly-detection', label: '이상탐지', icon: createElement(AlertTriangle, { size: ICON_SIZE }), ariaLabel: '이상 탐지 화면으로 이동' },
+  { id: 'performance', label: '성과분석', icon: createElement(Award, { size: ICON_SIZE }), ariaLabel: '성과 분석 화면으로 이동' },
   { id: 'briefing', label: '브리핑', icon: createElement(Briefcase, { size: ICON_SIZE }), ariaLabel: '브리핑 화면으로 이동' },
 ];
 
@@ -597,10 +600,10 @@ export type ClassesSubMenuId =
 
 /** 수업관리 페이지 서브 메뉴 설정 */
 export const CLASSES_SUB_MENU_ITEMS: SubSidebarMenuItem<ClassesSubMenuId>[] = [
-  { id: 'list', label: '수업 목록', icon: createElement(List, { size: ICON_SIZE }), ariaLabel: '수업 목록 화면으로 이동' },
-  { id: 'calendar', label: '수업 편성표', icon: createElement(CalendarDays, { size: ICON_SIZE }), ariaLabel: '수업 편성표 화면으로 이동' },
-  { id: 'statistics', label: '수업 통계', icon: createElement(BarChart3, { size: ICON_SIZE }), ariaLabel: '수업 통계 화면으로 이동' },
-  { id: 'schedule-conflicts', label: '일정 충돌', icon: createElement(AlertCircle, { size: ICON_SIZE }), ariaLabel: '일정 충돌 화면으로 이동' },
+  { id: 'list', label: '수업목록', icon: createElement(List, { size: ICON_SIZE }), ariaLabel: '수업 목록 화면으로 이동' },
+  { id: 'calendar', label: '수업편성표', icon: createElement(CalendarDays, { size: ICON_SIZE }), ariaLabel: '수업 편성표 화면으로 이동' },
+  { id: 'statistics', label: '수업통계', icon: createElement(BarChart3, { size: ICON_SIZE }), ariaLabel: '수업 통계 화면으로 이동' },
+  { id: 'schedule-conflicts', label: '일정충돌', icon: createElement(AlertCircle, { size: ICON_SIZE }), ariaLabel: '일정 충돌 화면으로 이동' },
 ];
 
 /** 기본 수업관리 서브 메뉴 ID */
@@ -710,9 +713,9 @@ export type BillingSubMenuId =
 /** 수납관리 페이지 서브 메뉴 설정 */
 export const BILLING_SUB_MENU_ITEMS: SubSidebarMenuItem<BillingSubMenuId>[] = [
   { id: 'invoices', label: '청구서 관리', icon: createElement(Receipt, { size: ICON_SIZE }), ariaLabel: '청구서 관리 화면으로 이동' },
-  { id: 'payments', label: '결제 내역', icon: createElement(CircleDollarSign, { size: ICON_SIZE }), ariaLabel: '결제 내역 화면으로 이동' },
-  { id: 'products', label: '상품 관리', icon: createElement(List, { size: ICON_SIZE }), ariaLabel: '상품 관리 화면으로 이동' },
-  { id: 'settings', label: '수납 설정', icon: createElement(Cog, { size: ICON_SIZE }), ariaLabel: '수납 설정 화면으로 이동' },
+  { id: 'payments', label: '결제내역', icon: createElement(CircleDollarSign, { size: ICON_SIZE }), ariaLabel: '결제내역 화면으로 이동' },
+  { id: 'products', label: '상품관리', icon: createElement(List, { size: ICON_SIZE }), ariaLabel: '상품관리 화면으로 이동' },
+  { id: 'settings', label: '수납설정', icon: createElement(Cog, { size: ICON_SIZE }), ariaLabel: '수납설정 화면으로 이동' },
 ];
 
 /** 기본 수납관리 서브 메뉴 ID */

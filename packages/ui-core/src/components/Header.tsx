@@ -53,6 +53,8 @@ export interface HeaderProps {
   userProfile?: UserProfile;
   onLogout?: () => void;
   onSettings?: () => void;
+  /** 제목 클릭 핸들러 (예: 홈으로 이동) */
+  onTitleClick?: () => void;
   /** 글로벌 검색 props (전달 시 검색창 활성화) */
   search?: HeaderSearchProps;
 }
@@ -66,6 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
   userProfile,
   onLogout,
   onSettings,
+  onTitleClick,
   search,
 }) => {
   const mode = useResponsiveMode();
@@ -140,12 +143,25 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
         <h1
+          onClick={onTitleClick}
           style={{
             fontWeight: 'var(--font-weight-bold)',
             fontSize: 'var(--font-size-xl)',
             color: 'var(--color-text)',
             margin: 0,
             letterSpacing: 'var(--letter-spacing-title)', // styles.css 준수: 타이틀 글자 간격 토큰 사용
+            cursor: onTitleClick ? 'pointer' : 'default',
+            transition: 'var(--transition-all)',
+          }}
+          onMouseEnter={(e) => {
+            if (onTitleClick) {
+              e.currentTarget.style.color = 'var(--color-primary)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (onTitleClick) {
+              e.currentTarget.style.color = 'var(--color-text)';
+            }
           }}
         >
           {title}

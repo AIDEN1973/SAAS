@@ -66,13 +66,15 @@ export const POLICY_KEY_V2_CATEGORIES: Record<
 export interface AutomationEventCriteriaField {
   field: string;
   label: string;
-  type: 'number' | 'string' | 'select' | 'boolean';
+  type: 'number' | 'string' | 'select' | 'boolean' | 'filter_tags';
   policyPath: string;
   options?: Array<{ value: string | number; label: string }>;
   min?: number;
   max?: number;
   /** 기본값 (Policy가 없을 때 UI에 표시할 값) */
-  defaultValue?: string | number | boolean;
+  defaultValue?: string | number | boolean | string[];
+  /** 다중 선택 가능 여부 (filter_tags 타입에서 사용) */
+  multiple?: boolean;
 }
 
 export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
@@ -107,6 +109,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       policyPath: 'auto_notification.payment_due_reminder.days_before_second',
       min: 1,
       defaultValue: 1,
+    },
+    {
+      field: 'filter_tag_ids',
+      label: '추가 필터 태그 (선택)',
+      type: 'filter_tags',
+      policyPath: 'auto_notification.payment_due_reminder.filter_tag_ids',
+      multiple: true,
+      defaultValue: [],
     },
   ],
   invoice_partial_balance: [
@@ -174,6 +184,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       policyPath: 'auto_notification.overdue_outstanding_over_limit.limit_amount',
       min: 0,
       defaultValue: 500000,
+    },
+    {
+      field: 'filter_tag_ids',
+      label: '추가 필터 태그 (선택)',
+      type: 'filter_tags',
+      policyPath: 'auto_notification.overdue_outstanding_over_limit.filter_tag_ids',
+      multiple: true,
+      defaultValue: [],
     },
   ],
   revenue_required_per_day: [
@@ -367,6 +385,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       min: 1,
       defaultValue: 30,
     },
+    {
+      field: 'filter_tag_ids',
+      label: '추가 필터 태그 (선택)',
+      type: 'filter_tags',
+      policyPath: 'auto_notification.class_reminder_today.filter_tag_ids',
+      multiple: true,
+      defaultValue: [],
+    },
   ],
   class_schedule_tomorrow: [
     {
@@ -476,6 +502,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       policyPath: 'auto_notification.ai_suggest_churn_focus.require_approval',
       defaultValue: true,
     },
+    {
+      field: 'filter_tag_ids',
+      label: '추가 필터 태그 (선택)',
+      type: 'filter_tags',
+      policyPath: 'auto_notification.ai_suggest_churn_focus.filter_tag_ids',
+      multiple: true,
+      defaultValue: [],
+    },
   ],
   attendance_rate_drop_weekly: [
     {
@@ -521,6 +555,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       ],
       defaultValue: 'kakao_at',
     },
+    {
+      field: 'filter_tag_ids',
+      label: '추가 필터 태그 (선택)',
+      type: 'filter_tags',
+      policyPath: 'auto_notification.risk_students_weekly_kpi.filter_tag_ids',
+      multiple: true,
+      defaultValue: [],
+    },
   ],
 
   // growth_marketing (6)
@@ -564,6 +606,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       policyPath: 'auto_notification.birthday_greeting.require_approval',
       defaultValue: true,
     },
+    {
+      field: 'filter_tag_ids',
+      label: '추가 필터 태그 (선택)',
+      type: 'filter_tags',
+      policyPath: 'auto_notification.birthday_greeting.filter_tag_ids',
+      multiple: true,
+      defaultValue: [],
+    },
   ],
   enrollment_anniversary: [
     {
@@ -583,6 +633,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'boolean',
       policyPath: 'auto_notification.enrollment_anniversary.require_approval',
       defaultValue: true,
+    },
+    {
+      field: 'filter_tag_ids',
+      label: '추가 필터 태그 (선택)',
+      type: 'filter_tags',
+      policyPath: 'auto_notification.enrollment_anniversary.filter_tag_ids',
+      multiple: true,
+      defaultValue: [],
     },
   ],
   regional_underperformance: [
@@ -821,6 +879,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       policyPath: 'auto_notification.student_onboarding_message.require_approval',
       defaultValue: false,
     },
+    {
+      field: 'filter_tag_ids',
+      label: '추가 필터 태그 (선택)',
+      type: 'filter_tags',
+      policyPath: 'auto_notification.student_onboarding_message.filter_tag_ids',
+      multiple: true,
+      defaultValue: [],
+    },
   ],
   bulk_message_send: [
     {
@@ -848,6 +914,14 @@ export const AUTOMATION_EVENT_CRITERIA_FIELDS: Record<
       type: 'boolean',
       policyPath: 'auto_notification.bulk_message_send.require_approval',
       defaultValue: true,
+    },
+    {
+      field: 'filter_tag_ids',
+      label: '추가 필터 태그 (선택)',
+      type: 'filter_tags',
+      policyPath: 'auto_notification.bulk_message_send.filter_tag_ids',
+      multiple: true,
+      defaultValue: [],
     },
   ],
   message_approval_workflow: [

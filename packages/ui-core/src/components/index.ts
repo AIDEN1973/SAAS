@@ -34,7 +34,7 @@ export type { HeaderProps, UserProfile, HeaderSearchProps } from './Header';
 export { Sidebar } from './Sidebar';
 export type { SidebarProps, SidebarItem } from './Sidebar';
 
-export { AppLayout } from './AppLayout';
+export { AppLayout, useSidebarAdvancedItem } from './AppLayout';
 export type { AppLayoutProps } from './AppLayout';
 
 // AppShellLayout은 AppLayout의 별칭 (문서 호환성)

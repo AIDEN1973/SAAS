@@ -12,5 +12,8 @@
 // 타입만 export (클라이언트에서도 사용 가능, 서버 코드는 포함하지 않음)
 export * from './types';
 
+// 필터 조건 카탈로그 (클라이언트에서도 사용 가능)
+export * from './filter-condition-catalog';
+
 // 서버 전용 코드는 이 index.ts에서 export하지 않습니다.
 // 서버에서는 직접 import: import { notificationService } from '@core/notification/service'

@@ -6,11 +6,27 @@
  * [불변 규칙] 반응형 Mobile에서 Drawer, Desktop에서 Persistent Sidebar
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import { clsx } from 'clsx';
 import { useResponsiveMode } from '../hooks/useResponsiveMode';
 import { Header, HeaderProps } from './Header';
 import { Sidebar, SidebarItem } from './Sidebar';
+
+// Sidebar Advanced Item 선택을 위한 Context
+interface SidebarAdvancedItemContextType {
+  selectedAdvancedItem: SidebarItem | null;
+  setSelectedAdvancedItem: (item: SidebarItem | null) => void;
+}
+
+const SidebarAdvancedItemContext = createContext<SidebarAdvancedItemContextType | null>(null);
+
+export const useSidebarAdvancedItem = () => {
+  const context = useContext(SidebarAdvancedItemContext);
+  if (!context) {
+    throw new Error('useSidebarAdvancedItem must be used within AppLayout');
+  }
+  return context;
+};
 
 export interface AppLayoutProps {
   header?: HeaderProps;
@@ -35,6 +51,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   const isDesktop = mode === 'lg' || mode === 'xl';
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [, setSidebarCollapsed] = useState(isTablet); // 태블릿 모드에서는 자동으로 축소
+  const [selectedAdvancedItem, setSelectedAdvancedItem] = useState<SidebarItem | null>(null);
 
   // 반응형 모드 변경 시 사이드바 상태 자동 조정
   useEffect(() => {
@@ -48,75 +65,79 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   }, [isTablet, isDesktop]);
 
   return (
-    <div
-      className={clsx(className)}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        overflow: 'hidden',
-        backgroundColor: 'var(--color-background)',
-      }}
-    >
-      {/* Header */}
-      {header && (
-        <Header
-          {...header}
-          onMenuClick={isMobile && sidebar ? () => setSidebarOpen(true) : undefined}
-        />
-      )}
+    <SidebarAdvancedItemContext.Provider value={{ selectedAdvancedItem, setSelectedAdvancedItem }}>
+      <div
+        className={clsx(className)}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100vh',
+          overflow: 'hidden',
+          backgroundColor: 'var(--color-background)',
+        }}
+      >
+        {/* Header */}
+        {header && (
+          <Header
+            {...header}
+            onMenuClick={isMobile && sidebar ? () => setSidebarOpen(true) : undefined}
+          />
+        )}
 
-      {/* 에이전트 모드 전용 라우트(/agent)이거나 에이전트가 열린 경우 children 그대로 렌더링 */}
-      {/* /agent 라우트는 AgentPage에서 AgentModeContainer를 직접 렌더링 */}
-      {sidebar?.currentPath === '/agent' ? (
-        // 에이전트 전용 라우트: children(AgentPage)을 그대로 렌더링
-        <div
-          style={{
-            display: 'flex',
-            flex: 1,
-            overflow: 'hidden',
-          }}
-        >
-          {children}
-        </div>
-      ) : (
-        // 일반 모드 (기존 레이아웃)
-        <div
-          style={{
-            display: 'flex',
-            flex: 1,
-            overflow: 'hidden',
-            position: 'relative',
-          }}
-        >
-          {/* Sidebar */}
-          {sidebar && (
-            <Sidebar
-              items={sidebar.items}
-              currentPath={sidebar.currentPath}
-              onItemClick={sidebar.onItemClick}
-              isOpen={sidebarOpen}
-              onClose={() => setSidebarOpen(false)}
-            />
-          )}
-
-          {/* Content */}
-          <main
+        {/* 에이전트 모드 전용 라우트(/agent)이거나 에이전트가 열린 경우 children 그대로 렌더링 */}
+        {/* /agent 라우트는 AgentPage에서 AgentModeContainer를 직접 렌더링 */}
+        {sidebar?.currentPath === '/agent' ? (
+          // 에이전트 전용 라우트: children(AgentPage)을 그대로 렌더링
+          <div
             style={{
+              display: 'flex',
               flex: 1,
-              overflowY: 'scroll', // 스크롤바 항상 표시하여 페이지별 콘텐츠 너비 일관성 보장
-              overflowX: 'hidden',
-              backgroundColor: 'var(--color-background)',
-              // padding은 각 페이지의 Container 컴포넌트에서 처리 (이중 padding 방지)
-              padding: 0,
-              transition: 'var(--transition-all)',
+              overflow: 'hidden',
             }}
           >
             {children}
-          </main>
-        </div>
-      )}
-    </div>
+          </div>
+        ) : (
+          // 일반 모드 (기존 레이아웃)
+          <div
+            style={{
+              display: 'flex',
+              flex: 1,
+              overflow: 'hidden',
+              position: 'relative',
+            }}
+          >
+            {/* Sidebar */}
+            {sidebar && (
+              <Sidebar
+                items={sidebar.items}
+                currentPath={sidebar.currentPath}
+                onItemClick={sidebar.onItemClick}
+                isOpen={sidebarOpen}
+                onClose={() => setSidebarOpen(false)}
+                selectedAdvancedItem={selectedAdvancedItem}
+                onAdvancedItemSelect={setSelectedAdvancedItem}
+              />
+            )}
+
+            {/* Content */}
+            <main
+              style={{
+                flex: 1,
+                overflowY: 'scroll', // 스크롤바 항상 표시하여 페이지별 콘텐츠 너비 일관성 보장
+                overflowX: 'hidden',
+                backgroundColor: 'var(--color-background)',
+                // padding은 각 페이지의 Container 컴포넌트에서 처리 (이중 padding 방지)
+                padding: 0,
+                transition: 'var(--transition-all)',
+              }}
+            >
+              {children}
+            </main>
+          </div>
+        )}
+      </div>
+    </SidebarAdvancedItemContext.Provider>
   );
 };
 

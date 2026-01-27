@@ -304,7 +304,7 @@ export function BillingPage() {
         {/* 서브 사이드바 (모바일에서는 숨김, 태블릿에서는 축소) */}
         {!isMobileMode && (
           <SubSidebar
-            title={`${terms.BILLING_LABEL} 관리`}
+            title={`${terms.BILLING_LABEL}관리`}
             items={BILLING_SUB_MENU_ITEMS}
             selectedId={selectedSubMenu}
             onSelect={handleSubMenuChange}
@@ -317,7 +317,7 @@ export function BillingPage() {
         {/* 메인 콘텐츠 */}
         <Container maxWidth="xl" padding="lg" style={{ flex: 1 }}>
           <PageHeader
-            title={BILLING_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu)?.label || `${terms.BILLING_LABEL} 관리`}
+            title={BILLING_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu)?.label || `${terms.BILLING_LABEL}관리`}
           />
 
           {/* 인보이스 탭 */}
@@ -516,7 +516,7 @@ export function BillingPage() {
                   fontWeight: 'var(--font-weight-semibold)',
                   marginBottom: 'var(--spacing-md)',
                 }}>
-                  수납 현황
+                  수납현황
                 </h3>
                 <div style={{ display: 'flex', gap: 'var(--spacing-xl)', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: '200px' }}>
@@ -553,7 +553,7 @@ export function BillingPage() {
                   fontWeight: 'var(--font-weight-semibold)',
                   marginBottom: 'var(--spacing-md)',
                 }}>
-                  최근 결제 내역
+                  최근 결제내역
                 </h3>
                 {paymentsLoading ? (
                   <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)', color: 'var(--color-text-secondary)' }}>
@@ -606,7 +606,7 @@ export function BillingPage() {
                     fontSize: 'var(--font-size-lg)',
                     fontWeight: 'var(--font-weight-semibold)',
                   }}>
-                    상품 목록
+                    상품목록
                   </h3>
                   <Button
                     variant="solid"
@@ -660,7 +660,7 @@ export function BillingPage() {
                   fontWeight: 'var(--font-weight-semibold)',
                   marginBottom: 'var(--spacing-md)',
                 }}>
-                  상품 유형 안내
+                  상품유형안내
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-md)' }}>
                   <div style={{ padding: 'var(--spacing-md)', backgroundColor: 'var(--color-blue-50)', borderRadius: 'var(--border-radius-md)' }}>
@@ -706,7 +706,7 @@ export function BillingPage() {
                   gap: 'var(--spacing-sm)',
                 }}>
                   <Clock size={20} />
-                  자동 청구 설정
+                  자동청구설정
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
                   <div style={{
@@ -755,7 +755,7 @@ export function BillingPage() {
                   gap: 'var(--spacing-sm)',
                 }}>
                   <AlertCircle size={20} />
-                  미납 관리 설정
+                  미납관리설정
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
                   <div style={{

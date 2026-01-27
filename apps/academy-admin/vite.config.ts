@@ -338,6 +338,7 @@ export default defineConfig(({ mode }) => {
       { find: '@core/party/service', replacement: path.resolve(__dirname, '../../packages/core/core-party/src/service.ts') },
       { find: '@core/party', replacement: path.resolve(__dirname, '../../packages/core/core-party/src') },
       { find: '@core/schema-registry', replacement: path.resolve(__dirname, '../../packages/core/core-schema-registry/src') },
+      { find: '@core/notification', replacement: path.resolve(__dirname, '../../packages/core/core-notification/src') },
       { find: '@env-registry', replacement: path.resolve(__dirname, '../../packages/env-registry/src') },
       { find: '@lib', replacement: path.resolve(__dirname, '../../packages/lib') },
       { find: '@design-system/core', replacement: path.resolve(__dirname, '../../packages/design-system/src') },

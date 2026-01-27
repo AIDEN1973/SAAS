@@ -588,13 +588,16 @@ export class ApiClient {
 
   /**
    * PostgREST가 View를 수정하지 못하는 경우 사용
+   *
+   * [주의] PostgreSQL 배열 파라미터는 자동으로 배열 리터럴 형식으로 변환됩니다.
+   * 예: ['a', 'b'] → '{a,b}'
    */
   async callRPC<T = unknown>(
     functionName: string,
     params?: Record<string, unknown>
   ): Promise<ApiResponse<T>> {
     try {
-      const { data, error } = await this.supabase.rpc(functionName, params || {});
+      const { data, error } = await this.supabase.rpc(functionName, params);
 
       if (error) {
         return {

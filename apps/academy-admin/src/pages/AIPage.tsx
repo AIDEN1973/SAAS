@@ -579,11 +579,11 @@ export function AIPage() {
                     if (aiInsights?.attendanceAnomalies && aiInsights.attendanceAnomalies.length > 0) {
                       setShowAttendanceDetail(true);
                     } else {
-                      showAlert(`${terms.ABSENCE_LABEL} 이상 탐지 데이터가 없습니다.\nAI 분석이 완료되면 결과를 확인할 수 있습니다.`, '알림');
+                      showAlert(`${terms.ABSENCE_LABEL}이상탐지 데이터가 없습니다.\nAI 분석이 완료되면 결과를 확인할 수 있습니다.`, '알림');
                     }
                   }}
                 >
-                  {terms.ABSENCE_LABEL} 이상 탐지
+                  {terms.ABSENCE_LABEL}이상탐지
                 </Button>
                 <Button
                   variant="outline"
@@ -593,11 +593,11 @@ export function AIPage() {
                     if (aiInsights?.performanceAnalysis && aiInsights.performanceAnalysis.length > 0) {
                       setShowPerformanceDetail(true);
                     } else {
-                      showAlert('성과 분석 데이터가 없습니다.\n"월간 리포트 생성" 버튼을 클릭하여 AI 분석을 실행하세요.', '알림');
+                      showAlert('성과분석 데이터가 없습니다.\n"월간 리포트 생성" 버튼을 클릭하여 AI 분석을 실행하세요.', '알림');
                     }
                   }}
                 >
-                  성과 분석
+                  성과분석
                 </Button>
                 <Button
                   variant="outline"
@@ -766,7 +766,7 @@ export function AIPage() {
                     </div>
                   )}
 
-                  {/* 출결 이상 탐지 요약 카드 - 아키텍처 문서 3.7.1: 인원 출결 이상 탐지 */}
+                  {/* 출결 이상탐지 요약 카드 - 아키텍처 문서 3.7.1: 인원 출결 이상 탐지 */}
                   {aiInsights.attendanceAnomalies && aiInsights.attendanceAnomalies.length > 0 && (
                     <div id="attendance-card">
                       <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)', cursor: 'pointer' }} onClick={() => {
@@ -774,7 +774,7 @@ export function AIPage() {
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
                           <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
-                            {terms.ABSENCE_LABEL} 이상 탐지
+                            {terms.ABSENCE_LABEL}이상탐지
                           </h2>
                         </div>
                         <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
@@ -799,7 +799,7 @@ export function AIPage() {
                     </div>
                   )}
 
-                  {/* 그룹/과목 성과 분석 요약 카드 - 아키텍처 문서 3.7.1: 그룹/과목 성과 분석 */}
+                  {/* 그룹/과목 성과분석 요약 카드 - 아키텍처 문서 3.7.1: 그룹/과목 성과 분석 */}
                   {aiInsights.performanceAnalysis && aiInsights.performanceAnalysis.length > 0 && (
                     <div id="performance-card">
                       <Card padding="lg" style={{ marginBottom: 'var(--spacing-xl)', cursor: 'pointer' }} onClick={() => {
@@ -807,7 +807,7 @@ export function AIPage() {
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
                           <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
-                            {terms.GROUP_LABEL}/{terms.SUBJECT_LABEL} 성과 분석
+                            {terms.GROUP_LABEL}/{terms.SUBJECT_LABEL}성과분석
                           </h2>
                         </div>
                         <p style={{ color: 'var(--color-text)', marginBottom: 'var(--spacing-sm)' }}>
@@ -1129,18 +1129,18 @@ export function AIPage() {
                 </>
               )}
 
-              {/* 상담 요약 탭 */}
+              {/* 상담요약 탭 */}
               {selectedSubMenu === 'consultation-summary' && (
                 <div id="consultation-card">
                   <ConsultationSummaryTab />
                 </div>
               )}
 
-              {/* 이상 탐지 탭 */}
+              {/* 이상탐지 탭 */}
               {selectedSubMenu === 'anomaly-detection' && (
                 <>
                 <Card padding="lg">
-                  <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>{terms.ABSENCE_LABEL} 이상 탐지</h3>
+                  <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>{terms.ABSENCE_LABEL}이상탐지</h3>
                   {aiInsights?.attendanceAnomalies && aiInsights.attendanceAnomalies.length > 0 ? (
                     <AttendanceAnomalyDetailContent
                       attendanceAnomalies={aiInsights.attendanceAnomalies}
@@ -1151,7 +1151,7 @@ export function AIPage() {
                   ) : (
                     <EmptyState
                       icon={Sparkles}
-                      message={`${terms.ABSENCE_LABEL} 이상 탐지 데이터가 없습니다.`}
+                      message={`${terms.ABSENCE_LABEL}이상탐지 데이터가 없습니다.`}
                       description="AI 분석이 완료되면 결과를 확인할 수 있습니다."
                     />
                   )}
@@ -1159,11 +1159,11 @@ export function AIPage() {
                 </>
               )}
 
-              {/* 성과 분석 탭 */}
+              {/* 성과분석 탭 */}
               {selectedSubMenu === 'performance' && (
                 <>
                 <Card padding="lg">
-                  <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>{terms.GROUP_LABEL}/{terms.SUBJECT_LABEL} 성과 분석</h3>
+                  <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-md)' }}>{terms.GROUP_LABEL}/{terms.SUBJECT_LABEL}성과분석</h3>
                   {generateReport.isPending ? (
                     <AIAnalysisLoadingUI
                       steps={PERFORMANCE_INSIGHTS_STEPS}
@@ -1180,7 +1180,7 @@ export function AIPage() {
                   ) : (
                     <EmptyState
                       icon={Sparkles}
-                      message="성과 분석 데이터가 없습니다."
+                      message="성과분석 데이터가 없습니다."
                       description='"월간 리포트 생성" 버튼을 클릭하여 AI 분석을 실행하세요.'
                     />
                   )}
@@ -1248,12 +1248,12 @@ export function AIPage() {
             </>
           )}
 
-          {/* 성과 분석 상세 모달 */}
+          {/* 성과분석 상세 모달 */}
           {isMobileMode ? (
             <Drawer
               isOpen={showPerformanceDetail}
               onClose={() => setShowPerformanceDetail(false)}
-              title={`${terms.GROUP_LABEL}/${terms.SUBJECT_LABEL} 성과 분석 상세`}
+              title={`${terms.GROUP_LABEL}/${terms.SUBJECT_LABEL}성과분석 상세`}
               position="bottom"
             >
               <PerformanceDetailContent
@@ -1268,7 +1268,7 @@ export function AIPage() {
             <Modal
               isOpen={showPerformanceDetail}
               onClose={() => setShowPerformanceDetail(false)}
-              title={`${terms.GROUP_LABEL}/과목 성과 분석 상세`}
+              title={`${terms.GROUP_LABEL}/${terms.SUBJECT_LABEL}성과분석 상세`}
               size="lg"
             >
               <PerformanceDetailContent
@@ -1281,12 +1281,12 @@ export function AIPage() {
             </Modal>
           )}
 
-          {/* 출결 이상 탐지 상세 모달 */}
+          {/* 출결 이상탐지 상세 모달 */}
           {isMobileMode ? (
             <Drawer
               isOpen={showAttendanceDetail}
               onClose={() => setShowAttendanceDetail(false)}
-              title={`${terms.ABSENCE_LABEL} 이상 탐지 상세`}
+              title={`${terms.ABSENCE_LABEL}이상탐지 상세`}
               position="bottom"
             >
               <AttendanceAnomalyDetailContent
@@ -1301,7 +1301,7 @@ export function AIPage() {
             <Modal
               isOpen={showAttendanceDetail}
               onClose={() => setShowAttendanceDetail(false)}
-              title={`${terms.ABSENCE_LABEL} 이상 탐지 상세`}
+              title={`${terms.ABSENCE_LABEL}이상탐지 상세`}
               size="lg"
             >
               <AttendanceAnomalyDetailContent
@@ -1584,7 +1584,7 @@ function PerformanceDetailContent({ performanceAnalysis, onNavigateToClass }: Pe
     return (
       <EmptyState
         icon={Sparkles}
-        message="성과 분석 데이터가 없습니다."
+        message="성과분석 데이터가 없습니다."
       />
     );
   }
@@ -2022,7 +2022,7 @@ function AttendanceAnomalyDetailContent({ attendanceAnomalies, onNavigateToStude
     return (
       <EmptyState
         icon={Sparkles}
-        message={`${terms.ABSENCE_LABEL} 이상 탐지 데이터가 없습니다.`}
+        message={`${terms.ABSENCE_LABEL}이상탐지 데이터가 없습니다.`}
       />
     );
   }

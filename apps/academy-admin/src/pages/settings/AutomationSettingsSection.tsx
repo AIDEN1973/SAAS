@@ -28,8 +28,42 @@ import {
   useIsTablet,
 } from '@ui-core/react';
 import { getApiContext, apiClient } from '@api-sdk/core';
+import { useFilterTags } from '@hooks/use-filter-tags';
 import { AUTOMATION_EVENT_CATALOG, AUTOMATION_EVENT_PLANNED } from '@core/core-automation';
-import { Wallet, Users, Heart, Megaphone, ShieldCheck, UserCog, BarChart3 } from 'lucide-react';
+import {
+  Wallet,
+  Users,
+  Heart,
+  Megaphone,
+  ShieldCheck,
+  UserCog,
+  BarChart3,
+  Bell,
+  FileText,
+  CreditCard,
+  TrendingDown,
+  TrendingUp,
+  AlertTriangle,
+  DollarSign,
+  Receipt,
+  Calendar,
+  PieChart,
+  BarChart4,
+  Sparkles,
+  Clock,
+  Target,
+  UserCheck,
+  UserX,
+  Cake,
+  Award,
+  MapPin,
+  Info,
+  UserPlus,
+  Send,
+  CheckCircle,
+  Briefcase,
+  CalendarOff,
+} from 'lucide-react';
 import {
   AUTOMATION_EVENT_DESCRIPTIONS,
   AUTOMATION_EVENT_CRITERIA_FIELDS,
@@ -43,6 +77,69 @@ import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { getAutomationEventPolicyPath } from '../../utils';
 
 type AutomationEventType = (typeof AUTOMATION_EVENT_CATALOG)[number];
+
+/**
+ * 이벤트 타입별 아이콘 매핑
+ */
+const getEventIcon = (eventType: AutomationEventType): React.ReactNode => {
+  const iconMap: Record<AutomationEventType, React.ReactNode> = {
+    // financial_health (10)
+    payment_due_reminder: <Bell size={18} strokeWidth={1.5} />,
+    invoice_partial_balance: <FileText size={18} strokeWidth={1.5} />,
+    recurring_payment_failed: <CreditCard size={18} strokeWidth={1.5} />,
+    revenue_target_under: <TrendingDown size={18} strokeWidth={1.5} />,
+    collection_rate_drop: <AlertTriangle size={18} strokeWidth={1.5} />,
+    overdue_outstanding_over_limit: <DollarSign size={18} strokeWidth={1.5} />,
+    revenue_required_per_day: <Target size={18} strokeWidth={1.5} />,
+    top_overdue_customers_digest: <Receipt size={18} strokeWidth={1.5} />,
+    refund_spike: <TrendingUp size={18} strokeWidth={1.5} />,
+    monthly_business_report: <PieChart size={18} strokeWidth={1.5} />,
+
+    // capacity_optimization (6)
+    class_fill_rate_low_persistent: <TrendingDown size={18} strokeWidth={1.5} />,
+    ai_suggest_class_merge: <Sparkles size={18} strokeWidth={1.5} />,
+    time_slot_fill_rate_low: <Clock size={18} strokeWidth={1.5} />,
+    high_fill_rate_expand_candidate: <TrendingUp size={18} strokeWidth={1.5} />,
+    unused_class_persistent: <CalendarOff size={18} strokeWidth={1.5} />,
+    weekly_ops_summary: <BarChart4 size={18} strokeWidth={1.5} />,
+
+    // customer_retention (8)
+    class_reminder_today: <Bell size={18} strokeWidth={1.5} />,
+    class_schedule_tomorrow: <Calendar size={18} strokeWidth={1.5} />,
+    consultation_reminder: <Clock size={18} strokeWidth={1.5} />,
+    absence_first_day: <AlertTriangle size={18} strokeWidth={1.5} />,
+    churn_increase: <UserX size={18} strokeWidth={1.5} />,
+    ai_suggest_churn_focus: <Sparkles size={18} strokeWidth={1.5} />,
+    attendance_rate_drop_weekly: <TrendingDown size={18} strokeWidth={1.5} />,
+    risk_students_weekly_kpi: <AlertTriangle size={18} strokeWidth={1.5} />,
+
+    // growth_marketing (6)
+    new_member_drop: <TrendingDown size={18} strokeWidth={1.5} />,
+    inquiry_conversion_drop: <TrendingDown size={18} strokeWidth={1.5} />,
+    birthday_greeting: <Cake size={18} strokeWidth={1.5} />,
+    enrollment_anniversary: <Award size={18} strokeWidth={1.5} />,
+    regional_underperformance: <MapPin size={18} strokeWidth={1.5} />,
+    regional_rank_drop: <TrendingDown size={18} strokeWidth={1.5} />,
+
+    // safety_compliance (10)
+    class_change_or_cancel: <Info size={18} strokeWidth={1.5} />,
+    checkin_reminder: <UserCheck size={18} strokeWidth={1.5} />,
+    checkout_missing_alert: <AlertTriangle size={18} strokeWidth={1.5} />,
+    announcement_urgent: <Megaphone size={18} strokeWidth={1.5} />,
+    announcement_digest: <FileText size={18} strokeWidth={1.5} />,
+    consultation_summary_ready: <CheckCircle size={18} strokeWidth={1.5} />,
+    attendance_pattern_anomaly: <AlertTriangle size={18} strokeWidth={1.5} />,
+    student_onboarding_message: <UserPlus size={18} strokeWidth={1.5} />,
+    bulk_message_send: <Send size={18} strokeWidth={1.5} />,
+    message_approval_workflow: <CheckCircle size={18} strokeWidth={1.5} />,
+
+    // workforce_ops (2)
+    teacher_workload_imbalance: <Briefcase size={18} strokeWidth={1.5} />,
+    staff_absence_schedule_risk: <CalendarOff size={18} strokeWidth={1.5} />,
+  };
+
+  return iconMap[eventType] || <Bell size={18} strokeWidth={1.5} />;
+};
 
 /**
  * 자동화 규칙 카드 컴포넌트
@@ -77,8 +174,11 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
   const [isMutating, setIsMutating] = useState(false);
 
   // 인라인 설정 폼 상태
-  const [formValues, setFormValues] = useState<Record<string, string | number | boolean>>({});
+  const [formValues, setFormValues] = useState<Record<string, string | number | boolean | string[]>>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  // 필터 태그 목록 조회
+  const { data: filterTags } = useFilterTags({ is_active: true });
 
   // mutation 진행 중이면 optimistic 값 사용, 아니면 서버 값 사용
   const isEnabled = isMutating && optimisticEnabled !== null ? optimisticEnabled : serverEnabled;
@@ -88,14 +188,14 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
   const updateConfig = useUpdateConfig();
 
   // 각 조건 필드의 현재 값 조회
-  const getCriteriaValue = useCallback((field: AutomationEventCriteriaField): string | number | boolean | null => {
+  const getCriteriaValue = useCallback((field: AutomationEventCriteriaField): string | number | boolean | string[] | null => {
     if (!currentConfigData) return field.defaultValue ?? null;
     const autoNotification = (currentConfigData as Record<string, unknown>).auto_notification as Record<string, unknown> | undefined;
     if (!autoNotification) return field.defaultValue ?? null;
     const eventConfig = autoNotification[eventType] as Record<string, unknown> | undefined;
     if (!eventConfig) return field.defaultValue ?? null;
     const value = eventConfig[field.field];
-    return value !== undefined ? (value as string | number | boolean) : (field.defaultValue ?? null);
+    return value !== undefined ? (value as string | number | boolean | string[]) : (field.defaultValue ?? null);
   }, [currentConfigData, eventType]);
 
   // 설명을 구조화된 형태로 분리 (메인 설명, 예시, 설정값)
@@ -128,9 +228,9 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
       example = rawExample.replace(/^예:/, '예 :');
     }
 
-    // 주요 조건 필드 값 표시 (채널 제외, 숫자/boolean 조건만)
+    // 주요 조건 필드 값 표시 (채널 제외, 숫자/boolean/filter_tags 조건)
     const conditionFields = criteriaFields.filter(f =>
-      (f.type === 'number' || f.type === 'boolean') && f.field !== 'channel'
+      (f.type === 'number' || f.type === 'boolean' || f.type === 'filter_tags') && f.field !== 'channel'
     );
 
     let settings: string | null = null;
@@ -143,22 +243,31 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
         let formattedValue: string;
         if (field.type === 'boolean') {
           formattedValue = value ? '활성화' : '비활성화';
+        } else if (field.type === 'filter_tags') {
+          // 필터 태그 배열
+          const tagIds = value as string[];
+          if (!tagIds || tagIds.length === 0) return null;
+          const tagNames = tagIds.map(tagId =>
+            filterTags?.find(t => t.id === tagId)?.display_label
+          ).filter(Boolean);
+          if (tagNames.length === 0) return null;
+          formattedValue = tagNames.join(', ');
         } else if (field.label.includes('원)')) {
-          formattedValue = `${Number(value).toLocaleString()}원`;
+          formattedValue = `${Number(value as string | number).toLocaleString()}원`;
         } else if (field.label.includes('%')) {
-          formattedValue = `${value}%`;
+          formattedValue = `${String(value)}%`;
         } else if (field.label.includes('일)') || field.label.includes('일수')) {
-          formattedValue = `${value}일`;
+          formattedValue = `${String(value)}일`;
         } else if (field.label.includes('분)') || field.label.includes('시간')) {
-          formattedValue = field.label.includes('시간') ? `${value}시간` : `${value}분`;
+          formattedValue = field.label.includes('시간') ? `${String(value)}시간` : `${String(value)}분`;
         } else if (field.label.includes('배수')) {
-          formattedValue = `${value}배`;
+          formattedValue = `${String(value)}배`;
         } else if (field.label.includes('위)')) {
-          formattedValue = `${value}위`;
+          formattedValue = `${String(value)}위`;
         } else if (field.label.includes('명)') || field.label.includes('수')) {
-          formattedValue = `${value}명`;
+          formattedValue = `${String(value)}명`;
         } else if (field.label.includes('건수')) {
-          formattedValue = `${value}건`;
+          formattedValue = `${String(value)}건`;
         } else {
           formattedValue = String(value);
         }
@@ -174,7 +283,7 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
     }
 
     return { mainDescription, example, settings };
-  }, [description, terms, criteriaFields, getCriteriaValue]);
+  }, [description, terms, criteriaFields, getCriteriaValue, filterTags]);
 
   // 토글 핸들러
   const toggleMutation = useMutation({
@@ -266,7 +375,7 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
   }, [tenantId, currentConfigData, eventType, formValues, updateConfig, showAlert]);
 
   // 폼 값 변경 핸들러
-  const handleFormValueChange = useCallback((fieldName: string, value: string | number | boolean) => {
+  const handleFormValueChange = useCallback((fieldName: string, value: string | number | boolean | string[]) => {
     setFormValues(prev => ({ ...prev, [fieldName]: value }));
   }, []);
 
@@ -280,10 +389,15 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
   const handleEnterEditMode = useCallback(() => {
     if (hasConfigurableFields) {
       // 현재 설정값으로 폼 초기화
-      const initialValues: Record<string, string | number | boolean> = {};
+      const initialValues: Record<string, string | number | boolean | string[]> = {};
       criteriaFields.forEach(field => {
         const value = getCriteriaValue(field);
-        initialValues[field.field] = value ?? field.defaultValue ?? '';
+        if (field.type === 'filter_tags') {
+          // filter_tags 타입은 배열로 처리
+          initialValues[field.field] = (value as string[] | null) ?? (field.defaultValue as string[] | undefined) ?? [];
+        } else {
+          initialValues[field.field] = (value as string | number | boolean | null) ?? field.defaultValue ?? '';
+        }
       });
       setFormValues(initialValues);
       setIsEditMode(true);
@@ -307,18 +421,37 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
 
   // 일반 모드 렌더링
   const renderViewMode = () => (
-    <>
-      {/* 상단: 제목 + 토글 스위치 */}
+    <div
+      style={{
+        opacity: isEnabled ? 1 : 0.7,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--spacing-sm)',
+      }}
+    >
+      {/* 상단: 아이콘 + 제목 + 토글 스위치 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span
-          style={{
-            fontWeight: 'var(--font-weight-semibold)',
-            fontSize: 'var(--font-size-lg)',
-            color: 'var(--color-text)',
-          }}
-        >
-          {description.title}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+          <div
+            style={{
+              color: 'var(--color-text)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {getEventIcon(eventType)}
+          </div>
+          <span
+            style={{
+              fontWeight: 'var(--font-weight-semibold)',
+              fontSize: 'var(--font-size-lg)',
+              color: 'var(--color-text)',
+            }}
+          >
+            {description.title}
+          </span>
+        </div>
         {/* 토글 wrapper: 카드 클릭 이벤트 전파 방지 */}
         <div onClick={(e) => e.stopPropagation()}>
           <Switch
@@ -390,8 +523,8 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
           <div />
         )}
 
-        {/* 설정 버튼 (조건 필드가 있는 경우에만 표시) - 배지 스타일 */}
-        {hasConfigurableFields && (
+        {/* 설정 버튼 (조건 필드가 있고 활성화된 경우에만 표시) - 배지 스타일 */}
+        {hasConfigurableFields && isEnabled && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -436,23 +569,35 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
           {stats.failed > 0 && ` • 실패 ${stats.failed}`}
         </div>
       )}
-    </>
+    </div>
   );
 
   // 설정 모드 렌더링
   const renderEditMode = () => (
     <>
-      {/* 상단: 제목 + 토글 스위치 */}
+      {/* 상단: 아이콘 + 제목 + 토글 스위치 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span
-          style={{
-            fontWeight: 'var(--font-weight-semibold)',
-            fontSize: 'var(--font-size-lg)',
-            color: 'var(--color-text)',
-          }}
-        >
-          {description.title} 설정
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+          <div
+            style={{
+              color: 'var(--color-text)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {getEventIcon(eventType)}
+          </div>
+          <span
+            style={{
+              fontWeight: 'var(--font-weight-semibold)',
+              fontSize: 'var(--font-size-lg)',
+              color: 'var(--color-text)',
+            }}
+          >
+            {description.title} 설정
+          </span>
+        </div>
         {/* 토글 wrapper: 카드 클릭 이벤트 전파 방지 */}
         <div onClick={(e) => e.stopPropagation()}>
           <Switch
@@ -528,6 +673,55 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
                 fullWidth
                 size="sm"
               />
+            ) : field.type === 'filter_tags' ? (
+              // 태그 필터 다중 선택
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+                {filterTags && filterTags.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xs)' }}>
+                    {filterTags.map((tag) => {
+                      const selectedTagIds = (formValues[field.field] as string[] | undefined) || (field.defaultValue as string[] | undefined) || [];
+                      const isSelected = selectedTagIds.includes(tag.id);
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => {
+                            const currentTags = [...selectedTagIds];
+                            if (isSelected) {
+                              handleFormValueChange(field.field, currentTags.filter(id => id !== tag.id));
+                            } else {
+                              handleFormValueChange(field.field, [...currentTags, tag.id]);
+                            }
+                          }}
+                          style={{
+                            padding: 'var(--spacing-xs) var(--spacing-sm)',
+                            borderRadius: 'var(--border-radius-sm)',
+                            border: isSelected ? 'none' : 'var(--border-width-thin) solid var(--color-gray-300)',
+                            backgroundColor: isSelected ? tag.color : 'var(--color-white)',
+                            color: isSelected ? 'var(--color-white)' : 'var(--color-text)',
+                            fontSize: 'var(--font-size-xs)',
+                            cursor: 'pointer',
+                            transition: 'var(--transition-base)',
+                          }}
+                        >
+                          {tag.display_label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)' }}>
+                    등록된 필터 태그가 없습니다
+                  </span>
+                )}
+                {((formValues[field.field] as string[] | undefined) || []).length > 0 && (
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                    선택됨: {((formValues[field.field] as string[]) || []).map(tagId =>
+                      filterTags?.find(t => t.id === tagId)?.display_label
+                    ).filter(Boolean).join(', ')}
+                  </span>
+                )}
+              </div>
             ) : (
               <Input
                 type="text"

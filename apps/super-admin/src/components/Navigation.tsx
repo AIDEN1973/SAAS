@@ -21,6 +21,7 @@ const navItems: NavItem[] = [
   { path: '/revenue', label: '매출 분석' },
   { path: '/regional', label: '지역별 분석' },
   { path: '/alimtalk', label: '알림톡 설정' },
+  { path: '/manual-logs', label: '매뉴얼 변경 로그' },
 ];
 
 export function Navigation() {

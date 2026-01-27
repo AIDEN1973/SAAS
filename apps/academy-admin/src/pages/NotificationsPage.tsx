@@ -35,6 +35,8 @@ import { Sparkles, FileText } from 'lucide-react';
 import { NOTIFICATIONS_SUB_MENU_ITEMS, DEFAULT_NOTIFICATIONS_SUB_MENU, getSubMenuFromUrl, setSubMenuToUrl } from '../constants';
 import type { NotificationsSubMenuId } from '../constants';
 // logWarn import 제거됨 - 채널 선택 기능 제거로 미사용
+// 태그 필터 발송 페이지
+import { BulkMessagePage } from './BulkMessagePage';
 
 export function NotificationsPage() {
   const { showAlert } = useModal();
@@ -693,6 +695,11 @@ export function NotificationsPage() {
               )}
             </Card>
             </>
+          )}
+
+          {/* 태그 필터 발송 탭 */}
+          {selectedSubMenu === 'tag-filter' && (
+            <BulkMessagePage />
           )}
 
           {/* 자동 알림 설정 탭 */}

@@ -37,6 +37,10 @@ export interface SidebarProps {
   className?: string;
   isOpen?: boolean;
   onClose?: () => void;
+  /** 외부에서 선택된 Advanced 메뉴 아이템 (controlled) */
+  selectedAdvancedItem?: SidebarItem | null;
+  /** Advanced 메뉴 아이템 선택 핸들러 */
+  onAdvancedItemSelect?: (item: SidebarItem | null) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -46,6 +50,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   className,
   isOpen = true,
   onClose,
+  selectedAdvancedItem: controlledSelectedAdvancedItem,
+  onAdvancedItemSelect,
 }) => {
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
@@ -53,9 +59,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
   const [advancedMenuOpen, setAdvancedMenuOpen] = useState(false);
   const [advancedMenuItems, setAdvancedMenuItems] = useState<SidebarItem[] | null>(null);
-  const [selectedAdvancedItem, setSelectedAdvancedItem] = useState<SidebarItem | null>(null);
+  const [internalSelectedAdvancedItem, setInternalSelectedAdvancedItem] = useState<SidebarItem | null>(null);
   const advancedButtonRef = useRef<HTMLButtonElement>(null);
   const prevPathRef = useRef<string | undefined>(currentPath);
+
+  // controlled vs uncontrolled 모드 지원
+  const selectedAdvancedItem = controlledSelectedAdvancedItem !== undefined
+    ? controlledSelectedAdvancedItem
+    : internalSelectedAdvancedItem;
 
   // 경로가 변경되면 advancedMenu 상태 초기화 (오버레이가 클릭을 차단하는 문제 해결)
   React.useEffect(() => {
@@ -66,6 +77,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [currentPath]);
 
+  // selectedAdvancedItem 업데이트 헬퍼
+  const updateSelectedAdvancedItem = (item: SidebarItem | null) => {
+    if (onAdvancedItemSelect) {
+      onAdvancedItemSelect(item);
+    } else {
+      setInternalSelectedAdvancedItem(item);
+    }
+  };
+
   const handleItemClick = (item: SidebarItem) => {
     // Advanced 메뉴이고 children이 있으면 레이어 메뉴 열기
     if (item.isAdvanced && item.children && item.children.length > 0) {
@@ -74,10 +94,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
 
-    // 일반 메뉴 클릭 시 레이어 메뉴와 선택된 항목 초기화
+    // 일반 메뉴 클릭 시 레이어 메뉴 닫기
     setAdvancedMenuOpen(false);
     setAdvancedMenuItems(null);
-    setSelectedAdvancedItem(null);
+
+    // 선택된 Advanced 아이템이 있고, 클릭한 메뉴의 경로가 Advanced 아이템 경로와 다르면 초기화
+    if (selectedAdvancedItem && item.path && selectedAdvancedItem.path) {
+      const advancedBasePath = selectedAdvancedItem.path.split('?')[0];
+      const clickedBasePath = item.path.split('?')[0];
+      if (!clickedBasePath.startsWith(advancedBasePath)) {
+        updateSelectedAdvancedItem(null);
+      }
+    }
 
     // 일반 메뉴 클릭 처리
     if (item.onClick) {
@@ -443,7 +471,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
 
     // 새로운 항목 선택
-    setSelectedAdvancedItem(item);
+    updateSelectedAdvancedItem(item);
 
     if (item.onClick) {
       item.onClick();

@@ -53,11 +53,11 @@ export function RecentActivityCard({ activity, isLoading, onAction }: RecentActi
       case 'students':
         return personLabel;
       case 'consultations':
-        return '상담';
+        return terms.CONSULTATION_LABEL;
       case 'attendance':
-        return '출결';
+        return terms.ATTENDANCE_LABEL;
       case 'tags':
-        return '태그';
+        return terms.TAG_LABEL;
     }
   };
 
@@ -128,7 +128,7 @@ export function RecentActivityCard({ activity, isLoading, onAction }: RecentActi
                     textAlign: 'center',
                     padding: 'var(--spacing-xl)',
                   }}>
-                    최근 등록된 학생 없음
+                    최근 등록된 {personLabel} 없음
                   </div>
                 ) : (
                   activity.recentStudents.map((student) => (

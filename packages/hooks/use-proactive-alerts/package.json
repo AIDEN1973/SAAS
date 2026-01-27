@@ -1,0 +1,11 @@
+{
+  "name": "@hooks/use-proactive-alerts",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@tanstack/react-query": "^5.64.2",
+    "@api-sdk/core": "workspace:*"
+  }
+}

@@ -195,7 +195,32 @@
       "Bash(supabase secrets --help:*)",
       "Bash(supabase secrets set --help:*)",
       "Bash(supabase secrets set:*)",
-      "Bash(supabase secrets list:*)"
+      "Bash(supabase secrets list:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npm search:*)",
+      "Bash(npm info:*)",
+      "Bash(pnpm build:packages:*)",
+      "Bash(supabase db dump:*)",
+      "mcp__memory__read_graph",
+      "Bash(supabase db remote:*)",
+      "Bash(supabase projects:*)",
+      "Bash(supabase db lint:*)",
+      "Bash(claude mcp add supabase --scope project --transport stdio --env SUPABASE_URL=https://xawypsrotrfoyozhrsbb.supabase.co --env SUPABASE_ACCESS_TOKEN=sbp_e796ebb4d69e93682af0a4b33a0e406e74f00541 --env SUPABASE_PROJECT_REF=xawypsrotrfoyozhrsbb -- npx -y @modelcontextprotocol/server-supabase)",
+      "Bash(cmd.exe /c \"claude mcp add supabase --scope project --transport stdio --env SUPABASE_URL=https://xawypsrotrfoyozhrsbb.supabase.co --env SUPABASE_ACCESS_TOKEN=sbp_e796ebb4d69e93682af0a4b33a0e406e74f00541 --env SUPABASE_PROJECT_REF=xawypsrotrfoyozhrsbb -- npx -y @modelcontextprotocol/server-supabase\")",
+      "Bash(cmd.exe /c \"claude --version\")",
+      "mcp__github__list_issues",
+      "Bash(npx:*)",
+      "WebFetch(domain:supabase.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(set:*)",
+      "Bash(set SUPABASE_ACCESS_TOKEN:*)",
+      "Bash(npm view:*)",
+      "Bash(cmd /c \"set SUPABASE_URL=https://xawypsrotrfoyozhrsbb.supabase.co && set SUPABASE_ACCESS_TOKEN=sbp_e796ebb4d69e93682af0a4b33a0e406e74f00541 && node c:/cursor/SAMDLE/node_modules/@supabase/mcp-server-supabase/dist/index.js --help\")",
+      "Bash(cmd /c \"set SUPABASE_URL=https://xawypsrotrfoyozhrsbb.supabase.co && set SUPABASE_ACCESS_TOKEN=sbp_e796ebb4d69e93682af0a4b33a0e406e74f00541 && node c:\\\\cursor\\\\SAMDLE\\\\node_modules\\\\@supabase\\\\mcp-server-supabase\\\\dist\\\\index.js --help\")",
+      "mcp__supabase__list_projects",
+      "Bash(pkill:*)",
+      "Bash(supabase db pull:*)",
+      "mcp__supabase__get_project"
     ]
   }
 }
