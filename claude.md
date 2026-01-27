@@ -529,6 +529,46 @@ const dateStr = new Date().toISOString().slice(0, 10); // 금지
 - 향후: 피트니스, 학교 등 확장 가능
 - Industry Adapter 패턴으로 새 업종 추가 시 Tool 코드 수정 불필요
 
+### 7. **Vercel 배포 & Turbo 설정 (2026-01-27)**
+
+#### 문제 배경
+Vercel은 루트에 `turbo.json`이 있으면 자동으로 Turbo를 감지하고 자체 내장 Turbo로 파싱합니다.
+Vercel의 내장 Turbo가 구버전이라 Turbo v2 형식(`tasks` 키)을 인식하지 못하는 문제가 발생합니다.
+
+#### 현재 해결책
+1. **`turbo.json`을 `.gitignore`에 추가** - Vercel이 클론 시 파일이 없으므로 Turbo 감지 안 함
+2. **`turbo.json.template`에 설정 보관** - 실제 Turbo 설정 내용
+3. **로컬에서 `npm run preturbo`로 복사** - `turbo.json.template` → `turbo.json`
+
+#### 관련 파일
+- `.gitignore` - `turbo.json` 제외
+- `turbo.json.template` - Turbo v2 설정 (`tasks` 형식)
+- `package.json` - `preturbo` 스크립트로 template 복사
+- `apps/*/vercel.json` - 각 앱별 Vercel 빌드 설정
+
+#### Vercel 빌드 오류 발생 시 체크리스트
+1. **`turbo.json` 관련 오류** (`Found an unknown key 'tasks'`):
+   - `turbo.json`이 git에 추가되었는지 확인 → `.gitignore`에 있어야 함
+   - `turbo.json.template`이 존재하는지 확인
+
+2. **모듈을 찾을 수 없음** (`Cannot find module 'xxx'`):
+   - 해당 패키지가 앱의 `package.json` dependencies에 있는지 확인
+   - 루트에만 있고 앱에 없으면 Vercel에서 찾지 못함
+
+3. **`workspace:*` 오류**:
+   - npm은 `workspace:*` 프로토콜 미지원
+   - `file:../../path` 형식으로 변경 필요
+
+#### 로컬 개발 시
+```bash
+# turbo.json이 없으면 template에서 복사
+npm run preturbo
+
+# 또는 개별 스크립트 실행 (preturbo 자동 호출)
+npm run dev
+npm run build
+```
+
 ---
 
 ## 📚 추가 참고 자료
