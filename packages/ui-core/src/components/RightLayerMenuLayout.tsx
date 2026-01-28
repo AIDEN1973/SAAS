@@ -124,6 +124,21 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
     return isExpanded ? 'var(--width-layer-menu-expanded)' : menuWidth;
   }, [menuWidth, isExpanded, isMobile]);
 
+  // 레이어 메뉴 열림/닫힘에 따라 서브사이드바 너비 동적 변경
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const root = document.documentElement;
+
+    // 레이어 메뉴가 열리고 오버레이 모드가 아닐 때 (push 모드) 서브사이드바 축소
+    if (layerMenu.isOpen && !effectiveUseOverlayMode && !isMobile && !isTablet) {
+      root.style.setProperty('--width-agent-history-sidebar', '11rem'); // 176px
+    } else {
+      // 레이어 메뉴가 닫히거나 오버레이 모드일 때 원래 너비로 복원
+      root.style.setProperty('--width-agent-history-sidebar', '14rem'); // 224px
+    }
+  }, [layerMenu.isOpen, effectiveUseOverlayMode, isMobile, isTablet]);
+
   // 메뉴가 닫히면 확장 상태 초기화
   const prevIsOpenRef = useRef(layerMenu.isOpen);
   useEffect(() => {

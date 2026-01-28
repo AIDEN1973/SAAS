@@ -114,7 +114,7 @@ export function parseWidthToPx(
     }
     // SSR 폴백: 기본 레이어 메뉴 너비 (하드코딩 최소화)
     const baseFontSize = 16; // SSR에서는 기본값 사용
-    return getCSSVariableAsPx('--width-layer-menu', 37.5 * baseFontSize);
+    return getCSSVariableAsPx('--width-layer-menu', 43.75 * baseFontSize);
   }
 
   // 직접 픽셀 값이 주어진 경우
@@ -145,7 +145,7 @@ export function parseWidthToPx(
         ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
         : 16;
       const fallbackMap: Record<string, number> = {
-        '--width-layer-menu': 37.5 * baseFontSize, // 600px (baseFontSize 기준)
+        '--width-layer-menu': 43.75 * baseFontSize, // 700px (baseFontSize 기준)
         '--width-layer-menu-tablet': 31.25 * baseFontSize, // 500px (baseFontSize 기준)
       };
 
@@ -158,5 +158,5 @@ export function parseWidthToPx(
   const baseFontSize = typeof window !== 'undefined'
     ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-base').trim()) || 16
     : 16;
-  return getCSSVariableAsPx('--width-layer-menu', 37.5 * baseFontSize);
+  return getCSSVariableAsPx('--width-layer-menu', 43.75 * baseFontSize);
 }

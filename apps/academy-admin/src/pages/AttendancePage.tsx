@@ -40,7 +40,7 @@ import { templates } from '../utils';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAttendanceLogs, useUpsertAttendanceLog } from '@hooks/use-attendance';
 import { useStudents } from '@hooks/use-student';
-import { useClasses } from '@hooks/use-class';
+import { useClasses, useTeachersWithStats } from '@hooks/use-class';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 import type { AttendanceFilter, AttendanceStatus, AttendanceLog, CreateAttendanceLogInput } from '@services/attendance-service';
 import type { Student, StudentClass } from '@services/student-service';
@@ -49,6 +49,7 @@ import { toKST } from '@lib/date-utils';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useConfig, useUpdateConfig } from '@hooks/use-config';
+import type { ClassTeacher } from '@services/class-service';
 
 export function AttendancePage() {
   const mode = useResponsiveMode();
@@ -67,6 +68,47 @@ export function AttendancePage() {
   const terms = useIndustryTerms();
   const context = getApiContext();
   const tenantId = context.tenantId;
+
+  // Fetch teachers data using useTeachersWithStats hook (includes persons JOIN for name)
+  const { data: teachers } = useTeachersWithStats();
+
+  // Fetch all class_teachers assignments
+  const { data: allClassTeachers } = useQuery({
+    queryKey: ['all-class-teachers', tenantId],
+    queryFn: async () => {
+      if (!tenantId) return [];
+      const response = await apiClient.get<ClassTeacher>('class_teachers', {
+        filters: { is_active: true },
+      });
+      if (response.error) throw new Error(response.error.message);
+      return response.data || [];
+    },
+    enabled: !!tenantId,
+  });
+
+  // Create class -> teachers mapping for efficient lookup (includes profile images)
+  const classTeachersMap = useMemo(() => {
+    if (!allClassTeachers || !teachers) {
+      return new Map<string, Array<{ name: string; profile_image_url?: string | null }>>();
+    }
+
+    const map = new Map<string, Array<{ name: string; profile_image_url?: string | null }>>();
+    allClassTeachers.forEach(ct => {
+      const teacher = teachers.find(t => t.id === ct.teacher_id);
+
+      if (teacher) {
+        if (!map.has(ct.class_id)) {
+          map.set(ct.class_id, []);
+        }
+        map.get(ct.class_id)!.push({
+          name: teacher.name,
+          profile_image_url: teacher.profile_image_url
+        });
+      }
+    });
+
+    return map;
+  }, [allClassTeachers, teachers]);
 
   // 역할별 권한 체크 (아키텍처 문서 2.3, 498-507줄)
   // Assistant: 출결 입력만 가능, 수정 권한 없음
@@ -1225,6 +1267,25 @@ export function AttendancePage() {
                   return 'secondary';
                 };
 
+                // 요일 배열 생성 헬퍼 함수
+                const getDayOfWeekArray = (dayOfWeek: string | string[] | null | undefined): string[] => {
+                  if (!dayOfWeek) return [];
+                  if (Array.isArray(dayOfWeek)) {
+                    return dayOfWeek.map(d => {
+                      const dayMap: Record<string, string> = {
+                        monday: '월', tuesday: '화', wednesday: '수',
+                        thursday: '목', friday: '금', saturday: '토', sunday: '일'
+                      };
+                      return dayMap[d] || d;
+                    });
+                  }
+                  const dayMap: Record<string, string> = {
+                    monday: '월', tuesday: '화', wednesday: '수',
+                    thursday: '목', friday: '금', saturday: '토', sunday: '일'
+                  };
+                  return [dayMap[dayOfWeek] || dayOfWeek];
+                };
+
                 // 수업 카드 렌더링 함수
                 const renderClassCard = (classInfo: typeof filteredByTimeRange[0], type: 'past' | 'current' | 'upcoming') => {
                   const classStudents = studentsByClass.get(classInfo.id) || [];
@@ -1237,13 +1298,36 @@ export function AttendancePage() {
 
                   // 카드 스타일
                   const cardStyle: React.CSSProperties = isEnded
-                    ? { opacity: 0.75 }
+                    ? {
+                        opacity: 0.75,
+                        filter: 'grayscale(100%)',
+                      }
                     : hasIssues
                     ? {
                         border: '2px solid var(--color-error)',
                         animation: 'pulse-border 2s ease-in-out infinite',
                       }
                     : {};
+
+                  // 강사 정보 조회
+                  const teacherInfo = classTeachersMap.get(classInfo.id);
+                  const teacherProfiles = teacherInfo
+                    ? teacherInfo.map(t => ({
+                        imageUrl: t.profile_image_url,
+                        name: t.name
+                      }))
+                    : undefined;
+
+                  // 과목명과 강사명 조합 (배지 레이블)
+                  const subjectAndTeacher = teacherInfo && teacherInfo.length > 0
+                    ? `${classInfo.subject || '수업'} / ${teacherInfo.map(t => t.name).join(', ')}`
+                    : classInfo.subject || '수업';
+
+                  // 요일 배열
+                  const dayOfWeekArray = getDayOfWeekArray(classInfo.day_of_week);
+
+                  // 등록된 학생 수 계산 (studentsByClass에서 조회)
+                  const studentCount = classStudents.length;
 
                   return (
                     <React.Fragment key={classInfo.id}>
@@ -1259,17 +1343,19 @@ export function AttendancePage() {
                       )}
                       <EntityCard
                         badge={{
-                          label: classInfo.subject || '수업',
+                          label: subjectAndTeacher,
                           color: getBadgeColor(classInfo.subject, isEnded),
                         }}
-                        secondaryLabel="-"
                         title={classInfo.name}
-                        mainValue={stats.present + stats.late}
-                        subValue={` / ${stats.total}`}
+                        mainValue={studentCount}
+                        subValue={` / ${classInfo.capacity || 0}`}
+                        dayOfWeek={dayOfWeekArray.length > 0 ? dayOfWeekArray : undefined}
                         description={`${classInfo.start_time.substring(0, 5)}~${classInfo.end_time.substring(0, 5)}`}
                         onClick={() => handleClassClick(classInfo.id)}
                         disabled={isEnded}
                         style={cardStyle}
+                        valueAtBottom={true}
+                        profiles={teacherProfiles}
                       />
                     </React.Fragment>
                   );
