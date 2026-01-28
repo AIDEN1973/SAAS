@@ -242,10 +242,13 @@ export function useUpdateClass() {
 
       // teacher_ids가 제공된 경우 강사 배정 업데이트
       if (teacher_ids !== undefined) {
+        // teacher_ids를 배열로 변환 (RPC 함수는 UUID[] 타입 요구)
+        const teacherIdsArray = Array.isArray(teacher_ids) ? teacher_ids : [teacher_ids];
+
         // RPC 함수 호출로 bulk 업데이트 (N+1 쿼리 방지)
         const rpcResponse = await apiClient.callRPC('update_class_teachers', {
           p_class_id: classId,
-          p_teacher_ids: teacher_ids,
+          p_teacher_ids: teacherIdsArray,
         });
 
         if (!rpcResponse.success) {
@@ -1149,15 +1152,14 @@ export function useCheckScheduleConflicts() {
         throw new Error('Tenant ID is required');
       }
 
-      // dayOfWeek가 배열이면 첫 번째 값만 사용 (RPC 함수가 단일 값만 지원)
-      const dayOfWeek = Array.isArray(params.dayOfWeek) ? params.dayOfWeek[0] : params.dayOfWeek;
+      // dayOfWeek를 배열로 변환 (RPC 함수는 TEXT[] 타입 지원)
+      const dayOfWeekArray = Array.isArray(params.dayOfWeek) ? params.dayOfWeek : [params.dayOfWeek];
 
       const response = await apiClient.callRPC<ScheduleConflictResult>('check_schedule_conflicts', {
-        p_tenant_id: tenantId,
-        p_day_of_week: dayOfWeek,
+        p_class_id: params.classId || null,
+        p_day_of_week: dayOfWeekArray,
         p_start_time: params.startTime,
         p_end_time: params.endTime,
-        p_class_id: params.classId || null,
         p_teacher_ids: params.teacherIds || null,
         p_room: params.room || null,
       });

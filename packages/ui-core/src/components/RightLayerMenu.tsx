@@ -30,8 +30,6 @@ export interface RightLayerMenuProps {
   onToggleExpand?: () => void;
   className?: string;
   style?: React.CSSProperties; // 추가 스타일 (오버레이 모드 등에서 사용)
-  /** 내용 변경 감지용 키 (예: studentId). 이 값이 변경되면 페이드 아웃/인 애니메이션 실행 */
-  contentKey?: string | number;
 }
 
 /**
@@ -97,22 +95,16 @@ export const RightLayerMenu: React.FC<RightLayerMenuProps> = ({
   // ============================================================================
   // 닫힘 애니메이션 중 콘텐츠 유지를 위한 캐싱
   // ============================================================================
-
-  // 이전 콘텐츠 캐싱 (닫힘 애니메이션 중 표시용)
   const cachedChildrenRef = useRef<React.ReactNode>(children);
   const cachedTitleRef = useRef<React.ReactNode>(title);
 
-  // 열림 상태일 때만 캐시 업데이트
-  useEffect(() => {
-    if (isOpen && children) {
-      cachedChildrenRef.current = children;
-    }
-    if (isOpen && title) {
-      cachedTitleRef.current = title;
-    }
-  }, [isOpen, children, title]);
+  // 열려있을 때만 캐시 업데이트 (동기적 처리)
+  if (isOpen) {
+    cachedChildrenRef.current = children;
+    cachedTitleRef.current = title;
+  }
 
-  // 표시할 콘텐츠: 열림 상태면 현재 children, 닫힘 상태면 캐시된 children
+  // 표시할 콘텐츠: 열림 상태면 최신 children, 닫힘 상태면 캐시
   const displayChildren = isOpen ? children : cachedChildrenRef.current;
   const displayTitle = isOpen ? title : cachedTitleRef.current;
 
@@ -237,7 +229,7 @@ export const RightLayerMenu: React.FC<RightLayerMenuProps> = ({
         </div>
       </div>
 
-      {/* 레이어 메뉴 내용 - 항상 표시 (닫힘 애니메이션 중 캐시된 콘텐츠 표시) */}
+      {/* 레이어 메뉴 내용 */}
       <div
         style={{
           flex: 1,

@@ -222,7 +222,10 @@
       "Bash(supabase db pull:*)",
       "mcp__supabase__get_project",
       "Bash(git rebase:*)",
-      "Bash(git filter-branch:*)"
+      "Bash(git filter-branch:*)",
+      "Bash(TURBO_CONFIG=.turbo-config.json npx turbo run build:*)",
+      "Bash(for i in {1..7})",
+      "mcp__supabase__get_publishable_keys"
     ]
   }
 }

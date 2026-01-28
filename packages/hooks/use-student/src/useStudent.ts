@@ -920,7 +920,8 @@ export function useStudentsPaged(params: {
       return { students, totalCount };
     },
     enabled: !!tenantId && page > 0 && pageSize > 0,
-    staleTime: 30 * 1000, // 30초간 캐시 유지
+    // [성능 개선 2026-01-27] staleTime 증가: 30초 → 2분 (학생 데이터는 자주 변경되지 않음)
+    staleTime: 2 * 60 * 1000, // 2분간 캐시 유지
     gcTime: 5 * 60 * 1000, // 5분간 가비지 컬렉션 방지
     placeholderData: (previousData) => previousData, // 페이지 전환 시 이전 데이터 유지하여 부드러운 UX (React Query v5)
     refetchOnWindowFocus: false, // 윈도우 포커스 시 자동 리패치 비활성화 (성능 최적화)
@@ -1916,8 +1917,9 @@ export function useStudentTagsByStudent(studentId: string | null) {
 /**
  * 전체 학생 태그 할당 정보 조회 Hook (통계용)
  * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
+ * [성능 개선 2026-01-27] 조건부 로딩 지원 (options.enabled)
  */
-export function useAllStudentTagAssignments() {
+export function useAllStudentTagAssignments(options?: { enabled?: boolean }) {
   const context = getApiContext();
   const tenantId = context.tenantId;
 
@@ -1928,9 +1930,13 @@ export function useAllStudentTagAssignments() {
     queryFn: async (): Promise<Array<{ student_id: string; tag_id: string }>> => {
       if (!tenantId) return [];
 
+      // [성능 개선 2026-01-27] limit 축소: 5000 → 1000 (최근 1000건만 조회)
+      // TODO: 서버 측 집계 또는 페이지네이션으로 전환 필요
+      // 현실적으로 대부분 학원은 학생 500명 이하이므로 1000건이면 충분
       const assignmentsResponse = await apiClient.get<TagAssignment>('tag_assignments', {
         filters: { entity_type: 'student' },
-        limit: 5000,
+        orderBy: { column: 'created_at', ascending: false },
+        limit: 1000,
       });
 
       if (assignmentsResponse.error) {
@@ -1942,7 +1948,9 @@ export function useAllStudentTagAssignments() {
         tag_id: a.tag_id,
       }));
     },
-    enabled: !!tenantId,
+    enabled: options?.enabled !== undefined ? (!!tenantId && options.enabled) : !!tenantId,
+    staleTime: 5 * 60 * 1000,  // 5분 (태그 할당은 자주 변경되지 않음)
+    gcTime: 10 * 60 * 1000,    // 10분
   });
 }
 
@@ -1962,10 +1970,12 @@ export async function fetchConsultations(
     filters.consultation_date = filter.consultation_date;
   }
 
+  // [성능 개선 2026-01-27] limit 축소: 100 → 200 (최근 200건만 조회)
+  // TODO: 서버 측 집계 또는 페이지네이션으로 전환 필요
   const response = await apiClient.get<StudentConsultation>('student_consultations', {
     filters,
     orderBy: { column: 'consultation_date', ascending: false },
-    limit: 100,
+    limit: 200,
   });
 
   if (response.error) {
@@ -1996,14 +2006,18 @@ export function useConsultations(studentId: string | null) {
  * 전체 상담기록 목록 조회 Hook (학생 필터 없음)
  * [불변 규칙] Zero-Trust: tenantId는 Context에서 자동으로 가져옴
  */
-export function useAllConsultations() {
+/**
+ * 전체 상담 내역 조회 Hook
+ * [성능 개선] enabled 옵션 추가하여 조건부 로딩 지원
+ */
+export function useAllConsultations(options?: { enabled?: boolean }) {
   const context = getApiContext();
   const tenantId = context.tenantId;
 
   return useQuery({
     queryKey: ['consultations', tenantId, 'all'],
     queryFn: () => fetchConsultations(tenantId!, undefined),
-    enabled: !!tenantId,
+    enabled: options?.enabled !== undefined ? (!!tenantId && options.enabled) : !!tenantId,
     staleTime: 5 * 60 * 1000,  // 5분 (상담 데이터는 자주 변경되지 않음)
     gcTime: 10 * 60 * 1000,    // 10분
     retry: 3,
@@ -2520,7 +2534,12 @@ export function useUpdateStudentTags() {
  * 모든 학생의 수업 배정 정보 조회 Hook
  * [요구사항] 수업배정 탭에서 전체 학생별 수업 배정 현황 표시
  */
-export function useAllStudentClasses() {
+/**
+ * 전체 학생-수업 배정 조회 Hook
+ * [성능 개선] enabled 옵션 추가하여 조건부 로딩 지원
+ * [주의] limit: 10,000으로 대용량 데이터 조회
+ */
+export function useAllStudentClasses(options?: { enabled?: boolean }) {
   const context = getApiContext();
   const tenantId = context.tenantId;
 
@@ -2529,10 +2548,13 @@ export function useAllStudentClasses() {
     queryFn: async () => {
       if (!tenantId) return [];
 
-      // 모든 활성 학생-수업 배정 조회
+      // [성능 개선 2026-01-27] limit 축소: 10000 → 1000 (최근 1000건만 조회)
+      // TODO: 서버 측 집계 또는 페이지네이션으로 전환 필요
+      // 현실적으로 대부분 학원은 학생 500명 이하이므로 1000건이면 충분
       const response = await apiClient.get<StudentClass>('student_classes', {
         filters: { is_active: true },
-        limit: 10000,
+        orderBy: { column: 'enrolled_at', ascending: false },
+        limit: 1000,
       });
 
       if (response.error) {
@@ -2553,7 +2575,7 @@ export function useAllStudentClasses() {
         class_ids,
       }));
     },
-    enabled: !!tenantId,
+    enabled: options?.enabled !== undefined ? (!!tenantId && options.enabled) : !!tenantId,
     staleTime: 5 * 60 * 1000,  // 5분 (수업 배정은 자주 변경되지 않음)
     gcTime: 10 * 60 * 1000,    // 10분
   });
@@ -2920,5 +2942,203 @@ export function useUpdateStudentClassEnrolledAt() {
       queryClient.invalidateQueries({ queryKey: ['student-classes', tenantId] });
       queryClient.invalidateQueries({ queryKey: ['students', tenantId] });
     },
+  });
+}
+
+// ============================================================================
+// 성능 개선 2026-01-27: 페이지네이션 및 서버 측 집계
+// ============================================================================
+
+/**
+ * 상담 내역 페이지네이션 Hook
+ * [성능 개선 2026-01-27] 대량 데이터 로딩 대신 페이지네이션 지원
+ */
+export function useConsultationsPaged(options: {
+  page?: number;
+  pageSize?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  consultationType?: string;
+  enabled?: boolean;
+}) {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+
+  const {
+    page = 1,
+    pageSize = 20,
+    dateFrom,
+    dateTo,
+    consultationType,
+    enabled = true,
+  } = options;
+
+  return useQuery({
+    queryKey: [
+      'consultations',
+      tenantId,
+      'paged',
+      page,
+      pageSize,
+      dateFrom,
+      dateTo,
+      consultationType,
+    ],
+    queryFn: async () => {
+      if (!tenantId) {
+        return { consultations: [], totalCount: 0 };
+      }
+
+      // 필터 구성
+      const filters: Record<string, any> = {};
+      if (consultationType && consultationType !== 'all') {
+        filters.consultation_type = consultationType;
+      }
+      if (dateFrom || dateTo) {
+        filters.consultation_date = {};
+        if (dateFrom) filters.consultation_date.gte = dateFrom;
+        if (dateTo) filters.consultation_date.lte = dateTo;
+      }
+
+      // 페이지네이션 쿼리
+      const offset = (page - 1) * pageSize;
+      const response = await apiClient.get<StudentConsultation>('student_consultations', {
+        filters,
+        orderBy: { column: 'consultation_date', ascending: false },
+        range: { from: offset, to: offset + pageSize - 1 },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      // 전체 개수 조회
+      const countResponse = await apiClient.get<StudentConsultation>('student_consultations', {
+        filters,
+        count: 'exact',
+        limit: 1,
+      });
+
+      const totalCount = countResponse.count || 0;
+
+      return {
+        consultations: response.data || [],
+        totalCount,
+      };
+    },
+    enabled: !!tenantId && enabled,
+    staleTime: 2 * 60 * 1000, // 2분
+    gcTime: 5 * 60 * 1000, // 5분
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
+}
+
+/**
+ * 학생-수업 배정 페이지네이션 Hook
+ * [성능 개선 2026-01-27] 전체 데이터 로딩 대신 필요한 만큼만 조회
+ */
+export function useStudentClassesPaged(options: {
+  page?: number;
+  pageSize?: number;
+  isActive?: boolean;
+  classId?: string;
+  enabled?: boolean;
+}) {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+
+  const {
+    page = 1,
+    pageSize = 50,
+    isActive = true,
+    classId,
+    enabled = true,
+  } = options;
+
+  return useQuery({
+    queryKey: ['student-classes', tenantId, 'paged', page, pageSize, isActive, classId],
+    queryFn: async () => {
+      if (!tenantId) {
+        return { studentClasses: [], totalCount: 0 };
+      }
+
+      const filters: Record<string, any> = { is_active: isActive };
+      if (classId) {
+        filters.class_id = classId;
+      }
+
+      const offset = (page - 1) * pageSize;
+      const response = await apiClient.get<StudentClass>('student_classes', {
+        filters,
+        orderBy: { column: 'enrolled_at', ascending: false },
+        range: { from: offset, to: offset + pageSize - 1 },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      // 전체 개수 조회
+      const countResponse = await apiClient.get<StudentClass>('student_classes', {
+        filters,
+        count: 'exact',
+        limit: 1,
+      });
+
+      const totalCount = countResponse.count || 0;
+
+      return {
+        studentClasses: response.data || [],
+        totalCount,
+      };
+    },
+    enabled: !!tenantId && enabled,
+    staleTime: 2 * 60 * 1000, // 2분
+    gcTime: 5 * 60 * 1000, // 5분
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
+}
+
+/**
+ * 서버 측 통계 집계 Hook
+ * [성능 개선 2026-01-27] 클라이언트에서 집계하지 않고 서버에서 집계
+ */
+export function useStudentStatsAggregation(options: {
+  aggregationType: 'tag_stats' | 'class_stats' | 'status_stats' | 'consultation_stats';
+  filters?: {
+    date_from?: string;
+    date_to?: string;
+    is_active?: boolean;
+  };
+  enabled?: boolean;
+}) {
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+  const { aggregationType, filters, enabled = true } = options;
+
+  return useQuery({
+    queryKey: ['student-stats', tenantId, aggregationType, filters],
+    queryFn: async () => {
+      if (!tenantId) return [];
+
+      // Edge Function 호출
+      const response = await apiClient.callEdgeFunction('student-stats-aggregation', {
+        aggregationType,
+        filters,
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      return response.data || [];
+    },
+    enabled: !!tenantId && enabled,
+    staleTime: 5 * 60 * 1000, // 5분 (통계는 자주 변경되지 않음)
+    gcTime: 10 * 60 * 1000, // 10분
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }

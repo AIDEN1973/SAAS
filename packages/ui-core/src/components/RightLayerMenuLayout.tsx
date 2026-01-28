@@ -44,6 +44,8 @@ export interface RightLayerMenuLayoutProps {
   layerMenu: Omit<RightLayerMenuProps, 'isOpen' | 'onClose'> & {
     isOpen: boolean;
     onClose: () => void;
+    /** @deprecated contentKey는 더 이상 사용되지 않습니다. 자동으로 무시됩니다. */
+    contentKey?: string | number;
   };
   className?: string;
 }
@@ -189,7 +191,6 @@ export const RightLayerMenuLayout: React.FC<RightLayerMenuLayoutProps> = ({
         title={layerMenu.title}
         width={effectiveMenuWidth}
         headerActions={layerMenu.headerActions}
-        contentKey={layerMenu.contentKey}
         expandable={!isMobile && !isTablet}
         isExpanded={isExpanded}
         onToggleExpand={() => setIsExpanded((v) => !v)}

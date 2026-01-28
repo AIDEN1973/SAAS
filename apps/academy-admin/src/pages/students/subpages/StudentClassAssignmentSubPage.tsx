@@ -11,10 +11,13 @@ import React, { useState, useMemo } from 'react';
 import { Card, Button, Modal, EmptyState, EntityCard, DataTable, Input, Select, useResponsiveMode, isMobile, isTablet, Badge } from '@ui-core/react';
 import type { DataTableColumn } from '@ui-core/react';
 import { GraduationCap, Check, LayoutGrid, List } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient, getApiContext } from '@api-sdk/core';
+import { useTeachersWithStats } from '@hooks/use-class';
 import { StatsTableLayout } from '../../../components';
 import type { StatsItem, ChartDataItem, PeriodFilter } from '../../../components/stats';
 import type { TableSchema, FilterSchema, TableColumnSchema } from '@schema-engine';
-import type { Class } from '@services/class-service';
+import type { Class, ClassTeacher } from '@services/class-service';
 
 /** 학생-수업 배정 정보 */
 interface StudentClassInfo {
@@ -105,6 +108,7 @@ export interface StudentClassAssignmentSubPageProps {
   // 업종 중립 라벨
   terms: {
     PERSON_LABEL_PRIMARY: string;
+    PERSON_LABEL_SECONDARY: string;
     GROUP_LABEL: string;
     SUBJECT_LABEL?: string;
     CAPACITY_LABEL?: string;
@@ -147,11 +151,57 @@ export function StudentClassAssignmentSubPage({
   currentSubMenuLabel,
   terms,
 }: StudentClassAssignmentSubPageProps) {
+  // Get tenantId for teacher data fetching
+  const context = getApiContext();
+  const tenantId = context.tenantId;
+
   // 반응형 모드 감지
   const mode = useResponsiveMode();
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
   const isTabletMode = isTablet(modeUpper);
+
+  // Fetch teachers data using useTeachersWithStats hook (includes persons JOIN for name)
+  const { data: teachers } = useTeachersWithStats();
+
+  // Fetch all class_teachers assignments
+  const { data: allClassTeachers } = useQuery({
+    queryKey: ['all-class-teachers', tenantId],
+    queryFn: async () => {
+      if (!tenantId) return [];
+      const response = await apiClient.get<ClassTeacher>('class_teachers', {
+        filters: { is_active: true },
+      });
+      if (response.error) throw new Error(response.error.message);
+      return response.data || [];
+    },
+    enabled: !!tenantId,
+  });
+
+  // Create class -> teachers mapping for efficient lookup (includes profile images)
+  const classTeachersMap = useMemo(() => {
+    if (!allClassTeachers || !teachers) {
+      return new Map<string, Array<{ name: string; profile_image_url?: string | null }>>();
+    }
+
+    const map = new Map<string, Array<{ name: string; profile_image_url?: string | null }>>();
+    allClassTeachers.forEach(ct => {
+      // [수정 2026-01-27] ct.teacher_id는 academy_teachers.id를 참조
+      const teacher = teachers.find(t => t.id === ct.teacher_id);
+
+      if (teacher) {
+        if (!map.has(ct.class_id)) {
+          map.set(ct.class_id, []);
+        }
+        map.get(ct.class_id)!.push({
+          name: teacher.name,
+          profile_image_url: teacher.profile_image_url
+        });
+      }
+    });
+
+    return map;
+  }, [allClassTeachers, teachers]);
 
   // 수업배정 모달 상태 (학생 선택 모드)
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -714,20 +764,37 @@ export function StudentClassAssignmentSubPage({
                           ? [classItem.day_of_week]
                           : [];
 
+                      // Get teacher info for this class
+                      const teacherInfo = classTeachersMap.get(classItem.id);
+
+                      // 과목과 선생님 이름을 하나의 배지로 표시 (예: "국어 송민준")
+                      const subjectAndTeacher = teacherInfo && teacherInfo.length > 0
+                        ? `${classItem.subject || terms.GROUP_LABEL} ${teacherInfo[0].name}`
+                        : classItem.subject || terms.GROUP_LABEL;
+
+                      // Convert teacher info to profiles format
+                      const teacherProfiles = teacherInfo
+                        ? teacherInfo.map(t => ({
+                            imageUrl: t.profile_image_url,
+                            name: t.name
+                          }))
+                        : undefined;
+
                       return (
                         <EntityCard
                           key={classItem.id}
                           badge={{
-                            label: classItem.subject || terms.GROUP_LABEL,
+                            label: subjectAndTeacher,
                             color: getBadgeColor(classItem.subject),
                           }}
-                          secondaryLabel="-"
                           title={classItem.name}
                           mainValue={studentCount}
                           subValue={` / ${classItem.capacity}`}
                           dayOfWeek={dayOfWeekArray.length > 0 ? dayOfWeekArray : undefined}
                           description={`${classItem.start_time?.slice(0, 5)}~${classItem.end_time?.slice(0, 5)}`}
                           onClick={() => handleClassCardClick(classItem.id)}
+                          valueAtBottom={true}
+                          profiles={teacherProfiles}
                         />
                       );
                     })}
@@ -822,7 +889,8 @@ export function StudentClassAssignmentSubPage({
                         label: '담당',
                         width: '12%',
                         render: (_, row) => {
-                          const teacherNames = (row as unknown as { teachers?: Array<{ name: string }> }).teachers;
+                          const classItem = row as Class;
+                          const teacherNames = classTeachersMap.get(classItem.id);
                           if (teacherNames && teacherNames.length > 0) {
                             return <span>{teacherNames.map(t => t.name).join(', ')}</span>;
                           }

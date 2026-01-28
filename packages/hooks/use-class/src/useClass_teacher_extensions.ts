@@ -335,7 +335,7 @@ export function useTeachersWithStats(filter?: TeacherFilter) {
         if (classTeachersResponse.data) {
           const classTeachers = classTeachersResponse.data;
 
-          // 수업별 학생 수 조회
+          // 수업별 학생 수 조회 (테이블명: student_classes, 상태 컬럼: is_active)
           const classIds = [...new Set(classTeachers.map((ct) => ct.class_id))];
 
           const enrollmentsMap: Record<string, number> = {};
@@ -343,11 +343,11 @@ export function useTeachersWithStats(filter?: TeacherFilter) {
             const enrollmentsResponse = await apiClient.get<{
               class_id: string;
               student_id: string;
-            }>('class_enrollments', {
+            }>('student_classes', {
               select: 'class_id, student_id',
               filters: {
                 class_id: classIds,
-                status: 'active',
+                is_active: true,
               },
             });
 
@@ -377,6 +377,7 @@ export function useTeachersWithStats(filter?: TeacherFilter) {
       // 최종 데이터 변환
       const teachers: TeacherWithStats[] = filteredTeachers.map((raw) => ({
         id: raw.id,
+        person_id: raw.person_id,
         tenant_id: raw.tenant_id,
         name: raw.persons?.name || '',
         email: raw.persons?.email || undefined,

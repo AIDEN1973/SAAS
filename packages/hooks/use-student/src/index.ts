@@ -34,6 +34,10 @@ export {
   useAssignStudentToClass,
   useUnassignStudentFromClass,
   useUpdateStudentClassEnrolledAt,
+  // [성능 개선 2026-01-27] 페이지네이션 및 서버 측 집계
+  useConsultationsPaged,
+  useStudentClassesPaged,
+  useStudentStatsAggregation,
 } from './useStudent';
 
 export {

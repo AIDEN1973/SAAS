@@ -628,6 +628,47 @@ export class ApiClient {
   }
 
   /**
+   * Edge Function 호출
+   * [성능 개선 2026-01-27] 서버 측 집계 및 복잡한 로직 수행
+   */
+  async callEdgeFunction<T = unknown>(
+    functionName: string,
+    body?: Record<string, unknown>
+  ): Promise<ApiResponse<T>> {
+    try {
+      const { data, error } = await this.supabase.functions.invoke(functionName, {
+        body,
+      });
+
+      if (error) {
+        return {
+          success: false,
+          error: {
+            message: error.message,
+            code: 'EDGE_FUNCTION_ERROR',
+          },
+          data: undefined,
+        };
+      }
+
+      return {
+        success: true,
+        data: data as T,
+        error: undefined,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'UNKNOWN_ERROR',
+        },
+        data: undefined,
+      };
+    }
+  }
+
+  /**
    * 파일 업로드 (Supabase Storage)
    *
    * [불변 규칙] 테넌트별 폴더 구조: `{tenant_id}/{bucket_path}/{file_name}`

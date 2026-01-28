@@ -53,6 +53,12 @@ export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectE
    * - 'end': 버튼 오른쪽 정렬
    */
   dropdownAlign?: 'start' | 'center' | 'end';
+  /**
+   * multiple 모드에서 선택된 항목 수 표시 시 사용할 단위
+   * - 기본값: '개' (예: "2개 선택됨")
+   * - 예시: '명' → "2명 선택됨"
+   */
+  selectedSuffix?: string;
 }
 
 /**
@@ -77,6 +83,7 @@ export const Select: React.FC<SelectProps> = ({
   dropdownMinWidth,
   autoDropdownWidth = false,
   dropdownAlign = 'start',
+  selectedSuffix = '개',
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ...props
 }) => {
@@ -316,7 +323,9 @@ export const Select: React.FC<SelectProps> = ({
 
   const displayText = multiple
     ? selectedLabels.length > 0
-      ? `${selectedLabels.length}개 선택됨`
+      ? selectedLabels.length === 1
+        ? selectedLabels[0] // 1개 선택 시 이름 표시
+        : `${selectedLabels.length}${selectedSuffix} 선택됨` // 2개 이상 선택 시 "N개/명 선택됨"
       : placeholder
     : selectedLabels[0] || placeholder;
 
@@ -522,7 +531,7 @@ export const Select: React.FC<SelectProps> = ({
                 padding: 'var(--spacing-xs)',
                 width: '100%', // 부모(Popover) 너비에 맞춤
                 boxSizing: 'border-box',
-                maxHeight: '300px', // 최대 높이 설정
+                maxHeight: 'var(--dropdown-max-height, 300px)', // 최대 높이 설정
                 overflowY: 'auto', // 세로 스크롤
                 scrollbarWidth: 'none', // Firefox: 스크롤바 숨김
                 msOverflowStyle: 'none', // IE/Edge: 스크롤바 숨김
@@ -606,7 +615,7 @@ export const Select: React.FC<SelectProps> = ({
                       {option.divider && (
                         <div
                           style={{
-                            height: '1px',
+                            height: 'var(--divider-height, 1px)',
                             backgroundColor: 'var(--color-gray-200)',
                             margin: 'var(--spacing-xs) 0',
                           }}

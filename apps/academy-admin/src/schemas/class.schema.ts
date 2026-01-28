@@ -160,10 +160,11 @@ export function createClassFormSchema(teachers?: Teacher[], terms?: IndustryTerm
         name: 'teacher_ids',
         kind: 'multiselect',
         ui: {
-          label: '담당 선생님',
+          label: terms ? `담당 ${terms.PERSON_LABEL_SECONDARY}` : '담당 선생님',
           colSpan: 1,
         },
         options: [
+          // class_teachers.teacher_id는 academy_teachers.id를 참조 (수정됨 2026-01-27)
           ...(teachers?.map((t) => ({ label: t.name, value: t.id })) || []),
         ],
       },

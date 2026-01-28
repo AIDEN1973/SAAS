@@ -1,6 +1,6 @@
--- P1-3: 강사별 통계 조회 RPC
--- 목적: 담당 반 수, 담당 학생 수, 담임/부담임 구분 통계 제공
--- 요구사항: TeachersPage에서 강사 카드에 통계 표시
+-- 2026-01-27: get_teacher_statistics 함수의 검증 로직 수정
+-- 문제: WHERE person_id = p_teacher_id (잘못됨)
+-- 수정: WHERE id = p_teacher_id (올바름)
 
 CREATE OR REPLACE FUNCTION public.get_teacher_statistics(
   p_tenant_id uuid,
@@ -77,10 +77,7 @@ EXCEPTION
 END;
 $$;
 
--- 코멘트
-COMMENT ON FUNCTION public.get_teacher_statistics IS
-'P1-3: 강사별 통계 조회 (담당 반 수, 담당 학생 수, 담임/부담임 구분). TeachersPage 카드에서 사용.';
-
--- 권한 부여
 GRANT EXECUTE ON FUNCTION public.get_teacher_statistics TO authenticated;
-REVOKE EXECUTE ON FUNCTION public.get_teacher_statistics FROM anon;
+
+COMMENT ON FUNCTION public.get_teacher_statistics IS
+'P1-3: 강사별 통계 조회 (담당 반 수, 담당 학생 수, 담임/부담임 구분). [2026-01-27 수정] id 기반 검증';

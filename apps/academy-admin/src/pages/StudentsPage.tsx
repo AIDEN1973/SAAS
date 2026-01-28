@@ -347,9 +347,9 @@ export function StudentsPage() {
     return result;
   }, [filteredAllConsultations, consultationFilters, students]);
 
-  // 기간에 맞는 학생 데이터 필터링
+  // [성능 개선 2026-01-27] 기간에 맞는 학생 데이터 필터링 - list 탭에서만 계산
   const filteredStudentsByPeriod = useMemo(() => {
-    if (!students || students.length === 0) return students;
+    if (selectedSubMenu !== 'list' || !students || students.length === 0) return students;
 
     const now = new Date();
     let startDate: Date;
@@ -421,10 +421,14 @@ export function StudentsPage() {
       const beforeEnd = endDate ? createdDate <= endDate : true;
       return afterStart && beforeEnd;
     });
-  }, [students, statsPeriod]);
+  }, [students, statsPeriod, selectedSubMenu]);
 
-  // 학생 현황 통계 계산 (기간 필터 적용)
+  // [성능 개선 2026-01-27] 학생 현황 통계 계산 - list 탭에서만 계산
   const studentStatusStats = useMemo(() => {
+    // list 탭이 아니면 빈 통계 반환
+    if (selectedSubMenu !== 'list') {
+      return { total: 0, active: 0, onLeave: 0, graduated: 0, withdrawn: 0 };
+    }
     // 데이터가 없을 때도 0으로 채운 통계 반환 (컴포넌트가 사라지지 않도록)
     if (!filteredStudentsByPeriod || filteredStudentsByPeriod.length === 0) {
       return {
@@ -449,11 +453,11 @@ export function StudentsPage() {
       graduated,
       withdrawn,
     };
-  }, [filteredStudentsByPeriod]);
+  }, [selectedSubMenu, filteredStudentsByPeriod]);
 
-  // 지난달 통계 계산 (trend 표시용)
+  // [성능 개선 2026-01-27] 지난달 통계 계산 (trend 표시용) - list 탭에서만 계산
   const lastMonthStats = useMemo(() => {
-    if (!students || students.length === 0) {
+    if (selectedSubMenu !== 'list' || !students || students.length === 0) {
       return {
         total: 0,
         active: 0,
@@ -487,11 +491,11 @@ export function StudentsPage() {
       graduated,
       withdrawn,
     };
-  }, [students]);
+  }, [selectedSubMenu, students]);
 
-  // 상담 통계 계산
+  // [성능 개선 2026-01-27] 상담 통계 계산 - consultations 탭에서만 계산
   const consultationStats = useMemo(() => {
-    if (!filteredConsultationsWithTableFilters || filteredConsultationsWithTableFilters.length === 0) {
+    if (selectedSubMenu !== 'consultations' || !filteredConsultationsWithTableFilters || filteredConsultationsWithTableFilters.length === 0) {
       return {
         total: 0,
         counseling: 0,
@@ -514,7 +518,7 @@ export function StudentsPage() {
       behavior,
       other,
     };
-  }, [filteredConsultationsWithTableFilters]);
+  }, [selectedSubMenu, filteredConsultationsWithTableFilters]);
 
   // StatsDashboard용 통계 카드 데이터 (학생 목록 탭용)
   const statsItems: StatsItem[] = useMemo(() => {
@@ -604,9 +608,9 @@ export function StudentsPage() {
     ];
   }, [consultationStats, terms.CONSULTATION_LABEL_PLURAL, terms.CONSULTATION_TYPE_LABELS]);
 
-  // 상담관리 탭용 차트 데이터 (선택된 카드에 따라 필터링)
+  // [성능 개선 2026-01-27] 상담관리 탭용 차트 데이터 - consultations 탭에서만 계산
   const consultationChartData: ChartDataItem[] = useMemo(() => {
-    if (!filteredConsultationsWithTableFilters || filteredConsultationsWithTableFilters.length === 0) {
+    if (selectedSubMenu !== 'consultations' || !filteredConsultationsWithTableFilters || filteredConsultationsWithTableFilters.length === 0) {
       return [];
     }
 
@@ -641,11 +645,11 @@ export function StudentsPage() {
           color: 'var(--color-primary)',
         };
       });
-  }, [filteredConsultationsWithTableFilters, selectedConsultationStatsKey]);
+  }, [selectedSubMenu, filteredConsultationsWithTableFilters, selectedConsultationStatsKey]);
 
-  // StatsDashboard용 차트 데이터 (선택된 카드에 따라 필터링)
+  // [성능 개선 2026-01-27] StatsDashboard용 차트 데이터 - list 탭에서만 계산
   const chartData: ChartDataItem[] = useMemo(() => {
-    if (!students || students.length === 0) {
+    if (selectedSubMenu !== 'list' || !students || students.length === 0) {
       return [];
     }
 
@@ -765,7 +769,7 @@ export function StudentsPage() {
         color: 'var(--color-primary)',
       };
     });
-  }, [students, statsPeriod, selectedStatsKey]);
+  }, [selectedSubMenu, students, statsPeriod, selectedStatsKey]);
 
   // 서브메뉴 아이템에 동적 라벨 및 opensInModalOrNewWindow 속성 적용
   const subMenuItemsWithDynamicLabels = useMemo(() => {
@@ -803,8 +807,6 @@ export function StudentsPage() {
         layerMenu={{
           isOpen: !!selectedStudentId,
           onClose: () => handleStudentSelect(null),
-          // 중요: 내용 변경 감지를 위해 selectedStudentId를 contentKey로 전달
-          contentKey: selectedStudentId || undefined,
           // 중요: 학생 상세 레이어 메뉴는 AI 레이어 메뉴보다 높은 z-index를 가져야 함 (항상 열려있는 AI 레이어 위에 오버레이)
           style: {
             zIndex: 'var(--z-modal)', // AI 레이어 메뉴(--z-sticky)보다 높음
@@ -1300,6 +1302,7 @@ export function StudentsPage() {
             currentSubMenuLabel={currentSubMenuLabel}
             terms={{
               PERSON_LABEL_PRIMARY: terms.PERSON_LABEL_PRIMARY,
+              PERSON_LABEL_SECONDARY: terms.PERSON_LABEL_SECONDARY,
               GROUP_LABEL: terms.GROUP_LABEL,
               MESSAGES: terms.MESSAGES,
             }}

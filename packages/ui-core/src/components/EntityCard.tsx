@@ -10,6 +10,7 @@
 import React from 'react';
 import { Card } from './Card';
 import { Badge } from './Badge';
+import { Avatar } from './Avatar';
 import { ColorToken } from '@design-system/core';
 
 export interface EntityCardProps {
@@ -18,8 +19,11 @@ export interface EntityCardProps {
     label: string;
     color?: ColorToken | 'blue' | 'gray' | 'green' | 'yellow';
   };
-  /** 보조 레이블 (배지로 표시) */
-  secondaryLabel?: string;
+  /** 보조 레이블 (배지로 표시) - 문자열 또는 배지 객체 지원 */
+  secondaryLabel?: string | {
+    label: string;
+    color?: ColorToken | 'blue' | 'gray' | 'green' | 'yellow';
+  };
   /** 카드 제목 */
   title: string;
   /** 메인 값 (큰 숫자 또는 텍스트) */
@@ -38,6 +42,13 @@ export interface EntityCardProps {
   disabled?: boolean;
   /** 추가 스타일 */
   style?: React.CSSProperties;
+  /** 값(mainValue/subValue)을 하단으로 이동 (기본: false) */
+  valueAtBottom?: boolean;
+  /** 프로필 이미지 정보 배열 (여러 명 지원) */
+  profiles?: Array<{
+    imageUrl?: string | null;
+    name: string;
+  }>;
 }
 
 /**
@@ -122,6 +133,8 @@ export const EntityCard: React.FC<EntityCardProps> = ({
   selected,
   disabled,
   style,
+  valueAtBottom = false,
+  profiles,
 }) => {
   const [isHovered, setIsHovered] = React.useState(false);
 
@@ -135,7 +148,6 @@ export const EntityCard: React.FC<EntityCardProps> = ({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
         gap: 'var(--spacing-sm)',
         cursor: onClick ? 'pointer' : 'default',
         opacity: disabled ? 'var(--opacity-disabled)' : 1,
@@ -147,99 +159,345 @@ export const EntityCard: React.FC<EntityCardProps> = ({
         ...style,
       }}
     >
-      {/* 상단: 주 배지 + 보조 배지 */}
-      {(badge || secondaryLabel) && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-          {badge && (
-            <Badge color={badge.color} size="sm">
-              {badge.label}
-            </Badge>
-          )}
-          {secondaryLabel && (
-            <Badge color="gray" size="sm" style={{ backgroundColor: 'var(--color-gray-100)', color: 'var(--color-text)' }}>
-              {secondaryLabel}
-            </Badge>
-          )}
-        </div>
-      )}
-
-      {/* 제목 + 메인값 (수업명 + 정원) */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginTop: badge || secondaryLabel ? 'var(--spacing-xs)' : 0,
-        }}
-      >
-        <span
-          style={{
-            fontWeight: 'var(--font-weight-extrabold)',
-            fontSize: 'var(--font-size-2xl)',
-            color: 'var(--color-text)',
-          }}
-        >
-          {title}
-        </span>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--spacing-xs)' }}>
-          <span
+      {valueAtBottom ? (
+        <>
+          {/* valueAtBottom = true: ProfileEntityCard와 동일한 레이아웃 */}
+          {/* 상단: 배지/제목 + 프로필 이미지 */}
+          <div
             style={{
-              fontSize: 'var(--font-size-2xl)',
-              fontWeight: 'var(--font-weight-extrabold)',
-              color: 'var(--color-text)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--spacing-md)',
             }}
           >
-            {mainValue}
-          </span>
-          {subValue && (
+            {/* 배지 + 제목 (좌측) */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {/* 배지 영역 */}
+              {(badge || secondaryLabel) && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', marginBottom: 'var(--spacing-xs)' }}>
+                  {badge && (
+                    <Badge color={badge.color} size="sm">
+                      {badge.label}
+                    </Badge>
+                  )}
+                  {secondaryLabel && (
+                    <Badge
+                      color={typeof secondaryLabel === 'string' ? 'gray' : (secondaryLabel.color || 'gray')}
+                      size="sm"
+                    >
+                      {typeof secondaryLabel === 'string' ? secondaryLabel : secondaryLabel.label}
+                    </Badge>
+                  )}
+                </div>
+              )}
+              {/* 제목 */}
+              <span
+                style={{
+                  fontWeight: 'var(--font-weight-extrabold)',
+                  fontSize: 'var(--font-size-2xl)',
+                  color: 'var(--color-text)',
+                  display: 'block',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {title}
+              </span>
+            </div>
+
+            {/* 프로필 이미지들 (우측, 40% 겹침) */}
+            {profiles && profiles.length > 0 && (
+              <div
+                style={{
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  position: 'relative',
+                  height: 'var(--size-avatar-xl)',
+                }}
+              >
+                {profiles.map((profile, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      position: 'relative',
+                      marginLeft: index > 0 ? 'calc(var(--size-avatar-xl) * -0.4)' : '0',
+                      zIndex: profiles.length - index,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 'var(--size-avatar-xl)',
+                        height: 'var(--size-avatar-xl)',
+                        borderRadius: 'var(--border-radius-full)',
+                        border: 'var(--border-width-medium) solid var(--color-gray-200)',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'var(--color-gray-100)',
+                      }}
+                    >
+                      {profile.imageUrl ? (
+                        <img
+                          src={profile.imageUrl}
+                          alt={profile.name}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: 'var(--font-size-lg)',
+                            fontWeight: 'var(--font-weight-semibold)',
+                            color: 'var(--color-text-secondary)',
+                          }}
+                        >
+                          {profile.name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 구분선 */}
+          <div
+            style={{
+              borderTop: 'var(--border-width-thin) solid var(--color-gray-200)',
+              marginTop: 'var(--spacing-xs)',
+              paddingTop: 'var(--spacing-xs)',
+            }}
+          />
+
+          {/* 하단: 요일 + 시간 (좌측) + 메인값/서브값 (우측) */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacing-sm)' }}>
+            {/* 좌측: 요일 + 시간 */}
+            {(dayOfWeek || description) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', overflow: 'hidden' }}>
+                {dayOfWeek && (
+                  <span
+                    style={{
+                      fontSize: 'var(--font-size-sm)',
+                      color: 'var(--color-text-secondary)',
+                      fontWeight: 'var(--font-weight-medium)',
+                    }}
+                  >
+                    {Array.isArray(dayOfWeek)
+                      ? sortDays(dayOfWeek).map(getDayShortLabel).join(', ')
+                      : getDayShortLabel(dayOfWeek)}
+                  </span>
+                )}
+                {description && (
+                  <span
+                    style={{
+                      fontSize: 'var(--font-size-sm)',
+                      color: 'var(--color-text-secondary)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {description}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* 우측: 메인값 + 서브값 */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--spacing-xs)', flexShrink: 0 }}>
+              <span
+                style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  color: 'var(--color-text)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {mainValue}
+              </span>
+              {subValue && (
+                <span
+                  style={{
+                    fontSize: 'var(--font-size-lg)',
+                    color: 'var(--color-text-secondary)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {subValue}
+                </span>
+              )}
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* valueAtBottom = false: 기본 레이아웃 (배지/제목 + 프로필 상단) */}
+          {/* 상단: 배지 + 프로필 이미지 */}
+          {(profiles || badge || secondaryLabel) && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacing-md)' }}>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
+                {badge && (
+                  <Badge color={badge.color} size="sm">
+                    {badge.label}
+                  </Badge>
+                )}
+                {secondaryLabel && (
+                  <Badge
+                    color={typeof secondaryLabel === 'string' ? 'gray' : (secondaryLabel.color || 'gray')}
+                    size="sm"
+                  >
+                    {typeof secondaryLabel === 'string' ? secondaryLabel : secondaryLabel.label}
+                  </Badge>
+                )}
+              </div>
+              {profiles && profiles.length > 0 && (
+                <div
+                  style={{
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    position: 'relative',
+                    height: 'var(--size-avatar-xl)',
+                  }}
+                >
+                  {profiles.map((profile, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        position: 'relative',
+                        marginLeft: index > 0 ? 'calc(var(--size-avatar-xl) * -0.5)' : '0',
+                        zIndex: profiles.length - index,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 'var(--size-avatar-xl)',
+                          height: 'var(--size-avatar-xl)',
+                          borderRadius: 'var(--border-radius-full)',
+                          border: 'var(--border-width-medium) solid var(--color-gray-200)',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: 'var(--color-gray-100)',
+                        }}
+                      >
+                        {profile.imageUrl ? (
+                          <img
+                            src={profile.imageUrl}
+                            alt={profile.name}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                            }}
+                          />
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: 'var(--font-size-lg)',
+                              fontWeight: 'var(--font-weight-semibold)',
+                              color: 'var(--color-text-secondary)',
+                            }}
+                          >
+                            {profile.name.charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 제목 + 메인값 */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: badge || secondaryLabel || profiles ? 'var(--spacing-xs)' : 0,
+            }}
+          >
             <span
               style={{
+                fontWeight: 'var(--font-weight-extrabold)',
                 fontSize: 'var(--font-size-2xl)',
-                color: 'var(--color-text-secondary)',
+                color: 'var(--color-text)',
               }}
             >
-              {subValue}
+              {title}
             </span>
-          )}
-        </div>
-      </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--spacing-xs)' }}>
+              <span
+                style={{
+                  fontSize: 'var(--font-size-2xl)',
+                  fontWeight: 'var(--font-weight-extrabold)',
+                  color: 'var(--color-text)',
+                }}
+              >
+                {mainValue}
+              </span>
+              {subValue && (
+                <span
+                  style={{
+                    fontSize: 'var(--font-size-2xl)',
+                    color: 'var(--color-text-secondary)',
+                  }}
+                >
+                  {subValue}
+                </span>
+              )}
+            </div>
+          </div>
 
-      {/* 구분선 */}
-      <div
-        style={{
-          borderTop: 'var(--border-width-thin) solid var(--color-gray-200)',
-          marginTop: 'var(--spacing-xs)',
-          paddingTop: 'var(--spacing-xs)',
-        }}
-      />
+          {/* 구분선 */}
+          <div
+            style={{
+              borderTop: 'var(--border-width-thin) solid var(--color-gray-200)',
+              marginTop: 'var(--spacing-xs)',
+              paddingTop: 'var(--spacing-xs)',
+            }}
+          />
 
-      {/* 설명 (요일 + 시간) */}
-      {(dayOfWeek || description) && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-          {dayOfWeek && (
-            <span
-              style={{
-                fontSize: 'var(--font-size-sm)',
-                color: 'var(--color-text-secondary)',
-                fontWeight: 'var(--font-weight-medium)',
-              }}
-            >
-              {Array.isArray(dayOfWeek)
-                ? sortDays(dayOfWeek).map(getDayShortLabel).join(', ')
-                : getDayShortLabel(dayOfWeek)}
-            </span>
+          {/* 설명 (요일 + 시간) */}
+          {(dayOfWeek || description) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+              {dayOfWeek && (
+                <span
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--color-text-secondary)',
+                    fontWeight: 'var(--font-weight-medium)',
+                  }}
+                >
+                  {Array.isArray(dayOfWeek)
+                    ? sortDays(dayOfWeek).map(getDayShortLabel).join(', ')
+                    : getDayShortLabel(dayOfWeek)}
+                </span>
+              )}
+              {description && (
+                <span
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--color-text-secondary)',
+                  }}
+                >
+                  {description}
+                </span>
+              )}
+            </div>
           )}
-          {description && (
-            <span
-              style={{
-                fontSize: 'var(--font-size-sm)',
-                color: 'var(--color-text-secondary)',
-              }}
-            >
-              {description}
-            </span>
-          )}
-        </div>
+        </>
       )}
     </Card>
   );

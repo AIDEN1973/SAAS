@@ -16,6 +16,19 @@ import type { FormSchema, FormFieldSchema } from '@schema-engine/types';
 import { teacherFormSchema } from '../../../schemas/teacher.schema';
 import { useTeacher } from '@hooks/use-class';
 
+// Avatar constants - Supabase Storage URLs
+const STORAGE_BASE_URL = 'https://xawypsrotrfoyozhrsbb.supabase.co/storage/v1/object/public/avatars';
+const MALE_AVATARS = [
+  `${STORAGE_BASE_URL}/male/man_1.jpg`,
+  `${STORAGE_BASE_URL}/male/man_2.jpg`,
+  `${STORAGE_BASE_URL}/male/man_3.jpg`,
+  `${STORAGE_BASE_URL}/male/man_4.jpg`,
+  `${STORAGE_BASE_URL}/male/man_5.jpg`,
+  `${STORAGE_BASE_URL}/male/man_6.jpg`,
+  `${STORAGE_BASE_URL}/male/man_7.jpg`,
+];
+const FEMALE_AVATARS: string[] = [];
+
 export type TeacherFormMode = 'create' | 'edit';
 
 export interface TeacherFormProps {
@@ -37,26 +50,41 @@ export const TeacherForm = ({
   // edit 모드에서만 강사 데이터 조회
   const { data: teacher, isLoading } = useTeacher(mode === 'edit' ? teacherId ?? null : null);
 
-  // mode에 따라 스키마 조정 (비밀번호 필드 validation)
+  // mode에 따라 스키마 조정 (비밀번호 필드 validation 및 플레이스홀더)
   const effectiveFormSchema = useMemo<FormSchema>(() => {
-    if (mode === 'create') {
-      return teacherFormSchema;
-    }
-
-    // edit 모드: 비밀번호 필드 validation 제거 (선택 입력)
-    const editFields = teacherFormSchema.form.fields.map((field: FormFieldSchema) => {
+    const modifiedFields = teacherFormSchema.form.fields.map((field: FormFieldSchema) => {
       if (field.name === 'password') {
+        if (mode === 'create') {
+          return {
+            ...field,
+            ui: {
+              ...field.ui,
+              placeholder: '비밀번호 입력',
+            },
+          };
+        }
+        // edit 모드
         return {
           ...field,
           ui: {
             ...field.ui,
-            placeholder: '변경할 비밀번호 입력',
+            placeholder: '비밀번호 변경 시에만 입력하세요',
             description: '변경하지 않으려면 비워두세요',
           },
           validation: undefined, // required, minLength 제거
         };
       }
       if (field.name === 'password_confirm') {
+        if (mode === 'create') {
+          return {
+            ...field,
+            ui: {
+              ...field.ui,
+              placeholder: '비밀번호 재입력',
+            },
+          };
+        }
+        // edit 모드
         return {
           ...field,
           ui: {
@@ -74,10 +102,10 @@ export const TeacherForm = ({
       ...teacherFormSchema,
       form: {
         ...teacherFormSchema.form,
-        fields: editFields,
+        fields: modifiedFields,
         submit: {
           ...teacherFormSchema.form.submit,
-          label: '수정',
+          label: mode === 'create' ? '등록' : '수정',
         },
       },
     };
@@ -89,6 +117,7 @@ export const TeacherForm = ({
       return {
         status: 'active',
         position: 'teacher',
+        gender: 'male',
       };
     }
 
@@ -97,6 +126,7 @@ export const TeacherForm = ({
 
     return {
       position: teacher.position || '',
+      gender: (teacher as unknown as { gender?: string }).gender || 'male',
       name: teacher.name || '',
       phone: teacher.phone || '',
       login_id: teacher.login_id || '',
@@ -118,7 +148,33 @@ export const TeacherForm = ({
   }, [mode, teacher]);
 
   const handleSubmit = useCallback(async (data: Record<string, unknown>) => {
-    // profile_image (File 객체)를 그대로 전달하여 상위에서 업로드 처리
+    // profile_image (File 객체) 또는 profile_image_url (캐릭터 URL)를 전달하여 상위에서 처리
+    // 캐릭터/사진이 선택되지 않았으면 성별에 맞는 랜덤 캐릭터 배정
+    const hasProfileImage = data.profile_image &&
+                           data.profile_image !== '' &&
+                           data.profile_image !== undefined &&
+                           (typeof data.profile_image === 'string' ? data.profile_image.trim() !== '' : true);
+
+    const hasProfileImageUrl = data.profile_image_url &&
+                              typeof data.profile_image_url === 'string' &&
+                              data.profile_image_url.trim() !== '';
+
+    // 프로필 이미지가 없으면 랜덤 캐릭터 배정
+    if (!hasProfileImage && !hasProfileImageUrl) {
+      const gender = (data.gender as string) || 'male';
+      const avatars = gender === 'male' ? MALE_AVATARS : FEMALE_AVATARS;
+
+      if (avatars.length > 0) {
+        const randomIndex = Math.floor(Math.random() * avatars.length);
+        const randomAvatar = avatars[randomIndex];
+        data.profile_image_url = randomAvatar;
+        // profile_image 필드에도 설정하여 프리뷰 표시
+        data.profile_image = randomAvatar;
+
+        console.log('[TeacherForm] 랜덤 캐릭터 배정:', { gender, randomAvatar, randomIndex });
+      }
+    }
+
     await onSubmit(data);
   }, [onSubmit]);
 

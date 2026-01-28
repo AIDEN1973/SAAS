@@ -18,10 +18,10 @@ DECLARE
   v_main_teacher_classes integer;
   v_assistant_classes integer;
 BEGIN
-  -- 입력 검증: 강사 존재 여부
+  -- 입력 검증: 강사 존재 여부 [수정 2026-01-27: person_id → id]
   IF NOT EXISTS (
     SELECT 1 FROM public.academy_teachers
-    WHERE person_id = p_teacher_id AND tenant_id = p_tenant_id
+    WHERE id = p_teacher_id AND tenant_id = p_tenant_id
   ) THEN
     RAISE EXCEPTION '존재하지 않는 강사입니다: %', p_teacher_id;
   END IF;

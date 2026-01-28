@@ -42,17 +42,22 @@ import {
 // 기술문서에서는 TextInput으로 명시되어 있으나, 실제 구현은 Input 컴포넌트를 사용합니다.
 
 /**
- * 샘플 캐릭터 목록 (향후 DB에서 관리 예정)
+ * 캐릭터 목록 - Supabase Storage
  * [업종중립] 프로필 캐릭터 선택 기능
  */
-const SAMPLE_CHARACTERS = [
-  { id: 'char_1', name: '캐릭터 1', url: '/characters/character_1.png' },
-  { id: 'char_2', name: '캐릭터 2', url: '/characters/character_2.png' },
-  { id: 'char_3', name: '캐릭터 3', url: '/characters/character_3.png' },
-  { id: 'char_4', name: '캐릭터 4', url: '/characters/character_4.png' },
-  { id: 'char_5', name: '캐릭터 5', url: '/characters/character_5.png' },
-  { id: 'char_6', name: '캐릭터 6', url: '/characters/character_6.png' },
+const STORAGE_BASE_URL = 'https://xawypsrotrfoyozhrsbb.supabase.co/storage/v1/object/public/avatars';
+
+const MALE_CHARACTERS = [
+  { id: 'man_1', name: '남성 캐릭터 1', url: `${STORAGE_BASE_URL}/male/man_1.jpg`, gender: 'male' },
+  { id: 'man_2', name: '남성 캐릭터 2', url: `${STORAGE_BASE_URL}/male/man_2.jpg`, gender: 'male' },
+  { id: 'man_3', name: '남성 캐릭터 3', url: `${STORAGE_BASE_URL}/male/man_3.jpg`, gender: 'male' },
+  { id: 'man_4', name: '남성 캐릭터 4', url: `${STORAGE_BASE_URL}/male/man_4.jpg`, gender: 'male' },
+  { id: 'man_5', name: '남성 캐릭터 5', url: `${STORAGE_BASE_URL}/male/man_5.jpg`, gender: 'male' },
+  { id: 'man_6', name: '남성 캐릭터 6', url: `${STORAGE_BASE_URL}/male/man_6.jpg`, gender: 'male' },
+  { id: 'man_7', name: '남성 캐릭터 7', url: `${STORAGE_BASE_URL}/male/man_7.jpg`, gender: 'male' },
 ];
+
+const FEMALE_CHARACTERS: typeof MALE_CHARACTERS = [];
 
 /**
  * ProfileImageButtonGroup Component
@@ -63,14 +68,19 @@ const SAMPLE_CHARACTERS = [
 interface ProfileImageButtonGroupProps {
   isDisabled: boolean;
   setFormValue?: UseFormSetValue<Record<string, unknown>>;
+  gender?: 'male' | 'female';
 }
 
 const ProfileImageButtonGroup: React.FC<ProfileImageButtonGroupProps> = ({
   isDisabled,
   setFormValue,
+  gender = 'male',
 }) => {
   const [showCharacterMenu, setShowCharacterMenu] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
+
+  // gender에 따라 캐릭터 목록 필터링
+  const availableCharacters = gender === 'male' ? MALE_CHARACTERS : FEMALE_CHARACTERS;
 
   // 외부 클릭 시 메뉴 닫기
   React.useEffect(() => {
@@ -90,9 +100,14 @@ const ProfileImageButtonGroup: React.FC<ProfileImageButtonGroupProps> = ({
   }, [showCharacterMenu]);
 
   // 캐릭터 선택 핸들러
-  const handleCharacterSelect = (character: typeof SAMPLE_CHARACTERS[0]) => {
+  const handleCharacterSelect = (character: typeof MALE_CHARACTERS[0]) => {
     if (setFormValue) {
-      // profile_image 필드에 캐릭터 URL 설정
+      // profile_image_url 필드에 캐릭터 URL 설정
+      setFormValue('profile_image_url', character.url, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      // profile_image 필드에도 캐릭터 URL 설정 (좌측 프로필 이미지 즉시 반영)
       setFormValue('profile_image', character.url, {
         shouldValidate: true,
         shouldDirty: true,
@@ -189,7 +204,7 @@ const ProfileImageButtonGroup: React.FC<ProfileImageButtonGroupProps> = ({
               color: 'var(--color-text-secondary)',
             }}
           >
-            캐릭터를 선택하세요
+            {gender === 'male' ? '남성' : '여성'} 캐릭터를 선택하세요
           </div>
 
           {/* 캐릭터 그리드 */}
@@ -200,7 +215,20 @@ const ProfileImageButtonGroup: React.FC<ProfileImageButtonGroupProps> = ({
               gap: 'var(--spacing-xs)',
             }}
           >
-            {SAMPLE_CHARACTERS.map((character) => (
+            {availableCharacters.length === 0 ? (
+              <div
+                style={{
+                  gridColumn: '1 / -1',
+                  padding: 'var(--spacing-md)',
+                  textAlign: 'center',
+                  color: 'var(--color-text-tertiary)',
+                  fontSize: 'var(--font-size-sm)',
+                }}
+              >
+                등록된 캐릭터가 없습니다.
+              </div>
+            ) : (
+              availableCharacters.map((character) => (
               <div
                 key={character.id}
                 onClick={() => handleCharacterSelect(character)}
@@ -224,35 +252,19 @@ const ProfileImageButtonGroup: React.FC<ProfileImageButtonGroupProps> = ({
                   e.currentTarget.style.transform = 'scale(1)';
                 }}
               >
-                {/* 캐릭터 이미지 (향후 실제 이미지로 교체) */}
-                <div
+                {/* 캐릭터 이미지 */}
+                <img
+                  src={character.url}
+                  alt={character.name}
                   style={{
                     width: '100%',
                     height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 'var(--font-size-xs)',
-                    color: 'var(--color-text-tertiary)',
+                    objectFit: 'cover',
                   }}
-                >
-                  {/* 임시 플레이스홀더 아이콘 */}
-                  <svg
-                    width="32"
-                    height="32"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="8" r="4" />
-                    <path d="M18 20a6 6 0 0 0-12 0" />
-                  </svg>
-                </div>
+                />
               </div>
-            ))}
+              ))
+            )}
           </div>
 
           {/* 안내 메시지 */}
@@ -531,6 +543,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               size={size}
               showInlineLabelWhenHasValue={showInlineLabelWhenHasValue}
               value={(f.value ?? '') as string}
+              autoComplete={kind === 'password' ? 'new-password' : undefined}
               onChange={(e) => {
                 if ((import.meta as any).env?.DEV) {
                   const nativeIsComposing = (e.nativeEvent as any)?.isComposing;
@@ -696,6 +709,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               onBlur={f.onBlur}
               multiple={kind === 'multiselect'}
               options={selectOptions}
+              selectedSuffix={name === 'teacher_ids' ? '명' : '개'}
             />
           )}
         />
@@ -1152,11 +1166,15 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
 
   // profile_image_button 특수 처리 (캐릭터 선택 + 사진 선택)
   if (kind === 'custom' && (name === 'profile_image_button' || effectiveComponentType === 'profile_image_button')) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const gender = useWatch({ control, name: 'gender' }) as 'male' | 'female' | undefined;
+
     return (
       <FormFieldLayout colSpan={colSpan} rowSpan={rowSpan}>
         <ProfileImageButtonGroup
           isDisabled={isDisabled}
           setFormValue={setFormValue}
+          gender={gender || 'male'}
         />
       </FormFieldLayout>
     );

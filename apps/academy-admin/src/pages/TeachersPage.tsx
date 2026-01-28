@@ -10,6 +10,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { ErrorBoundary, useModal, useResponsiveMode , Container, Card, Button, Modal, PageHeader, isMobile, isTablet, EmptyState, SubSidebar, ProfileEntityCard, RightLayerMenuLayout, useIconSize, useIconStrokeWidth, IconButtonGroup, Avatar, DataTable, Badge } from '@ui-core/react';
 import type { DataTableColumn } from '@ui-core/react';
 import { UserCog, Link2, Copy, Check, User, Trash2, Pencil, LayoutGrid, List, UserPlus } from 'lucide-react';
@@ -30,7 +31,7 @@ import {
 import type { TeacherWithStats } from '@hooks/use-class';
 import type { UpdateTeacherInput, TeacherStatus, TeacherPosition } from '@services/class-service';
 import type { CreateTeacherWithAuthInput } from '@industry/academy';
-import { apiClient } from '@api-sdk/core';
+import { apiClient, getApiContext } from '@api-sdk/core';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 // [SSOT] Barrel export를 통한 통합 import
 import { TEACHERS_SUB_MENU_ITEMS, DEFAULT_TEACHERS_SUB_MENU, TEACHERS_MENU_LABEL_MAPPING, getSubMenuFromUrl, setSubMenuToUrl, applyDynamicLabels } from '../constants';
@@ -67,6 +68,7 @@ function formatDayOfWeek(dayOfWeek: string | string[] | null | undefined): strin
 }
 
 export function TeachersPage() {
+  const queryClient = useQueryClient();
   const { showConfirm, showAlert } = useModal();
   const terms = useIndustryTerms();
   const [searchParams] = useSearchParams();
@@ -154,6 +156,13 @@ export function TeachersPage() {
 
   const handleCreateTeacher = async (data: Record<string, unknown>) => {
     let profileImageUrl: string | undefined = undefined;
+    // Zero-Trust: Context에서 tenantId 추출
+    const { tenantId } = getApiContext();
+
+    if (!tenantId) {
+      showAlert('테넌트 정보를 찾을 수 없습니다.', '오류', 'error');
+      return;
+    }
 
     try {
       // 프로필 이미지 업로드 처리
@@ -184,7 +193,8 @@ export function TeachersPage() {
         specialization: data.specialization ? String(data.specialization) : undefined,
         hire_date: data.hire_date ? String(data.hire_date) : undefined,
         employee_id: data.employee_id ? String(data.employee_id) : undefined,
-        profile_image_url: profileImageUrl,
+        // 파일 업로드 URL 우선, 없으면 랜덤 캐릭터 URL 사용
+        profile_image_url: profileImageUrl || (typeof data.profile_image_url === 'string' && data.profile_image_url !== '' ? data.profile_image_url : undefined),
         bio: data.bio ? String(data.bio) : undefined,
         notes: data.notes ? String(data.notes) : undefined,
         pay_type: data.pay_type ? String(data.pay_type) : undefined,
@@ -196,6 +206,47 @@ export function TeachersPage() {
         status: data.status ? (data.status as TeacherStatus) : 'active',
       };
 
+      // [P1 최적화] Optimistic Update - 즉시 UI에 임시 강사 표시
+      const tempId = 'temp-' + Date.now();
+      queryClient.setQueryData<TeacherWithStats[]>(
+        ['teachers-with-stats', tenantId],
+        (old) => {
+          const tempTeacher: TeacherWithStats = {
+            id: tempId,
+            person_id: tempId,
+            tenant_id: tenantId,
+            name: input.name,
+            phone: input.phone,
+            position: input.position,
+            login_id: input.login_id,
+            specialization: input.specialization,
+            hire_date: input.hire_date,
+            employee_id: input.employee_id,
+            // 파일 업로드 URL 우선, 없으면 랜덤 캐릭터 URL 사용
+            profile_image_url: profileImageUrl || (typeof data.profile_image_url === 'string' && data.profile_image_url !== '' ? data.profile_image_url : undefined),
+            bio: input.bio,
+            notes: input.notes,
+            status: input.status || 'active',
+            total_classes: 0,
+            total_students: 0,
+            main_teacher_classes: 0,
+            assistant_classes: 0,
+            // TeacherWithStats에 필요한 추가 필드들
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            created_by: undefined,
+            updated_by: undefined,
+            pay_type: input.pay_type,
+            base_salary: input.base_salary,
+            hourly_rate: input.hourly_rate,
+            bank_name: input.bank_name,
+            bank_account: input.bank_account,
+            salary_notes: input.salary_notes,
+          };
+          return [...(old || []), tempTeacher];
+        }
+      );
+
       // Edge Function 호출하여 강사 생성 (auth.users + persons + academy_teachers)
       const response = await apiClient.invokeFunction('create-teacher-direct', input as unknown as Record<string, unknown>);
 
@@ -203,9 +254,21 @@ export function TeachersPage() {
         throw new Error(response.error?.message || '강사 등록에 실패했습니다.');
       }
 
+      // [P0 최적화] 강사 목록 쿼리 무효화 - 즉시 UI 갱신
+      await queryClient.invalidateQueries({ queryKey: ['teachers-with-stats'] });
+
       setShowCreateForm(false);
       showAlert('강사가 등록되었습니다.', '성공', 'success');
     } catch (error) {
+      // [P1 최적화] Optimistic Update 롤백 - 실패 시 임시 강사 제거
+      queryClient.setQueryData<TeacherWithStats[]>(
+        ['teachers-with-stats', tenantId],
+        (old) => {
+          if (!old) return old;
+          return old.filter((teacher) => !teacher.id.startsWith('temp-'));
+        }
+      );
+
       // 롤백: 이미지 업로드 성공 후 강사 생성 실패 시 이미지 삭제
       if (profileImageUrl) {
         await apiClient.deleteFile('teacher-profiles', profileImageUrl);
@@ -477,9 +540,18 @@ export function TeachersPage() {
             }}
           >
             <Container maxWidth="xl" padding="lg">
-          <PageHeader
-            title={TEACHERS_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu)?.label || `${terms.PERSON_LABEL_SECONDARY} 관리`}
-          />
+          {/* PageHeader와 토글 버튼을 감싸는 wrapper - StatsTableLayout과 동일한 구조 */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--spacing-sm)',
+            marginBottom: 'var(--spacing-xl)',
+          }}>
+            <PageHeader
+              title={TEACHERS_SUB_MENU_ITEMS.find(item => item.id === selectedSubMenu)?.label || `${terms.PERSON_LABEL_SECONDARY} 관리`}
+              style={{ marginBottom: 0 }}
+            />
+          </div>
 
           {/* 강사 목록 탭 (기본) */}
           {selectedSubMenu === 'list' && (
@@ -810,6 +882,7 @@ export function TeachersPage() {
                     key={teacher.id}
                     teacher={teacher}
                     onClick={(teacherId) => handleTeacherSelect(teacherId)}
+                    terms={terms}
                   />
                 ))}
               </div>
@@ -1221,34 +1294,35 @@ export function TeachersPage() {
 function TeacherCard({
   teacher,
   onClick,
+  terms,
 }: {
   teacher: TeacherWithStats;
   onClick: (teacherId: string) => void;
+  terms: ReturnType<typeof useIndustryTerms>;
 }) {
-  // 직급별 색상 매핑
-  const getPositionBadgeColor = (position?: string): 'primary' | 'success' | 'warning' | 'error' | 'secondary' => {
-    if (!position) return 'secondary';
-    if (position === 'vice_principal') return 'error';
-    if (position === 'manager') return 'warning';
-    if (position === 'teacher') return 'primary';
-    if (position === 'assistant') return 'success';
+  // 과목 배지 색상 매핑 (수업 카드와 동일한 로직)
+  const getBadgeColor = (subject?: string): 'primary' | 'success' | 'warning' | 'error' | 'secondary' => {
+    const subjectLower = (subject || '').toLowerCase();
+    if (subjectLower.includes('국어') || subjectLower.includes('korean')) return 'primary';
+    if (subjectLower.includes('수학') || subjectLower.includes('math')) return 'error';
+    if (subjectLower.includes('과학') || subjectLower.includes('science')) return 'success';
+    if (subjectLower.includes('영어') || subjectLower.includes('english')) return 'warning';
     return 'secondary';
   };
 
   // 직급 레이블 (SSOT: use-class Hook의 POSITION_LABELS 사용)
-  const positionLabel = teacher.position ? POSITION_LABELS[teacher.position] || teacher.position : '직급 미지정';
+  const positionLabel = teacher.position ? POSITION_LABELS[teacher.position] || teacher.position : '';
 
   return (
     <ProfileEntityCard
       profileImageUrl={teacher.profile_image_url}
-      badge={{
-        label: teacher.specialization || '전문 분야',
-        color: getPositionBadgeColor(teacher.position),
-      }}
-      secondaryLabel={positionLabel}
-      title={teacher.name}
+      badge={teacher.specialization ? {
+        label: teacher.specialization,
+        color: getBadgeColor(teacher.specialization),
+      } : undefined}
+      title={`${teacher.name} ${positionLabel}`}
       description={teacher.phone || teacher.email || '-'}
-      statsText={`${teacher.total_classes || 0}개 / ${teacher.total_students || 0}명`}
+      statsText={`${terms.GROUP_LABEL} ${teacher.total_classes || 0}개 / ${terms.PERSON_LABEL_PRIMARY} ${teacher.total_students || 0}명`}
       onClick={() => onClick(teacher.id)}
     />
   );
@@ -1295,8 +1369,8 @@ function TeacherInfoPanel({
     { label: '상태', value: teacher.status === 'active' ? terms.STAFF_ACTIVE : teacher.status === 'on_leave' ? terms.STAFF_LEAVE : teacher.status === 'resigned' ? terms.STAFF_RESIGNED : '-' },
     { label: '입사일', value: teacher.hire_date || '-' },
     { label: '사번', value: teacher.employee_id || '-' },
-    { label: '담당 수업', value: `${teacher.total_classes || 0}개` },
-    { label: '담당 학생', value: `${teacher.total_students || 0}명` },
+    { label: `담당 ${terms.GROUP_LABEL}`, value: `${teacher.total_classes || 0}개` },
+    { label: `담당 ${terms.PERSON_LABEL_PRIMARY}`, value: `${teacher.total_students || 0}명` },
     { label: '소개', value: teacher.bio || '-', colSpan: 2 },
     { label: '메모', value: teacher.notes || '-', colSpan: 2 },
   ], [teacher, terms]);

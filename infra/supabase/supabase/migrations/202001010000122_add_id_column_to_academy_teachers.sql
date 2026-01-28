@@ -30,12 +30,12 @@ UPDATE public.academy_teachers
 SET id = gen_random_uuid()
 WHERE id IS NULL;
 
--- 6. FOREIGN KEY 제약조건 재생성 (person_id를 참조하도록 유지)
---    class_teachers.teacher_id는 academy_teachers.person_id를 참조
+-- 6. FOREIGN KEY 제약조건 재생성 [수정 2026-01-27: person_id → id]
+--    class_teachers.teacher_id는 academy_teachers.id를 참조
 ALTER TABLE public.class_teachers
   ADD CONSTRAINT class_teachers_teacher_id_fkey
   FOREIGN KEY (teacher_id)
-  REFERENCES public.academy_teachers(person_id)
+  REFERENCES public.academy_teachers(id)
   ON DELETE CASCADE;
 
 -- 7. 인덱스 확인 및 최적화

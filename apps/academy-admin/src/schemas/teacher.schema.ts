@@ -119,6 +119,21 @@ export const teacherFormSchema: FormSchema = {
         },
       },
       {
+        name: 'gender',
+        kind: 'select',
+        options: [
+          { value: 'male', label: '남성' },
+          { value: 'female', label: '여성' },
+        ],
+        ui: {
+          label: '성별',
+          colSpan: 1,
+        },
+        validation: {
+          required: true,
+        },
+      },
+      {
         name: 'specialization',
         kind: 'select',
         options: [...ACADEMY_SPECIALIZATIONS],

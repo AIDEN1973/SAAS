@@ -1,8 +1,12 @@
--- P0-2: 반 생성 + 강사 배정 트랜잭션 안전성 보장
--- 목적: 반 생성과 강사 배정을 atomic하게 처리하여 부분 성공 방지
--- 요구사항: ClassesPage.tsx에서 teacher_ids 처리를 DB RPC로 이관
+-- 2026-01-27: create_class_with_teachers 함수의 teacher_id 검증 오류 수정
+-- 문제: WHERE person_id = v_teacher_id (잘못됨)
+-- 수정: WHERE id = v_teacher_id (올바름)
+-- 영향: 강사 배정 시 잘못된 ID가 저장되는 문제 해결
 
--- RPC 함수: 반 생성 + 강사 배정 (트랜잭션)
+-- 기존 함수 삭제
+DROP FUNCTION IF EXISTS public.create_class_with_teachers CASCADE;
+
+-- 수정된 함수 재생성
 CREATE OR REPLACE FUNCTION public.create_class_with_teachers(
   p_tenant_id uuid,
   p_name text,
@@ -12,10 +16,12 @@ CREATE OR REPLACE FUNCTION public.create_class_with_teachers(
   p_start_time time DEFAULT '14:00:00',
   p_end_time time DEFAULT '15:30:00',
   p_capacity integer DEFAULT 20,
+  p_color text DEFAULT NULL,
   p_room text DEFAULT NULL,
   p_notes text DEFAULT NULL,
   p_status text DEFAULT 'active',
   p_teacher_ids uuid[] DEFAULT NULL,
+  p_teacher_roles text[] DEFAULT NULL,
   p_created_by uuid DEFAULT NULL
 )
 RETURNS jsonb
@@ -26,6 +32,8 @@ AS $$
 DECLARE
   v_class_id uuid;
   v_teacher_id uuid;
+  v_teacher_role text;
+  v_role_index integer := 1;
   v_result jsonb;
 BEGIN
   -- 입력 검증
@@ -51,6 +59,7 @@ BEGIN
     start_time,
     end_time,
     capacity,
+    color,
     room,
     notes,
     status,
@@ -65,6 +74,7 @@ BEGIN
     p_start_time,
     p_end_time,
     p_capacity,
+    p_color,
     p_room,
     p_notes,
     p_status,
@@ -77,12 +87,20 @@ BEGIN
   IF p_teacher_ids IS NOT NULL AND array_length(p_teacher_ids, 1) > 0 THEN
     FOREACH v_teacher_id IN ARRAY p_teacher_ids
     LOOP
-      -- 강사 존재 여부 확인 (teacher_id = academy_teachers.id)
+      -- [수정됨 2026-01-27] 강사 존재 여부 확인: person_id → id
+      -- v_teacher_id는 academy_teachers.id이므로 id 컬럼과 비교해야 함
       IF NOT EXISTS (
         SELECT 1 FROM public.academy_teachers
         WHERE id = v_teacher_id AND tenant_id = p_tenant_id
       ) THEN
         RAISE EXCEPTION '존재하지 않는 강사입니다: %', v_teacher_id;
+      END IF;
+
+      -- 역할 결정 (p_teacher_roles 배열이 있으면 사용, 없으면 'teacher')
+      IF p_teacher_roles IS NOT NULL AND array_length(p_teacher_roles, 1) >= v_role_index THEN
+        v_teacher_role := p_teacher_roles[v_role_index];
+      ELSE
+        v_teacher_role := 'teacher';
       END IF;
 
       -- 강사 배정
@@ -97,10 +115,12 @@ BEGIN
         p_tenant_id,
         v_class_id,
         v_teacher_id,
-        'teacher',
+        v_teacher_role,
         CURRENT_DATE,
         true
       );
+
+      v_role_index := v_role_index + 1;
     END LOOP;
   END IF;
 
@@ -137,10 +157,10 @@ EXCEPTION
 END;
 $$;
 
--- RLS 정책: authenticated 사용자만 호출 가능
-COMMENT ON FUNCTION public.create_class_with_teachers IS
-'P0-2: 반 생성 + 강사 배정을 트랜잭션으로 처리하여 부분 성공 방지. JWT claim 기반 tenant_id 검증 포함.';
-
 -- 권한 부여
 GRANT EXECUTE ON FUNCTION public.create_class_with_teachers TO authenticated;
 REVOKE EXECUTE ON FUNCTION public.create_class_with_teachers FROM anon;
+
+-- 코멘트
+COMMENT ON FUNCTION public.create_class_with_teachers IS
+'P0-2: 반 생성 + 강사 배정을 트랜잭션으로 처리. [2026-01-27 수정] teacher_id 검증 오류 수정 (person_id → id)';

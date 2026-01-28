@@ -17,10 +17,9 @@ import { templates, p } from '../utils';
 import type { ClassesSubMenuId } from '../constants';
 import { BookOpen, Users, CheckCircle, XCircle, AlertTriangle, Trash2, Pencil } from 'lucide-react';
 import { SchemaForm } from '@schema-engine';
-import { apiClient } from '@api-sdk/core';
+import { apiClient, getApiContext } from '@api-sdk/core';
 import { useQuery } from '@tanstack/react-query';
 import { CreateClassForm } from './classes/components/CreateClassForm';
-import { useSchema } from '@hooks/use-schema';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
 import { toKST } from '@lib/date-utils';
 import {
@@ -30,10 +29,11 @@ import {
   useDeleteClass,
   // useClassStatistics, // TODO: 통계 기능 구현 시 사용
   useTeachers,
+  useTeachersWithStats,
   useCheckScheduleConflicts,
   useClassTeachers,
 } from '@hooks/use-class';
-import type { Class, CreateClassInput, UpdateClassInput, ClassFilter, ClassStatus, DayOfWeek, Teacher } from '@services/class-service';
+import type { Class, CreateClassInput, UpdateClassInput, ClassFilter, ClassStatus, DayOfWeek, Teacher, ClassTeacher } from '@services/class-service';
 import { createClassFormSchema } from '../schemas/class.schema';
 import type { FormSchema } from '@schema-engine/types';
 import { CardGridLayout } from '../components/CardGridLayout';
@@ -123,6 +123,8 @@ export function ClassesPage() {
   const [searchParams] = useSearchParams();
   const mode = useResponsiveMode();
   const terms = useIndustryTerms();
+  const context = getApiContext();
+  const tenantId = context.tenantId;
   // [SSOT] 반응형 모드 확인은 SSOT 헬퍼 함수 사용
   const modeUpper = mode.toUpperCase() as 'XS' | 'SM' | 'MD' | 'LG' | 'XL';
   const isMobileMode = isMobile(modeUpper);
@@ -265,7 +267,42 @@ export function ClassesPage() {
     });
   }, [classes, timeSlotFilter]);
 
-  const { data: teachers } = useTeachers();
+  // [수정 2026-01-27] useTeachersWithStats 사용
+  // class_teachers.teacher_id는 academy_teachers.id를 참조 (FK 제약 조건 수정됨)
+  const { data: teachers } = useTeachersWithStats();
+
+  // 모든 활성 class_teachers 가져오기 (테이블 표시용)
+  const { data: allClassTeachers } = useQuery({
+    queryKey: ['all-class-teachers', tenantId],
+    queryFn: async () => {
+      if (!tenantId) return [];
+      const response = await apiClient.get<ClassTeacher>('class_teachers', {
+        filters: { is_active: true },
+      });
+      if (response.error) throw new Error(response.error.message);
+      return response.data || [];
+    },
+    enabled: !!tenantId,
+  });
+
+  // 클래스별 teacher 매핑 (테이블 표시용)
+  const classTeachersMap = useMemo(() => {
+    if (!allClassTeachers || !teachers) return new Map();
+
+    const map = new Map<string, Array<{ name: string }>>();
+    allClassTeachers.forEach(ct => {
+      // [수정 2026-01-27] ct.teacher_id는 academy_teachers.id를 참조
+      const teacher = teachers.find(t => t.id === ct.teacher_id);
+      if (teacher) {
+        if (!map.has(ct.class_id)) {
+          map.set(ct.class_id, []);
+        }
+        map.get(ct.class_id)!.push({ name: teacher.name });
+      }
+    });
+    return map;
+  }, [allClassTeachers, teachers]);
+
   const createClass = useCreateClass();
   const updateClass = useUpdateClass();
   const deleteClass = useDeleteClass();
@@ -294,11 +331,11 @@ export function ClassesPage() {
     setLayerMenuTab(tab);
   }, []);
 
-  // Schema Registry 연동 (아키텍처 문서 S3 참조)
-  const { data: classFormSchemaData } = useSchema('class', createClassFormSchema(teachers || [], terms), 'form');
-
-  // Fallback: Registry에서 조회 실패 시 로컬 스키마 사용
-  const effectiveFormSchema = classFormSchemaData || createClassFormSchema(teachers || [], terms);
+  // [수정 2026-01-27] useSchema 제거 - 동적 옵션(teachers)이 손실되는 문제 해결
+  // Registry는 정적 스키마 전용이므로, 동적 데이터가 포함된 스키마는 직접 생성
+  const effectiveFormSchema = useMemo(() => {
+    return createClassFormSchema(teachers || [], terms);
+  }, [teachers, terms]);
 
   // 뷰 모드 토글 핸들러 (localStorage 지속성)
   const handleToggleViewMode = useCallback((mode: 'list' | 'calendar') => {
@@ -523,6 +560,8 @@ export function ClassesPage() {
                     {layerMenuTab === 'info' && (
                       <ClassInfoTab
                         classData={selectedClass}
+                        classTeachers={selectedClassTeachers || []}
+                        teachers={teachers || []}
                         isEditing={isEditingInLayer}
                         effectiveFormSchema={effectiveFormSchema}
                         onEdit={() => setIsEditingInLayer(true)}
@@ -790,10 +829,10 @@ export function ClassesPage() {
                   label: '담당',
                   width: '12%',
                   render: (_, classItem) => {
-                    // classItem에 teachers 정보가 있으면 표시, 없으면 - 표시
-                    const teacherNames = (classItem as unknown as { teachers?: Array<{ name: string }> }).teachers;
+                    // classTeachersMap에서 해당 클래스의 teachers 가져오기
+                    const teacherNames = classTeachersMap.get(classItem.id) as Array<{ name: string }> | undefined;
                     if (teacherNames && teacherNames.length > 0) {
-                      return <span>{teacherNames.map(t => t.name).join(', ')}</span>;
+                      return <span>{teacherNames.map((t) => t.name).join(', ')}</span>;
                     }
                     return <span style={{ color: 'var(--color-text-tertiary)' }}>-</span>;
                   },
@@ -904,6 +943,8 @@ export function ClassesPage() {
  */
 function ClassInfoTab({
   classData,
+  classTeachers,
+  teachers,
   isEditing,
   effectiveFormSchema,
   onEdit,
@@ -912,6 +953,8 @@ function ClassInfoTab({
   onSave,
 }: {
   classData: Class;
+  classTeachers: ClassTeacher[];
+  teachers: Teacher[];
   isEditing: boolean;
   effectiveFormSchema: FormSchema;
   onEdit: () => void;
@@ -931,6 +974,19 @@ function ClassInfoTab({
     ? classData.grade.join(', ')
     : classData.grade || '-';
 
+  // 담당 선생님 라벨 생성
+  const teacherLabel = useMemo(() => {
+    if (!classTeachers || classTeachers.length === 0) return '-';
+
+    const teacherNames = classTeachers.map(ct => {
+      // [수정 2026-01-27] ct.teacher_id는 academy_teachers.id를 참조
+      const teacher = teachers?.find(t => t.id === ct.teacher_id);
+      return teacher?.name || '알 수 없음';
+    });
+
+    return teacherNames.join(', ');
+  }, [classTeachers, teachers]);
+
   const formDefaultValues = useMemo(() => {
     // subject 값이 기본 옵션에 없으면 직접입력으로 처리
     const predefinedSubjects = ['국어', '영어', '수학', '과학'];
@@ -945,10 +1001,11 @@ function ClassInfoTab({
       start_time: classData.start_time?.substring(0, 5) || '14:00',
       end_time: classData.end_time?.substring(0, 5) || '15:30',
       capacity: classData.capacity || 20,
+      teacher_ids: classTeachers.map((ct) => ct.teacher_id),
       notes: classData.notes || '',
       status: classData.status || 'active',
     };
-  }, [classData]);
+  }, [classData, classTeachers]);
 
   const editSchema = useMemo(() => ({
     ...effectiveFormSchema,
@@ -970,9 +1027,10 @@ function ClassInfoTab({
     { label: '시간', value: `${classData.start_time?.substring(0, 5) || ''} ~ ${classData.end_time?.substring(0, 5) || ''}` },
     { label: terms.CAPACITY_LABEL, value: `${classData.current_count} / ${classData.capacity}명 (${((classData.current_count / classData.capacity) * 100).toFixed(0)}%)` },
     { label: '학년', value: gradeLabel },
+    { label: `담당 ${terms.PERSON_LABEL_SECONDARY}`, value: teacherLabel },
     { label: '운영 상태', value: classData.status === 'active' ? '운영 중' : '중단' },
     { label: '메모', value: classData.notes || '-', colSpan: 2 },
-  ], [classData, dayLabel, gradeLabel, terms]);
+  ], [classData, dayLabel, gradeLabel, teacherLabel, terms]);
 
   const handleSubmit = useCallback(async (data: Record<string, unknown>) => {
     // subject: 직접입력 선택 시 subject_custom 값 사용
@@ -998,9 +1056,11 @@ function ClassInfoTab({
       start_time: data.start_time ? `${String(data.start_time)}:00` : undefined,
       end_time: data.end_time ? `${String(data.end_time)}:00` : undefined,
       capacity: data.capacity ? Number(data.capacity) : undefined,
+      teacher_ids: data.teacher_ids && Array.isArray(data.teacher_ids) ? data.teacher_ids as string[] : undefined,
       notes: data.notes ? String(data.notes) : undefined,
       status: data.status as ClassStatus | undefined,
     };
+
     await onSave(classData.id, input);
   }, [classData.id, onSave]);
 
@@ -1229,6 +1289,7 @@ function ClassTeachersTab({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
       {classTeachers.map((ct) => {
+        // [수정 2026-01-27] ct.teacher_id는 academy_teachers.id를 참조
         const teacher = allTeachers.find(t => t.id === ct.teacher_id);
         return (
           <Card key={ct.id} padding="sm">

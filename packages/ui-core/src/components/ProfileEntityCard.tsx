@@ -193,20 +193,38 @@ export const ProfileEntityCard: React.FC<ProfileEntityCardProps> = ({
             {description}
           </span>
         )}
-        {/* 통계 정보 (오른쪽) */}
-        {statsText && (
-          <span
-            style={{
-              fontSize: 'var(--font-size-sm)',
-              color: 'var(--color-text-secondary)',
-              fontWeight: 'var(--font-weight-medium)',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-            }}
-          >
-            {statsText}
-          </span>
-        )}
+        {/* 통계 정보 (오른쪽) - 숫자는 semibold, 구분자/단위는 normal */}
+        {statsText && (() => {
+          // statsText 파싱: "10개 / 20명" 형식
+          // 정규식으로 숫자와 나머지 분리 (공백 보존)
+          const parts = statsText.split(/(\d+)/g).filter(part => part !== '');
+
+          return (
+            <span
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                color: 'var(--color-text)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              {parts.map((part, index) => {
+                // 숫자인 경우 semibold
+                const isNumber = /^\d+$/.test(part);
+                return (
+                  <span
+                    key={index}
+                    style={{
+                      fontWeight: isNumber ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)',
+                    }}
+                  >
+                    {part}
+                  </span>
+                );
+              })}
+            </span>
+          );
+        })()}
       </div>
     </Card>
   );

@@ -198,7 +198,8 @@ export type TeacherRole = 'teacher' | 'assistant';  // 담임/부담임
 export type TeacherPosition = 'vice_principal' | 'manager' | 'teacher' | 'assistant' | 'other';  // 직급: 부원장, 실장, 선생님, 조교, 기타
 
 export interface Teacher {
-  id: string;  // person_id
+  id: string;  // academy_teachers.id
+  person_id: string;  // academy_teachers.person_id (외래키)
   tenant_id: string;
   name: string;  // persons.name
   email?: string;  // persons.email

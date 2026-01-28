@@ -277,15 +277,25 @@ export function useStudentPage(): UseStudentPageReturn {
 
   // 태그 및 수업 데이터
   const { data: tags } = useStudentTags();
-  const { data: tagAssignments } = useAllStudentTagAssignments();
-  const { data: classes } = useClasses({ status: 'active' });
+
+  // [성능 개선 2026-01-27] 서브메뉴 정보 (여러 조건부 로딩에서 재사용)
+  const currentSubMenu = searchParams.get('tab') || 'list';
+
+  // [성능 개선 2026-01-27] tagAssignments는 statistics 탭에서만 사용 - 조건부 로딩
+  const shouldLoadTagAssignments = currentSubMenu === 'statistics';
+  const { data: tagAssignments } = useAllStudentTagAssignments({
+    enabled: shouldLoadTagAssignments,
+  });
+
+  // [성능 개선] useClasses 중복 호출 제거: classes와 allClasses를 하나로 통합
+  const { data: allClasses } = useClasses({ status: 'active' });
 
   // 파일 입력 ref
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Schema Registry 연동
   // [성능 최적화] createStudentFilterSchema를 메모이제이션하여 중복 호출 방지
-  const studentFilterSchema = useMemo(() => createStudentFilterSchema(classes || []), [classes]);
+  const studentFilterSchema = useMemo(() => createStudentFilterSchema(allClasses || []), [allClasses]);
   const { data: studentFormSchemaData } = useSchema('student', studentFormSchema, 'form');
   const { data: studentFilterSchemaData } = useSchema('student_filter', studentFilterSchema, 'filter');
   const { data: studentTableSchemaData } = useSchema('student_table', studentTableSchema, 'table');
@@ -304,13 +314,16 @@ export function useStudentPage(): UseStudentPageReturn {
   const { data: allSelectedStudentConsultations, isLoading: selectedStudentConsultationsLoading } = useConsultations(selectedStudentId);
   const { data: selectedStudentTags, isLoading: selectedStudentTagsLoading } = useStudentTagsByStudent(selectedStudentId);
   const { data: selectedStudentClasses, isLoading: selectedStudentClassesLoading } = useStudentClasses(selectedStudentId);
-  const { data: allClasses } = useClasses({ status: 'active' });
   const { data: session } = useSession();
   const userId = session?.user?.id;
   const { data: userRole } = useUserRole();
 
-  // 전체 상담 내역 조회 (상담관리 탭용)
-  const { data: allConsultationsData, isLoading: allConsultationsLoading } = useAllConsultations();
+  // [성능 개선] 전체 상담 내역 조회 (상담관리 탭 선택 시에만 로딩)
+  const shouldLoadConsultations = currentSubMenu === 'consultations';
+
+  const { data: allConsultationsData, isLoading: allConsultationsLoading } = useAllConsultations({
+    enabled: shouldLoadConsultations,
+  });
   const allConsultations = useMemo<StudentConsultation[]>(() => {
     if (!allConsultationsData) return [];
     return (allConsultationsData as unknown) as StudentConsultation[];
@@ -330,8 +343,12 @@ export function useStudentPage(): UseStudentPageReturn {
     return allConsultations.filter((c) => c.consultation_type === consultationTypeFilter);
   }, [allConsultations, consultationTypeFilter]);
 
-  // 전체 학생 수업 배정 정보 조회 (수업배정 탭용)
-  const { data: allStudentClassesData, isLoading: allStudentClassesLoading } = useAllStudentClasses();
+  // [성능 개선] 전체 학생 수업 배정 정보 조회 (수업배정 탭 선택 시에만 로딩)
+  const shouldLoadStudentClasses = currentSubMenu === 'class-assignment';
+
+  const { data: allStudentClassesData, isLoading: allStudentClassesLoading } = useAllStudentClasses({
+    enabled: shouldLoadStudentClasses,
+  });
   const allStudentClasses = useMemo(() => {
     return allStudentClassesData || [];
   }, [allStudentClassesData]);
@@ -352,25 +369,27 @@ export function useStudentPage(): UseStudentPageReturn {
 
   // ============================================================
   // URL → State 동기화 (브라우저 뒤로가기, 직접 URL 입력 등 지원)
-  // [SSOT] 출결관리와 동일한 단순 패턴
+  // [성능 개선 2026-01-27] ClassesPage와 동일하게 단순화
   // ============================================================
   useEffect(() => {
     if (urlStudentId && urlStudentId !== selectedStudentId) {
       setSelectedStudentId(urlStudentId);
-      const initialTab: LayerMenuTab = (urlPanel || urlTab || getInitialTab()) as LayerMenuTab;
-      setLayerMenuTab(initialTab);
+      // [성능 개선] 탭 초기화 제거 - 사용자가 선택한 탭 유지
+      // ClassesPage처럼 학생 선택 시 기본 탭으로만 리셋
+      setLayerMenuTab('info');
     } else if (!urlStudentId && selectedStudentId) {
       setSelectedStudentId(null);
     }
-  }, [urlStudentId, selectedStudentId, urlPanel, urlTab, getInitialTab]);
+  }, [urlStudentId, selectedStudentId]);
 
-  // 탭 동기화
-  useEffect(() => {
-    const newTab: LayerMenuTab = (urlPanel || urlTab || getInitialTab()) as LayerMenuTab;
-    if (newTab !== layerMenuTab) {
-      setLayerMenuTab(newTab);
-    }
-  }, [urlPanel, urlTab, getInitialTab, layerMenuTab]);
+  // [성능 개선 2026-01-27] 탭 동기화 제거 - URL 변경하지 않으므로 동기화 불필요
+  // ClassesPage처럼 상태만으로 탭 관리
+  // useEffect(() => {
+  //   const newTab: LayerMenuTab = (urlPanel || urlTab || getInitialTab()) as LayerMenuTab;
+  //   if (newTab !== layerMenuTab) {
+  //     setLayerMenuTab(newTab);
+  //   }
+  // }, [urlPanel, urlTab, getInitialTab, layerMenuTab]);
 
   // 학생 선택 핸들러
   // [SSOT] 출결관리(AttendancePage)와 동일한 단순 패턴
@@ -396,15 +415,10 @@ export function useStudentPage(): UseStudentPageReturn {
 
   // 탭 변경 핸들러
   const handleTabChange = useCallback((newTab: LayerMenuTab) => {
+    // [성능 개선 2026-01-27] 탭 전환 시 URL 변경 제거 (깜빡임 방지)
+    // ClassesPage와 동일하게 상태만 변경하여 즉시 전환
     setLayerMenuTab(newTab);
-    if (selectedStudentId) {
-      // canonical URL 사용
-      // [P0-2 수정] SSOT: ROUTES 상수 사용으로 안전성 확보 (동적 파라미터는 ROUTES 함수로 처리)
-      // [P0-2 수정] SSOT: safeNavigate 사용 (일관성)
-      const targetPath = ROUTES.STUDENT_DETAIL(selectedStudentId, newTab);
-      safeNavigate(targetPath, { replace: true });
-    }
-  }, [selectedStudentId, safeNavigate]);
+  }, []);
 
   // 학생 선택 시 상태 초기화
   useEffect(() => {
@@ -627,7 +641,7 @@ export function useStudentPage(): UseStudentPageReturn {
     error: error instanceof Error ? error : null,
     tags,
     tagAssignments,
-    classes,
+    classes: allClasses, // [성능 개선] 중복 호출 제거로 allClasses 사용
     selectedStudent,
     selectedStudentLoading,
     selectedStudentConsultations,

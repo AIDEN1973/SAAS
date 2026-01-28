@@ -28,7 +28,6 @@ import {
   useIsTablet,
 } from '@ui-core/react';
 import { getApiContext, apiClient } from '@api-sdk/core';
-import { useFilterTags } from '@hooks/use-filter-tags';
 import { AUTOMATION_EVENT_CATALOG, AUTOMATION_EVENT_PLANNED } from '@core/core-automation';
 import {
   Wallet,
@@ -174,11 +173,8 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
   const [isMutating, setIsMutating] = useState(false);
 
   // 인라인 설정 폼 상태
-  const [formValues, setFormValues] = useState<Record<string, string | number | boolean | string[]>>({});
+  const [formValues, setFormValues] = useState<Record<string, string | number | boolean>>({});
   const [isSaving, setIsSaving] = useState(false);
-
-  // 필터 태그 목록 조회
-  const { data: filterTags } = useFilterTags({ is_active: true });
 
   // mutation 진행 중이면 optimistic 값 사용, 아니면 서버 값 사용
   const isEnabled = isMutating && optimisticEnabled !== null ? optimisticEnabled : serverEnabled;
@@ -188,14 +184,14 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
   const updateConfig = useUpdateConfig();
 
   // 각 조건 필드의 현재 값 조회
-  const getCriteriaValue = useCallback((field: AutomationEventCriteriaField): string | number | boolean | string[] | null => {
-    if (!currentConfigData) return field.defaultValue ?? null;
+  const getCriteriaValue = useCallback((field: AutomationEventCriteriaField): string | number | boolean | null => {
+    if (!currentConfigData) return (field.defaultValue as string | number | boolean) ?? null;
     const autoNotification = (currentConfigData as Record<string, unknown>).auto_notification as Record<string, unknown> | undefined;
-    if (!autoNotification) return field.defaultValue ?? null;
+    if (!autoNotification) return (field.defaultValue as string | number | boolean) ?? null;
     const eventConfig = autoNotification[eventType] as Record<string, unknown> | undefined;
-    if (!eventConfig) return field.defaultValue ?? null;
+    if (!eventConfig) return (field.defaultValue as string | number | boolean) ?? null;
     const value = eventConfig[field.field];
-    return value !== undefined ? (value as string | number | boolean | string[]) : (field.defaultValue ?? null);
+    return value !== undefined ? (value as string | number | boolean) : ((field.defaultValue as string | number | boolean) ?? null);
   }, [currentConfigData, eventType]);
 
   // 설명을 구조화된 형태로 분리 (메인 설명, 예시, 설정값)
@@ -228,9 +224,9 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
       example = rawExample.replace(/^예:/, '예 :');
     }
 
-    // 주요 조건 필드 값 표시 (채널 제외, 숫자/boolean/filter_tags 조건)
+    // 주요 조건 필드 값 표시 (채널 제외, 숫자/boolean 조건)
     const conditionFields = criteriaFields.filter(f =>
-      (f.type === 'number' || f.type === 'boolean' || f.type === 'filter_tags') && f.field !== 'channel'
+      (f.type === 'number' || f.type === 'boolean') && f.field !== 'channel'
     );
 
     let settings: string | null = null;
@@ -243,15 +239,6 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
         let formattedValue: string;
         if (field.type === 'boolean') {
           formattedValue = value ? '활성화' : '비활성화';
-        } else if (field.type === 'filter_tags') {
-          // 필터 태그 배열
-          const tagIds = value as string[];
-          if (!tagIds || tagIds.length === 0) return null;
-          const tagNames = tagIds.map(tagId =>
-            filterTags?.find(t => t.id === tagId)?.display_label
-          ).filter(Boolean);
-          if (tagNames.length === 0) return null;
-          formattedValue = tagNames.join(', ');
         } else if (field.label.includes('원)')) {
           formattedValue = `${Number(value as string | number).toLocaleString()}원`;
         } else if (field.label.includes('%')) {
@@ -283,7 +270,7 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
     }
 
     return { mainDescription, example, settings };
-  }, [description, terms, criteriaFields, getCriteriaValue, filterTags]);
+  }, [description, terms, criteriaFields, getCriteriaValue]);
 
   // 토글 핸들러
   const toggleMutation = useMutation({
@@ -375,7 +362,7 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
   }, [tenantId, currentConfigData, eventType, formValues, updateConfig, showAlert]);
 
   // 폼 값 변경 핸들러
-  const handleFormValueChange = useCallback((fieldName: string, value: string | number | boolean | string[]) => {
+  const handleFormValueChange = useCallback((fieldName: string, value: string | number | boolean) => {
     setFormValues(prev => ({ ...prev, [fieldName]: value }));
   }, []);
 
@@ -389,15 +376,10 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
   const handleEnterEditMode = useCallback(() => {
     if (hasConfigurableFields) {
       // 현재 설정값으로 폼 초기화
-      const initialValues: Record<string, string | number | boolean | string[]> = {};
+      const initialValues: Record<string, string | number | boolean> = {};
       criteriaFields.forEach(field => {
         const value = getCriteriaValue(field);
-        if (field.type === 'filter_tags') {
-          // filter_tags 타입은 배열로 처리
-          initialValues[field.field] = (value as string[] | null) ?? (field.defaultValue as string[] | undefined) ?? [];
-        } else {
-          initialValues[field.field] = (value as string | number | boolean | null) ?? field.defaultValue ?? '';
-        }
+        initialValues[field.field] = (value as string | number | boolean | null) ?? (field.defaultValue as string | number | boolean) ?? '';
       });
       setFormValues(initialValues);
       setIsEditMode(true);
@@ -673,55 +655,6 @@ function AutomationCard({ eventType, terms, stats, showStats }: AutomationCardPr
                 fullWidth
                 size="sm"
               />
-            ) : field.type === 'filter_tags' ? (
-              // 태그 필터 다중 선택
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
-                {filterTags && filterTags.length > 0 ? (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xs)' }}>
-                    {filterTags.map((tag) => {
-                      const selectedTagIds = (formValues[field.field] as string[] | undefined) || (field.defaultValue as string[] | undefined) || [];
-                      const isSelected = selectedTagIds.includes(tag.id);
-                      return (
-                        <button
-                          key={tag.id}
-                          type="button"
-                          onClick={() => {
-                            const currentTags = [...selectedTagIds];
-                            if (isSelected) {
-                              handleFormValueChange(field.field, currentTags.filter(id => id !== tag.id));
-                            } else {
-                              handleFormValueChange(field.field, [...currentTags, tag.id]);
-                            }
-                          }}
-                          style={{
-                            padding: 'var(--spacing-xs) var(--spacing-sm)',
-                            borderRadius: 'var(--border-radius-sm)',
-                            border: isSelected ? 'none' : 'var(--border-width-thin) solid var(--color-gray-300)',
-                            backgroundColor: isSelected ? tag.color : 'var(--color-white)',
-                            color: isSelected ? 'var(--color-white)' : 'var(--color-text)',
-                            fontSize: 'var(--font-size-xs)',
-                            cursor: 'pointer',
-                            transition: 'var(--transition-base)',
-                          }}
-                        >
-                          {tag.display_label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)' }}>
-                    등록된 필터 태그가 없습니다
-                  </span>
-                )}
-                {((formValues[field.field] as string[] | undefined) || []).length > 0 && (
-                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                    선택됨: {((formValues[field.field] as string[]) || []).map(tagId =>
-                      filterTags?.find(t => t.id === tagId)?.display_label
-                    ).filter(Boolean).join(', ')}
-                  </span>
-                )}
-              </div>
             ) : (
               <Input
                 type="text"
