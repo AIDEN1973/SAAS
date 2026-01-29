@@ -82,9 +82,22 @@ export const ClassAttendanceLayer: React.FC<ClassAttendanceLayerProps> = ({
   );
 
   const handleStatusChange = useCallback(
-    (studentId: string) => (status: AttendanceStatus) => {
+    (studentId: string, currentStatus: AttendanceStatus | null) => (status: AttendanceStatus) => {
+      // 토글 방식: 이미 선택된 버튼을 다시 클릭하면 상태 취소 (null로 변경)
+      const newStatus = currentStatus === status ? null : status;
+
+      if (import.meta.env?.DEV) {
+        console.log('[ClassAttendanceLayer] 🔄 출석 상태 변경:', {
+          studentId,
+          currentStatus,
+          clickedStatus: status,
+          newStatus,
+          isToggle: currentStatus === status,
+        });
+      }
+
       onAttendanceChange(studentId, {
-        status,
+        status: newStatus,
         manual_status_override: true,
         user_modified: true,
         ai_predicted: false,
@@ -172,7 +185,7 @@ export const ClassAttendanceLayer: React.FC<ClassAttendanceLayerProps> = ({
                 attendanceState={state}
                 onCheckInChange={handleCheckInChange(student.id)}
                 onCheckOutChange={handleCheckOutChange(student.id)}
-                onStatusChange={handleStatusChange(student.id)}
+                onStatusChange={handleStatusChange(student.id, state.status)}
                 isKioskCheckIn={isKioskCheckIn}
                 disabled={isSaving}
                 classStartTime={classInfo.start_time}

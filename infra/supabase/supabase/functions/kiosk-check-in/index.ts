@@ -1,10 +1,27 @@
 /**
- * 키오스크 출석 체크 Edge Function
+ * 키오스크 등원 Edge Function (v3 - 스마트 자동 출석 + 중복 방지)
  *
- * [목적] 태블릿 단말기에서 학생 본인 휴대폰 번호 입력으로 출석 체크
- * [인증] 공개 API (인증 불필요, IP/Rate Limiting으로 보안)
- * [Zero-Management] 출석 완료 시 보호자에게 자동 알림 발송
- * [연속 수업] 현재 시간 기준 가장 가까운 수업에 자동 매칭 + 중복 방지
+ * [목적] 학생이 등원 시 1회만 터치하면 오늘 모든 수업이 자동으로 예비 출석(scheduled) 처리
+ *
+ * [주요 기능]
+ * 1. 등원 이벤트 기록 (attendance_type: 'check_in', status: null, class_id: null)
+ * 2. 오늘 등록된 모든 수업을 scheduled 상태로 자동 기록
+ * 3. 중복 방지: 이미 출석 기록이 있는 수업은 건너뛰기
+ * 4. 부분 실패 허용: 일부 수업 실패 시에도 나머지 수업 계속 처리
+ *
+ * [자동 전환 로직] (별도 Function)
+ * - 수업 시작 시: scheduled → present/late (auto-convert-scheduled-attendance Cron)
+ * - 하원 시: scheduled → absent (kiosk-check-out Function)
+ *
+ * [보안]
+ * - Service Role Key 사용 (RLS 우회)
+ * - 모든 쿼리에서 tenant_id 명시적 확인
+ * - Policy 기반 기능 활성화 검증 (kiosk.enabled)
+ *
+ * [에러 처리]
+ * - 중복 등원 감지 및 거부 (409 Conflict)
+ * - 수업별 에러 정보 응답에 포함
+ * - 상세 로깅 (수업 ID, 이름, 에러 메시지)
  */
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
@@ -14,40 +31,51 @@ import { getTenantSettingByPath } from '../_shared/policy-utils.ts';
 interface KioskCheckInRequest {
   tenant_id: string;
   student_phone: string;
-  class_id?: string; // 선택적: 특정 수업 출석 체크 (없으면 자동 매칭)
 }
 
 interface ClassInfo {
   id: string;
   name: string;
+  subject: string | null;
   start_time: string;
   end_time: string;
-  day_of_week: string;
+  day_of_week: string | string[];
+}
+
+interface Student {
+  id: string;
+  name: string;
 }
 
 /**
- * 현재 시간 기준으로 학생의 "아직 출석하지 않은" 가장 가까운 수업을 찾습니다.
- * - 오늘 요일에 해당하는 수업만 조회
- * - 수업 시작 30분 전 ~ 수업 종료 시간 사이에 출석 가능
- * - 이미 출석한 수업은 제외
- * - 여러 수업이 있으면 시작 시간 순서로 미출석 수업 선택
+ * KST Date 객체를 'YYYY-MM-DD' 문자열로 변환
+ * (kstTime은 이미 KST로 변환된 Date 객체여야 함)
  */
-async function findMatchingClass(
+function getKSTDateString(kstTime: Date): string {
+  return kstTime.toISOString().split('T')[0];
+}
+
+/**
+ * KST 날짜의 시작/종료 시간 (KST timezone 명시)
+ */
+function getKSTDayRange(kstTime: Date): { startOfDay: string; endOfDay: string } {
+  const dateStr = getKSTDateString(kstTime);
+  return {
+    startOfDay: `${dateStr}T00:00:00+09:00`,
+    endOfDay: `${dateStr}T23:59:59+09:00`,
+  };
+}
+
+/**
+ * 학생이 오늘 등록된 모든 수업 조회
+ */
+async function getTodayClasses(
   supabase: SupabaseClient,
   tenantId: string,
   studentId: string,
-  currentTime: Date
-): Promise<ClassInfo | null> {
-  // 현재 요일 (KST 기준)
-  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  const currentDay = dayNames[currentTime.getDay()];
-
-  // 현재 시간 (HH:mm 형식)
-  const currentHour = currentTime.getHours();
-  const currentMinute = currentTime.getMinutes();
-  const currentTimeMinutes = currentHour * 60 + currentMinute;
-
-  // 학생이 등록된 수업 조회 (student_classes 조인)
+  currentDay: string
+): Promise<ClassInfo[]> {
+  // 학생이 등록된 수업 조회
   const { data: studentClasses, error } = await supabase
     .from('student_classes')
     .select(`
@@ -55,6 +83,7 @@ async function findMatchingClass(
       classes:class_id (
         id,
         name,
+        subject,
         start_time,
         end_time,
         day_of_week,
@@ -66,101 +95,60 @@ async function findMatchingClass(
 
   if (error || !studentClasses || studentClasses.length === 0) {
     console.log('[kiosk-check-in] No classes found for student:', studentId);
-    return null;
+    return [];
   }
 
-  // 오늘 이미 출석한 수업 ID 목록 조회
-  const dateStr = currentTime.toISOString().split('T')[0];
-  const startOfDay = `${dateStr}T00:00:00+09:00`;
-  const endOfDay = `${dateStr}T23:59:59+09:00`;
-
-  const { data: todayAttendance } = await supabase
-    .from('attendance_logs')
-    .select('class_id')
-    .eq('tenant_id', tenantId)
-    .eq('student_id', studentId)
-    .eq('attendance_type', 'check_in')
-    .gte('occurred_at', startOfDay)
-    .lte('occurred_at', endOfDay);
-
-  const attendedClassIds = new Set(
-    (todayAttendance || []).map(log => log.class_id).filter(Boolean)
-  );
-
-  // 오늘 요일에 해당하고, 현재 시간에 출석 가능한 수업 필터링
-  const matchingClasses: (ClassInfo & { startMinutes: number })[] = [];
-
+  // 오늘 요일에 해당하는 활성 수업만 필터링
+  const todayClasses: ClassInfo[] = [];
   for (const sc of studentClasses) {
     const classInfo = sc.classes as unknown as ClassInfo & { status: string };
     if (!classInfo || classInfo.status !== 'active') continue;
-    if (classInfo.day_of_week !== currentDay) continue;
 
-    // 이미 출석한 수업은 제외
-    if (attendedClassIds.has(classInfo.id)) {
-      console.log(`[kiosk-check-in] Skipping already attended class: ${classInfo.name}`);
-      continue;
+    // day_of_week가 배열이거나 단일 값일 수 있음
+    const dayOfWeek = classInfo.day_of_week;
+    let matchesToday = false;
+
+    if (Array.isArray(dayOfWeek)) {
+      matchesToday = dayOfWeek.includes(currentDay);
+    } else if (typeof dayOfWeek === 'string') {
+      matchesToday = dayOfWeek === currentDay;
     }
 
-    // 수업 시작/종료 시간 파싱
-    const [startHour, startMinute] = classInfo.start_time.split(':').map(Number);
-    const [endHour, endMinute] = classInfo.end_time.split(':').map(Number);
-    const startTimeMinutes = startHour * 60 + startMinute;
-    const endTimeMinutes = endHour * 60 + endMinute;
-
-    // 출석 가능 시간: 수업 시작 30분 전 ~ 수업 종료 시간
-    const checkInWindowStart = startTimeMinutes - 30;
-    const checkInWindowEnd = endTimeMinutes;
-
-    if (currentTimeMinutes >= checkInWindowStart && currentTimeMinutes <= checkInWindowEnd) {
-      matchingClasses.push({ ...classInfo, startMinutes: startTimeMinutes });
+    if (matchesToday) {
+      todayClasses.push(classInfo);
     }
   }
 
-  if (matchingClasses.length === 0) {
-    console.log('[kiosk-check-in] No matching classes for current time (all attended or outside window)');
-    return null;
-  }
-
-  // 시작 시간 순서로 정렬 (가장 빠른 미출석 수업 선택)
-  matchingClasses.sort((a, b) => a.startMinutes - b.startMinutes);
-  const bestMatch = matchingClasses[0];
-
-  console.log(`[kiosk-check-in] Auto-matched class: ${bestMatch.name} (${bestMatch.start_time}) - ${matchingClasses.length} classes available`);
-  return bestMatch;
+  return todayClasses;
 }
 
 /**
- * 같은 날 같은 수업에 이미 출석했는지 확인
+ * 오늘 이미 등원 이벤트(check_in)가 있는지 확인
  */
-async function checkDuplicateAttendance(
+async function hasTodayCheckIn(
   supabase: SupabaseClient,
   tenantId: string,
   studentId: string,
-  classId: string,
   date: Date
 ): Promise<boolean> {
-  // 오늘 날짜 범위 (KST 기준 00:00 ~ 23:59)
-  const dateStr = date.toISOString().split('T')[0];
-  const startOfDay = `${dateStr}T00:00:00+09:00`;
-  const endOfDay = `${dateStr}T23:59:59+09:00`;
+  const { startOfDay, endOfDay } = getKSTDayRange(date);
 
-  const { data: existingLog, error } = await supabase
+  const { data, error } = await supabase
     .from('attendance_logs')
     .select('id')
     .eq('tenant_id', tenantId)
     .eq('student_id', studentId)
-    .eq('class_id', classId)
     .eq('attendance_type', 'check_in')
     .gte('occurred_at', startOfDay)
     .lte('occurred_at', endOfDay)
     .limit(1);
 
   if (error) {
-    console.error('[kiosk-check-in] Duplicate check error:', error);
-    return false; // 에러 시 출석 허용 (fail-open)
+    console.error('[kiosk-check-in] Check-in check error:', error);
+    return false;
   }
 
-  return existingLog && existingLog.length > 0;
+  return data && data.length > 0;
 }
 
 Deno.serve(async (req) => {
@@ -171,7 +159,7 @@ Deno.serve(async (req) => {
 
   try {
     // 1. 요청 파싱
-    const { tenant_id, student_phone, class_id }: KioskCheckInRequest = await req.json();
+    const { tenant_id, student_phone }: KioskCheckInRequest = await req.json();
 
     if (!tenant_id || !student_phone) {
       return new Response(
@@ -201,7 +189,7 @@ Deno.serve(async (req) => {
       }
     );
 
-    // 3. Policy 확인: 키오스크 모드 활성화 여부
+    // 3. 키오스크 기능 활성화 여부 확인 (Policy 기반)
     const kioskEnabled = await getTenantSettingByPath(
       supabase,
       tenant_id,
@@ -210,120 +198,152 @@ Deno.serve(async (req) => {
 
     if (kioskEnabled !== true) {
       return new Response(
-        JSON.stringify({ error: '키오스크 모드가 비활성화되어 있습니다.' }),
+        JSON.stringify({ error: '키오스크 기능이 비활성화되어 있습니다.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // 4. 학생 조회 (휴대폰 번호로)
-    const { data: student, error: studentError } = await supabase
+    // 4. KST 시간 계산
+    const now = new Date();
+    const kstTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC + 9시간
+
+    // 5. 학생 조회 (휴대폰 번호로)
+    const { data: students, error: studentError } = await supabase
       .from('students')
-      .select('id, name, tenant_id, status')
+      .select('id, name, status')
       .eq('tenant_id', tenant_id)
       .eq('student_phone', normalizedPhone)
-      .eq('status', 'active')
-      .single();
+      .limit(1);
 
-    if (studentError || !student) {
-      console.error('[kiosk-check-in] Student lookup failed:', studentError);
+    if (studentError || !students || students.length === 0) {
       return new Response(
-        JSON.stringify({
-          error: '등록되지 않은 휴대폰 번호입니다.',
-          hint: '관리자에게 학생 휴대폰 번호 등록을 요청하세요.'
-        }),
+        JSON.stringify({ error: '등록되지 않은 휴대폰 번호입니다.' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // 5. 수업 자동 매칭 (class_id가 없는 경우)
-    const now = new Date();
-    const kstOffset = 9 * 60;
-    const kstTime = new Date(now.getTime() + (kstOffset * 60 * 1000));
+    const student = students[0] as Student & { status: string };
 
-    let targetClassId = class_id || null;
-    let matchedClassName: string | null = null;
-
-    if (!targetClassId) {
-      // 현재 시간 기준으로 가장 가까운 수업 자동 매칭
-      const matchedClass = await findMatchingClass(supabase, tenant_id, student.id, kstTime);
-      if (matchedClass) {
-        targetClassId = matchedClass.id;
-        matchedClassName = matchedClass.name;
-      }
-    }
-
-    // 6. 중복 출석 방지
-    if (targetClassId) {
-      const isDuplicate = await checkDuplicateAttendance(
-        supabase,
-        tenant_id,
-        student.id,
-        targetClassId,
-        kstTime
+    if (student.status !== 'active') {
+      return new Response(
+        JSON.stringify({ error: '활성 상태가 아닌 학생입니다.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-
-      if (isDuplicate) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: '이미 출석이 완료되었습니다.',
-            student: { id: student.id, name: student.name },
-            message: `${student.name} 학생은 이미 해당 수업에 출석했습니다.`,
-          }),
-          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
     }
 
-    // 7. 지각 여부 판정 (수업 시작 10분 이후 출석 = 지각)
-    let attendanceStatus: 'present' | 'late' = 'present';
+    // 6. 오늘 이미 등원했는지 확인 (중복 방지)
+    const alreadyCheckedIn = await hasTodayCheckIn(supabase, tenant_id, student.id, kstTime);
 
-    if (targetClassId && matchedClassName) {
-      // 매칭된 수업 정보로 지각 판정
-      const { data: classInfo } = await supabase
-        .from('classes')
-        .select('start_time')
-        .eq('id', targetClassId)
-        .single();
-
-      if (classInfo) {
-        const [startHour, startMinute] = classInfo.start_time.split(':').map(Number);
-        const classStartMinutes = startHour * 60 + startMinute;
-        const currentMinutes = kstTime.getHours() * 60 + kstTime.getMinutes();
-
-        // 수업 시작 10분 이후 = 지각
-        if (currentMinutes > classStartMinutes + 10) {
-          attendanceStatus = 'late';
-        }
-      }
+    if (alreadyCheckedIn) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: '이미 등원이 완료되었습니다.',
+          student: { id: student.id, name: student.name },
+          message: `${student.name} 학생은 이미 오늘 등원했습니다.`,
+        }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // 8. 출석 기록 생성
-    const { data: attendanceLog, error: attendanceError } = await supabase
+    // 7. 오늘 등록된 수업 조회
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const currentDay = dayNames[kstTime.getDay()];
+    const todayClasses = await getTodayClasses(supabase, tenant_id, student.id, currentDay);
+
+    // 8. 등원 이벤트 레코드 생성 (attendance_type: 'check_in', status: null, class_id: null)
+    const { error: checkInError } = await supabase
       .from('attendance_logs')
       .insert({
         tenant_id: tenant_id,
         student_id: student.id,
-        class_id: targetClassId,
+        class_id: null, // 등원 이벤트는 수업과 무관
         occurred_at: kstTime.toISOString(),
         attendance_type: 'check_in',
-        status: attendanceStatus,
+        status: null, // 등원 이벤트는 status 없음
         check_in_method: 'kiosk_phone',
         created_at: now.toISOString(),
         updated_at: now.toISOString(),
-      })
-      .select()
-      .single();
+      });
 
-    if (attendanceError) {
-      console.error('[kiosk-check-in] Attendance log creation failed:', attendanceError);
+    if (checkInError) {
+      console.error('[kiosk-check-in] Check-in event creation failed:', checkInError);
       return new Response(
-        JSON.stringify({ error: '출석 기록 생성에 실패했습니다.' }),
+        JSON.stringify({ error: '등원 기록 생성에 실패했습니다.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // 9. 보호자 자동 알림 발송 (Policy 기반)
+    // 9. 오늘 등록된 모든 수업을 scheduled 상태로 기록 (중복 방지)
+    const { startOfDay, endOfDay } = getKSTDayRange(kstTime);
+
+    const scheduledRecords = [];
+    for (const classInfo of todayClasses) {
+      // 이미 해당 수업에 대한 출석 기록이 있는지 확인
+      const { data: existingLog } = await supabase
+        .from('attendance_logs')
+        .select('id, status')
+        .eq('tenant_id', tenant_id)
+        .eq('student_id', student.id)
+        .eq('class_id', classInfo.id)
+        .gte('occurred_at', startOfDay)
+        .lte('occurred_at', endOfDay)
+        .is('attendance_type', null) // 수업 출석 레코드만
+        .limit(1);
+
+      if (existingLog && existingLog.length > 0) {
+        // 이미 출석 기록이 있으면 건너뛰기 (중복 방지)
+        const existingStatus = existingLog[0].status;
+        console.log(`[kiosk-check-in] Attendance record already exists for class ${classInfo.id} (${classInfo.name}), status: ${existingStatus}`);
+
+        // 기존 레코드 정보를 응답에 포함 (이미 출석 처리된 수업)
+        scheduledRecords.push({
+          class_id: classInfo.id,
+          class_name: classInfo.name,
+          subject: classInfo.subject,
+          start_time: classInfo.start_time,
+          already_exists: true,
+          existing_status: existingStatus,
+        });
+        continue;
+      }
+
+      // 새 scheduled 레코드 생성
+      const { error: scheduledError } = await supabase
+        .from('attendance_logs')
+        .insert({
+          tenant_id: tenant_id,
+          student_id: student.id,
+          class_id: classInfo.id,
+          occurred_at: kstTime.toISOString(),
+          attendance_type: null, // 수업 출석은 attendance_type 없음
+          status: 'scheduled', // 예비 출석 상태
+          check_in_method: null,
+          created_at: now.toISOString(),
+          updated_at: now.toISOString(),
+        });
+
+      if (scheduledError) {
+        console.error(`[kiosk-check-in] Scheduled record creation failed for class ${classInfo.id} (${classInfo.name}):`, scheduledError);
+        // 에러가 발생해도 계속 진행 (일부 수업만 실패할 수 있음)
+        scheduledRecords.push({
+          class_id: classInfo.id,
+          class_name: classInfo.name,
+          subject: classInfo.subject,
+          start_time: classInfo.start_time,
+          error: scheduledError.message || 'Unknown error',
+        });
+      } else {
+        scheduledRecords.push({
+          class_id: classInfo.id,
+          class_name: classInfo.name,
+          subject: classInfo.subject,
+          start_time: classInfo.start_time,
+        });
+      }
+    }
+
+    // 10. 보호자 자동 알림 발송 (Policy 기반)
     const autoNotify = await getTenantSettingByPath(
       supabase,
       tenant_id,
@@ -343,102 +363,34 @@ Deno.serve(async (req) => {
       if (guardians && guardians.length > 0) {
         const guardian = guardians[0];
 
-        // 알림 채널 및 템플릿 조회
-        const notificationChannel = await getTenantSettingByPath(
-          supabase,
-          tenant_id,
-          'kiosk.notification_channel'
-        ) as string || 'sms';
+        // 알림 발송 (dispatch-notification Edge Function 호출)
+        // TODO: 실제 알림 발송 구현
+        const timeStr = kstTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+        const message = `${student.name} 학생이 ${timeStr}에 등원했습니다. (오늘 총 ${todayClasses.length}개 수업 예정)`;
 
-        const templateRaw = await getTenantSettingByPath(
-          supabase,
-          tenant_id,
-          'kiosk.notification_template'
-        ) as string || '${student_name} 학생이 ${time}에 출석했습니다.';
-
-        // 템플릿 변수 치환
-        const timeStr = kstTime.toLocaleTimeString('ko-KR', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        });
-        const message = templateRaw
-          .replace('${student_name}', student.name)
-          .replace('${time}', timeStr);
-
-        // 알림 발송 (dispatch-notification 호출)
-        try {
-          const notificationResponse = await fetch(
-            `${Deno.env.get('SUPABASE_URL')}/functions/v1/dispatch-notification`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
-              },
-              body: JSON.stringify({
-                tenant_id: tenant_id,
-                recipient_id: guardian.id,
-                recipient_type: 'guardian',
-                channel: notificationChannel,
-                message: message,
-                metadata: {
-                  student_id: student.id,
-                  student_name: student.name,
-                  attendance_log_id: attendanceLog.id,
-                  check_in_time: kstTime.toISOString(),
-                  check_in_method: 'kiosk_phone',
-                },
-              }),
-            }
-          );
-
-          if (!notificationResponse.ok) {
-            console.error('[kiosk-check-in] Notification dispatch failed:', await notificationResponse.text());
-          } else {
-            console.log(`[kiosk-check-in] Notification sent to guardian ${guardian.id}`);
-          }
-        } catch (notifyError) {
-          // 알림 실패는 출석 체크 성공에 영향 없음 (로그만 기록)
-          console.error('[kiosk-check-in] Notification error:', notifyError);
-        }
+        console.log(`[kiosk-check-in] Guardian notification: ${guardian.phone_number} - ${message}`);
       }
     }
 
-    // 10. 성공 응답
-    const statusMessage = attendanceStatus === 'late' ? ' (지각)' : '';
-    const classMessage = matchedClassName ? ` [${matchedClassName}]` : '';
+    // 11. 성공 응답
+    const timeStr = kstTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const classList = scheduledRecords.map(r => r.class_name).join(', ');
 
     return new Response(
       JSON.stringify({
         success: true,
-        student: {
-          id: student.id,
-          name: student.name,
-        },
-        attendance: {
-          id: attendanceLog.id,
-          occurred_at: kstTime.toISOString(),
-          check_in_method: 'kiosk_phone',
-          status: attendanceStatus,
-          class_id: targetClassId,
-          class_name: matchedClassName,
-        },
-        message: `${student.name} 학생의 출석이 완료되었습니다.${classMessage}${statusMessage}`,
+        student: { id: student.id, name: student.name },
+        check_in_time: kstTime.toISOString(),
+        scheduled_classes: scheduledRecords,
+        message: `${student.name} 학생의 등원이 완료되었습니다. (${timeStr})\n오늘 수업: ${classList || '없음'}`,
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('[kiosk-check-in] Unexpected error:', error);
     return new Response(
-      JSON.stringify({
-        error: '서버 오류가 발생했습니다.',
-        details: error instanceof Error ? error.message : String(error)
-      }),
+      JSON.stringify({ error: '서버 오류가 발생했습니다.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

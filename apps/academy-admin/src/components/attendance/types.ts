@@ -23,7 +23,7 @@ export interface StudentAttendanceState {
   student_id: string;
   check_in: boolean;
   check_out: boolean;
-  status: AttendanceStatus;
+  status: AttendanceStatus | null; // null = 출석 상태 미확정
   check_in_time?: string; // HH:mm 형식
   check_out_time?: string; // HH:mm 형식
   ai_predicted?: boolean;

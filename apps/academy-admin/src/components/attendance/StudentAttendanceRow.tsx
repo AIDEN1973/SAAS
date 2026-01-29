@@ -5,61 +5,18 @@
  * [불변 규칙] CSS 변수만 사용 (하드코딩 금지)
  */
 
-import React, { useCallback, useMemo } from 'react';
-import { Badge, Select } from '@ui-core/react';
+import React, { useMemo } from 'react';
+import { Badge, Button } from '@ui-core/react';
 import { useIndustryTerms } from '@hooks/use-industry-terms';
-import { AttendanceCheckbox } from './AttendanceCheckbox';
-import { determineLateStatus } from './utils';
-import { LAYOUT_SIZES } from './constants';
 import type { StudentAttendanceRowProps } from './types';
-import type { AttendanceStatus } from '@services/attendance-service';
 
 export const StudentAttendanceRow: React.FC<StudentAttendanceRowProps> = ({
   student,
   attendanceState,
-  onCheckInChange,
-  onCheckOutChange,
   onStatusChange,
-  isKioskCheckIn = false,
   disabled = false,
-  classStartTime,
 }) => {
   const terms = useIndustryTerms();
-
-  // 등원 시간 변경 시 자동 상태 판정
-  const handleCheckInChange = useCallback(
-    (checked: boolean, time?: string) => {
-      if (!checked) {
-        // 체크 해제
-        onCheckInChange(false, undefined);
-        return;
-      }
-
-      // 체크 시 시간 기반 자동 상태 판정
-      let newStatus: AttendanceStatus = 'present';
-
-      if (time && classStartTime && !attendanceState.manual_status_override) {
-        const determinedStatus = determineLateStatus(time, classStartTime);
-        if (determinedStatus) {
-          newStatus = determinedStatus;
-        }
-      }
-
-      onCheckInChange(true, time);
-
-      // 자동 상태 판정이 필요한 경우에만 상태 변경
-      if (!attendanceState.manual_status_override && newStatus !== attendanceState.status) {
-        onStatusChange(newStatus);
-      }
-    },
-    [onCheckInChange, onStatusChange, classStartTime, attendanceState.manual_status_override, attendanceState.status]
-  );
-
-  // 학생 정보 표시
-  const studentInfo = useMemo(() => {
-    const grade = student.grade ? `${student.grade}${terms.GRADE_LABEL}` : '';
-    return grade;
-  }, [student.grade, terms.GRADE_LABEL]);
 
   // 상태 배지 색상
   const statusBadgeColor = useMemo(() => {
@@ -72,10 +29,24 @@ export const StudentAttendanceRow: React.FC<StudentAttendanceRowProps> = ({
         return 'error';
       case 'excused':
         return 'gray';
+      case 'scheduled':
+        return 'blue';
       default:
         return 'gray';
     }
   }, [attendanceState.status]);
+
+  // [DEBUG] scheduled 상태 디버깅
+  if (import.meta.env?.DEV && attendanceState.status === 'scheduled') {
+    console.log('[StudentAttendanceRow] scheduled 상태:', {
+      studentName: student.name,
+      status: attendanceState.status,
+      check_in: attendanceState.check_in,
+      check_in_time: attendanceState.check_in_time,
+      check_out: attendanceState.check_out,
+      statusBadgeColor,
+    });
+  }
 
   return (
     <div
@@ -93,7 +64,7 @@ export const StudentAttendanceRow: React.FC<StudentAttendanceRowProps> = ({
       <div
         style={{
           flex: '1 1 auto',
-          minWidth: `${LAYOUT_SIZES.STUDENT_INFO_MIN_WIDTH}px`,
+          minWidth: '120px',
           display: 'flex',
           alignItems: 'center',
           gap: 'var(--spacing-sm)',
@@ -128,20 +99,10 @@ export const StudentAttendanceRow: React.FC<StudentAttendanceRowProps> = ({
           >
             {student.name}
           </div>
-          {studentInfo && (
-            <div
-              style={{
-                fontSize: 'var(--font-size-sm)',
-                color: 'var(--color-text-secondary)',
-              }}
-            >
-              {studentInfo}
-            </div>
-          )}
         </div>
       </div>
 
-      {/* 등원 체크 */}
+      {/* 출석 상태 버튼 그룹 */}
       <div
         style={{
           display: 'flex',
@@ -149,80 +110,52 @@ export const StudentAttendanceRow: React.FC<StudentAttendanceRowProps> = ({
           gap: 'var(--spacing-xs)',
         }}
       >
-        <span
-          style={{
-            fontSize: 'var(--font-size-sm)',
-            color: 'var(--color-text-secondary)',
-            minWidth: `${LAYOUT_SIZES.CHECKBOX_LABEL_MIN_WIDTH}px`,
-          }}
-        >
-          {terms.CHECK_IN_LABEL}
-        </span>
-        <AttendanceCheckbox
-          checked={attendanceState.check_in}
-          time={attendanceState.check_in_time}
-          onChange={handleCheckInChange}
-          disabled={disabled}
-          isKiosk={isKioskCheckIn}
-          label={`${student.name} 등원`}
-        />
+        {/* scheduled 상태일 때는 배지만 표시 */}
+        {attendanceState.status === 'scheduled' ? (
+          <Badge variant="soft" color="info">
+            출석 대기
+          </Badge>
+        ) : (
+          <>
+            <Button
+              variant={attendanceState.status === 'present' ? 'solid' : 'outline'}
+              color="success"
+              size="sm"
+              onClick={() => onStatusChange('present')}
+              disabled={disabled}
+            >
+              {terms.PRESENT_LABEL}
+            </Button>
+            <Button
+              variant={attendanceState.status === 'late' ? 'solid' : 'outline'}
+              color="warning"
+              size="sm"
+              onClick={() => onStatusChange('late')}
+              disabled={disabled}
+            >
+              {terms.LATE_LABEL}
+            </Button>
+            <Button
+              variant={attendanceState.status === 'absent' ? 'solid' : 'outline'}
+              color="error"
+              size="sm"
+              onClick={() => onStatusChange('absent')}
+              disabled={disabled}
+            >
+              {terms.ABSENCE_LABEL}
+            </Button>
+            <Button
+              variant={attendanceState.status === 'excused' ? 'solid' : 'outline'}
+              color="info"
+              size="sm"
+              onClick={() => onStatusChange('excused')}
+              disabled={disabled}
+            >
+              {terms.EXCUSED_LABEL}
+            </Button>
+          </>
+        )}
       </div>
-
-      {/* 하원 체크 */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--spacing-xs)',
-        }}
-      >
-        <span
-          style={{
-            fontSize: 'var(--font-size-sm)',
-            color: 'var(--color-text-secondary)',
-            minWidth: `${LAYOUT_SIZES.CHECKBOX_LABEL_MIN_WIDTH}px`,
-          }}
-        >
-          {terms.CHECK_OUT_LABEL}
-        </span>
-        <AttendanceCheckbox
-          checked={attendanceState.check_out}
-          time={attendanceState.check_out_time}
-          onChange={onCheckOutChange}
-          disabled={disabled}
-          label={`${student.name} 하원`}
-        />
-      </div>
-
-      {/* 출석 상태 */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--spacing-xs)',
-          minWidth: `${LAYOUT_SIZES.TIME_BADGE_MIN_WIDTH}px`,
-        }}
-      >
-        <Select
-          value={attendanceState.status}
-          onChange={(value) => onStatusChange(value as AttendanceStatus)}
-          options={[
-            { value: 'present', label: terms.PRESENT_LABEL },
-            { value: 'late', label: terms.LATE_LABEL },
-            { value: 'absent', label: terms.ABSENCE_LABEL },
-            { value: 'excused', label: terms.EXCUSED_LABEL },
-          ]}
-          size="sm"
-          disabled={disabled}
-        />
-      </div>
-
-      {/* 상태 배지 (지각 시에만 표시) */}
-      {attendanceState.status === 'late' && attendanceState.check_in && (
-        <Badge variant="soft" color={statusBadgeColor}>
-          {terms.LATE_LABEL}
-        </Badge>
-      )}
     </div>
   );
 };

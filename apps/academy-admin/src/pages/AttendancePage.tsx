@@ -16,6 +16,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ErrorBoundary, Container, Card, Badge, useModal, PageHeader, useResponsiveMode, isMobile, isTablet, NotificationCardLayout, SubSidebar, EmptyState, RightLayerMenuLayout, EntityCard } from '@ui-core/react';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { CardGridLayout } from '../components/CardGridLayout';
 import { StatsDashboard } from '../components/stats/StatsDashboard';
 // StatsItem type은 StatsDashboard에서 내부적으로 사용됨
@@ -27,6 +28,7 @@ import {
   groupAttendanceByDate,
   getDefaultDateRange,
   createAttendanceRecords,
+  isClassStarted,
   TIME_RANGE_CONFIG,
   DAY_OF_WEEK_MAP,
   DAY_NAMES,
@@ -45,8 +47,8 @@ import { useIndustryTerms } from '@hooks/use-industry-terms';
 import type { AttendanceFilter, AttendanceStatus, AttendanceLog, CreateAttendanceLogInput } from '@services/attendance-service';
 import type { Student, StudentClass } from '@services/student-service';
 import { toKST } from '@lib/date-utils';
+import { createClient } from '@lib/supabase-client';
 // import { useUserRole } from '@hooks/use-auth'; // TODO: 권한 체크 구현 시 사용
-import { useQuery } from '@tanstack/react-query';
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useConfig, useUpdateConfig } from '@hooks/use-config';
 import type { ClassTeacher } from '@services/class-service';
@@ -146,6 +148,7 @@ export function AttendancePage() {
     studentAttendanceStatesRef.current = studentAttendanceStates;
   }, [studentAttendanceStates]);
   const [isSaving, setIsSaving] = useState(false);
+  const queryClient = useQueryClient();
 
   // 새로운 UI 관련 상태
   const [selectedClassIdForLayer, setSelectedClassIdForLayer] = useState<string | null>(null);
@@ -357,6 +360,7 @@ export function AttendancePage() {
   );
 
   // [성능 최적화] 출석 로그를 Map으로 인덱싱 (O(n*m) → O(n+m))
+  // [Phase 5] check_in/check_out 이벤트 + 수업 출석 레코드(scheduled 등)를 모두 로드
   const attendanceLogsMap = useMemo(() => {
     if (import.meta.env?.DEV) {
       console.log('[AttendancePage] 📥 attendanceLogs 인덱싱 시작:', {
@@ -366,6 +370,7 @@ export function AttendancePage() {
 
     const checkInMap = new Map<string, AttendanceLog>();
     const checkOutMap = new Map<string, AttendanceLog>();
+    const classAttendanceMap = new Map<string, AttendanceLog>(); // 수업 출석 레코드 (scheduled/present/late/absent/excused)
 
     // [근본 수정] 같은 학생의 여러 로그 중 가장 최신 레코드만 유지
     // DESC 정렬된 데이터를 순차 처리하면 가장 오래된 레코드가 마지막에 덮어쓰므로,
@@ -401,6 +406,37 @@ export function AttendancePage() {
         if (!existingLog || new Date(log.occurred_at) > new Date(existingLog.occurred_at)) {
           checkOutMap.set(log.student_id, log);
         }
+      } else if (log.attendance_type === null && log.class_id) {
+        // 수업 출석 레코드 (attendance_type이 null이고 class_id가 있는 경우)
+        // [Phase 7] 레이어가 열려있으면 selectedClassIdForLayer, 아니면 selectedClassId
+        const activeClassId = selectedClassIdForLayer || selectedClassId;
+        if (!activeClassId || activeClassId === log.class_id) {
+          const key = `${log.student_id}-${log.class_id}`;
+          const existingLog = classAttendanceMap.get(key);
+
+          // [수정] 타임스탬프가 동일할 때 ID로 2차 비교 (높은 ID = 최신)
+          const existingTime = existingLog ? new Date(existingLog.occurred_at).getTime() : 0;
+          const currentTime = new Date(log.occurred_at).getTime();
+          const existingId = existingLog?.id ? Number(existingLog.id) : 0;
+          const currentId = log.id ? Number(log.id) : 0;
+
+          const isNewer = !existingLog ||
+            currentTime > existingTime ||
+            (currentTime === existingTime && currentId > existingId);
+
+          if (isNewer) {
+            if (import.meta.env?.DEV) {
+              console.log('[AttendancePage] ✅ 수업 출석 레코드 인덱싱:', {
+                student_id: log.student_id,
+                class_id: log.class_id,
+                status: log.status,
+                id: log.id,
+                attendance_type: log.attendance_type,
+              });
+            }
+            classAttendanceMap.set(key, log);
+          }
+        }
       }
     });
 
@@ -408,11 +444,12 @@ export function AttendancePage() {
       console.log('[AttendancePage] 📊 인덱싱 완료:', {
         checkInCount: checkInMap.size,
         checkOutCount: checkOutMap.size,
+        classAttendanceCount: classAttendanceMap.size,
       });
     }
 
-    return { checkInMap, checkOutMap };
-  }, [attendanceLogs]);  // selectedDate, selectedClassId는 실제로 사용되지 않음
+    return { checkInMap, checkOutMap, classAttendanceMap };
+  }, [attendanceLogs, selectedClassId, selectedClassIdForLayer]);
 
   // 선택된 수업의 학생 목록
   const filteredStudents = useMemo(() => {
@@ -534,6 +571,9 @@ export function AttendancePage() {
       console.log('[AttendancePage] 📊 attendanceLogsMap:', {
         checkInCount: attendanceLogsMap.checkInMap.size,
         checkOutCount: attendanceLogsMap.checkOutMap.size,
+        classAttendanceCount: attendanceLogsMap.classAttendanceMap.size,
+        selectedClassId,
+        selectedClassIdForLayer,
       });
     }
 
@@ -552,13 +592,35 @@ export function AttendancePage() {
       const savedCheckInLog = attendanceLogsMap.checkInMap.get(student.id);
       const savedCheckOutLog = attendanceLogsMap.checkOutMap.get(student.id);
 
-      if (savedCheckInLog || savedCheckOutLog) {
-        // 저장된 출석 데이터 우선 적용
+      // [Phase 7] 수업 출석 레코드 조회 (scheduled 등)
+      // 레이어가 열려있으면 selectedClassIdForLayer 사용, 아니면 selectedClassId 사용
+      const activeClassId = selectedClassIdForLayer || selectedClassId;
+      const classAttendanceKey = activeClassId ? `${student.id}-${activeClassId}` : undefined;
+      const savedClassAttendanceLog = classAttendanceKey
+        ? attendanceLogsMap.classAttendanceMap.get(classAttendanceKey)
+        : undefined;
+
+      // [Phase 5] check_in/check_out 이벤트 + 수업 출석 레코드를 조합
+      if (savedCheckInLog || savedCheckOutLog || savedClassAttendanceLog) {
+        // [Phase 7] 수업 출석 레코드가 있으면 해당 status 사용
+        // 수업 출석 레코드가 없으면 null (토글로 취소된 경우 또는 아직 미설정)
+        const status = savedClassAttendanceLog?.status ?? null;
+
+        if (import.meta.env?.DEV) {
+          console.log('[AttendancePage] 🔍 데이터 동기화:', {
+            studentId: student.id,
+            studentName: student.name,
+            savedClassAttendanceLog: savedClassAttendanceLog,
+            savedCheckInLog: !!savedCheckInLog,
+            finalStatus: status,
+          });
+        }
+
         newStates[student.id] = {
           student_id: student.id,
           check_in: !!savedCheckInLog,
           check_out: !!savedCheckOutLog,
-          status: savedCheckInLog?.status || 'present',
+          status: status,
           check_in_time: savedCheckInLog ? toKST(savedCheckInLog.occurred_at).format('HH:mm') : undefined,
           check_out_time: savedCheckOutLog ? toKST(savedCheckOutLog.occurred_at).format('HH:mm') : undefined,
           ai_predicted: false,
@@ -577,11 +639,12 @@ export function AttendancePage() {
             user_modified: false,
           };
         } else {
+          // [Phase 7] 레코드 없음 = 상태 미확정 (null)
           newStates[student.id] = {
             student_id: student.id,
             check_in: false,
             check_out: false,
-            status: 'present',
+            status: null,
             ai_predicted: false,
             user_modified: false,
           };
@@ -593,7 +656,7 @@ export function AttendancePage() {
       console.log('[AttendancePage] 🎯 동기화 완료');
     }
     setStudentAttendanceStates(newStates);
-  }, [aiPredictions, isLoadingPredictions, filteredStudents, attendanceLogsMap]);
+  }, [aiPredictions, isLoadingPredictions, filteredStudents, attendanceLogsMap, selectedClassId, selectedClassIdForLayer]);
 
   // 선택된 수업/날짜 변경 시 상태 초기화 및 필터 업데이트
   useEffect(() => {
@@ -940,7 +1003,7 @@ export function AttendancePage() {
           student_id: studentId,
           check_in: false,
           check_out: false,
-          status: 'present' as AttendanceStatus,
+          status: null, // 초기 상태는 null (미확정)
           user_modified: false,
         };
         return {
@@ -954,6 +1017,46 @@ export function AttendancePage() {
     },
     []
   );
+
+  // 클라이언트 실시간 자동 출석 확정 (scheduled → present 변환)
+  useEffect(() => {
+    if (!selectedClassForLayer) return;
+
+    const checkAndConvertScheduled = () => {
+      // 수업이 시작되었는지 확인
+      if (!isClassStarted(selectedClassForLayer.start_time)) {
+        return;
+      }
+
+      // scheduled 상태인 학생들을 찾아서 자동으로 present로 변환
+      Object.entries(studentAttendanceStates).forEach(([studentId, state]) => {
+        if (state.status === 'scheduled') {
+          if (import.meta.env?.DEV) {
+            console.log('[AttendancePage] 🔄 자동 출석 확정:', {
+              studentId,
+              classStartTime: selectedClassForLayer.start_time,
+              from: 'scheduled',
+              to: 'present',
+            });
+          }
+
+          handleLayerAttendanceChange(studentId, {
+            status: 'present',
+            user_modified: false,
+            ai_predicted: false,
+          });
+        }
+      });
+    };
+
+    // 즉시 한 번 실행
+    checkAndConvertScheduled();
+
+    // 1분마다 재확인 (실시간 업데이트)
+    const interval = setInterval(checkAndConvertScheduled, 60000);
+
+    return () => clearInterval(interval);
+  }, [selectedClassForLayer, studentAttendanceStates, handleLayerAttendanceChange]);
 
   // 레이어 내 일괄 등원 핸들러
   const handleLayerBulkCheckIn = useCallback(() => {
@@ -993,47 +1096,134 @@ export function AttendancePage() {
     setIsSaving(true);
     try {
       const attendanceRecords: CreateAttendanceLogInput[] = [];
+      const deleteStudentIds: string[] = [];
 
       studentsInSelectedClass.forEach((student) => {
         const state = studentAttendanceStates[student.id];
+
+        if (import.meta.env?.DEV) {
+          console.log('[AttendancePage] 🔍 학생 상태 확인:', {
+            name: student.name,
+            id: student.id,
+            status: state?.status,
+            user_modified: state?.user_modified,
+            state: state,
+          });
+        }
+
         if (!state?.user_modified) return;
 
-        // createAttendanceRecords 유틸리티 사용
+        // status가 null인 경우: DB 레코드 삭제 (출석 취소)
+        if (state.status === null) {
+          deleteStudentIds.push(student.id);
+          if (import.meta.env?.DEV) {
+            console.log('[AttendancePage] 🗑️ 출석 취소 (레코드 삭제):', student.name, student.id);
+          }
+          return;
+        }
+
+        // [Phase 7] 이중 레코드 패턴: check_in/check_out 이벤트 + 수업 출석 레코드
         const selectedClass = selectedDateClasses.find((c) => c.id === selectedClassIdForLayer);
-        const records = createAttendanceRecords(
+
+        // 1. check_in/check_out 이벤트 레코드 (attendance_type != null, class_id = null, status = null)
+        const eventRecords = createAttendanceRecords(
           state,
           selectedDate,
           selectedClass?.start_time
         );
+        attendanceRecords.push(...eventRecords);
 
-        // class_id 추가 (유틸리티에서는 undefined로 생성됨)
-        records.forEach(record => {
-          record.class_id = selectedClassIdForLayer;
-          attendanceRecords.push(record);
+        // 2. 수업 출석 레코드 (attendance_type = null, class_id != null, status != null)
+        const occurredAt = state.check_in && state.check_in_time
+          ? (() => {
+              const [hour, minute] = state.check_in_time.split(':').map(Number);
+              return toKST(selectedDate).hour(hour).minute(minute).second(0).format('YYYY-MM-DDTHH:mm:ssZ');
+            })()
+          : selectedClass?.start_time
+            ? (() => {
+                const [hour, minute] = selectedClass.start_time.split(':').map(Number);
+                return toKST(selectedDate).hour(hour).minute(minute).second(0).format('YYYY-MM-DDTHH:mm:ssZ');
+              })()
+            : toKST().format('YYYY-MM-DDTHH:mm:ssZ');
+
+        attendanceRecords.push({
+          student_id: student.id,
+          class_id: selectedClassIdForLayer,
+          occurred_at: occurredAt,
+          attendance_type: null, // 수업 출석 레코드는 attendance_type이 null
+          status: state.status,
+          check_in_method: state.check_in ? 'manual' : undefined,
         });
       });
 
       if (import.meta.env?.DEV) {
         console.log('[AttendancePage] 📤 레이어 저장:', attendanceRecords.length, '개 레코드');
+        console.log('[AttendancePage] 📝 저장할 레코드 상세:', JSON.stringify(attendanceRecords, null, 2));
+        console.log('[AttendancePage] 🗑️ 레이어 삭제:', deleteStudentIds.length, '개 레코드');
+        console.log('[AttendancePage] 🗑️ 삭제 대상 학생 IDs:', deleteStudentIds);
+        console.log('[AttendancePage] 📅 선택된 날짜:', selectedDate);
+        console.log('[AttendancePage] 📚 수업 ID:', selectedClassIdForLayer);
       }
 
+      // 1. 삭제할 레코드 처리 (RLS로 자동 tenant 필터링)
+      if (deleteStudentIds.length > 0) {
+        const supabase = createClient();
+
+        // KST 날짜를 UTC 범위로 변환 (KST 00:00 = UTC 전날 15:00, KST 23:59 = UTC 당일 14:59)
+        const kstStartTime = toKST(selectedDate).startOf('day'); // KST 00:00:00
+        const kstEndTime = toKST(selectedDate).endOf('day');     // KST 23:59:59
+        const utcStart = kstStartTime.utc().format('YYYY-MM-DDTHH:mm:ssZ');
+        const utcEnd = kstEndTime.utc().format('YYYY-MM-DDTHH:mm:ssZ');
+
+        if (import.meta.env?.DEV) {
+          console.log('[AttendancePage] 🔍 삭제 쿼리 실행:', {
+            student_ids: deleteStudentIds,
+            class_id: selectedClassIdForLayer,
+            selectedDate_KST: selectedDate,
+            kstStart: kstStartTime.format('YYYY-MM-DD HH:mm:ss'),
+            kstEnd: kstEndTime.format('YYYY-MM-DD HH:mm:ss'),
+            utcStart,
+            utcEnd,
+          });
+        }
+
+        // 수업 출석 레코드만 삭제 (attendance_type IS NULL)
+        const { data: deletedData, error: deleteError } = await supabase
+          .from('attendance_logs')
+          .delete()
+          .in('student_id', deleteStudentIds)
+          .eq('class_id', selectedClassIdForLayer)
+          .is('attendance_type', null) // 중요: 수업 출석 레코드만 삭제
+          .gte('occurred_at', utcStart)
+          .lte('occurred_at', utcEnd)
+          .select(); // 삭제된 레코드 반환
+
+        if (import.meta.env?.DEV) {
+          console.log('[AttendancePage] ✅ 삭제 결과:', {
+            deletedCount: deletedData?.length || 0,
+            deletedRecords: deletedData,
+            error: deleteError,
+          });
+        }
+
+        if (deleteError) {
+          console.error('[AttendancePage] ❌ 삭제 오류:', deleteError);
+          throw deleteError;
+        }
+      }
+
+      // 2. UPSERT 레코드 처리
       for (const record of attendanceRecords) {
         await upsertAttendance.mutateAsync(record);
       }
 
+      // 3. 저장 완료 후 데이터 다시 불러오기
+      await queryClient.invalidateQueries({ queryKey: ['attendance_logs'] });
+
       showAlert(terms.MESSAGES.SAVE_SUCCESS, terms.MESSAGES.SUCCESS, 'success');
 
-      // user_modified 플래그 초기화
-      setStudentAttendanceStates((prevStates) => {
-        const newStates: Record<string, StudentAttendanceState> = {};
-        Object.entries(prevStates).forEach(([studentId, state]) => {
-          newStates[studentId] = {
-            ...state,
-            user_modified: false,
-          };
-        });
-        return newStates;
-      });
+      // 4. user_modified 플래그 초기화는 데이터 동기화 후 자동으로 처리됨
+      // (useEffect의 동기화 로직이 새로운 데이터로 상태를 재설정함)
     } catch (error) {
       showAlert(terms.MESSAGES.SAVE_ERROR, terms.MESSAGES.ERROR, 'error');
     } finally {
@@ -1049,6 +1239,7 @@ export function AttendancePage() {
     upsertAttendance,
     showAlert,
     terms,
+    queryClient,
   ]);
 
   // ========== END 새로운 시간대별 그룹화 UI ==========

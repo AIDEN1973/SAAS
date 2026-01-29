@@ -284,7 +284,7 @@ const ACADEMY_TERMS: IndustryTerms = {
   ABSENCE_LABEL: '결석',
   LATE_LABEL: '지각',
   PRESENT_LABEL: '출석',
-  EXCUSED_LABEL: '사유',
+  EXCUSED_LABEL: '인정결석',
   CHECK_IN_LABEL: '등원',
   CHECK_OUT_LABEL: '하원',
   TOTAL_LABEL: '총원',

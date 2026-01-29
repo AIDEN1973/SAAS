@@ -321,16 +321,16 @@ export interface AssignTeacherInput {
 
 // 출결 관리용
 export type AttendanceType = 'check_in' | 'check_out' | 'absent' | 'late';
-export type AttendanceStatus = 'present' | 'late' | 'absent' | 'excused';
+export type AttendanceStatus = 'present' | 'late' | 'absent' | 'excused' | 'scheduled';
 
 export interface AttendanceLog {
   id: string;
   tenant_id: string;
   student_id: string;
-  class_id?: string;
+  class_id?: string | null;
   occurred_at: string;  // timestamptz
-  attendance_type: AttendanceType;
-  status: AttendanceStatus;
+  attendance_type: AttendanceType | null;  // null for class attendance records
+  status: AttendanceStatus | null;  // null for check_in/check_out events
   check_in_method?: 'manual' | 'kiosk_phone' | 'qr_scan' | 'phone_auth';  // 체크인 방법
   notes?: string;
   created_by?: string;
@@ -339,10 +339,10 @@ export interface AttendanceLog {
 
 export interface CreateAttendanceLogInput {
   student_id: string;
-  class_id?: string;
+  class_id?: string | null;
   occurred_at: string;  // timestamptz
-  attendance_type: AttendanceType;
-  status: AttendanceStatus;
+  attendance_type: AttendanceType | null;  // null for class attendance records
+  status: AttendanceStatus | null;  // null for check_in/check_out events
   check_in_method?: 'manual' | 'kiosk_phone' | 'qr_scan' | 'phone_auth';  // 체크인 방법
   notes?: string;
 }

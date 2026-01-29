@@ -767,9 +767,9 @@ export function StudentClassAssignmentSubPage({
                       // Get teacher info for this class
                       const teacherInfo = classTeachersMap.get(classItem.id);
 
-                      // 과목과 선생님 이름을 하나의 배지로 표시 (예: "국어 송민준")
+                      // 과목과 선생님 이름을 하나의 배지로 표시 (예: "국어 / 고현정")
                       const subjectAndTeacher = teacherInfo && teacherInfo.length > 0
-                        ? `${classItem.subject || terms.GROUP_LABEL} ${teacherInfo[0].name}`
+                        ? `${classItem.subject || terms.GROUP_LABEL} / ${teacherInfo[0].name}`
                         : classItem.subject || terms.GROUP_LABEL;
 
                       // Convert teacher info to profiles format

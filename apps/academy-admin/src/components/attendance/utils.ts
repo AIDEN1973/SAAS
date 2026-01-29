@@ -87,6 +87,24 @@ export const determineLateStatus = (
 };
 
 /**
+ * 현재 시간이 수업 시작 시간을 지났는지 확인
+ * @param classStartTime - 수업 시작 시간 (HH:mm)
+ * @returns boolean
+ */
+export const isClassStarted = (classStartTime: string | undefined): boolean => {
+  if (!classStartTime) return false;
+
+  const parsed = parseTimeString(classStartTime);
+  if (!parsed) return false;
+
+  const now = toKST();
+  const currentMinutes = now.hour() * 60 + now.minute();
+  const startMinutes = parsed.hour * 60 + parsed.minute;
+
+  return currentMinutes >= startMinutes;
+};
+
+/**
  * 수업별 출석 통계 계산
  */
 export const calculateClassStats = (
@@ -413,11 +431,11 @@ export const createAttendanceRecords = (
 ): CreateAttendanceLogInput[] => {
   const records: CreateAttendanceLogInput[] = [];
 
-  // 등원 기록 또는 결석/사유 기록
-  if (state.check_in || state.status === 'absent' || state.status === 'excused') {
+  // [Phase 7] 등원 이벤트 기록 (attendance_type='check_in', class_id=null, status=null)
+  if (state.check_in) {
     let occurredAt: string;
 
-    if (state.check_in && state.check_in_time) {
+    if (state.check_in_time) {
       // 체크인 시간이 있으면 사용
       const [hour, minute] = state.check_in_time.split(':').map(Number);
       occurredAt = toKST(selectedDate).hour(hour).minute(minute).second(0).format('YYYY-MM-DDTHH:mm:ssZ');
@@ -435,12 +453,12 @@ export const createAttendanceRecords = (
       class_id: undefined,
       occurred_at: occurredAt,
       attendance_type: 'check_in',
-      status: state.status,
+      status: null, // 이벤트 레코드는 status가 null
       check_in_method: 'manual',
     });
   }
 
-  // 하원 기록
+  // [Phase 7] 하원 이벤트 기록 (attendance_type='check_out', class_id=null, status=null)
   if (state.check_out) {
     const checkOutTimeStr = state.check_out_time || toKST().format('HH:mm');
     const [hour, minute] = checkOutTimeStr.split(':').map(Number);
@@ -451,7 +469,7 @@ export const createAttendanceRecords = (
       class_id: undefined,
       occurred_at: occurredAt,
       attendance_type: 'check_out',
-      status: state.status,
+      status: null, // 이벤트 레코드는 status가 null
     });
   }
 

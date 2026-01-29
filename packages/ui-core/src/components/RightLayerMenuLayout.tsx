@@ -36,8 +36,8 @@ const setLayerMenuTransitioning = (value: boolean) => {
   transitionListeners.forEach(listener => listener(layerMenuTransitioning));
 };
 
-// 오버레이 모드 기준 너비 (1669px)
-const OVERLAY_THRESHOLD_PX = 1669;
+// 오버레이 모드 기준 너비 (1760px)
+const OVERLAY_THRESHOLD_PX = 1760;
 
 export interface RightLayerMenuLayoutProps {
   children: React.ReactNode;
