@@ -493,7 +493,6 @@ export function BulkMessagePage() {
                                 fontSize: 'var(--font-size-base)',
                                 color: 'var(--color-text-primary)',
                                 whiteSpace: 'pre-wrap',
-                                margin: 0,
                               }}
                             >
                               {templates?.find((t) => t.id === selectedTemplateId)?.content || ''}
@@ -553,7 +552,6 @@ export function BulkMessagePage() {
                                 fontSize: 'var(--font-size-base)',
                                 color: 'var(--color-text-primary)',
                                 whiteSpace: 'pre-wrap',
-                                margin: 0,
                               }}
                             >
                               {customMessageContent}

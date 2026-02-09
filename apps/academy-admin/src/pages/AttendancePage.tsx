@@ -29,6 +29,7 @@ import {
   getDefaultDateRange,
   createAttendanceRecords,
   isClassStarted,
+  ATTENDANCE_TIME_CONFIG,
   TIME_RANGE_CONFIG,
   DAY_OF_WEEK_MAP,
   DAY_NAMES,
@@ -1058,74 +1059,86 @@ export function AttendancePage() {
     return () => clearInterval(interval);
   }, [selectedClassForLayer, studentAttendanceStates, handleLayerAttendanceChange]);
 
-  // 레이어 내 일괄 등원 핸들러
+  // 레이어 내 일괄 등원 핸들러 (등원 시간 기반 출석/지각 자동 판정)
   const handleLayerBulkCheckIn = useCallback(() => {
     const currentTime = toKST().format('HH:mm');
+    const classStartTime = selectedClassForLayer?.start_time;
+
+    // 자동 판정: 등원 시간 vs 수업 시작 시간
+    let autoStatus: 'present' | 'late' = 'present';
+    if (classStartTime) {
+      const [ciH, ciM] = currentTime.split(':').map(Number);
+      const [csH, csM] = classStartTime.split(':').map(Number);
+      const diff = (ciH * 60 + ciM) - (csH * 60 + csM);
+      if (diff > ATTENDANCE_TIME_CONFIG.LATE_THRESHOLD_MINUTES) {
+        autoStatus = 'late';
+      }
+    }
+
     studentsInSelectedClass.forEach((student) => {
       handleLayerAttendanceChange(student.id, {
         check_in: true,
         check_in_time: currentTime,
-        status: 'present',
+        status: autoStatus,
         user_modified: true,
         ai_predicted: false,
       });
     });
-  }, [studentsInSelectedClass, handleLayerAttendanceChange]);
+  }, [studentsInSelectedClass, selectedClassForLayer, handleLayerAttendanceChange]);
 
-  // 레이어 내 일괄 하원 핸들러
-  const handleLayerBulkCheckOut = useCallback(() => {
-    const currentTime = toKST().format('HH:mm');
-    studentsInSelectedClass.forEach((student) => {
-      handleLayerAttendanceChange(student.id, {
-        check_out: true,
-        check_out_time: currentTime,
-        user_modified: true,
-        ai_predicted: false,
-      });
-    });
-  }, [studentsInSelectedClass, handleLayerAttendanceChange]);
+  // 개별 학생 저장 핸들러 (stateOverride: 현재 저장할 상태를 직접 전달받음)
+  const handleSaveStudent = useCallback(async (studentId: string, stateOverride: Partial<StudentAttendanceState>) => {
+    if (!selectedClassIdForLayer) return;
 
-  // 레이어 내 저장 핸들러
-  const handleLayerSave = useCallback(async () => {
-    if (isSaving || !selectedClassIdForLayer) return;
+    const student = studentsInSelectedClass.find((s) => s.id === studentId);
+    const currentState = studentAttendanceStates[studentId];
+
+    if (!student) return;
+
+    // stateOverride를 currentState에 병합하여 최신 상태로 저장
+    const state = { ...currentState, ...stateOverride };
 
     if (import.meta.env?.DEV) {
-      console.log('[AttendancePage] 💾 레이어 저장 시작:', selectedClassIdForLayer);
+      console.log('[AttendancePage] 💾 개별 학생 저장 시작:', {
+        studentId,
+        studentName: student.name,
+        currentState,
+        stateOverride,
+        mergedState: state,
+      });
     }
 
-    setIsSaving(true);
     try {
       const attendanceRecords: CreateAttendanceLogInput[] = [];
-      const deleteStudentIds: string[] = [];
 
-      studentsInSelectedClass.forEach((student) => {
-        const state = studentAttendanceStates[student.id];
+      // status가 null인 경우: DB 레코드 삭제 (출석 취소)
+      if (state.status === null) {
+        const supabase = createClient();
 
-        if (import.meta.env?.DEV) {
-          console.log('[AttendancePage] 🔍 학생 상태 확인:', {
-            name: student.name,
-            id: student.id,
-            status: state?.status,
-            user_modified: state?.user_modified,
-            state: state,
-          });
+        // KST 날짜를 UTC 범위로 변환
+        const kstStartTime = toKST(selectedDate).startOf('day');
+        const kstEndTime = toKST(selectedDate).endOf('day');
+        const utcStart = kstStartTime.utc().format('YYYY-MM-DDTHH:mm:ssZ');
+        const utcEnd = kstEndTime.utc().format('YYYY-MM-DDTHH:mm:ssZ');
+
+        const { error: deleteError } = await supabase
+          .from('attendance_logs')
+          .delete()
+          .eq('student_id', studentId)
+          .eq('class_id', selectedClassIdForLayer)
+          .is('attendance_type', null)
+          .gte('occurred_at', utcStart)
+          .lte('occurred_at', utcEnd);
+
+        if (deleteError) {
+          console.error('[AttendancePage] ❌ 삭제 오류:', deleteError);
+          throw deleteError;
         }
-
-        if (!state?.user_modified) return;
-
-        // status가 null인 경우: DB 레코드 삭제 (출석 취소)
-        if (state.status === null) {
-          deleteStudentIds.push(student.id);
-          if (import.meta.env?.DEV) {
-            console.log('[AttendancePage] 🗑️ 출석 취소 (레코드 삭제):', student.name, student.id);
-          }
-          return;
-        }
-
+      } else {
         // [Phase 7] 이중 레코드 패턴: check_in/check_out 이벤트 + 수업 출석 레코드
         const selectedClass = selectedDateClasses.find((c) => c.id === selectedClassIdForLayer);
 
-        // 1. check_in/check_out 이벤트 레코드 (attendance_type != null, class_id = null, status = null)
+        // 1. check_in/check_out 이벤트 레코드
         const eventRecords = createAttendanceRecords(
           state,
           selectedDate,
@@ -1133,7 +1146,7 @@ export function AttendancePage() {
         );
         attendanceRecords.push(...eventRecords);
 
-        // 2. 수업 출석 레코드 (attendance_type = null, class_id != null, status != null)
+        // 2. 수업 출석 레코드
         const occurredAt = state.check_in && state.check_in_time
           ? (() => {
               const [hour, minute] = state.check_in_time.split(':').map(Number);
@@ -1147,90 +1160,38 @@ export function AttendancePage() {
             : toKST().format('YYYY-MM-DDTHH:mm:ssZ');
 
         attendanceRecords.push({
-          student_id: student.id,
+          student_id: studentId,
           class_id: selectedClassIdForLayer,
           occurred_at: occurredAt,
-          attendance_type: null, // 수업 출석 레코드는 attendance_type이 null
+          attendance_type: null,
           status: state.status,
           check_in_method: state.check_in ? 'manual' : undefined,
         });
-      });
 
-      if (import.meta.env?.DEV) {
-        console.log('[AttendancePage] 📤 레이어 저장:', attendanceRecords.length, '개 레코드');
-        console.log('[AttendancePage] 📝 저장할 레코드 상세:', JSON.stringify(attendanceRecords, null, 2));
-        console.log('[AttendancePage] 🗑️ 레이어 삭제:', deleteStudentIds.length, '개 레코드');
-        console.log('[AttendancePage] 🗑️ 삭제 대상 학생 IDs:', deleteStudentIds);
-        console.log('[AttendancePage] 📅 선택된 날짜:', selectedDate);
-        console.log('[AttendancePage] 📚 수업 ID:', selectedClassIdForLayer);
-      }
-
-      // 1. 삭제할 레코드 처리 (RLS로 자동 tenant 필터링)
-      if (deleteStudentIds.length > 0) {
-        const supabase = createClient();
-
-        // KST 날짜를 UTC 범위로 변환 (KST 00:00 = UTC 전날 15:00, KST 23:59 = UTC 당일 14:59)
-        const kstStartTime = toKST(selectedDate).startOf('day'); // KST 00:00:00
-        const kstEndTime = toKST(selectedDate).endOf('day');     // KST 23:59:59
-        const utcStart = kstStartTime.utc().format('YYYY-MM-DDTHH:mm:ssZ');
-        const utcEnd = kstEndTime.utc().format('YYYY-MM-DDTHH:mm:ssZ');
-
-        if (import.meta.env?.DEV) {
-          console.log('[AttendancePage] 🔍 삭제 쿼리 실행:', {
-            student_ids: deleteStudentIds,
-            class_id: selectedClassIdForLayer,
-            selectedDate_KST: selectedDate,
-            kstStart: kstStartTime.format('YYYY-MM-DD HH:mm:ss'),
-            kstEnd: kstEndTime.format('YYYY-MM-DD HH:mm:ss'),
-            utcStart,
-            utcEnd,
-          });
-        }
-
-        // 수업 출석 레코드만 삭제 (attendance_type IS NULL)
-        const { data: deletedData, error: deleteError } = await supabase
-          .from('attendance_logs')
-          .delete()
-          .in('student_id', deleteStudentIds)
-          .eq('class_id', selectedClassIdForLayer)
-          .is('attendance_type', null) // 중요: 수업 출석 레코드만 삭제
-          .gte('occurred_at', utcStart)
-          .lte('occurred_at', utcEnd)
-          .select(); // 삭제된 레코드 반환
-
-        if (import.meta.env?.DEV) {
-          console.log('[AttendancePage] ✅ 삭제 결과:', {
-            deletedCount: deletedData?.length || 0,
-            deletedRecords: deletedData,
-            error: deleteError,
-          });
-        }
-
-        if (deleteError) {
-          console.error('[AttendancePage] ❌ 삭제 오류:', deleteError);
-          throw deleteError;
+        // UPSERT 레코드 처리
+        for (const record of attendanceRecords) {
+          await upsertAttendance.mutateAsync(record);
         }
       }
 
-      // 2. UPSERT 레코드 처리
-      for (const record of attendanceRecords) {
-        await upsertAttendance.mutateAsync(record);
-      }
-
-      // 3. 저장 완료 후 데이터 다시 불러오기
+      // 저장 완료 후 데이터 다시 불러오기
       await queryClient.invalidateQueries({ queryKey: ['attendance_logs'] });
 
-      showAlert(terms.MESSAGES.SAVE_SUCCESS, terms.MESSAGES.SUCCESS, 'success');
+      // user_modified 플래그 초기화
+      setStudentAttendanceStates((prev) => ({
+        ...prev,
+        [studentId]: {
+          ...prev[studentId],
+          user_modified: false,
+        },
+      }));
 
-      // 4. user_modified 플래그 초기화는 데이터 동기화 후 자동으로 처리됨
-      // (useEffect의 동기화 로직이 새로운 데이터로 상태를 재설정함)
+      showAlert(terms.MESSAGES.SAVE_SUCCESS, terms.MESSAGES.SUCCESS, 'success');
     } catch (error) {
       showAlert(terms.MESSAGES.SAVE_ERROR, terms.MESSAGES.ERROR, 'error');
-    } finally {
-      setIsSaving(false);
+      throw error;
     }
   }, [
-    isSaving,
     selectedClassIdForLayer,
     studentsInSelectedClass,
     studentAttendanceStates,
@@ -1298,10 +1259,8 @@ export function AttendancePage() {
                     checkInLogsMap={attendanceLogsMap.checkInMap}
                     onAttendanceChange={handleLayerAttendanceChange}
                     onBulkCheckIn={handleLayerBulkCheckIn}
-                    onBulkCheckOut={handleLayerBulkCheckOut}
-                    onSave={handleLayerSave}
+                    onSaveStudent={handleSaveStudent}
                     isSaving={isSaving}
-                    onClose={handleLayerClose}
                   />
                 ),
               }}

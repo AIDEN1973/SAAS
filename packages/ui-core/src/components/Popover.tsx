@@ -8,6 +8,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { clsx } from 'clsx';
 
 export interface PopoverProps {
@@ -206,8 +207,8 @@ export const Popover: React.FC<PopoverProps> = ({
 
   if (!isOpen || !anchorEl) return null;
 
-  // style prop에 width가 있으면 minWidth/maxWidth를 설정하지 않음 (셀렉트 박스 너비에 맞추기 위함)
-  // 그렇지 않으면 기본 minWidth/maxWidth 적용
+  // style prop에 width가 있으면 해당 값 사용
+  // 그렇지 않으면 콘텐츠 기반 자동 너비 (minWidth 없이 maxWidth만 적용)
   const hasCustomWidth = style?.width || style?.minWidth;
   const popoverStyle: React.CSSProperties = {
     position: 'fixed',
@@ -219,9 +220,9 @@ export const Popover: React.FC<PopoverProps> = ({
     boxShadow: 'var(--shadow-lg)',
     border: 'var(--border-width-thin) solid var(--color-gray-200)',
     padding: 'var(--spacing-xs)',
-    // style에 width가 없을 때만 minWidth/maxWidth 적용
+    // style에 width가 없을 때 콘텐츠 기반 자동 너비
     ...(hasCustomWidth ? {} : {
-      minWidth: 'var(--width-card-min)', // styles.css 준수: 카드 최소 너비
+      width: 'fit-content', // 콘텐츠 기반 동적 너비
       maxWidth: 'var(--width-content-max)', // styles.css 준수: 콘텐츠 최대 너비
     }),
     // overflow와 maxHeight는 자식 컴포넌트에서 처리 (이중 스크롤 방지)
@@ -238,7 +239,8 @@ export const Popover: React.FC<PopoverProps> = ({
     e.stopPropagation(); // 이벤트 전파 방지 (상위 요소의 클릭 이벤트 트리거 방지)
   };
 
-  return (
+  // Portal을 사용하여 body에 직접 렌더링 (overflow: hidden 영향 회피)
+  return createPortal(
     <div
       ref={popoverRef}
       className={clsx(className)}
@@ -247,6 +249,7 @@ export const Popover: React.FC<PopoverProps> = ({
       onMouseDown={handlePopoverClick}
     >
       {children}
-    </div>
+    </div>,
+    document.body
   );
 };

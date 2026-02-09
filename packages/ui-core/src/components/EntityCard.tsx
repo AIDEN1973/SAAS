@@ -151,7 +151,7 @@ export const EntityCard: React.FC<EntityCardProps> = ({
         gap: 'var(--spacing-sm)',
         cursor: onClick ? 'pointer' : 'default',
         opacity: disabled ? 'var(--opacity-disabled)' : 1,
-        borderColor: selected ? 'var(--color-primary)' : 'var(--color-gray-200)',
+        border: `var(--border-width-thin) solid ${selected ? 'var(--color-primary)' : 'var(--color-gray-200)'}`,
         backgroundColor: isHovered ? 'var(--color-gray-50)' : 'var(--color-white)',
         transition: 'background-color var(--transition-fast)',
         paddingTop: 'var(--spacing-lg)',

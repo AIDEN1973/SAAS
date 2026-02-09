@@ -841,7 +841,7 @@ export function DataTable<T = unknown>({
                             fontSize: 'var(--font-size-base)',
                             textAlign: column.align || 'left',
                             lineHeight: 'var(--line-height-tight)',
-                            fontWeight: column.key === 'name' ? 'var(--font-weight-bold)' : 'var(--font-weight-normal)', // styles.css 준수: 이름 열만 볼드 처리
+                            fontWeight: ['name', 'student_name', 'teacher_name'].includes(column.key) ? 'var(--font-weight-bold)' : 'var(--font-weight-normal)', // styles.css 준수: 사람 이름 열 볼드 처리
                           }}
                         >
                           {column.render ? column.render(value, row) : String(value ?? '')}
@@ -1107,7 +1107,7 @@ export function DataTable<T = unknown>({
                             textAlign: column.align || 'center',
                             color: 'var(--color-text)',
                             fontSize: 'var(--font-size-base)', // styles.css 준수: 기본 폰트 사이즈 적용
-                            fontWeight: column.key === 'name' ? 'var(--font-weight-bold)' : 'var(--font-weight-normal)', // styles.css 준수: 이름 열만 볼드 처리
+                            fontWeight: ['name', 'student_name', 'teacher_name'].includes(column.key) ? 'var(--font-weight-bold)' : 'var(--font-weight-normal)', // styles.css 준수: 사람 이름 열 볼드 처리
                             borderBottom: 'none', // 행간 구분선은 별도 tr로 처리
                             ...(colIndex === 0 && {
                               paddingLeft: 'var(--spacing-lg)',

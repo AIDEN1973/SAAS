@@ -144,6 +144,9 @@ export type { DateInputProps } from './DateInput';
 export { Popover } from './Popover';
 export type { PopoverProps } from './Popover';
 
+export { PopoverMenu, PopoverMenuItem, PopoverMenuDivider } from './PopoverMenu';
+export type { PopoverMenuProps, PopoverMenuItemProps, PopoverMenuDividerProps } from './PopoverMenu';
+
 export { RightLayerMenu } from './RightLayerMenu';
 export type { RightLayerMenuProps } from './RightLayerMenu';
 

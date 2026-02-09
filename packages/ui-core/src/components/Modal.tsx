@@ -72,7 +72,6 @@ export const Modal: React.FC<ModalProps> = ({
   const modalTitleId = React.useId();
   const mode = useResponsiveMode();
   const isMobile = mode === 'xs' || mode === 'sm';
-
   useEffect(() => {
     if (!isOpen || !closeOnEscape) return;
 
@@ -158,8 +157,7 @@ export const Modal: React.FC<ModalProps> = ({
       />
 
       {/* Modal Content */}
-      <Card
-        variant="elevated"
+      <div
         role="dialog"
         aria-modal={true}
         aria-labelledby={title ? modalTitleId : undefined}
@@ -170,14 +168,14 @@ export const Modal: React.FC<ModalProps> = ({
           maxHeight: isMobile ? 'var(--height-modal-max-mobile)' : 'var(--height-modal-max)', // styles.css 준수: 모달 높이 토큰 사용
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
           padding: 'var(--spacing-none)', // styles.css 준수: spacing 토큰 사용
+          // overflow: hidden 제거 — 각 영역이 직접 borderRadius를 가져 서브픽셀 렌더링 문제 근본 방지
           borderRadius: 'var(--border-radius-lg)', // 라운드 LG (16px)
           ...sizeMap[size],
           ...style, // 커스텀 스타일 적용
         }}
       >
-        {/* Header - Card의 overflow: hidden이 라운드를 처리하므로 별도 borderRadius 불필요 */}
+        {/* Header */}
         {title && (
           <div
             style={{
@@ -187,8 +185,9 @@ export const Modal: React.FC<ModalProps> = ({
               padding: 'var(--spacing-md)',
               paddingBottom: 'var(--spacing-sm)',
               backgroundColor: 'var(--color-primary)',
-              borderBottom: 'var(--border-width-thin) solid var(--color-primary-dark)',
               flexShrink: 0,
+              borderTopLeftRadius: 'var(--border-radius-lg)',
+              borderTopRightRadius: 'var(--border-radius-lg)',
             }}
           >
             <h2
@@ -235,15 +234,21 @@ export const Modal: React.FC<ModalProps> = ({
 
         {/* Content */}
         <div
-          className="ui-core-hiddenScrollbar"
+          className="ui-core-hiddenScrollbar ui-core-modalContent"
           style={{
             paddingLeft: 'var(--spacing-xl)',
             paddingRight: 'var(--spacing-xl)',
-            paddingTop: 'var(--spacing-lg)',
-            paddingBottom: 'var(--spacing-lg)',
+            paddingTop: 'var(--spacing-xl)',
+            paddingBottom: 'var(--spacing-xl)',
             overflowY: 'auto',
             flex: 1,
-            marginBottom: footer ? 'var(--spacing-none)' : (bodyLayout === 'form-inline' ? 'var(--spacing-none)' : 'var(--spacing-xl)'),
+            textAlign: 'center',
+            backgroundColor: 'var(--color-white)',
+            // title이 없으면 Content가 최상단 → 상단 라운드 적용
+            ...(!title ? { borderTopLeftRadius: 'var(--border-radius-lg)', borderTopRightRadius: 'var(--border-radius-lg)' } : {}),
+            // footer가 없으면 Content가 최하단 → 하단 라운드 적용
+            ...(!footer ? { borderBottomLeftRadius: 'var(--border-radius-lg)', borderBottomRightRadius: 'var(--border-radius-lg)' } : {}),
+            marginBottom: 'var(--spacing-none)',
           }}
         >
           {inlineFields && bodyLayout === 'form-inline' ? (
@@ -346,8 +351,11 @@ export const Modal: React.FC<ModalProps> = ({
               paddingRight: 'var(--spacing-xl)',
               paddingTop: 'var(--spacing-lg)',
               paddingBottom: 'var(--spacing-lg)',
+              backgroundColor: 'var(--color-white)',
               borderTop: 'var(--border-width-thin) solid var(--color-gray-200)', // styles.css 준수: border-width 토큰 사용
               flexShrink: 0,
+              borderBottomLeftRadius: 'var(--border-radius-lg)',
+              borderBottomRightRadius: 'var(--border-radius-lg)',
             }}
           >
             <div
@@ -363,7 +371,7 @@ export const Modal: React.FC<ModalProps> = ({
             </div>
           </div>
         )}
-      </Card>
+      </div>
     </div>
   );
 };

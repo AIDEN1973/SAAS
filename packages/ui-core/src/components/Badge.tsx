@@ -8,7 +8,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
 import { ColorToken, SizeToken } from '@design-system/core';
-import { createBadgeColorMap } from '../hooks/useCssVariable';
 
 export interface BadgeProps {
   children: React.ReactNode;
@@ -20,8 +19,80 @@ export interface BadgeProps {
   onClick?: () => void;
 }
 
-// [성능 최적화] 컴포넌트 외부에서 한 번만 생성 (모든 Badge 인스턴스가 공유)
-const BADGE_COLOR_MAP = createBadgeColorMap();
+/**
+ * Badge 색상 맵 (CSS 변수 사용 - SSOT 준수)
+ *
+ * [불변 규칙] 모든 색상은 CSS 변수를 사용합니다.
+ * Button 컴포넌트와 동일한 패턴으로 일관성 유지
+ */
+const BADGE_COLOR_MAP: Record<string, {
+  main: string;
+  light: string;
+  dark: string;
+  bg50: string;
+}> = {
+  primary: {
+    main: 'var(--color-primary)',
+    light: 'var(--color-primary-light)',
+    dark: 'var(--color-primary-dark)',
+    bg50: 'var(--color-primary-50)',
+  },
+  secondary: {
+    main: 'var(--color-secondary)',
+    light: 'var(--color-secondary-light)',
+    dark: 'var(--color-secondary-dark)',
+    bg50: 'var(--color-secondary-50)',
+  },
+  success: {
+    main: 'var(--color-success)',
+    light: 'var(--color-success-light)',
+    dark: 'var(--color-success-dark)',
+    bg50: 'var(--color-success-50)',
+  },
+  warning: {
+    main: 'var(--color-warning)',
+    light: 'var(--color-warning-light)',
+    dark: 'var(--color-warning-dark)',
+    bg50: 'var(--color-warning-50)',
+  },
+  error: {
+    main: 'var(--color-error)',
+    light: 'var(--color-error-light)',
+    dark: 'var(--color-error-dark)',
+    bg50: 'var(--color-error-50)',
+  },
+  info: {
+    main: 'var(--color-info)',
+    light: 'var(--color-info-light)',
+    dark: 'var(--color-info-dark)',
+    bg50: 'var(--color-info-50)',
+  },
+  // 별칭 (레거시 호환)
+  blue: {
+    main: 'var(--color-primary)',
+    light: 'var(--color-primary-light)',
+    dark: 'var(--color-primary-dark)',
+    bg50: 'var(--color-primary-50)',
+  },
+  gray: {
+    main: 'var(--color-gray-400)',
+    light: 'var(--color-gray-300)',
+    dark: 'var(--color-gray-400)',
+    bg50: 'var(--color-gray-50)',
+  },
+  green: {
+    main: 'var(--color-success)',
+    light: 'var(--color-success-light)',
+    dark: 'var(--color-success-dark)',
+    bg50: 'var(--color-success-50)',
+  },
+  yellow: {
+    main: 'var(--color-warning)',
+    light: 'var(--color-warning-light)',
+    dark: 'var(--color-warning-dark)',
+    bg50: 'var(--color-warning-50)',
+  },
+};
 
 /**
  * Badge 컴포넌트

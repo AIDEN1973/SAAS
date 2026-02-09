@@ -64,16 +64,18 @@ export interface StudentAttendanceRowProps {
   attendanceState: StudentAttendanceState;
   /** 등원 체크 변경 핸들러 */
   onCheckInChange: (checked: boolean, time?: string) => void;
-  /** 하원 체크 변경 핸들러 */
-  onCheckOutChange: (checked: boolean, time?: string) => void;
   /** 상태 변경 핸들러 */
   onStatusChange: (status: AttendanceStatus) => void;
+  /** 저장 핸들러 (즉시 저장 시 사용, 상태를 직접 전달) */
+  onSave: (stateOverride: Partial<StudentAttendanceState>) => Promise<void>;
   /** 키오스크 등원 여부 */
   isKioskCheckIn?: boolean;
   /** 비활성화 */
   disabled?: boolean;
   /** 수업 시작 시간 (지각 판정용) */
   classStartTime?: string;
+  /** 학생 정보 숨김 여부 (테이블에서 사용 시) */
+  hideStudentInfo?: boolean;
 }
 
 
@@ -91,14 +93,10 @@ export interface ClassAttendanceLayerProps {
   onAttendanceChange: (studentId: string, state: Partial<StudentAttendanceState>) => void;
   /** 일괄 등원 핸들러 */
   onBulkCheckIn: () => void;
-  /** 일괄 하원 핸들러 */
-  onBulkCheckOut: () => void;
-  /** 저장 핸들러 */
-  onSave: () => void;
+  /** 개별 학생 저장 핸들러 (학생 ID별 즉시 저장, 상태를 직접 전달) */
+  onSaveStudent: (studentId: string, stateOverride: Partial<StudentAttendanceState>) => Promise<void>;
   /** 저장 중 여부 */
   isSaving: boolean;
-  /** 닫기 핸들러 */
-  onClose: () => void;
 }
 
 
