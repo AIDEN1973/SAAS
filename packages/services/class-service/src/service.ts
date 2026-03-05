@@ -83,11 +83,17 @@ export class ClassService {
     activeStudents: number;
     attendanceRate: number;
   }> {
-    const stats = await academyService.getClassStatistics(tenantId, classId);
-    // academyService는 다른 형식을 반환하므로 변환 필요
+    const [stats, classData] = await Promise.all([
+      academyService.getClassStatistics(tenantId, classId),
+      academyService.getClass(tenantId, classId),
+    ]);
+
+    // academy_classes.current_count는 enroll/unenroll 시 자동 갱신됨
+    const activeStudents = classData?.current_count ?? 0;
+
     return {
-      totalStudents: 0, // TODO: 실제 학생 수 계산
-      activeStudents: 0, // TODO: 실제 활성 학생 수 계산
+      totalStudents: activeStudents,
+      activeStudents,
       attendanceRate: stats.attendance_rate,
     };
   }

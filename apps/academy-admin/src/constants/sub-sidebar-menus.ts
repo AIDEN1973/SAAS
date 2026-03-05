@@ -92,7 +92,8 @@ export type DynamicMenuLabelId =
   | 'consultation_list'  // 상담관리
   | 'tag_management'     // 태그관리
   // 출결 관련
-  | 'attendance_today'   // 오늘출결
+  | 'attendance_by_class'  // 수업별 출결
+  | 'attendance_by_student' // 학생별 출결
   | 'attendance_history' // 출결기록
   | 'attendance_stats'   // 출결통계
   | 'attendance_settings' // 출결설정
@@ -152,7 +153,8 @@ export function getDynamicMenuLabel(
     consultation_list: `${terms.CONSULTATION_LABEL}관리`,
     tag_management: `${terms.TAG_LABEL}관리`,
     // 출결 관련
-    attendance_today: `오늘${terms.ATTENDANCE_LABEL}`,
+    attendance_by_class: `${terms.GROUP_LABEL}별 ${terms.ATTENDANCE_LABEL}`,
+    attendance_by_student: `${terms.PERSON_LABEL_PRIMARY}별 ${terms.ATTENDANCE_LABEL}`,
     attendance_history: `${terms.ATTENDANCE_LABEL}기록`,
     attendance_stats: `${terms.ATTENDANCE_LABEL}통계`,
     attendance_settings: `${terms.ATTENDANCE_LABEL}설정`,
@@ -205,7 +207,8 @@ export function getDynamicAriaLabel(
     consultation_list: `${terms.CONSULTATION_LABEL} 관리 화면으로 이동`,
     tag_management: `${terms.TAG_LABEL} 관리 화면으로 이동`,
     // 출결 관련
-    attendance_today: `오늘 ${terms.ATTENDANCE_LABEL} 관리 화면으로 이동`,
+    attendance_by_class: `${terms.GROUP_LABEL}별 ${terms.ATTENDANCE_LABEL} 화면으로 이동`,
+    attendance_by_student: `${terms.PERSON_LABEL_PRIMARY}별 ${terms.ATTENDANCE_LABEL} 화면으로 이동`,
     attendance_history: `${terms.ATTENDANCE_LABEL} 기록 조회 화면으로 이동`,
     attendance_stats: `${terms.ATTENDANCE_LABEL} 통계 화면으로 이동`,
     attendance_settings: `${terms.ATTENDANCE_LABEL} 설정 화면으로 이동`,
@@ -279,6 +282,7 @@ export const STUDENTS_MENU_LABEL_MAPPING: Partial<Record<StudentsSubMenuId, Dyna
 /** 출결관리 페이지 서브 메뉴 ID */
 export type AttendanceSubMenuId =
   | 'today'
+  | 'by-student'
   | 'history'
   | 'statistics'
   | 'settings';
@@ -287,8 +291,13 @@ export type AttendanceSubMenuId =
 export const ATTENDANCE_SUB_MENU_ITEMS: SubSidebarMenuItem<AttendanceSubMenuId>[] = [
   {
     id: 'today',
-    label: '오늘 출결',
-    ariaLabel: '오늘 출결 관리 화면으로 이동',
+    label: '수업별 출결',
+    ariaLabel: '수업별 출결 화면으로 이동',
+  },
+  {
+    id: 'by-student',
+    label: '학생별 출결',
+    ariaLabel: '학생별 출결 화면으로 이동',
   },
   {
     id: 'history',
@@ -309,7 +318,8 @@ export const ATTENDANCE_SUB_MENU_ITEMS: SubSidebarMenuItem<AttendanceSubMenuId>[
 
 /** 출결관리 메뉴의 동적 라벨 매핑 */
 export const ATTENDANCE_MENU_LABEL_MAPPING: Partial<Record<AttendanceSubMenuId, DynamicMenuLabelId>> = {
-  today: 'attendance_today',
+  today: 'attendance_by_class',
+  'by-student': 'attendance_by_student',
   history: 'attendance_history',
   statistics: 'attendance_stats',
   settings: 'attendance_settings',

@@ -15,6 +15,14 @@
 // 타입은 Industry Layer에서 re-export
 export * from './types';
 
+// [SSOT] 데이터 변환 순수 함수 re-export (DB 의존성 없음, 클라이언트에서 사용 가능)
+export {
+  ACADEMY_STUDENTS_SELECT,
+  extractAcademyData,
+  mapPersonToStudent,
+  intersect,
+} from '@industry/academy';
+
 // 서버 사용 코드는 이 index.ts에서 export하지 않습니다.
 // 서버에서는 직접 import: import { studentService } from '@services/student-service/service'
 // 또는: import { studentService } from '@services/student-service/dist/service' (빌드 후)

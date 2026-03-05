@@ -109,7 +109,7 @@ test.describe('로그인 플로우', () => {
     }
   });
 
-  test.skip('로그아웃할 수 있어야 함', async ({ page }) => {
+  test('로그아웃할 수 있어야 함', async ({ page }) => {
     // 로그인
     await page.goto('/login');
     await page.fill('input[type="email"]', TEST_USER.email);

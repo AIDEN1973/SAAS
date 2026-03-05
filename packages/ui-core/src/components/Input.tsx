@@ -238,57 +238,46 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
           value={value}
           onCompositionStart={(e) => {
             isComposingRef.current = true;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-            if ((import.meta as any).env?.DEV) {
+            if (import.meta.env?.DEV) {
               console.log('[IME][Input] compositionstart', {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-                name: (props as any)?.name,
+                name: props.name,
                 isControlled,
                 valueProp,
                 value,
                 data: (e as unknown as CompositionEvent).data,
               });
             }
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-            (props as any).onCompositionStart?.(e);
+            props.onCompositionStart?.(e);
           }}
           onCompositionEnd={(e) => {
             isComposingRef.current = false;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-            if ((import.meta as any).env?.DEV) {
+            if (import.meta.env?.DEV) {
               console.log('[IME][Input] compositionend', {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-                name: (props as any)?.name,
+                name: props.name,
                 isControlled,
                 valueProp,
                 value,
                 data: (e as unknown as CompositionEvent).data,
               });
             }
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-            (props as any).onCompositionEnd?.(e);
+            props.onCompositionEnd?.(e);
           }}
           onChange={(e) => {
             const newValue = e.target.value;
             if (!isControlled) setInternalValue(newValue);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-            if ((import.meta as any).env?.DEV) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-              const nativeIsComposing = (e.nativeEvent as any)?.isComposing;
+            if (import.meta.env?.DEV) {
+              const nativeIsComposing = (e.nativeEvent as InputEvent).isComposing;
               console.log('[IME][Input] change', {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-                name: (props as any)?.name,
+                name: props.name,
                 isControlled,
                 isComposingRef: isComposingRef.current,
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 nativeIsComposing,
                 newValue,
                 prevValue: value,
               });
             }
             onChange?.(e);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-            (props as any).onChange?.(e);
+            (props as Partial<Pick<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'>>).onChange?.(e);
           }}
           onFocus={handleFocus}
           onBlur={handleBlur}

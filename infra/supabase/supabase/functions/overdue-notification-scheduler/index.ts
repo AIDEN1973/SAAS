@@ -17,6 +17,9 @@ import { checkAndUpdateAutomationSafety } from '../_shared/automation-safety.ts'
 import { toKST, toKSTDate } from '../_shared/date-utils.ts';
 import { createTaskCardWithDedup } from '../_shared/create-task-card-with-dedup.ts';
 import { createExecutionAuditRecord } from '../_shared/execution-audit-utils.ts';
+import { withRetry } from '../_shared/retry-utils.ts';
+import { enqueueDLQ } from '../_shared/dlq-utils.ts';
+import { alertOnBatchFailure } from '../_shared/alerting.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,6 +37,7 @@ serve(async (req) => {
   try {
     // [불변 규칙] Edge Functions도 env-registry를 통해 환경변수 접근
     const supabase = createClient(envServer.SUPABASE_URL, envServer.SERVICE_ROLE_KEY);
+    const batchStartTime = Date.now();
 
     // 기술문서 19-1-2: KST 기준 날짜 처리
     // [불변 규칙] 파일명 생성 시 날짜 형식은 반드시 KST 기준을 사용합니다.
@@ -60,6 +64,7 @@ serve(async (req) => {
     }
 
     let totalSent = 0;
+    const errors: string[] = [];
 
     // ⚠️ 중요: event_type 검증 (SSOT 강제, Fail-Closed)
     const eventType = 'overdue_outstanding_over_limit';
@@ -174,31 +179,39 @@ serve(async (req) => {
             continue;
           }
 
-          // 미납 알림 생성
-          const { error: notificationError } = await supabase
-            .from('notifications')
-            .insert({
-              tenant_id: tenant.id,
-              recipient_type: 'guardian',
-              recipient_id: guardian.id,
-              channel: notificationChannel,
-              event_type: NOTIFICATIONS_EVENT_TYPE_OVERDUE,
-              template_key: 'billing_overdue_academy_v1', // ⚠️ 주의: template_key는 업종별로 다를 수 있음 (Industry Adapter에서 처리)
-              template_data: {
-                student_name: invoice.persons?.name || '대상', // 업종 중립: 학생 → 대상
-                invoice_number: invoice.invoice_number,
-                amount: invoice.amount,
-                amount_due: (invoice.amount || 0) - (invoice.amount_paid || 0),
-                due_date: invoice.due_date,
-                invoice_id: invoice.id,
-              },
-              status: 'pending',
-              scheduled_at: toKST().toISOString(),
-            });
-
-          if (!notificationError) {
+          // 미납 알림 생성 ([Phase 3] withRetry + DLQ)
+          try {
+            await withRetry(
+              () => supabase.from('notifications').insert({
+                tenant_id: tenant.id,
+                recipient_type: 'guardian',
+                recipient_id: guardian.id,
+                channel: notificationChannel,
+                event_type: NOTIFICATIONS_EVENT_TYPE_OVERDUE,
+                template_key: 'billing_overdue_academy_v1', // ⚠️ 주의: template_key는 업종별로 다를 수 있음 (Industry Adapter에서 처리)
+                template_data: {
+                  student_name: invoice.persons?.name || '대상', // 업종 중립: 학생 → 대상
+                  invoice_number: invoice.invoice_number,
+                  amount: invoice.amount,
+                  amount_due: (invoice.amount || 0) - (invoice.amount_paid || 0),
+                  due_date: invoice.due_date,
+                  invoice_id: invoice.id,
+                },
+                status: 'pending',
+                scheduled_at: toKST().toISOString(),
+              }),
+              { maxRetries: 2, baseDelay: 500 }
+            );
             totalSent++;
             console.log(`[Overdue Notification] Created notification for invoice ${invoice.id}`);
+          } catch (notifError) {
+            console.error(`[Overdue Notification] Failed to create notification for invoice ${invoice.id}:`, notifError);
+            await enqueueDLQ(supabase, {
+              tenant_id: tenant.id,
+              function_name: 'overdue-notification-scheduler',
+              payload: { invoice_id: invoice.id, guardian_id: guardian.id },
+              error_message: notifError instanceof Error ? notifError.message : String(notifError),
+            });
           }
         }
 
@@ -294,17 +307,23 @@ serve(async (req) => {
         }
       } catch (error) {
         console.error(`[Overdue Notification] Error for tenant ${tenant.id}:`, error);
+        errors.push(`Tenant ${tenant.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        await enqueueDLQ(supabase, {
+          tenant_id: tenant.id,
+          function_name: 'overdue-notification-scheduler',
+          payload: { tenant_id: tenant.id, date: today },
+          error_message: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
     // Execution Audit 기록 생성 (액티비티.md 3.2, 12 참조)
     // 스케줄러/배치 작업: source='scheduler' (액티비티.md 6.1 참조)
-    const batchStartTime = Date.now();
     try {
       await createExecutionAuditRecord(supabase, {
         tenant_id: 'system', // 배치 작업은 모든 테넌트를 처리하므로 'system'으로 기록
         operation_type: 'scheduler.overdue-notification',
-        status: 'success',
+        status: errors.length > 0 ? 'partial' : 'success',
         source: 'scheduler', // 스케줄러 실행 (액티비티.md 6.1 참조)
         actor_type: 'system',
         actor_id: 'svc:edge:overdue-notification-scheduler',
@@ -313,6 +332,7 @@ serve(async (req) => {
           sent_count: totalSent,
           tenant_count: tenants?.length || 0,
           execution_date: today,
+          errors: errors.length > 0 ? errors : undefined,
         },
         reference: {
           entity_type: 'batch',
@@ -323,6 +343,18 @@ serve(async (req) => {
       });
     } catch (auditError) {
       console.error('[Overdue Notification] Failed to create audit record:', auditError);
+    }
+
+    // [Phase 3] 배치 실패율 기반 알림
+    if ((tenants?.length || 0) > 0) {
+      await alertOnBatchFailure(supabase, {
+        functionName: 'overdue-notification-scheduler',
+        totalCount: tenants?.length || 0,
+        successCount: (tenants?.length || 0) - errors.length,
+        failedCount: errors.length,
+        failureRateThreshold: 20,
+        context: { sent_count: totalSent },
+      });
     }
 
     return new Response(

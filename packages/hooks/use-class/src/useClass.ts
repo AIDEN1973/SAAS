@@ -358,7 +358,7 @@ export function useClassStatistics(classId: string | null) {
     queryFn: async () => {
       if (!tenantId || !classId) return null;
 
-      // TODO: 출결 테이블이 구현되면 실제 통계 계산
+      // [Deferred] 출결 테이블이 구현되면 실제 통계 계산
       // 현재는 기본값 반환
       const classData = await apiClient.get<Class>('academy_classes', {
         filters: { id: classId },
@@ -371,9 +371,11 @@ export function useClassStatistics(classId: string | null) {
 
       const classInfo = classData.data[0];
       return {
-        attendance_rate: 0,  // TODO: 출결 테이블 기반 계산
-        capacity_rate: (classInfo.current_count / classInfo.capacity) * 100,
-        late_rate: 0,  // TODO: 출결 테이블 기반 계산
+        attendance_rate: 0,  // [Deferred] 출결 테이블 기반 계산
+        capacity_rate: classInfo.capacity > 0
+          ? (classInfo.current_count / classInfo.capacity) * 100
+          : 0,
+        late_rate: 0,  // [Deferred] 출결 테이블 기반 계산
       };
     },
     enabled: !!tenantId && !!classId,

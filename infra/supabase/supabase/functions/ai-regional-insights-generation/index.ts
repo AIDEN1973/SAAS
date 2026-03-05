@@ -56,7 +56,34 @@ interface RegionMetric {
   revenue_growth_rate_avg?: string | number;
   revenue_growth_rate_p25?: string | number;
   revenue_growth_rate_p75?: string | number;
+  [key: string]: string | number | undefined;
 }
+
+/** 테넌트 설정의 config value 구조 */
+interface TenantConfigValue {
+  location?: {
+    si?: string;
+    gu?: string;
+    dong?: string;
+    location_code?: string;
+    sigungu_code?: string;
+    sido_code?: string;
+  };
+  industry_type?: string;
+}
+
+/** 청구서 행 타입 (invoices 테이블) */
+interface InvoiceRow {
+  amount_paid: number | null;
+}
+
+/** 출석 로그 행 타입 (attendance_logs 테이블) */
+interface AttendanceLogRow {
+  status: string;
+}
+
+/** Supabase 클라이언트 타입 (Edge Function 환경) */
+type SupabaseClientType = ReturnType<typeof createClient>;
 
 interface LocationInfo {
   region: string;
@@ -74,7 +101,7 @@ interface AIInsightData {
   insight_type: string;
   title: string;
   summary: string;
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   related_entity_type: string;
   related_entity_id: string | null;
   status: string;
@@ -160,7 +187,7 @@ serve(async (req) => {
           continue;
         }
 
-        const locationConfig = config.value as any;
+        const locationConfig = config.value as TenantConfigValue;
         const location = locationConfig.location || {};
         const industryType = locationConfig.industry_type || 'academy';
 
@@ -253,7 +280,7 @@ serve(async (req) => {
  * 아키텍처 문서 3.6.2~3.6.3 참조
  */
 async function generateRegionalInsights(
-  supabase: any,
+  supabase: SupabaseClientType,
   tenantId: string,
   locationInfo: LocationInfo,
   industryType: string,
@@ -288,7 +315,7 @@ async function generateRegionalInsights(
  * 특정 메트릭에 대한 지역 인사이트 생성
  */
 async function generateMetricInsight(
-  supabase: any,
+  supabase: SupabaseClientType,
   tenantId: string,
   locationInfo: LocationInfo,
   industryType: string,
@@ -320,7 +347,7 @@ async function generateMetricInsight(
         .gte('period_start', `${currentMonth}-01`),
       tenantId
     );
-    value = invoices?.reduce((sum: number, inv: any) => sum + (inv.amount_paid || 0), 0) || 0;
+    value = invoices?.reduce((sum: number, inv: InvoiceRow) => sum + (inv.amount_paid || 0), 0) || 0;
   } else if (metric === 'attendance') {
     // 현재 달 출석률 계산
     const currentMonth = toKSTMonth();
@@ -332,7 +359,7 @@ async function generateMetricInsight(
       tenantId
     );
     if (logs && logs.length > 0) {
-      const presentCount = logs.filter((log: any) => log.status === 'present').length;
+      const presentCount = logs.filter((log: AttendanceLogRow) => log.status === 'present').length;
       value = Math.round((presentCount / logs.length) * 100);
     }
   } else if (metric === 'growth') {
@@ -411,9 +438,9 @@ async function generateMetricInsight(
       console.warn(`[AI Regional Insights] Error fetching dong metrics:`, error);
     }
 
-    if (dongMetrics.length > 0 && (dongMetrics[0] as any).store_count && (dongMetrics[0] as any).store_count >= minimumSampleSize) {
+    if (dongMetrics.length > 0 && dongMetrics[0].store_count && dongMetrics[0].store_count >= minimumSampleSize) {
       comparisonGroup = 'same_dong';
-      sampleCount = (dongMetrics[0] as any).store_count;
+      sampleCount = dongMetrics[0].store_count;
       usedFallback = false;
       average = getMetricValue(dongMetrics[0], metric, 'avg', 0);
       top10Percent = getMetricValue(dongMetrics[0], metric, 'p75', average * PERCENTILE_FALLBACK_RATIOS.TOP10_FACTOR_STUDENTS);
@@ -438,9 +465,9 @@ async function generateMetricInsight(
           console.warn(`[AI Regional Insights] Error fetching sigungu metrics:`, error);
         }
 
-        if (sigunguMetrics.length > 0 && (sigunguMetrics[0] as any).store_count && (sigunguMetrics[0] as any).store_count >= minimumSampleSize) {
+        if (sigunguMetrics.length > 0 && sigunguMetrics[0].store_count && sigunguMetrics[0].store_count >= minimumSampleSize) {
           comparisonGroup = 'same_sigungu';
-          sampleCount = (sigunguMetrics[0] as any).store_count;
+          sampleCount = sigunguMetrics[0].store_count;
           usedFallback = true;
           fallbackLevel = 'same_sigungu';
           average = getMetricValue(sigunguMetrics[0], metric, 'avg', 0);
@@ -466,9 +493,9 @@ async function generateMetricInsight(
               console.warn(`[AI Regional Insights] Error fetching sido metrics:`, error);
             }
 
-            if (sidoMetrics.length > 0 && (sidoMetrics[0] as any).store_count && (sidoMetrics[0] as any).store_count >= minimumSampleSize) {
+            if (sidoMetrics.length > 0 && sidoMetrics[0].store_count && sidoMetrics[0].store_count >= minimumSampleSize) {
               comparisonGroup = 'same_sido';
-              sampleCount = (sidoMetrics[0] as any).store_count;
+              sampleCount = sidoMetrics[0].store_count;
               usedFallback = true;
               fallbackLevel = 'same_sido';
               average = getMetricValue(sidoMetrics[0], metric, 'avg', 0);
@@ -585,8 +612,8 @@ function getMetricValue(
   const key = keyMap[metric]?.[type];
   if (!key) return fallback;
 
-  const value = (metrics as any)[key];
-  return value ? Math.round(Number(value)) : fallback;
+  const value = metrics[key];
+  return value !== undefined && value !== null ? Math.round(Number(value)) : fallback;
 }
 
 /**

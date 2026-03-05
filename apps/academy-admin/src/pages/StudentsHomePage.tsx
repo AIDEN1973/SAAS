@@ -63,7 +63,7 @@ export function StudentsHomePage() {
   const { data: schemaData } = useSchema('student', studentFormSchema, 'form');
   const schema = schemaData || studentFormSchema;
 
-  // TODO: 태그 관리 기능은 태그 관련 hooks가 구현되면 활성화
+  // [Deferred] 태그 관리 기능은 태그 관련 hooks가 구현되면 활성화
   // const [newTagName, setNewTagName] = useState('');
   // const [newTagColor, setNewTagColor] = useState('#3B82F6');
 
@@ -128,7 +128,7 @@ export function StudentsHomePage() {
     },
   });
 
-  // TODO: 태그 관리 핸들러는 태그 관련 hooks가 구현되면 활성화
+  // [Deferred] 태그 관리 핸들러는 태그 관련 hooks가 구현되면 활성화
   // const handleCreateTag = useCallback(async () => {
   //   if (!newTagName.trim()) {
   //     showAlert('태그 이름을 입력해주세요.', terms.MESSAGES.ERROR);

@@ -69,7 +69,9 @@ export async function loadWidget(
   try {
     const module = await loader();
     // default export 또는 named export 처리
-    const Component = (module as any).default || module;
+    // loader가 ESM 모듈 객체를 반환할 수 있으므로 default export 확인
+    const moduleWithDefault = module as React.ComponentType<Record<string, unknown>> & { default?: React.ComponentType<Record<string, unknown>> };
+    const Component = moduleWithDefault.default || module;
 
     if (!Component) {
       console.error(`[Schema Engine] Widget "${componentType}" loaded but no component found in module.`);

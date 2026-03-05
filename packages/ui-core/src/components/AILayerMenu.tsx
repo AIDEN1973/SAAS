@@ -86,33 +86,20 @@ export const AILayerMenu: React.FC<AILayerMenuProps> = ({
   onChatOpsViewTaskCard,
   onChatOpsReset,
 
-  // Execution Audit Props (하위 호환성을 위해 유지, 미사용)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  executionAuditRuns = [],
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  executionAuditLoading = false,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  executionAuditHasMore = false,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  executionAuditNextCursor,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  executionAuditStepsByRunId = {},
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  executionAuditStepsLoading = {},
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onExecutionAuditLoadMore,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onExecutionAuditLoadSteps,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onExecutionAuditViewRun,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onExecutionAuditRowClick,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onExecutionAuditFilterChange,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  executionAuditInitialFilters,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  executionAuditAvailableOperationTypes = [],
+  // Execution Audit Props (하위 호환성을 위해 인터페이스에 유지, 미사용)
+  executionAuditRuns: _executionAuditRuns = [],
+  executionAuditLoading: _executionAuditLoading = false,
+  executionAuditHasMore: _executionAuditHasMore = false,
+  executionAuditNextCursor: _executionAuditNextCursor,
+  executionAuditStepsByRunId: _executionAuditStepsByRunId = {},
+  executionAuditStepsLoading: _executionAuditStepsLoading = {},
+  onExecutionAuditLoadMore: _onExecutionAuditLoadMore,
+  onExecutionAuditLoadSteps: _onExecutionAuditLoadSteps,
+  onExecutionAuditViewRun: _onExecutionAuditViewRun,
+  onExecutionAuditRowClick: _onExecutionAuditRowClick,
+  onExecutionAuditFilterChange: _onExecutionAuditFilterChange,
+  executionAuditInitialFilters: _executionAuditInitialFilters,
+  executionAuditAvailableOperationTypes: _executionAuditAvailableOperationTypes = [],
 }) => {
   const mode = useResponsiveMode();
   const isTablet = mode === 'md';

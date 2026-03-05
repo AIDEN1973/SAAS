@@ -9,8 +9,8 @@
 import React from 'react';
 import { Grid } from '@ui-core/react';
 import type { DetailSchema } from '../types';
-// import { SchemaField } from './SchemaField'; // TODO: 향후 사용 예정
-// TODO: useForm 없이 읽기 전용 필드 사용
+// import { SchemaField } from './SchemaField'; // [Deferred] 향후 사용 예정
+// [Deferred] useForm 없이 읽기 전용 필드 사용
 
 export interface SchemaDetailProps {
   schema: DetailSchema;
@@ -31,7 +31,7 @@ export const SchemaDetail: React.FC<SchemaDetailProps> = ({
 }) => {
   const layout = schema.detail.layout;
 
-  // TODO: 읽기 전용 필드 렌더링
+  // [Deferred] 읽기 전용 필드 렌더링
   // SchemaField를 사용하되 disabled={true} 또는 readonly 모드로 표시
 
   return (

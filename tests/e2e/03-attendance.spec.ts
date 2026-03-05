@@ -26,8 +26,8 @@ test.describe('출석 관리 플로우', () => {
     }
   });
 
-  test.skip('출석 체크 페이지에 접근할 수 있어야 함', async ({ page }) => {
-    // TODO: /attendance 페이지 구현 후 활성화
+  test('출석 체크 페이지에 접근할 수 있어야 함', async ({ page }) => {
+
     await page.goto('/attendance');
 
     // 페이지 제목 확인
@@ -57,15 +57,17 @@ test.describe('출석 관리 플로우', () => {
     }
   });
 
-  test.skip('출석 기록을 조회할 수 있어야 함', async ({ page }) => {
-    // TODO: /attendance 페이지 구현 후 활성화
+  test('출석 기록을 조회할 수 있어야 함', async ({ page }) => {
+
     await page.goto('/attendance');
 
     // 날짜 선택기가 있는지 확인
     const datePicker = page.locator('input[type="date"], [data-testid="date-picker"]');
     if (await datePicker.isVisible({ timeout: 2000 }).catch(() => false)) {
-      // 오늘 날짜로 설정 (또는 기본값)
-      const today = new Date().toISOString().split('T')[0];
+      // KST 기준 오늘 날짜 (UTC+9)
+      const now = new Date();
+      const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+      const today = kst.toISOString().split('T')[0];
       await datePicker.fill(today);
     }
 
@@ -74,8 +76,8 @@ test.describe('출석 관리 플로우', () => {
     await expect(attendanceList).toBeVisible({ timeout: 5000 });
   });
 
-  test.skip('출석 통계를 확인할 수 있어야 함', async ({ page }) => {
-    // TODO: /attendance 페이지 구현 후 활성화
+  test('출석 통계를 확인할 수 있어야 함', async ({ page }) => {
+
     await page.goto('/attendance');
 
     // 통계 탭 또는 섹션 찾기

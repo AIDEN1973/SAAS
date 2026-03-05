@@ -44,7 +44,7 @@ export function useWeatherSignals() {
       if (!tenantId) return null;
 
       // 서버 API를 통해 날씨 정보 조회 (클라이언트에서 직접 외부 API 호출 금지)
-      // TODO: 실제 날씨 API 엔드포인트 구현 필요
+      // [Phase 4 잔여] 실제 날씨 API 엔드포인트 구현 필요
       // 예: const response = await apiClient.get('weather');
       // 현재는 null 반환 (구현 예정)
       return null;

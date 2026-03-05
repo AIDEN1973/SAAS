@@ -32,7 +32,7 @@ export interface MigrationRule {
  * @returns 마이그레이션된 스키마
  */
 export function migrateSchema(schema: BaseSchema, targetVersion: string): BaseSchema {
-  // TODO: Migration Rule 정의 및 적용
+  // [Deferred] Migration Rule 정의 및 적용
   // 현재는 스키마를 그대로 반환 (마이그레이션 규칙이 없으므로 변경 없음)
 
   // 향후 마이그레이션 규칙 적용

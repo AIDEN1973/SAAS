@@ -79,7 +79,7 @@ export function useAttendanceNotifications(studentId?: string) {
   return useQuery<AttendanceNotification[]>({
     queryKey: ['attendance-notifications', tenantId, studentId],
     queryFn: async () => {
-      // TODO: 실제 API 엔드포인트로 교체 필요
+      // [Phase 4 잔여] 실제 API 엔드포인트로 교체 필요
       // 현재는 notifications 테이블에서 출결 관련 알림을 조회한다고 가정
       // RLS 정책에 의해 현재 사용자의 자녀에 대한 알림만 조회됨
       const filters: Record<string, unknown> = {
@@ -115,7 +115,7 @@ export function useQRAttendance() {
    */
   const verifyQRToken = async (qrToken: string): Promise<QRTokenVerificationResult> => {
     try {
-      // TODO: 실제 API 엔드포인트로 교체 필요
+      // [Phase 4 잔여] 실제 API 엔드포인트로 교체 필요
       // Edge Function: fns-attendance-verify-qr-token 호출
       const response = await apiClient.post<QRTokenVerificationResult>(
         'functions/v1/fns-attendance-verify-qr-token',
@@ -136,7 +136,7 @@ export function useQRAttendance() {
    * OTP 발송
    */
   const sendOTP = async (phone: string): Promise<void> => {
-    // TODO: 실제 API 엔드포인트로 교체 필요
+    // [Phase 4 잔여] 실제 API 엔드포인트로 교체 필요
     const response = await apiClient.post('functions/v1/fns-auth-send-otp', { phone });
 
     if (response.error) {
@@ -149,7 +149,7 @@ export function useQRAttendance() {
    */
   const verifyOTP = async (phone: string, otp: string): Promise<OTPVerificationResult> => {
     try {
-      // TODO: 실제 API 엔드포인트로 교체 필요
+      // [Phase 4 잔여] 실제 API 엔드포인트로 교체 필요
       const response = await apiClient.post<OTPVerificationResult>(
         'functions/v1/fns-auth-verify-otp',
         { phone, otp }
@@ -175,7 +175,7 @@ export function useQRAttendance() {
     gps?: { lat?: number; lng?: number };
   }): Promise<AttendanceSubmissionResult> => {
     try {
-      // TODO: 실제 API 엔드포인트로 교체 필요
+      // [Phase 4 잔여] 실제 API 엔드포인트로 교체 필요
       // Edge Function: fns-attendance-submit 호출
       const response = await apiClient.post<AttendanceSubmissionResult>(
         'functions/v1/fns-attendance-submit',
@@ -206,7 +206,7 @@ export function useQRAttendance() {
     input: FallbackAuthInput
   ): Promise<AttendanceSubmissionResult> => {
     try {
-      // TODO: 실제 API 엔드포인트로 교체 필요
+      // [Phase 4 잔여] 실제 API 엔드포인트로 교체 필요
       const response = await apiClient.post<AttendanceSubmissionResult>(
         'functions/v1/fns-attendance-submit-fallback',
         input as unknown as Record<string, unknown>

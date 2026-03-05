@@ -48,6 +48,27 @@ export type ResolveAmbiguous = {
   candidates: ResolveAmbiguousCandidate[];
 };
 
+/** 파라미터에 resolve 결과를 주입하기 위한 확장 타입 */
+interface ResolveExtendedParams extends Record<string, unknown> {
+  _resolve_failed?: ResolveFailed;
+  _resolve_ambiguous?: ResolveAmbiguous;
+}
+
+/** 사람(persons) 테이블 조회 결과 행 */
+interface PersonRow {
+  id: string;
+  name: string;
+  phone: string | null;
+}
+
+/** Supabase 쿼리 에러 타입 */
+interface SupabaseQueryError {
+  message: string;
+  details?: string;
+  hint?: string;
+  code?: string;
+}
+
 function isUuid(s: unknown): boolean {
   if (typeof s !== 'string') return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
@@ -57,21 +78,21 @@ function isUuid(s: unknown): boolean {
  * 🔧 FIX: P0-RES - 공통 실패 구조 주입
  * 🔧 FIX: P0-6 - 충돌 정책: ambiguous > failed (사용자 선택 가능하면 우선)
  */
-function attachResolveFailed(params: Record<string, unknown>, failed: ResolveFailed) {
+function attachResolveFailed(params: ResolveExtendedParams, failed: ResolveFailed) {
   // ambiguous가 이미 있으면 failed는 덮어쓰지 않음 (우선순위: ambiguous > failed)
-  if ((params as any)._resolve_ambiguous) {
+  if (params._resolve_ambiguous) {
     return;
   }
-  (params as any)._resolve_failed = failed;
-  delete (params as any)._resolve_ambiguous;
+  params._resolve_failed = failed;
+  delete params._resolve_ambiguous;
 }
 
 /**
  * 🔧 FIX: P0-RES - 공통 ambiguous 구조 주입
  */
-function attachResolveAmbiguous(params: Record<string, unknown>, amb: ResolveAmbiguous) {
-  (params as any)._resolve_ambiguous = amb;
-  delete (params as any)._resolve_failed;
+function attachResolveAmbiguous(params: ResolveExtendedParams, amb: ResolveAmbiguous) {
+  params._resolve_ambiguous = amb;
+  delete params._resolve_failed;
 }
 
 /**
@@ -83,7 +104,7 @@ async function queryPersonsByName(
   tenantId: string,
   pattern: string,
   mode: 'eq' | 'ilike' | 'ilike_contains'
-): Promise<{ data: any[] | null; error: any }> {
+): Promise<{ data: PersonRow[] | null; error: SupabaseQueryError | null }> {
   let query = supabase
     .from('persons')
     .select('id, name, phone')
@@ -151,8 +172,8 @@ async function resolveStudentIdByName(
     strategies.push({ pattern: trimmed, mode: 'ilike_contains' }); // 4) 포함 검색
   }
 
-  let data: any[] | null = null;
-  let error: any = null;
+  let data: PersonRow[] | null = null;
+  let error: SupabaseQueryError | null = null;
 
   for (const strategy of strategies) {
     const result = await queryPersonsByName(supabase, tenantId, strategy.pattern, strategy.mode);
@@ -172,7 +193,7 @@ async function resolveStudentIdByName(
 
   // 🔧 FIX: P0-4 - maxCandidates meta 실제 적용
   // 🔧 FIX: P0-GATE - 후보 힌트 생성 (PII 최소화: 전화번호 끝 4자리)
-  const candidates: ResolveAmbiguousCandidate[] = data.slice(0, maxCandidates).map((r: any) => {
+  const candidates: ResolveAmbiguousCandidate[] = data.slice(0, maxCandidates).map((r: PersonRow) => {
     const phoneHint = r.phone && typeof r.phone === 'string' && r.phone.length >= 4
       ? `전화끝4자리: ${r.phone.slice(-4)}`
       : '';
@@ -222,7 +243,7 @@ export async function normalizeParams(
   // student_id가 없거나 유효하지 않은 경우, name으로 변환 시도
   // 🔧 FIX: P0-RES - ambiguous 구조 사용
   // 🔧 FIX: P0-GATE - meta 기반 해소 (shouldResolveStudent가 true인 경우에만)
-  const p = normalized as Record<string, unknown>;
+  const p = normalized as ResolveExtendedParams;
   if (!hasValidStudentId && shouldResolveStudent) {
     // name이 있으면 name 사용, 없으면 student_id를 name으로 간주 (AI가 잘못 넣은 경우)
     const studentName = (normalized.name && typeof normalized.name === 'string')

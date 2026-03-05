@@ -13,6 +13,23 @@ import type { FormSchema, TableSchema, DetailSchema, FilterSchema, WidgetSchema,
 
 type SchemaType = 'form' | 'table' | 'detail' | 'filter' | 'widget';
 
+/**
+ * 간단한 semver 비교: current >= required 여부 반환
+ * major.minor.patch 형식만 지원
+ */
+function isVersionGte(current: string, required: string): boolean {
+  const parse = (v: string) =>
+    v.replace(/^v/, '').split('.').map((s) => {
+      const n = parseInt(s, 10);
+      return isNaN(n) ? 0 : n;
+    });
+  const [cMajor = 0, cMinor = 0, cPatch = 0] = parse(current);
+  const [rMajor = 0, rMinor = 0, rPatch = 0] = parse(required);
+  if (cMajor !== rMajor) return cMajor > rMajor;
+  if (cMinor !== rMinor) return cMinor > rMinor;
+  return cPatch >= rPatch;
+}
+
 type SchemaByType<T extends SchemaType> =
   T extends 'form' ? FormSchema :
   T extends 'table' ? TableSchema :
@@ -150,7 +167,7 @@ export function useSchema<T extends SchemaType = 'form'>(
         const schemas = Array.isArray(response.data) ? response.data : [response.data];
 
         // 클라이언트에서 type과 min_supported_client 필터링
-        const clientVersion = '1.0.0'; // TODO: 실제 클라이언트 버전으로 교체
+        const clientVersion = context?.clientVersion || '1.0.0';
         const filteredSchemas = schemas.filter((s) => {
           // schema_json에서 type 확인
           const schemaType = (s.schema_json as { type?: string })?.type;
@@ -158,10 +175,13 @@ export function useSchema<T extends SchemaType = 'form'>(
             return false;
           }
 
-          // min_supported_client 확인 (간단한 버전 비교)
-          // TODO: 실제 Semver 비교 로직 구현 필요
-          // 현재는 간단히 문자열 비교
-          return true; // 일단 모든 active 스키마 반환
+          // min_supported_client 확인 (semver 비교)
+          const minVersion = (s as Record<string, unknown>).min_supported_client as string | undefined;
+          if (minVersion && !isVersionGte(clientVersion, minVersion)) {
+            return false;
+          }
+
+          return true;
         });
 
         if (filteredSchemas.length === 0) {

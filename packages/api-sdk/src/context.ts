@@ -13,6 +13,7 @@ export interface ApiContextState {
   tenantId?: string;
   industryType?: string;
   authToken?: string;
+  clientVersion?: string;
 }
 
 // [P1-3] 불변 객체로 Context 관리 (Race Condition 방지)

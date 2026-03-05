@@ -211,7 +211,7 @@ export function BillingPage() {
       const paidInvoices = invoices.filter((inv: BillingHistoryItem) => inv.status === 'paid');
       const totalAmount = paidInvoices.reduce((sum: number, inv: BillingHistoryItem) => sum + (inv.amount_paid || 0), 0);
 
-      // P2 TODO: settlements 테이블 생성 후 실제 정산 기록 저장
+      // P2 [Deferred]: settlements 테이블 생성 후 실제 정산 기록 저장
       // 장기 계획: 월별 정산 내역 히스토리 관리
       // 우선순위: 중간 (현재는 계산만 수행)
       return {
@@ -264,7 +264,7 @@ export function BillingPage() {
   });
   void saveTeacherRevenueSplit;
 
-  // P1 TODO: 인보이스 상태 업데이트 기능 구현
+  // P1 [Deferred]: 인보이스 상태 업데이트 기능 구현
   // 우선순위: 높음 (관리자가 수동으로 상태 변경 필요)
   // 예: draft → pending, pending → paid, paid → cancelled
   // const updateInvoiceStatus = useMutation({
@@ -295,7 +295,7 @@ export function BillingPage() {
   };
 
 
-  // TODO: handleStatusChange 구현 필요 (현재 미사용)
+  // [Deferred] handleStatusChange 구현 필요 (현재 미사용)
   // const handleStatusChange = async (id: string, newStatus: InvoiceStatus) => { ... };
 
   return (

@@ -23,7 +23,7 @@ export interface SchemaLoadOptions {
   type: 'form' | 'table' | 'detail' | 'filter' | 'widget';
   locale?: string;  // i18n 로케일
   clientVersion?: string;  // 클라이언트 버전 (호환성 체크용)
-
+  industryType?: string;  // 업종 타입 (업종별 스키마 오버라이드용)
 }
 
 export interface SchemaLoadResult {
@@ -44,7 +44,7 @@ export interface SchemaLoadResult {
  * @returns 로드된 스키마
  */
 export async function loadSchema(options: SchemaLoadOptions): Promise<SchemaLoadResult> {
-  const { tenantId, entity, type, locale = 'ko', clientVersion } = options;
+  const { tenantId, entity, type, locale = 'ko', clientVersion, industryType } = options;
 
   try {
     // 현재 구현: SchemaRegistryService를 통해 schema_json 직접 조회
@@ -55,7 +55,7 @@ export async function loadSchema(options: SchemaLoadOptions): Promise<SchemaLoad
     // 스키마 조회 (우선순위 적용)
     const schema = await registryService.getSchema(entity, {
       tenantId,
-      industryType: undefined, // TODO: context에서 가져오기
+      industryType: industryType || undefined,
       clientVersion: clientVersion || '1.0.0',
       fallbackSchema: undefined,
     });

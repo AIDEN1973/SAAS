@@ -84,8 +84,7 @@ export const Select: React.FC<SelectProps> = ({
   autoDropdownWidth = false,
   dropdownAlign = 'start',
   selectedSuffix = '개',
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  ...props
+  ..._props
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -98,20 +97,14 @@ export const Select: React.FC<SelectProps> = ({
     if (children) {
       const opts: SelectOption[] = [];
       React.Children.forEach(children, (child) => {
-        if (React.isValidElement(child) && child.type === 'option') {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-          const value = child.props.value;
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          const label = child.props.children?.toString() || child.props.value?.toString() || '';
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-          const disabled = child.props.disabled;
+        if (React.isValidElement<React.OptionHTMLAttributes<HTMLOptionElement>>(child) && child.type === 'option') {
+          const optValue = child.props.value;
+          const optLabel = child.props.children?.toString() || optValue?.toString() || '';
+          const optDisabled = child.props.disabled;
           opts.push({
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            value,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            label,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            disabled,
+            value: optValue as string | number,
+            label: optLabel,
+            disabled: optDisabled,
           });
         }
       });
@@ -166,8 +159,7 @@ export const Select: React.FC<SelectProps> = ({
   }, [value, options, multiple]);
 
   const hasValue = selectedLabelsForStyle.length > 0;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const showInlineLabel = showInlineLabelWhenHasValue && hasValue;
+  const _showInlineLabel = showInlineLabelWhenHasValue && hasValue;
 
   const selectStyle: React.CSSProperties = {
     height: '100%', // wrapper의 height를 채움
@@ -227,11 +219,10 @@ export const Select: React.FC<SelectProps> = ({
       e.stopPropagation(); // 이벤트 전파 방지 (상위 요소의 클릭 이벤트 트리거 방지)
     }
     if (multiple) {
-      const currentValues = Array.isArray(value) ? value : [];
+      const currentValues: string[] = Array.isArray(value) ? (value as string[]) : [];
       const valueStr = String(optionValue);
-      const newValues = currentValues.includes(valueStr)
+      const newValues: string[] = currentValues.includes(valueStr)
         ? currentValues.filter((v) => v !== valueStr)
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         : [...currentValues, valueStr];
       onChange?.(newValues);
     } else {

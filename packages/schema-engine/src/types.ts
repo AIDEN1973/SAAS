@@ -297,7 +297,7 @@ export interface TableColumnSchema {
   type?: 'text' | 'number' | 'date' | 'datetime' | 'tag' | 'badge' | 'custom';
   render?: 'text' | 'date' | 'number' | 'currency' | 'custom';  // 하위 호환성
   badge_config?: Record<string, {
-    color: string;  // ColorToken | 'blue' | 'gray' | 'green' | 'yellow' (Badge 컴포넌트 참조)
+    color: ColorToken | 'blue' | 'gray' | 'green' | 'yellow';
     label?: string;  // 직접 라벨 (하위 호환성)
     labelKey?: string;  // i18n 키 (권장)
   }>;  // badge type용 설정

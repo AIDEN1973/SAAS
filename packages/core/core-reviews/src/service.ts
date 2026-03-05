@@ -94,7 +94,7 @@ export class ReviewsService {
         title: input.title,
         content: input.content,
         is_visible: input.is_visible ?? true,
-        created_by: null, // TODO: auth.uid()에서 가져오기
+        created_by: null, // [Deferred] auth.uid()에서 가져오기
       })
       .select()
       .single();

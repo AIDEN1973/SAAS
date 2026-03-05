@@ -5,14 +5,13 @@
  * - 동적 CORS 헤더 생성
  */
 
-import { envServer } from '../../_shared/env-registry.ts';
-
 /**
  * 🔧 FIX: P0-SEC - CORS 헤더 생성 (allowlist 지원)
  */
 export function getCorsHeaders(origin: string | null): Record<string, string> {
   // 환경변수에서 허용된 origin 목록 가져오기 (쉼표로 구분)
-  const allowedOriginsEnv = (envServer as any).ALLOWED_ORIGINS || '*';
+  // @ts-ignore - Deno는 Edge Function 환경에서만 존재
+  const allowedOriginsEnv: string = (typeof Deno !== 'undefined' ? Deno.env.get('ALLOWED_ORIGINS') : undefined) ?? '*';
   const allowedOrigins = allowedOriginsEnv === '*'
     ? ['*']
     : allowedOriginsEnv.split(',').map((o: string) => o.trim());

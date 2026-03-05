@@ -37,8 +37,8 @@ test.describe('학생 관리 플로우', () => {
     }
   });
 
-  test.skip('학생 목록을 조회할 수 있어야 함', async ({ page }) => {
-    // TODO: /students 페이지 구현 후 활성화
+  test('학생 목록을 조회할 수 있어야 함', async ({ page }) => {
+
     // 학생 관리 페이지로 이동
     await page.goto('/students');
 
@@ -58,8 +58,8 @@ test.describe('학생 관리 플로우', () => {
     }
   });
 
-  test.skip('새로운 학생을 등록할 수 있어야 함', async ({ page }) => {
-    // TODO: /students 페이지 구현 후 활성화
+  test('새로운 학생을 등록할 수 있어야 함', async ({ page }) => {
+
     await page.goto('/students');
 
     // 학생 등록 버튼 클릭
@@ -100,8 +100,8 @@ test.describe('학생 관리 플로우', () => {
     }
   });
 
-  test.skip('학생 정보를 수정할 수 있어야 함', async ({ page }) => {
-    // TODO: /students 페이지 구현 후 활성화
+  test('학생 정보를 수정할 수 있어야 함', async ({ page }) => {
+
     await page.goto('/students');
 
     // 첫 번째 학생 클릭
@@ -132,8 +132,8 @@ test.describe('학생 관리 플로우', () => {
     await expect(page.locator('text=/수정.*완료|성공.*저장/')).toBeVisible({ timeout: 10000 });
   });
 
-  test.skip('학생을 검색할 수 있어야 함', async ({ page }) => {
-    // TODO: /students 페이지 구현 후 활성화
+  test('학생을 검색할 수 있어야 함', async ({ page }) => {
+
     await page.goto('/students');
 
     // 검색 입력 필드 찾기
@@ -187,8 +187,8 @@ test.describe('학생 관리 플로우', () => {
     }
   });
 
-  test.skip('학생 상세 정보를 조회할 수 있어야 함', async ({ page }) => {
-    // TODO: /students 페이지 구현 후 활성화
+  test('학생 상세 정보를 조회할 수 있어야 함', async ({ page }) => {
+
     await page.goto('/students');
 
     // 첫 번째 학생 클릭

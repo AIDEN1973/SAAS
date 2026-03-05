@@ -12,8 +12,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('권한 기반 접근 제어 (RBAC)', () => {
-  test.skip('관리자는 모든 페이지에 접근할 수 있어야 함', async ({ page }) => {
-    // TODO: /students, /classes, /teachers, /analytics 페이지 구현 후 활성화
+  test('관리자는 모든 페이지에 접근할 수 있어야 함', async ({ page }) => {
     // 관리자로 로그인
     await page.goto('/login');
     await page.fill(
@@ -55,8 +54,7 @@ test.describe('권한 기반 접근 제어 (RBAC)', () => {
     }
   });
 
-  test.skip('일반 사용자는 제한된 페이지만 접근할 수 있어야 함', async ({ page }) => {
-    // TODO: /billing 페이지 구현 후 활성화
+  test('일반 사용자는 제한된 페이지만 접근할 수 있어야 함', async ({ page }) => {
     // 일반 사용자로 로그인 (학부모 등)
     await page.goto('/login');
     await page.fill(
@@ -86,8 +84,7 @@ test.describe('권한 기반 접근 제어 (RBAC)', () => {
     }
   });
 
-  test.skip('권한 없는 페이지 접근 시 리다이렉션되어야 함', async ({ page }) => {
-    // TODO: /analytics, /settings 페이지 구현 후 활성화
+  test('권한 없는 페이지 접근 시 리다이렉션되어야 함', async ({ page }) => {
     // 일반 사용자로 로그인
     await page.goto('/login');
     await page.fill(
@@ -127,10 +124,9 @@ test.describe('권한 기반 접근 제어 (RBAC)', () => {
     }
   });
 
-  test.skip('로그아웃 후 보호된 페이지 접근 시 로그인 페이지로 리다이렉션되어야 함', async ({
+  test('로그아웃 후 보호된 페이지 접근 시 로그인 페이지로 리다이렉션되어야 함', async ({
     page,
   }) => {
-    // TODO: 로그아웃 기능 (user-menu-button) 구현 후 활성화
     // 로그인
     await page.goto('/login');
     await page.fill('input[type="email"]', process.env.TEST_USER_EMAIL || 'test@example.com');
@@ -155,8 +151,7 @@ test.describe('권한 기반 접근 제어 (RBAC)', () => {
     await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
   });
 
-  test.skip('다른 테넌트의 데이터에 접근할 수 없어야 함', async ({ page }) => {
-    // TODO: /students 페이지 구현 후 활성화
+  test('다른 테넌트의 데이터에 접근할 수 없어야 함', async ({ page }) => {
     // 로그인
     await page.goto('/login');
     await page.fill('input[type="email"]', process.env.TEST_USER_EMAIL || 'test@example.com');

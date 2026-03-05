@@ -16,6 +16,10 @@ import { envServer } from '../_shared/env-registry.ts';
 import { toKSTDate, toKST, toKSTMonth } from '../_shared/date-utils.ts';
 import { checkAndUpdateAutomationSafety } from '../_shared/automation-safety.ts';
 import { logError, createErrorLogEntry } from '../_shared/error-tracking.ts';
+import { withRetry } from '../_shared/retry-utils.ts';
+import { enqueueDLQ } from '../_shared/dlq-utils.ts';
+import { alertOnBatchFailure } from '../_shared/alerting.ts';
+import { createExecutionAuditRecord } from '../_shared/execution-audit-utils.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,6 +38,7 @@ serve(async (req) => {
   try {
     // [불변 규칙] Edge Functions도 env-registry를 통해 환경변수 접근
     const supabase = createClient(envServer.SUPABASE_URL, envServer.SERVICE_ROLE_KEY);
+    const batchStartTime = Date.now();
 
     // 기술문서 19-1-2: KST 기준 날짜 처리
     // [불변 규칙] 파일명 생성 시 날짜 형식은 반드시 KST 기준을 사용합니다.
@@ -61,6 +66,7 @@ serve(async (req) => {
     }
 
     let totalUpdated = 0;
+    const errors: string[] = [];
 
     for (const tenant of tenants) {
       try {
@@ -167,36 +173,40 @@ serve(async (req) => {
 
         // 통계 업데이트 (analytics.daily_store_metrics 테이블 사용, 정본)
         // ⚠️ 참고: analytics.daily_metrics는 구버전/폐기된 네이밍입니다.
-        const { error: upsertError } = await supabase
-          .schema('analytics')
-          .from('daily_store_metrics')  // 정본: daily_metrics는 구버전
-          .upsert({
-            tenant_id: tenant.id,
-            date_kst: dateKst,
-            student_count: studentCount,
-            revenue: revenue,
-            attendance_rate: attendanceRate,
-            new_enrollments: newEnrollments, // Phase 1: 실제 계산값 사용
-            late_rate: lateRate,
-            absent_rate: absentRate,
-            active_student_count: activeStudentCount,
-            inactive_student_count: inactiveStudentCount,
-            avg_students_per_class: avgStudentsPerClass,
-            avg_capacity_rate: avgCapacityRate,
-            arpu: arpu,
-            // Phase 2-3: 추가 메트릭 저장
-            overdue_rate: overdueRate,
-            churn_rate: churnRate,
-            updated_at: toKST().toISOString(),
-          }, {
-            onConflict: 'tenant_id,date_kst',
-          });
-
-        if (!upsertError) {
+        // [Phase 3] withRetry 적용
+        try {
+          await withRetry(
+            () => supabase
+              .schema('analytics')
+              .from('daily_store_metrics')  // 정본: daily_metrics는 구버전
+              .upsert({
+                tenant_id: tenant.id,
+                date_kst: dateKst,
+                student_count: studentCount,
+                revenue: revenue,
+                attendance_rate: attendanceRate,
+                new_enrollments: newEnrollments, // Phase 1: 실제 계산값 사용
+                late_rate: lateRate,
+                absent_rate: absentRate,
+                active_student_count: activeStudentCount,
+                inactive_student_count: inactiveStudentCount,
+                avg_students_per_class: avgStudentsPerClass,
+                avg_capacity_rate: avgCapacityRate,
+                arpu: arpu,
+                // Phase 2-3: 추가 메트릭 저장
+                overdue_rate: overdueRate,
+                churn_rate: churnRate,
+                updated_at: toKST().toISOString(),
+              }, {
+                onConflict: 'tenant_id,date_kst',
+              }),
+            { maxRetries: 2, baseDelay: 500 }
+          );
           totalUpdated++;
           console.log(`[Daily Statistics] Updated metrics for tenant ${tenant.id}`);
-        } else {
+        } catch (upsertError) {
           console.error(`[Daily Statistics] Failed to update for tenant ${tenant.id}:`, upsertError);
+          errors.push(`Tenant ${tenant.id}: ${upsertError instanceof Error ? upsertError.message : String(upsertError)}`);
         }
 
         // revenue_target_under 처리 (매일 07:10 실행)
@@ -281,6 +291,14 @@ serve(async (req) => {
           tenant.id,
           { phase: 'tenant_processing', date_kst: dateKst }
         ));
+        // [Phase 3] DLQ 등록 및 에러 추적
+        await enqueueDLQ(supabase, {
+          tenant_id: tenant.id,
+          function_name: 'daily-statistics-update',
+          payload: { tenant_id: tenant.id, date_kst: dateKst },
+          error_message: error instanceof Error ? error.message : String(error),
+        });
+        errors.push(`Tenant ${tenant.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
 
@@ -534,6 +552,48 @@ serve(async (req) => {
       // 지역 집계 실패해도 전체 작업은 성공으로 처리 (매장 통계는 이미 업데이트됨)
     }
 
+    // [Phase 3] Execution Audit 기록
+    try {
+      await createExecutionAuditRecord(supabase, {
+        tenant_id: 'system',
+        operation_type: 'scheduler.daily-statistics-update',
+        status: errors.length > 0 ? 'partial' : 'success',
+        source: 'scheduler',
+        actor_type: 'system',
+        actor_id: 'svc:edge:daily-statistics-update',
+        summary: `일일 통계 업데이트 완료 (${totalUpdated}건 업데이트)`,
+        details: {
+          updated_count: totalUpdated,
+          regional_updated_count: regionalUpdated,
+          tenant_count: tenants?.length || 0,
+          errors: errors.length > 0 ? errors : undefined,
+        },
+        reference: {
+          entity_type: 'batch',
+          entity_id: `daily-statistics-update:${dateKst}`,
+        },
+        duration_ms: Date.now() - batchStartTime,
+        ...(errors.length > 0 && {
+          error_code: 'PARTIAL_FAILURE',
+          error_summary: `${errors.length}개 테넌트 처리 실패`,
+        }),
+      });
+    } catch (auditError) {
+      console.error('[Daily Statistics] Failed to create audit record:', auditError);
+    }
+
+    // [Phase 3] 배치 실패율 기반 알림
+    if ((tenants?.length || 0) > 0) {
+      await alertOnBatchFailure(supabase, {
+        functionName: 'daily-statistics-update',
+        totalCount: tenants?.length || 0,
+        successCount: (tenants?.length || 0) - errors.length,
+        failedCount: errors.length,
+        failureRateThreshold: 10,
+        context: { updated_count: totalUpdated, regional_updated_count: regionalUpdated },
+      });
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -547,13 +607,19 @@ serve(async (req) => {
     console.error('[Daily Statistics] Fatal error:', error);
 
     // P0-2: Error Tracking 추가 (Fatal Error)
-    await logError(supabase, createErrorLogEntry(
-      error,
-      'daily-statistics-update',
-      undefined,
-      { phase: 'fatal', is_cron_job: true },
-      'critical'
-    ));
+    // supabase는 try 블록 내부에서 선언되므로 fatal catch에서 새 클라이언트 생성
+    try {
+      const supabaseForError = createClient(envServer.SUPABASE_URL, envServer.SERVICE_ROLE_KEY);
+      await logError(supabaseForError, createErrorLogEntry(
+        error,
+        'daily-statistics-update',
+        undefined,
+        { phase: 'fatal', is_cron_job: true },
+        'critical'
+      ));
+    } catch (logErr) {
+      console.error('[Daily Statistics] Failed to log fatal error:', logErr);
+    }
 
     return new Response(
       JSON.stringify({

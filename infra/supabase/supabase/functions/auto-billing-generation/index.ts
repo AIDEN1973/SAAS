@@ -14,6 +14,9 @@ import { withTenant } from '../_shared/withTenant.ts';
 import { envServer } from '../_shared/env-registry.ts';
 import { createExecutionAuditRecord } from '../_shared/execution-audit-utils.ts';
 import { toKST, toKSTDate, toKSTMonth } from '../_shared/date-utils.ts';
+import { withRetry } from '../_shared/retry-utils.ts';
+import { enqueueDLQ } from '../_shared/dlq-utils.ts';
+import { alertOnBatchFailure } from '../_shared/alerting.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,6 +32,8 @@ serve(async (req) => {
   }
 
   try {
+    const batchStartTime = Date.now();
+
     // [불변 규칙] Edge Functions도 env-registry를 통해 환경변수 접근
     // [불변 규칙] Role 분리: 상용화 단계에서 Role 분리 구현
     // auto-billing-generation은 BILLING_BATCH_ROLE_KEY 사용, 없으면 SERVICE_ROLE_KEY fallback
@@ -203,27 +208,88 @@ serve(async (req) => {
           continue;
         }
 
-        // 청구서 생성
-        // ⚠️ 참고: billing_plans 테이블이 구현되면 실제 금액을 조회하여 설정해야 함
-        // 현재는 amount=0으로 생성하며, 이후 수동으로 금액을 설정하거나 billing_plans 연동 필요
-        const invoices = studentsToBill.map((student: { id: string }) => ({
+        // billing_plans에서 학생별 활성 수강료 조회
+        const studentIds = studentsToBill.map((s: { id: string }) => s.id);
+        const { data: billingPlans } = await withTenant(
+          supabase
+            .from('billing_plans')
+            .select('student_id, amount')
+            .in('student_id', studentIds)
+            .eq('status', 'active'),
+          tenant.id
+        );
+
+        // 학생별 수강료 합산 맵 생성
+        const studentAmountMap = new Map<string, number>();
+        if (billingPlans && billingPlans.length > 0) {
+          for (const plan of billingPlans) {
+            const current = studentAmountMap.get(plan.student_id) || 0;
+            studentAmountMap.set(plan.student_id, current + plan.amount);
+          }
+        }
+
+        // billing_plans가 없는 학생은 인보이스 생성 건너뜀
+        const billableStudents = studentsToBill.filter(
+          (student: { id: string }) => (studentAmountMap.get(student.id) || 0) > 0
+        );
+
+        if (billableStudents.length === 0) {
+          console.log(`[Auto Billing] No billable students (no active billing plans) for tenant ${tenant.id}`);
+          continue;
+        }
+
+        if (billableStudents.length < studentsToBill.length) {
+          console.warn(
+            `[Auto Billing] ${studentsToBill.length - billableStudents.length} students skipped (no billing plan) for tenant ${tenant.id}`
+          );
+        }
+
+        // 청구서 생성 (billing_plans 기반 실제 금액)
+        const invoices = billableStudents.map((student: { id: string }) => ({
           tenant_id: tenant.id,
           payer_id: student.id,
-          amount: 0, // ⚠️ 향후 billing_plans에서 실제 금액 조회 필요
+          amount: studentAmountMap.get(student.id) || 0,
           period_start: periodStart,
           period_end: periodEnd,
-          due_date: periodEnd, // 기한은 월말
+          due_date: periodEnd,
           status: 'draft',
           industry_type: tenant.industry_type,
         }));
 
-        const { error: insertError } = await supabase
-          .from('invoices')
-          .insert(invoices);
+        // [Phase 3] 재시도 적용: 인보이스 INSERT 실패 시 지수 백오프 재시도
+        try {
+          await withRetry(
+            () => supabase.from('invoices').insert(invoices),
+            {
+              maxRetries: 3,
+              baseDelay: 1000,
+              onRetry: (attempt, err, delay) => {
+                console.warn(`[Auto Billing] Invoice insert retry ${attempt}/3 for tenant ${tenant.id}, delay ${delay}ms`);
+              },
+            }
+          );
+        } catch (insertError) {
+          const errMsg = insertError && typeof insertError === 'object' && 'message' in insertError
+            ? (insertError as { message: string }).message
+            : String(insertError);
+          console.error(`[Auto Billing] Failed to create invoices for tenant ${tenant.id} after retries:`, insertError);
+          errors.push(`Tenant ${tenant.id}: ${errMsg}`);
 
-        if (insertError) {
-          console.error(`[Auto Billing] Failed to create invoices for tenant ${tenant.id}:`, insertError);
-          errors.push(`Tenant ${tenant.id}: ${insertError.message}`);
+          // [Phase 3] DLQ 적재: 재시도 소진 후 실패한 작업 저장
+          await enqueueDLQ(supabase, {
+            tenant_id: tenant.id,
+            function_name: 'auto-billing-generation',
+            payload: {
+              tenant_id: tenant.id,
+              student_count: invoices.length,
+              period_start: periodStart,
+              period_end: periodEnd,
+              industry_type: tenant.industry_type,
+            },
+            error_message: errMsg,
+            error_code: insertError && typeof insertError === 'object' && 'code' in insertError
+              ? String((insertError as { code: string }).code) : undefined,
+          });
           continue;
         }
 
@@ -266,6 +332,20 @@ serve(async (req) => {
       });
     } catch (auditError) {
       console.error('[Auto Billing] Failed to create audit record:', auditError);
+    }
+
+    // [Phase 3] 배치 실패율 기반 알림
+    const processedTenantCount = tenants?.length || 0;
+    const failedTenantCount = errors.length;
+    if (processedTenantCount > 0) {
+      await alertOnBatchFailure(supabase, {
+        functionName: 'auto-billing-generation',
+        totalCount: processedTenantCount,
+        successCount: processedTenantCount - failedTenantCount,
+        failedCount: failedTenantCount,
+        failureRateThreshold: 10,
+        context: { generated_count: totalGenerated, period: currentMonth },
+      });
     }
 
     return new Response(

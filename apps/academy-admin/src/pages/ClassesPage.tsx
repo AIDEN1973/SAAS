@@ -27,7 +27,7 @@ import {
   useCreateClass,
   useUpdateClass,
   useDeleteClass,
-  // useClassStatistics, // TODO: 통계 기능 구현 시 사용
+  // useClassStatistics, // [Deferred] 통계 기능 구현 시 사용
   useTeachers,
   useTeachersWithStats,
   useCheckScheduleConflicts,
@@ -368,7 +368,7 @@ export function ClassesPage() {
   //     day_of_week: filters.day_of_week as DayOfWeek | undefined,
   //   });
   //   // Promise 반환 없음
-  // }, []); // TODO: 필터 기능 구현 시 사용
+  // }, []); // [Deferred] 필터 기능 구현 시 사용
 
   const checkConflicts = useCheckScheduleConflicts();
 
@@ -1820,7 +1820,7 @@ function ScheduleConflictsTab() {
   const terms = useIndustryTerms();
   const { data: allClasses, isLoading } = useClasses({});
   const { data: teachers } = useTeachers();
-  void teachers; // TODO: 강사별 충돌 탐지 기능 구현 시 사용
+  void teachers; // [Deferred] 강사별 충돌 탐지 기능 구현 시 사용
 
   // 충돌 탐지
   const conflicts = useMemo(() => {

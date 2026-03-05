@@ -83,13 +83,11 @@ export function useRegionalStatsCards() {
         ? Math.round((presentCount / attendanceLogs.length) * 100)
         : 0;
 
-      // 2. 지역 정보 가져오기 (임시로 context에서 가져온다고 가정)
-      // 실제로는 useConfig를 사용해야 하지만, Hook 내부에서는 불가능하므로
-      // 매개변수로 받거나 별도 처리 필요
-      const region = '강남구'; // TODO: context 또는 config에서 가져오기
+      // 지역 정보: context의 region 또는 미설정 시 빈 문자열
+      const region = context?.region || '';
 
       // 3. 지역 통계 조회 (간소화된 버전)
-      let dongMetrics: any[] = [];
+      let dongMetrics: Array<Record<string, unknown>> = [];
       try {
         // location_code는 실제로는 config에서 가져와야 함
         // 여기서는 임시로 빈 배열 반환

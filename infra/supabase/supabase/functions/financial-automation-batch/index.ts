@@ -19,6 +19,10 @@ import { envServer } from '../_shared/env-registry.ts';
 import { toKSTDate, toKST, toKSTMonth } from '../_shared/date-utils.ts';
 import { checkAndUpdateAutomationSafety } from '../_shared/automation-safety.ts';
 import { createTaskCardWithDedup } from '../_shared/create-task-card-with-dedup.ts';
+import { withRetry } from '../_shared/retry-utils.ts';
+import { enqueueDLQ } from '../_shared/dlq-utils.ts';
+import { alertOnBatchFailure } from '../_shared/alerting.ts';
+import { createExecutionAuditRecord } from '../_shared/execution-audit-utils.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -824,6 +828,7 @@ serve(async (req) => {
   }
 
   try {
+    const batchStartTime = Date.now();
     const supabase = createClient(envServer.SUPABASE_URL, envServer.SERVICE_ROLE_KEY);
     const kstTime = toKST();
     const hour = kstTime.getHours();
@@ -844,6 +849,7 @@ serve(async (req) => {
     }
 
     let totalProcessed = 0;
+    const errors: string[] = [];
 
     for (const tenant of tenants) {
       try {
@@ -871,7 +877,56 @@ serve(async (req) => {
         totalProcessed += await processRecurringPaymentFailed(supabase, tenant.id, kstTime);
       } catch (error) {
         console.error(`[Financial Automation] Error for tenant ${tenant.id}:`, error);
+        errors.push(`Tenant ${tenant.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        // [Phase 3] DLQ 적재
+        await enqueueDLQ(supabase, {
+          tenant_id: tenant.id,
+          function_name: 'financial-automation-batch',
+          payload: { tenant_id: tenant.id, hour, minute },
+          error_message: error instanceof Error ? error.message : String(error),
+        });
       }
+    }
+
+    // [Phase 3] Execution Audit 기록
+    try {
+      await createExecutionAuditRecord(supabase, {
+        tenant_id: 'system',
+        operation_type: 'scheduler.financial-automation-batch',
+        status: errors.length > 0 ? 'partial' : 'success',
+        source: 'scheduler',
+        actor_type: 'system',
+        actor_id: 'svc:edge:financial-automation-batch',
+        summary: `재무 자동화 배치 작업 완료 (${totalProcessed}건 처리)`,
+        details: {
+          processed_count: totalProcessed,
+          tenant_count: tenants?.length || 0,
+          errors: errors.length > 0 ? errors : undefined,
+        },
+        reference: {
+          entity_type: 'batch',
+          entity_id: `financial-automation-batch:${toKSTDate()}`,
+        },
+        duration_ms: Date.now() - batchStartTime,
+        ...(errors.length > 0 && {
+          error_code: 'PARTIAL_FAILURE',
+          error_summary: `${errors.length}개 테넌트 처리 실패`,
+        }),
+      });
+    } catch (auditError) {
+      console.error('[Financial Automation] Failed to create audit record:', auditError);
+    }
+
+    // [Phase 3] 배치 실패율 기반 알림
+    if ((tenants?.length || 0) > 0) {
+      await alertOnBatchFailure(supabase, {
+        functionName: 'financial-automation-batch',
+        totalCount: tenants?.length || 0,
+        successCount: (tenants?.length || 0) - errors.length,
+        failedCount: errors.length,
+        failureRateThreshold: 10,
+        context: { processed_count: totalProcessed },
+      });
     }
 
     return new Response(
@@ -880,6 +935,27 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('[Financial Automation] Fatal error:', error);
+    try {
+      const supabaseForAudit = createClient(envServer.SUPABASE_URL, envServer.SERVICE_ROLE_KEY);
+      await createExecutionAuditRecord(supabaseForAudit, {
+        tenant_id: 'system',
+        operation_type: 'scheduler.financial-automation-batch',
+        status: 'failed',
+        source: 'scheduler',
+        actor_type: 'system',
+        actor_id: 'svc:edge:financial-automation-batch',
+        summary: '재무 자동화 배치 작업 실패',
+        details: null,
+        reference: {
+          entity_type: 'batch',
+          entity_id: `financial-automation-batch:${toKSTDate()}`,
+        },
+        error_code: 'BATCH_EXECUTION_FAILED',
+        error_summary: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } catch (auditError) {
+      console.error('[Financial Automation] Failed to create audit record:', auditError);
+    }
     return new Response(
       JSON.stringify({
         success: false,

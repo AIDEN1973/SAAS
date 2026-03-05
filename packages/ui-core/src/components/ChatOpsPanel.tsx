@@ -46,6 +46,37 @@ export type ChatOpsMessageType =
   | 'executed_failed';
 
 /**
+ * L0 Intent 실행 결과 데이터 타입
+ * 각 Intent별 반환 구조를 통합한 인터페이스
+ */
+export interface L0ResultData {
+  /** student.query.profile: 단일 학생 프로필 */
+  student?: {
+    name?: string;
+    phone?: string;
+    email?: string;
+    grade?: string;
+    class_name?: string;
+    status?: string;
+    guardian_name?: string;
+    guardian_contact?: string;
+    [key: string]: unknown;
+  };
+  /** attendance.query.by_student / 범용 records */
+  records?: Array<Record<string, unknown>>;
+  /** attendance.query.late / class.query.roster / student.query.search 등 */
+  students?: Array<Record<string, unknown>>;
+  /** billing.query.by_student 등 */
+  invoices?: Array<Record<string, unknown>>;
+  /** 범용 단일 invoice */
+  invoice?: Record<string, unknown>;
+  /** class.query 등 */
+  classes?: Array<Record<string, unknown>>;
+  /** 기타 동적 필드 */
+  [key: string]: unknown;
+}
+
+/**
  * ChatOps 메시지 인터페이스
  */
 export interface ChatOpsMessage {
@@ -65,7 +96,7 @@ export interface ChatOpsMessage {
     intent_key?: string;
     automation_level?: 'L0' | 'L1' | 'L2';
     params?: Record<string, unknown>;
-    l0_result?: unknown; // L0 Intent 실행 결과
+    l0_result?: L0ResultData; // L0 Intent 실행 결과
     original_message?: string; // 원본 사용자 메시지 (필터링용)
     isStreaming?: boolean; // 스트리밍 중 여부 (타이핑 커서 표시용)
     hasError?: boolean; // 에러 발생 여부
@@ -322,6 +353,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // 메시지가 추가될 때마다 스크롤을 맨 아래로 이동
   useEffect(() => {
@@ -341,6 +373,13 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
       setTimeout(() => {
         inputRef.current?.focus();
       }, 0);
+    }
+  };
+
+  // 제안 버튼에서 직접 메시지를 전송 (setInputValue + requestSubmit race condition 방지)
+  const handleSuggestionClick = (message: string) => {
+    if (!isLoading) {
+      onSendMessage(message);
     }
   };
 
@@ -658,7 +697,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
               )}
               {/* L0 Intent 결과를 구조화된 형태로 표시 */}
               {!isUser && message.metadata?.l0_result !== undefined && message.metadata?.automation_level === 'L0' && (() => {
-                const l0Result = message.metadata.l0_result as any;
+                const l0Result = message.metadata.l0_result;
                 const intentKey = message.metadata?.intent_key;
 
                 // student.query.profile: 학생 프로필 정보를 사용자 친화적인 형식으로 표시
@@ -1018,7 +1057,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                 const { requestedFields, showAll } = extractRequestedFields(originalMessage);
 
                 // 범용 렌더링 함수: 객체나 배열을 필터링하여 표시
-                const renderFilteredResult = (data: any, title: string = '조회 결과'): React.ReactNode => {
+                const renderFilteredResult = (data: Record<string, unknown> | Array<Record<string, unknown>>, title: string = '조회 결과'): React.ReactNode => {
                   // 배열인 경우 (students, records, invoices 등)
                   if (Array.isArray(data)) {
                     if (data.length === 0) {
@@ -1086,9 +1125,9 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                           </Badge>
                         </div>
                         <div style={{ color: 'var(--color-text)', fontSize: 'var(--font-size-sm)' }}>
-                          {data.slice(0, 20).map((item: any, idx: number) => (
+                          {data.slice(0, 20).map((item: Record<string, unknown>, idx: number) => (
                             <div
-                              key={item.id || idx}
+                              key={(item.id as React.Key) || idx}
                               style={{
                                 marginBottom: 'var(--spacing-xs)',
                                 paddingBottom: 'var(--spacing-xs)',
@@ -1102,17 +1141,17 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                                 return (
                                   <span key={field} style={{ marginRight: 'var(--spacing-sm)' }}>
                                     {field === 'status' ? (
-                                      <Badge variant="outline" color={getStatusColor(value)}>
-                                        {getStatusLabel(value)}
+                                      <Badge variant="outline" color={getStatusColor(String(value))}>
+                                        {getStatusLabel(String(value))}
                                       </Badge>
                                     ) : field === 'amount' ? (
                                       <span style={{ fontWeight: 'var(--font-weight-medium)' }}>
-                                        {typeof value === 'number' ? `${value.toLocaleString()}원` : value}
+                                        {typeof value === 'number' ? `${value.toLocaleString()}원` : String(value)}
                                       </span>
                                     ) : field === 'name' || field.includes('name') ? (
-                                      <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{value}</span>
+                                      <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{String(value)}</span>
                                     ) : (
-                                      <span style={{ color: 'var(--color-gray-600)' }}>{value}</span>
+                                      <span style={{ color: 'var(--color-gray-600)' }}>{String(value)}</span>
                                     )}
                                   </span>
                                 );
@@ -1130,8 +1169,9 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                   }
 
                   // 객체인 경우 (student, invoice 등 단일 객체)
-                  if (typeof data === 'object' && data !== null) {
-                    const fields = Object.keys(data);
+                  if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
+                    const objData = data as Record<string, unknown>;
+                    const fields = Object.keys(objData);
 
                     // 필터링된 필드만 추출 - FIELD_KEYWORDS_MAP 사용 (SSOT)
                     let visibleFields = showAll
@@ -1171,7 +1211,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                         </div>
                         <div style={{ color: 'var(--color-text)', fontSize: 'var(--font-size-sm)' }}>
                           {visibleFields.map((field) => {
-                            const value = data[field];
+                            const value = objData[field];
                             if (value === null || value === undefined || value === '') return null;
 
                             return (
@@ -1180,8 +1220,8 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
                                   {getFieldLabel(field, industryTerms)}:
                                 </span>
                                 {field === 'status' ? (
-                                  <Badge variant="outline" color={getStatusColor(value)}>
-                                    {getStatusLabel(value)}
+                                  <Badge variant="outline" color={getStatusColor(String(value))}>
+                                    {getStatusLabel(String(value))}
                                   </Badge>
                                 ) : (
                                   <span>{formatValue(field, value)}</span>
@@ -1367,7 +1407,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
 
           {/* 입력창 (중앙 배치) */}
           <div style={{ width: '100%', maxWidth: 'var(--width-agent-chat-max)' }}>
-            <form onSubmit={handleSubmit}>
+            <form ref={formRef} onSubmit={handleSubmit}>
               <div
                 style={{
                   position: 'relative',
@@ -1473,11 +1513,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={async () => {
-                setInputValue('오늘 출석 현황 알려줘');
-                // 즉시 전송
-                await handleSubmit(new Event('submit') as any);
-              }}
+              onClick={() => handleSuggestionClick('오늘 출석 현황 알려줘')}
               style={{ borderRadius: 'var(--border-radius-full)' }}
             >
               📊 오늘 출석 현황
@@ -1485,10 +1521,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={async () => {
-                setInputValue('이번 달 미납 학생 조회');
-                await handleSubmit(new Event('submit') as any);
-              }}
+              onClick={() => handleSuggestionClick('이번 달 미납 학생 조회')}
               style={{ borderRadius: 'var(--border-radius-full)' }}
             >
               💰 미납 학생 조회
@@ -1496,10 +1529,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={async () => {
-                setInputValue('오늘 지각 학생 목록 보여줘');
-                await handleSubmit(new Event('submit') as any);
-              }}
+              onClick={() => handleSuggestionClick('오늘 지각 학생 목록 보여줘')}
               style={{ borderRadius: 'var(--border-radius-full)' }}
             >
               ⏰ 지각 학생 확인
@@ -1507,10 +1537,7 @@ export const ChatOpsPanel: React.FC<ChatOpsPanelProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={async () => {
-                setInputValue('A반 학생 명단 조회');
-                await handleSubmit(new Event('submit') as any);
-              }}
+              onClick={() => handleSuggestionClick('A반 학생 명단 조회')}
               style={{ borderRadius: 'var(--border-radius-full)' }}
             >
               👥 반 명단 조회

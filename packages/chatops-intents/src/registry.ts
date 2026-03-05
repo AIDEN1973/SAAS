@@ -13,7 +13,7 @@
 
 import { z } from 'zod';
 // Domain Action Catalog import (상대 경로 사용 - workspace 의존성 해결 전까지)
-// TODO: workspace 의존성 해결 후 @core/automation에서 직접 import하도록 변경 예정
+// [Deferred] workspace 의존성 해결 후 @core/automation에서 직접 import하도록 변경 예정
 const DOMAIN_ACTION_CATALOG = [
   // attendance (4)
   'attendance.correct_record',
@@ -80,7 +80,7 @@ const DOMAIN_ACTION_CATALOG = [
 // AUTOMATION_EVENT_CATALOG와 동기화되어야 합니다.
 // 현재 Registry에 사용된 event_type만 포함 (전체 목록은 SSOT 참조)
 // 빌드타임 검증을 위해 별도 스크립트(scripts/verify-ssot-sync.ts)에서 전체 동기화를 검증합니다.
-// TODO: workspace 의존성 해결 후 @core/automation에서 직접 import하도록 변경 예정
+// [Deferred] workspace 의존성 해결 후 @core/automation에서 직접 import하도록 변경 예정
 const EVENT_CATALOG_FOR_VALIDATION = [
   'absence_first_day', // customer_retention
   'announcement_digest', // safety_compliance

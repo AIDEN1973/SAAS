@@ -35,7 +35,7 @@ export interface SchemaFormProps {
    * - schema-engine은 특정 SDK를 직접 import하지 않습니다.
    * - 앱에서 `@api-sdk/core`의 `apiClient`를 주입하는 방식으로 사용합니다.
    */
-  apiClient?: { get: (table: string, options?: any) => Promise<any> };
+  apiClient?: { get: (table: string, options?: Record<string, unknown>) => Promise<unknown> };
   // Card padding 제어 (Drawer/Modal 내부에서 사용 시)
   disableCardPadding?: boolean;
   /** 카드 내부 타이틀 (타이틀 하단에 구분선 자동 추가) */
@@ -125,7 +125,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
       return; // 변경되지 않았으면 건너뜀
     }
 
-    if ((import.meta as any).env?.DEV) {
+    if (import.meta.env?.DEV) {
       console.log('[IME][SchemaForm] reset triggered by mergedDefaultValues change', {
         changedKeys: Object.keys(mergedDefaultValues).filter(
           (key) => prevMergedDefaultValuesRef.current[key] !== mergedDefaultValues[key]
@@ -386,7 +386,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
                 label: formConfig.submit.labelKey
                   ? (translations[formConfig.submit.labelKey] || formConfig.submit.labelKey)
                   : (formConfig.submit.label || 'Submit'),
-                icon: (formConfig.submit as any).icon || <Save />,
+                icon: <Save />,
                 variant: formConfig.submit.variant,
                 color: formConfig.submit.color,
                 size: formConfig.submit.size,
@@ -701,7 +701,7 @@ export const SchemaFormWithMethods: React.FC<SchemaFormWithMethodsProps> = ({
                 label: formConfig.submit.labelKey
                   ? (translations[formConfig.submit.labelKey] || formConfig.submit.labelKey)
                   : (formConfig.submit.label || 'Submit'),
-                icon: (formConfig.submit as any).icon || <Save />,
+                icon: <Save />,
                 variant: formConfig.submit.variant,
                 color: formConfig.submit.color,
                 size: formConfig.submit.size,

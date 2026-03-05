@@ -78,7 +78,7 @@ export function createClient(): SupabaseClient {
   }
 
   // 개발 환경에서 URL 확인 로그 출력
-  if (typeof window !== 'undefined' && (import.meta as any).env?.DEV) {
+  if (typeof window !== 'undefined' && import.meta.env?.DEV) {
     const correctUrl = 'https://xawypsrotrfoyozhrsbb.supabase.co';
     const isCorrect = supabaseUrl === correctUrl;
 
@@ -115,7 +115,7 @@ export function createClient(): SupabaseClient {
 
   // Custom storage adapter for cross-origin session sharing
   // 개발 환경에서만 사용 (프로덕션에서는 같은 origin 사용 권장)
-  const customStorage = typeof window !== 'undefined' && (import.meta as any).env?.DEV
+  const customStorage = typeof window !== 'undefined' && import.meta.env?.DEV
     ? createCrossOriginStorage()
     : undefined;
 

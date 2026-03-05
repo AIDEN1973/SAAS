@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Core Auth Signup Service
  *
@@ -95,8 +92,8 @@ export class SignupService {
         user: {
           id: data.user.id,
           email: data.user.email || '',
-          name: (data.user.user_metadata?.name as string) || '',
-          phone: (data.user.user_metadata?.phone as string) || '',
+          name: String(data.user.user_metadata?.name ?? ''),
+          phone: String(data.user.user_metadata?.phone ?? ''),
           created_at: data.user.created_at,
         },
         session: data.session ? {
@@ -253,8 +250,8 @@ export class SignupService {
         user: {
           id: data.user.id,
           email: data.user.email || '',
-          name: (data.user.user_metadata?.name as string) || '',
-          phone: (data.user.user_metadata?.phone as string) || '',
+          name: String(data.user.user_metadata?.name ?? ''),
+          phone: String(data.user.user_metadata?.phone ?? ''),
           created_at: data.user.created_at,
         },
         session: sessionData.session ? {

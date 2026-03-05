@@ -43,7 +43,7 @@ export function renderTable(schema: TableSchema): React.ReactElement {
 
   const { table } = schema;
 
-  // TODO: Table 컴포넌트를 ui-core에 추가하여 Tailwind 직접 사용 제거
+  // [Deferred] Table 컴포넌트를 ui-core에 추가하여 Tailwind 직접 사용 제거
   // 현재는 기본 HTML table 사용 (향후 ui-core/Table 컴포넌트로 교체 예정)
   return (
     <Container maxWidth="full" padding="xs">

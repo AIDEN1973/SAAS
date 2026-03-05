@@ -13,6 +13,14 @@
 // 타입만 export (클라이언트에도 사용 가능, 서버 코드는 포함되지 않음)
 export * from './types';
 
+// [SSOT] 데이터 변환 순수 함수 (DB 의존성 없음, 클라이언트/서버 양쪽 사용 가능)
+export {
+  ACADEMY_STUDENTS_SELECT,
+  extractAcademyData,
+  mapPersonToStudent,
+  intersect,
+} from './student-transforms';
+
 // Industry Adapter export (Label 변환용, 클라이언트에서 사용 가능)
 export * from './adapter';
 

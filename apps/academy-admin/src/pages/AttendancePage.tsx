@@ -49,7 +49,7 @@ import type { AttendanceFilter, AttendanceStatus, AttendanceLog, CreateAttendanc
 import type { Student, StudentClass } from '@services/student-service';
 import { toKST } from '@lib/date-utils';
 import { createClient } from '@lib/supabase-client';
-// import { useUserRole } from '@hooks/use-auth'; // TODO: 권한 체크 구현 시 사용
+// import { useUserRole } from '@hooks/use-auth'; // [Deferred] 권한 체크 구현 시 사용
 import { apiClient, getApiContext } from '@api-sdk/core';
 import { useConfig, useUpdateConfig } from '@hooks/use-config';
 import type { ClassTeacher } from '@services/class-service';
@@ -67,7 +67,7 @@ export function AttendancePage() {
   useEffect(() => {
     setSidebarCollapsed(isTabletMode);
   }, [isTabletMode]);
-  // const { data: userRole } = useUserRole(); // TODO: 권한 체크 구현 시 사용
+  // const { data: userRole } = useUserRole(); // [Deferred] 권한 체크 구현 시 사용
   const terms = useIndustryTerms();
   const context = getApiContext();
   const tenantId = context.tenantId;
@@ -116,7 +116,7 @@ export function AttendancePage() {
   // 역할별 권한 체크 (아키텍처 문서 2.3, 498-507줄)
   // Assistant: 출결 입력만 가능, 수정 권한 없음
   // Teacher: 출결 입력 및 수정 모두 가능
-  // const canModifyAttendance = userRole !== 'assistant'; // TODO: 권한 체크 구현 시 사용
+  // const canModifyAttendance = userRole !== 'assistant'; // [Deferred] 권한 체크 구현 시 사용
 
 
   // 오늘 출결하기 관련 상태
@@ -137,11 +137,11 @@ export function AttendancePage() {
     }
   });
   const [selectedDate, _setSelectedDate] = useState<string>(toKST().format('YYYY-MM-DD'));
-  void _setSelectedDate; // TODO: 날짜 선택 UI 구현 시 사용
+  void _setSelectedDate; // [Deferred] 날짜 선택 UI 구현 시 사용
   const [searchQuery, _setSearchQuery] = useState<string>('');
-  void _setSearchQuery; // TODO: 검색 UI 구현 시 사용
+  void _setSearchQuery; // [Deferred] 검색 UI 구현 시 사용
   const [checkInMethodFilter, _setCheckInMethodFilter] = useState<string>('');
-  void _setCheckInMethodFilter; // TODO: 필터 UI 구현 시 사용
+  void _setCheckInMethodFilter; // [Deferred] 필터 UI 구현 시 사용
   const [studentAttendanceStates, setStudentAttendanceStates] = useState<Record<string, StudentAttendanceState>>({});
   const studentAttendanceStatesRef = useRef<Record<string, StudentAttendanceState>>({});
   // 최신 상태를 ref에 동기화 (useEffect 내에서 클로저 문제 방지)
@@ -183,7 +183,7 @@ export function AttendancePage() {
   // 출결 설정 조회 및 업데이트
   const { data: config } = useConfig();
   const updateConfig = useUpdateConfig();
-  void updateConfig; // TODO: 출결 설정 업데이트 기능 구현 시 사용
+  void updateConfig; // [Deferred] 출결 설정 업데이트 기능 구현 시 사용
 
   // URL 쿼리 파라미터와 연동된 서브 사이드바 상태
   const [searchParams] = useSearchParams();
@@ -207,6 +207,7 @@ export function AttendancePage() {
   const subMenuItemsWithIcons = useMemo(() => {
     const iconMap: Record<AttendanceSubMenuId, React.ReactNode> = {
       today: <CalendarCheck size={16} />,
+      'by-student': <Users size={16} />,
       history: <History size={16} />,
       statistics: <BarChart3 size={16} />,
       settings: <Settings size={16} />,
@@ -223,7 +224,7 @@ export function AttendancePage() {
   }, [terms]);
 
 
-  // TODO: 수업 선택 UI 구현 시 사용
+  // [Deferred] 수업 선택 UI 구현 시 사용
   const _handleClassIdChange = useCallback((classId: string | null) => {
     setSelectedClassId(classId);
     try {
@@ -556,7 +557,7 @@ export function AttendancePage() {
   const isLoading = isLoadingLogs || isLoadingStudents || isLoadingClasses || isLoadingPredictions;
 
   // 전체 에러 상태 (아키텍처 문서 3.3.3: error 상태)
-  // TODO: 에러 UI 표시 구현 시 사용
+  // [Deferred] 에러 UI 표시 구현 시 사용
   const _error = errorLogs || errorStudents || errorClasses;
   void _error;
 
@@ -740,7 +741,7 @@ export function AttendancePage() {
   // handleCreateAttendance 함수 제거됨 (미사용)
 
 
-  // 출결 저장 핸들러 - TODO: 레이어 UI 외부 저장 버튼 구현 시 사용
+  // 출결 저장 핸들러 - [Deferred] 레이어 UI 외부 저장 버튼 구현 시 사용
   const _handleSaveAttendance = useCallback(async () => {
     if (isSaving) return;
 
@@ -826,7 +827,7 @@ export function AttendancePage() {
   }, [studentAttendanceStates, selectedClassId, selectedDate, isSaving, upsertAttendance, showAlert, terms, classes]);
   void _handleSaveAttendance;
 
-  // 일괄 등원/하원 핸들러 - TODO: 레이어 UI 외부 일괄 등원 버튼 구현 시 사용
+  // 일괄 등원/하원 핸들러 - [Deferred] 레이어 UI 외부 일괄 등원 버튼 구현 시 사용
   const _handleBulkCheckIn = useCallback(() => {
     const newStates = { ...studentAttendanceStates };
     const currentTime = toKST().format('HH:mm'); // [시간 기록 중심] 현재 시간 자동 설정
@@ -855,7 +856,7 @@ export function AttendancePage() {
   }, [filteredStudents, studentAttendanceStates]);
   void _handleBulkCheckIn;
 
-  // TODO: 레이어 UI 외부 일괄 하원 버튼 구현 시 사용
+  // [Deferred] 레이어 UI 외부 일괄 하원 버튼 구현 시 사용
   const _handleBulkCheckOut = useCallback(() => {
     const newStates = { ...studentAttendanceStates };
     const currentTime = toKST().format('HH:mm'); // [시간 기록 중심] 현재 시간 자동 설정
@@ -1223,7 +1224,7 @@ export function AttendancePage() {
 
         {/* 메인 콘텐츠 */}
         <div style={{ flex: 1 }}>
-          {/* 오늘 출결 탭 */}
+          {/* 수업별 출결 탭 */}
           {selectedSubMenu === 'today' && (
             <RightLayerMenuLayout
               layerMenu={{
@@ -1511,7 +1512,7 @@ export function AttendancePage() {
                   );
                 };
 
-                // 섹션 헤더 스타일 - TODO: 섹션 헤더 UI 구현 시 사용
+                // 섹션 헤더 스타일 - [Deferred] 섹션 헤더 UI 구현 시 사용
                 const _sectionHeaderStyle: React.CSSProperties = {
                   display: 'flex',
                   alignItems: 'center',
@@ -1596,6 +1597,16 @@ export function AttendancePage() {
               </Container>
             </RightLayerMenuLayout>
           )}
+
+        {/* 학생별 출결 탭 */}
+        {selectedSubMenu === 'by-student' && (
+          <Container>
+            <EmptyState
+              message={`${terms.PERSON_LABEL_PRIMARY}별 ${terms.ATTENDANCE_LABEL}`}
+              description="준비 중인 기능입니다."
+            />
+          </Container>
+        )}
 
         {/* 출결기록 탭 */}
         {selectedSubMenu === 'history' && (() => {

@@ -334,14 +334,14 @@ export function StudentsPage() {
 
     // 시작일 필터
     if (consultationFilters.date_from) {
-      const fromDate = new Date(consultationFilters.date_from);
-      result = result.filter((c) => new Date(c.consultation_date) >= fromDate);
+      const fromDate = toKST(consultationFilters.date_from).toDate();
+      result = result.filter((c) => toKST(c.consultation_date).toDate() >= fromDate);
     }
 
     // 종료일 필터
     if (consultationFilters.date_to) {
-      const toDate = new Date(consultationFilters.date_to);
-      result = result.filter((c) => new Date(c.consultation_date) <= toDate);
+      const toDate = toKST(consultationFilters.date_to).toDate();
+      result = result.filter((c) => toKST(c.consultation_date).toDate() <= toDate);
     }
 
     return result;
@@ -351,62 +351,61 @@ export function StudentsPage() {
   const filteredStudentsByPeriod = useMemo(() => {
     if (selectedSubMenu !== 'list' || !students || students.length === 0) return students;
 
-    const now = new Date();
+    const now = toKST();
     let startDate: Date;
     let endDate: Date | null = null;
 
     switch (statsPeriod) {
       case 'today': {
         // 오늘: 오늘 00:00:00부터
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        startDate = now.startOf('day').toDate();
         break;
       }
       case 'yesterday': {
         // 어제: 어제 00:00:00부터 어제 23:59:59까지
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
-        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
+        startDate = now.subtract(1, 'day').startOf('day').toDate();
+        endDate = now.subtract(1, 'day').endOf('day').toDate();
         break;
       }
       case 'thisWeek': {
         // 이번주: 이번주 월요일 00:00:00부터
-        const dayOfWeek = now.getDay(); // 0(일) ~ 6(토)
+        const dayOfWeek = now.day(); // 0(일) ~ 6(토)
         const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // 일요일이면 6일 전, 그 외는 (요일-1)일 전
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToMonday, 0, 0, 0);
+        startDate = now.subtract(daysToMonday, 'day').startOf('day').toDate();
         break;
       }
       case 'lastWeek': {
         // 지난주: 지난주 월요일 00:00:00부터 일요일 23:59:59까지
-        const dayOfWeek = now.getDay();
+        const dayOfWeek = now.day();
         const daysToLastMonday = dayOfWeek === 0 ? 13 : dayOfWeek + 6;
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToLastMonday, 0, 0, 0);
-        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek === 0 ? 7 : dayOfWeek), 23, 59, 59);
+        startDate = now.subtract(daysToLastMonday, 'day').startOf('day').toDate();
+        endDate = now.subtract(dayOfWeek === 0 ? 7 : dayOfWeek, 'day').endOf('day').toDate();
         break;
       }
       case 'lastMonth': {
         // 지난달: 지난달 1일 00:00:00부터 지난달 마지막날 23:59:59까지
-        const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        startDate = new Date(lastMonthDate.getFullYear(), lastMonthDate.getMonth(), 1, 0, 0, 0);
-        endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59); // 이번달 0일 = 지난달 마지막날
+        startDate = now.subtract(1, 'month').startOf('month').toDate();
+        endDate = now.startOf('month').subtract(1, 'day').endOf('day').toDate();
         break;
       }
       case '1month': {
         // 최근 1개월
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        startDate = now.subtract(1, 'month').toDate();
         break;
       }
       case '3months': {
         // 최근 3개월
-        startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+        startDate = now.subtract(3, 'month').toDate();
         break;
       }
       case '6months': {
         // 최근 6개월
-        startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+        startDate = now.subtract(6, 'month').toDate();
         break;
       }
       case '1year': {
         // 최근 1년
-        startDate = new Date(now.getFullYear(), now.getMonth() - 12, now.getDate());
+        startDate = now.subtract(12, 'month').toDate();
         break;
       }
       default:
@@ -416,7 +415,7 @@ export function StudentsPage() {
     return students.filter(s => {
       const student = s as { created_at?: string };
       if (!student.created_at) return true; // created_at이 없으면 포함
-      const createdDate = new Date(student.created_at);
+      const createdDate = toKST(student.created_at).toDate();
       const afterStart = createdDate >= startDate;
       const beforeEnd = endDate ? createdDate <= endDate : true;
       return afterStart && beforeEnd;
@@ -467,15 +466,15 @@ export function StudentsPage() {
       };
     }
 
-    // 지난달 말일 계산
-    const now = new Date();
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0); // 이번 달 0일 = 지난달 마지막 날
+    // 지난달 말일 계산 (KST 기준)
+    const now = toKST();
+    const lastMonthEnd = now.startOf('month').subtract(1, 'day').endOf('day').toDate();
 
     // 지난달까지 생성된 학생들
     const lastMonthStudents = students.filter(s => {
       const student = s as { created_at?: string };
       if (!student.created_at) return false;
-      return new Date(student.created_at) <= lastMonthEnd;
+      return toKST(student.created_at).toDate() <= lastMonthEnd;
     });
 
     const total = lastMonthStudents.length;
@@ -653,58 +652,57 @@ export function StudentsPage() {
       return [];
     }
 
-    const now = new Date();
+    const now = toKST();
     let startDate: Date;
-    let endDate: Date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    let endDate: Date = now.endOf('day').toDate();
 
     // 기간에 따른 시작 날짜 계산 (filteredStudentsByPeriod와 동일한 로직)
     switch (statsPeriod) {
       case 'today': {
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        startDate = now.startOf('day').toDate();
         break;
       }
       case 'yesterday': {
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
-        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
+        startDate = now.subtract(1, 'day').startOf('day').toDate();
+        endDate = now.subtract(1, 'day').endOf('day').toDate();
         break;
       }
       case 'thisWeek': {
-        const dayOfWeek = now.getDay();
+        const dayOfWeek = now.day();
         const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToMonday, 0, 0, 0);
+        startDate = now.subtract(daysToMonday, 'day').startOf('day').toDate();
         break;
       }
       case 'lastWeek': {
-        const dayOfWeek = now.getDay();
+        const dayOfWeek = now.day();
         const daysToLastMonday = dayOfWeek === 0 ? 13 : dayOfWeek + 6;
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToLastMonday, 0, 0, 0);
-        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek === 0 ? 7 : dayOfWeek), 23, 59, 59);
+        startDate = now.subtract(daysToLastMonday, 'day').startOf('day').toDate();
+        endDate = now.subtract(dayOfWeek === 0 ? 7 : dayOfWeek, 'day').endOf('day').toDate();
         break;
       }
       case 'lastMonth': {
-        const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        startDate = new Date(lastMonthDate.getFullYear(), lastMonthDate.getMonth(), 1, 0, 0, 0);
-        endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+        startDate = now.subtract(1, 'month').startOf('month').toDate();
+        endDate = now.startOf('month').subtract(1, 'day').endOf('day').toDate();
         break;
       }
       case '1month': {
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        startDate = now.subtract(1, 'month').toDate();
         break;
       }
       case '3months': {
-        startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+        startDate = now.subtract(3, 'month').toDate();
         break;
       }
       case '6months': {
-        startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+        startDate = now.subtract(6, 'month').toDate();
         break;
       }
       case '1year': {
-        startDate = new Date(now.getFullYear(), now.getMonth() - 12, now.getDate());
+        startDate = now.subtract(12, 'month').toDate();
         break;
       }
       default:
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        startDate = now.subtract(1, 'month').toDate();
     }
 
     // 선택된 카드에 따라 학생 상태 필터링 함수
@@ -724,20 +722,19 @@ export function StudentsPage() {
     students.forEach(s => {
       const student = s as { created_at?: string; status?: StudentStatus };
       if (student.created_at && statusFilter(student.status as StudentStatus)) {
-        const date = new Date(student.created_at);
-        const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        const dateKey = toKST(student.created_at).format('YYYY-MM-DD');
         dateMap.set(dateKey, (dateMap.get(dateKey) || 0) + 1);
       }
     });
 
     // 기간 내 모든 날짜 생성
     const allDates: string[] = [];
-    const currentDate = new Date(startDate);
+    let currentDate = toKST(startDate);
+    const endDateKST = toKST(endDate);
 
-    while (currentDate <= endDate) {
-      const dateKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
-      allDates.push(dateKey);
-      currentDate.setDate(currentDate.getDate() + 1);
+    while (currentDate.isBefore(endDateKST) || currentDate.isSame(endDateKST, 'day')) {
+      allDates.push(currentDate.format('YYYY-MM-DD'));
+      currentDate = currentDate.add(1, 'day');
     }
 
     // 누적 합계 계산 (startDate 이전의 학생 수부터 시작, 상태 필터 적용)
@@ -747,8 +744,7 @@ export function StudentsPage() {
     students.forEach(s => {
       const student = s as { created_at?: string; status?: StudentStatus };
       if (student.created_at && statusFilter(student.status as StudentStatus)) {
-        const date = new Date(student.created_at);
-        if (date < startDate) {
+        if (toKST(student.created_at).toDate() < startDate) {
           cumulative++;
         }
       }
@@ -1209,7 +1205,7 @@ export function StudentsPage() {
                 const link = document.createElement('a');
                 const url = URL.createObjectURL(blob);
                 link.setAttribute('href', url);
-                link.setAttribute('download', `상담목록_${toKST(new Date()).format('YYYY-MM-DD')}.csv`);
+                link.setAttribute('download', `상담목록_${toKST().format('YYYY-MM-DD')}.csv`);
                 link.style.visibility = 'hidden';
                 document.body.appendChild(link);
                 link.click();

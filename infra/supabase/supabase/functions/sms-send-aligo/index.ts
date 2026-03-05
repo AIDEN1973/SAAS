@@ -436,7 +436,7 @@ serve(async (req: Request) => {
         break;
       default:
         return new Response(
-          JSON.stringify({ error: `지원하지 않는 action입니다: ${(body as any).action}` }),
+          JSON.stringify({ error: `지원하지 않는 action입니다: ${(body as { action: string }).action}` }),
           {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -417,7 +417,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
       // [P2-8 수정] Fail Closed: 정식 데이터 소스 없으면 카드 생성하지 않음
       // 출결 오류 Emergency는 정식 데이터 소스(오류 전용 필드/테이블)가 없어 임시 구현 상태
       // notes 키워드 기반 필터링은 오탐 가능성이 높으므로, 정식 데이터 소스 준비 전까지 카드 생성 금지
-      // TODO[DATA]: 출결 오류 전용 필드/테이블이 추가되면 아래 로직 활성화
+      // [Deferred][DATA]: 출결 오류 전용 필드/테이블이 추가되면 아래 로직 활성화
       // [SSOT] POLICY_REGISTRY 직접 사용 (EMERGENCY_CARDS_POLICY_PATHS 대신)
       // const attendanceErrorEnabled = getPolicyValueFromConfig(config, POLICY_REGISTRY.ATTENDANCE_ERROR_ENABLED.path);
       // if (attendanceErrorEnabled === true) { ... }
@@ -471,7 +471,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
       }
 
       // 5. 시스템 오류 체크 (추가)
-      // TODO[DATA]: 시스템 오류 로그 테이블이 생성되면 실제 조회로 변경
+      // [Deferred][DATA]: 시스템 오류 로그 테이블이 생성되면 실제 조회로 변경
 
       return cards;
     },
@@ -516,7 +516,7 @@ function HomePageInner({ tenantId }: { tenantId: string }) {
     // - 따라서 priority >= aiRiskScoreThresholdValue 비교는 위험 점수 임계값 비교와 동일합니다
     // - 주의: 이는 task_type='risk'인 경우에만 유효하며, 다른 task_type과는 스케일(0~100) 규칙이 다를 수 있습니다
     // - 아키텍처 문서 3.1.2: TaskCard의 priority는 0-100 스케일로 정의되어 있으나, task_type='risk'에서만 특수 해석 적용
-    // - TODO[ARCH]: task_type별 priority 스케일 규칙을 SSOT(아키텍처 문서 또는 Policy Registry)에 명시하여 확장 시 일관성 보장
+    // - [Deferred][ARCH]: task_type별 priority 스케일 규칙을 SSOT(아키텍처 문서 또는 Policy Registry)에 명시하여 확장 시 일관성 보장
     //   * 옵션 1: 아키텍처 문서에 task_type별 priority 해석 규칙 명시
     //   * 옵션 2: task_type별 전용 필드(risk_score, urgency_level 등) 사용하여 priority와 분리
     const highRiskCard = normalizedTaskCards.find((card) => {

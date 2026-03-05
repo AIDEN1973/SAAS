@@ -227,8 +227,7 @@ export const TimelineModal: React.FC<TimelineModalProps> = ({
   isOpen,
   onClose,
   executionAuditRuns = [],
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  executionAuditLoading = false,
+  executionAuditLoading: _executionAuditLoading = false,
   onExecutionAuditRowClick,
   onExecutionAuditFilterChange,
   executionAuditInitialFilters,

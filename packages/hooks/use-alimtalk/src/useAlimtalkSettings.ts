@@ -465,11 +465,11 @@ export function useAlimtalkSettings(): UseAlimtalkSettingsReturn {
     status,
     profiles,
     templates,
-    history: [], // TODO: Implement with React Query
-    historyDetail: [], // TODO: Implement with React Query
+    history: [], // [Phase 4 잔여] Implement with React Query
+    historyDetail: [], // [Phase 4 잔여] Implement with React Query
     remainPoints,
-    categories: [], // TODO: Implement with React Query
-    pagination: { currentPage: 1, totalPage: 1 }, // TODO: Implement with React Query
+    categories: [], // [Phase 4 잔여] Implement with React Query
+    pagination: { currentPage: 1, totalPage: 1 }, // [Phase 4 잔여] Implement with React Query
 
     // 액션
     fetchStatus,

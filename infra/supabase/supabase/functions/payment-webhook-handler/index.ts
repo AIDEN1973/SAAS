@@ -19,6 +19,9 @@ import { envServer } from '../_shared/env-registry.ts';
 import { checkAndUpdateAutomationSafety } from '../_shared/automation-safety.ts';
 import { toKST, toKSTDate } from '../_shared/date-utils.ts';
 import { createExecutionAuditRecord } from '../_shared/execution-audit-utils.ts';
+import { withRetry } from '../_shared/retry-utils.ts';
+import { enqueueDLQ } from '../_shared/dlq-utils.ts';
+import { sendImmediateAlert } from '../_shared/alerting.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,16 +37,89 @@ serve(async (req) => {
     });
   }
 
+  let processedEventId: string | null = null;
   try {
+    // ── 웹훅 서명 검증 (Phase 0-1) ──
+    const rawBody = await req.text();
+    const webhookSecret = envServer.PAYMENT_WEBHOOK_SECRET;
+    if (webhookSecret) {
+      const signature = req.headers.get('x-webhook-signature') || req.headers.get('toss-signature');
+      if (!signature) {
+        console.error('[Payment Webhook] Missing webhook signature header');
+        return new Response(
+          JSON.stringify({ success: false, message: 'Missing webhook signature' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // HMAC-SHA256 검증
+      const encoder = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(webhookSecret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+      const signatureBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody));
+      const expectedSignature = Array.from(new Uint8Array(signatureBuffer))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      if (signature !== expectedSignature) {
+        console.error('[Payment Webhook] Invalid webhook signature');
+        return new Response(
+          JSON.stringify({ success: false, message: 'Invalid webhook signature' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // ── 멱등성 체크: 동일 이벤트 중복 처리 방지 ──
+    const body = JSON.parse(rawBody);
+    const eventId = body.event_id || body.idempotency_key || `${body.payment_id || body.id}:${body.event_type || body.type}`;
+    processedEventId = eventId;
+
     // [불변 규칙] Role 분리: 상용화 단계에서 Role 분리 구현
     // payment-webhook-handler는 PAYMENT_WEBHOOK_ROLE_KEY 사용, 없으면 SERVICE_ROLE_KEY fallback
     const roleKey = envServer.PAYMENT_WEBHOOK_ROLE_KEY || envServer.SERVICE_ROLE_KEY;
     const supabase = createClient(envServer.SUPABASE_URL, roleKey);
-    const body = await req.json();
+
+    // 멱등성: 이미 처리된 이벤트인지 확인
+    const { data: existingEvent } = await supabase
+      .from('webhook_events')
+      .select('id, status')
+      .eq('event_id', eventId)
+      .maybeSingle();
+
+    if (existingEvent) {
+      return new Response(
+        JSON.stringify({ success: true, message: 'Event already processed', event_id: eventId }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 이벤트 수신 기록
+    await supabase.from('webhook_events').insert({
+      event_id: eventId,
+      event_type: body.event_type || body.type,
+      payload: body,
+      status: 'processing',
+      received_at: new Date().toISOString(),
+    });
+
+    // webhook_events 상태 업데이트 헬퍼
+    const updateWebhookStatus = async (status: string) => {
+      await supabase
+        .from('webhook_events')
+        .update({ status, processed_at: new Date().toISOString() })
+        .eq('event_id', eventId);
+    };
 
     // Webhook 이벤트 타입 확인
     const eventType = body.event_type || body.type;
     if (eventType !== 'payment.failed' && eventType !== 'recurring_payment_failed') {
+      await updateWebhookStatus('skipped');
       return new Response(
         JSON.stringify({ success: false, message: 'Unsupported event type' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -55,6 +131,7 @@ serve(async (req) => {
     const invoiceId = body.invoice_id;
 
     if (!paymentId || !tenantId || !invoiceId) {
+      await updateWebhookStatus('failed');
       return new Response(
         JSON.stringify({ success: false, message: 'Missing required fields' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -71,6 +148,7 @@ serve(async (req) => {
       `auto_notification.${automationEventType}.enabled`
     );
     if (!enabled || enabled !== true) {
+      await updateWebhookStatus('skipped');
       return new Response(
         JSON.stringify({ success: true, message: 'Automation disabled' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -84,6 +162,7 @@ serve(async (req) => {
     ) as string;
 
     if (!channel) {
+      await updateWebhookStatus('failed');
       return new Response(
         JSON.stringify({ success: false, message: 'Channel policy not found' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -100,6 +179,7 @@ serve(async (req) => {
       `auto_notification.${automationEventType}.throttle.daily_limit`
     );
     if (!safetyCheck.canExecute) {
+      await updateWebhookStatus('skipped');
       return new Response(
         JSON.stringify({ success: true, message: `Skipping due to safety check: ${safetyCheck.reason}` }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -117,6 +197,7 @@ serve(async (req) => {
     );
 
     if (!invoice) {
+      await updateWebhookStatus('failed');
       return new Response(
         JSON.stringify({ success: false, message: 'Invoice not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -134,6 +215,7 @@ serve(async (req) => {
     );
 
     if (!guardian) {
+      await updateWebhookStatus('failed');
       return new Response(
         JSON.stringify({ success: false, message: 'Guardian not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -144,20 +226,58 @@ serve(async (req) => {
     const startTime = Date.now();
     const today = toKSTDate(kstTime);
     const dedupKey = `${tenantId}:${automationEventType}:invoice:${invoiceId}:guardian:${guardian.id}:${today}`;
-    await supabase.from('automation_actions').insert({
-      tenant_id: tenantId,
-      action_type: 'send_notification',
-      executor_role: 'system',
-      dedup_key: dedupKey,
-      execution_context: {
-        event_type: automationEventType,
-        invoice_id: invoiceId,
-        payment_id: paymentId,
-        recipient_id: guardian.id,
-        channel,
-        failure_reason: body.failure_reason || 'Unknown',
-      },
-    });
+    try {
+      await withRetry(
+        () => supabase.from('automation_actions').insert({
+          tenant_id: tenantId,
+          action_type: 'send_notification',
+          executor_role: 'system',
+          dedup_key: dedupKey,
+          execution_context: {
+            event_type: automationEventType,
+            invoice_id: invoiceId,
+            payment_id: paymentId,
+            recipient_id: guardian.id,
+            channel,
+            failure_reason: body.failure_reason || 'Unknown',
+          },
+        }),
+        { maxRetries: 3, baseDelay: 1000 }
+      );
+    } catch (insertError) {
+      console.error('[Payment Webhook] automation_actions insert failed after retries:', insertError);
+
+      await enqueueDLQ(supabase, {
+        tenant_id: tenantId,
+        function_name: 'payment-webhook-handler',
+        payload: {
+          eventId,
+          eventType,
+          invoiceId,
+          paymentId,
+          guardianId: guardian.id,
+          channel,
+          dedupKey,
+        },
+        error_message: insertError instanceof Error ? insertError.message : String(insertError),
+      });
+
+      await sendImmediateAlert(supabase, {
+        functionName: 'payment-webhook-handler',
+        errorType: 'automation_action_insert_failed',
+        severity: 'critical',
+        message: `[결제 웹훅] automation_actions insert 실패 (invoice: ${invoiceId}, payment: ${paymentId})`,
+        context: {
+          invoiceId,
+          paymentId,
+          guardianId: guardian.id,
+          error: insertError instanceof Error ? insertError.message : String(insertError),
+        },
+        tenantId,
+      });
+
+      throw insertError;
+    }
 
     // Execution Audit 기록 생성 (액티비티.md 3.4, 12 참조)
     // 웹훅 수신 처리: source='webhook' (액티비티.md 6.1 참조)
@@ -182,12 +302,66 @@ serve(async (req) => {
       duration_ms: durationMs,
     });
 
+    // 멱등성: 처리 완료 기록
+    await supabase
+      .from('webhook_events')
+      .update({ status: 'completed', processed_at: new Date().toISOString() })
+      .eq('event_id', eventId);
+
     return new Response(
       JSON.stringify({ success: true, message: 'Notification queued' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     console.error('[Payment Webhook] Fatal error:', error);
+
+    // DLQ 및 즉시 알림 (best-effort)
+    try {
+      const supabaseForDLQ = createClient(
+        envServer.SUPABASE_URL,
+        envServer.PAYMENT_WEBHOOK_ROLE_KEY || envServer.SERVICE_ROLE_KEY
+      );
+
+      await enqueueDLQ(supabaseForDLQ, {
+        tenant_id: null,
+        function_name: 'payment-webhook-handler',
+        payload: {
+          eventId: processedEventId,
+          eventType: 'payment.failed',
+          rawPayload: 'redacted',
+          failReason: error instanceof Error ? error.message : String(error),
+        },
+        error_message: error instanceof Error ? error.message : String(error),
+      });
+
+      await sendImmediateAlert(supabaseForDLQ, {
+        functionName: 'payment-webhook-handler',
+        errorType: 'webhook_processing_failed',
+        severity: 'critical',
+        message: `[결제 웹훅] Fatal error - 웹훅 처리 실패 (event: ${processedEventId || 'unknown'})`,
+        context: {
+          eventId: processedEventId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    } catch (dlqError) {
+      console.error('[Payment Webhook] Failed to enqueue DLQ/alert on fatal error:', dlqError);
+    }
+
+    // webhook_events 상태 업데이트 (best-effort)
+    if (processedEventId) {
+      try {
+        const roleKey = envServer.PAYMENT_WEBHOOK_ROLE_KEY || envServer.SERVICE_ROLE_KEY;
+        const supabaseForCleanup = createClient(envServer.SUPABASE_URL, roleKey);
+        await supabaseForCleanup
+          .from('webhook_events')
+          .update({ status: 'failed', processed_at: new Date().toISOString() })
+          .eq('event_id', processedEventId);
+      } catch (cleanupError) {
+        console.error('[Payment Webhook] Failed to update webhook_events on error:', cleanupError);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: false,

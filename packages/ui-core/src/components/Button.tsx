@@ -251,7 +251,6 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
   };
 
   // style prop을 제거하여 중복 전달 방지
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { style: _unusedStyle, ...restProps } = props;
 
   return (

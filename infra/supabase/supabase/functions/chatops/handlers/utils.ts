@@ -11,7 +11,7 @@ import { maskPII } from '../../_shared/pii-utils.ts';
  * [P0-LOG-A] Error/object를 string으로 변환 후 마스킹
  */
 export function maskErr(e: unknown): string {
-  const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as any).message) : String(e);
+  const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message) : String(e);
   return maskPII(msg) as string;
 }
 

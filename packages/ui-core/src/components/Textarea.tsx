@@ -64,11 +64,9 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
 
   // 개발 환경 IME 로깅 함수 (DRY 원칙, 성능 최적화)
   const logIMEEvent = React.useCallback((eventType: string, data?: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-    if ((import.meta as any).env?.DEV) {
+    if (import.meta.env?.DEV) {
       console.log(`[IME][Textarea] ${eventType}`, {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-        name: (props as any)?.name,
+        name: props.name,
         value,
         data,
       });
@@ -175,33 +173,26 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
         onCompositionStart={(e) => {
           isComposingRef.current = true;
           logIMEEvent('compositionstart', (e as unknown as CompositionEvent).data);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-          (props as any).onCompositionStart?.(e);
+          props.onCompositionStart?.(e);
         }}
         onCompositionEnd={(e) => {
           isComposingRef.current = false;
           logIMEEvent('compositionend', (e as unknown as CompositionEvent).data);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-          (props as any).onCompositionEnd?.(e);
+          props.onCompositionEnd?.(e);
         }}
         onChange={(e) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-          if ((import.meta as any).env?.DEV) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-            const nativeIsComposing = (e.nativeEvent as any)?.isComposing;
+          if (import.meta.env?.DEV) {
+            const nativeIsComposing = (e.nativeEvent as InputEvent)?.isComposing;
             console.log('[IME][Textarea] change', {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-              name: (props as any)?.name,
+              name: props.name,
               isComposingRef: isComposingRef.current,
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               nativeIsComposing,
               newValue: e.target.value,
               prevValue: value,
             });
           }
           onChange?.(e);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-          (props as any).onChange?.(e);
+          (props as React.TextareaHTMLAttributes<HTMLTextAreaElement>).onChange?.(e);
         }}
           onFocus={handleFocus}
           onBlur={handleBlur}

@@ -69,7 +69,7 @@ export async function fetchBillingHistory(
   tenantId: string,
   filter?: BillingHistoryFilter
 ): Promise<BillingHistoryItem[]> {
-  // TODO: 실제 API 엔드포인트로 교체 필요
+  // [Phase 4 잔여] 실제 API 엔드포인트로 교체 필요
   // 현재는 invoices 테이블에서 조회한다고 가정
   // RLS 정책에 의해 현재 사용자의 자녀에 대한 청구서만 조회됨
   const filters: Record<string, unknown> = {};
@@ -124,7 +124,7 @@ export function useInvoice(invoiceId?: string) {
     queryFn: async (): Promise<Invoice[]> => {
       if (!invoiceId) return [];
 
-      // TODO: 실제 API 엔드포인트로 교체 필요
+      // [Phase 4 잔여] 실제 API 엔드포인트로 교체 필요
       const response = await apiClient.get<Invoice>(`invoices/${invoiceId}`);
 
       if (response.error) {
@@ -148,7 +148,7 @@ export function useProcessPayment() {
   return useMutation({
     mutationFn: async (input: PaymentInput): Promise<PaymentResult> => {
       const startTime = Date.now();
-      // TODO: 실제 API 엔드포인트로 교체 필요
+      // [Phase 4 잔여] 실제 API 엔드포인트로 교체 필요
       // Edge Function: fns-payment-process 호출
       const response = await apiClient.post<PaymentResult>(
         'functions/v1/fns-payment-process',

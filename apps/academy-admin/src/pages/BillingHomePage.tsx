@@ -78,7 +78,7 @@ export function BillingHomePage() {
       }
 
 
-      // P3 TODO: 결제수단 미등록 체크 (payment_methods 테이블 구현 후 활성화)
+      // P3 [Deferred]: 결제수단 미등록 체크 (payment_methods 테이블 구현 후 활성화)
       // 장기 계획: 자동 청구를 위한 결제수단 등록 체크 기능
       // 우선순위: 낮음 (현재는 수동 결제만 지원)
 

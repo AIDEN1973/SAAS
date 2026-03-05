@@ -17,10 +17,11 @@ import {
   FieldErrors,
   UseFormSetValue,
 } from 'react-hook-form';
+import type { RegisterOptions } from 'react-hook-form';
 import { getConditionalActions } from '../core/conditionEvaluator';
 import { buildValidationRules } from '../core/validation';
 import { formatKoreanPhoneNumber } from '../core/formatKoreanPhoneNumber';
-import type { FormFieldSchema, ConditionRule, MultiConditionRule } from '../types';
+import type { FormFieldSchema } from '../types';
 import { loadWidget } from '../widgets/registry';
 import {
   Input,
@@ -40,6 +41,24 @@ import {
 } from '@ui-core/react';
 // ⚠️ 참고: Input 컴포넌트는 TextInput의 역할을 수행합니다.
 // 기술문서에서는 TextInput으로 명시되어 있으나, 실제 구현은 Input 컴포넌트를 사용합니다.
+
+/**
+ * Controller의 rules prop에 호환되는 타입
+ * Controller.rules = Omit<RegisterOptions, 'valueAsNumber' | 'valueAsDate' | 'setValueAs' | 'disabled'>
+ */
+type ControllerRules = Omit<RegisterOptions<Record<string, unknown>, string>, 'valueAsNumber' | 'valueAsDate' | 'setValueAs' | 'disabled'>;
+
+/**
+ * FormFieldSchema.ui에 rows 속성을 포함하는 확장 타입
+ * textarea kind에서 행 수 설정을 위해 사용
+ */
+type TextareaUIConfig = FormFieldSchema['ui'] & { rows?: number };
+
+/**
+ * FormFieldSchema.options의 개별 항목 타입 (disabled/divider 포함)
+ * schema types에 이미 disabled/divider가 정의되어 있으므로, 직접 참조
+ */
+type SchemaOptionItem = NonNullable<FormFieldSchema['options']>[number];
 
 /**
  * 캐릭터 목록 - Supabase Storage
@@ -346,7 +365,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
   const placeholder = ui?.placeholderKey
     ? (translations[ui.placeholderKey] || ui.placeholder || ui.placeholderKey)
     : ui?.placeholder;
-  // const description = ui?.descriptionKey ? (translations[ui.descriptionKey] || ui.descriptionKey) : ui?.description; // TODO: 향후 사용 예정
+  // const description = ui?.descriptionKey ? (translations[ui.descriptionKey] || ui.descriptionKey) : ui?.description; // [Deferred] 향후 사용 예정
 
   // 1) 조건부 필드 감시
   // 단일 조건 또는 복수 조건에서 참조하는 모든 필드를 감시
@@ -477,7 +496,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
   // ⚠️ 중요: 동적 required는 정적 required보다 우선합니다.
   // BaseRules에 이미 required 옵션이 있어도, Condition Rule에 의한 동적 required가 덮어씁니다.
   const baseRules = buildValidationRules(field);
-  const finalRules = isRequired
+  const finalRules: ControllerRules = isRequired
     ? { ...baseRules, required: '필수 입력 항목입니다.' }
     : baseRules;
 
@@ -501,7 +520,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules as any}
+          rules={finalRules}
           render={({ field: f }) => (
             <AddressInput
               value={(f.value ?? '') as string}
@@ -531,7 +550,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules as any}
+          rules={finalRules}
           render={({ field: f }) => (
             <Input
               type={inputType}
@@ -545,8 +564,8 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               value={(f.value ?? '') as string}
               autoComplete={kind === 'password' ? 'new-password' : undefined}
               onChange={(e) => {
-                if ((import.meta as any).env?.DEV) {
-                  const nativeIsComposing = (e.nativeEvent as any)?.isComposing;
+                if (import.meta.env?.DEV) {
+                  const nativeIsComposing = (e.nativeEvent as InputEvent)?.isComposing;
                   console.log('[IME][SchemaField->Input] change', {
                     field: name,
                     kind,
@@ -582,7 +601,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules as any}
+          rules={finalRules}
           render={({ field: f }) => (
             <NumberInput
               label={placeholder ? undefined : label}
@@ -612,7 +631,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules as any}
+          rules={finalRules}
           render={({ field: f }) => (
             <TimeInput
               label={placeholder ? undefined : label}
@@ -641,7 +660,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules as any}
+          rules={finalRules}
           render={({ field: f }) => (
             <Textarea
               label={placeholder ? undefined : label}
@@ -649,11 +668,11 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
               error={error}
               disabled={isDisabled}
               fullWidth
-              rows={(ui as any)?.rows} // ui.rows 속성 지원 (textarea 행 수 설정)
+              rows={(ui as TextareaUIConfig)?.rows} // ui.rows 속성 지원 (textarea 행 수 설정)
               value={(f.value ?? '') as string}
               onChange={(e) => {
-                if ((import.meta as any).env?.DEV) {
-                  const nativeIsComposing = (e.nativeEvent as any)?.isComposing;
+                if (import.meta.env?.DEV) {
+                  const nativeIsComposing = (e.nativeEvent as InputEvent)?.isComposing;
                   console.log('[IME][SchemaField->Textarea] change', {
                     field: name,
                     kind,
@@ -685,8 +704,8 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
       return {
         value: opt.value,
         label: translatedLabel,  // 항상 string으로 보장
-        disabled: (opt as any).disabled,  // divider/disabled는 schema types에 정의됨
-        divider: (opt as any).divider,    // divider 속성 전달
+        disabled: (opt as SchemaOptionItem).disabled,  // divider/disabled는 schema types에 정의됨
+        divider: (opt as SchemaOptionItem).divider,    // divider 속성 전달
       };
     });
 
@@ -695,7 +714,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules as any}
+          rules={finalRules}
           render={({ field: f }) => (
             <Select
               label={placeholder || label}
@@ -729,7 +748,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
           <Controller
             name={name}
             control={control}
-            rules={finalRules as any}
+            rules={finalRules}
             render={({ field: f }) => (
               <div>
                 {effectiveOptions?.map((opt) => {
@@ -769,7 +788,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules as any}
+          rules={finalRules}
           render={({ field: f }) => (
             <Checkbox
               label={label}
@@ -791,7 +810,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules as any}
+          rules={finalRules}
           render={({ field: f }) => (
             <DateInput
               label={label}
@@ -817,7 +836,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules as any}
+          rules={finalRules}
           render={({ field: f }) => (
             <DatePicker
               label={label}
@@ -859,7 +878,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules as any}
+          rules={finalRules}
           render={({ field: f }) => {
             const currentValue = (f.value as { start?: string; end?: string }) || {};
 
@@ -986,7 +1005,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         <Controller
           name={name}
           control={control}
-          rules={finalRules as any}
+          rules={finalRules}
           render={({ field: f }) => {
             // 초기값이 URL인 경우 preview 초기값으로 설정 (http 또는 / 로 시작하는 경로)
             const isUrlValue = (val: unknown): val is string =>
@@ -1190,7 +1209,7 @@ const SchemaFieldComponent: React.FC<SchemaFieldProps> = ({
         control={control}
         errors={errors}
         isDisabled={isDisabled}
-        finalRules={finalRules as ConditionRule | MultiConditionRule | undefined}
+        finalRules={finalRules}
         translations={translations}
       />
     );
@@ -1211,7 +1230,7 @@ const CustomWidgetField: React.FC<{
   control: Control<Record<string, unknown>>;
   errors: FieldErrors<Record<string, unknown>>;
   isDisabled: boolean;
-  finalRules: ConditionRule | MultiConditionRule | undefined;
+  finalRules: ControllerRules;
   translations?: Record<string, string>;
 }> = ({ componentType, field, colSpan, control, errors, isDisabled, finalRules, translations: _translations = {} }) => {
   const [CustomComponent, setCustomComponent] = React.useState<React.ComponentType<Record<string, unknown>> | null>(null);
@@ -1324,7 +1343,7 @@ const CustomWidgetField: React.FC<{
       <Controller
         name={field.name}
         control={control}
-        rules={finalRules as any}
+        rules={finalRules}
         render={({ field: f }) => (
           <CustomComponent
             {...widgetProps}

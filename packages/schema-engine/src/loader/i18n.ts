@@ -124,7 +124,7 @@ export async function bindI18n(
     return bindFormSchemaI18n(schema as FormSchema, allTranslations, industryAdapter);
   }
 
-  // TODO: table, detail, filter, widget 스키마도 처리
+  // [Deferred] table, detail, filter, widget 스키마도 처리
 
   return schema;
 }

@@ -26,8 +26,8 @@ test.describe('결제 관리 플로우', () => {
     }
   });
 
-  test.skip('청구서 목록을 조회할 수 있어야 함', async ({ page }) => {
-    // TODO: /billing 페이지 구현 후 활성화
+  test('청구서 목록을 조회할 수 있어야 함', async ({ page }) => {
+
     await page.goto('/billing');
 
     // 페이지 제목 확인

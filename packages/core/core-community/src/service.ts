@@ -93,7 +93,7 @@ export class CommunityService {
         content: input.content,
         post_type: input.post_type,
         is_pinned: input.is_pinned ?? false,
-        created_by: null, // TODO: auth.uid()에서 가져오기
+        created_by: null, // [Deferred] auth.uid()에서 가져오기
       })
       .select()
       .single();
@@ -182,7 +182,7 @@ export class CommunityService {
         tenant_id: tenantId,
         post_id: input.post_id,
         content: input.content,
-        created_by: null, // TODO: auth.uid()에서 가져오기
+        created_by: null, // [Deferred] auth.uid()에서 가져오기
       })
       .select()
       .single();

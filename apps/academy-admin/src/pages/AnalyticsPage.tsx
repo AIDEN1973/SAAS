@@ -188,7 +188,7 @@ export function AnalyticsPage() {
       const arpu = studentCount > 0 ? Math.round(revenue / studentCount) : 0;
 
       // Phase 2: 평균 정원율 (그룹 정보 필요 - 현재는 간단히 계산)
-      // TODO: 실제로는 classes 테이블에서 capacity와 현재 인원 조회 필요
+      // [Phase 4 잔여] 실제로는 classes 테이블에서 capacity와 현재 인원 조회 필요
       const capacityRate = 75; // 임시값 (추후 실제 계산 로직 필요)
 
       // Phase 2: 미납률 (미납액 / 전체 청구액)

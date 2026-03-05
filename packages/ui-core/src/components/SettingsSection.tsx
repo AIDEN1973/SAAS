@@ -35,7 +35,6 @@ export interface SettingsSectionProps {
 export const SettingsSection: React.FC<SettingsSectionProps> = ({
   title,
   // description은 deprecated되어 사용하지 않음, 하위 호환성 유지를 위해 props에서만 받음
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   description: _description,
   icon,
   children,

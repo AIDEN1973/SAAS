@@ -194,7 +194,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
           case 'tag':
           case 'badge': {
             // badge_config가 정의되어 있으면 사용
-            const badgeConfig = (col as any).badge_config;
+            const badgeConfig = col.badge_config;
             if (badgeConfig && _value && typeof _value === 'string') {
               const config = badgeConfig[_value];
               if (config) {
@@ -473,7 +473,7 @@ export const SchemaTable: React.FC<SchemaTableProps> = ({
           />
         </div>
       )}
-      {/* TODO: selection, bulkActions, virtualization 지원 */}
+      {/* [Deferred] selection, bulkActions, virtualization 지원 */}
     </div>
   );
 };

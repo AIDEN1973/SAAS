@@ -50,9 +50,7 @@ export interface ManualSidebarProps {
 
 export function ManualSidebar({
   currentManual,
-  currentSectionId: _currentSectionId, // eslint-disable-line @typescript-eslint/no-unused-vars
   onSelectManual,
-  onSelectSection: _onSelectSection, // eslint-disable-line @typescript-eslint/no-unused-vars
   onClose,
 }: ManualSidebarProps) {
   const handleMenuClick = (item: SidebarMenuItem) => {
