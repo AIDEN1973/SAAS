@@ -664,11 +664,11 @@ export function AutomationSettingsPage() {
     queryFn: async () => {
       if (!tenantId) return {};
 
-      // 최근 30일간의 모든 자동화 실행 기록을 한번에 조회
+      // [개선] 서버사이드 30일 필터 — 10K 클라이언트 필터링 제거
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const thirtyDaysAgoISO = thirtyDaysAgo.toISOString();
 
-      // operation_type이 'automation.'으로 시작하는 모든 레코드 조회
       const response = await apiClient.get<{
         id: string;
         operation_type: string;
@@ -677,19 +677,20 @@ export function AutomationSettingsPage() {
       }>('execution_audit_runs', {
         filters: {
           operation_type: 'like.automation.%',
+          occurred_at: { gte: thirtyDaysAgoISO },
         },
         orderBy: { column: 'occurred_at', ascending: false },
-        limit: 10000, // 최근 10000건 (충분한 데이터)
+        limit: 5000,
       });
 
-      // 클라이언트 측에서 30일 필터링
-      const filteredData = response.data?.filter((record) => {
-        const recordDate = new Date(record.occurred_at);
-        return recordDate >= thirtyDaysAgo;
-      }) || [];
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      const filteredData = response.data || [];
 
       // 데이터가 없으면 빈 객체 반환
-      if (!filteredData || filteredData.length === 0) {
+      if (filteredData.length === 0) {
         return {};
       }
 

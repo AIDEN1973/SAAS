@@ -192,17 +192,24 @@ export function NotificationsPage() {
       const recipients = String(data.recipients ?? '').split('\n').filter((r: string) => r.trim());
 
       // [불변 규칙] 채널 선택 제거됨 - 알림톡 기본, SMS는 폴백으로만 작동
-      // 각 수신자에게 알림 생성
-      const promises = recipients.map((recipient: string) =>
-        apiClient.post<Notification>('notifications', {
-          recipient: recipient.trim(),
-          content: data.content,
-          status: 'pending',
-          scheduled_at: data.scheduled_at || undefined, // 예약 발송 시간 (있으면 전달)
-        })
-      );
+      // [개선] 동시 요청 수 제한 (배치 크기 10)으로 API 과부하 방지
+      const BATCH_SIZE = 10;
+      const results: Awaited<ReturnType<typeof apiClient.post>>[] = [];
 
-      const results = await Promise.all(promises);
+      for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+        const batch = recipients.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+          batch.map((recipient: string) =>
+            apiClient.post<Notification>('notifications', {
+              recipient: recipient.trim(),
+              content: data.content,
+              status: 'pending',
+              scheduled_at: data.scheduled_at || undefined,
+            })
+          )
+        );
+        results.push(...batchResults);
+      }
 
       // Execution Audit 기록 생성 (액티비티.md 3.2, 3.3, 12 참조)
       if (session?.user?.id && tenantId) {

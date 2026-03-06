@@ -5,13 +5,13 @@
  * [불변 규칙] Schema Registry CRUD 작업
  *
  * 예외: meta.schema_registry는 공통 스키마이므로 tenant_id 컬럼이 없습니다.
- * RPC 함수를 사용하여 접근하므로 createClient() 직접 사용이 필요합니다.
+ * RPC 함수를 사용하여 접근합니다.
  *
  * 기술문서: docu/스키마에디터.txt 17. API 명세
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { createClient } from '@lib/supabase-client';
+import { apiClient } from '@api-sdk/core';
 import type { UISchema } from '@schema-engine/types';
 
 export interface SchemaRegistryEntry {
@@ -66,30 +66,24 @@ export function useSchemaList(filters?: {
   return useQuery({
     queryKey: ['schema-registry', 'list', filters],
     queryFn: async () => {
-      const supabase = createClient();
-
       // RPC 함수 사용 (meta 스키마 접근)
       // 중요: Supabase RPC는 모든 매개변수를 명시적으로 전달해야 함
-      const { data, error } = await supabase.rpc('get_schema_registry_list', {
+      const response = await apiClient.callRPC<SchemaRegistryEntry[]>('get_schema_registry_list', {
         p_entity: filters?.entity ?? null,
         p_industry_type: filters?.industry_type ?? null,
         p_status: filters?.status ?? null,
       });
 
-      if (error) {
-        // 상세 오류 정보 로깅
+      if (response.error) {
         console.error('[Schema Registry] RPC 호출 실패:', {
           function: 'get_schema_registry_list',
-          error: error,
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
+          message: response.error.message,
+          code: response.error.code,
         });
-        throw new Error(`Failed to fetch schemas: ${error.message}${error.details ? ` (${error.details})` : ''}${error.hint ? ` Hint: ${error.hint}` : ''}`);
+        throw new Error(`Failed to fetch schemas: ${response.error.message}`);
       }
 
-      return (data || []) as SchemaRegistryEntry[];
+      return (response.data || []) as SchemaRegistryEntry[];
     },
     staleTime: 30 * 1000, // 30초
   });
@@ -102,22 +96,20 @@ export function useSchema(id: string) {
   return useQuery({
     queryKey: ['schema-registry', id],
     queryFn: async () => {
-      const supabase = createClient();
-
-      // RPC 함수 사용 (meta 스키마 접근)
-      const { data, error } = await supabase.rpc('get_schema_registry', {
+      const response = await apiClient.callRPC<SchemaRegistryEntry[]>('get_schema_registry', {
         p_id: id,
       });
 
-      if (error) {
-        throw new Error(`Failed to fetch schema: ${error.message}`);
+      if (response.error) {
+        throw new Error(`Failed to fetch schema: ${response.error.message}`);
       }
 
-      if (!data || data.length === 0) {
+      const data = response.data;
+      if (!data || (Array.isArray(data) && data.length === 0)) {
         throw new Error('Schema not found');
       }
 
-      return data[0] as SchemaRegistryEntry;
+      return Array.isArray(data) ? data[0] : data as SchemaRegistryEntry;
     },
     enabled: !!id,
   });
@@ -134,10 +126,7 @@ export function useCreateSchema() {
 
   return useMutation({
     mutationFn: async (input: CreateSchemaInput) => {
-      const supabase = createClient();
-
-      // RPC 함수 사용 (meta 스키마 접근)
-      const { data, error } = await supabase.rpc('create_schema_registry', {
+      const response = await apiClient.callRPC<SchemaRegistryEntry[]>('create_schema_registry', {
         p_entity: input.entity,
         p_industry_type: input.industry_type || null,
         p_version: input.version,
@@ -147,15 +136,16 @@ export function useCreateSchema() {
         p_migration_script: input.migration_script || null,
       });
 
-      if (error) {
-        throw new Error(`Failed to create schema: ${error.message}`);
+      if (response.error) {
+        throw new Error(`Failed to create schema: ${response.error.message}`);
       }
 
-      if (!data || data.length === 0) {
+      const data = response.data;
+      if (!data || (Array.isArray(data) && data.length === 0)) {
         throw new Error('Failed to create schema: No data returned');
       }
 
-      return data[0] as SchemaRegistryEntry;
+      return Array.isArray(data) ? data[0] : data as SchemaRegistryEntry;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schema-registry'] });
@@ -178,10 +168,7 @@ export function useUpdateSchema() {
       input: UpdateSchemaInput;
       expectedUpdatedAt?: string; // Optimistic Locking용
     }) => {
-      const supabase = createClient();
-
-      // RPC 함수 사용 (meta 스키마 접근, Optimistic Locking 지원)
-      const { data, error } = await supabase.rpc('update_schema_registry', {
+      const response = await apiClient.callRPC<SchemaRegistryEntry[]>('update_schema_registry', {
         p_id: id,
         p_schema_json: input.schema_json,
         p_migration_script: input.migration_script || null,
@@ -190,19 +177,20 @@ export function useUpdateSchema() {
         p_expected_updated_at: expectedUpdatedAt || null,
       });
 
-      if (error) {
+      if (response.error) {
         // Optimistic Locking 충돌 또는 기타 오류
-        if (error.message?.includes('modified by another user') || error.message?.includes('Schema was modified')) {
+        if (response.error.message?.includes('modified by another user') || response.error.message?.includes('Schema was modified')) {
           throw new Error('다른 관리자가 먼저 수정했습니다. 변경 내용을 다시 확인해주세요.');
         }
-        throw new Error(`Failed to update schema: ${error.message}`);
+        throw new Error(`Failed to update schema: ${response.error.message}`);
       }
 
-      if (!data || data.length === 0) {
+      const data = response.data;
+      if (!data || (Array.isArray(data) && data.length === 0)) {
         throw new Error('Failed to update schema: No data returned');
       }
 
-      return data[0] as SchemaRegistryEntry;
+      return Array.isArray(data) ? data[0] : data as SchemaRegistryEntry;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['schema-registry'] });
@@ -222,31 +210,30 @@ export function useActivateSchema() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const supabase = createClient();
-
-      // RPC 함수 사용 (meta 스키마 접근, 원자적 트랜잭션)
-      const { data, error } = await supabase.rpc('activate_schema_registry', {
+      const activateResponse = await apiClient.callRPC<SchemaRegistryEntry[]>('activate_schema_registry', {
         p_id: id,
       });
 
-      if (error) {
-        throw new Error(`Failed to activate schema: ${error.message}`);
+      if (activateResponse.error) {
+        throw new Error(`Failed to activate schema: ${activateResponse.error.message}`);
       }
 
-      if (!data || data.length === 0) {
+      const activateData = activateResponse.data;
+      if (!activateData || (Array.isArray(activateData) && activateData.length === 0)) {
         throw new Error('Failed to activate schema: No data returned');
       }
 
       // RPC 결과는 일부 필드만 반환하므로, 전체 스키마를 다시 조회
-      const { data: fullSchema, error: fetchError } = await supabase.rpc('get_schema_registry', {
+      const fetchResponse = await apiClient.callRPC<SchemaRegistryEntry[]>('get_schema_registry', {
         p_id: id,
       });
 
-      if (fetchError || !fullSchema || fullSchema.length === 0) {
-        throw new Error(`Failed to fetch activated schema: ${fetchError?.message || 'Schema not found'}`);
+      const fullSchema = fetchResponse.data;
+      if (fetchResponse.error || !fullSchema || (Array.isArray(fullSchema) && fullSchema.length === 0)) {
+        throw new Error(`Failed to fetch activated schema: ${fetchResponse.error?.message || 'Schema not found'}`);
       }
 
-      return fullSchema[0] as SchemaRegistryEntry;
+      return Array.isArray(fullSchema) ? fullSchema[0] : fullSchema as SchemaRegistryEntry;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schema-registry'] });
@@ -264,15 +251,12 @@ export function useDeleteSchema() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const supabase = createClient();
-
-      // RPC 함수 사용 (meta 스키마 접근)
-      const { error } = await supabase.rpc('delete_schema_registry', {
+      const response = await apiClient.callRPC('delete_schema_registry', {
         p_id: id,
       });
 
-      if (error) {
-        throw new Error(`Failed to delete schema: ${error.message}`);
+      if (response.error) {
+        throw new Error(`Failed to delete schema: ${response.error.message}`);
       }
     },
     onSuccess: () => {

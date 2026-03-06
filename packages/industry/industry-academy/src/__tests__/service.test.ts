@@ -31,11 +31,29 @@ function createChainMock(resolvedData: unknown = [], resolvedError: unknown = nu
   return chain;
 }
 
-const mockFrom = vi.fn();
-const mockRpc = vi.fn();
+// vi.hoisted로 mock 변수를 vi.mock보다 먼저 초기화 (호이스팅 문제 방지)
+const {
+  mockFrom, mockRpc,
+  mockTagsServiceGetTags, mockTagsServiceAssignTags,
+  mockPartyServiceCreatePerson, mockPartyServiceDeletePerson,
+} = vi.hoisted(() => ({
+  mockFrom: vi.fn(),
+  mockRpc: vi.fn(),
+  mockTagsServiceGetTags: vi.fn(),
+  mockTagsServiceAssignTags: vi.fn(),
+  mockPartyServiceCreatePerson: vi.fn(),
+  mockPartyServiceDeletePerson: vi.fn(),
+}));
 
 vi.mock('@lib/supabase-client', () => ({
   createClient: () => ({
+    from: mockFrom,
+    rpc: mockRpc,
+  }),
+}));
+
+vi.mock('@lib/supabase-client/server', () => ({
+  createServerClient: () => ({
     from: mockFrom,
     rpc: mockRpc,
   }),
@@ -56,8 +74,6 @@ vi.mock('@lib/date-utils', () => ({
 }));
 
 // 외부 서비스 의존성 모킹
-const mockTagsServiceGetTags = vi.fn();
-const mockTagsServiceAssignTags = vi.fn();
 vi.mock('@core/tags/service', () => ({
   tagsService: {
     getTags: (...args: unknown[]) => mockTagsServiceGetTags(...args),
@@ -65,10 +81,10 @@ vi.mock('@core/tags/service', () => ({
   },
 }));
 
-const mockPartyServiceCreatePerson = vi.fn();
 vi.mock('@core/party/service', () => ({
   partyService: {
     createPerson: (...args: unknown[]) => mockPartyServiceCreatePerson(...args),
+    deletePerson: (...args: unknown[]) => mockPartyServiceDeletePerson(...args),
   },
 }));
 
